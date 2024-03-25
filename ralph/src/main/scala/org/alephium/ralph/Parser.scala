@@ -323,22 +323,26 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {
+  def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type.NamedType): P[Type] = {
     P(
-      Lexer.typeId.map(id => Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id))) |
+      // Lexer.primTpes currently can't have source index as they are case objects
+      Lexer.typeId.map(id =>
+        Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id).atSourceIndex(id.sourceIndex))
+      ) |
         arrayType(parseType(contractTypeCtor))
     )
   }
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
-      Type.FixedSizeArray(tpe, size)
+    P(Index ~ "[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]" ~~ Index).map {
+      case (from, tpe, size, to) =>
+        Type.FixedSizeArray(tpe, size).atSourceIndex(from, to, fileURI)
     }
   }
   def argument[Unknown: P](
       allowMutable: Boolean
-  )(contractTypeCtor: Ast.TypeId => Type): P[Ast.Argument] =
+  )(contractTypeCtor: Ast.TypeId => Type.NamedType): P[Ast.Argument] =
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
         P(parseType(contractTypeCtor) ~~ Index).map { case (tpe, endIndex) =>
