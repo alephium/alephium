@@ -191,8 +191,9 @@ object VM {
       outputs: Iterable[TxOutput],
       hardFork: HardFork
   ): ExeResult[Unit] = {
+    val minimalStorageDeposit = minimalContractStorageDeposit(hardFork)
     val contractOutputWithoutEnoughAlphOpt = outputs.find {
-      case output: ContractOutput => output.amount < minimalAlphInContract
+      case output: ContractOutput => output.amount < minimalStorageDeposit
       case _                      => false
     }
     if (hardFork.isLemanEnabled()) {

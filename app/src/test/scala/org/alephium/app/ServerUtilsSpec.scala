@@ -913,14 +913,25 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "check the minimal amount deposit for contract creation" in new Fixture {
     val serverUtils = new ServerUtils
-    serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(None, HardFork.Leman) isE minimalAlphInContract
     serverUtils.getInitialAttoAlphAmount(
-      Some(minimalAlphInContract)
+      Some(minimalAlphInContract),
+      HardFork.Leman
     ) isE minimalAlphInContract
     serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1))
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Leman)
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
+
+    serverUtils.getInitialAttoAlphAmount(None, HardFork.Ghost) isE minimalAlphInContractRhone
+    serverUtils.getInitialAttoAlphAmount(
+      Some(minimalAlphInContractRhone),
+      HardFork.Ghost
+    ) isE minimalAlphInContractRhone
+    serverUtils
+      .getInitialAttoAlphAmount(Some(minimalAlphInContractRhone - 1), HardFork.Ghost)
+      .leftValue
+      .detail is "Expect 0.1 ALPH deposit to deploy a new contract"
   }
 
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {

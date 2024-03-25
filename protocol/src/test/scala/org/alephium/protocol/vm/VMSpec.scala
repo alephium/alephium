@@ -555,9 +555,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     VM
       .checkCodeSize(
         GasBox.unsafe(200 + 32 * 1024),
-      ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024)),
-      HardFork.Ghost
-    ) isE GasBox.zero
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024)),
+        HardFork.Ghost
+      ) isE GasBox.zero
   }
 
   it should "check field size" in {
