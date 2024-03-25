@@ -1161,7 +1161,7 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "get balance for contract address" in new ContractFixture {
     val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
       blockFlow.getBalance(address, Int.MaxValue, true).rightValue
-    attoAlphBalance is ALPH.oneAlph
+    attoAlphBalance is minimalAlphInContract
     attoAlphLockedBalance is U256.Zero
     tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
     tokenLockedBalances.length is 0
@@ -1174,7 +1174,7 @@ class TxUtilsSpec extends AlephiumSpec {
     utxos.length is 1
     utxo.ref is ref
     utxo.output.lockupScript is address
-    utxo.output.amount is ALPH.oneAlph
+    utxo.output.amount is minimalAlphInContract
     utxo.output.tokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
   }
 

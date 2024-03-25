@@ -201,7 +201,9 @@ class VMSpec extends AlephiumSpec with Generators {
         initialImmState: AVector[Val] = AVector.empty,
         initialMutState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
         tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
-        initialAttoAlphAmount: U256 = minimalAlphInContract
+        initialAttoAlphAmount: U256 = minimalContractStorageDeposit(
+          networkConfig.getHardFork(TimeStamp.now())
+        )
     ): (ContractId, ContractOutputRef) = {
       val (contractId, contractOutputRef) =
         createContract(
@@ -426,8 +428,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |    transferTokenToSelf!(sender, ALPH, 1 alph)
          |    assert!(tokenRemaining!(sender, ALPH) == senderAlph - 1 alph, 0)
-         |    transferTokenFromSelf!(sender, ALPH, 1 alph)
-         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == contractAlph - 1 alph, 0)
+         |    transferTokenFromSelf!(sender, ALPH, 0.1 alph)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == contractAlph - 0.1 alph, 0)
          |    transferToken!(sender, selfAddress!(), ALPH, 1 alph)
          |    assert!(tokenRemaining!(sender, ALPH) == senderAlph - 2 alph, 0)
          |  }
@@ -1006,7 +1008,7 @@ class VMSpec extends AlephiumSpec with Generators {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(minimalContractDeposit!() == 1 alph, 0)
+         |  assert!(minimalContractDeposit!() == 0.1 alph, 0)
          |  assert!(mapEntryDeposit!() == minimalContractDeposit!(), 0)
          |}
          |""".stripMargin
@@ -1404,13 +1406,13 @@ class VMSpec extends AlephiumSpec with Generators {
 
     val fooCallerContractId  = ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooCallerId)))
     val fooCallerAssetBefore = getContractAsset(fooCallerContractId, chainIndex)
-    fooCallerAssetBefore.amount is ALPH.oneAlph
+    fooCallerAssetBefore.amount is minimalAlphInContract
 
     callTxScript(destroy())
     checkContractState(fooId, foo, fooAssetRef, false)
 
     val fooCallerAssetAfter = getContractAsset(fooCallerContractId, chainIndex)
-    fooCallerAssetAfter.amount is ALPH.alph(2)
+    fooCallerAssetAfter.amount is minimalAlphInContract.mulUnsafe(2)
   }
 
   it should "destroy contract and transfer fund to caller's caller" in new DestroyFixture
@@ -4560,7 +4562,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
-         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == 0.1 alph, 0)
          |  }
          |}
          |""".stripMargin
@@ -4720,9 +4722,9 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     test(ALPH.oneNanoAlph)
-    test(ALPH.oneAlph - 1)
-    test(ALPH.oneAlph)
-    test(ALPH.oneAlph + 1)
+    test(minimalAlphInContract - 1)
+    test(minimalAlphInContract)
+    test(minimalAlphInContract + 1)
   }
 
   it should "call the correct contract method based on the interface method index" in new ContractFixture {
