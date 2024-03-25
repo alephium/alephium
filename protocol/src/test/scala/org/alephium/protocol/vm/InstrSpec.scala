@@ -3800,7 +3800,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "MinimalContractDeposit" in new StatefulInstrFixture {
     runAndCheckGas(MinimalContractDeposit)
-    frame.opStack.pop() isE Val.U256(model.minimalAlphInContractRhone)
+    frame.opStack.pop() isE Val.U256(model.minimalAlphInContract)
     frame.opStack.isEmpty is true
   }
 
