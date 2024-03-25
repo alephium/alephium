@@ -1574,7 +1574,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   "TxUtils.updateSelectedGas" should "Update selected gas" in new MultiInputTransactionFixture {
     {
-      info("empty list")
+
       blockFlow.updateSelectedGas(AVector.empty, 0) is AVector
         .empty[(TxUtils.InputData, TxUtils.AssetOutputInfoWithGas)]
     }
@@ -1628,6 +1628,121 @@ class TxUtilsSpec extends AlephiumSpec {
       updated.length is entries.length
       // TODO do we want to test how much was reduced?
       updated.head._2.gas < gas is true
+    }
+    {
+      info("Some inputs defined gas to 0 and other not")
+      val gas  = minimalGas.mulUnsafe(100)
+      val gas0 = GasBox.zero
+
+      val inputs     = buildInputs(1)
+      val inputData0 = inputData.copy(gasOpt = Some(gas0))
+
+      val selectedWithGas  = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas0 = TxUtils.AssetOutputInfoWithGas(inputs, gas0)
+
+      forAll(Gen.choose(1, 5), Gen.choose(1, 5)) { case (nbGasNone, nbGas0) =>
+        val entries = AVector.fill(nbGasNone + nbGas0) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesNone = AVector.fill(nbGasNone) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesSome0 = AVector.fill(nbGas0) {
+          (inputData0, selectedWithGas0)
+        }
+
+        val updated  = blockFlow.updateSelectedGas(entries, 2)
+        val updated2 = blockFlow.updateSelectedGas(entriesNone ++ entriesSome0, 2)
+
+        val expectedGas = updated.map(_._2.gas.value).sum
+
+        // The final gas should be the same, but only payed by the inputs that had gas undefined
+        updated2.map(_._2.gas.value).sum is expectedGas
+        updated2.take(nbGasNone).map(_._2.gas.value).sum is expectedGas
+        updated2.drop(nbGasNone).map(_._2.gas.value).sum is 0
+      }
+    }
+    {
+      info("Some inputs defined a bit of gas, but not enough, and other not")
+      val gas      = minimalGas.mulUnsafe(100)
+      val bitOfGas = GasBox.unsafe(100)
+
+      val inputs     = buildInputs(1)
+      val inputData0 = inputData.copy(gasOpt = Some(bitOfGas))
+
+      val selectedWithGas  = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas0 = TxUtils.AssetOutputInfoWithGas(inputs, bitOfGas)
+
+      forAll(Gen.choose(1, 5), Gen.choose(1, 5)) { case (nbGasNone, nbGasSome) =>
+        val entries = AVector.fill(nbGasNone + nbGasSome) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesNone = AVector.fill(nbGasNone) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesSome0 = AVector.fill(nbGasSome) {
+          (inputData0, selectedWithGas0)
+        }
+
+        val updated  = blockFlow.updateSelectedGas(entries, 2)
+        val updated2 = blockFlow.updateSelectedGas(entriesNone ++ entriesSome0, 2)
+
+        val expectedGas = updated.map(_._2.gas.value).sum
+
+        // The final gas should be the same, but only payed by the inputs that had gas undefined
+        updated2.map(_._2.gas.value).sum is expectedGas
+        updated2
+          .take(nbGasNone)
+          .map(_._2.gas.value)
+          .sum is expectedGas - (bitOfGas.value * nbGasSome)
+        updated2.drop(nbGasNone).foreach { case (_, selected) =>
+          selected.gas is bitOfGas
+        }
+      }
+    }
+    {
+      info("Some inputs defined a too much gas and other not")
+      val gas        = minimalGas.mulUnsafe(100)
+      val tooMuchGas = GasBox.unsafe(10000000)
+
+      val inputs     = buildInputs(1)
+      val inputData0 = inputData.copy(gasOpt = Some(tooMuchGas))
+
+      val selectedWithGas  = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas0 = TxUtils.AssetOutputInfoWithGas(inputs, tooMuchGas)
+
+      forAll(Gen.choose(1, 5), Gen.choose(1, 5)) { case (nbGasNone, nbGasSome) =>
+        val entries = AVector.fill(nbGasNone + nbGasSome) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesNone = AVector.fill(nbGasNone) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesSome0 = AVector.fill(nbGasSome) {
+          (inputData0, selectedWithGas0)
+        }
+
+        val updated  = blockFlow.updateSelectedGas(entries, 2)
+        val updated2 = blockFlow.updateSelectedGas(entriesNone ++ entriesSome0, 2)
+
+        val expectedGas = updated.map(_._2.gas.value).sum
+
+        val finalGas = updated2.map(_._2.gas.value).sum
+        // The final gas is more than expected, but only payed by the inputs that had gas undefined
+        finalGas > expectedGas is true
+        updated2.take(nbGasNone).foreach { case (_, selected) =>
+          selected.gas is GasBox.zero
+        }
+        updated2.drop(nbGasNone).foreach { case (_, selected) =>
+          selected.gas is tooMuchGas
+        }
+      }
     }
   }
 

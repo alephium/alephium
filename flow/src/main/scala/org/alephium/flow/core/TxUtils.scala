@@ -451,12 +451,22 @@ trait TxUtils { Self: FlowUtils =>
      * If `gasOpt` is empty, we let the `UtxoSelectionAlgo` choose enough utxos so everyone can
      * pay the base fee and a simple tx, but later we reduce the fees.
      */
+    val somePayForOthers: Boolean =
+      inputs.exists(_.gasOpt.isDefined) && inputs.exists(_.gasOpt.isEmpty)
+
     inputs
       .mapE { input =>
+        val dustAmountNeeded = if (somePayForOthers && input.gasOpt.isEmpty) {
+          // If some inputs needs to pay for others, we need to add more dust amount to make sure they
+          // can cover all fees
+          dustAmountPerInputNeeded.addUnsafe(maximalGasPerTx.toU256)
+        } else {
+          dustAmountPerInputNeeded
+        }
         selectInputDataUtxos(
           input,
           outputInfos,
-          dustAmountPerInputNeeded,
+          dustAmountNeeded,
           targetBlockHashOpt,
           gasPrice,
           utxosLimit,
@@ -501,13 +511,16 @@ trait TxUtils { Self: FlowUtils =>
    * Update the gas for all inputs.
    * Each input pay individually for their own utxos, more inputs mean higher fees
    * The base fee needed for the tx is then shared by everyone
+   *
+   * If some inputs have defined gas, we don't update them.
+   * Other inputs pays for the rest.
    */
   def updateSelectedGas(
       inputs: AVector[(InputData, AssetOutputInfoWithGas)],
       destinationOutputLengths: Int
   ): AVector[(InputData, AssetOutputInfoWithGas)] = {
-    // If some input have explicit gas, we don't update
-    if (inputs.length > 0 && !inputs.exists(_._1.gasOpt.isDefined)) {
+    // If all inputs defined gas, we don't need to update anything
+    if (inputs.length > 0 && inputs.exists(_._1.gasOpt.isEmpty)) {
       val gasPerInput = inputs.map { case (input, selected) =>
         /*
          We only consider 1 change output here.
@@ -526,7 +539,7 @@ trait TxUtils { Self: FlowUtils =>
         val inGas              = GasEstimation.gasForP2PKHInputs(selected.assets.length)
         val inOutGas           = inGas.addUnsafe(outGas)
 
-        (input, selected.copy(gas = inOutGas), selected.gas)
+        (input, selected, inOutGas)
       }
 
       // Computing base fee and splitting it between all inputs
@@ -535,26 +548,101 @@ trait TxUtils { Self: FlowUtils =>
       val baseFeeShared     = GasBox.unsafe(baseFee / inputs.length)
       val baseFeeSharedRest = GasBox.unsafe(baseFee % inputs.length)
 
-      gasPerInput.mapWithIndex { case ((input, selected, initialGas), i) =>
-        val newGas = selected.gas.addUnsafe(baseFeeShared)
-        // We don't want to update to a higher gas
-        val payedGas = if (newGas < initialGas) newGas else initialGas
+      val result = gasPerInput.mapWithIndex { case ((input, selected, gas), i) =>
+        val payedGas = gas.addUnsafe(baseFeeShared)
 
         // If we had only 1 input, we need to make sure we don't update
         // below minimal gas, as its the only one paying.
         if (inputs.length == 1) {
           val oneInputGas = if (payedGas < minimalGas) minimalGas else payedGas
-          (input, selected.copy(gas = oneInputGas))
+          ((input, selected), oneInputGas)
         } else if (i == 0) {
           // First input is paying for the rest that cannot be divided by everyone
-          (input, selected.copy(gas = payedGas.addUnsafe(baseFeeSharedRest)))
+          (
+            (input, selected),
+            payedGas.addUnsafe(baseFeeSharedRest)
+          )
         } else {
-          (input, selected.copy(gas = payedGas))
+          ((input, selected), payedGas)
         }
       }
+
+      if (!inputs.exists(_._1.gasOpt.isDefined)) {
+        // No input had defined gas, we can return our full auto selected values
+        result.map { case ((input, selected), gas) =>
+          (input, selected.copy(gas = gas))
+        }
+      } else {
+        updateMissingFeeFromSelectedGas(result)
+      }
     } else {
+      // All inputs had defined gas, we don't need to update anything
       inputs
     }
+  }
+
+  /*
+   * In the special case where some inputs defined gas and other not, there are two cases:
+   * - Inputs with defined gas are not paying enough to cover their own fees, other inputs will share the missing gas
+   * - Enough gas is payed by the defined gas and we can set gas to 0 for others
+   */
+  def updateMissingFeeFromSelectedGas(
+      inputs: AVector[((InputData, AssetOutputInfoWithGas), GasBox)]
+  ): AVector[(InputData, AssetOutputInfoWithGas)] = {
+
+    // We need to keep the order of the inputs to return the correct order
+    val inputsOrder = inputs.zipWithIndex
+
+    val inputsGasDefined = inputsOrder.collect {
+      case (((input, selected), _), order) if input.gasOpt.isDefined =>
+        // As the gas was defined, the selection algo already returned the correct gas
+        ((input, selected), order)
+    }
+
+    val inputsGasUndefined = inputsOrder.filter { case (((input, _), _), _) =>
+      input.gasOpt.isEmpty
+    }
+
+    // Sum how much gas we need to pay for all inputs
+    val totalGasToPay = inputs.map { case ((_, _), gas) => gas.value }.sum
+
+    val totalGasPayedByDefined = inputsGasDefined.map { case ((_, selected), _) =>
+      selected.gas.value
+    }.sum
+
+    val totalGasPayedByUndefined = inputsGasUndefined.map { case ((_, gas), _) =>
+      gas.value
+    }.sum
+
+    val totalGasPayed = totalGasPayedByDefined + totalGasPayedByUndefined
+
+    val missingGas = totalGasToPay - totalGasPayed
+
+    val updatedGasForInputsGasUndefined = {
+      if (missingGas > 0) {
+        // We need to pay more, we split between everyone that didn't have defined gas
+        val diffShared     = missingGas / inputsGasUndefined.length
+        val diffSharedRest = missingGas % inputsGasUndefined.length
+        inputsGasUndefined.zipWithIndex.map { case ((((input, selected), gas), order), i) =>
+          if (i == 0) {
+            // First input is paying for the rest that cannot be divided by everyone
+            val updatedGas = gas.addUnsafe(GasBox.unsafe(diffShared + diffSharedRest))
+            ((input, selected.copy(gas = updatedGas)), order)
+          } else {
+            ((input, selected.copy(gas = gas.addUnsafe(GasBox.unsafe(diffShared)))), order)
+          }
+        }
+      } else {
+        // Defined gas already cover the fees, we can set gas to 0
+        inputsGasUndefined.map { case (((input, selected), _), order) =>
+          ((input, selected.copy(gas = GasBox.zero)), order)
+        }
+      }
+    }
+
+    (inputsGasDefined ++ updatedGasForInputsGasUndefined)
+      .sortBy { case ((_, _), order) => order }
+      .map { case (result, _) => result }
   }
 
   private def makeChangeOutput(
