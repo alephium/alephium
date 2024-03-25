@@ -87,4 +87,13 @@ object ALPH {
       case _ => None
     }
   }
+
+  def prettifyAmount(amount: U256): String = {
+    if (amount == U256.Zero) {
+      "0 alph"
+    } else {
+      val converted = (BigDecimal(amount.v) / BigDecimal(oneAlph.v)).toDouble
+      s"$converted alph"
+    }
+  }
 }
