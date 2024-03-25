@@ -599,7 +599,7 @@ case object MinimalContractDeposit
     with GasBase
     with StatefulInstrCompanion0 {
   def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.pushOpStack(Val.U256(model.minimalAlphInContract))
+    frame.pushOpStack(Val.U256(model.minimalAlphInContractRhone))
   }
 }
 
@@ -1654,7 +1654,7 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
       approved <- balanceState
         .useAllApproved(lockupScript)
         .toRight(Right(NoAssetsApproved(Address.Asset(lockupScript))))
-      outputs <- approved.toLockedTxOutput(lockupScript, lockTime)
+      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, frame.ctx.getHardFork())
       _       <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
