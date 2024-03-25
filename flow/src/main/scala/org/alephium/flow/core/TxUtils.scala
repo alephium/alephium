@@ -357,7 +357,6 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val dustAmountsE = for {
       groupIndex  <- checkMultiInputsGroup(inputs)
-      _           <- checkMultiInputsGas(inputs)
       _           <- checkOutputInfos(groupIndex, outputInfos)
       nbOfTokens  <- checkInOutAmounts(inputs, outputInfos)
       dustAmounts <- calculateDustAmountNeeded(outputInfos)
@@ -985,24 +984,6 @@ trait TxUtils { Self: FlowUtils =>
         }
       } else {
         Left("Different groups for transaction inputs")
-      }
-    }
-  }
-
-  /*
-   * Either every input defined gas or none
-   */
-  private def checkMultiInputsGas(
-      inputs: AVector[InputData]
-  ): Either[String, Unit] = {
-    if (inputs.isEmpty) {
-      Left("Zero transaction inputs")
-    } else {
-      val definedGas = inputs.filter(_.gasOpt.isDefined).length
-      if (definedGas == 0 || definedGas == inputs.length) {
-        Right(())
-      } else {
-        Left("Missing `gasAmount` in some inputs")
       }
     }
   }

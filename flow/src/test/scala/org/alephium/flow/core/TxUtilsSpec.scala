@@ -1570,23 +1570,6 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .leftValue is "Selected UTXOs different from lockup script group"
     }
-
-    {
-      info("Not all gasAmount are defined")
-      val i1     = buildInputData(pub1, amount, gas = Some(GasBox.zero))
-      val i2     = buildInputData(pub1, amount, gas = None)
-      val inputs = AVector(i1, i2)
-      blockFlow
-        .transferMultiInputs(
-          inputs,
-          outputInfos,
-          nonCoinbaseMinGasPrice,
-          Int.MaxValue,
-          None
-        )
-        .rightValue
-        .leftValue is "Missing `gasAmount` in some inputs"
-    }
   }
 
   "TxUtils.updateSelectedGas" should "Update selected gas" in new MultiInputTransactionFixture {
