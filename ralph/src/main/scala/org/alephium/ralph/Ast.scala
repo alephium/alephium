@@ -27,7 +27,7 @@ import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
 import org.alephium.ralph.Parser.UsingAnnotation
-import org.alephium.util.{AVector, Hex, I256}
+import org.alephium.util.{AVector, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
@@ -264,6 +264,160 @@ object Ast {
     }
   }
 
+  object MapOps {
+    private def genMapKey[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        expr: Ast.Expr[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      val codes = expr.genCode(state)
+      expr.getType(state)(0) match {
+        case Type.Bool    => codes :+ BoolToByteVec
+        case Type.U256    => codes :+ U256ToByteVec
+        case Type.I256    => codes :+ I256ToByteVec
+        case Type.Address => codes :+ AddressToByteVec
+        case Type.ByteVec => codes
+        case tpe => // dead branch
+          throw Compiler.Error(s"Invalid key type $tpe", expr.sourceIndex)
+      }
+    }
+
+    @inline def genSubContractPath[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        ident: Ast.Ident,
+        index: Ast.Expr[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      (state.genLoadCode(ident) ++ genMapKey(state, index)) :+ ByteVecConcat
+    }
+
+    @inline def genSubContractPath[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        map: Ast.Expr[Ctx],
+        index: Ast.Expr[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      (map.genCode(state) ++ genMapKey(state, index)) :+ ByteVecConcat
+    }
+
+    @tailrec
+    private def calcFieldOffset(
+        state: Compiler.State[StatefulContext],
+        tpe: Type,
+        selectors: Seq[FieldSelector],
+        isMutable: Boolean,
+        fieldOffset: FieldRefOffset[StatefulContext]
+    ): (FieldRefOffset[StatefulContext], Boolean) = {
+      (state.resolveType(tpe), selectors.headOption) match {
+        case (_, None) => (fieldOffset, isMutable)
+        case (tpe: Type.FixedSizeArray, Some(s: IndexSelector[StatefulContext @unchecked])) =>
+          val newOffset = fieldOffset.calcArrayElementOffset(state, tpe, s.index, isMutable)
+          calcFieldOffset(state, tpe.baseType, selectors.drop(1), isMutable, newOffset)
+        case (tpe: Type.Struct, Some(IdentSelector(ident))) =>
+          val ast            = state.getStruct(tpe.id)
+          val newOffset      = fieldOffset.calcStructFieldOffset(state, ast, ident, isMutable)
+          val field          = ast.getField(ident)
+          val isFieldMutable = isMutable && field.isMutable
+          calcFieldOffset(state, field.tpe, selectors.drop(1), isFieldMutable, newOffset)
+        case _ => // dead branch
+          throw Compiler.Error(
+            s"Invalid type $tpe and selectors $selectors",
+            selectors.headOption.flatMap(_.sourceIndex)
+          )
+      }
+    }
+
+    private def calcFieldOffset(
+        state: Compiler.State[StatefulContext],
+        rootType: Type,
+        selectors: Seq[FieldSelector]
+    ): (VarOffset[StatefulContext], VarOffset[StatefulContext], Boolean) = {
+      val initOffset = FieldRefOffset[StatefulContext](ConstantVarOffset(0), ConstantVarOffset(0))
+      val (offset, isMutable) = calcFieldOffset(
+        state,
+        rootType,
+        selectors,
+        isMutable = true,
+        initOffset
+      )
+      (offset.immFieldOffset, offset.mutFieldOffset, isMutable)
+    }
+
+    private def genSubContractId(
+        state: Compiler.State[StatefulContext],
+        objCodes: Seq[Instr[StatefulContext]],
+        size: Int
+    ): (Seq[Instr[StatefulContext]], Seq[Instr[StatefulContext]]) = {
+      if (size == 1) {
+        (Seq.empty, objCodes)
+      } else {
+        val ident = state.getSubContractIdVar()
+        (objCodes ++ state.genStoreCode(ident).flatten, state.genLoadCode(ident))
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genLoad[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        rootType: Type,
+        tpe: Type,
+        pathCodes: Seq[Instr[Ctx]],
+        selectors: Seq[FieldSelector]
+    ): Seq[Instr[Ctx]] = {
+      val statefulState                     = state.asInstanceOf[Compiler.State[StatefulContext]]
+      val (immOffset, mutOffset, isMutable) = calcFieldOffset(statefulState, rootType, selectors)
+      val mutability                        = state.flattenTypeMutability(tpe, isMutable)
+      val (initCodes, subContractIdCodes) = genSubContractId(
+        statefulState,
+        pathCodes.asInstanceOf[Seq[Instr[StatefulContext]]] :+ SubContractId,
+        mutability.length
+      )
+      val funcArgAndRet =
+        Seq(ConstInstr.u256(Val.U256(U256.One)), ConstInstr.u256(Val.U256(U256.One)))
+      val instrs = mutability.indices
+        .foldLeft((Seq.empty[Instr[StatefulContext]], immOffset, mutOffset)) {
+          case ((instrs, immOffset, mutOffset), index) =>
+            val objCodes = if (index == 0) initCodes ++ subContractIdCodes else subContractIdCodes
+            if (mutability(index)) {
+              val loadCodes = mutOffset.genCode() ++ funcArgAndRet ++
+                objCodes :+ CallExternal(CreateMapEntity.LoadMutFieldMethodIndex)
+              (instrs ++ loadCodes, immOffset, mutOffset.add(1))
+            } else {
+              val loadCodes = immOffset.genCode() ++ funcArgAndRet ++
+                objCodes :+ CallExternal(CreateMapEntity.LoadImmFieldMethodIndex)
+              (instrs ++ loadCodes, immOffset.add(1), mutOffset)
+            }
+        }
+        ._1
+      instrs.asInstanceOf[Seq[Instr[Ctx]]]
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genStore[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        rootType: Type,
+        tpe: Type,
+        pathCodes: Seq[Instr[Ctx]],
+        selectors: Seq[FieldSelector]
+    ): Seq[Seq[Instr[Ctx]]] = {
+      val statefulState     = state.asInstanceOf[Compiler.State[StatefulContext]]
+      val (_, mutOffset, _) = calcFieldOffset(statefulState, rootType, selectors)
+      val length            = state.flattenTypeLength(Seq(tpe))
+      val (initCodes, subContractIdCodes) = genSubContractId(
+        statefulState,
+        pathCodes.asInstanceOf[Seq[Instr[StatefulContext]]] :+ SubContractId,
+        length
+      )
+      val instrs = (0 until length).map { index =>
+        val indexCodes = if (index == 0) mutOffset.genCode() else mutOffset.add(index).genCode()
+        val objCodes =
+          if (index == length - 1) initCodes ++ subContractIdCodes else subContractIdCodes
+        indexCodes ++ Seq(
+          ConstInstr.u256(Val.U256(U256.Two)),
+          ConstInstr.u256(Val.U256(U256.Zero))
+        ) ++ objCodes :+ CallExternal(CreateMapEntity.StoreMutFieldMethodIndex)
+      }
+      instrs.asInstanceOf[Seq[Seq[Instr[Ctx]]]]
+    }
+  }
+
   final case class LoadFieldBySelectors[Ctx <: StatelessContext](
       base: Expr[Ctx],
       selectors: Seq[FieldSelector]
@@ -289,9 +443,8 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       base.getType(state) match {
         case Seq(map: Type.Map) =>
-          val contract  = ContractGenerator.genContract(state, map.value)
-          val pathCodes = ContractGenerator.genSubContractPath(state, base, mapKeyIndex)
-          contract.genLoad(state, selectors.tail, pathCodes)
+          val pathCodes = MapOps.genSubContractPath(state, base, mapKeyIndex)
+          MapOps.genLoad(state, map.value, getType(state).head, pathCodes, selectors.tail)
         case _ =>
           val (ref, codes) = state.getOrCreateVariablesRef(base)
           val subRef       = ref.subRef(state, selectors.init)
@@ -315,7 +468,7 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val pathCodes = ContractGenerator.genSubContractPath(state, base, index)
+      val pathCodes = MapOps.genSubContractPath(state, base, index)
       pathCodes ++ Seq(SubContractId, ContractExists)
     }
   }
@@ -827,13 +980,29 @@ object Ast {
       approveAssets.foreach(_.check(state))
       checkArgTypes(state, Seq(mapType.key, mapType.value))
     }
+    private def checkFieldLength(length: Int): Unit = {
+      if (length > 0xff) {
+        throw Compiler.Error(
+          s"The number of struct fields exceeds the maximum limit",
+          args(1).sourceIndex
+        )
+      }
+    }
     private def genCreateContract(
         state: Compiler.State[StatefulContext]
     ): Seq[Instr[StatefulContext]] = {
-      val mapType   = getMapType(state)
-      val contract  = ContractGenerator.genContract(state, mapType.value)
-      val pathCodes = ContractGenerator.genSubContractPath(state, ident, args(0))
-      contract.genCreate(state, args(1), genMapDebug(state, pathCodes, isInsert = true))
+      val mapType          = getMapType(state)
+      val fieldsMutability = state.flattenTypeMutability(mapType.value, isMutable = true)
+      val mutFieldLength   = fieldsMutability.count(identity)
+      val immFieldLength   = fieldsMutability.length - mutFieldLength + 1 // parent contract id
+      checkFieldLength(mutFieldLength)
+      checkFieldLength(immFieldLength)
+
+      val pathCodes              = MapOps.genSubContractPath(state, ident, args(0))
+      val (immFields, mutFields) = state.genInitCodes(fieldsMutability, Seq(args(1)))
+      val insertWithDebug        = genMapDebug(state, pathCodes, isInsert = true)
+      insertWithDebug ++ (immFields :+ SelfContractId) ++
+        mutFields :+ CreateMapEntity(immFieldLength.toByte, mutFieldLength.toByte)
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val approveAssetCodes   = approveAssets.flatMap(_.genCode(state))
@@ -849,10 +1018,12 @@ object Ast {
       checkArgTypes(state, Seq(mapType.key, Type.Address))
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val mapType   = getMapType(state)
-      val contract  = ContractGenerator.genContract(state, mapType.value)
-      val pathCodes = ContractGenerator.genSubContractPath(state, ident, args(0))
-      contract.genDestroy(state, args(1), genMapDebug(state, pathCodes, isInsert = false))
+      val pathCodes = MapOps.genSubContractPath(state, ident, args(0))
+      val objCodes  = genMapDebug(state, pathCodes, isInsert = false) :+ SubContractId
+      args(1).genCode(state) ++ Seq(
+        ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
+        ConstInstr.u256(Val.U256(U256.Zero))
+      ) ++ objCodes :+ CallExternal(CreateMapEntity.DestroyMethodIndex)
     }
   }
 
@@ -1211,9 +1382,8 @@ object Ast {
       val variable = state.getVariable(ident)
       variable.tpe match {
         case map: Type.Map =>
-          val contract  = ContractGenerator.genContract(state, map.value)
-          val pathCodes = ContractGenerator.genSubContractPath(state, ident, mapKeyIndex)
-          Seq(contract.genStore(state, selectors.tail, pathCodes))
+          val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
+          MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
           val ref    = state.getVariablesRef(ident)
           val subRef = ref.subRef(state, selectors.init)

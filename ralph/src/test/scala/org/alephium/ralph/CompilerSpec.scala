@@ -5717,6 +5717,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code, "The return type of function f0 cannot be map")
     }
+
+    {
+      info("The number of struct fields exceeds the maximum limit")
+      def code(size: Int, mut: String) =
+        s"""
+           |struct Foo { $mut a: [U256; $size] }
+           |Contract Bar(mut map: Map[U256, Foo]) {
+           |  pub fn bar(address: Address) -> () {
+           |    map.insert!{address -> ALPH : 1 alph}(1, $$Foo { a: [0; $size] }$$)
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code(256, "mut"), "The number of struct fields exceeds the maximum limit")
+      testContractError(code(256, ""), "The number of struct fields exceeds the maximum limit")
+      // we have an extra immutable field `parentContractId`
+      testContractError(code(255, ""), "The number of struct fields exceeds the maximum limit")
+      Compiler.compileContractFull(code(255, "mut").replace("$", "")).isRight is true
+      Compiler.compileContractFull(code(254, "").replace("$", "")).isRight is true
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
