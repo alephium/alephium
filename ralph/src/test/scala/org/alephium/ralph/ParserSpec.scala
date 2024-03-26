@@ -1936,6 +1936,14 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Type.U256,
         Type.NamedType(TypeId("Foo"))
       )
+    fastparse
+      .parse("Map[U256, [U256; 2]]", StatefulParser.parseType(Type.NamedType)(_))
+      .get
+      .value is Type
+      .Map(
+        Type.U256,
+        Type.FixedSizeArray(Type.U256, 2)
+      )
     fail(
       s"Map[$$Foo, Foo]",
       StatefulParser.parseType(Type.NamedType)(_),
@@ -1950,6 +1958,16 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       s"[$$Map[U256, U256]; 2]",
       StatefulParser.parseType(Type.NamedType)(_),
       "Array element type cannot be map"
+    )
+    fail(
+      s"Map[$$[U256; 2], U256]",
+      StatefulParser.parseType(Type.NamedType)(_),
+      "The key type of map can only be primitive type"
+    )
+    fail(
+      s"Map[$$Map[U256, U256], U256]",
+      StatefulParser.parseType(Type.NamedType)(_),
+      "The key type of map can only be primitive type"
     )
 
     parse(

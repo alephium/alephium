@@ -645,7 +645,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "Invalid condition type: Const(U256(1))"
     )
     Compiler.compileContract(code(update = "true")).isLeft is true
-    testContractError(code(update = "$i = true$"), "Cannot assign List(Bool) to List(U256)")
+    testContractError(code(update = "$i = true$"), "Cannot assign \"Bool\" to \"U256\"")
     Compiler.compileContract(code(body = "")).isLeft is true
     testContractError(
       code(initialize = "", forKey = "$for$"),
@@ -965,7 +965,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"U256\"",
+        "Expected array or map type, got \"U256\"",
       s"""
          |// invalid array expression
          |Contract Foo() {
@@ -976,7 +976,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"U256\"", // TODO: improve this error message
+        "Expected array or map type, got \"U256\"", // TODO: improve this error message
       s"""
          |// invalid array expression
          |Contract Foo() {
@@ -1018,7 +1018,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Cannot assign List(U256) to List(I256)",
+        "Cannot assign \"U256\" to \"I256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> U256 {
@@ -4752,7 +4752,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Cannot assign List(U256) to List(Foo)")
+      testContractError(code, "Cannot assign \"U256\" to \"Foo\"")
     }
 
     {
@@ -4804,11 +4804,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$"),
-        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foo. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$", "mut"),
-        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foo. Assignment only works when all of the (nested) fields are mutable."
       )
     }
 
@@ -4830,7 +4830,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos = [[Foo { x : 2 }; 2]; 2]$$", "", "mut"),
-        "Cannot assign to variable foos. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foos. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foos[0] = [Foo { x : 2 }; 2]$$", "", ""),
@@ -4838,7 +4838,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos[0] = [Foo { x : 2 }; 2]$$", "", "mut"),
-        "Cannot assign to immutable element in array foos. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array foos. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foos[0][0] = Foo { x : 2 }$$", "", ""),
@@ -4846,7 +4846,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos[0][0] = Foo { x : 2 }$$", "", "mut"),
-        "Cannot assign to immutable element in array foos. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array foos. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foos[0][0].x = 2$$", "", ""),
@@ -4881,15 +4881,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foo = Foo{bars: [Bar{x: 1}; 2]}$$"),
-        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foo. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo.bars = [Bar{x: 1}; 2]$$"),
-        "Cannot assign to field bars in struct Foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to field bars in struct Foo. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo.bars[0] = Bar{x: 1}$$"),
-        "Cannot assign to immutable element in array Foo.bars. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array Foo.bars. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo.bars[0].x = 2$$"),
@@ -5557,7 +5557,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code(s"map$$[#00]$$ = 1"),
         "Invalid map key type \"ByteVec\", expected \"U256\""
       )
-      testContractError(code(s"$$map[0] = #00$$"), "Cannot assign List(ByteVec) to List(U256)")
+      testContractError(code(s"$$map[0] = #00$$"), "Cannot assign \"ByteVec\" to \"U256\"")
     }
 
     {
@@ -5578,7 +5578,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(
         code(s"$$map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}$$"),
-        "Cannot assign to value in map \"map\". Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to value in map \"map\". Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$map[0].x = 1$$"),
@@ -5586,11 +5586,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$map[0].y = [Foo{a: 0}; 2]$$"),
-        "Cannot assign to field y in struct Bar. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to field y in struct Bar. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$map[0].y[0] = Foo{a: 0}$$"),
-        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$map[0].y[0].a = 1$$"),
@@ -5623,7 +5623,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(
         code(s"$$map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]$$"),
-        "Cannot assign to value in map \"map\". Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to value in map \"map\". Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$map[0][0].x = 1$$"),
@@ -5631,11 +5631,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$map[0][0].y = [Foo{a: 0}; 2]$$"),
-        "Cannot assign to field y in struct Bar. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to field y in struct Bar. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$map[0][0].y[0] = Foo{a: 0}$$"),
-        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$map[0][0].y[0].a = 1$$"),
@@ -5662,7 +5662,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f() -> () {}
            |}
            |""".stripMargin
-      testContractError(code, "Map type fields does not support in struct Foo")
+      testContractError(code, "Map type fields does not support in struct")
     }
 
     {
@@ -5673,7 +5673,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  let _ = map[0]
            |}
            |""".stripMargin
-      testTxScriptError(code, "Map type fields does not support in script Main")
+      testTxScriptError(code, "Map type fields does not support in TxScript")
     }
 
     {
@@ -5727,7 +5727,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Cannot assign List(Map[U256,ByteVec]) to List(Map[U256,U256])")
+      testContractError(code, "Cannot assign \"Map[U256,ByteVec]\" to \"Map[U256,U256]\"")
     }
 
     {

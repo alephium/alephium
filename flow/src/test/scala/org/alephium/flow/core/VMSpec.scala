@@ -4996,6 +4996,8 @@ class VMSpec extends AlephiumSpec with Generators {
         val contractState = worldState.getContractState(subContractId).rightValue
         contractState.immFields is (immFields :+ Val.ByteVec(mapContractId.bytes))
         contractState.mutFields is mutFields
+        val contractAsset = worldState.getContractAsset(contractState.contractOutputRef).rightValue
+        contractAsset.amount is minimalAlphInContract
       }
       callTxScript(checkAndUpdate)
       callTxScript(remove)
