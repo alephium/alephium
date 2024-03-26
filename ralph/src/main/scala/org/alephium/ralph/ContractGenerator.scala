@@ -225,26 +225,14 @@ object ContractGenerator {
     ): Seq[Instr[StatefulContext]] = {
       val fields           = contract.fields.dropRight(1) // remove the `parentContractId` field
       val fieldsMutability = fields.flatMap(f => state.flattenTypeMutability(f.tpe, f.isMutable))
-      val (initCodes, argCodes) = state.flattenArgs(Seq(expr))
-      assume(argCodes.length == fieldsMutability.length)
-      val (immFields, mutFields) = argCodes.view
-        .zip(fieldsMutability)
-        .foldLeft((Seq.empty[Instr[StatefulContext]], Seq.empty[Instr[StatefulContext]])) {
-          case ((immFields, mutFields), (instrs, isMutable)) =>
-            if (isMutable) {
-              (immFields, mutFields ++ instrs)
-            } else {
-              (immFields ++ instrs, mutFields)
-            }
-        }
-      val immFieldLength = fieldsMutability.count(!_)
-      val mutFieldLength = fieldsMutability.length - immFieldLength
+      val (immFields, mutFields) = state.genInitCodes(fieldsMutability, Seq(expr))
+      val immFieldLength         = fieldsMutability.count(!_)
+      val mutFieldLength         = fieldsMutability.length - immFieldLength
       val encodeImmFields = immFields ++
         Seq(SelfContractId, ConstInstr.u256(Val.U256(U256.unsafe(immFieldLength + 1))), Encode)
       val encodeMutFields =
         mutFields ++ Seq(ConstInstr.u256(Val.U256(U256.unsafe(mutFieldLength))), Encode)
       (pathCodes :+ BytesConst(Val.ByteVec(bytecode))) ++
-        initCodes ++
         encodeImmFields ++
         encodeMutFields ++
         Seq(CreateSubContract, Pop)
