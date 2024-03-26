@@ -83,7 +83,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def getHashesUnsafe(header: BlockHeader, acc: AVector[BlockHash]): AVector[BlockHash] = {
+  private def getHashWithUncleDepsUnsafe(
+      header: BlockHeader,
+      acc: AVector[BlockHash],
+      checkDuplicate: Boolean
+  ): AVector[BlockHash] = {
     val hardFork = networkConfig.getHardFork(header.timestamp)
     if (hardFork.isGhostEnabled()) {
       val block = getBlockUnsafe(header.hash)
@@ -91,10 +95,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         case Right(hashes) => hashes
         case Left(error)   => throw error
       }
-      val newAcc = if (acc.contains(header.hash)) acc else acc :+ header.hash
+      val newAcc = if (checkDuplicate && acc.contains(header.hash)) acc else acc :+ header.hash
       uncles.fold(newAcc) { case (acc, uncleHash) =>
         val uncleHeader = getBlockHeaderUnsafe(uncleHash)
-        getHashesUnsafe(uncleHeader, acc)
+        getHashWithUncleDepsUnsafe(uncleHeader, acc, checkDuplicate)
       }
     } else {
       acc :+ header.hash
@@ -110,9 +114,9 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         acc: AVector[BlockHash]
     ): AVector[BlockHash] = {
       if (currentHeight <= heightFrom) {
-        getHashesUnsafe(currentHeader, acc)
+        getHashWithUncleDepsUnsafe(currentHeader, acc, checkDuplicate = false)
       } else {
-        val newAcc       = getHashesUnsafe(currentHeader, acc)
+        val newAcc       = getHashWithUncleDepsUnsafe(currentHeader, acc, checkDuplicate = false)
         val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
         iter(parentHeader, currentHeight - 1, newAcc)
       }
@@ -125,12 +129,12 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     // For a block with a height from `heightFrom` to `uncleHeightTo`, its uncle's height may lower than `heightFrom`
     val uncleHeightTo = math.min(heightFrom + ALPH.MaxUncleAge - 1, heightTo)
-    val hashes = AVector.from(heightFrom to uncleHeightTo).fold(AVector.empty[BlockHash]) {
+    val hashes = AVector.from(heightFrom to uncleHeightTo).fold(AVector.ofCapacity[BlockHash](heightTo - heightFrom + 1)) {
       case (acc, height) =>
         val hashes = getHashesUnsafe(height)
         hashes.fold(acc) { case (acc, hash) =>
           val header = getBlockHeaderUnsafe(hash)
-          getHashesUnsafe(header, acc)
+          getHashWithUncleDepsUnsafe(header, acc, checkDuplicate = true)
         }
     }
     if (uncleHeightTo < heightTo) {
@@ -179,14 +183,16 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
+    val blockHeight     = getHeightUnsafe(parentHeader.hash) + 1
+    val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
+
     @tailrec
     def iter(
         fromHeader: BlockHeader,
         num: Int,
-        usedUncles: AVector[BlockHash],
-        ancestors: AVector[BlockHash],
         unclesAcc: AVector[(BlockHash, LockupScript.Asset, Int)]
     ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
+
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
         unclesAcc
       } else {
@@ -199,16 +205,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
               ancestors.exists(_ == uncle.parentHash) &&
               validator(uncle.header)
           )
-          .map(block => (block.hash, block.minerLockupScript, height))
+          .map(block => (block.hash, block.minerLockupScript, blockHeight - height))
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
-        iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
+        iter(parentHeader, num - 1, unclesAcc ++ selected)
       }
     }
 
-    val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
-    val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
-    val blockHeight     = getHeightUnsafe(parentHeader.hash) + 1
-    availableUncles.takeUpto(ALPH.MaxUncleSize).map(u => (u._1, u._2, blockHeight - u._3))
+    val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, AVector.empty)
+    availableUncles.takeUpto(ALPH.MaxUncleSize)
   }
 
   def selectUncles(
