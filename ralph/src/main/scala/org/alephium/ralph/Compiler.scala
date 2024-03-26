@@ -94,9 +94,7 @@ object Compiler {
 
   private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
     try {
-      val result = compileMultiContract(input).map(genCode)
-      ContractGenerator.clearCache()
-      result
+      compileMultiContract(input).map(genCode)
     } catch {
       case e: Error => Left(e)
     }
@@ -110,14 +108,8 @@ object Compiler {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
-        val statefulScripts    = multiContract.genStatefulScripts()(compilerOptions)
-        val generatedContracts = ContractGenerator.generatedContracts()
-        ContractGenerator.clearCache()
-        (
-          statefulContracts ++ generatedContracts,
-          statefulScripts,
-          AVector.from(multiContract.structs)
-        )
+        val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
+        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
       }
     } catch {
       case e: Error => Left(e)
@@ -606,6 +598,12 @@ object Compiler {
     def getMutFieldArrayVarIndex(): Ast.Ident = {
       getMutFieldArrayVarIndex(
         addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
+      )
+    }
+
+    def getSubContractIdVar(): Ast.Ident = {
+      getSubContractIdVar(
+        addLocalVariable(_, Type.ByteVec, isMutable = true, isUnused = false, isGenerated = true)
       )
     }
 

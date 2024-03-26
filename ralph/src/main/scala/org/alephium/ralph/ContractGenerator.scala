@@ -318,38 +318,6 @@ object ContractGenerator {
     }
   }
 
-  private def genMapKey[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      expr: Ast.Expr[Ctx]
-  ): Seq[Instr[Ctx]] = {
-    val codes = expr.genCode(state)
-    expr.getType(state)(0) match {
-      case Type.Bool    => codes :+ BoolToByteVec
-      case Type.U256    => codes :+ U256ToByteVec
-      case Type.I256    => codes :+ I256ToByteVec
-      case Type.Address => codes :+ AddressToByteVec
-      case Type.ByteVec => codes
-      case tpe => // dead branch
-        throw Compiler.Error(s"Invalid key type $tpe", expr.sourceIndex)
-    }
-  }
-
-  @inline def genSubContractPath[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      ident: Ast.Ident,
-      index: Ast.Expr[Ctx]
-  ): Seq[Instr[Ctx]] = {
-    (state.genLoadCode(ident) ++ genMapKey(state, index)) :+ ByteVecConcat
-  }
-
-  @inline def genSubContractPath[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      map: Ast.Expr[Ctx],
-      index: Ast.Expr[Ctx]
-  ): Seq[Instr[Ctx]] = {
-    (map.genCode(state) ++ genMapKey(state, index)) :+ ByteVecConcat
-  }
-
   sealed trait FieldSelector
   final case class FieldName(name: String) extends FieldSelector
   case object ArrayIndex                   extends FieldSelector
