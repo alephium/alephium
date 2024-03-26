@@ -606,20 +606,20 @@ trait TxUtils { Self: FlowUtils =>
     // Sum how much gas we need to pay for all inputs
     val totalGasToPay = inputs.map { case ((_, _), computedGas) => computedGas.value }.sum
 
-    val totalGasPayedByDefined = inputsGasDefined.map { case ((_, selected), _) =>
+    val totalGasPaidByDefined = inputsGasDefined.map { case ((_, selected), _) =>
       selected.gas.value
     }.sum
 
-    val totalGasPayedByUndefined = inputsGasUndefined.map { case ((_, computedGas), _) =>
+    val totalGasPaidByUndefined = inputsGasUndefined.map { case ((_, computedGas), _) =>
       computedGas.value
     }.sum
 
-    val totalGasPayed = totalGasPayedByDefined + totalGasPayedByUndefined
+    val totalGasPaid = totalGasPaidByDefined + totalGasPaidByUndefined
 
-    val gasDiff = totalGasToPay - totalGasPayed
+    val gasDiff = totalGasToPay - totalGasPaid
 
     val updatedGasForInputsGasUndefined = {
-      if (totalGasToPay - totalGasPayedByDefined <= 0) {
+      if (totalGasToPay - totalGasPaidByDefined <= 0) {
         // Defined gas already cover the fees, we can update gas to 0
         inputsGasUndefined.map { case (((input, selected), _), order) =>
           ((input, selected.copy(gas = GasBox.zero)), order)

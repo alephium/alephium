@@ -1721,7 +1721,9 @@ class TxUtilsSpec extends AlephiumSpec {
 
         val updated = blockFlow.updateSelectedGas(entries, 2)
 
-        val bitTooMuchGas    = updated.map(_._2.gas).head.addUnsafe(GasBox.unsafe(100))
+        val averageGas       = updated.map(_._2.gas.value).sum / entries.length
+        val gasToAdd         = 100
+        val bitTooMuchGas    = GasBox.unsafe(averageGas).addUnsafe(GasBox.unsafe(gasToAdd))
         val inputData0       = inputData.copy(gasOpt = Some(bitTooMuchGas))
         val selectedWithGas0 = TxUtils.AssetOutputInfoWithGas(inputs, bitTooMuchGas)
 
@@ -1740,12 +1742,21 @@ class TxUtilsSpec extends AlephiumSpec {
         // Overall gas is always the same
         updated2.map(_._2.gas.value).sum is expectedGas
 
-        val gasPayByUndefined  = updated.take(nbGasNone).map(_._2.gas.value).sum
-        val gasPayByUndefined2 = updated2.take(nbGasNone).map(_._2.gas.value).sum
+        val gasPayByUndefined  = updated.take(nbGasNone).map(_._2.gas.value)
+        val gasPayByUndefined2 = updated2.take(nbGasNone).map(_._2.gas.value)
+
+        val totalTooMuch = gasToAdd * nbGasSome
+        val shared       = totalTooMuch / nbGasNone
+        val sharedRest   = totalTooMuch % nbGasNone
 
         // Input with undefined gas are still paying, but less
-        gasPayByUndefined2 > 0 is true
-        gasPayByUndefined > gasPayByUndefined2 is true
+        gasPayByUndefined2.sum > 0 is true
+        gasPayByUndefined.sum > gasPayByUndefined2.sum is true
+        gasPayByUndefined.toSeq.zip(gasPayByUndefined2.toSeq).zipWithIndex.foreach {
+          case ((gas, gas2), i) =>
+            val expected = if (i == 0) gas - shared - sharedRest else gas - shared
+            gas2 is expected
+        }
       }
     }
     {
