@@ -204,7 +204,7 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Ghost hard fork */
-    PayGasFee, MinimalContractDeposit
+    PayGasFee, MinimalContractDeposit, CreateMapEntity
   )
   // format: on
 
@@ -1951,7 +1951,7 @@ object TokenIssuance {
   }
 }
 
-sealed trait CreateContractAbstract extends ContractInstr {
+sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
   def subContract: Boolean
   def copyCreate: Boolean
 
@@ -1993,21 +1993,30 @@ sealed trait CreateContractAbstract extends ContractInstr {
     }
   }
 
+  protected def prepareMutFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    frame.popFields()
+  }
+
+  protected def prepareImmFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    if (frame.ctx.getHardFork().isLemanEnabled()) {
+      frame.popFields()
+    } else {
+      Right(CreateContractAbstract.emptyImmFields)
+    }
+  }
+
+  def returnContractId: Boolean = true
+
   def __runWith[C <: StatefulContext](
       frame: Frame[C],
       tokenIssuance: TokenIssuance
   ): ExeResult[Unit] = {
     for {
       tokenIssuanceInfo <- getTokenIssuanceInfo(frame, tokenIssuance)
-      mutFields         <- frame.popFields()
-      immFields <-
-        if (frame.ctx.getHardFork().isLemanEnabled()) {
-          frame.popFields()
-        } else {
-          Right(CreateContractAbstract.emptyImmFields)
-        }
-      _            <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
-      contractCode <- prepareContractCode(frame)
+      mutFields         <- prepareMutFields(frame)
+      immFields         <- prepareImmFields(frame)
+      _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
+      contractCode      <- prepareContractCode(frame)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
@@ -2022,7 +2031,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
         tokenIssuanceInfo
       )
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled()) {
+        if (frame.ctx.getHardFork().isLemanEnabled() && returnContractId) {
           frame.pushOpStack(Val.ByteVec(newContractId.bytes))
         } else {
           okay
@@ -2030,6 +2039,8 @@ sealed trait CreateContractAbstract extends ContractInstr {
     } yield ()
   }
 }
+
+sealed trait CreateContractAbstract extends ContractFactory with StatefulInstrCompanion0
 
 object CreateContractAbstract {
   val emptyImmFields: AVector[Val] = AVector.empty
@@ -2140,6 +2151,126 @@ object CreateSubContractAndTransferToken
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, tokenIssuance = IssueTokenAndTransfer)
+  }
+}
+
+@ByteCode
+final case class CreateMapEntity(immFields: Byte, mutFields: Byte)
+    extends ContractFactory
+    with GhostInstrWithSimpleGas[StatefulContext]
+    with GasCreate {
+  def subContract: Boolean = true
+  def copyCreate: Boolean  = false
+
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[Byte, Byte].serialize((immFields, mutFields))
+
+  override def prepareMutFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    frame.opStack.pop(mutFields.toInt)
+  }
+
+  override def prepareImmFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    frame.opStack.pop(immFields.toInt)
+  }
+
+  override def prepareContractCode[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[StatefulContract.HalfDecoded] = {
+    val contract = CreateMapEntity.genContract(immFields.toInt, mutFields.toInt)
+    val bytecode = encode(contract)
+    frame.ctx
+      .chargeContractCodeSize(bytecode, frame.ctx.getHardFork())
+      .map(_ => contract.toHalfDecoded())
+  }
+
+  override def returnContractId: Boolean = false
+
+  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, tokenIssuance = NoIssuance)
+  }
+}
+object CreateMapEntity extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[Byte, Byte]) {
+  def apply(value: (Byte, Byte)): CreateMapEntity = CreateMapEntity(value._1, value._2)
+
+  val LoadImmFieldMethodIndex: Byte  = 0
+  val LoadMutFieldMethodIndex: Byte  = 1
+  val StoreMutFieldMethodIndex: Byte = 2
+  val DestroyMethodIndex: Byte       = 3
+
+  private lazy val loadImmFieldByIndex =
+    Method[StatefulContext](
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      argsLength = 1,
+      localsLength = 1,
+      returnLength = 1,
+      instrs = AVector(LoadLocal(0), LoadImmFieldByIndex)
+    )
+
+  private lazy val loadMutFieldByIndex = {
+    Method[StatefulContext](
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      argsLength = 1,
+      localsLength = 1,
+      returnLength = 1,
+      instrs = AVector(LoadLocal(0), LoadMutFieldByIndex)
+    )
+  }
+
+  private def genStoreMutFieldByIndex(parentContractIdIndex: Byte): Method[StatefulContext] = {
+    Method(
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      argsLength = 2,
+      localsLength = 2,
+      returnLength = 0,
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0), // value
+        LoadLocal(1), // index
+        StoreMutFieldByIndex
+      )
+    )
+  }
+
+  private def genDestroy(parentContractIdIndex: Byte): Method[StatefulContext] = {
+    Method(
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = true,
+      argsLength = 1,
+      localsLength = 1,
+      returnLength = 0,
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0),
+        DestroySelf
+      )
+    )
+  }
+
+  def genContract(immFields: Int, mutFields: Int): StatefulContract = {
+    assume(immFields >= 1) // parent contract id
+    val parentContractIdIndex = (immFields - 1).toByte
+    StatefulContract(
+      immFields + mutFields,
+      AVector(
+        loadImmFieldByIndex,
+        loadMutFieldByIndex,
+        genStoreMutFieldByIndex(parentContractIdIndex),
+        genDestroy(parentContractIdIndex)
+      )
+    )
   }
 }
 
