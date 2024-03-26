@@ -26,27 +26,13 @@ import org.alephium.util.{AVector, U256}
 final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type) {
   import ContractGenerator._
 
-  private var usedFieldNames: Option[Seq[String]] = None
-  private def getUsedFieldNames: Seq[String] = {
-    usedFieldNames match {
-      case Some(names) => names
-      case None =>
-        val names = tpe match {
-          case Type.Struct(id) => state.getStruct(id).fields.map(_.name)
-          case _               => Seq.empty
-        }
-        usedFieldNames = Some(names)
-        names
-    }
-  }
-
   private def getPathAndArgs(selectors: Seq[FieldSelector]): (String, Seq[String]) = {
     val (path, args) = selectors.foldLeft(("", Seq.empty[String])) {
       case ((path, indexes), selector) =>
         selector match {
           case FieldName(name) => (s"$path.$name", indexes)
           case ArrayIndex =>
-            val index = freshName(s"index${indexes.length}", getUsedFieldNames)
+            val index = s"index${indexes.length}"
             (s"$path[$index]", indexes :+ s"$index: U256")
         }
     }
@@ -63,9 +49,9 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
        |""".stripMargin
   }
 
-  private lazy val parentContractIdFieldName = freshName("parentContractId", getUsedFieldNames)
+  private lazy val parentContractIdFieldName = "parentContractId"
   private def genCheckCallerFunc(funcIndex: Int): String = {
-    val callerContractIdName = freshName("callerContractId", getUsedFieldNames)
+    val callerContractIdName = "callerContractId"
     s"""
        |fn f$funcIndex($callerContractIdName: ByteVec) -> () {
        |  checkCaller!($callerContractIdName == $parentContractIdFieldName, 0)
@@ -81,7 +67,7 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
   ): String = {
     val (path, args) = getPathAndArgs(selectors)
     val argList      = if (args.isEmpty) "" else s", ${args.mkString(", ")}"
-    val newValueName = freshName("newValue", getUsedFieldNames)
+    val newValueName = "newValue"
     s"""
        |@using(updateFields = true)
        |pub fn f$funcIndex($newValueName: ${getTypeSignature(tpe)}$argList) -> () {
@@ -91,15 +77,17 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
        |""".stripMargin
   }
 
-  private lazy val structFields = {
-    tpe match {
-      case Type.Struct(id) => state.getStruct(id).fields
-      case _ => Seq(Ast.StructField(Ast.Ident(DefaultFieldName), isMutable = true, tpe = tpe))
-    }
-  }
+  private lazy val contractFields = Seq(
+    Ast.StructField(Ast.Ident(DefaultFieldName), isMutable = true, tpe),
+    Ast.StructField(
+      Ast.Ident(parentContractIdFieldName),
+      isMutable = false,
+      tpe = Type.ByteVec
+    )
+  )
 
   private def genDestroyFunc(checkFuncIndex: Int): String = {
-    val addressName = freshName("address", getUsedFieldNames)
+    val addressName = "address"
     s"""
        |@using(assetsInContract = true)
        |pub fn destroy($addressName: Address) -> () {
@@ -110,12 +98,7 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
   }
 
   private def genContractFields: String = {
-    val allFields = structFields :+ Ast.StructField(
-      Ast.Ident(parentContractIdFieldName),
-      isMutable = false,
-      tpe = Type.ByteVec
-    )
-    allFields.view
+    contractFields.view
       .map { f =>
         val mut = if (f.isMutable) "mut" else ""
         s"$mut ${f.ident.name}: ${getTypeSignature(f.tpe)}"
@@ -127,52 +110,14 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
   private val storeFuncIndex = mutable.Map.empty[Seq[FieldSelector], Int]
   private val allFuncs       = mutable.ArrayBuffer.empty[String]
 
-  private def genLoadStruct() = {
-    tpe match {
-      case Type.Struct(id) =>
-        val funcIndex = allFuncs.length
-        val fields = structFields.view.map(f => s"${f.ident.name}: ${f.ident.name}").mkString(", ")
-        val func =
-          s"""
-             |pub fn f$funcIndex() -> ${id.name} {
-             |  return ${id.name} { $fields }
-             |}
-             |""".stripMargin
-        loadFuncIndex += (Seq.empty -> funcIndex)
-        allFuncs.addOne(func)
-      case _ =>
-    }
-  }
-
-  private def genStoreStruct(checkFuncIndex: Int) = {
-    tpe match {
-      case Type.Struct(id) if state.isTypeMutable(tpe) =>
-        val funcIndex    = allFuncs.length
-        val newValueName = freshName("newValue", getUsedFieldNames)
-        val assignments = structFields.view
-          .map(f => s"${f.ident.name} = $newValueName.${f.ident.name}")
-          .mkString("\n")
-        val func =
-          s"""
-             |pub fn f$funcIndex($newValueName: ${id.name}) -> () {
-             |  f$checkFuncIndex(callerContractId!())
-             |  $assignments
-             |}
-             |""".stripMargin
-        storeFuncIndex += (Seq.empty -> funcIndex)
-        allFuncs.addOne(func)
-      case _ =>
-    }
-  }
-
   private def genFuncs: (FuncIndex, FuncIndex, Seq[String]) = {
-    val flattenedFields = structFields.flatMap(f =>
-      flattenFields(state, state.resolveType(f.tpe), f.isMutable, Seq(FieldName(f.name)))
-    )
+    val flattenedFields = contractFields
+      .dropRight(1)
+      .flatMap(f =>
+        flattenFields(state, state.resolveType(f.tpe), f.isMutable, Seq(FieldName(f.name)))
+      )
     val checkCallerFuncIndex = allFuncs.length
     allFuncs.addOne(genCheckCallerFunc(checkCallerFuncIndex))
-    genLoadStruct()
-    genStoreStruct(checkCallerFuncIndex)
     flattenedFields.foreach { field =>
       val loadIndex = allFuncs.length
       loadFuncIndex += (field.selectors -> loadIndex)
@@ -188,12 +133,8 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
   }
 
   private def getContractName: String = {
-    val baseName = tpe match {
-      case Type.Struct(id) => s"StructWrapper${id.name}"
-      case _ =>
-        val name = s"SimpleWrapper${getTypeSignature(tpe)}"
-        name.filterNot(c => "[;]".contains(c))
-    }
+    val typeSignature = getTypeSignature(tpe)
+    val baseName      = s"ContractWrapper${typeSignature.replaceAll("[\\[;\\]]", "_")}"
     val usedTypeName =
       state.contractTable.view.keys.map(_.name).toSeq ++ state.globalState.structs.map(_.name)
     freshName(baseName, usedTypeName)
@@ -330,8 +271,7 @@ object ContractGenerator {
     private def getPathAndIndexes(
         selectors: Seq[Ast.FieldSelector]
     ): (Seq[FieldSelector], Seq[Ast.Expr[StatefulContext]]) = {
-      val path: Seq[FieldSelector] =
-        if (tpe.isStructType) Seq.empty else Seq(FieldName(DefaultFieldName))
+      val path: Seq[FieldSelector] = Seq(FieldName(DefaultFieldName))
       selectors.foldLeft((path, Seq.empty[Ast.Expr[StatefulContext]])) {
         case ((path, indexes), selector) =>
           selector match {
