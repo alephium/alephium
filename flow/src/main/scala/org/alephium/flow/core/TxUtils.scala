@@ -624,11 +624,6 @@ trait TxUtils { Self: FlowUtils =>
         inputsGasUndefined.map { case (((input, selected), _), order) =>
           ((input, selected.copy(gas = GasBox.zero)), order)
         }
-      } else if (gasDiff == 0) {
-        // We are paying the exact amount, nothing to do
-        inputsGasUndefined.map { case (((input, selected), gas), order) =>
-          ((input, selected.copy(gas = gas)), order)
-        }
       } else {
         // We have more or less gas, we can increase or decrease the gas for each input
         val diffShared     = gasDiff / inputsGasUndefined.length
