@@ -456,17 +456,17 @@ trait TxUtils { Self: FlowUtils =>
 
     inputs
       .mapE { input =>
-        val dustAmountNeeded = if (somePayForOthers && input.gasOpt.isEmpty) {
-          // If some inputs needs to pay for others, we need to add more dust amount to make sure they
-          // can cover all fees
-          dustAmountPerInputNeeded.addUnsafe(maximalGasPerTx.toU256)
+        val gas = if (somePayForOthers && input.gasOpt.isEmpty) {
+          // If some inputs needs to pay for others, we need to make sure we select them
+          // enough UTXOs to cover all fees
+          Some(maximalGasPerTx)
         } else {
-          dustAmountPerInputNeeded
+          input.gasOpt
         }
         selectInputDataUtxos(
-          input,
+          input.copy(gasOpt = gas),
           outputInfos,
-          dustAmountNeeded,
+          dustAmountPerInputNeeded,
           targetBlockHashOpt,
           gasPrice,
           utxosLimit,
@@ -604,38 +604,45 @@ trait TxUtils { Self: FlowUtils =>
     }
 
     // Sum how much gas we need to pay for all inputs
-    val totalGasToPay = inputs.map { case ((_, _), gas) => gas.value }.sum
+    val totalGasToPay = inputs.map { case ((_, _), computedGas) => computedGas.value }.sum
 
     val totalGasPayedByDefined = inputsGasDefined.map { case ((_, selected), _) =>
       selected.gas.value
     }.sum
 
-    val totalGasPayedByUndefined = inputsGasUndefined.map { case ((_, gas), _) =>
-      gas.value
+    val totalGasPayedByUndefined = inputsGasUndefined.map { case ((_, computedGas), _) =>
+      computedGas.value
     }.sum
 
     val totalGasPayed = totalGasPayedByDefined + totalGasPayedByUndefined
 
-    val missingGas = totalGasToPay - totalGasPayed
+    val gasDiff = totalGasToPay - totalGasPayed
 
     val updatedGasForInputsGasUndefined = {
-      if (missingGas > 0) {
-        // We need to pay more, we split between everyone that didn't have defined gas
-        val diffShared     = missingGas / inputsGasUndefined.length
-        val diffSharedRest = missingGas % inputsGasUndefined.length
+      if (totalGasToPay - totalGasPayedByDefined <= 0) {
+        // Defined gas already cover the fees, we can update gas to 0
+        inputsGasUndefined.map { case (((input, selected), _), order) =>
+          ((input, selected.copy(gas = GasBox.zero)), order)
+        }
+      } else if (gasDiff == 0) {
+        // We are paying the exact amount, nothing to do
+        inputsGasUndefined.map { case (((input, selected), gas), order) =>
+          ((input, selected.copy(gas = gas)), order)
+        }
+      } else {
+        // We have more or less gas, we can increase or decrease the gas for each input
+        val diffShared     = gasDiff / inputsGasUndefined.length
+        val diffSharedRest = gasDiff % inputsGasUndefined.length
         inputsGasUndefined.zipWithIndex.map { case ((((input, selected), gas), order), i) =>
           if (i == 0) {
             // First input is paying for the rest that cannot be divided by everyone
-            val updatedGas = gas.addUnsafe(GasBox.unsafe(diffShared + diffSharedRest))
+            val updatedGas =
+              GasBox.from(gas.value + diffShared + diffSharedRest).getOrElse(GasBox.zero)
             ((input, selected.copy(gas = updatedGas)), order)
           } else {
-            ((input, selected.copy(gas = gas.addUnsafe(GasBox.unsafe(diffShared)))), order)
+            val updatedGas = GasBox.from(gas.value + diffShared).getOrElse(GasBox.zero)
+            ((input, selected.copy(gas = updatedGas)), order)
           }
-        }
-      } else {
-        // Defined gas already cover the fees, we can set gas to 0
-        inputsGasUndefined.map { case (((input, selected), _), order) =>
-          ((input, selected.copy(gas = GasBox.zero)), order)
         }
       }
     }

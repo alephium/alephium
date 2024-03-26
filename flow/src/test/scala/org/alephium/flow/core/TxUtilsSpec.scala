@@ -1705,7 +1705,51 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
     {
-      info("Some inputs defined a too much gas and other not")
+      info(
+        "Some inputs defined a bit to much of gas for their own input, we can reduce others inputs gas"
+      )
+      val gas = minimalGas.mulUnsafe(100)
+
+      val inputs = buildInputs(1)
+
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      forAll(Gen.choose(1, 5), Gen.choose(1, 5)) { case (nbGasNone, nbGasSome) =>
+        val entries = AVector.fill(nbGasNone + nbGasSome) {
+          (inputData, selectedWithGas)
+        }
+
+        val updated = blockFlow.updateSelectedGas(entries, 2)
+
+        val bitTooMuchGas    = updated.map(_._2.gas).head.addUnsafe(GasBox.unsafe(100))
+        val inputData0       = inputData.copy(gasOpt = Some(bitTooMuchGas))
+        val selectedWithGas0 = TxUtils.AssetOutputInfoWithGas(inputs, bitTooMuchGas)
+
+        val entriesNone = AVector.fill(nbGasNone) {
+          (inputData, selectedWithGas)
+        }
+
+        val entriesSome0 = AVector.fill(nbGasSome) {
+          (inputData0, selectedWithGas0)
+        }
+
+        val updated2 = blockFlow.updateSelectedGas(entriesNone ++ entriesSome0, 2)
+
+        val expectedGas = updated.map(_._2.gas.value).sum
+
+        // Overall gas is always the same
+        updated2.map(_._2.gas.value).sum is expectedGas
+
+        val gasPayByUndefined  = updated.take(nbGasNone).map(_._2.gas.value).sum
+        val gasPayByUndefined2 = updated2.take(nbGasNone).map(_._2.gas.value).sum
+
+        // Input with undefined gas are still paying, but less
+        gasPayByUndefined2 > 0 is true
+        gasPayByUndefined > gasPayByUndefined2 is true
+      }
+    }
+    {
+      info("Some inputs defined too much gas and other not")
       val gas        = minimalGas.mulUnsafe(100)
       val tooMuchGas = GasBox.unsafe(10000000)
 
