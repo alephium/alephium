@@ -996,12 +996,13 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main)
   }
 
-  it should "test minimalContractDeposit" in new ContractFixture {
+  it should "test minimalContractDeposit and mapEntryDeposit" in new ContractFixture {
     val main: String =
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!(minimalContractDeposit!() == 1 alph, 0)
+         |  assert!(mapEntryDeposit!() == minimalContractDeposit!(), 0)
          |}
          |""".stripMargin
 
@@ -5031,7 +5032,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract MapContract(mut map: Map[$keyType, U256]) {
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$address -> ALPH: minimalContractDeposit!()}($keyValue, 1)
+         |    map.insert!{@$address -> ALPH: mapEntryDeposit!()}($keyValue, 1)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5064,8 +5065,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract MapContract(mut map: Map[U256, ByteVec]) {
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(0, #00)
-         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(1, #01)
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, #00)
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, #01)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5099,8 +5100,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract MapContract(mut map: Map[U256, [ByteVec; 2]]) {
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(0, [#00, #01])
-         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(1, [#02, #03])
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [#00, #01])
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, [#02, #03])
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5153,7 +5154,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn insert() -> () {
          |    let foo0 = Foo{a: 0, b: 1}
          |    let foo1 = Foo{a: 2, b: 3}
-         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(0, [foo0, foo1])
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [foo0, foo1])
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5472,11 +5473,11 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract Foo(mut map0: Map[U256, U256], mut map1: Map[U256, U256]) {
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap0(key: U256, value: U256) -> () {
-         |    map0.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(key, value)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(key, value)
          |  }
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap1(key: U256, value: U256) -> () {
-         |    map1.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(key, value)
+         |    map1.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(key, value)
          |  }
          |  pub fn updateMap0(key: U256, oldValue: U256, newValue: U256) -> () {
          |    assert!(map0[key] == oldValue, 0)
@@ -5508,7 +5509,7 @@ class VMSpec extends AlephiumSpec with Generators {
         s"""
            |TxScript Main() {
            |  let foo = Foo(#${fooId.toHexString})
-           |  foo.insertToMap$mapIndex{@$genesisAddress -> ALPH: minimalContractDeposit!()}($key, $value)
+           |  foo.insertToMap$mapIndex{@$genesisAddress -> ALPH: mapEntryDeposit!()}($key, $value)
            |}
            |$foo
            |""".stripMargin

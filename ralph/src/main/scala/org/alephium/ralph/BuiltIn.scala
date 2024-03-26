@@ -1588,6 +1588,17 @@ object BuiltIn {
       doc = "The minimal contract deposit"
     )
 
+  val mapEntryDeposit: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utils(
+      "mapEntryDeposit",
+      Seq.empty,
+      Seq(Type.U256),
+      MinimalContractDeposit,
+      argsName = Seq.empty,
+      retComment = "the amount of ALPH required to create a map entry",
+      doc = "The amount of ALPH required to create a map entry"
+    )
+
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
     def category: Category                                = Category.SubContract
@@ -1839,7 +1850,8 @@ object BuiltIn {
       nullContractAddress,
       selfContract,
       payGasFee,
-      minimalContractDeposit
+      minimalContractDeposit,
+      mapEntryDeposit
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
