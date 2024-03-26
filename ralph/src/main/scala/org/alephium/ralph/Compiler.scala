@@ -911,15 +911,37 @@ object Compiler {
       }
     }
 
-    def flattenArgs(exprs: Seq[Ast.Expr[Ctx]]): (Seq[Instr[Ctx]], Seq[Seq[Instr[Ctx]]]) = {
-      exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
-        case ((initCodes, argCodes), expr) =>
-          expr.getType(this) match {
-            case Seq(_: Type.FixedSizeArray) | Seq(_: Type.Struct) =>
-              val (ref, codes) = getOrCreateVariablesRef(expr)
-              (initCodes ++ codes, argCodes ++ ref.genLoadFieldsCode(this))
-            case _ => (initCodes, argCodes :+ expr.genCode(this))
+    def genInitCodes(
+        fieldsMutability: Seq[Boolean],
+        exprs: Seq[Ast.Expr[Ctx]]
+    ): (Seq[Instr[Ctx]], Seq[Instr[Ctx]]) = {
+      if (fieldsMutability.forall(identity)) { // all fields are mutable
+        (Seq.empty, exprs.flatMap(_.genCode(this)))
+      } else if (fieldsMutability.forall(!_)) { // all fields are immutable
+        (exprs.flatMap(_.genCode(this)), Seq.empty)
+      } else {
+        val (initCodes, argCodes) =
+          exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
+            case ((initCodes, argCodes), expr) =>
+              expr.getType(this) match {
+                case Seq(_: Type.FixedSizeArray) | Seq(_: Type.Struct) =>
+                  val (ref, codes) = getOrCreateVariablesRef(expr)
+                  (initCodes ++ codes, argCodes ++ ref.genLoadFieldsCode(this))
+                case _ => (initCodes, argCodes :+ expr.genCode(this))
+              }
           }
+        assume(argCodes.length == fieldsMutability.length)
+        val (immFields, mutFields) = argCodes.view
+          .zip(fieldsMutability)
+          .foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Instr[Ctx]])) {
+            case ((immFields, mutFields), (instrs, isMutable)) =>
+              if (isMutable) {
+                (immFields, mutFields ++ instrs)
+              } else {
+                (immFields ++ instrs, mutFields)
+              }
+          }
+        (initCodes ++ immFields, mutFields)
       }
     }
 
