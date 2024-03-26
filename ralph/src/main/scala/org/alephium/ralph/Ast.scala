@@ -250,7 +250,7 @@ object Ast {
               (map.value, selector.sourceIndex)
             case (tpe, _: IndexSelector[Ctx @unchecked]) =>
               throw Compiler.Error(
-                s"Expected array type, got ${quote(tpe)}",
+                s"Expected array or map type, got ${quote(tpe)}",
                 SourceIndex(this.sourceIndex, sourceIndex)
               )
             case (tpe, _: IdentSelector) =>
@@ -270,12 +270,13 @@ object Ast {
   ) extends Expr[Ctx]
       with AccessFieldBase[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      assume(selectors.nonEmpty)
       base.getType(state) match {
         case Seq(t: Type.FixedSizeArray) => Seq(_getType(state, t, base.sourceIndex))
         case Seq(t: Type.Struct)         => Seq(_getType(state, t, base.sourceIndex))
         case Seq(t: Type.Map)            => Seq(_getType(state, t, base.sourceIndex))
         case tpe =>
-          val tpeStr = if (tpe.length == 1) quote(tpe(0)) else quote(tpe)
+          val tpeStr = quoteTypes(tpe)
           selectors.headOption match {
             case Some(IndexSelector(_)) =>
               throw Compiler.Error(s"Expected array or map type, got $tpeStr", base.sourceIndex)
@@ -687,7 +688,7 @@ object Ast {
       fields.find(_.tpe.isMapType) match {
         case Some(field) =>
           throw Compiler.Error(
-            s"Map type fields does not support in struct ${id.name}",
+            s"Map type fields does not support in struct",
             field.ident.sourceIndex
           )
         case _ =>
@@ -826,7 +827,9 @@ object Ast {
       approveAssets.foreach(_.check(state))
       checkArgTypes(state, Seq(mapType.key, mapType.value))
     }
-    def genCreateContract(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
+    private def genCreateContract(
+        state: Compiler.State[StatefulContext]
+    ): Seq[Instr[StatefulContext]] = {
       val mapType   = getMapType(state)
       val contract  = ContractGenerator.genContract(state, mapType.value)
       val pathCodes = ContractGenerator.genSubContractPath(state, ident, args(0))
@@ -1098,7 +1101,7 @@ object Ast {
       }
       if (!state.isTypeMutable(getType(state))) {
         throw Compiler.Error(
-          s"Cannot assign to variable ${ident.name}. Assignment only works when all of the field selectors are mutable.",
+          s"Cannot assign to variable ${ident.name}. Assignment only works when all of the (nested) fields are mutable.",
           sourceIndex
         )
       }
@@ -1123,7 +1126,7 @@ object Ast {
       if (selectors.isEmpty) {
         if (!state.isTypeMutable(mapType.value)) {
           throw Compiler.Error(
-            s"Cannot assign to value in map ${quote(ident.name)}. Assignment only works when all of the field selectors are mutable.",
+            s"Cannot assign to value in map ${quote(ident.name)}. Assignment only works when all of the (nested) fields are mutable.",
             sourceIndex
           )
         }
@@ -1154,7 +1157,7 @@ object Ast {
             val arraySelector =
               structId.map(id => s"${id.name}.${lastField.name}").getOrElse(lastField.name)
             throw Compiler.Error(
-              s"Cannot assign to immutable element in array $arraySelector. Assignment only works when all of the field selectors are mutable.",
+              s"Cannot assign to immutable element in array $arraySelector. Assignment only works when all of the (nested) fields are mutable.",
               sourceIndex
             )
           }
@@ -1172,7 +1175,7 @@ object Ast {
           }
           if (!state.isTypeMutable(field.tpe)) {
             throw Compiler.Error(
-              s"Cannot assign to field ${field.name} in struct ${struct.id.name}. Assignment only works when all of the field selectors are mutable.",
+              s"Cannot assign to field ${field.name} in struct ${struct.id.name}. Assignment only works when all of the (nested) fields are mutable.",
               sourceIndex
             )
           }
@@ -1281,7 +1284,10 @@ object Ast {
       val leftTypes  = targets.map(_.getType(state))
       val rightTypes = rhs.getType(state)
       if (leftTypes != rightTypes) {
-        throw Compiler.Error(s"Cannot assign $rightTypes to $leftTypes", sourceIndex)
+        throw Compiler.Error(
+          s"Cannot assign ${quoteTypes(rightTypes)} to ${quoteTypes(leftTypes)}",
+          sourceIndex
+        )
       }
       targets.foreach(_.checkMutable(state, sourceIndex))
     }
@@ -1636,7 +1642,7 @@ object Ast {
       templateVars.find(_.tpe.isMapType) match {
         case Some(field) =>
           throw Compiler.Error(
-            s"Map type fields does not support in script $name",
+            s"Map type fields does not support in TxScript",
             field.ident.sourceIndex
           )
         case None =>
