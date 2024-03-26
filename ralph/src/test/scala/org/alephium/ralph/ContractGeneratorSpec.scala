@@ -62,7 +62,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
     def generatedCode(tpe: Type): String = {
       val typeSignature = ContractGenerator.getTypeSignature(tpe)
       s"""
-         |Contract SimpleWrapper${typeSignature}(mut value: $typeSignature,  parentContractId: ByteVec) {
+         |Contract ContractWrapper${typeSignature}(mut value: $typeSignature,  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -99,7 +99,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract SimpleWrapperU2562(mut value: [U256;2],  parentContractId: ByteVec) {
+         |Contract ContractWrapper_U256_2_(mut value: [U256;2],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -142,7 +142,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract SimpleWrapperU25623(mut value: [[U256;2];3],  parentContractId: ByteVec) {
+         |Contract ContractWrapper__U256_2__3_(mut value: [[U256;2];3],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -197,7 +197,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract SimpleWrapperBar2(mut value: [Bar;2],  parentContractId: ByteVec) {
+         |Contract ContractWrapper_Bar_2_(mut value: [Bar;2],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -249,33 +249,41 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract StructWrapperBar(a: I256, mut b: [Foo;2],  parentContractId: ByteVec) {
+         |Contract ContractWrapperBar(mut value: Bar,  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
+         |
          |  pub fn f1() -> Bar {
-         |    return Bar { a: a, b: b }
+         |    return value
          |  }
+         |
          |  pub fn f2() -> I256 {
-         |    return a
+         |    return value.a
          |  }
+         |
          |  pub fn f3() -> [Foo;2] {
-         |    return b
+         |    return value.b
          |  }
+         |
          |  pub fn f4(index0: U256) -> Foo {
-         |    return b[index0]
+         |    return value.b[index0]
          |  }
+         |
          |  pub fn f5(index0: U256) -> U256 {
-         |    return b[index0].x
+         |    return value.b[index0].x
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f6(newValue: U256, index0: U256) -> () {
          |    f0(callerContractId!())
-         |    b[index0].x = newValue
+         |    value.b[index0].x = newValue
          |  }
+         |
          |  pub fn f7(index0: U256) -> ByteVec {
-         |    return b[index0].y
+         |    return value.b[index0].y
          |  }
+         |
          |  @using(assetsInContract = true)
          |  pub fn destroy(address: Address) -> () {
          |    f0(callerContractId!())
@@ -307,58 +315,71 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract StructWrapperBar(mut a: I256, mut b: [Foo;2],  parentContractId: ByteVec) {
+         |Contract ContractWrapperBar(mut value: Bar,  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
+         |
          |  pub fn f1() -> Bar {
-         |    return Bar { a: a, b: b }
+         |    return value
          |  }
+         |
+         |  @using(updateFields = true)
          |  pub fn f2(newValue: Bar) -> () {
          |    f0(callerContractId!())
-         |    a = newValue.a
-         |    b = newValue.b
+         |    value = newValue
          |  }
+         |
          |  pub fn f3() -> I256 {
-         |    return a
+         |    return value.a
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f4(newValue: I256) -> () {
          |    f0(callerContractId!())
-         |    a = newValue
+         |    value.a = newValue
          |  }
+         |
          |  pub fn f5() -> [Foo;2] {
-         |    return b
+         |    return value.b
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f6(newValue: [Foo;2]) -> () {
          |    f0(callerContractId!())
-         |    b = newValue
+         |    value.b = newValue
          |  }
+         |
          |  pub fn f7(index0: U256) -> Foo {
-         |    return b[index0]
+         |    return value.b[index0]
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f8(newValue: Foo, index0: U256) -> () {
          |    f0(callerContractId!())
-         |    b[index0] = newValue
+         |    value.b[index0] = newValue
          |  }
+         |
          |  pub fn f9(index0: U256) -> U256 {
-         |    return b[index0].x
+         |    return value.b[index0].x
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f10(newValue: U256, index0: U256) -> () {
          |    f0(callerContractId!())
-         |    b[index0].x = newValue
+         |    value.b[index0].x = newValue
          |  }
+         |
          |  pub fn f11(index0: U256) -> ByteVec {
-         |    return b[index0].y
+         |    return value.b[index0].y
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f12(newValue: ByteVec, index0: U256) -> () {
          |    f0(callerContractId!())
-         |    b[index0].y = newValue
+         |    value.b[index0].y = newValue
          |  }
+         |
          |  @using(assetsInContract = true)
          |  pub fn destroy(address: Address) -> () {
          |    f0(callerContractId!())
@@ -395,42 +416,53 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract StructWrapperBaz(c: Bool, mut d: [Bar;2], parentContractId: ByteVec) {
+         |Contract ContractWrapperBaz(mut value: Baz,  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
+         |
          |  pub fn f1() -> Baz {
-         |    return Baz { c: c, d: d }
+         |    return value
          |  }
+         |
          |  pub fn f2() -> Bool {
-         |    return c
+         |    return value.c
          |  }
+         |
          |  pub fn f3() -> [Bar;2] {
-         |    return d
+         |    return value.d
          |  }
+         |
          |  pub fn f4(index0: U256) -> Bar {
-         |    return d[index0]
+         |    return value.d[index0]
          |  }
+         |
          |  pub fn f5(index0: U256) -> I256 {
-         |    return d[index0].a
+         |    return value.d[index0].a
          |  }
+         |
          |  pub fn f6(index0: U256) -> [Foo;2] {
-         |    return d[index0].b
+         |    return value.d[index0].b
          |  }
+         |
          |  pub fn f7(index0: U256, index1: U256) -> Foo {
-         |    return d[index0].b[index1]
+         |    return value.d[index0].b[index1]
          |  }
+         |
          |  pub fn f8(index0: U256, index1: U256) -> U256 {
-         |    return d[index0].b[index1].x
+         |    return value.d[index0].b[index1].x
          |  }
+         |
          |  @using(updateFields = true)
          |  pub fn f9(newValue: U256, index0: U256, index1: U256) -> () {
          |    f0(callerContractId!())
-         |    d[index0].b[index1].x = newValue
+         |    value.d[index0].b[index1].x = newValue
          |  }
+         |
          |  pub fn f10(index0: U256, index1: U256) -> ByteVec {
-         |    return d[index0].b[index1].y
+         |    return value.d[index0].b[index1].y
          |  }
+         |
          |  @using(assetsInContract = true)
          |  pub fn destroy(address: Address) -> () {
          |    f0(callerContractId!())
@@ -442,26 +474,10 @@ class ContractGeneratorSpec extends AlephiumSpec {
     test(code, Type.Struct(Ast.TypeId("Baz")), generatedCode)
   }
 
-  it should "generate fresh one if the field name has been used" in new Fixture {
-    val code =
-      s"""
-         |struct Foo { mut parentContractId: ByteVec }
-         |Contract Bar(mut map: Map[U256, Foo]) {
-         |  pub fn f() -> () {
-         |    map[0].parentContractId = #00
-         |  }
-         |}
-         |""".stripMargin
-
-    val generated = genContract(code, Type.Struct(Ast.TypeId("Foo")))
-    generated.contract.fields(0).ident.name is "parentContractId"
-    generated.contract.fields(1).ident.name is "parentContractId_"
-  }
-
   it should "generate fresh one if the contract name has been used" in new Fixture {
     val code =
       s"""
-         |Contract SimpleWrapperU256(mut map: Map[U256, U256]) {
+         |Contract ContractWrapperU256(mut map: Map[U256, U256]) {
          |  pub fn f() -> () {
          |    map[0] = 0
          |  }
@@ -469,6 +485,6 @@ class ContractGeneratorSpec extends AlephiumSpec {
          |""".stripMargin
 
     val generated = genContract(code, Type.U256)
-    generated.contract.ident.name is "SimpleWrapperU256_"
+    generated.contract.ident.name is "ContractWrapperU256_"
   }
 }
