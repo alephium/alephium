@@ -4888,6 +4888,37 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "test encode map type contract fields" in new ContractFixture {
+    val contract =
+      s"""
+         |Contract Foo(@unused mut a: U256, @unused b: U256, @unused mut c: Map[U256, U256]) {
+         |  pub fn f() -> () {}
+         |}
+         |""".stripMargin
+
+    val compiledContract = Compiler.compileContract(contract).rightValue
+    val contractBytecode = Hex.toHexString(serialize(compiledContract))
+
+    val script =
+      s"""
+         |TxScript Deploy() {
+         |  let (encodedImmFields, encodedMutFields) = Foo.encodeFields!(0, 1)
+         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(
+         |    #$contractBytecode,
+         |    encodedImmFields,
+         |    encodedMutFields
+         |  )
+         |}
+         |$contract
+         |""".stripMargin
+
+    deployAndCheckContractState(
+      script,
+      AVector(Val.U256(U256.unsafe(1))),
+      AVector(Val.U256(U256.unsafe(0)))
+    )
+  }
+
   trait MapFixture extends ContractFixture {
     def mapContract: String
     lazy val mapContractId = createContract(mapContract)._1

@@ -1841,7 +1841,8 @@ object Ast {
         globalState: GlobalState
     ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
-      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState))
+      val fieldsExceptMaps  = fields.filterNot(_.tpe.isMapType)
+      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fieldsExceptMaps, globalState))
     }
 
     private def checkFuncs(): Unit = {
