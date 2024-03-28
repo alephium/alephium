@@ -5415,7 +5415,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Bar(foo: Foo) {
            |  pub fn bar(address: Address) -> () {
            |    let mut map = $$foo.foo()$$
-           |    map.insert!{address -> ALPH: minimalContractDeposit!()}(1, 2)
+           |    map.insert!{address -> ALPH: mapEntryDeposit!()}(1, 2)
            |  }
            |}
            |Contract Foo(@unused mut map: Map[U256, U256]) {
@@ -5434,7 +5434,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  pub fn f(address: Address) -> () {
            |    let map = 0
-           |    $$map$$.insert!{address -> ALPH: 1}(0, 0)
+           |    $$map$$.insert!{address -> ALPH: mapEntryDeposit!()}(0, 0)
            |  }
            |}
            |""".stripMargin
@@ -5447,7 +5447,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo(mut map: Map[U256, U256]) {
            |  pub fn f(address: Address) -> () {
-           |    $$map.insert!{address -> ALPH : 1 alph}($args)$$
+           |    $$map.insert!{address -> ALPH: mapEntryDeposit!()}($args)$$
            |  }
            |}
            |""".stripMargin
@@ -5725,7 +5725,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Foo { $mut a: [U256; $size] }
            |Contract Bar(mut map: Map[U256, Foo]) {
            |  pub fn bar(address: Address) -> () {
-           |    map.insert!{address -> ALPH : 1 alph}(1, $$Foo { a: [0; $size] }$$)
+           |    map.insert!{address -> ALPH: mapEntryDeposit!()}(1, $$Foo { a: [0; $size] }$$)
            |  }
            |}
            |""".stripMargin
@@ -5736,6 +5736,37 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code(255, ""), "The number of struct fields exceeds the maximum limit")
       Compiler.compileContractFull(code(255, "mut").replace("$", "")).isRight is true
       Compiler.compileContractFull(code(254, "").replace("$", "")).isRight is true
+    }
+
+    {
+      info("Check approved assets for map insert")
+      def code(approvedAssets: String) =
+        s"""
+           |Contract Foo(mut map: Map[U256, U256], @unused tokenId: ByteVec) {
+           |  @using(preapprovedAssets = true)
+           |  pub fn foo(address: Address) -> () {
+           |    $$map.insert!$approvedAssets(0, 0)$$
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code(""), "Expected approve `ALPH: mapEntryDeposit!()` for map insert")
+      testContractError(
+        code("{address -> ALPH: minimalContractDeposit!()}"),
+        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
+      )
+      testContractError(
+        code("{address -> ALPH: 1 alph}"),
+        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
+      )
+      testContractError(
+        code("{address -> ALPH: mapEntryDeposit!(), tokenId: 1 alph}"),
+        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
+      )
+      testContractError(
+        code("{address -> tokenId: 1 alph}"),
+        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
+      )
     }
   }
 

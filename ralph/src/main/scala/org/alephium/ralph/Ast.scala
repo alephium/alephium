@@ -976,7 +976,14 @@ object Ast {
       args: Seq[Expr[StatefulContext]]
   ) extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
-      val mapType = getMapType(state)
+      val mapType        = getMapType(state)
+      val expectedAmount = CallExpr(BuiltIn.mapEntryDeposit.funcId, Seq.empty, Seq.empty)
+      if (approveAssets.flatMap(_.tokenAmounts) != Seq((ALPHTokenId(), expectedAmount))) {
+        throw Compiler.Error(
+          "Expected approve `ALPH: mapEntryDeposit!()` for map insert",
+          sourceIndex
+        )
+      }
       approveAssets.foreach(_.check(state))
       checkArgTypes(state, Seq(mapType.key, mapType.value))
     }
