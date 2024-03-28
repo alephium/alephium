@@ -5768,6 +5768,48 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
       )
     }
+
+    {
+      info("Use a variable to store path if the load/store method is called multiple times")
+      val code =
+        s"""
+           |Contract Foo(mut map: Map[U256, [U256; 2]]) {
+           |  pub fn read() -> [U256; 2] {
+           |    return map[0]
+           |  }
+           |  pub fn write() -> () {
+           |    map[0] = [0; 2]
+           |  }
+           |}
+           |""".stripMargin
+
+      val methods = Compiler.compileContractFull(code).rightValue.code.methods
+      methods(0).argsLength is 0
+      methods(0).localsLength is 1
+      methods(1).argsLength is 0
+      methods(1).localsLength is 1
+    }
+
+    {
+      info("Generate codes for path if the load/store method is called only once")
+      val code =
+        s"""
+           |Contract Foo(mut map: Map[U256, [U256; 2]]) {
+           |  pub fn read() -> U256 {
+           |    return map[0][0]
+           |  }
+           |  pub fn write() -> () {
+           |    map[0][0] = 0
+           |  }
+           |}
+           |""".stripMargin
+
+      val methods = Compiler.compileContractFull(code).rightValue.code.methods
+      methods(0).argsLength is 0
+      methods(0).localsLength is 0
+      methods(1).argsLength is 0
+      methods(1).localsLength is 0
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
