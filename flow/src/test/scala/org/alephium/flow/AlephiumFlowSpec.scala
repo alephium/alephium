@@ -828,8 +828,26 @@ trait FlowFixture
       initialAttoAlphAmount: U256 = minimalAlphInContract,
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
   ): (ContractId, ContractOutputRef) = {
+    val contract = Compiler.compileContract(input).rightValue
+    createCompiledContract(
+      contract,
+      initialImmState,
+      initialMutState,
+      tokenIssuanceInfo,
+      initialAttoAlphAmount,
+      chainIndex
+    )
+  }
+
+  def createCompiledContract(
+      contract: StatefulContract,
+      initialImmState: AVector[Val] = AVector.empty,
+      initialMutState: AVector[Val] = AVector.empty,
+      tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
+      initialAttoAlphAmount: U256 = minimalAlphInContract,
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+  ): (ContractId, ContractOutputRef) = {
     val genesisLockup = getGenesisLockupScript(chainIndex)
-    val contract      = Compiler.compileContract(input).rightValue
     val txScript =
       contractCreation(
         contract,
@@ -859,6 +877,13 @@ trait FlowFixture
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
   ): Block = {
     val script = Compiler.compileTxScript(input).rightValue
+    callCompiledTxScript(script, chainIndex)
+  }
+
+  def callCompiledTxScript(
+      script: StatefulScript,
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+  ): Block = {
     script.toTemplateString() is Hex.toHexString(serialize(script))
     val block =
       if (script.entryMethod.usePreapprovedAssets) {
