@@ -251,6 +251,11 @@ class VMSpec extends AlephiumSpec with Generators {
         s"Right(TxScriptExeFailed($failure))"
     }
 
+    def failCallTxScript(script: StatefulScript, failure: ExeFailure) = {
+      intercept[AssertionError](callCompiledTxScript(script)).getMessage is
+        s"Right(TxScriptExeFailed($failure))"
+    }
+
     def failCallTxScript(script: String, failure: ExeFailure) = {
       intercept[AssertionError](callTxScript(script)).getMessage is
         s"Right(TxScriptExeFailed($failure))"
@@ -4804,10 +4809,11 @@ class VMSpec extends AlephiumSpec with Generators {
          |$mapContract
          |""".stripMargin
 
-    def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])]
+    def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])] = Map.empty
 
-    def calcSubPath(key: Val) = {
-      val prefix = ByteString.fromArrayUnsafe(s"__map__0__".getBytes(StandardCharsets.US_ASCII))
+    def calcSubPath(key: Val, index: Int = 0) = {
+      val prefix =
+        ByteString.fromArrayUnsafe(s"__map__${index}__".getBytes(StandardCharsets.US_ASCII))
       prefix ++ key.toByteVec().bytes
     }
 
@@ -4816,8 +4822,8 @@ class VMSpec extends AlephiumSpec with Generators {
       ByteString.fromString(Hex.toHexString(subPath)) ++ ByteString.fromString(",")
     }
 
-    def calcSubContractId(key: Val) = {
-      val subPath = calcSubPath(key)
+    def calcSubContractId(key: Val, index: Int = 0) = {
+      val subPath = calcSubPath(key, index)
       mapContractId.subContractId(subPath, mapContractId.groupIndex)
     }
 
@@ -4831,39 +4837,58 @@ class VMSpec extends AlephiumSpec with Generators {
          |$mapContract
          |""".stripMargin
 
+    def checkSubContractState(
+        key: Val,
+        immFields: AVector[Val],
+        mutFields: AVector[Val],
+        mapIndex: Int = 0
+    ) = {
+      val worldState    = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
+      val subContractId = calcSubContractId(key, mapIndex)
+      val subContractState = worldState.getContractState(subContractId).rightValue
+      subContractState.immFields is (immFields :+ Val.ByteVec(mapContractId.bytes))
+      subContractState.mutFields is mutFields
+      val contractAsset = worldState.getContractAsset(subContractState.contractOutputRef).rightValue
+      contractAsset.amount is minimalAlphInContract
+    }
+
+    def subContractNotExist(key: Val, mapIndex: Int = 0) = {
+      val subContractId = calcSubContractId(key, mapIndex)
+      val worldState    = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
+      worldState.contractExists(subContractId).rightValue is false
+    }
+
     def runTest() = {
       val currentCount = getCurrentCount(blockFlow, chainIndex.from, mapContractId).getOrElse(0)
       mapKeyAndValue.foreach { case (key, _) =>
-        val subContractId = calcSubContractId(key)
-        val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
-        worldState.contractExists(subContractId).rightValue is false
+        subContractNotExist(key)
       }
-      callTxScript(insert)
+      val balance0 = getAlphBalance(blockFlow, genesisAddress.lockupScript)
+      val block0   = callTxScript(insert)
+      val balance1 = getAlphBalance(blockFlow, genesisAddress.lockupScript)
+      val txFee0   = block0.nonCoinbase.head.gasFeeUnsafe
+      (balance0 - txFee0 - minimalAlphInContract.mulUnsafe(mapKeyAndValue.size)) is balance1
       val insertEvent = getLogStates(blockFlow, mapContractId, currentCount).value
       insertEvent.states.length is mapKeyAndValue.size
       mapKeyAndValue.zipWithIndex.foreach { case ((key, (immFields, mutFields)), index) =>
         val logState = insertEvent.states(index)
         logState.index is debugEventIndexInt.toByte
         logState.fields is AVector[Val](Val.ByteVec(calcLogPath(key) ++ Val.True.toDebugString()))
-        val subContractId = calcSubContractId(key)
-        val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
-        val contractState = worldState.getContractState(subContractId).rightValue
-        contractState.immFields is (immFields :+ Val.ByteVec(mapContractId.bytes))
-        contractState.mutFields is mutFields
-        val contractAsset = worldState.getContractAsset(contractState.contractOutputRef).rightValue
-        contractAsset.amount is minimalAlphInContract
+        checkSubContractState(key, immFields, mutFields)
       }
       callTxScript(checkAndUpdate)
-      callTxScript(remove)
+      val balance2 = getAlphBalance(blockFlow, genesisAddress.lockupScript)
+      val block1   = callTxScript(remove)
+      val balance3 = getAlphBalance(blockFlow, genesisAddress.lockupScript)
+      val txFee1   = block1.nonCoinbase.head.gasFeeUnsafe
+      (balance2 - txFee1 + minimalAlphInContract.mulUnsafe(mapKeyAndValue.size)) is balance3
       val removeEvent = getLogStates(blockFlow, mapContractId, currentCount + 1).value
       removeEvent.states.length is mapKeyAndValue.size
       mapKeyAndValue.zipWithIndex.foreach { case ((key, _), index) =>
         val logState = removeEvent.states(index)
         logState.index is debugEventIndexInt.toByte
         logState.fields is AVector[Val](Val.ByteVec(calcLogPath(key) ++ Val.False.toDebugString()))
-        val subContractId = calcSubContractId(key)
-        val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
-        worldState.contractExists(subContractId).rightValue is false
+        subContractNotExist(key)
       }
 
       callTxScript(insertAndUpdate)
@@ -4908,7 +4933,7 @@ class VMSpec extends AlephiumSpec with Generators {
       val defaultValue = getDefaultValue(tpe)
       val fixture = new MapFixture {
         def mapContract: String = contractCode(genesisAddress, tpe.toString, defaultValue._1)
-        def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])] =
+        override def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])] =
           Map(defaultValue._2 -> (AVector.empty, AVector(Val.U256(1))))
       }
       fixture.runTest()
@@ -4943,7 +4968,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
 
-    val mapKeyAndValue = Map(
+    override val mapKeyAndValue = Map(
       Val.U256(0) -> (AVector.empty, AVector(Val.ByteVec(Hex.unsafe("00")))),
       Val.U256(1) -> (AVector.empty, AVector(Val.ByteVec(Hex.unsafe("01"))))
     )
@@ -4991,7 +5016,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
 
-    val mapKeyAndValue = Map(
+    override val mapKeyAndValue = Map(
       Val.U256(0) -> (AVector.empty, AVector("00", "01").map(s => Val.ByteVec(Hex.unsafe(s)))),
       Val.U256(1) -> (AVector.empty, AVector("02", "03").map(s => Val.ByteVec(Hex.unsafe(s))))
     )
@@ -5037,7 +5062,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
     val immFields: AVector[Val] = AVector(1, 3).map(v => Val.U256(U256.unsafe(v)))
     val mutFields: AVector[Val] = AVector(0, 2).map(v => Val.U256(U256.unsafe(v)))
-    val mapKeyAndValue          = Map(Val.U256(0) -> (immFields, mutFields))
+    override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
     runTest()
   }
 
@@ -5140,7 +5165,7 @@ class VMSpec extends AlephiumSpec with Generators {
       Val.ByteVec(Hex.unsafe("03")),
       Val.ByteVec(Hex.unsafe("04"))
     )
-    val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+    override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
   }
 
   it should "test mutable struct type as map value" in new MapFixture {
@@ -5320,11 +5345,11 @@ class VMSpec extends AlephiumSpec with Generators {
       Val.ByteVec(Hex.unsafe("03")),
       Val.ByteVec(Hex.unsafe("04"))
     )
-    val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+    override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
   }
 
-  it should "test multiple maps" in new ContractFixture {
-    val foo =
+  it should "test multiple maps" in new MapFixture {
+    val mapContract =
       s"""
          |Contract Foo(mut map0: Map[U256, U256], mut map1: Map[U256, U256]) {
          |  @using(preapprovedAssets = true)
@@ -5352,61 +5377,53 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
 
-    val fooId = createContract(foo)._1
-
-    def calcSubContractId(mapIndex: Int, key: Int) = {
-      val prefix =
-        ByteString.fromArrayUnsafe(s"__map__${mapIndex}__".getBytes(StandardCharsets.US_ASCII))
-      val subPath = prefix ++ serialize(U256.unsafe(key))
-      fooId.subContractId(subPath, fooId.groupIndex)
-    }
     def insertToMap(mapIndex: Int, key: Int, value: Int) = {
       val code =
         s"""
            |TxScript Main() {
-           |  let foo = Foo(#${fooId.toHexString})
+           |  let foo = Foo(#${mapContractId.toHexString})
            |  foo.insertToMap$mapIndex{@$genesisAddress -> ALPH: mapEntryDeposit!()}($key, $value)
            |}
-           |$foo
+           |$mapContract
            |""".stripMargin
       callTxScript(code)
-      val subContractId    = calcSubContractId(mapIndex, key)
-      val worldState       = blockFlow.getBestPersistedWorldState(fooId.groupIndex).rightValue
-      val subContractState = worldState.getContractState(subContractId).rightValue
-      subContractState.immFields is AVector[Val](Val.ByteVec(fooId.bytes))
-      subContractState.mutFields is AVector[Val](Val.U256(U256.unsafe(value)))
+      checkSubContractState(
+        Val.U256(U256.unsafe(key)),
+        AVector.empty,
+        AVector(Val.U256(U256.unsafe(value))),
+        mapIndex
+      )
     }
 
     def updateMap(mapIndex: Int, key: Int, oldValue: Int, newValue: Int) = {
       val code =
         s"""
            |TxScript Main() {
-           |  let foo = Foo(#${fooId.toHexString})
+           |  let foo = Foo(#${mapContractId.toHexString})
            |  foo.updateMap$mapIndex($key, $oldValue, $newValue)
            |}
-           |$foo
+           |$mapContract
            |""".stripMargin
       callTxScript(code)
-      val subContractId    = calcSubContractId(mapIndex, key)
-      val worldState       = blockFlow.getBestPersistedWorldState(fooId.groupIndex).rightValue
-      val subContractState = worldState.getContractState(subContractId).rightValue
-      subContractState.immFields is AVector[Val](Val.ByteVec(fooId.bytes))
-      subContractState.mutFields is AVector[Val](Val.U256(U256.unsafe(newValue)))
+      checkSubContractState(
+        Val.U256(U256.unsafe(key)),
+        AVector.empty,
+        AVector(Val.U256(U256.unsafe(newValue))),
+        mapIndex
+      )
     }
 
     def removeFromMap(mapIndex: Int, key: Int) = {
       val code =
         s"""
            |TxScript Main() {
-           |  let foo = Foo(#${fooId.toHexString})
+           |  let foo = Foo(#${mapContractId.toHexString})
            |  foo.removeFromMap$mapIndex($key)
            |}
-           |$foo
+           |$mapContract
            |""".stripMargin
       callTxScript(code)
-      val subContractId = calcSubContractId(mapIndex, key)
-      val worldState    = blockFlow.getBestPersistedWorldState(fooId.groupIndex).rightValue
-      worldState.contractExists(subContractId).rightValue is false
+      subContractNotExist(Val.U256(U256.unsafe(key)), mapIndex)
     }
 
     insertToMap(0, 1, 1)
@@ -5415,6 +5432,78 @@ class VMSpec extends AlephiumSpec with Generators {
     updateMap(1, 1, 2, 4)
     removeFromMap(0, 1)
     removeFromMap(1, 1)
+  }
+
+  it should "check caller contract id when updating map entry" in new MapFixture {
+    val mapContract =
+      s"""
+         |Contract Foo(mut map: Map[U256, U256]) {
+         |  pub fn update() -> () {
+         |    map[0] = 1
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    map.remove!(0, @$genesisAddress)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    val insertScript =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${mapContractId.toHexString})
+         |  foo.insert{@$genesisAddress -> ALPH: mapEntryDeposit!()}()
+         |}
+         |$mapContract
+         |""".stripMargin
+    callTxScript(insertScript)
+    val mapKey = Val.U256(U256.Zero)
+    checkSubContractState(mapKey, AVector.empty, AVector(Val.U256(U256.Zero)))
+
+    val subContractId = calcSubContractId(mapKey)
+    val invalidCallerContract = {
+      val storeFieldInstrs = AVector[Instr[StatefulContext]](
+        ConstInstr.u256(Val.U256(U256.One)),  // new value
+        ConstInstr.u256(Val.U256(U256.Zero)), // mutable field index
+        ConstInstr.u256(Val.U256(U256.Two)),
+        ConstInstr.u256(Val.U256(U256.Zero)),
+        BytesConst(Val.ByteVec(subContractId.bytes)),
+        CallExternal(CreateMapEntity.StoreMutFieldMethodIndex)
+      )
+      val storeFieldMethod = Method(true, false, false, 0, 0, 0, storeFieldInstrs)
+      val destroyInstrs = AVector[Instr[StatefulContext]](
+        AddressConst(Val.Address(genesisAddress.lockupScript)),
+        ConstInstr.u256(Val.U256(U256.One)),
+        ConstInstr.u256(Val.U256(U256.Zero)),
+        BytesConst(Val.ByteVec(subContractId.bytes)),
+        CallExternal(CreateMapEntity.DestroyMethodIndex)
+      )
+      val destroyMethod = Method(true, false, false, 0, 0, 0, destroyInstrs)
+      StatefulContract(0, AVector(storeFieldMethod, destroyMethod))
+    }
+
+    val invalidCallerId = createCompiledContract(invalidCallerContract)._1
+    def createCallScript(callerContractId: ContractId, methodIndex: Int) = {
+      val callInstrs = AVector[Instr[StatefulContext]](
+        ConstInstr.u256(Val.U256(U256.Zero)),
+        ConstInstr.u256(Val.U256(U256.Zero)),
+        BytesConst(Val.ByteVec(callerContractId.bytes)),
+        CallExternal(methodIndex.toByte)
+      )
+      StatefulScript.unsafe(AVector(Method(true, true, false, 0, 0, 0, callInstrs)))
+    }
+
+    failCallTxScript(createCallScript(invalidCallerId, 0), AssertionFailed) // update map entry
+    failCallTxScript(createCallScript(invalidCallerId, 1), AssertionFailed) // destroy map entry
+    callCompiledTxScript(createCallScript(mapContractId, 0))
+    checkSubContractState(mapKey, AVector.empty, AVector(Val.U256(U256.One)))
+    callCompiledTxScript(createCallScript(mapContractId, 1))
+    subContractNotExist(mapKey)
   }
 
   private def getEvents(
