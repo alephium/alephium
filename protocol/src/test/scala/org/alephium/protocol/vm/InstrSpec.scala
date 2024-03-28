@@ -97,7 +97,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector[GhostInstr[StatefulContext]](
         PayGasFee,
         MinimalContractDeposit,
-        CreateMapEntity(twoBytes)
+        CreateMapEntry(twoBytes)
       )
   }
 
@@ -2870,7 +2870,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
             CopyCreateContractAndTransferToken =>
           801 // 801 from contractLoadGas
         case CreateSubContract | CreateSubContractWithToken | CreateSubContractAndTransferToken |
-            CreateMapEntity(_, _) =>
+            CreateMapEntry(_, _) =>
           contractBytes.length + 314
         case CopyCreateSubContract | CopyCreateSubContractWithToken |
             CopyCreateSubContractAndTransferToken =>
@@ -3073,18 +3073,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "CreateMapEntity" in new CreateContractAbstractFixture {
+  it should "CreateMapEntry" in new CreateContractAbstractFixture {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
-    override lazy val contract = CreateMapEntity.genContract(immFields.length, mutFields.length)
+    override lazy val contract = CreateMapEntry.genContract(immFields.length, mutFields.length)
 
     stack.push(Val.ByteVec(serialize("entity")))
     immFields.foreach(stack.push)
     mutFields.foreach(stack.push)
 
     val subContractId = getSubContractId("entity")
-    val instr         = CreateMapEntity(immFields.length.toByte, mutFields.length.toByte)
+    val instr         = CreateMapEntry(immFields.length.toByte, mutFields.length.toByte)
     createContract(instr)
     frame.opStack.size is 0
     checkContractState(instr, subContractId, ALPH.oneAlph, AVector.empty, None)
@@ -3971,7 +3971,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntity(byte, byte) -> 32000
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -4101,7 +4101,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntity(byte, byte) -> 210
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(byte, byte) -> 210
     )
     // format: on
 
@@ -4163,7 +4163,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit, CreateMapEntity(twoBytes)
+      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes)
     )
     // format: on
   }

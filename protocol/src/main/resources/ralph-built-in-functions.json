@@ -548,7 +548,7 @@
     "params": [
       
     ],
-    "returns": "@returns the minimal ALPH amount of contract deposit"
+    "returns": "@returns the minimal ALPH amount for contract deposit"
   },
   {
     "name": "mapEntryDeposit",

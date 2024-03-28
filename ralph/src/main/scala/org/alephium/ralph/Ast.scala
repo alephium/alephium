@@ -377,11 +377,11 @@ object Ast {
             val objCodes = if (index == 0) initCodes ++ subContractIdCodes else subContractIdCodes
             if (mutability(index)) {
               val loadCodes = mutOffset.genCode() ++ funcArgAndRet ++
-                objCodes :+ CallExternal(CreateMapEntity.LoadMutFieldMethodIndex)
+                objCodes :+ CallExternal(CreateMapEntry.LoadMutFieldMethodIndex)
               (instrs ++ loadCodes, immOffset, mutOffset.add(1))
             } else {
               val loadCodes = immOffset.genCode() ++ funcArgAndRet ++
-                objCodes :+ CallExternal(CreateMapEntity.LoadImmFieldMethodIndex)
+                objCodes :+ CallExternal(CreateMapEntry.LoadImmFieldMethodIndex)
               (instrs ++ loadCodes, immOffset.add(1), mutOffset)
             }
         }
@@ -412,7 +412,7 @@ object Ast {
         indexCodes ++ Seq(
           ConstInstr.u256(Val.U256(U256.Two)),
           ConstInstr.u256(Val.U256(U256.Zero))
-        ) ++ objCodes :+ CallExternal(CreateMapEntity.StoreMutFieldMethodIndex)
+        ) ++ objCodes :+ CallExternal(CreateMapEntry.StoreMutFieldMethodIndex)
       }
       instrs.asInstanceOf[Seq[Seq[Instr[Ctx]]]]
     }
@@ -1009,7 +1009,7 @@ object Ast {
       val (immFields, mutFields) = state.genInitCodes(fieldsMutability, Seq(args(1)))
       val insertWithDebug        = genMapDebug(state, pathCodes, isInsert = true)
       insertWithDebug ++ (immFields :+ SelfContractId) ++
-        mutFields :+ CreateMapEntity(immFieldLength.toByte, mutFieldLength.toByte)
+        mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val approveAssetCodes   = approveAssets.flatMap(_.genCode(state))
@@ -1030,7 +1030,7 @@ object Ast {
       args(1).genCode(state) ++ Seq(
         ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
         ConstInstr.u256(Val.U256(U256.Zero))
-      ) ++ objCodes :+ CallExternal(CreateMapEntity.DestroyMethodIndex)
+      ) ++ objCodes :+ CallExternal(CreateMapEntry.DestroyMethodIndex)
     }
   }
 

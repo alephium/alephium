@@ -204,7 +204,7 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Ghost hard fork */
-    PayGasFee, MinimalContractDeposit, CreateMapEntity
+    PayGasFee, MinimalContractDeposit, CreateMapEntry
   )
   // format: on
 
@@ -2155,7 +2155,7 @@ object CreateSubContractAndTransferToken
 }
 
 @ByteCode
-final case class CreateMapEntity(immFields: Byte, mutFields: Byte)
+final case class CreateMapEntry(immFields: Byte, mutFields: Byte)
     extends ContractFactory
     with GhostInstrWithSimpleGas[StatefulContext]
     with GasCreate {
@@ -2176,7 +2176,7 @@ final case class CreateMapEntity(immFields: Byte, mutFields: Byte)
   override def prepareContractCode[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[StatefulContract.HalfDecoded] = {
-    val contract = CreateMapEntity.genContract(immFields.toInt, mutFields.toInt)
+    val contract = CreateMapEntry.genContract(immFields.toInt, mutFields.toInt)
     val bytecode = encode(contract)
     frame.ctx
       .chargeContractCodeSize(bytecode, frame.ctx.getHardFork())
@@ -2189,8 +2189,8 @@ final case class CreateMapEntity(immFields: Byte, mutFields: Byte)
     __runWith(frame, tokenIssuance = NoIssuance)
   }
 }
-object CreateMapEntity extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[Byte, Byte]) {
-  def apply(value: (Byte, Byte)): CreateMapEntity = CreateMapEntity(value._1, value._2)
+object CreateMapEntry extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[Byte, Byte]) {
+  def apply(value: (Byte, Byte)): CreateMapEntry = CreateMapEntry(value._1, value._2)
 
   val LoadImmFieldMethodIndex: Byte  = 0
   val LoadMutFieldMethodIndex: Byte  = 1
