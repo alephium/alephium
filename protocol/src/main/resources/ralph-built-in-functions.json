@@ -558,7 +558,17 @@
     "params": [
       
     ],
-    "returns": "@returns the minimal ALPH amount of contract deposit"
+    "returns": "@returns the minimal ALPH amount for contract deposit"
+  },
+  {
+    "name": "mapEntryDeposit",
+    "category": "Utils",
+    "signature": "fn mapEntryDeposit!() -> (U256)",
+    "doc": "The amount of ALPH required to create a map entry",
+    "params": [
+      
+    ],
+    "returns": "@returns the amount of ALPH required to create a map entry"
   },
   {
     "name": "networkId",

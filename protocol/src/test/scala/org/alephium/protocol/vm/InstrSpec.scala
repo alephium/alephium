@@ -94,7 +94,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait GhostForkFixture extends AllInstrsFixture {
     val ghostStatelessInstrs = AVector[GhostInstr[StatelessContext]](GroupOfAddress)
     val ghostStatefulInstrs =
-      AVector[GhostInstr[StatefulContext]](PayGasFee, MinimalContractDeposit)
+      AVector[GhostInstr[StatefulContext]](
+        PayGasFee,
+        MinimalContractDeposit,
+        CreateMapEntry(twoBytes)
+      )
   }
 
   it should "check all LemanInstr" in new LemanForkFixture {
@@ -1985,7 +1989,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait StatefulFixture extends GenFixture {
-    val baseMethod =
+    lazy val baseMethod =
       Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
@@ -1996,9 +2000,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         instrs = AVector()
       )
 
-    val contract = StatefulContract(2, methods = AVector(baseMethod))
+    lazy val contract = StatefulContract(2, methods = AVector(baseMethod))
 
-    val tokenId = TokenId.generate
+    lazy val tokenId = TokenId.generate
 
     def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
       MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.alph(amount))))
@@ -2874,14 +2878,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       fromContractId.subContractId(serialize(path), frame.ctx.blockEnv.chainIndex.from)
     }
 
-    // scalastyle:off method.length
-    def test(
-        instr: CreateContractAbstract,
-        attoAlphAmount: U256,
-        tokens: AVector[(TokenId, U256)],
-        tokenAmount: Option[U256],
-        expectedContractId: Option[ContractId] = None
-    ) = {
+    def createContract(instr: ContractFactory) = {
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
       val extraGas = instr match {
@@ -2890,7 +2887,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         case CopyCreateContract | CopyCreateContractWithToken |
             CopyCreateContractAndTransferToken =>
           801 // 801 from contractLoadGas
-        case CreateSubContract | CreateSubContractWithToken | CreateSubContractAndTransferToken =>
+        case CreateSubContract | CreateSubContractWithToken | CreateSubContractAndTransferToken |
+            CreateMapEntry(_, _) =>
           contractBytes.length + 314
         case CopyCreateSubContract | CopyCreateSubContractWithToken |
             CopyCreateSubContractAndTransferToken =>
@@ -2899,10 +2897,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       initialGas.subUnsafe(frame.ctx.gasRemaining) is GasBox.unsafe(
         instr.gas().value + immFields.length + mutFields.length + extraGas
       )
-      frame.opStack.size is 1
-      val contractId = ContractId.from(frame.popOpStackByteVec().rightValue.bytes).get
-      expectedContractId.foreach { _ is contractId }
+    }
 
+    def checkContractState(
+        instr: ContractFactory,
+        contractId: ContractId,
+        attoAlphAmount: U256,
+        tokens: AVector[(TokenId, U256)],
+        tokenAmount: Option[U256]
+    ) = {
       val contractState = frame.ctx.worldState.getContractState(contractId).rightValue
       contractState.immFields is immFields
       contractState.mutFields is mutFields
@@ -2926,6 +2929,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       } else {
         event.fields(1) is Val.ByteVec(ByteString.empty)
       }
+    }
+
+    def test(
+        instr: ContractFactory,
+        attoAlphAmount: U256,
+        tokens: AVector[(TokenId, U256)],
+        tokenAmount: Option[U256],
+        expectedContractId: Option[ContractId] = None
+    ) = {
+      createContract(instr)
+      frame.opStack.size is 1
+      val contractId = ContractId.from(frame.popOpStackByteVec().rightValue.bytes).get
+      expectedContractId.foreach { _ is contractId }
+      checkContractState(instr, contractId, attoAlphAmount, tokens, tokenAmount)
     }
   }
 
@@ -3072,6 +3089,23 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       CreateSubContractAndTransferToken.runWith(frame).leftValue isE a[InvalidAssetAddress]
     }
+  }
+
+  it should "CreateMapEntry" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
+
+    override lazy val contract = CreateMapEntry.genContract(immFields.length, mutFields.length)
+
+    stack.push(Val.ByteVec(serialize("entity")))
+    immFields.foreach(stack.push)
+    mutFields.foreach(stack.push)
+
+    val subContractId = getSubContractId("entity")
+    val instr         = CreateMapEntry(immFields.length.toByte, mutFields.length.toByte)
+    createContract(instr)
+    frame.opStack.size is 0
+    checkContractState(instr, subContractId, ALPH.oneAlph, AVector.empty, None)
   }
 
   it should "check external method arg and return length" in new ContextGenerators {
@@ -3957,7 +3991,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -4089,7 +4123,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(byte, byte) -> 210
     )
     // format: on
 
@@ -4102,6 +4136,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
     def byte: Byte = bytes.sample()
+    val twoBytes   = (byte, byte)
     def int: Int   = ints.sample()
     // format: off
     val statelessInstrs: AVector[Instr[StatelessContext]] = AVector(
@@ -4152,7 +4187,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit
+      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes)
     )
     // format: on
   }

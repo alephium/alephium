@@ -23,11 +23,12 @@ final case class ScopeState(
     var freshNameIndex: Int,
     var localArrayIndexVar: Option[Ast.Ident],
     var immFieldArrayIndexVar: Option[Ast.Ident],
-    var mutFieldArrayIndexVar: Option[Ast.Ident]
+    var mutFieldArrayIndexVar: Option[Ast.Ident],
+    var subContractIdVar: Option[Ast.Ident]
 )
 
 object ScopeState {
-  def default(): ScopeState = ScopeState(0, 0, None, None, None)
+  def default(): ScopeState = ScopeState(0, 0, None, None, None, None)
 }
 
 trait Scope { self: Compiler.State[_] =>
@@ -87,6 +88,17 @@ trait Scope { self: Compiler.State[_] =>
         val ident = Ast.Ident(freshName())
         addLocalVariable(ident)
         currentScopeState.mutFieldArrayIndexVar = Some(ident)
+        ident
+    }
+  }
+
+  def getSubContractIdVar(addLocalVariable: Ast.Ident => Unit): Ast.Ident = {
+    currentScopeState.subContractIdVar match {
+      case Some(ident) => ident
+      case None =>
+        val ident = Ast.Ident(freshName())
+        addLocalVariable(ident)
+        currentScopeState.subContractIdVar = Some(ident)
         ident
     }
   }

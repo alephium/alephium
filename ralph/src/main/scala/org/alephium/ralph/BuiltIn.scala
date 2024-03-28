@@ -1593,8 +1593,19 @@ object BuiltIn {
       Seq(Type.U256),
       MinimalContractDeposit,
       argsName = Seq.empty,
-      retComment = "the minimal ALPH amount of contract deposit",
+      retComment = "the minimal ALPH amount for contract deposit",
       doc = "The minimal contract deposit"
+    )
+
+  val mapEntryDeposit: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utils(
+      "mapEntryDeposit",
+      Seq.empty,
+      Seq(Type.U256),
+      MinimalContractDeposit,
+      argsName = Seq.empty,
+      retComment = "the amount of ALPH required to create a map entry",
+      doc = "The amount of ALPH required to create a map entry"
     )
 
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
@@ -1848,7 +1859,8 @@ object BuiltIn {
       nullContractAddress,
       selfContract,
       payGasFee,
-      minimalContractDeposit
+      minimalContractDeposit,
+      mapEntryDeposit
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
@@ -1906,17 +1918,7 @@ object BuiltIn {
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
-        val (initCodes, argCodes) = state.flattenArgs(args)
-        assume(argCodes.length == fieldsMutability.length)
-        val (immFields, mutFields) = argCodes.view.zipWithIndex
-          .foldLeft[(Seq[Instr[C]], Seq[Instr[C]])]((Seq.empty, Seq.empty)) {
-            case ((immFields, mutFields), (instrs, index)) =>
-              if (fieldsMutability(index)) {
-                (immFields, mutFields ++ instrs)
-              } else {
-                (immFields ++ instrs, mutFields)
-              }
-          }
+        val (immFields, mutFields) = state.genInitCodes(fieldsMutability, args)
         val immFieldInstrs = immFields ++ ContractBuiltIn.genCodeForStdId(
           stdInterfaceIdOpt,
           immFieldsLength
@@ -1925,7 +1927,7 @@ object BuiltIn {
           U256Const(Val.U256.unsafe(mutFieldsLength)),
           Encode
         )
-        initCodes ++ immFieldInstrs ++ mutFieldInstrs
+        immFieldInstrs ++ mutFieldInstrs
       }
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq.empty

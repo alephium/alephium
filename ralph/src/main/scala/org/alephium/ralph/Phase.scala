@@ -64,6 +64,7 @@ trait PhaseLike { self: Compiler.State[_] =>
       scopeState.localArrayIndexVar = None
       scopeState.immFieldArrayIndexVar = None
       scopeState.mutFieldArrayIndexVar = None
+      scopeState.subContractIdVar = None
     }
   }
 
