@@ -1584,7 +1584,7 @@ object BuiltIn {
       Seq(Type.U256),
       MinimalContractDeposit,
       argsName = Seq.empty,
-      retComment = "the minimal ALPH amount of contract deposit",
+      retComment = "the minimal ALPH amount for contract deposit",
       doc = "The minimal contract deposit"
     )
 

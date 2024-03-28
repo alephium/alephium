@@ -5619,7 +5619,7 @@ class VMSpec extends AlephiumSpec with Generators {
         ConstInstr.u256(Val.U256(U256.Two)),
         ConstInstr.u256(Val.U256(U256.Zero)),
         BytesConst(Val.ByteVec(subContractId.bytes)),
-        CallExternal(CreateMapEntity.StoreMutFieldMethodIndex)
+        CallExternal(CreateMapEntry.StoreMutFieldMethodIndex)
       )
       val storeFieldMethod = Method(true, false, false, 0, 0, 0, storeFieldInstrs)
       val destroyInstrs = AVector[Instr[StatefulContext]](
@@ -5627,7 +5627,7 @@ class VMSpec extends AlephiumSpec with Generators {
         ConstInstr.u256(Val.U256(U256.One)),
         ConstInstr.u256(Val.U256(U256.Zero)),
         BytesConst(Val.ByteVec(subContractId.bytes)),
-        CallExternal(CreateMapEntity.DestroyMethodIndex)
+        CallExternal(CreateMapEntry.DestroyMethodIndex)
       )
       val destroyMethod = Method(true, false, false, 0, 0, 0, destroyInstrs)
       StatefulContract(0, AVector(storeFieldMethod, destroyMethod))
