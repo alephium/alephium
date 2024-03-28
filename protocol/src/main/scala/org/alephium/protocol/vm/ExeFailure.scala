@@ -21,6 +21,7 @@ import java.math.BigInteger
 import akka.util.ByteString
 
 import org.alephium.io.IOError
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
 import org.alephium.util.{Hex, U256}
@@ -260,7 +261,8 @@ case object BalanceErrorWhenSwitchingBackFrame extends ExeFailure
 final case class LowerThanContractMinimalBalance(address: Address, amount: U256)
     extends ExeFailure {
   override def toString: String =
-    s"Contract output contains ${amount}, less than contract minimal balance ${minimalAlphInContract}"
+    s"Contract output contains ${ALPH.prettifyAmount(amount)}," +
+      s"less than contract minimal balance ${ALPH.prettifyAmount(minimalAlphInContract)}"
 }
 
 case object UnableToPayGasFee extends ExeFailure {
@@ -284,8 +286,8 @@ final case class InvalidOutputBalances(
         tokenDustAmount.addUnsafe(dustUtxoAmount)
       }
     }
-    s"Invalid ALPH balance for address $address, expected $totalDustAmount, " +
-      s"got $attoAlphAmount, you need to transfer more ALPH to this address"
+    s"Invalid ALPH balance for address $address, expected ${ALPH.prettifyAmount(totalDustAmount)}, " +
+      s"got ${ALPH.prettifyAmount(attoAlphAmount)}, you need to transfer more ALPH to this address"
   }
 }
 
@@ -314,7 +316,7 @@ final case class ContractAssetUnloaded(address: Address.Contract) extends ExeFai
 
 case object EmptyContractAsset extends ExeFailure {
   override def toString: String =
-    s"The contract's asset(s) have been used up, but a minimum of ${dustUtxoAmount} ALPH is required"
+    s"The contract's asset(s) have been used up, but a minimum of ${ALPH.prettifyAmount(dustUtxoAmount)} ALPH is required"
 }
 
 case object NoCaller extends ExeFailure {

@@ -1654,7 +1654,7 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
       approved <- balanceState
         .useAllApproved(lockupScript)
         .toRight(Right(NoAssetsApproved(Address.Asset(lockupScript))))
-      outputs <- approved.toLockedTxOutput(lockupScript, lockTime)
+      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, frame.ctx.getHardFork())
       _       <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }

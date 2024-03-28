@@ -913,14 +913,25 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "check the minimal amount deposit for contract creation" in new Fixture {
     val serverUtils = new ServerUtils
-    serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(None, HardFork.Leman) isE minimalAlphInContractPreRhone
     serverUtils.getInitialAttoAlphAmount(
-      Some(minimalAlphInContract)
-    ) isE minimalAlphInContract
+      Some(minimalAlphInContractPreRhone),
+      HardFork.Leman
+    ) isE minimalAlphInContractPreRhone
     serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1))
+      .getInitialAttoAlphAmount(Some(minimalAlphInContractPreRhone - 1), HardFork.Leman)
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
+
+    serverUtils.getInitialAttoAlphAmount(None, HardFork.Ghost) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(
+      Some(minimalAlphInContract),
+      HardFork.Ghost
+    ) isE minimalAlphInContract
+    serverUtils
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Ghost)
+      .leftValue
+      .detail is "Expect 0.1 ALPH deposit to deploy a new contract"
   }
 
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
@@ -1340,7 +1351,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     barState0.immFields is AVector.empty[Val]
     barState0.mutFields is AVector[Val](ValU256(2))
     barState0.address is barAddress
-    barState0.asset is AssetState(ALPH.oneAlph, Some(AVector.empty))
+    barState0.asset is AssetState(minimalAlphInContract, Some(AVector.empty))
     val fooState0 = callContractResult0.contracts(1)
     barState0.immFields is AVector.empty[Val]
     fooState0.mutFields is AVector[Val](ValU256(2))
@@ -1362,7 +1373,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     barState1.immFields is AVector.empty[Val]
     barState1.mutFields is AVector[Val](ValU256(1))
     barState1.address is barAddress
-    barState1.asset is AssetState(ALPH.oneAlph, Some(AVector.empty))
+    barState1.asset is AssetState(minimalAlphInContract, Some(AVector.empty))
     val fooState1 = callContractResult1.contracts(1)
     barState1.immFields is AVector.empty[Val]
     fooState1.mutFields is AVector[Val](ValU256(1))
