@@ -854,10 +854,13 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
-    P(Index ~ Lexer.ident ~ "." ~ "insert!" ~ approveAssets ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
+    P(
+      Index ~ Lexer.ident ~ "." ~ "insert!" ~ approveAssets.? ~
+        "(" ~ expr.rep(0, ",") ~ ")" ~~ Index
+    )
       .map { case (fromIndex, ident, approveAssets, exprs, endIndex) =>
-        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
-        Ast.InsertToMap(ident, approveAssets, exprs).atSourceIndex(sourceIndex)
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+        Ast.InsertToMap(ident, approveAssets.getOrElse(Seq.empty), exprs).atSourceIndex(sourceIndex)
       }
 
   def removeFromMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =

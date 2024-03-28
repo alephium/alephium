@@ -5237,7 +5237,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!{@$genesisAddress -> ALPH: 1 alph}(0, baz)
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5339,7 +5339,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!{@$genesisAddress -> ALPH: 1 alph}(0, baz)
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
