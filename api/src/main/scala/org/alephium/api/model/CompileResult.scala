@@ -67,11 +67,11 @@ final case class CompileContractResult(
     codeHashDebug: Hash,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
-    maps: AVector[CompileResult.MapSig],
     constants: AVector[CompileResult.Constant],
     enums: AVector[CompileResult.Enum],
     events: AVector[CompileResult.EventSig],
     warnings: AVector[String],
+    maps: Option[CompileResult.MapsSig] = None,
     stdInterfaceId: Option[String] = None
 ) extends CompileResult.Versioned
 
@@ -95,7 +95,7 @@ object CompileContractResult {
       compiled.debugCode.hash,
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
-      maps = AVector.from(contractAst.maps.view.map(CompileResult.MapSig.from)),
+      maps = CompileResult.MapsSig.from(contractAst.maps),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
       constants = AVector.from(contractAst.constantVars.map(CompileResult.Constant.from)),
       enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
@@ -229,10 +229,15 @@ object CompileResult {
     }
   }
 
-  final case class MapSig(name: String, `type`: String)
-  object MapSig {
-    def from(mapDef: Ast.MapDef): MapSig = {
-      MapSig(mapDef.ident.name, mapDef.tpe.signature)
+  final case class MapsSig(names: AVector[String], types: AVector[String])
+  object MapsSig {
+    def from(mapDefs: Seq[Ast.MapDef]): Option[MapsSig] = {
+      Option.when(mapDefs.nonEmpty)(
+        MapsSig(
+          AVector.from(mapDefs.view.map(_.name)),
+          AVector.from(mapDefs.view.map(_.tpe.signature))
+        )
+      )
     }
   }
 
