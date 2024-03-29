@@ -6995,12 +6995,6 @@
                       ]
                     }
                   ],
-                  "maps": [
-                    {
-                      "name": "foo",
-                      "type": "Map[U256,U256]"
-                    }
-                  ],
                   "constants": [
                     {
                       "name": "A",
@@ -7051,6 +7045,14 @@
                   "warnings": [
                     "Found unused fields in Foo: a"
                   ],
+                  "maps": {
+                    "names": [
+                      "foo"
+                    ],
+                    "types": [
+                      "Map[U256,U256]"
+                    ]
+                  },
                   "stdInterfaceId": "0001"
                 }
               }
@@ -7222,12 +7224,6 @@
                           ]
                         }
                       ],
-                      "maps": [
-                        {
-                          "name": "foo",
-                          "type": "Map[U256,U256]"
-                        }
-                      ],
                       "constants": [
                         {
                           "name": "A",
@@ -7278,6 +7274,14 @@
                       "warnings": [
                         "Found unused fields in Foo: a"
                       ],
+                      "maps": {
+                        "names": [
+                          "foo"
+                        ],
+                        "types": [
+                          "Map[U256,U256]"
+                        ]
+                      },
                       "stdInterfaceId": "0001"
                     }
                   ],
@@ -11209,7 +11213,6 @@
           "codeHashDebug",
           "fields",
           "functions",
-          "maps",
           "constants",
           "enums",
           "events",
@@ -11246,12 +11249,6 @@
               "$ref": "#/components/schemas/FunctionSig"
             }
           },
-          "maps": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MapSig"
-            }
-          },
           "constants": {
             "type": "array",
             "items": {
@@ -11275,6 +11272,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "maps": {
+            "$ref": "#/components/schemas/MapsSig"
           },
           "stdInterfaceId": {
             "type": "string"
@@ -12016,18 +12016,24 @@
           }
         }
       },
-      "MapSig": {
+      "MapsSig": {
         "required": [
-          "name",
-          "type"
+          "names",
+          "types"
         ],
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string"
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
-          "type": {
-            "type": "string"
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
