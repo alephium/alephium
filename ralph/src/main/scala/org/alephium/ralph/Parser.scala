@@ -788,7 +788,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def mapDef[Unknown: P]: P[Ast.MapDef] = {
     PP(
-      Lexer.token(Keyword.`map`) ~ "[" ~ mapKeyType ~ ","
+      Lexer.token(Keyword.`mapping`) ~ "[" ~ mapKeyType ~ ","
         ~ parseType(Type.NamedType) ~ "]" ~ Lexer.ident
     ) { case (_, key, value, ident) =>
       Ast.MapDef(ident, Type.Map(key, value))
