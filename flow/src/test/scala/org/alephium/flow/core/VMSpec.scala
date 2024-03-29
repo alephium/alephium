@@ -5056,21 +5056,22 @@ class VMSpec extends AlephiumSpec with Generators {
 
     def contractCode(address: Address.Asset, keyType: String, keyValue: String): String =
       s"""
-         |Contract MapContract(mut map: Map[$keyType, U256]) {
+         |Contract MapContract() {
+         |  map[$keyType, U256] map0
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$address -> ALPH: mapEntryDeposit!()}($keyValue, 1)
+         |    map0.insert!{@$address -> ALPH: mapEntryDeposit!()}($keyValue, 1)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
-         |    assert!(map.contains!($keyValue), 0)
-         |    assert!(map[$keyValue] == 1, 0)
-         |    map[$keyValue] = 2
-         |    assert!(map[$keyValue] == 2, 0)
+         |    assert!(map0.contains!($keyValue), 0)
+         |    assert!(map0[$keyValue] == 1, 0)
+         |    map0[$keyValue] = 2
+         |    assert!(map0[$keyValue] == 2, 0)
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!($keyValue, @$address)
+         |    map0.remove!($keyValue, @$address)
          |  }
          |}
          |""".stripMargin
@@ -5089,27 +5090,28 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "test primitive type as map value" in new MapFixture {
     val mapContract =
       s"""
-         |Contract MapContract(mut map: Map[U256, ByteVec]) {
+         |Contract MapContract() {
+         |  map[U256, ByteVec] map0
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, #00)
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, #01)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, #00)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, #01)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
-         |    assert!(map[0] == #00, 0)
-         |    assert!(map[1] == #01, 0)
-         |    assert!(map.contains!(0) && map.contains!(1), 0)
-         |    assert!(!map.contains!(2), 0)
-         |    map[0] = #02
-         |    map[1] = #03
+         |    assert!(map0[0] == #00, 0)
+         |    assert!(map0[1] == #01, 0)
+         |    assert!(map0.contains!(0) && map0.contains!(1), 0)
+         |    assert!(!map0.contains!(2), 0)
+         |    map0[0] = #02
+         |    map0[1] = #03
          |  }
          |
          |  pub fn remove() -> () {
-         |    assert!(map[0] == #02, 0)
-         |    assert!(map[1] == #03, 0)
-         |    map.remove!(0, @$genesisAddress)
-         |    map.remove!(1, @$genesisAddress)
+         |    assert!(map0[0] == #02, 0)
+         |    assert!(map0[1] == #03, 0)
+         |    map0.remove!(0, @$genesisAddress)
+         |    map0.remove!(1, @$genesisAddress)
          |  }
          |}
          |""".stripMargin
@@ -5124,40 +5126,41 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "test primitive array type as map value" in new MapFixture {
     val mapContract =
       s"""
-         |Contract MapContract(mut map: Map[U256, [ByteVec; 2]]) {
+         |Contract MapContract() {
+         |  map[U256, [ByteVec; 2]] map0
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [#00, #01])
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, [#02, #03])
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [#00, #01])
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, [#02, #03])
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
-         |    assert!(map.contains!(0) && map.contains!(1), 0)
-         |    assert!(!map.contains!(2), 0)
-         |    assert!(map[0][0] == #00 && map[0][1] == #01, 0)
-         |    assert!(map[1][0] == #02 && map[1][1] == #03, 0)
+         |    assert!(map0.contains!(0) && map0.contains!(1), 0)
+         |    assert!(!map0.contains!(2), 0)
+         |    assert!(map0[0][0] == #00 && map0[0][1] == #01, 0)
+         |    assert!(map0[1][0] == #02 && map0[1][1] == #03, 0)
          |    let mut number = 0
          |    for (let mut i = 0; i < 2; i = i + 1) {
          |      for (let mut j = 0; j < 2; j = j + 1) {
-         |        assert!(map[i][j] == u256To1Byte!(number), 0)
+         |        assert!(map0[i][j] == u256To1Byte!(number), 0)
          |        number = number + 1
          |      }
          |    }
-         |    map[0] = [#04, #05]
-         |    map[1] = [#06, #07]
-         |    assert!(map[0][0] == #04 && map[0][1] == #05, 0)
-         |    assert!(map[1][0] == #06 && map[1][1] == #07, 0)
-         |    map[0][0] = #08
-         |    map[0][1] = #09
-         |    map[1][0] = #10
-         |    map[1][1] = #11
+         |    map0[0] = [#04, #05]
+         |    map0[1] = [#06, #07]
+         |    assert!(map0[0][0] == #04 && map0[0][1] == #05, 0)
+         |    assert!(map0[1][0] == #06 && map0[1][1] == #07, 0)
+         |    map0[0][0] = #08
+         |    map0[0][1] = #09
+         |    map0[1][0] = #10
+         |    map0[1][1] = #11
          |  }
          |
          |  pub fn remove() -> () {
-         |    assert!(map[0][0] == #08 && map[0][1] == #09, 0)
-         |    assert!(map[1][0] == #10 && map[1][1] == #11, 0)
-         |    map.remove!(0, @$genesisAddress)
-         |    map.remove!(1, @$genesisAddress)
+         |    assert!(map0[0][0] == #08 && map0[0][1] == #09, 0)
+         |    assert!(map0[1][0] == #10 && map0[1][1] == #11, 0)
+         |    map0.remove!(0, @$genesisAddress)
+         |    map0.remove!(1, @$genesisAddress)
          |  }
          |}
          |""".stripMargin
@@ -5176,32 +5179,33 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mut a: U256,
          |  b: U256
          |}
-         |Contract MapContract(mut map: Map[U256, [Foo; 2]]) {
+         |Contract MapContract() {
+         |  map[U256, [Foo; 2]] map0
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    let foo0 = Foo{a: 0, b: 1}
          |    let foo1 = Foo{a: 2, b: 3}
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [foo0, foo1])
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [foo0, foo1])
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
-         |    assert!(map.contains!(0), 0)
-         |    assert!(!map.contains!(1), 0)
-         |    assert!(map[0][0].a == 0 && map[0][0].b == 1, 0)
-         |    assert!(map[0][1].a == 2 && map[0][1].b == 3, 0)
+         |    assert!(map0.contains!(0), 0)
+         |    assert!(!map0.contains!(1), 0)
+         |    assert!(map0[0][0].a == 0 && map0[0][0].b == 1, 0)
+         |    assert!(map0[0][1].a == 2 && map0[0][1].b == 3, 0)
          |    let mut number = 0
          |    for (let mut i = 0; i < 2; i = i + 1) {
-         |      assert!(map[0][i].a == number && map[0][i].b == (number + 1), 0)
+         |      assert!(map0[0][i].a == number && map0[0][i].b == (number + 1), 0)
          |      number = number + 2
          |    }
-         |    map[0][0].a = 4
-         |    map[0][1].a = 5
+         |    map0[0][0].a = 4
+         |    map0[0][1].a = 5
          |  }
          |
          |  pub fn remove() -> () {
-         |    assert!(map[0][0].a == 4 && map[0][0].b == 1, 0)
-         |    assert!(map[0][1].a == 5 && map[0][1].b == 3, 0)
-         |    map.remove!(0, @$genesisAddress)
+         |    assert!(map0[0][0].a == 4 && map0[0][0].b == 1, 0)
+         |    assert!(map0[0][1].a == 5 && map0[0][1].b == 3, 0)
+         |    map0.remove!(0, @$genesisAddress)
          |  }
          |}
          |""".stripMargin
@@ -5227,7 +5231,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mut x: Bool,
          |  mut y: [Bar; 2]
          |}
-         |Contract MapContract(mut map: Map[U256, Baz]) {
+         |Contract MapContract() {
+         |  map[U256, Baz] map0
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    let baz = Baz{
@@ -5237,25 +5242,25 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
-         |    assert!(map.contains!(0), 0)
-         |    assert!(!map.contains!(1), 0)
-         |    f0(map, 0)
-         |    map[0].x = true
-         |    map[0].y[0].c = -3i
-         |    map[0].y[0].d[0].b = #05
-         |    map[0].y[0].d[1].b = #06
-         |    map[0].y[1].c = -4i
-         |    map[0].y[1].d[0].b = #07
-         |    map[0].y[1].d[1].b = #08
-         |    f1(map, 0)
+         |    assert!(map0.contains!(0), 0)
+         |    assert!(!map0.contains!(1), 0)
+         |    f0(0)
+         |    map0[0].x = true
+         |    map0[0].y[0].c = -3i
+         |    map0[0].y[0].d[0].b = #05
+         |    map0[0].y[0].d[1].b = #06
+         |    map0[0].y[1].c = -4i
+         |    map0[0].y[1].d[0].b = #07
+         |    map0[0].y[1].d[1].b = #08
+         |    f1(0)
          |  }
          |
-         |  fn f0(map: Map[U256, Baz], key: U256) -> () {
-         |    let baz = map[key]
+         |  fn f0(key: U256) -> () {
+         |    let baz = map0[key]
          |    assert!(!baz.x, 0)
          |    assert!(baz.y[0].c == -1i, 0)
          |    assert!(baz.y[0].d[0].a == 1, 0)
@@ -5268,35 +5273,35 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].a == 4, 0)
          |    assert!(baz.y[1].d[1].b == #04, 0)
          |
-         |    assert!(!map[key].x, 0)
-         |    assert!(map[key].y[0].c == -1i, 0)
-         |    assert!(map[key].y[0].d[0].a == 1, 0)
-         |    assert!(map[key].y[0].d[0].b == #01, 0)
-         |    assert!(map[key].y[0].d[1].a == 2, 0)
-         |    assert!(map[key].y[0].d[1].b == #02, 0)
-         |    assert!(map[key].y[1].c == -2i, 0)
-         |    assert!(map[key].y[1].d[0].a == 3, 0)
-         |    assert!(map[key].y[1].d[0].b == #03, 0)
-         |    assert!(map[key].y[1].d[1].a == 4, 0)
-         |    assert!(map[key].y[1].d[1].b == #04, 0)
+         |    assert!(!map0[key].x, 0)
+         |    assert!(map0[key].y[0].c == -1i, 0)
+         |    assert!(map0[key].y[0].d[0].a == 1, 0)
+         |    assert!(map0[key].y[0].d[0].b == #01, 0)
+         |    assert!(map0[key].y[0].d[1].a == 2, 0)
+         |    assert!(map0[key].y[0].d[1].b == #02, 0)
+         |    assert!(map0[key].y[1].c == -2i, 0)
+         |    assert!(map0[key].y[1].d[0].a == 3, 0)
+         |    assert!(map0[key].y[1].d[0].b == #03, 0)
+         |    assert!(map0[key].y[1].d[1].a == 4, 0)
+         |    assert!(map0[key].y[1].d[1].b == #04, 0)
          |  }
          |
-         |  fn f1(map: Map[U256, Baz], key: U256) -> () {
-         |    assert!(map[key].x, 0)
-         |    assert!(map[key].y[0].c == -3i, 0)
-         |    assert!(map[key].y[0].d[0].a == 1, 0)
-         |    assert!(map[key].y[0].d[0].b == #05, 0)
-         |    assert!(map[key].y[0].d[1].a == 2, 0)
-         |    assert!(map[key].y[0].d[1].b == #06, 0)
-         |    assert!(map[key].y[1].c == -4i, 0)
-         |    assert!(map[key].y[1].d[0].a == 3, 0)
-         |    assert!(map[key].y[1].d[0].b == #07, 0)
-         |    assert!(map[key].y[1].d[1].a == 4, 0)
-         |    assert!(map[key].y[1].d[1].b == #08, 0)
+         |  fn f1(key: U256) -> () {
+         |    assert!(map0[key].x, 0)
+         |    assert!(map0[key].y[0].c == -3i, 0)
+         |    assert!(map0[key].y[0].d[0].a == 1, 0)
+         |    assert!(map0[key].y[0].d[0].b == #05, 0)
+         |    assert!(map0[key].y[0].d[1].a == 2, 0)
+         |    assert!(map0[key].y[0].d[1].b == #06, 0)
+         |    assert!(map0[key].y[1].c == -4i, 0)
+         |    assert!(map0[key].y[1].d[0].a == 3, 0)
+         |    assert!(map0[key].y[1].d[0].b == #07, 0)
+         |    assert!(map0[key].y[1].d[1].a == 4, 0)
+         |    assert!(map0[key].y[1].d[1].b == #08, 0)
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!(0, @$genesisAddress)
+         |    map0.remove!(0, @$genesisAddress)
          |  }
          |}
          |""".stripMargin
@@ -5312,6 +5317,7 @@ class VMSpec extends AlephiumSpec with Generators {
       Val.ByteVec(Hex.unsafe("04"))
     )
     override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+    runTest()
   }
 
   it should "test mutable struct type as map value" in new MapFixture {
@@ -5329,7 +5335,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mut x: Bool,
          |  mut y: [Bar; 2]
          |}
-         |Contract MapContract(mut map: Map[U256, Baz]) {
+         |Contract MapContract() {
+         |  map[U256, Baz] map0
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    let baz = Baz{
@@ -5339,43 +5346,43 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
-         |    assert!(map.contains!(0), 0)
-         |    assert!(!map.contains!(1), 0)
-         |    f0(map, 0)
-         |    f1(map, 0)
-         |    f2(map, 0)
-         |    f3(map, 0)
-         |    f4(map, 0)
-         |    f5(map, 0)
+         |    assert!(map0.contains!(0), 0)
+         |    assert!(!map0.contains!(1), 0)
+         |    f0(0)
+         |    f1(0)
+         |    f2(0)
+         |    f3(0)
+         |    f4(0)
+         |    f5(0)
          |  }
          |
-         |  fn f0(map: Map[U256, Baz], key: U256) -> () {
-         |    assert!(!map[key].x, 0)
-         |    assert!(map[key].y[0].c == -1i, 0)
-         |    assert!(map[key].y[0].d[0].a == 1, 0)
-         |    assert!(map[key].y[0].d[0].b == #01, 0)
-         |    assert!(map[key].y[0].d[1].a == 2, 0)
-         |    assert!(map[key].y[0].d[1].b == #02, 0)
-         |    assert!(map[key].y[1].c == -2i, 0)
-         |    assert!(map[key].y[1].d[0].a == 3, 0)
-         |    assert!(map[key].y[1].d[0].b == #03, 0)
-         |    assert!(map[key].y[1].d[1].a == 4, 0)
-         |    assert!(map[key].y[1].d[1].b == #04, 0)
+         |  fn f0(key: U256) -> () {
+         |    assert!(!map0[key].x, 0)
+         |    assert!(map0[key].y[0].c == -1i, 0)
+         |    assert!(map0[key].y[0].d[0].a == 1, 0)
+         |    assert!(map0[key].y[0].d[0].b == #01, 0)
+         |    assert!(map0[key].y[0].d[1].a == 2, 0)
+         |    assert!(map0[key].y[0].d[1].b == #02, 0)
+         |    assert!(map0[key].y[1].c == -2i, 0)
+         |    assert!(map0[key].y[1].d[0].a == 3, 0)
+         |    assert!(map0[key].y[1].d[0].b == #03, 0)
+         |    assert!(map0[key].y[1].d[1].a == 4, 0)
+         |    assert!(map0[key].y[1].d[1].b == #04, 0)
          |  }
          |
-         |  fn f1(map: Map[U256, Baz], key: U256) -> () {
-         |    map[key] = Baz{
+         |  fn f1(key: U256) -> () {
+         |    map0[key] = Baz{
          |      x: true,
          |      y: [
          |        Bar{c: -2i, d: [Foo{a: 2, b: #02}, Foo{a: 3, b: #03}]},
          |        Bar{c: -3i, d: [Foo{a: 4, b: #04}, Foo{a: 5, b: #05}]}
          |      ]
          |    }
-         |    let baz = map[key]
+         |    let baz = map0[key]
          |    assert!(baz.x, 0)
          |    assert!(baz.y[0].c == -2i, 0)
          |    assert!(baz.y[0].d[0].a == 2, 0)
@@ -5389,11 +5396,11 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #05, 0)
          |  }
          |
-         |  fn f2(map: Map[U256, Baz], key: U256) -> () {
-         |    map[key].x = false
-         |    map[key].y[0] = Bar{c: -3i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
-         |    map[key].y[1] = Bar{c: -4i, d: [Foo{a: 5, b: #05}, Foo{a: 6, b: #06}]}
-         |    let baz = map[key]
+         |  fn f2(key: U256) -> () {
+         |    map0[key].x = false
+         |    map0[key].y[0] = Bar{c: -3i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
+         |    map0[key].y[1] = Bar{c: -4i, d: [Foo{a: 5, b: #05}, Foo{a: 6, b: #06}]}
+         |    let baz = map0[key]
          |    assert!(!baz.x, 0)
          |    assert!(baz.y[0].c == -3i, 0)
          |    assert!(baz.y[0].d[0].a == 3, 0)
@@ -5407,13 +5414,13 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #06, 0)
          |  }
          |
-         |  fn f3(map: Map[U256, Baz], key: U256) -> () {
-         |    map[key].x = true
-         |    map[key].y[0].c = -4i
-         |    map[key].y[0].d = [Foo{a: 4, b: #04}, Foo{a: 5, b: #05}]
-         |    map[key].y[1].c = -5i
-         |    map[key].y[1].d = [Foo{a: 6, b: #06}, Foo{a: 7, b: #07}]
-         |    let baz = map[key]
+         |  fn f3(key: U256) -> () {
+         |    map0[key].x = true
+         |    map0[key].y[0].c = -4i
+         |    map0[key].y[0].d = [Foo{a: 4, b: #04}, Foo{a: 5, b: #05}]
+         |    map0[key].y[1].c = -5i
+         |    map0[key].y[1].d = [Foo{a: 6, b: #06}, Foo{a: 7, b: #07}]
+         |    let baz = map0[key]
          |    assert!(baz.x, 0)
          |    assert!(baz.y[0].c == -4i, 0)
          |    assert!(baz.y[0].d[0].a == 4, 0)
@@ -5427,15 +5434,15 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #07, 0)
          |  }
          |
-         |  fn f4(map: Map[U256, Baz], key: U256) -> () {
-         |    map[key].x = false
-         |    map[key].y[0].c = -5i
-         |    map[key].y[0].d[0] = Foo{a: 5, b: #05}
-         |    map[key].y[0].d[1] = Foo{a: 6, b: #06}
-         |    map[key].y[1].c = -6i
-         |    map[key].y[1].d[0] = Foo{a: 7, b: #07}
-         |    map[key].y[1].d[1] = Foo{a: 8, b: #08}
-         |    let baz = map[key]
+         |  fn f4(key: U256) -> () {
+         |    map0[key].x = false
+         |    map0[key].y[0].c = -5i
+         |    map0[key].y[0].d[0] = Foo{a: 5, b: #05}
+         |    map0[key].y[0].d[1] = Foo{a: 6, b: #06}
+         |    map0[key].y[1].c = -6i
+         |    map0[key].y[1].d[0] = Foo{a: 7, b: #07}
+         |    map0[key].y[1].d[1] = Foo{a: 8, b: #08}
+         |    let baz = map0[key]
          |    assert!(!baz.x, 0)
          |    assert!(baz.y[0].c == -5i, 0)
          |    assert!(baz.y[0].d[0].a == 5, 0)
@@ -5449,19 +5456,19 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #08, 0)
          |  }
          |
-         |  fn f5(map: Map[U256, Baz], key: U256) -> () {
-         |    map[key].x = true
-         |    map[key].y[0].c = -6i
-         |    map[key].y[0].d[0].a = 6
-         |    map[key].y[0].d[0].b = #06
-         |    map[key].y[0].d[1].a = 7
-         |    map[key].y[0].d[1].b = #07
-         |    map[key].y[1].c = -7i
-         |    map[key].y[1].d[0].a = 8
-         |    map[key].y[1].d[0].b = #08
-         |    map[key].y[1].d[1].a = 9
-         |    map[key].y[1].d[1].b = #09
-         |    let baz = map[key]
+         |  fn f5(key: U256) -> () {
+         |    map0[key].x = true
+         |    map0[key].y[0].c = -6i
+         |    map0[key].y[0].d[0].a = 6
+         |    map0[key].y[0].d[0].b = #06
+         |    map0[key].y[0].d[1].a = 7
+         |    map0[key].y[0].d[1].b = #07
+         |    map0[key].y[1].c = -7i
+         |    map0[key].y[1].d[0].a = 8
+         |    map0[key].y[1].d[0].b = #08
+         |    map0[key].y[1].d[1].a = 9
+         |    map0[key].y[1].d[1].b = #09
+         |    let baz = map0[key]
          |    assert!(baz.x, 0)
          |    assert!(baz.y[0].c == -6i, 0)
          |    assert!(baz.y[0].d[0].a == 6, 0)
@@ -5476,28 +5483,35 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!(0, @$genesisAddress)
+         |    map0.remove!(0, @$genesisAddress)
          |  }
          |}
          |""".stripMargin
 
-    val immFields: AVector[Val] = AVector(1, 2, 3, 4).map(v => Val.U256(U256.unsafe(v)))
+    val immFields: AVector[Val] = AVector.empty
     val mutFields: AVector[Val] = AVector(
       Val.False,
       Val.I256(I256.unsafe(-1)),
+      Val.U256(U256.unsafe(1)),
       Val.ByteVec(Hex.unsafe("01")),
+      Val.U256(U256.unsafe(2)),
       Val.ByteVec(Hex.unsafe("02")),
       Val.I256(I256.unsafe(-2)),
+      Val.U256(U256.unsafe(3)),
       Val.ByteVec(Hex.unsafe("03")),
+      Val.U256(U256.unsafe(4)),
       Val.ByteVec(Hex.unsafe("04"))
     )
     override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+    runTest()
   }
 
   it should "test multiple maps" in new MapFixture {
     val mapContract =
       s"""
-         |Contract Foo(mut map0: Map[U256, U256], mut map1: Map[U256, U256]) {
+         |Contract Foo() {
+         |  map[U256, U256] map0
+         |  map[U256, U256] map1
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap0(key: U256, value: U256) -> () {
          |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(key, value)
@@ -5583,18 +5597,19 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "check caller contract id when updating map entry" in new MapFixture {
     val mapContract =
       s"""
-         |Contract Foo(mut map: Map[U256, U256]) {
+         |Contract Foo() {
+         |  map[U256, U256] map0
          |  pub fn update() -> () {
-         |    map[0] = 1
+         |    map0[0] = 1
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!(0, @$genesisAddress)
+         |    map0.remove!(0, @$genesisAddress)
          |  }
          |
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, 0)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, 0)
          |  }
          |}
          |""".stripMargin

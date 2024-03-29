@@ -200,8 +200,9 @@ object Compiler {
     ) extends VarInfo {
       def isLocal: Boolean = false
     }
-    final case class MapVar(tpe: Type.Map, isUnused: Boolean, index: Int) extends VarInfo {
+    final case class MapVar(tpe: Type.Map, index: Int) extends VarInfo {
       def isMutable: Boolean   = true
+      def isUnused: Boolean    = false
       def isGenerated: Boolean = false
       def isLocal: Boolean     = false
     }
@@ -640,14 +641,9 @@ object Compiler {
       trackGenCodePhaseNewVars(sname)
     }
 
-    private[ralph] def addMapVar(
-        ident: Ast.Ident,
-        tpe: Type.Map,
-        isUnused: Boolean,
-        mapIndex: Int
-    ): Unit = {
+    private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)
-      addVarInfo(sname, VarInfo.MapVar(tpe, isUnused, mapIndex))
+      addVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
@@ -828,9 +824,22 @@ object Compiler {
       }
     }
 
+    def checkUnusedMaps(): Unit = {
+      val unusedMaps = varTable.filter { case (name, varInfo) =>
+        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(name)) && !accessedVars
+          .contains(WriteVariable(name))
+      }
+      if (unusedMaps.nonEmpty) {
+        warnUnusedMaps(typeId, unusedMaps.keys.toSeq)
+      }
+    }
+
     def checkUnusedFields(): Unit = {
       val unusedVars = varTable.filter { case (name, varInfo) =>
-        !varInfo.isGenerated && !varInfo.isUnused && !accessedVars.contains(ReadVariable(name))
+        !varInfo.isGenerated &&
+        !varInfo.isUnused &&
+        !accessedVars.contains(ReadVariable(name)) &&
+        !varInfo.tpe.isMapType
       }
       val unusedConstants = mutable.ArrayBuffer.empty[String]
       val unusedFields    = mutable.ArrayBuffer.empty[String]
@@ -851,6 +860,7 @@ object Compiler {
       val unassignedMutableFields = varTable.view
         .filter { case (name, varInfo) =>
           !varInfo.isLocal &&
+          !varInfo.tpe.isMapType &&
           varInfo.isMutable &&
           isTypeMutable(varInfo.tpe) &&
           !varInfo.isGenerated &&
@@ -1249,7 +1259,7 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
-        case VarInfo.MapVar(_, _, index)                        => genMapIndex(index)
+        case VarInfo.MapVar(_, index)                           => genMapIndex(index)
       }
     }
 

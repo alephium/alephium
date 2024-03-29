@@ -677,9 +677,6 @@ object Ast {
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
       val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
-      if (retTypes.exists(_.isMapType)) {
-        throw Compiler.Error("Access to other contracts' maps is not allowed", sourceIndex)
-      }
       (contractType.id, retTypes)
     }
 
@@ -842,17 +839,6 @@ object Ast {
 
     def name: String = id.name
 
-    def checkMapType(): Unit = {
-      fields.find(_.tpe.isMapType) match {
-        case Some(field) =>
-          throw Compiler.Error(
-            s"Map type fields does not support in struct",
-            field.ident.sourceIndex
-          )
-        case _ =>
-      }
-    }
-
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
     def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
     def getFieldsMutability(): AVector[Boolean]   = AVector.from(fields.view.map(_.isMutable))
@@ -915,6 +901,10 @@ object Ast {
       }
       sortedFields.flatMap(_._2.genCode(state))
     }
+  }
+
+  final case class MapDef(ident: Ident, tpe: Type.Map) extends UniqueDef with Positioned {
+    def name: String = ident.name
   }
 
   sealed trait Statement[Ctx <: StatelessContext]
@@ -1057,9 +1047,6 @@ object Ast {
       }
       vars.zip(types).foreach {
         case (NamedVar(isMutable, ident), tpe) =>
-          if (tpe.isMapType && !isMutable) {
-            throw Compiler.Error(s"Map must be declared as mutable", sourceIndex)
-          }
           state.addLocalVariable(ident, tpe, isMutable, isUnused = false, isGenerated = false)
         case _ =>
       }
@@ -1184,28 +1171,8 @@ object Ast {
       }
     }
 
-    private def checkMapType(): Unit = {
-      args.find(_.tpe.isMapType) match {
-        case Some(arg) =>
-          throw Compiler.Error(
-            s"The arg type of function ${id.name} cannot be map",
-            arg.ident.sourceIndex
-          )
-        case None =>
-      }
-      rtypes.find(_.isMapType) match {
-        case Some(_) =>
-          throw Compiler.Error(
-            s"The return type of function ${id.name} cannot be map",
-            id.sourceIndex
-          )
-        case _ =>
-      }
-    }
-
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setFuncScope(id)
-      checkMapType()
       state.checkArguments(args)
       args.foreach { arg =>
         val argTpe = state.resolveType(arg.tpe)
@@ -1830,49 +1797,25 @@ object Ast {
       }
     }
 
-    private def checkMapType(): Unit = {
-      templateVars.find(_.tpe.isMapType) match {
-        case Some(field) =>
-          throw Compiler.Error(
-            s"Map type fields does not support in TxScript",
-            field.ident.sourceIndex
-          )
-        case None =>
-      }
-    }
-
     private def checkAndAddFields(state: Compiler.State[Ctx]): Unit = {
-      var mapIndex = 0
       fields.foreach { field =>
-        state.resolveType(field.tpe) match {
-          case t: Type.Map =>
-            if (!field.isMutable) {
-              throw Compiler.Error(
-                s"Map field ${field.ident.name} must be mutable",
-                field.ident.sourceIndex
-              )
-            }
-            state.addMapVar(field.ident, t, field.isUnused, mapIndex)
-            mapIndex += 1
-          case tpe =>
-            state.addFieldVariable(
-              field.ident,
-              tpe,
-              field.isMutable,
-              field.isUnused,
-              isGenerated = false
-            )
-        }
+        state.addFieldVariable(
+          field.ident,
+          state.resolveType(field.tpe),
+          field.isMutable,
+          field.isUnused,
+          isGenerated = false
+        )
       }
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
-      checkMapType()
       state.setCheckPhase()
       state.checkArguments(fields)
       addTemplateVars(state)
       checkAndAddFields(state)
       funcs.foreach(_.check(state))
+      state.checkUnusedMaps()
       state.checkUnusedFields()
       state.checkUnassignedMutableFields()
     }
@@ -1918,6 +1861,7 @@ object Ast {
 
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
+    def maps: Seq[MapDef]
     def events: Seq[EventDef]
     def constantVars: Seq[ConstantVarDef]
     def enums: Seq[EnumDef]
@@ -1947,6 +1891,7 @@ object Ast {
       Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe", sourceIndex)
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
     def enums: Seq[EnumDef]               = throw error("enum")
+    def maps: Seq[MapDef]                 = throw error("map")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): AVector[String] = AVector.from(templateVars.view.map(_.ident.name))
@@ -2007,6 +1952,7 @@ object Ast {
       templateVars: Seq[Argument],
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
+      maps: Seq[MapDef],
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef],
       enums: Seq[EnumDef],
@@ -2024,8 +1970,7 @@ object Ast {
         globalState: GlobalState
     ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
-      val fieldsExceptMaps  = fields.filterNot(_.tpe.isMapType)
-      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fieldsExceptMaps, globalState))
+      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState))
     }
 
     private def checkFuncs(): Unit = {
@@ -2067,8 +2012,17 @@ object Ast {
       }
     }
 
+    private def checkMaps(state: Compiler.State[StatefulContext]): Unit = {
+      UniqueDef.checkDuplicates(maps, "maps")
+      maps.view.zipWithIndex.foreach { case (m, index) =>
+        val mapType = Type.Map(m.tpe.key, state.resolveType(m.tpe.value))
+        state.addMapVar(m.ident, mapType, index)
+      }
+    }
+
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       state.setCheckPhase()
+      checkMaps(state)
       checkFuncs()
       checkConstants(state)
       checkInheritances(state)
@@ -2078,10 +2032,9 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods    = genMethods(state)
-      val fieldTypes = fields.view.filterNot(_.tpe.isMapType).map(_.tpe).toSeq
+      val methods = genMethods(state)
       val fieldsLength =
-        state.flattenTypeLength(fieldTypes) + (if (hasStdIdField) 1 else 0)
+        state.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
       StatefulContract(fieldsLength, methods)
     }
 
@@ -2138,6 +2091,7 @@ object Ast {
 
     def templateVars: Seq[Argument]       = throw error("template variable")
     def fields: Seq[Argument]             = throw error("field")
+    def maps: Seq[MapDef]                 = throw error("map")
     def getFieldsSignature(): String      = throw error("field")
     def getFieldTypes(): Seq[String]      = throw error("field")
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
@@ -2250,7 +2204,6 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiContract = {
-      structs.foreach(_.checkMapType())
       UniqueDef.checkDuplicates(contracts ++ structs, "TxScript/Contract/Interface/Struct")
 
       val parentsCache = buildDependencies()
@@ -2258,7 +2211,7 @@ object Ast {
         case script: TxScript =>
           script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
-          val (stdIdEnabled, stdId, funcs, events, constantVars, enums) =
+          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums) =
             MultiContract.extractDefs(parentsCache, c)
           Contract(
             Some(stdIdEnabled),
@@ -2268,13 +2221,14 @@ object Ast {
             c.templateVars,
             c.fields,
             funcs,
+            maps,
             events,
             constantVars,
             enums,
             c.inheritances
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
-          val (_, stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
+          val (_, stdId, funcs, _, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(stdId, i.ident, funcs, events, i.inheritances).atSourceIndex(
             i.sourceIndex
           )
@@ -2461,6 +2415,7 @@ object Ast {
         Boolean,
         Option[StdInterfaceId],
         Seq[FuncDef[StatefulContext]],
+        Seq[MapDef],
         Seq[EventDef],
         Seq[ConstantVarDef],
         Seq[EnumDef]
@@ -2486,6 +2441,7 @@ object Ast {
       checkInterfaceMethodIndex(sortedInterfaces)
 
       val contractEvents = allContracts.flatMap(_.events)
+      val maps           = allContracts.flatMap(_.maps)
       val events         = sortedInterfaces.flatMap(_.events) ++ contractEvents
 
       val resultFuncs = contract match {
@@ -2516,7 +2472,7 @@ object Ast {
           unimplementedFuncs
       }
 
-      (stdIdEnabled, stdId, resultFuncs, events, constantVars, enums)
+      (stdIdEnabled, stdId, resultFuncs, maps, events, constantVars, enums)
     }
     // scalastyle:on method.length
 

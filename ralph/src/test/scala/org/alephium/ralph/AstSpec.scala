@@ -791,6 +791,7 @@ class AstSpec extends AlephiumSpec {
       Seq.empty,
       Seq.empty,
       Seq.empty,
+      Seq.empty,
       Seq.empty
     )
 
