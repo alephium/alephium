@@ -66,7 +66,7 @@ object Keyword {
     override def name: String =
       "ALPH"
   }
-  case object `map` extends Used
+  case object `mapping` extends Used
 
   case object `@unused` extends Unused
   // scalastyle:on object.name

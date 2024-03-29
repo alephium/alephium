@@ -5388,8 +5388,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  pub fn f(address: Address) -> () {
-           |    let map0 = 0
-           |    $$map0$$.insert!{address -> ALPH: mapEntryDeposit!()}(0, 0)
+           |    let map = 0
+           |    $$map$$.insert!{address -> ALPH: mapEntryDeposit!()}(0, 0)
            |  }
            |}
            |""".stripMargin
@@ -5401,9 +5401,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       def code(args: String) =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  pub fn f(address: Address) -> () {
-           |    $$map0.insert!{address -> ALPH: mapEntryDeposit!()}($args)$$
+           |    $$map.insert!{address -> ALPH: mapEntryDeposit!()}($args)$$
            |  }
            |}
            |""".stripMargin
@@ -5427,8 +5427,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  pub fn f(address: Address) -> () {
-           |    let map0 = 0
-           |    $$map0$$.remove!(0, address)
+           |    let map = 0
+           |    $$map$$.remove!(0, address)
            |  }
            |}
            |""".stripMargin
@@ -5440,9 +5440,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       def code(args: String) =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  pub fn f(address: Address) -> () {
-           |    $$map0.remove!($args)$$
+           |    $$map.remove!($args)$$
            |  }
            |}
            |""".stripMargin
@@ -5465,21 +5465,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       def code(stmt: String) =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  pub fn foo() -> () {
            |    $stmt
            |  }
            |}
            |""".stripMargin
       testContractError(
-        code(s"let _ = map0$$[#00]$$"),
+        code(s"let _ = map$$[#00]$$"),
         "Invalid map key type \"ByteVec\", expected \"U256\""
       )
       testContractError(
-        code(s"map0$$[#00]$$ = 1"),
+        code(s"map$$[#00]$$ = 1"),
         "Invalid map key type \"ByteVec\", expected \"U256\""
       )
-      testContractError(code(s"$$map0[0] = #00$$"), "Cannot assign \"ByteVec\" to \"U256\"")
+      testContractError(code(s"$$map[0] = #00$$"), "Cannot assign \"ByteVec\" to \"U256\"")
     }
 
     {
@@ -5492,7 +5492,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  mut y: [Foo; 2]
            |}
            |Contract Baz() {
-           |  map[U256, Bar] map0
+           |  mapping[U256, Bar] map
            |  pub fn f() -> () {
            |    $stmt
            |  }
@@ -5500,31 +5500,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       testContractError(
-        code(s"$$map0[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}$$"),
-        "Cannot assign to value in map \"map0\". Assignment only works when all of the (nested) fields are mutable."
+        code(s"$$map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}$$"),
+        "Cannot assign to value in map \"map\". Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
-        code(s"$$map0[0].x = 1$$"),
+        code(s"$$map[0].x = 1$$"),
         "Cannot assign to immutable field x in struct Bar."
       )
       testContractError(
-        code(s"$$map0[0].y = [Foo{a: 0}; 2]$$"),
+        code(s"$$map[0].y = [Foo{a: 0}; 2]$$"),
         "Cannot assign to field y in struct Bar. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
-        code(s"$$map0[0].y[0] = Foo{a: 0}$$"),
+        code(s"$$map[0].y[0] = Foo{a: 0}$$"),
         "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
-        code(s"$$map0[0].y[0].a = 1$$"),
+        code(s"$$map[0].y[0].a = 1$$"),
         "Cannot assign to immutable field a in struct Foo."
       )
-      Compiler.compileContractFull(code("map0[0].x = 1", "", "mut")).isRight is true
-      Compiler.compileContractFull(code("map0[0].y[0] = Foo{a: 0}", "mut")).isRight is true
-      Compiler.compileContractFull(code("map0[0].y[0].a = 1", "mut")).isRight is true
-      Compiler.compileContractFull(code("map0[0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].x = 1", "", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y[0].a = 1", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
       Compiler
-        .compileContractFull(code("map0[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
+        .compileContractFull(code("map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
         .isRight is true
     }
 
@@ -5538,7 +5538,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  mut y: [Foo; 2]
            |}
            |Contract Baz() {
-           |  map[U256, [Bar; 2]] map0
+           |  mapping[U256, [Bar; 2]] map
            |  pub fn f() -> () {
            |    $stmt
            |  }
@@ -5546,34 +5546,34 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       testContractError(
-        code(s"$$map0[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]$$"),
-        "Cannot assign to value in map \"map0\". Assignment only works when all of the (nested) fields are mutable."
+        code(s"$$map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]$$"),
+        "Cannot assign to value in map \"map\". Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
-        code(s"$$map0[0][0].x = 1$$"),
+        code(s"$$map[0][0].x = 1$$"),
         "Cannot assign to immutable field x in struct Bar."
       )
       testContractError(
-        code(s"$$map0[0][0].y = [Foo{a: 0}; 2]$$"),
+        code(s"$$map[0][0].y = [Foo{a: 0}; 2]$$"),
         "Cannot assign to field y in struct Bar. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
-        code(s"$$map0[0][0].y[0] = Foo{a: 0}$$"),
+        code(s"$$map[0][0].y[0] = Foo{a: 0}$$"),
         "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
-        code(s"$$map0[0][0].y[0].a = 1$$"),
+        code(s"$$map[0][0].y[0].a = 1$$"),
         "Cannot assign to immutable field a in struct Foo."
       )
-      Compiler.compileContractFull(code("map0[0][0].x = 1", "", "mut")).isRight is true
-      Compiler.compileContractFull(code("map0[0][0].y[0] = Foo{a: 0}", "mut")).isRight is true
-      Compiler.compileContractFull(code("map0[0][0].y[0].a = 1", "mut")).isRight is true
-      Compiler.compileContractFull(code("map0[0][0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].x = 1", "", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y[0].a = 1", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
       Compiler
-        .compileContractFull(code("map0[0][0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
+        .compileContractFull(code("map[0][0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
         .isRight is true
       Compiler
-        .compileContractFull(code("map0[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut"))
+        .compileContractFull(code("map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut"))
         .isRight is true
     }
 
@@ -5583,8 +5583,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  pub fn f() -> () {
-           |    let map0 = 0
-           |    let _ = $$map0$$.contains!(0)
+           |    let map = 0
+           |    let _ = $$map$$.contains!(0)
            |  }
            |}
            |""".stripMargin
@@ -5596,9 +5596,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  pub fn f() -> () {
-           |    let _ = $$map0.contains!(#00)$$
+           |    let _ = $$map.contains!(#00)$$
            |  }
            |}
            |""".stripMargin
@@ -5610,14 +5610,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
-           |  map[U256, U256] map1
+           |  mapping[U256, U256] map0
+           |  mapping[U256, U256] map1
            |  pub fn f() -> () {
            |    $$map0 = map1$$
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Cannot assign to map field map0.")
+      testContractError(code, "Cannot assign to map variable map0.")
     }
 
     {
@@ -5625,8 +5625,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
-           |  map[U256, ByteVec] map1
+           |  mapping[U256, U256] map0
+           |  mapping[U256, ByteVec] map1
            |  pub fn f() -> () {
            |    let mut localMap0 = map0
            |    $$localMap0 = map1$$
@@ -5642,9 +5642,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |struct Foo { $mut a: [U256; $size] }
            |Contract Bar() {
-           |  map[U256, Foo] map0
+           |  mapping[U256, Foo] map
            |  pub fn bar(address: Address) -> () {
-           |    map0.insert!{address -> ALPH: mapEntryDeposit!()}(1, $$Foo { a: [0; $size] }$$)
+           |    map.insert!{address -> ALPH: mapEntryDeposit!()}(1, $$Foo { a: [0; $size] }$$)
            |  }
            |}
            |""".stripMargin
@@ -5662,10 +5662,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       def code(approvedAssets: String) =
         s"""
            |Contract Foo(@unused tokenId: ByteVec) {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  @using(preapprovedAssets = true)
            |  pub fn foo(address: Address) -> () {
-           |    $$map0.insert!$approvedAssets(0, 0)$$
+           |    $$map.insert!$approvedAssets(0, 0)$$
            |  }
            |}
            |""".stripMargin
@@ -5694,12 +5694,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  map[U256, [U256; 2]] map0
+           |  mapping[U256, [U256; 2]] map
            |  pub fn read() -> [U256; 2] {
-           |    return map0[0]
+           |    return map[0]
            |  }
            |  pub fn write() -> () {
-           |    map0[0] = [0; 2]
+           |    map[0] = [0; 2]
            |  }
            |}
            |""".stripMargin
@@ -5716,12 +5716,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  map[U256, [U256; 2]] map0
+           |  mapping[U256, [U256; 2]] map
            |  pub fn read() -> U256 {
-           |    return map0[0][0]
+           |    return map[0][0]
            |  }
            |  pub fn write() -> () {
-           |    map0[0][0] = 0
+           |    map[0][0] = 0
            |  }
            |}
            |""".stripMargin
@@ -5738,25 +5738,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code0 =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
-           |  $$map[U256, U256] map0$$
+           |  mapping[U256, U256] map
+           |  $$mapping[U256, U256] map$$
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
-      testContractError(code0, "These maps are defined multiple times: map0")
+      testContractError(code0, "These maps are defined multiple times: map")
 
       val code1 =
         s"""
            |Contract Foo() extends Bar() {
-           |  $$map[U256, U256] map0$$
+           |  $$mapping[U256, U256] map$$
            |  pub fn foo() -> () {}
            |}
            |Abstract Contract Bar() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  pub fn bar() -> () {}
            |}
            |""".stripMargin
-      testContractError(code1, "These maps are defined multiple times: map0")
+      testContractError(code1, "These maps are defined multiple times: map")
     }
 
     {
@@ -5764,12 +5764,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue.warnings is AVector(
-        "Found unused maps in Foo: map0"
+        "Found unused maps in Foo: map"
       )
     }
   }
@@ -5841,7 +5841,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "compile successfully when statements in contract body are not in strict order" in new Fixture {
     val statements = Seq(
-      "map[U256, U256] map0",
+      "mapping[U256, U256] map",
       "event E(v: U256)",
       "const V = 1",
       "enum FooErrorCodes { Error0 = 0 }",

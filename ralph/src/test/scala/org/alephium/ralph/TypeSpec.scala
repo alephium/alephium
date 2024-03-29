@@ -80,7 +80,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |  id: ByteVec
        |}
        |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2], gg: Account) {
-       |  map[U256, U256] map0
+       |  mapping[U256, U256] map
        |
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |

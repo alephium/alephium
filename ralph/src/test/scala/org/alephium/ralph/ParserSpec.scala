@@ -1214,7 +1214,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val foo: String =
         s"""
            |Contract Foo() {
-           |  map[U256, U256] map0
+           |  mapping[U256, U256] map0
            |
            |  pub fn foo() -> () {}
            |}
@@ -1223,7 +1223,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val bar: String =
         s"""
            |Contract Bar() extends Foo() {
-           |  map[U256, U256] map1
+           |  mapping[U256, U256] map1
            |
            |  pub fn bar() -> () {}
            |}
@@ -1876,32 +1876,32 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.position is code.indexOf("$")
     }
 
-    fastparse.parse("map[U256, U256] map0", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
-      Ident("map0"),
+    fastparse.parse("mapping[U256, U256] map", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
+      Ident("map"),
       Type.Map(Type.U256, Type.U256)
     )
-    fastparse.parse("map[U256, Foo] map0", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
-      Ident("map0"),
+    fastparse.parse("mapping[U256, Foo] map", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
+      Ident("map"),
       Type.Map(Type.U256, Type.NamedType(TypeId("Foo")))
     )
-    fastparse.parse("map[U256, [U256; 2]] map0", StatefulParser.mapDef(_)).get.value is
-      Ast.MapDef(Ident("map0"), Type.Map(Type.U256, Type.FixedSizeArray(Type.U256, 2)))
+    fastparse.parse("mapping[U256, [U256; 2]] map", StatefulParser.mapDef(_)).get.value is
+      Ast.MapDef(Ident("map"), Type.Map(Type.U256, Type.FixedSizeArray(Type.U256, 2)))
     fail(
-      s"map[$$Foo, Foo] map0",
+      s"mapping[$$Foo, Foo] map",
       StatefulParser.mapDef(_),
       "The key type of map can only be primitive type"
     )
     fail(
-      s"map[$$[U256; 2], U256] map0",
+      s"mapping[$$[U256; 2], U256] map",
       StatefulParser.mapDef(_),
       "The key type of map can only be primitive type"
     )
 
     parse(
-      "map0.insert!{address -> ALPH: 1 alph}(1, 0)",
+      "map.insert!{address -> ALPH: 1 alph}(1, 0)",
       StatefulParser.statement(_)
     ).get.value is Ast.InsertToMap(
-      Ident("map0"),
+      Ident("map"),
       Seq(
         ApproveAsset[StatefulContext](
           Variable(Ident("address")),
@@ -1910,13 +1910,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       Seq[Expr[StatefulContext]](Const(Val.U256(U256.One)), Const(Val.U256(U256.Zero)))
     )
-    parse("map0.remove!(1, address)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
-      Ident("map0"),
+    parse("map.remove!(1, address)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
+      Ident("map"),
       Seq[Expr[StatefulContext]](Const(Val.U256(U256.One)), Variable(Ident("address")))
     )
 
-    parse("map0.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
-      Variable(Ident("map0")),
+    parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
+      Variable(Ident("map")),
       constantIndex(0)
     )
   }

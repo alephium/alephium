@@ -1238,7 +1238,7 @@ object Ast {
       val variable = state.getVariable(ident)
       variable match {
         case _: Compiler.VarInfo.MapVar =>
-          throw Compiler.Error(s"Cannot assign to map field ${ident.name}.", sourceIndex)
+          throw Compiler.Error(s"Cannot assign to map variable ${ident.name}.", sourceIndex)
         case _ =>
       }
       if (!variable.isMutable) {

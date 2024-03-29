@@ -1123,11 +1123,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
-         |    "Found unused maps in Foo: map0",
+         |    "Found unused maps in Foo: map",
          |    "Found unused constants in Foo: A,Color.Blue,Color.Red",
          |    "Found unused fields in Foo: cc, ff"
          |  ],
-         |  "maps": { "names": ["map0"], "types": ["Map[U256,U256]"] }
+         |  "maps": { "names": ["map"], "types": ["Map[U256,U256]"] }
          |}
          |""".stripMargin
     val jsonString = write(result0)
