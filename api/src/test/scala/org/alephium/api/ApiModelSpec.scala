@@ -1077,9 +1077,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "codeHash": "8232ffadc0c21503d4968607332b425617fd05e62edd0a27bb34df02fd191016",
          |  "codeHashDebug":"049ce2b22e2eed2d6b92326f2e4677aa899a50f7922f8da3102dbe36ca1ae965",
          |  "fields": {
-         |    "names": ["aa","bb","cc","dd","ee","ff", "gg", "map"],
-         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account", "Map[U256,Account]"],
-         |    "isMutable": [false, true, false, true, false, false, false, true]
+         |    "names": ["aa","bb","cc","dd","ee","ff", "gg"],
+         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account"],
+         |    "isMutable": [false, true, false, true, false, false, false]
          |  },
          |  "functions": [
          |    {
@@ -1093,6 +1093,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
          |    }
          |  ],
+         |  "maps": [{ "name": "map0", "type": "Map[U256,U256]"}],
          |  "constants": [
          |    {
          |      "name": "A",
@@ -1123,6 +1124,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
+         |    "Found unused maps in Foo: map0",
          |    "Found unused constants in Foo: A,Color.Blue,Color.Red",
          |    "Found unused fields in Foo: cc, ff"
          |  ]

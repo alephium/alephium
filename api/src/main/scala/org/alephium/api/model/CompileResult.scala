@@ -67,6 +67,7 @@ final case class CompileContractResult(
     codeHashDebug: Hash,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
+    maps: AVector[CompileResult.MapSig],
     constants: AVector[CompileResult.Constant],
     enums: AVector[CompileResult.Enum],
     events: AVector[CompileResult.EventSig],
@@ -94,6 +95,7 @@ object CompileContractResult {
       compiled.debugCode.hash,
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      maps = AVector.from(contractAst.maps.view.map(CompileResult.MapSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
       constants = AVector.from(contractAst.constantVars.map(CompileResult.Constant.from)),
       enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
@@ -224,6 +226,13 @@ object CompileResult {
   object Enum {
     def from(enumDef: Ast.EnumDef): Enum = {
       Enum(enumDef.name, AVector.from(enumDef.fields.map(EnumField.from)))
+    }
+  }
+
+  final case class MapSig(name: String, `type`: String)
+  object MapSig {
+    def from(mapDef: Ast.MapDef): MapSig = {
+      MapSig(mapDef.ident.name, mapDef.tpe.signature)
     }
   }
 
