@@ -6995,6 +6995,12 @@
                       ]
                     }
                   ],
+                  "maps": [
+                    {
+                      "name": "foo",
+                      "type": "Map[U256,U256]"
+                    }
+                  ],
                   "constants": [
                     {
                       "name": "A",
@@ -7214,6 +7220,12 @@
                             "ByteVec",
                             "Address"
                           ]
+                        }
+                      ],
+                      "maps": [
+                        {
+                          "name": "foo",
+                          "type": "Map[U256,U256]"
                         }
                       ],
                       "constants": [
@@ -11197,6 +11209,7 @@
           "codeHashDebug",
           "fields",
           "functions",
+          "maps",
           "constants",
           "enums",
           "events",
@@ -11231,6 +11244,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FunctionSig"
+            }
+          },
+          "maps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MapSig"
             }
           },
           "constants": {
@@ -11993,6 +12012,21 @@
         "type": "object",
         "properties": {
           "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "MapSig": {
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
             "type": "string"
           }
         }
