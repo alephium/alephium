@@ -2197,7 +2197,7 @@ object CreateMapEntry extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[
   val StoreMutFieldMethodIndex: Byte = 2
   val DestroyMethodIndex: Byte       = 3
 
-  private lazy val loadImmFieldByIndex =
+  private def genLoadImmFieldByIndex(parentContractIdIndex: Byte) =
     Method[StatefulContext](
       isPublic = true,
       usePreapprovedAssets = false,
@@ -2205,10 +2205,17 @@ object CreateMapEntry extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
-      instrs = AVector(LoadLocal(0), LoadImmFieldByIndex)
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0),
+        LoadImmFieldByIndex
+      )
     )
 
-  private lazy val loadMutFieldByIndex = {
+  private def genLoadMutFieldByIndex(parentContractIdIndex: Byte) = {
     Method[StatefulContext](
       isPublic = true,
       usePreapprovedAssets = false,
@@ -2216,7 +2223,14 @@ object CreateMapEntry extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
-      instrs = AVector(LoadLocal(0), LoadMutFieldByIndex)
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0),
+        LoadMutFieldByIndex
+      )
     )
   }
 
@@ -2265,8 +2279,8 @@ object CreateMapEntry extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[
     StatefulContract(
       immFields + mutFields,
       AVector(
-        loadImmFieldByIndex,
-        loadMutFieldByIndex,
+        genLoadImmFieldByIndex(parentContractIdIndex),
+        genLoadMutFieldByIndex(parentContractIdIndex),
         genStoreMutFieldByIndex(parentContractIdIndex),
         genDestroy(parentContractIdIndex)
       )

@@ -5417,13 +5417,22 @@ class VMSpec extends AlephiumSpec with Generators {
     removeFromMap(1, 1)
   }
 
-  it should "check caller contract id when updating map entry" in new MapFixture {
+  it should "check caller contract id when calling generated map contract functions" in new MapFixture {
     val mapContract =
       s"""
+         |struct Bar { mut a: U256, b: U256 }
          |Contract Foo() {
-         |  map[U256, U256] map0
+         |  map[U256, Bar] map0
+         |  pub fn readB() -> () {
+         |    assert!(map0[0].b == 0, 0)
+         |  }
+         |
+         |  pub fn readA() -> () {
+         |    assert!(map0[0].a == 0, 0)
+         |  }
+         |
          |  pub fn update() -> () {
-         |    map0[0] = 1
+         |    map0[0].a = 1
          |  }
          |
          |  pub fn remove() -> () {
@@ -5432,7 +5441,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, 0)
+         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, Bar { a: 0, b: 0 })
          |  }
          |}
          |""".stripMargin
@@ -5446,11 +5455,25 @@ class VMSpec extends AlephiumSpec with Generators {
          |$mapContract
          |""".stripMargin
     callTxScript(insertScript)
-    val mapKey = Val.U256(U256.Zero)
-    checkSubContractState(mapKey, AVector.empty, AVector(Val.U256(U256.Zero)))
-
+    val mapKey        = Val.U256(U256.Zero)
     val subContractId = calcSubContractId(mapKey)
     val invalidCallerContract = {
+      val loadImmFieldInstrs = AVector[Instr[StatefulContext]](
+        ConstInstr.u256(Val.U256(U256.Zero)), // the index of `Bar.b`
+        ConstInstr.u256(Val.U256(U256.One)),
+        ConstInstr.u256(Val.U256(U256.One)),
+        BytesConst(Val.ByteVec(subContractId.bytes)),
+        CallExternal(CreateMapEntry.LoadImmFieldMethodIndex)
+      )
+      val loadImmFieldMethod = Method(true, false, false, 0, 0, 0, loadImmFieldInstrs)
+      val loadMutFieldInstrs = AVector[Instr[StatefulContext]](
+        ConstInstr.u256(Val.U256(U256.Zero)), // the index of `Bar.a`
+        ConstInstr.u256(Val.U256(U256.One)),
+        ConstInstr.u256(Val.U256(U256.One)),
+        BytesConst(Val.ByteVec(subContractId.bytes)),
+        CallExternal(CreateMapEntry.LoadMutFieldMethodIndex)
+      )
+      val loadMutFieldMethod = Method(true, false, false, 0, 0, 0, loadMutFieldInstrs)
       val storeFieldInstrs = AVector[Instr[StatefulContext]](
         ConstInstr.u256(Val.U256(U256.One)),  // new value
         ConstInstr.u256(Val.U256(U256.Zero)), // mutable field index
@@ -5468,7 +5491,10 @@ class VMSpec extends AlephiumSpec with Generators {
         CallExternal(CreateMapEntry.DestroyMethodIndex)
       )
       val destroyMethod = Method(true, false, false, 0, 0, 0, destroyInstrs)
-      StatefulContract(0, AVector(storeFieldMethod, destroyMethod))
+      StatefulContract(
+        0,
+        AVector(loadImmFieldMethod, loadMutFieldMethod, storeFieldMethod, destroyMethod)
+      )
     }
 
     val invalidCallerId = createCompiledContract(invalidCallerContract)._1
@@ -5482,11 +5508,17 @@ class VMSpec extends AlephiumSpec with Generators {
       StatefulScript.unsafe(AVector(Method(true, true, false, 0, 0, 0, callInstrs)))
     }
 
-    failCallTxScript(createCallScript(invalidCallerId, 0), AssertionFailed) // update map entry
-    failCallTxScript(createCallScript(invalidCallerId, 1), AssertionFailed) // destroy map entry
+    failCallTxScript(createCallScript(invalidCallerId, 0), AssertionFailed) // load `Bar.b`
+    failCallTxScript(createCallScript(invalidCallerId, 1), AssertionFailed) // load `Bar.a`
+    failCallTxScript(createCallScript(invalidCallerId, 2), AssertionFailed) // update `Bar.a`
+    failCallTxScript(createCallScript(invalidCallerId, 3), AssertionFailed) // destroy map entry
+
+    checkSubContractState(mapKey, AVector(Val.U256(U256.Zero)), AVector(Val.U256(U256.Zero)))
     callCompiledTxScript(createCallScript(mapContractId, 0))
-    checkSubContractState(mapKey, AVector.empty, AVector(Val.U256(U256.One)))
     callCompiledTxScript(createCallScript(mapContractId, 1))
+    callCompiledTxScript(createCallScript(mapContractId, 2))
+    checkSubContractState(mapKey, AVector(Val.U256(U256.Zero)), AVector(Val.U256(U256.One)))
+    callCompiledTxScript(createCallScript(mapContractId, 3))
     subContractNotExist(mapKey)
   }
 
