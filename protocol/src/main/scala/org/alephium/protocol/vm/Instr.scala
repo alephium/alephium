@@ -2147,11 +2147,11 @@ final case class CreateMapEntry(immFields: Byte, mutFields: Byte)
     ByteString(code) ++ serdeImpl[Byte, Byte].serialize((immFields, mutFields))
 
   override def prepareMutFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
-    frame.opStack.pop(mutFields.toInt)
+    frame.opStack.pop(Bytes.toPosInt(mutFields))
   }
 
   override def prepareImmFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
-    frame.opStack.pop(immFields.toInt)
+    frame.opStack.pop(Bytes.toPosInt(immFields))
   }
 
   override def prepareContractCode[C <: StatefulContext](
