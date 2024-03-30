@@ -316,6 +316,7 @@ trait ApiModelCodec {
     readwriter[String].bimap(_.value, CompileProjectResult.Patch(_))
   implicit val compileResultFieldsRW: RW[CompileResult.FieldsSig]     = macroRW
   implicit val compileResultFunctionRW: RW[CompileResult.FunctionSig] = macroRW
+  implicit val compileResultMapsRW: RW[CompileResult.MapsSig]         = macroRW
   implicit val compileResultEventRW: RW[CompileResult.EventSig]       = macroRW
   implicit val compileResultConstantRW: RW[CompileResult.Constant]    = macroRW
   implicit val compileResultEnumFieldRW: RW[CompileResult.EnumField]  = macroRW

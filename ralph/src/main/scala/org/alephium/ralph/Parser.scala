@@ -313,13 +313,8 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ Index ~ baseType ~ Index ~ ";" ~ nonNegativeNum("array size") ~ "]").map {
-      case (from, tpe, to, size) =>
-        if (tpe.isMapType) {
-          val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
-          throw Compiler.Error("Array element type cannot be map", sourceIndex)
-        }
-        Type.FixedSizeArray(tpe, size)
+    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
+      Type.FixedSizeArray(tpe, size)
     }
   }
   def argument[Unknown: P](
@@ -722,14 +717,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  override def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {
-    P(
-      mapType | Lexer.typeId.map(id => Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id))) |
-        arrayType(parseType(contractTypeCtor))
-    )
-  }
-
   def mapKeyType[Unknown: P]: P[Type] = {
     P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
       if (!tpe.isPrimitive) {
@@ -740,19 +727,12 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def mapValueType[Unknown: P]: P[Type] = {
-    P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
-      if (tpe.isMapType) {
-        val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
-        throw Compiler.Error("The value type of map cannot be map", sourceIndex)
-      }
-      tpe
-    }
-  }
-
-  def mapType[Unknown: P]: P[Type] = {
-    P(Lexer.token(Keyword.Map) ~ "[" ~ mapKeyType ~ "," ~ mapValueType ~ "]").map {
-      case (_, key, value) => Type.Map(key, value)
+  def mapDef[Unknown: P]: P[Ast.MapDef] = {
+    PP(
+      Lexer.token(Keyword.`mapping`) ~ "[" ~ mapKeyType ~ ","
+        ~ parseType(Type.NamedType) ~ "]" ~ Lexer.ident
+    ) { case (_, key, value, ident) =>
+      Ast.MapDef(ident, Type.Map(key, value))
     }
   }
 
@@ -959,13 +939,14 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
 
   // scalastyle:off method.length
+  // scalastyle:off cyclomatic.complexity
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
       annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
-        contractInheritances.? ~ "{" ~ (eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
+        contractInheritances.? ~ "{" ~ (mapDef | eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
         ~~ Index
     ).map {
       case (
@@ -980,12 +961,18 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             endIndex
           ) =>
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
+        val maps                  = ArrayBuffer.empty[Ast.MapDef]
         val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
         val events                = ArrayBuffer.empty[Ast.EventDef]
         val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
         val enums                 = ArrayBuffer.empty[Ast.EnumDef]
 
         statements.foreach {
+          case m: Ast.MapDef =>
+            if (events.nonEmpty || constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(m.sourceIndex)
+            }
+            maps += m
           case e: Ast.EventDef =>
             if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
@@ -1015,6 +1002,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             Seq.empty,
             fields,
             funcs.toSeq,
+            maps.toSeq,
             events.toSeq,
             constantVars.toSeq,
             enums.toSeq,
@@ -1023,10 +1011,11 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }
   // scalastyle:on method.length
+  // scalastyle:on cyclomatic.complexity
 
   private def throwContractStmtsOutOfOrderException(sourceIndex: Option[SourceIndex]) = {
     throw Compiler.Error(
-      "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`",
+      "Contract statements should be in the order of `maps`, `events`, `consts`, `enums` and `methods`",
       sourceIndex
     )
   }

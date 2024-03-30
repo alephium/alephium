@@ -4768,37 +4768,6 @@ class VMSpec extends AlephiumSpec with Generators {
     )
   }
 
-  it should "test encode map type contract fields" in new ContractFixture {
-    val contract =
-      s"""
-         |Contract Foo(@unused mut a: U256, @unused b: U256, @unused mut c: Map[U256, U256]) {
-         |  pub fn f() -> () {}
-         |}
-         |""".stripMargin
-
-    val compiledContract = Compiler.compileContract(contract).rightValue
-    val contractBytecode = Hex.toHexString(serialize(compiledContract))
-
-    val script =
-      s"""
-         |TxScript Deploy() {
-         |  let (encodedImmFields, encodedMutFields) = Foo.encodeFields!(0, 1)
-         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(
-         |    #$contractBytecode,
-         |    encodedImmFields,
-         |    encodedMutFields
-         |  )
-         |}
-         |$contract
-         |""".stripMargin
-
-    deployAndCheckContractState(
-      script,
-      AVector(Val.U256(U256.unsafe(1))),
-      AVector(Val.U256(U256.unsafe(0)))
-    )
-  }
-
   trait MapFixture extends ContractFixture {
     def mapContract: String
     lazy val mapContractId = createContract(mapContract)._1
@@ -4930,7 +4899,8 @@ class VMSpec extends AlephiumSpec with Generators {
 
     def contractCode(address: Address.Asset, keyType: String, keyValue: String): String =
       s"""
-         |Contract MapContract(mut map: Map[$keyType, U256]) {
+         |Contract MapContract() {
+         |  mapping[$keyType, U256] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    map.insert!{@$address -> ALPH: mapEntryDeposit!()}($keyValue, 1)
@@ -4963,7 +4933,8 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "test primitive type as map value" in new MapFixture {
     val mapContract =
       s"""
-         |Contract MapContract(mut map: Map[U256, ByteVec]) {
+         |Contract MapContract() {
+         |  mapping[U256, ByteVec] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, #00)
@@ -4998,7 +4969,8 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "test primitive array type as map value" in new MapFixture {
     val mapContract =
       s"""
-         |Contract MapContract(mut map: Map[U256, [ByteVec; 2]]) {
+         |Contract MapContract() {
+         |  mapping[U256, [ByteVec; 2]] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [#00, #01])
@@ -5050,7 +5022,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mut a: U256,
          |  b: U256
          |}
-         |Contract MapContract(mut map: Map[U256, [Foo; 2]]) {
+         |Contract MapContract() {
+         |  mapping[U256, [Foo; 2]] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    let foo0 = Foo{a: 0, b: 1}
@@ -5101,7 +5074,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mut x: Bool,
          |  mut y: [Bar; 2]
          |}
-         |Contract MapContract(mut map: Map[U256, Baz]) {
+         |Contract MapContract() {
+         |  mapping[U256, Baz] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    let baz = Baz{
@@ -5117,7 +5091,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn checkAndUpdate() -> () {
          |    assert!(map.contains!(0), 0)
          |    assert!(!map.contains!(1), 0)
-         |    f0(map, 0)
+         |    f0(0)
          |    map[0].x = true
          |    map[0].y[0].c = -3i
          |    map[0].y[0].d[0].b = #05
@@ -5125,10 +5099,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |    map[0].y[1].c = -4i
          |    map[0].y[1].d[0].b = #07
          |    map[0].y[1].d[1].b = #08
-         |    f1(map, 0)
+         |    f1(0)
          |  }
          |
-         |  fn f0(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f0(key: U256) -> () {
          |    let baz = map[key]
          |    assert!(!baz.x, 0)
          |    assert!(baz.y[0].c == -1i, 0)
@@ -5155,7 +5129,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(map[key].y[1].d[1].b == #04, 0)
          |  }
          |
-         |  fn f1(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f1(key: U256) -> () {
          |    assert!(map[key].x, 0)
          |    assert!(map[key].y[0].c == -3i, 0)
          |    assert!(map[key].y[0].d[0].a == 1, 0)
@@ -5186,6 +5160,7 @@ class VMSpec extends AlephiumSpec with Generators {
       Val.ByteVec(Hex.unsafe("04"))
     )
     override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+    runTest()
   }
 
   it should "test mutable struct type as map value" in new MapFixture {
@@ -5203,7 +5178,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mut x: Bool,
          |  mut y: [Bar; 2]
          |}
-         |Contract MapContract(mut map: Map[U256, Baz]) {
+         |Contract MapContract() {
+         |  mapping[U256, Baz] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
          |    let baz = Baz{
@@ -5219,15 +5195,15 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn checkAndUpdate() -> () {
          |    assert!(map.contains!(0), 0)
          |    assert!(!map.contains!(1), 0)
-         |    f0(map, 0)
-         |    f1(map, 0)
-         |    f2(map, 0)
-         |    f3(map, 0)
-         |    f4(map, 0)
-         |    f5(map, 0)
+         |    f0(0)
+         |    f1(0)
+         |    f2(0)
+         |    f3(0)
+         |    f4(0)
+         |    f5(0)
          |  }
          |
-         |  fn f0(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f0(key: U256) -> () {
          |    assert!(!map[key].x, 0)
          |    assert!(map[key].y[0].c == -1i, 0)
          |    assert!(map[key].y[0].d[0].a == 1, 0)
@@ -5241,7 +5217,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(map[key].y[1].d[1].b == #04, 0)
          |  }
          |
-         |  fn f1(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f1(key: U256) -> () {
          |    map[key] = Baz{
          |      x: true,
          |      y: [
@@ -5263,7 +5239,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #05, 0)
          |  }
          |
-         |  fn f2(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f2(key: U256) -> () {
          |    map[key].x = false
          |    map[key].y[0] = Bar{c: -3i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |    map[key].y[1] = Bar{c: -4i, d: [Foo{a: 5, b: #05}, Foo{a: 6, b: #06}]}
@@ -5281,7 +5257,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #06, 0)
          |  }
          |
-         |  fn f3(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f3(key: U256) -> () {
          |    map[key].x = true
          |    map[key].y[0].c = -4i
          |    map[key].y[0].d = [Foo{a: 4, b: #04}, Foo{a: 5, b: #05}]
@@ -5301,7 +5277,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #07, 0)
          |  }
          |
-         |  fn f4(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f4(key: U256) -> () {
          |    map[key].x = false
          |    map[key].y[0].c = -5i
          |    map[key].y[0].d[0] = Foo{a: 5, b: #05}
@@ -5323,7 +5299,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(baz.y[1].d[1].b == #08, 0)
          |  }
          |
-         |  fn f5(map: Map[U256, Baz], key: U256) -> () {
+         |  fn f5(key: U256) -> () {
          |    map[key].x = true
          |    map[key].y[0].c = -6i
          |    map[key].y[0].d[0].a = 6
@@ -5355,23 +5331,30 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
 
-    val immFields: AVector[Val] = AVector(1, 2, 3, 4).map(v => Val.U256(U256.unsafe(v)))
+    val immFields: AVector[Val] = AVector.empty
     val mutFields: AVector[Val] = AVector(
       Val.False,
       Val.I256(I256.unsafe(-1)),
+      Val.U256(U256.unsafe(1)),
       Val.ByteVec(Hex.unsafe("01")),
+      Val.U256(U256.unsafe(2)),
       Val.ByteVec(Hex.unsafe("02")),
       Val.I256(I256.unsafe(-2)),
+      Val.U256(U256.unsafe(3)),
       Val.ByteVec(Hex.unsafe("03")),
+      Val.U256(U256.unsafe(4)),
       Val.ByteVec(Hex.unsafe("04"))
     )
     override val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+    runTest()
   }
 
   it should "test multiple maps" in new MapFixture {
     val mapContract =
       s"""
-         |Contract Foo(mut map0: Map[U256, U256], mut map1: Map[U256, U256]) {
+         |Contract Foo() {
+         |  mapping[U256, U256] map0
+         |  mapping[U256, U256] map1
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap0(key: U256, value: U256) -> () {
          |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(key, value)
@@ -5454,12 +5437,22 @@ class VMSpec extends AlephiumSpec with Generators {
     removeFromMap(1, 1)
   }
 
-  it should "check caller contract id when updating map entry" in new MapFixture {
+  it should "check caller contract id when calling generated map contract functions" in new MapFixture {
     val mapContract =
       s"""
-         |Contract Foo(mut map: Map[U256, U256]) {
+         |struct Bar { mut a: U256, b: U256 }
+         |Contract Foo() {
+         |  mapping[U256, Bar] map
+         |  pub fn readB() -> () {
+         |    assert!(map[0].b == 0, 0)
+         |  }
+         |
+         |  pub fn readA() -> () {
+         |    assert!(map[0].a == 0, 0)
+         |  }
+         |
          |  pub fn update() -> () {
-         |    map[0] = 1
+         |    map[0].a = 1
          |  }
          |
          |  pub fn remove() -> () {
@@ -5468,7 +5461,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, 0)
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, Bar { a: 0, b: 0 })
          |  }
          |}
          |""".stripMargin
@@ -5482,11 +5475,25 @@ class VMSpec extends AlephiumSpec with Generators {
          |$mapContract
          |""".stripMargin
     callTxScript(insertScript)
-    val mapKey = Val.U256(U256.Zero)
-    checkSubContractState(mapKey, AVector.empty, AVector(Val.U256(U256.Zero)))
-
+    val mapKey        = Val.U256(U256.Zero)
     val subContractId = calcSubContractId(mapKey)
     val invalidCallerContract = {
+      val loadImmFieldInstrs = AVector[Instr[StatefulContext]](
+        ConstInstr.u256(Val.U256(U256.Zero)), // the index of `Bar.b`
+        ConstInstr.u256(Val.U256(U256.One)),
+        ConstInstr.u256(Val.U256(U256.One)),
+        BytesConst(Val.ByteVec(subContractId.bytes)),
+        CallExternal(CreateMapEntry.LoadImmFieldMethodIndex)
+      )
+      val loadImmFieldMethod = Method(true, false, false, 0, 0, 0, loadImmFieldInstrs)
+      val loadMutFieldInstrs = AVector[Instr[StatefulContext]](
+        ConstInstr.u256(Val.U256(U256.Zero)), // the index of `Bar.a`
+        ConstInstr.u256(Val.U256(U256.One)),
+        ConstInstr.u256(Val.U256(U256.One)),
+        BytesConst(Val.ByteVec(subContractId.bytes)),
+        CallExternal(CreateMapEntry.LoadMutFieldMethodIndex)
+      )
+      val loadMutFieldMethod = Method(true, false, false, 0, 0, 0, loadMutFieldInstrs)
       val storeFieldInstrs = AVector[Instr[StatefulContext]](
         ConstInstr.u256(Val.U256(U256.One)),  // new value
         ConstInstr.u256(Val.U256(U256.Zero)), // mutable field index
@@ -5504,7 +5511,10 @@ class VMSpec extends AlephiumSpec with Generators {
         CallExternal(CreateMapEntry.DestroyMethodIndex)
       )
       val destroyMethod = Method(true, false, false, 0, 0, 0, destroyInstrs)
-      StatefulContract(0, AVector(storeFieldMethod, destroyMethod))
+      StatefulContract(
+        0,
+        AVector(loadImmFieldMethod, loadMutFieldMethod, storeFieldMethod, destroyMethod)
+      )
     }
 
     val invalidCallerId = createCompiledContract(invalidCallerContract)._1
@@ -5518,11 +5528,17 @@ class VMSpec extends AlephiumSpec with Generators {
       StatefulScript.unsafe(AVector(Method(true, true, false, 0, 0, 0, callInstrs)))
     }
 
-    failCallTxScript(createCallScript(invalidCallerId, 0), AssertionFailed) // update map entry
-    failCallTxScript(createCallScript(invalidCallerId, 1), AssertionFailed) // destroy map entry
+    failCallTxScript(createCallScript(invalidCallerId, 0), AssertionFailed) // load `Bar.b`
+    failCallTxScript(createCallScript(invalidCallerId, 1), AssertionFailed) // load `Bar.a`
+    failCallTxScript(createCallScript(invalidCallerId, 2), AssertionFailed) // update `Bar.a`
+    failCallTxScript(createCallScript(invalidCallerId, 3), AssertionFailed) // destroy map entry
+
+    checkSubContractState(mapKey, AVector(Val.U256(U256.Zero)), AVector(Val.U256(U256.Zero)))
     callCompiledTxScript(createCallScript(mapContractId, 0))
-    checkSubContractState(mapKey, AVector.empty, AVector(Val.U256(U256.One)))
     callCompiledTxScript(createCallScript(mapContractId, 1))
+    callCompiledTxScript(createCallScript(mapContractId, 2))
+    checkSubContractState(mapKey, AVector(Val.U256(U256.Zero)), AVector(Val.U256(U256.One)))
+    callCompiledTxScript(createCallScript(mapContractId, 3))
     subContractNotExist(mapKey)
   }
 

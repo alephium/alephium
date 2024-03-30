@@ -50,8 +50,7 @@ class KeywordSpec extends AlephiumSpec {
       "enum",
       "Abstract",
       "ALPH",
-      "emptyMap",
-      "Map"
+      "mapping"
     )
 
   it should "match string keyword" in {

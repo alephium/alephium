@@ -39,6 +39,12 @@ trait Warnings {
     }
   }
 
+  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[String]): Unit = {
+    if (!compilerOptions.ignoreUnusedVariablesWarnings) {
+      warnings += s"Found unused maps in ${typeId.name}: ${unusedMaps.sorted.mkString(", ")}"
+    }
+  }
+
   def warnUnusedConstants(
       typeId: Ast.TypeId,
       unusedConstants: mutable.ArrayBuffer[String]
