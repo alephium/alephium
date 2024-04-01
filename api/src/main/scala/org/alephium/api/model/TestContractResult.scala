@@ -33,5 +33,5 @@ final case class TestContractResult(
 )
 
 final case class DebugMessage(contractAddress: Address.Contract, message: String) {
-  override def toString(): String = s"DEBUG - ${contractAddress.toBase58} - $message"
+  override def toString(): String = s"> Contract @ ${contractAddress.toBase58} - $message"
 }

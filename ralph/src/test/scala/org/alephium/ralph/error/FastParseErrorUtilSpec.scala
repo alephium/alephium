@@ -38,8 +38,9 @@ class FastParseErrorUtilSpec extends AlephiumSpec {
   }
 
   it should "return label when input index does not exist" in {
-    val input  = "a"
-    val traced = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
+    val input = "a"
+    val traced =
+      fastparse.parse(input, new Lexer(None).typedNum(_)).asInstanceOf[Parsed.Failure].trace()
 
     // stack does not contain index `1`
     traced.stack is

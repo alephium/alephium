@@ -26,7 +26,19 @@ import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
-class LexerSpec extends AlephiumSpec {
+abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
+  val Lexer           = new Lexer(fileURI)
+  val StatelessParser = new StatelessParser(fileURI)
+
+  def parsePositioned[A <: Ast.Positioned](
+      input: String,
+      parser: fastparse.P[_] => fastparse.P[A]
+  ): fastparse.Parsed[A] = {
+    val result = fastparse.parse(input, parser(_))
+    result.get.value.sourceIndex.get.fileURI is fileURI
+    result
+  }
+
   it should "parse lexer" in {
     val byte32  = Byte32.generate.toHexString
     val address = Address.p2pkh(PublicKey.generate)
@@ -57,14 +69,14 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
       address.lockupScript
     )
-    fastparse.parse("x", Lexer.ident(_)).get.value is Ast.Ident("x")
-    fastparse.parse("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
-    fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
-    fastparse.parse("x: U256", StatelessParser.funcArgument(_)).get.value is
+    parsePositioned("x", Lexer.ident(_)).get.value is Ast.Ident("x")
+    parsePositioned("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
+    parsePositioned("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
+    parsePositioned("x: U256", StatelessParser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = false, isUnused = false)
-    fastparse.parse("mut x: U256", StatelessParser.funcArgument(_)).get.value is
+    parsePositioned("mut x: U256", StatelessParser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = false)
-    fastparse.parse("@unused mut x: U256", StatelessParser.funcArgument(_)).get.value is
+    parsePositioned("@unused mut x: U256", StatelessParser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = true)
     fastparse
       .parse("@unused mut x: U256", StatelessParser.contractField(allowMutable = true)(_))
@@ -72,8 +84,8 @@ class LexerSpec extends AlephiumSpec {
       .value is
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
-    fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
-    fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
+    parsePositioned("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
+    parsePositioned("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
   }
 
   it should "report CompilerError messages with line number information" in {
@@ -92,7 +104,7 @@ class LexerSpec extends AlephiumSpec {
       val failure =
         intercept[CompilerError.`Expected an U256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.toError(input).message is
+      failure.format(input) is
         """-- error (1:1): Syntax error
           |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
           |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -106,7 +118,7 @@ class LexerSpec extends AlephiumSpec {
       val failure =
         intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.toError(input).message is
+      failure.format(input) is
         """-- error (1:1): Syntax error
           |1 |-123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
           |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +132,7 @@ class LexerSpec extends AlephiumSpec {
       val failure =
         intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.toError(input).message is
+      failure.format(input) is
         """-- error (1:1): Syntax error
           |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789i
           |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -149,10 +161,10 @@ class LexerSpec extends AlephiumSpec {
 
         val failure =
           intercept[CompilerError.`Expected an U256 value`] {
-            fastparse.parse(errorScript, StatelessParser.assetScript(_))
+            parsePositioned(errorScript, StatelessParser.assetScript(_))
           }
 
-        failure.toError(errorScript).message is
+        failure.format(errorScript) is
           """-- error (5:13): Syntax error
             |5 |    let c = 123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
             |  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -183,7 +195,7 @@ class LexerSpec extends AlephiumSpec {
       Val.Address(address.lockupScript)
     intercept[CompilerError.`Invalid byteVec`](
       fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))
-    ) is CompilerError.`Invalid byteVec`(address.toBase58, 1)
+    ) is CompilerError.`Invalid byteVec`(address.toBase58, 1, fileURI)
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
       Val.ByteVec(contract.contractId.bytes)
 
@@ -192,8 +204,7 @@ class LexerSpec extends AlephiumSpec {
 
       val invalidByteVec = "#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2"
       intercept[CompilerError.`Invalid byteVec`](fastparse.parse(invalidByteVec, Lexer.bytes(_)))
-        .toError(invalidByteVec)
-        .message is
+        .format(invalidByteVec) is
         """-- error (1:2): Type error
           |1 |#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2
           |  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -225,7 +236,7 @@ class LexerSpec extends AlephiumSpec {
             .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
         }
 
-      error.toError(code).message is
+      error.format(code) is
         """-- error (1:1): Syntax error
           |1 |mut foo
           |  |^^^
@@ -273,11 +284,10 @@ class LexerSpec extends AlephiumSpec {
     val error =
       intercept[CompilerError.`Invalid number`](fastparse.parse(number, Lexer.integer(_)))
 
-    error is CompilerError.`Invalid number`(number, 0)
+    error is CompilerError.`Invalid number`(number, 0, fileURI)
 
     error
-      .toError(number)
-      .message is
+      .format(number) is
       """-- error (1:1): Type error
         |1 |0.1
         |  |^^^
@@ -293,9 +303,9 @@ class LexerSpec extends AlephiumSpec {
         fastparse.parse(contractAddress, Lexer.contractAddress(_))
       }
 
-    error is CompilerError.`Invalid address`(contractAddress, 0)
+    error is CompilerError.`Invalid address`(contractAddress, 0, fileURI)
 
-    error.toError(contractAddress).message is
+    error.format(contractAddress) is
       """-- error (1:1): Type error
         |1 |abcefgh
         |  |^^^^^^^
@@ -303,3 +313,6 @@ class LexerSpec extends AlephiumSpec {
         |""".stripMargin
   }
 }
+
+class LexerNoFileSpec extends LexerSpec(None)
+class LexerFileSpec   extends LexerSpec(Some(new java.net.URI("file:///path/to/file")))

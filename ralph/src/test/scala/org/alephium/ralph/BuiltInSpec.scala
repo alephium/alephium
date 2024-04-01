@@ -65,13 +65,15 @@ class BuiltInSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val ast = Compiler.compileContractFull(code).rightValue.ast
-    ast.builtInContractFuncs().length is 3
-    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
+    val ast         = Compiler.compileContractFull(code).rightValue.ast
+    val globalState = Ast.GlobalState(Seq.empty)
+    ast.builtInContractFuncs(globalState).length is 3
+    val funcTable = ast.funcTable(globalState)
+    funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
-    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
+    funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
-    ast.funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
+    funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
   }
 
   it should "initialize built-in encoding functions for contracts using standard interfaces" in {
@@ -90,20 +92,22 @@ class BuiltInSpec extends AlephiumSpec {
          |""".stripMargin
 
     def test(enabled: Boolean, encodeImmFieldsInstrs: Seq[Instr[StatelessContext]]) = {
-      val ast = Compiler.compileContractFull(code(enabled)).rightValue.ast
-      ast.funcTable.size is 4
-      ast.builtInContractFuncs().length is 3
+      val ast         = Compiler.compileContractFull(code(enabled)).rightValue.ast
+      val globalState = Ast.GlobalState(Seq.empty)
+      val funcTable   = ast.funcTable(globalState)
+      funcTable.size is 4
+      ast.builtInContractFuncs(globalState).length is 3
 
-      val foo = ast.funcTable(Ast.FuncId("foo", false))
+      val foo = funcTable(Ast.FuncId("foo", false))
       foo.isStatic is false
-      val encodeImmFields = ast.funcTable(Ast.FuncId("encodeImmFields", true))
+      val encodeImmFields = funcTable(Ast.FuncId("encodeImmFields", true))
       encodeImmFields.isStatic is true
       encodeImmFields.genCode(Seq.empty) is encodeImmFieldsInstrs
-      val encodeMutFields = ast.funcTable(Ast.FuncId("encodeMutFields", true))
+      val encodeMutFields = funcTable(Ast.FuncId("encodeMutFields", true))
       encodeMutFields.isStatic is true
       encodeMutFields.genCode(Seq.empty) is
         Seq(U256Const(Val.U256(U256.Zero)), Encode)
-      val encodeFields = ast.funcTable(Ast.FuncId("encodeFields", true))
+      val encodeFields = funcTable(Ast.FuncId("encodeFields", true))
       encodeFields.isStatic is true
       encodeFields.genCode(Seq.empty) is Seq.empty
     }
@@ -118,5 +122,56 @@ class BuiltInSpec extends AlephiumSpec {
     )
 
     test(false, Seq(U256Const(Val.U256(U256.Zero)), Encode))
+  }
+
+  it should "return correct error source index" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!($$addModN!(2, 4) == 1, 0)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val index = code.indexOf("$")
+    val error = Compiler.compileContractFull(code.replace("$", "")).leftValue
+
+    error.message is "Invalid args type \"List(U256, U256)\" for builtin func addModN, expected \"List(U256, U256, U256)\""
+    error.position is index
+  }
+
+  it should "display contract type correctly in error message" in {
+    val barCode = "Contract BarContract() {}"
+    val invalidArgsCode =
+      s"""
+         |Contract Foo(barContract: BarContract) {
+         |  pub fn foo() -> () {
+         |    let _ = $$subContractId!(barContract)
+         |  }
+         |}
+         |$barCode
+         |""".stripMargin
+    val invalidArgsIndex = invalidArgsCode.indexOf("$")
+    val invalidArgsError = Compiler.compileContractFull(invalidArgsCode.replace("$", "")).leftValue
+
+    invalidArgsError.message is "Invalid args type \"List(BarContract)\" for builtin func subContractId, expected \"List(ByteVec)\""
+    invalidArgsError.position is invalidArgsIndex
+
+    val invalidReturnCode =
+      s"""
+         |Contract Foo(barContract: BarContract) {
+         |  pub fn foo() -> ByteVec {
+         |    $$return barContract
+         |  }
+         |}
+         |$barCode
+         |""".stripMargin
+    val invalidReturnIndex = invalidReturnCode.indexOf("$")
+    val invalidReturnError =
+      Compiler.compileContractFull(invalidReturnCode.replace("$", "")).leftValue
+
+    invalidReturnError.message is s"Invalid return types \"List(BarContract)\" for func foo, expected \"List(ByteVec)\""
+    invalidReturnError.position is invalidReturnIndex
   }
 }

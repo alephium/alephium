@@ -43,6 +43,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
@@ -405,6 +406,23 @@ trait EndpointsLogic extends Endpoints {
     bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
   )
 
+  val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(
+    buildMultiInputsTransaction =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils
+            .buildMultiInputsTransaction(
+              blockFlow,
+              buildMultiInputsTransaction
+            )
+        )
+      },
+    bt =>
+      bt.from.headOption
+        .map(t => t.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply))
+        .getOrElse(Left(ApiError.BadRequest("Empty list of input")))
+  )
+
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
     buildSweepAddressTransactions =>
       withSyncedClique {
@@ -618,12 +636,30 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(Right(()))
   }
 
-  val contractStateLogic = serverLogic(contractState) { case (contractAddress, groupIndex) =>
+  val targetToHashrateLogic = serverLogic(targetToHashrate) { targetToHashrate =>
+    Future.successful(
+      try {
+        val hashrate =
+          HashRate.from(Target.unsafe(targetToHashrate.target), consenseConfig.blockTargetTime)
+        Right(TargetToHashrate.Result(hashrate.value))
+      } catch {
+        case _: Throwable =>
+          Left(
+            ApiError.BadRequest(
+              s"Invalid target string: ${Hex.toHexString(targetToHashrate.target)}"
+            )
+          )
+      }
+    )
+  }
+
+  val contractStateLogic = serverLogic(contractState) { contractAddress =>
+    val groupIndex = contractAddress.groupIndex
     requestFromGroupIndex(
       groupIndex,
-      Future.successful(serverUtils.getContractState(blockFlow, contractAddress, groupIndex)),
+      Future.successful(serverUtils.getContractState(blockFlow, contractAddress)),
       contractState,
-      (contractAddress, groupIndex)
+      contractAddress
     )
   }
 
