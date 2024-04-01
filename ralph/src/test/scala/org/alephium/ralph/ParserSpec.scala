@@ -99,8 +99,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       StructCtor[StatefulContext](
         TypeId("Foo"),
         Seq(
-          (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
-          (Ident("y"), Const(Val.False))
+          (Ident("x"), Some(Const(Val.U256(U256.unsafe(1))))),
+          (Ident("y"), Some(Const(Val.False)))
         )
       )
     parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
@@ -109,8 +109,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           StructCtor(
             TypeId("Foo"),
             Seq(
-              (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
-              (Ident("y"), Const(Val.False))
+              (Ident("x"), Some(Const(Val.U256(U256.unsafe(1))))),
+              (Ident("y"), Some(Const(Val.False)))
             )
           )
         ),
@@ -120,25 +120,37 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       StructCtor[StatefulContext](
         TypeId("Foo"),
         Seq(
-          (Ident("x"), Const(Val.True)),
-          (Ident("bar"), StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))))
+          (Ident("x"), Some(Const(Val.True))),
+          (Ident("bar"), Some(StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False)))))))
         )
       )
     parse("Foo { x: true, bar: [Bar { y: false }; 2] }", StatefulParser.expr(_)).get.value is
       StructCtor[StatefulContext](
         TypeId("Foo"),
         Seq(
-          (Ident("x"), Const(Val.True)),
+          (Ident("x"), Some(Const(Val.True))),
           (
             Ident("bar"),
-            CreateArrayExpr(
-              Seq(
-                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))),
-                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False))))
+            Some(
+              CreateArrayExpr(
+                Seq(
+                  StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False))))),
+                  StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False)))))
+                )
               )
             )
           )
         )
+      )
+    parse("Foo { x, y }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq((Ident("x"), None), (Ident("y"), None))
+      )
+    parse("Foo { x: true, y }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq((Ident("x"), Some(Const(Val.True))), (Ident("y"), None))
       )
     parse("a.b.c", StatefulParser.expr(_)).get.value is
       StructFieldSelector[StatefulContext](

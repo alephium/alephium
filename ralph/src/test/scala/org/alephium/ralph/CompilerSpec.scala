@@ -4876,10 +4876,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |
            |Contract C() {
            |  fn func() -> () {
-           |    let foo = $$Foo$$ {
+           |    let foo = $$Foo {
            |      x: 1,
            |      y: 2
-           |    }
+           |    }$$
            |  }
            |}
            |""".stripMargin
@@ -4963,6 +4963,35 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContractFull(code).rightValue.warnings.isEmpty is true
+    }
+
+    {
+      info("Variable does not exist")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract Bar() {
+           |  pub fn func() -> Foo {
+           |    return Foo { $$x$$ }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Variable func.x does not exist or is used before declaration")
+    }
+
+    {
+      info("Invalid variable type")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract Bar() {
+           |  pub fn func() -> Foo {
+           |    let x = true
+           |    return $$Foo { x }$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Invalid struct fields, expect List(x:U256)")
     }
   }
 
@@ -5382,6 +5411,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           Val.ByteVec(Hex.unsafe("00"))
         )
       )
+    }
+
+    {
+      info("Create a struct using variables as fields")
+      val code =
+        s"""
+           |struct Foo { x: U256, y: ByteVec }
+           |struct Bar { a: Bool, b: U256, foo: Foo }
+           |Contract Baz() {
+           |  pub fn f() -> () {
+           |    let x = 0
+           |    let y = #00
+           |    let foo = Foo { x, y }
+           |    let a = true
+           |    let bar = Bar { a, b: 1, foo }
+           |    assert!(bar.a, 0)
+           |    assert!(bar.b == 1, 0)
+           |    assert!(bar.foo.x == 0, 0)
+           |    assert!(bar.foo.y == #00, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
     }
   }
 

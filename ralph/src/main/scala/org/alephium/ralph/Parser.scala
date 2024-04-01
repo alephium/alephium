@@ -198,7 +198,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 
   def structCtor[Unknown: P]: P[Ast.StructCtor[Ctx]] =
-    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ ":" ~ expr).rep(0, ",") ~ "}") {
+    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ P(":" ~ expr).?).rep(0, ",") ~ "}") {
       case (typeId, fields) =>
         if (fields.isEmpty) {
           throw Compiler.Error(s"No field definition in struct ${typeId.name}", typeId.sourceIndex)

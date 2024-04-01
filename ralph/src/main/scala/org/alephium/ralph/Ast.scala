@@ -639,16 +639,21 @@ object Ast {
     }
   }
 
-  final case class StructCtor[Ctx <: StatelessContext](id: TypeId, fields: Seq[(Ident, Expr[Ctx])])
-      extends Expr[Ctx] {
+  final case class StructCtor[Ctx <: StatelessContext](
+      id: TypeId,
+      fields: Seq[(Ident, Option[Expr[Ctx]])]
+  ) extends Expr[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       val struct   = state.getStruct(id)
       val expected = struct.fields.map(field => (field.ident, Seq(state.resolveType(field.tpe))))
-      val have     = fields.map { case (ident, expr) => (ident, expr.getType(state)) }
+      val have = fields.map { case (ident, expr) =>
+        val tpe = expr.map(_.getType(state)).getOrElse(Seq(state.getVariable(ident).tpe))
+        (ident, tpe)
+      }
       if (expected.length != have.length || have.exists(f => !expected.contains(f))) {
         throw Compiler.Error(
           s"Invalid struct fields, expect ${struct.fields.map(_.signature)}",
-          id.sourceIndex
+          sourceIndex
         )
       }
       Seq(struct.tpe)
@@ -662,7 +667,10 @@ object Ast {
             throw Compiler.Error(s"Struct field ${field.ident} does not exist", id.sourceIndex)
           )
       }
-      sortedFields.flatMap(_._2.genCode(state))
+      sortedFields.flatMap {
+        case (_, Some(expr)) => expr.genCode(state)
+        case (field, None)   => state.genLoadCode(field)
+      }
     }
   }
 
