@@ -285,8 +285,15 @@ abstract class Parser[Ctx <: StatelessContext] {
     varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
+    PP(Lexer.token(Keyword.let) ~ varDeclarations ~/ "=" ~ expr) { case (_, vars, expr) =>
       Ast.VarDef(vars, expr)
+    }
+  def structDestruction[Unknown: P]: P[Ast.StructDestruction[Ctx]] =
+    P(
+      Lexer.token(Keyword.let) ~ Lexer.typeId ~/ "{" ~ varDeclaration.rep(0, ",") ~ "}" ~ "=" ~ expr
+    ).map { case (from, id, vars, expr) =>
+      val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+      Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
@@ -709,7 +716,9 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
+    P(
+      varDef | structDestruction | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
+    )
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
@@ -765,7 +774,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def contractFields[Unknown: P]: P[Seq[Ast.Argument]] =

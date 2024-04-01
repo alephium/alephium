@@ -902,6 +902,44 @@ object Ast {
     }
   }
 
+  final case class StructDestruction[Ctx <: StatelessContext](
+      id: TypeId,
+      vars: Seq[VarDeclaration],
+      expr: Expr[Ctx]
+  ) extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      val struct = expr.getType(state) match {
+        case Seq(tpe: Type.Struct) if tpe.id == id => state.getStruct(id)
+        case types =>
+          throw Compiler.Error(
+            s"Expected struct type ${quote(id.name)}, got ${quoteTypes(types)}",
+            expr.sourceIndex
+          )
+      }
+      if (struct.fields.length != vars.length) {
+        throw Compiler.Error(
+          s"Struct field length mismatch: expected ${struct.fields.length}, got ${vars.length}",
+          sourceIndex
+        )
+      }
+      vars.view.zipWithIndex.foreach {
+        case (NamedVar(isMutable, ident), index) =>
+          val tpe = state.resolveType(struct.fields(index).tpe)
+          state.addLocalVariable(ident, tpe, isMutable, isUnused = false, isGenerated = false)
+        case _ =>
+      }
+    }
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val struct = state.getStruct(id)
+      val storeCodes = vars.zip(struct.fields).flatMap {
+        case (NamedVar(_, ident), _) => state.genStoreCode(ident)
+        case (AnonymousVar, field) =>
+          Seq(Seq.fill(state.flattenTypeLength(Seq(field.tpe)))(Pop))
+      }
+      expr.genCode(state) ++ storeCodes.reverse.flatten
+    }
+  }
+
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def ident: Ident
 

@@ -4993,6 +4993,61 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code, "Invalid struct fields, expect List(x:U256)")
     }
+
+    {
+      info("Invalid expr type in struct destruction")
+      def code(expr: String) =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |struct Bar { a: U256 }
+           |Contract Baz() {
+           |  pub fn func() -> U256 {
+           |    let Foo { a, b } = $$$expr$$
+           |    return a + b
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code("0"), "Expected struct type \"Foo\", got \"U256\"")
+      testContractError(code("Bar { a: 0 }"), "Expected struct type \"Foo\", got \"Bar\"")
+      testContractError(
+        code("[0; 2]"),
+        "Expected struct type \"Foo\", got \"FixedSizeArray(U256,2)\""
+      )
+    }
+
+    {
+      info("Invalid var length in struct destruction")
+      def code(vars: String) =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |Contract Baz() {
+           |  pub fn func() -> U256 {
+           |    $$let Foo { $vars } = Foo { x: 0, y: 0 }$$
+           |    return 0
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(""), "Struct field length mismatch: expected 2, got 0")
+      testContractError(code("a"), "Struct field length mismatch: expected 2, got 1")
+      testContractError(code("a, b, c"), "Struct field length mismatch: expected 2, got 3")
+      testContractError(code("_, _, _"), "Struct field length mismatch: expected 2, got 3")
+    }
+
+    {
+      info("Assign to immutable variable")
+      def code(mut: String = "") =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |Contract Bar() {
+           |  pub fn func(foo: Foo) -> () {
+           |    let Foo { $mut x, _ } = foo
+           |    $$x = 0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(), "Cannot assign to immutable variable x.")
+      Compiler.compileContractFull(code("mut").replace("$", "")).isRight is true
+    }
   }
 
   it should "test struct" in new Fixture {
@@ -5430,6 +5485,47 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(bar.b == 1, 0)
            |    assert!(bar.foo.x == 0, 0)
            |    assert!(bar.foo.y == #00, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("Struct destruction")
+      val code =
+        s"""
+           |struct Foo { mut x: U256, y: U256 }
+           |struct Bar { a: U256, b: [U256; 2], foo: Foo }
+           |Contract Baz() {
+           |  pub fn func() -> () {
+           |    let foo = Foo { x: 0, y: 1 }
+           |    let Foo { x0, y0 } = foo
+           |    assert!(x0 == 0 && y0 == 1, 0)
+           |
+           |    let Foo { mut x1, mut y1 } = foo
+           |    assert!(x1 == 0 && y1 == 1, 0)
+           |    x1 = 1
+           |    y1 = 2
+           |    assert!(x1 == 1 && y1 == 2, 0)
+           |
+           |    let Foo { x2, y2 } = Foo { y: 2, x: 1 }
+           |    assert!(x2 == 1 && y2 == 2, 0)
+           |
+           |    let bar = Bar { a: 0, b: [1, 2], foo: Foo { x: 3, y: 4 } }
+           |    let Bar { a0, b0, foo0 } = bar
+           |    assert!(a0 == 0 && b0[0] == 1 && b0[1] == 2 && foo0.x == 3 && foo0.y == 4, 0)
+           |    let Bar { _, b1, foo1 } = bar
+           |    assert!(b1[0] == 1 && b1[1] == 2 && foo1.x == 3 && foo1.y == 4, 0)
+           |    let Bar { _, _, foo2 } = bar
+           |    assert!(foo2.x == 3 && foo2.y == 4, 0)
+           |    let Bar { a3, _, foo3 } = bar
+           |    assert!(a3 == 0 && foo3.x == 3 && foo3.y == 4, 0)
+           |    let Bar { a4, mut b4, mut foo4 } = bar
+           |    assert!(a4 == 0 && b4[0] == 1 && b4[1] == 2 && foo4.x == 3 && foo4.y == 4, 0)
+           |    b4 = [5, 6]
+           |    foo4.x = 7
+           |    assert!(a4 == 0 && b4[0] == 5 && b4[1] == 6 && foo4.x == 7 && foo4.y == 4, 0)
            |  }
            |}
            |""".stripMargin
