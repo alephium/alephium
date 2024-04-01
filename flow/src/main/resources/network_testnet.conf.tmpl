@@ -21,9 +21,11 @@ alephium {
   consensus {
     mainnet {
       block-target-time = 64 seconds
+      uncle-dependency-gap-time = 16 seconds
     }
     ghost {
       block-target-time = 16 seconds
+      uncle-dependency-gap-time = 8 seconds
     }
     num-zeros-at-least-in-hash = 24
   }
