@@ -19,7 +19,7 @@ package org.alephium.ralph
 import org.alephium.protocol.vm.Val
 import org.alephium.util.AVector
 
-sealed trait Type {
+sealed trait Type extends Ast.Positioned {
   def toVal: Val.Type
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

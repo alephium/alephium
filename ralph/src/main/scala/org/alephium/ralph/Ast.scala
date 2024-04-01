@@ -1687,7 +1687,7 @@ object Ast {
     }
   }
 
-  sealed trait Inheritance {
+  sealed trait Inheritance extends Positioned {
     def parentId: TypeId
   }
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance

@@ -330,22 +330,26 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {
+  def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type.NamedType): P[Type] = {
     P(
-      Lexer.typeId.map(id => Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id))) |
+      // Lexer.primTpes currently can't have source index as they are case objects
+      Lexer.typeId.map(id =>
+        Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id).atSourceIndex(id.sourceIndex))
+      ) |
         arrayType(parseType(contractTypeCtor))
     )
   }
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
-      Type.FixedSizeArray(tpe, size)
+    P(Index ~ "[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]" ~~ Index).map {
+      case (from, tpe, size, to) =>
+        Type.FixedSizeArray(tpe, size).atSourceIndex(from, to, fileURI)
     }
   }
   def argument[Unknown: P](
       allowMutable: Boolean
-  )(contractTypeCtor: Ast.TypeId => Type): P[Ast.Argument] =
+  )(contractTypeCtor: Ast.TypeId => Type.NamedType): P[Ast.Argument] =
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
         P(parseType(contractTypeCtor) ~~ Index).map { case (tpe, endIndex) =>
@@ -837,8 +841,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def inheritanceFields[Unknown: P]: P[Seq[Ast.Ident]] =
     P("(" ~ Lexer.ident.rep(0, ",") ~ ")")
   def contractInheritance[Unknown: P]: P[Ast.ContractInheritance] =
-    P(Lexer.typeId ~ inheritanceFields).map { case (typeId, fields) =>
-      Ast.ContractInheritance(typeId, fields)
+    P(Index ~ Lexer.typeId ~ inheritanceFields ~~ Index).map {
+      case (startIndex, typeId, fields, endIndex) =>
+        Ast.ContractInheritance(typeId, fields).atSourceIndex(startIndex, endIndex, fileURI)
     }
 
   def interfaceImplementing[Unknown: P]: P[Seq[Ast.Inheritance]] =
@@ -999,7 +1004,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def interfaceInheritance[Unknown: P]: P[Ast.InterfaceInheritance] =
-    P(Lexer.typeId).map(Ast.InterfaceInheritance)
+    P(Lexer.typeId).map(typeId =>
+      Ast.InterfaceInheritance(typeId).atSourceIndex(typeId.sourceIndex)
+    )
   def interfaceFunc[Unknown: P]: P[Ast.FuncDef[StatefulContext]] = {
     funcTmp.map { f =>
       f.body match {
