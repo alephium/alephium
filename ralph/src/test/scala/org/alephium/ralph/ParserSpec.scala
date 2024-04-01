@@ -622,6 +622,15 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
                         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
     intercept[Compiler.Error](fastparse.parse(invalidCode, StatelessParser.func(_))).message is
       "These keys are defined multiple times: assetsInContract"
+
+    val invalidAssetsInContract =
+      s"""@using($$assetsInContract = 1)
+         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val error = intercept[Compiler.Error](
+      fastparse.parse(invalidAssetsInContract.replace("$", ""), StatelessParser.func(_))
+    )
+    error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
+    error.position is invalidAssetsInContract.indexOf("$")
   }
 
   it should "parser contract initial states" in {

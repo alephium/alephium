@@ -549,9 +549,12 @@ abstract class Parser[Ctx <: StatelessContext] {
   def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
   def enforceUsingContractAssets[Unknown: P]: P[Ast.AnnotationField] =
-    P(Parser.UsingAnnotation.useContractAssetsKey ~ "=" ~ "enforced").map(_ =>
-      Ast.AnnotationField(Ast.Ident(Parser.UsingAnnotation.useContractAssetsKey), Val.Enforced)
-    )
+    P(Index ~ Parser.UsingAnnotation.useContractAssetsKey ~ "=" ~ "enforced" ~~ Index).map {
+      case (from, to) =>
+        Ast
+          .AnnotationField(Ast.Ident(Parser.UsingAnnotation.useContractAssetsKey), Val.Enforced)
+          .atSourceIndex(from, to, fileURI)
+    }
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
     P(Index ~ Lexer.ident ~ "=" ~ expr ~~ Index).map {
       case (fromIndex, ident, expr: Ast.Const[_], endIndex) =>
