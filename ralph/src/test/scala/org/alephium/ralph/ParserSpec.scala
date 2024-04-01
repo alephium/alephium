@@ -1695,9 +1695,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("main", false),
             true,
             false,
-            false,
+            None,
             true,
             false,
+            None,
             Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
             Seq(Type.NamedType(TypeId("Foo"))),
             Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
@@ -1772,14 +1773,23 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
          |""".stripMargin
 
     val funcs = fastparse.parse(interface("1"), StatefulParser.interface(_)).get.value.funcs
-    funcs(0).useMethodIndex is Some(1.toByte)
+    funcs(0).useMethodIndex is Some(1)
     funcs(0).usePreapprovedAssets is true
-    funcs(1).useMethodIndex is Some(2.toByte)
+    funcs(1).useMethodIndex is Some(2)
 
     intercept[Compiler.Error](
       fastparse.parse(interface("false"), StatefulParser.interface(_))
     ).message is
       "Expect U256 for methodIndex in annotation @using"
+    intercept[Compiler.Error](
+      fastparse.parse(interface("-1"), StatefulParser.interface(_))
+    ).message is
+      "Expect U256 for methodIndex in annotation @using"
+    fastparse.parse(interface("255"), StatefulParser.interface(_)).isSuccess is true
+    intercept[Compiler.Error](
+      fastparse.parse(interface("256"), StatefulParser.interface(_))
+    ).message is
+      "Invalid method index 256, expecting a value in the range [0, 0xff]"
 
     val contract =
       s"""

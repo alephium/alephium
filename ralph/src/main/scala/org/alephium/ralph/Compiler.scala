@@ -283,9 +283,9 @@ object Compiler {
     }
 
     @scala.annotation.tailrec
-    private def getNextIndex(fromIndex: Byte, preDefinedIndexes: Seq[Byte]): Byte = {
+    private def getNextIndex(fromIndex: Int, preDefinedIndexes: Seq[Int]): Int = {
       if (preDefinedIndexes.contains(fromIndex)) {
-        getNextIndex((fromIndex + 1).toByte, preDefinedIndexes)
+        getNextIndex(fromIndex + 1, preDefinedIndexes)
       } else {
         fromIndex
       }
@@ -299,14 +299,14 @@ object Compiler {
         val preDefinedIndexes = funcs.collect {
           case Ast.FuncDef(_, _, _, _, _, _, _, Some(index), _, _, _) => index
         }
-        var fromIndex: Byte = 0
+        var fromIndex: Int = 0
         funcs.map { func =>
           func.useMethodIndex match {
-            case Some(index) => from(func, index)
+            case Some(index) => from(func, index.toByte)
             case None =>
               val funcIndex = getNextIndex(fromIndex, preDefinedIndexes)
-              fromIndex = (funcIndex + 1).toByte
-              from(func, funcIndex)
+              fromIndex = funcIndex + 1
+              from(func, funcIndex.toByte)
           }
         }
       } else {

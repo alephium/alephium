@@ -408,6 +408,12 @@ abstract class Parser[Ctx <: StatelessContext] {
         }
     }
   def func[Unknown: P]: P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
+    if (f.useMethodIndex.nonEmpty) {
+      throw Compiler.Error(
+        "The `methodIndex` annotation can only be used for interface functions",
+        f.id.sourceIndex
+      )
+    }
     Ast
       .FuncDef(
         f.annotations,
@@ -575,7 +581,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useContractAssets: Option[Ast.UseContractAssets],
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
-    useMethodIndex: Option[Byte],
+    useMethodIndex: Option[Int],
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -644,7 +650,7 @@ object Parser {
       assetsInContract: Option[Ast.UseContractAssets],
       checkExternalCaller: Boolean,
       updateFields: Boolean,
-      methodIndex: Option[Byte]
+      methodIndex: Option[Int]
   )
 
   object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
@@ -683,6 +689,18 @@ object Parser {
         annotation: Ast.Annotation,
         default: UsingAnnotationFields
     ): UsingAnnotationFields = {
+      val methodIndex =
+        extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toInt)
+      methodIndex match {
+        case Some(index) =>
+          if (index < 0 || index > 0xff) {
+            throw Compiler.Error(
+              s"Invalid method index $index, expecting a value in the range [0, 0xff]",
+              annotation.fields.find(_.ident.name == useMethodIndexKey).flatMap(_.sourceIndex)
+            )
+          }
+        case None => ()
+      }
       UsingAnnotationFields(
         extractField(annotation, usePreapprovedAssetsKey, Val.Bool(default.preapprovedAssets)).v,
         extractUseContractAsset(annotation),
@@ -692,7 +710,7 @@ object Parser {
           Val.Bool(default.checkExternalCaller)
         ).v,
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
-        extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toByte)
+        methodIndex
       )
     }
   }

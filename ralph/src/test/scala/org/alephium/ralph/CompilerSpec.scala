@@ -2799,17 +2799,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     Compiler.compileContract(replace(code())).isRight is true
     Compiler
-      .compileContract(code("true", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+      .compileContract(
+        replace(code("true", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+      )
       .isRight is true
     Compiler
-      .compileContract(code("false", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+      .compileContract(
+        replace(code("false", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+      )
       .isRight is true
     testContractError(
       code("true"),
       "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on." +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
-    Compiler.compileContract(code("enforced")).isRight is true
+    Compiler.compileContract(replace(code("enforced"))).isRight is true
   }
 
   it should "check types for braces syntax" in {
@@ -5675,7 +5679,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "assign correct method index to interface functions" in {
-    def createFunc(name: String, methodIndex: Option[Byte] = None): Ast.FuncDef[StatefulContext] =
+    def createFunc(name: String, methodIndex: Option[Int] = None): Ast.FuncDef[StatefulContext] =
       Ast.FuncDef(
         Seq.empty,
         Ast.FuncId(name, false),
@@ -5700,39 +5704,39 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       createFunc("f1"),
       createFunc("f2")
     )
-    checkFuncIndexes(funcs0, Map("f0" -> 0.toByte, "f1" -> 1.toByte, "f2" -> 2.toByte))
+    checkFuncIndexes(funcs0, Map("f0" -> 0, "f1" -> 1, "f2" -> 2))
 
     val funcs1 = Seq(
       createFunc("f0"),
-      createFunc("f1", Some(0.toByte)),
+      createFunc("f1", Some(0)),
       createFunc("f2"),
-      createFunc("f3", Some(1.toByte))
+      createFunc("f3", Some(1))
     )
     checkFuncIndexes(
       funcs1,
-      Map("f1" -> 0.toByte, "f3" -> 1.toByte, "f0" -> 2.toByte, "f2" -> 3.toByte)
+      Map("f1" -> 0, "f3" -> 1, "f0" -> 2, "f2" -> 3)
     )
 
     val funcs2 = Seq(
-      createFunc("f0", Some(3.toByte)),
+      createFunc("f0", Some(3)),
       createFunc("f1"),
-      createFunc("f2", Some(1.toByte)),
+      createFunc("f2", Some(1)),
       createFunc("f3")
     )
     checkFuncIndexes(
       funcs2,
-      Map("f1" -> 0.toByte, "f2" -> 1.toByte, "f3" -> 2.toByte, "f0" -> 3.toByte)
+      Map("f1" -> 0, "f2" -> 1, "f3" -> 2, "f0" -> 3)
     )
 
     val funcs3 = Seq(
-      createFunc("f0", Some(1.toByte)),
+      createFunc("f0", Some(1)),
       createFunc("f1"),
       createFunc("f2"),
-      createFunc("f3", Some(5.toByte))
+      createFunc("f3", Some(5))
     )
     checkFuncIndexes(
       funcs3,
-      Map("f1" -> 0.toByte, "f0" -> 1.toByte, "f2" -> 2.toByte, "f3" -> 5.toByte)
+      Map("f1" -> 0, "f0" -> 1, "f2" -> 2, "f3" -> 5)
     )
   }
 }

@@ -772,7 +772,7 @@ object Ast {
       useAssetsInContract: Option[UseContractAssets],
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
-      useMethodIndex: Option[Byte],
+      useMethodIndex: Option[Int],
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -2218,7 +2218,7 @@ object Ast {
 
       val remainFuncsIterator = remains.iterator
       funcs.indices.map { index =>
-        preDefinedIndexFuncs.find(_.useMethodIndex.contains(index.toByte)) match {
+        preDefinedIndexFuncs.find(_.useMethodIndex.contains(index)) match {
           case Some(func) => func
           case None       => remainFuncsIterator.next()
         }
