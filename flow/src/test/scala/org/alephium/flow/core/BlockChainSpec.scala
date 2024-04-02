@@ -722,6 +722,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getUsedUnclesAndAncestors(bestHeader).rightValue
     usedUncleHashes.isEmpty is true
     ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+    ancestors.contains(bestHeader.hash) is false
   }
 
   it should "get the right used uncles all uncles are used" in new GhostFixture {
@@ -735,6 +736,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getUsedUnclesAndAncestors(bestHeader).rightValue
     usedUncleHashes.toSet is allUncles.map(_.hash)
     ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+    ancestors.contains(bestHeader.hash) is false
   }
 
   it should "select recent available uncles" in new GhostFixture {

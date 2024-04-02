@@ -78,7 +78,8 @@ final case class ConsensusSetting(
   val windowTimeSpanMax: Duration =
     (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
-  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(maxForkDepth.toLong)
+  private[setting] val tipsPruneDuration: Duration =
+    blockTargetTime.timesUnsafe(maxForkDepth.toLong)
 }
 //scalastyle:on
 
@@ -263,12 +264,12 @@ object AlephiumConfig {
   }
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
-      uncleDependencyGapTime: Option[Duration]
+      uncleDependencyGapTime: Duration
   ) {
     def toConsensusSetting(emission: Emission, numZerosAtLeastInHash: Int): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
-        uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
+        uncleDependencyGapTime,
         numZerosAtLeastInHash,
         emission
       )
