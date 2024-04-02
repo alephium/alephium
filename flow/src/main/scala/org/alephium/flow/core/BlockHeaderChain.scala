@@ -267,14 +267,14 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       while (getHashesUnsafe(startHeight).length > 1) {
         startHeight = startHeight - 1
       }
-      checkHashIndexingUnsafe(startHeight)
+      checkAndRepairHashIndexingUnsafe(startHeight)
       logger.info(s"Start checking hash indexing for $chainIndex from height $startHeight")
     } else {
       logger.info(s"No need to check hash indexing for $chainIndex due to too few blocks")
     }
   }
 
-  def checkHashIndexingUnsafe(startHeight: Int): Unit = {
+  def checkAndRepairHashIndexingUnsafe(startHeight: Int): Unit = {
     val startHash  = getHashesUnsafe(startHeight).head
     val chainIndex = ChainIndex.from(startHash)
 

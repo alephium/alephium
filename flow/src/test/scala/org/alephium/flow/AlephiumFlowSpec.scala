@@ -504,7 +504,7 @@ trait FlowFixture
       deps: AVector[BlockHash],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), txs, blockTs, target)
   }
@@ -526,7 +526,7 @@ trait FlowFixture
       deps: BlockDeps,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     val hardFork = networkConfig.getHardFork(blockTs)
     val loosenDeps =
@@ -546,7 +546,7 @@ trait FlowFixture
       depStateHash: Hash,
       txsHash: Hash,
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
 

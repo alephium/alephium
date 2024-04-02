@@ -74,7 +74,9 @@ case object InvalidUnclesBeforeGhostHardFork extends InvalidUncleStatus
 case object InvalidUncleSize                 extends InvalidUncleStatus
 case object UnsortedUncles                   extends InvalidUncleStatus
 case object InvalidUncleDeps                 extends InvalidUncleStatus
-case object InvalidUncles                    extends InvalidUncleStatus
+case object NotUnclesForTheBlock             extends InvalidUncleStatus
+case object UncleHashConflictWithParentHash  extends InvalidUncleStatus
+case object UnclesAlreadyUsed                extends InvalidUncleStatus
 case object UncleDoesNotExist                extends InvalidUncleStatus
 
 object ValidationStatus {

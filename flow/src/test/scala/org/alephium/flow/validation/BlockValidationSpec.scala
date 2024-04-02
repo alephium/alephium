@@ -31,6 +31,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice, Method, StatefulScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class BlockValidationSpec extends AlephiumSpec {
 
   trait Fixture extends BlockValidation with FlowFixture with NoIndexModelGeneratorsLike {
@@ -229,6 +230,22 @@ class BlockValidationSpec extends AlephiumSpec {
       .fail(InvalidCoinbaseFormat)
   }
 
+  it should "check uncles for pre-ghost hardfork" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) isnot HardFork.Ghost
+
+    val uncleHashes = AVector.fill(ALPH.MaxUncleSize)(BlockHash.random)
+
+    implicit val validator = (blk: Block) => {
+      networkConfig.getHardFork(blk.timestamp) isnot HardFork.Ghost
+      checkUncles(blockFlow, blk.chainIndex, blk, uncleHashes)
+    }
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    block.fail(InvalidUnclesBeforeGhostHardFork)
+  }
+
   it should "check coinbase data for ghost hardfork" in new CoinbaseDataFixture {
     override val configValues = Map(("alephium.network.ghost-hard-fork-timestamp", 0))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
@@ -246,6 +263,11 @@ class BlockValidationSpec extends AlephiumSpec {
     )
     block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
     block.pass()
+
+    info("empty uncles")
+    val block1 = emptyBlock(blockFlow, chainIndex)
+    block1.uncleHashes.rightValue.isEmpty is true
+    block1.pass()
 
     info("wrong block timestamp")
     val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
@@ -648,7 +670,7 @@ class BlockValidationSpec extends AlephiumSpec {
       blockFlow,
       block1Template.setUncles(AVector((block0.uncleHashes.rightValue.head, miner)))
     )
-    checkBlock(block1, blockFlow).left.value isE InvalidUncles
+    checkBlock(block1, blockFlow).left.value isE UnclesAlreadyUsed
   }
 
   it should "invalidate block if uncle is sibling" in new GhostFixture {
@@ -663,7 +685,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block11, blockFlow).left.value isE UncleDoesNotExist
 
     addAndCheck(blockFlow, block10)
-    checkBlock(block11, blockFlow).left.value isE InvalidUncles
+    checkBlock(block11, blockFlow).left.value isE UncleHashConflictWithParentHash
   }
 
   it should "invalidate block if uncle is ancestor" in new GhostFixture {
@@ -675,11 +697,18 @@ class BlockValidationSpec extends AlephiumSpec {
       val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
       val invalidBlock  = mine(blockFlow, blockTemplate.setUncles(AVector((block0.hash, miner))))
       invalidBlock.parentHash is parentBlock.hash
-      checkBlock(invalidBlock, blockFlow).left.value isE InvalidUncles
+      checkBlock(invalidBlock, blockFlow).left.value isE NotUnclesForTheBlock
 
       parentBlock = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, parentBlock)
     }
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    (blockFlow.getMaxHeight(chainIndex).rightValue -
+      blockFlow.getHeightUnsafe(block0.hash)) > ALPH.MaxUncleAge is true
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val invalidBlock  = mine(blockFlow, blockTemplate.setUncles(AVector((block0.hash, miner))))
+    checkBlock(invalidBlock, blockFlow).left.value isE UncleHashConflictWithParentHash
   }
 
   it should "invalidate block if uncles' parent is not from mainchain" in new GhostFixture {
@@ -694,7 +723,7 @@ class BlockValidationSpec extends AlephiumSpec {
     blockTemplate.uncleHashes.length is 1
     val sortedHashes = sortUncleHashes(blockTemplate.uncleHashes ++ uncleHashes)
     val block        = mine(blockFlow, blockTemplate.setUncles(sortedHashes.map((_, miner))))
-    checkBlock(block, blockFlow).left.value isE InvalidUncles
+    checkBlock(block, blockFlow).left.value isE UncleHashConflictWithParentHash
   }
 
   it should "invalidate block with invalid uncle intra deps" in new Fixture {

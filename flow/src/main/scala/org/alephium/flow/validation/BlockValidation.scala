@@ -136,7 +136,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     } yield sideResult
   }
 
-  private def checkUncles(
+  private[validation] def checkUncles(
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
@@ -179,13 +179,17 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       parentHeader           <- from(blockchain.getBlockHeader(block.uncleHash(chainIndex.to)))
       usedUnclesAndAncestors <- from(blockchain.getUsedUnclesAndAncestors(parentHeader))
       (usedUncles, ancestors) = usedUnclesAndAncestors
-      isValid = uncles.forall { uncle =>
-        uncle.hash != parentHeader.hash &&
-        !ancestors.exists(_ == uncle.hash) &&
-        ancestors.exists(_ == uncle.parentHash) &&
-        !usedUncles.contains(uncle.hash)
+      _ <- uncles.foreachE { uncle =>
+        if (uncle.hash == parentHeader.hash || ancestors.exists(_ == uncle.hash)) {
+          invalidBlock(NotUnclesForTheBlock)
+        } else if (!ancestors.exists(_ == uncle.parentHash)) {
+          invalidBlock(UncleHashConflictWithParentHash)
+        } else if (usedUncles.contains(uncle.hash)) {
+          invalidBlock(UnclesAlreadyUsed)
+        } else {
+          validBlock(())
+        }
       }
-      _ <- if (isValid) validBlock(()) else invalidBlock(InvalidUncles)
     } yield ()
   }
 
