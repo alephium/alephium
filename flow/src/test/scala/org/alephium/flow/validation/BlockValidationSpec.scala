@@ -222,6 +222,11 @@ class BlockValidationSpec extends AlephiumSpec {
     info("wrong format")
     val wrongFormat = ByteString("wrong-coinbase-data-format")
     block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
+
+    info("empty fixed outputs")
+    block.Coinbase
+      .unsignedTx(unsigned => unsigned.copy(fixedOutputs = AVector.empty))
+      .fail(InvalidCoinbaseFormat)
   }
 
   it should "check coinbase data for ghost hardfork" in new CoinbaseDataFixture {
@@ -253,6 +258,11 @@ class BlockValidationSpec extends AlephiumSpec {
     info("wrong format")
     val wrongFormat = ByteString("wrong-coinbase-data-format")
     block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
+
+    info("empty fixed outputs")
+    block.Coinbase
+      .unsignedTx(unsigned => unsigned.copy(fixedOutputs = AVector.empty))
+      .fail(InvalidCoinbaseFormat)
   }
 
   it should "check coinbase locked amount" in new Fixture {

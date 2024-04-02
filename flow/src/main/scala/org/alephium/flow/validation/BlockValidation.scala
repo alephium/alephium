@@ -389,21 +389,25 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block
   ): BlockValidationResult[AVector[BlockHash]] = {
     val coinbase = block.coinbase
-    val data     = coinbase.unsigned.fixedOutputs.head.additionalData
-    deserialize[CoinbaseData](data) match {
-      case Right(CoinbaseDataV1(prefix, _)) =>
-        if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-          validBlock(AVector.empty)
-        } else {
-          invalidBlock(InvalidCoinbaseData)
-        }
-      case Right(CoinbaseDataV2(prefix, uncleHashes, _)) =>
-        if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-          validBlock(uncleHashes)
-        } else {
-          invalidBlock(InvalidCoinbaseData)
-        }
-      case Left(_) => invalidBlock(InvalidCoinbaseData)
+    if (coinbase.unsigned.fixedOutputs.isEmpty) {
+      invalidBlock(InvalidCoinbaseFormat)
+    } else {
+      val data = coinbase.unsigned.fixedOutputs.head.additionalData
+      deserialize[CoinbaseData](data) match {
+        case Right(CoinbaseDataV1(prefix, _)) =>
+          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+            validBlock(AVector.empty)
+          } else {
+            invalidBlock(InvalidCoinbaseData)
+          }
+        case Right(CoinbaseDataV2(prefix, uncleHashes, _)) =>
+          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+            validBlock(uncleHashes)
+          } else {
+            invalidBlock(InvalidCoinbaseData)
+          }
+        case Left(_) => invalidBlock(InvalidCoinbaseData)
+      }
     }
   }
 
