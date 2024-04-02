@@ -25,7 +25,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{AVector, Bytes, EitherF, U256}
 
 // scalastyle:off number.of.methods
 
@@ -148,7 +148,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         val blockchain = flow.getBlockChain(chainIndex)
         for {
           _ <- checkUncleSize(uncleHashes)
-          _ <- checkDuplicateUncles(uncleHashes)
+          _ <- checkUncleOrder(uncleHashes)
           uncleHeaders <- uncleHashes.mapE(blockchain.getBlockHeader) match {
             case Left(IOError.KeyNotFound(_)) => invalidBlock(UncleDoesNotExist)
             case result                       => from(result)
@@ -197,13 +197,19 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  @inline private def checkDuplicateUncles(
+  @inline private[validation] def checkUncleOrder(
       uncles: AVector[BlockHash]
   ): BlockValidationResult[Unit] = {
-    if (uncles.toSeq.distinct.length != uncles.length) {
-      invalidBlock(DuplicatedUncles)
-    } else {
-      validBlock(())
+    uncles.foreachWithIndexE { case (hash, index) =>
+      if (index > 0) {
+        if (Bytes.byteStringOrdering.compare(hash.bytes, uncles(index - 1).bytes) <= 0) {
+          invalidBlock(UnsortedUncles)
+        } else {
+          validBlock(())
+        }
+      } else {
+        validBlock(())
+      }
     }
   }
 

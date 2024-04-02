@@ -462,7 +462,17 @@ trait FlowFixture
         template.templateTs,
         uncles
       )
-      template.copy(transactions = txs :+ coinbaseTx)
+      val coinbaseData = deserialize[CoinbaseData](
+        coinbaseTx.unsigned.fixedOutputs.head.additionalData
+      ).rightValue.asInstanceOf[CoinbaseDataV2]
+      val newCoinbaseData = coinbaseData.copy(uncleHashes = uncles.map(_._1))
+      val newOutput = coinbaseTx.unsigned.fixedOutputs.head
+        .copy(additionalData = serialize[CoinbaseData](newCoinbaseData))
+      val unsignedTx = coinbaseTx.unsigned.copy(fixedOutputs =
+        coinbaseTx.unsigned.fixedOutputs.replace(0, newOutput)
+      )
+      val newCoinbaseTx = coinbaseTx.copy(unsigned = unsignedTx)
+      template.copy(transactions = txs :+ newCoinbaseTx)
     }
 
     lazy val uncleHashes: AVector[BlockHash] = {

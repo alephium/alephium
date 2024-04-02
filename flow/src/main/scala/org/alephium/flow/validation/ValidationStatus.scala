@@ -72,7 +72,7 @@ final case object InvalidFlowTxs                                    extends Inva
 sealed trait InvalidUncleStatus              extends InvalidBlockStatus
 case object InvalidUnclesBeforeGhostHardFork extends InvalidUncleStatus
 case object InvalidUncleSize                 extends InvalidUncleStatus
-case object DuplicatedUncles                 extends InvalidUncleStatus
+case object UnsortedUncles                   extends InvalidUncleStatus
 case object InvalidUncleDeps                 extends InvalidUncleStatus
 case object InvalidUncles                    extends InvalidUncleStatus
 case object UncleDoesNotExist                extends InvalidUncleStatus
