@@ -391,15 +391,15 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "cache block uncle hashes" in {
+  it should "cache block ghost uncle hashes" in {
     val block = blockGen.sample.get
-    block.uncleHashes.rightValue.isEmpty is true
-    block._uncleHashes is Some(AVector.empty[BlockHash])
+    block.ghostUncleHashes.rightValue.isEmpty is true
+    block._ghostUncleHashes is Some(AVector.empty[BlockHash])
 
-    val uncleHashes = AVector.fill(2)(BlockHash.random)
+    val ghostUncleHashes = AVector.fill(2)(BlockHash.random)
     val coinbaseData: CoinbaseData = CoinbaseDataV2(
       CoinbaseDataPrefix.from(block.chainIndex, block.timestamp),
-      uncleHashes,
+      ghostUncleHashes,
       ByteString.empty
     )
     val newOutput =
@@ -410,7 +410,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       )
     )
     val newBlock = block.copy(transactions = AVector(newCoinbaseTx))
-    newBlock.uncleHashes.rightValue is uncleHashes
-    newBlock._uncleHashes is Some(uncleHashes)
+    newBlock.ghostUncleHashes.rightValue is ghostUncleHashes
+    newBlock._ghostUncleHashes is Some(ghostUncleHashes)
   }
 }

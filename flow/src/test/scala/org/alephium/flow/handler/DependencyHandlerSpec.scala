@@ -304,18 +304,18 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.processing.isEmpty is true
   }
 
-  it should "wait for uncles" in new Fixture {
+  it should "wait for ghost uncles" in new Fixture {
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val blockFlow0   = isolatedBlockFlow()
     val lockupScript = getGenesisLockupScript(chainIndex.to)
 
-    def mineBlock(parentHash: BlockHash, uncleHashes: AVector[BlockHash]): Block = {
+    def mineBlock(parentHash: BlockHash, ghostUncleHashes: AVector[BlockHash]): Block = {
       val template0   = blockFlow0.prepareBlockFlowUnsafe(chainIndex, lockupScript)
       val parentIndex = brokerConfig.groups - 1 + chainIndex.to.value
       val newDeps     = template0.deps.replace(parentIndex, parentHash)
       val uncles =
-        uncleHashes.map(hash =>
-          SelectedUncle(hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1)
+        ghostUncleHashes.map(hash =>
+          SelectedGhostUncle(hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1)
         )
       val template1 = template0
         .rebuild(template0.transactions.init, uncles, lockupScript)
@@ -336,7 +336,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val main1 = mineBlockTemplate(blockFlow0, chainIndex)
     addAndCheck(blockFlow0, main1)
     main1.parentHash is main0.hash
-    main1.uncleHashes.rightValue is AVector(fork0.hash)
+    main1.ghostUncleHashes.rightValue is AVector(fork0.hash)
 
     state.addPendingData(main1, broker, origin)
     state.pending.unsafe(main1.hash).extract() is (main1, broker, origin)
@@ -357,7 +357,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.missingIndex.get(fork0.hash) is Some(ArrayBuffer(main1.hash))
     state.missing.get(main1.hash) is Some(ArrayBuffer(fork0.hash))
 
-    // add uncles
+    // add ghost uncles
     state.addPendingData(fork0, broker, origin)
     state.pending.unsafe(fork0.hash).extract() is (fork0, broker, origin)
     state.readies is mutable.HashSet(fork0.hash, main0.hash)

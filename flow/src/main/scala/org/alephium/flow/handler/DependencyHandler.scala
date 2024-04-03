@@ -132,7 +132,7 @@ trait DependencyHandlerState extends IOBaseActor {
       case block: Block =>
         val hardFork = networkSetting.getHardFork(block.timestamp)
         if (hardFork.isGhostEnabled()) {
-          block.uncleHashes(networkSetting) match {
+          block.ghostUncleHashes(networkSetting) match {
             case Right(hashes) => block.blockDeps.deps ++ hashes
             case Left(error) =>
               log.error(s"Failed to deserialize uncles, error: $error")

@@ -313,7 +313,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     server1.stop().futureValue is ()
   }
 
-  it should "sync uncle blocks" in new CliqueFixture {
+  it should "sync ghost uncle blocks" in new CliqueFixture {
     val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
 
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {

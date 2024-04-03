@@ -205,30 +205,30 @@ trait FlowUtils
     }
   }
 
-  private def getUnclesUnsafe(
+  private def getGhostUnclesUnsafe(
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): AVector[SelectedUncle] = {
+  ): AVector[SelectedGhostUncle] = {
     if (hardFork.isGhostEnabled()) {
-      getUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
+      getGhostUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
       AVector.empty
     }
   }
 
-  @inline private def getUncles(
+  @inline private def getGhostUncles(
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): IOResult[AVector[SelectedUncle]] = {
-    IOUtils.tryExecute(getUnclesUnsafe(hardFork, deps, parentHeader))
+  ): IOResult[AVector[SelectedGhostUncle]] = {
+    IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
-  ): IOResult[(BlockFlowTemplate, AVector[SelectedUncle])] = {
+  ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val bestDeps = getBestDeps(chainIndex.from)
     for {
@@ -238,7 +238,7 @@ trait FlowUtils
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
       target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
       groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
-      uncles       <- getUncles(hardFork, loosenDeps, parentHeader)
+      uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
       template <- prepareBlockFlow(
         chainIndex,
@@ -267,7 +267,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      uncles: AVector[SelectedUncle],
+      uncles: AVector[SelectedGhostUncle],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -296,14 +296,14 @@ trait FlowUtils
   final def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate,
-      uncles: AVector[SelectedUncle],
+      uncles: AVector[SelectedGhostUncle],
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {
       case Left(Left(error)) => Left(error)
       case Left(Right(error)) =>
         error match {
-          case _: InvalidUncleStatus =>
+          case _: InvalidGhostUncleStatus =>
             logger.warn("Assemble block with empty uncles due to invalid uncles")
             Right(template.rebuild(template.transactions.init, AVector.empty, miner))
           case ExistInvalidTx(t, _) =>
