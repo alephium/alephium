@@ -23,7 +23,7 @@ import org.alephium.protocol.config.{EmissionConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, Bytes, TimeStamp, U256}
 
 object Coinbase {
   def miningReward(gasFee: U256, target: Target, blockTs: TimeStamp)(implicit
@@ -128,8 +128,10 @@ object Coinbase {
       blockTs: TimeStamp,
       uncles: AVector[SelectedUncle]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_.blockHash), minerData)
-    val reward       = miningReward(gasFee, target, blockTs)
-    build(coinbaseData, reward, lockupScript, blockTs, uncles)
+    val sortedUncles = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
+    val coinbaseData =
+      CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
+    val reward = miningReward(gasFee, target, blockTs)
+    build(coinbaseData, reward, lockupScript, blockTs, sortedUncles)
   }
 }

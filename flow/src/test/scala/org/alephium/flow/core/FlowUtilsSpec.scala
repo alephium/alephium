@@ -241,12 +241,19 @@ class FlowUtilsSpec extends AlephiumSpec {
       blockFlow.getMaxHeight(chainIndex).rightValue is 6
       val hashesAtHeight5 = blockFlow.getHashes(chainIndex, 5).rightValue
       val hashesAtHeight6 = blockFlow.getHashes(chainIndex, 6).rightValue
-      block4.uncleHashes.rightValue is AVector(hashesAtHeight6(1), hashesAtHeight5(1))
+      val uncleHashes     = block4.uncleHashes.rightValue
+      uncleHashes is
+        AVector(hashesAtHeight6(1), hashesAtHeight5(1)).sortBy(_.bytes)(Bytes.byteStringOrdering)
       block4.coinbase.unsigned.fixedOutputs.length is 3
       val uncle0Reward = block4.coinbase.unsigned.fixedOutputs(1).amount
       val uncle1Reward = block4.coinbase.unsigned.fixedOutputs(2).amount
-      uncle0Reward is Coinbase.calcUncleReward(mainChainReward, 1)
-      uncle1Reward is Coinbase.calcUncleReward(mainChainReward, 2)
+      if (uncleHashes == AVector(hashesAtHeight6(1), hashesAtHeight5(1))) {
+        uncle0Reward is Coinbase.calcUncleReward(mainChainReward, 1)
+        uncle1Reward is Coinbase.calcUncleReward(mainChainReward, 2)
+      } else {
+        uncle0Reward is Coinbase.calcUncleReward(mainChainReward, 2)
+        uncle1Reward is Coinbase.calcUncleReward(mainChainReward, 1)
+      }
       block4.coinbaseReward is mainChainReward.addUnsafe(
         uncle0Reward.addUnsafe(uncle1Reward).divUnsafe(32)
       )

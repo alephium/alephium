@@ -638,7 +638,7 @@ class BlockValidationSpec extends AlephiumSpec {
       block
     }
 
-    def mineBlockWith2Uncle(heightDiff0: Int, heightDiff1: Int): Block = {
+    def mineBlockWith2Uncle(heightDiff0: Int, heightDiff1: Int): (Block, Int, Int) = {
       assume(heightDiff0 <= heightDiff1)
       (0 until ALPH.MaxUncleAge).foreach(_ =>
         addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
@@ -653,9 +653,10 @@ class BlockValidationSpec extends AlephiumSpec {
       val uncleHashes = block.uncleHashes.rightValue
       uncleHashes.length is 2
       val blockHeight = maxHeight + 1
-      (blockHeight - blockFlow.getHeight(uncleHashes(0)).rightValue) is heightDiff0
-      (blockHeight - blockFlow.getHeight(uncleHashes(1)).rightValue) is heightDiff1
-      block
+      val diffs       = uncleHashes.map(hash => blockHeight - blockFlow.getHeight(hash).rightValue)
+      ((diffs == AVector(heightDiff0, heightDiff1)) ||
+        (diffs == AVector(heightDiff1, heightDiff0))) is true
+      (block, diffs(0), diffs(1))
     }
   }
 
@@ -708,12 +709,12 @@ class BlockValidationSpec extends AlephiumSpec {
 
     {
       info("block has 2 uncles")
-      val diffs           = (0 until 2).map(_ => Random.between(1, ALPH.MaxUncleAge)).sorted
-      val block           = mineBlockWith2Uncle(diffs(0), diffs(1))
-      val miningReward    = getMiningReward(block)
-      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
-      val uncleReward0    = Coinbase.calcUncleReward(mainChainReward, diffs(0))
-      val uncleReward1    = Coinbase.calcUncleReward(mainChainReward, diffs(1))
+      val diffs                 = (0 until 2).map(_ => Random.between(1, ALPH.MaxUncleAge)).sorted
+      val (block, diff0, diff1) = mineBlockWith2Uncle(diffs(0), diffs(1))
+      val miningReward          = getMiningReward(block)
+      val mainChainReward       = Coinbase.calcMainChainReward(miningReward)
+      val uncleReward0          = Coinbase.calcUncleReward(mainChainReward, diff0)
+      val uncleReward1          = Coinbase.calcUncleReward(mainChainReward, diff1)
       val blockReward =
         mainChainReward.addUnsafe(uncleReward0.addUnsafe(uncleReward1).divUnsafe(32))
       implicit val validator =
@@ -789,12 +790,12 @@ class BlockValidationSpec extends AlephiumSpec {
 
     {
       info("block has 2 uncles")
-      val diffs           = (0 until 2).map(_ => Random.between(1, ALPH.MaxUncleAge)).sorted
-      val block           = mineBlockWith2Uncle(diffs(0), diffs(1))
-      val miningReward    = getMiningReward(block)
-      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
-      val uncleReward0    = Coinbase.calcUncleReward(mainChainReward, diffs(0))
-      val uncleReward1    = Coinbase.calcUncleReward(mainChainReward, diffs(1))
+      val diffs                 = (0 until 2).map(_ => Random.between(1, ALPH.MaxUncleAge)).sorted
+      val (block, diff0, diff1) = mineBlockWith2Uncle(diffs(0), diffs(1))
+      val miningReward          = getMiningReward(block)
+      val mainChainReward       = Coinbase.calcMainChainReward(miningReward)
+      val uncleReward0          = Coinbase.calcUncleReward(mainChainReward, diff0)
+      val uncleReward1          = Coinbase.calcUncleReward(mainChainReward, diff1)
 
       info("valid")
       block.pass()
@@ -869,10 +870,14 @@ class BlockValidationSpec extends AlephiumSpec {
     val block0 = mine(blockFlow, blockTemplate)
     checkBlock(block0, blockFlow).isRight is true
 
+    val uncleBlock      = blockFlow.getBlockUnsafe(blockTemplate.uncleHashes.head)
+    val uncleBlockMiner = uncleBlock.coinbase.unsigned.fixedOutputs.head.lockupScript
     val block1 =
       mine(
         blockFlow,
-        blockTemplate.setUncles(AVector(SelectedUncle(blockTemplate.uncleHashes.head, miner, 1)))
+        blockTemplate.setUncles(
+          AVector(SelectedUncle(blockTemplate.uncleHashes.head, uncleBlockMiner, 1))
+        )
       )
     checkBlock(block1, blockFlow).isRight is true
 
