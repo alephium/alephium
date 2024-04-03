@@ -208,7 +208,7 @@ trait FlowUtils
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
+  ): AVector[SelectedUncle] = {
     if (hardFork.isGhostEnabled()) {
       getUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
@@ -220,14 +220,14 @@ trait FlowUtils
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): IOResult[AVector[(BlockHash, LockupScript.Asset, Int)]] = {
+  ): IOResult[AVector[SelectedUncle]] = {
     IOUtils.tryExecute(getUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
-  ): IOResult[(BlockFlowTemplate, AVector[(BlockHash, LockupScript.Asset, Int)])] = {
+  ): IOResult[(BlockFlowTemplate, AVector[SelectedUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val bestDeps = getBestDeps(chainIndex.from)
     for {
@@ -265,7 +265,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      uncles: AVector[(BlockHash, LockupScript.Asset, Int)],
+      uncles: AVector[SelectedUncle],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -294,7 +294,7 @@ trait FlowUtils
   final def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate,
-      uncles: AVector[(BlockHash, LockupScript.Asset, Int)],
+      uncles: AVector[SelectedUncle],
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {

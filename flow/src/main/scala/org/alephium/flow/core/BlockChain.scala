@@ -23,10 +23,10 @@ import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSettings
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALPH}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LockupScript, WorldState}
+import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -178,20 +178,21 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def selectUnclesUnsafe(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
+  ): AVector[SelectedUncle] = {
+    val blockHeight             = getHeightUnsafe(parentHeader.hash) + 1
+    val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
+
     @tailrec
     def iter(
         fromHeader: BlockHeader,
         num: Int,
-        usedUncles: AVector[BlockHash],
-        ancestors: AVector[BlockHash],
-        unclesAcc: AVector[(BlockHash, LockupScript.Asset, Int)]
-    ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
+        unclesAcc: AVector[SelectedUncle]
+    ): AVector[SelectedUncle] = {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
         unclesAcc
       } else {
-        val height      = getHeightUnsafe(fromHeader.hash)
-        val uncleHashes = getHashesUnsafe(height).filter(_ != fromHeader.hash)
+        val uncleHeight = getHeightUnsafe(fromHeader.hash)
+        val uncleHashes = getHashesUnsafe(uncleHeight).filter(_ != fromHeader.hash)
         val uncleBlocks = uncleHashes.map(getBlockUnsafe)
         val selected = uncleBlocks
           .filter(uncle =>
@@ -199,22 +200,21 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
               ancestors.exists(_ == uncle.parentHash) &&
               validator(uncle.header)
           )
-          .map(block => (block.hash, block.minerLockupScript, height))
+          .map(block =>
+            SelectedUncle(block.hash, block.minerLockupScript, blockHeight - uncleHeight)
+          )
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
-        iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
+        iter(parentHeader, num - 1, unclesAcc ++ selected)
       }
     }
 
-    val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
-    val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
-    val blockHeight     = getHeightUnsafe(parentHeader.hash) + 1
-    availableUncles.takeUpto(ALPH.MaxUncleSize).map(u => (u._1, u._2, blockHeight - u._3))
+    iter(parentHeader, ALPH.MaxUncleAge, AVector.empty).takeUpto(ALPH.MaxUncleSize)
   }
 
   def selectUncles(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[(BlockHash, LockupScript.Asset, Int)]] = {
+  ): IOResult[AVector[SelectedUncle]] = {
     IOUtils.tryExecute(selectUnclesUnsafe(parentHeader, validator))
   }
 

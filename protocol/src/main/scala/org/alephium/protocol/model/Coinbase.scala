@@ -74,12 +74,12 @@ object Coinbase {
       miningReward: U256,
       lockupScript: LockupScript.Asset,
       lockTime: TimeStamp,
-      uncleMiners: AVector[(BlockHash, LockupScript.Asset, Int)]
+      uncles: AVector[SelectedUncle]
   )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
     val mainChainReward = calcMainChainReward(miningReward)
-    val uncleRewardOutputs = uncleMiners.map { case (_, uncleLockupScript, heightDiff) =>
-      val uncleReward = calcUncleReward(mainChainReward, heightDiff)
-      AssetOutput(uncleReward, uncleLockupScript, lockTime, AVector.empty, ByteString.empty)
+    val uncleRewardOutputs = uncles.map { uncle =>
+      val uncleReward = calcUncleReward(mainChainReward, uncle.heightDiff)
+      AssetOutput(uncleReward, uncle.lockupScript, lockTime, AVector.empty, ByteString.empty)
     }
     val blockRewardOutput = AssetOutput(
       calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount)),
@@ -97,13 +97,13 @@ object Coinbase {
       miningReward: U256,
       lockupScript: LockupScript.Asset,
       blockTs: TimeStamp,
-      uncleMiners: AVector[(BlockHash, LockupScript.Asset, Int)]
+      uncles: AVector[SelectedUncle]
   )(implicit networkConfig: NetworkConfig): Transaction = {
     val lockTime = blockTs + networkConfig.coinbaseLockupPeriod
     val hardFork = networkConfig.getHardFork(blockTs)
     val outputs = if (hardFork.isGhostEnabled()) {
       assume(coinbaseData.isGhostEnabled)
-      coinbaseOutputsGhost(coinbaseData, miningReward, lockupScript, lockTime, uncleMiners)
+      coinbaseOutputsGhost(coinbaseData, miningReward, lockupScript, lockTime, uncles)
     } else {
       assume(!coinbaseData.isGhostEnabled)
       coinbaseOutputsPreGhost(coinbaseData, miningReward, lockupScript, lockTime)
@@ -126,9 +126,9 @@ object Coinbase {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset, Int)]
+      uncles: AVector[SelectedUncle]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_._1), minerData)
+    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_.blockHash), minerData)
     val reward       = miningReward(gasFee, target, blockTs)
     build(coinbaseData, reward, lockupScript, blockTs, uncles)
   }

@@ -534,7 +534,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val miner               = getGenesisLockupScript(chainIndex.to)
     val uncleHash           = prepare()
     val (template0, uncles) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
-    uncles.map(_._1) is AVector(uncleHash)
+    uncles.map(_.blockHash) is AVector(uncleHash)
     blockFlow.validateTemplate(chainIndex, template0, uncles, miner).rightValue is template0
 
     val block = mine(blockFlow, template0)
