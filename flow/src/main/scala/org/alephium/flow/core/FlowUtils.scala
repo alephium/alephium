@@ -27,6 +27,7 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSettings, MemPoolSetting}
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult, IOUtils}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -257,6 +258,7 @@ trait FlowUtils
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     createBlockTemplate(chainIndex, miner).flatMap { case (template, uncles) =>
+      assume(uncles.length <= ALPH.MaxUncleSize)
       validateTemplate(chainIndex, template, uncles, miner)
     }
   }

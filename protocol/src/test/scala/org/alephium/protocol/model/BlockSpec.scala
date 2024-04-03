@@ -191,7 +191,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "serde the pre-ghost snapshots properly" in new BlockSnapshotsFixture {
+  it should "serde the snapshots properly" in new BlockSnapshotsFixture {
     implicit val basePath                          = "src/test/resources/models/block"
     override def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
 

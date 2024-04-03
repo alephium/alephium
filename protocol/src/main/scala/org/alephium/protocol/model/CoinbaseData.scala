@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, Bytes, TimeStamp}
 
 final case class CoinbaseDataPrefix private (fromGroup: Byte, toGroup: Byte, blockTs: TimeStamp)
 
@@ -105,7 +105,8 @@ object CoinbaseData {
     val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
     val hardFork = networkConfig.getHardFork(blockTs)
     if (hardFork.isGhostEnabled()) {
-      CoinbaseDataV2(prefix, uncleHashes, minerData)
+      val sortedUncleHashes = uncleHashes.sortBy(_.bytes)(Bytes.byteStringOrdering)
+      CoinbaseDataV2(prefix, sortedUncleHashes, minerData)
     } else {
       CoinbaseDataV1(prefix, minerData)
     }

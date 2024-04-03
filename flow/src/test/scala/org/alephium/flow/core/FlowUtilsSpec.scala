@@ -475,6 +475,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Ghost
 
     val block = mine(blockFlow, blockTemplate)
+    block.header.version is DefaultBlockVersion
     block.uncleHashes.rightValue is AVector(uncleHash)
     addAndCheck(blockFlow, block)
   }
