@@ -84,7 +84,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.broker.groups is 4
     config.consensus.ghost.numZerosAtLeastInHash is 37
     config.consensus.ghost.blockTargetTime is Duration.ofSecondsUnsafe(16)
-    config.consensus.ghost.uncleDependencyGapTime is Duration.ofSecondsUnsafe(4)
+    config.consensus.ghost.uncleDependencyGapTime is Duration.ofSecondsUnsafe(8)
     val initialHashRate =
       HashRate.from(
         config.consensus.ghost.maxMiningTarget,

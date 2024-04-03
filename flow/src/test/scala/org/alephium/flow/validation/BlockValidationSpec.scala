@@ -203,7 +203,7 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check coinbase data for pre-ghost hardfork" in new CoinbaseDataFixture {
     override val configValues =
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) isnot HardFork.Ghost
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
@@ -233,12 +233,12 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check uncles for pre-ghost hardfork" in new Fixture {
     override val configValues =
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) isnot HardFork.Ghost
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     val uncleHashes = AVector.fill(ALPH.MaxUncleSize)(BlockHash.random)
 
     implicit val validator = (blk: Block) => {
-      networkConfig.getHardFork(blk.timestamp) isnot HardFork.Ghost
+      networkConfig.getHardFork(blk.timestamp) is HardFork.Leman
       checkUncles(blockFlow, blk.chainIndex, blk, uncleHashes)
     }
 
