@@ -426,7 +426,7 @@ trait FlowFixture
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)] = AVector.empty
+      uncles: AVector[SelectedUncle] = AVector.empty
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
@@ -451,28 +451,20 @@ trait FlowFixture
   }
 
   implicit class RichBlockFlowTemplate(template: BlockFlowTemplate) {
-    def setUncles(uncles: AVector[(BlockHash, LockupScript.Asset)]): BlockFlowTemplate = {
+    def setUncles(uncles: AVector[SelectedUncle]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
-      val coinbaseTx = Transaction.coinbase(
+      implicit val emissionConfig = consensusConfigs.ghost
+      val gasFee                  = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+      val reward = Coinbase.miningReward(gasFee, template.target, template.templateTs)
+      val coinbaseData = CoinbaseData.from(
         template.index,
-        txs,
-        miner,
-        template.target,
         template.templateTs,
-        uncles
+        uncles.map(_.blockHash),
+        ByteString.empty
       )
-      val coinbaseData = deserialize[CoinbaseData](
-        coinbaseTx.unsigned.fixedOutputs.head.additionalData
-      ).rightValue.asInstanceOf[CoinbaseDataV2]
-      val newCoinbaseData = coinbaseData.copy(uncleHashes = uncles.map(_._1))
-      val newOutput = coinbaseTx.unsigned.fixedOutputs.head
-        .copy(additionalData = serialize[CoinbaseData](newCoinbaseData))
-      val unsignedTx = coinbaseTx.unsigned.copy(fixedOutputs =
-        coinbaseTx.unsigned.fixedOutputs.replace(0, newOutput)
-      )
-      val newCoinbaseTx = coinbaseTx.copy(unsigned = unsignedTx)
-      template.copy(transactions = txs :+ newCoinbaseTx)
+      val coinbaseTx = Coinbase.build(coinbaseData, reward, miner, template.templateTs, uncles)
+      template.copy(transactions = txs :+ coinbaseTx)
     }
 
     lazy val uncleHashes: AVector[BlockHash] = {

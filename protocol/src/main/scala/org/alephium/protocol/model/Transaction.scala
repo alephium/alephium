@@ -251,7 +251,7 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)]
+      uncles: AVector[SelectedUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
@@ -264,7 +264,7 @@ object Transaction {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)]
+      uncles: AVector[SelectedUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
     coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)
@@ -276,7 +276,7 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)]
+      uncles: AVector[SelectedUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
@@ -288,7 +288,7 @@ object Transaction {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)]
+      uncles: AVector[SelectedUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     val emissionConfig = consensusConfigs.getConsensusConfig(blockTs)
     Coinbase.build(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)(

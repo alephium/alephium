@@ -23,7 +23,7 @@ import org.alephium.protocol.config.{EmissionConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, Bytes, TimeStamp, U256}
 
 object Coinbase {
   def miningReward(gasFee: U256, target: Target, blockTs: TimeStamp)(implicit
@@ -38,9 +38,58 @@ object Coinbase {
     }
   }
 
-  def uncleReward(miningReward: U256): U256 = {
-    // FIXME
-    miningReward
+  @inline
+  def calcMainChainReward(miningReward: U256): U256 = {
+    val numerator   = U256.unsafe(100 * 8 * 32)
+    val denominator = U256.unsafe(5 * 7 * 33 + 100 * 8 * 32)
+    miningReward.mulUnsafe(numerator).divUnsafe(denominator)
+  }
+
+  @inline
+  def calcUncleReward(mainChainReward: U256, heightDiff: Int): U256 = {
+    val heightDiffMax = ALPH.MaxUncleAge + 1
+    assume(heightDiff > 0 && heightDiff < heightDiffMax)
+    val numerator = U256.unsafe(heightDiffMax - heightDiff)
+    mainChainReward.mulUnsafe(numerator).divUnsafe(U256.unsafe(heightDiffMax))
+  }
+
+  @inline
+  def calcBlockReward(mainChainReward: U256, uncleRewards: AVector[U256]): U256 = {
+    val inclusionReward = uncleRewards.fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.unsafe(32))
+    mainChainReward.addUnsafe(inclusionReward)
+  }
+
+  def coinbaseOutputsPreGhost(
+      coinbaseData: CoinbaseData,
+      miningReward: U256,
+      lockupScript: LockupScript.Asset,
+      lockTime: TimeStamp
+  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
+    AVector(
+      AssetOutput(miningReward, lockupScript, lockTime, AVector.empty, serialize(coinbaseData))
+    )
+  }
+
+  def coinbaseOutputsGhost(
+      coinbaseData: CoinbaseData,
+      miningReward: U256,
+      lockupScript: LockupScript.Asset,
+      lockTime: TimeStamp,
+      uncles: AVector[SelectedUncle]
+  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
+    val mainChainReward = calcMainChainReward(miningReward)
+    val uncleRewardOutputs = uncles.map { uncle =>
+      val uncleReward = calcUncleReward(mainChainReward, uncle.heightDiff)
+      AssetOutput(uncleReward, uncle.lockupScript, lockTime, AVector.empty, ByteString.empty)
+    }
+    val blockRewardOutput = AssetOutput(
+      calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount)),
+      lockupScript,
+      lockTime,
+      AVector.empty,
+      serialize(coinbaseData)
+    )
+    blockRewardOutput +: uncleRewardOutputs
   }
 
   // scalastyle:off parameter.number
@@ -48,16 +97,20 @@ object Coinbase {
       coinbaseData: CoinbaseData,
       miningReward: U256,
       lockupScript: LockupScript.Asset,
-      lockTime: TimeStamp,
-      uncleMiners: AVector[LockupScript.Asset]
+      blockTs: TimeStamp,
+      uncles: AVector[SelectedUncle]
   )(implicit networkConfig: NetworkConfig): Transaction = {
-    val txOutput =
-      AssetOutput(miningReward, lockupScript, lockTime, AVector.empty, serialize(coinbaseData))
-    val uncleRewardOutputs = uncleMiners.map(
-      AssetOutput(uncleReward(miningReward), _, lockTime, AVector.empty, ByteString.empty)
-    )
+    val lockTime = blockTs + networkConfig.coinbaseLockupPeriod
+    val hardFork = networkConfig.getHardFork(blockTs)
+    val outputs = if (hardFork.isGhostEnabled()) {
+      assume(coinbaseData.isGhostEnabled)
+      coinbaseOutputsGhost(coinbaseData, miningReward, lockupScript, lockTime, uncles)
+    } else {
+      assume(!coinbaseData.isGhostEnabled)
+      coinbaseOutputsPreGhost(coinbaseData, miningReward, lockupScript, lockTime)
+    }
     Transaction(
-      UnsignedTransaction.coinbase(AVector.empty, txOutput +: uncleRewardOutputs),
+      UnsignedTransaction.coinbase(AVector.empty, outputs),
       scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
@@ -74,11 +127,12 @@ object Coinbase {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)]
+      uncles: AVector[SelectedUncle]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_._1), minerData)
-    val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
-    val reward       = miningReward(gasFee, target, blockTs)
-    build(coinbaseData, reward, lockupScript, lockTime, uncles.map(_._2))
+    val sortedUncles = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
+    val coinbaseData =
+      CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
+    val reward = miningReward(gasFee, target, blockTs)
+    build(coinbaseData, reward, lockupScript, blockTs, sortedUncles)
   }
 }
