@@ -640,7 +640,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.hashesCache.put(2, AVector(shortHash, longHash))
     chain.getHashes(2) isE AVector(shortHash, longHash)
 
-    chain.checkHashIndexingUnsafe(3)
+    chain.checkAndRepairHashIndexingUnsafe(3)
     chain.getHashes(2) isE AVector(longHash, shortHash)
     chain.hashesCache.get(2).value is AVector(longHash, shortHash)
   }
@@ -677,8 +677,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       // generate `length + 1` blocks to make sure this is the canonical chain
       (0 until length + 1).foreach { k =>
         val parentHash = allMainchainBlocks.lastOption.getOrElse(genesis.hash)
-        val uncleHashes = if (allUncles.size >= 2) {
-          AVector.from(allUncles.takeRight(2).map(_.hash))
+        val uncleHashes = if (allUncles.size >= ALPH.MaxUncleSize) {
+          AVector.from(allUncles.takeRight(ALPH.MaxUncleSize).map(_.hash))
         } else {
           AVector.empty
         }
@@ -722,6 +722,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getUsedUnclesAndAncestors(bestHeader).rightValue
     usedUncleHashes.isEmpty is true
     ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+    ancestors.contains(bestHeader.hash) is false
   }
 
   it should "get the right used uncles all uncles are used" in new GhostFixture {
@@ -735,6 +736,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getUsedUnclesAndAncestors(bestHeader).rightValue
     usedUncleHashes.toSet is allUncles.map(_.hash)
     ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+    ancestors.contains(bestHeader.hash) is false
   }
 
   it should "select recent available uncles" in new GhostFixture {

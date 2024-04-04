@@ -157,6 +157,12 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   private[core] lazy val hashesCache =
     Cache.lruSafe[Int, AVector[BlockHash]](consensusConfigs.blockCacheCapacityPerChain * 4)
 
+  def updateHashesCache(height: Int, hashes: AVector[BlockHash]): Unit = {
+    if (hashesCache.contains(height)) {
+      hashesCache.put(height, hashes)
+    }
+  }
+
   def cacheHashes(height: Int, hashes: AVector[BlockHash]): Unit = hashesCache.put(height, hashes)
 
   def getHashesUnsafe(height: Int): AVector[BlockHash] = {

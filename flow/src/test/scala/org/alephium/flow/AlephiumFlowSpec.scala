@@ -462,7 +462,17 @@ trait FlowFixture
         template.templateTs,
         uncles
       )
-      template.copy(transactions = txs :+ coinbaseTx)
+      val coinbaseData = deserialize[CoinbaseData](
+        coinbaseTx.unsigned.fixedOutputs.head.additionalData
+      ).rightValue.asInstanceOf[CoinbaseDataV2]
+      val newCoinbaseData = coinbaseData.copy(uncleHashes = uncles.map(_._1))
+      val newOutput = coinbaseTx.unsigned.fixedOutputs.head
+        .copy(additionalData = serialize[CoinbaseData](newCoinbaseData))
+      val unsignedTx = coinbaseTx.unsigned.copy(fixedOutputs =
+        coinbaseTx.unsigned.fixedOutputs.replace(0, newOutput)
+      )
+      val newCoinbaseTx = coinbaseTx.copy(unsigned = unsignedTx)
+      template.copy(transactions = txs :+ newCoinbaseTx)
     }
 
     lazy val uncleHashes: AVector[BlockHash] = {
@@ -494,7 +504,7 @@ trait FlowFixture
       deps: AVector[BlockHash],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), txs, blockTs, target)
   }
@@ -516,7 +526,7 @@ trait FlowFixture
       deps: BlockDeps,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     val hardFork = networkConfig.getHardFork(blockTs)
     val loosenDeps =
@@ -536,7 +546,7 @@ trait FlowFixture
       depStateHash: Hash,
       txsHash: Hash,
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
 
