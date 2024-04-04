@@ -641,7 +641,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.hashesCache.put(2, AVector(shortHash, longHash))
     chain.getHashes(2) isE AVector(shortHash, longHash)
 
-    chain.checkHashIndexingUnsafe(3)
+    chain.checkAndRepairHashIndexingUnsafe(3)
     chain.getHashes(2) isE AVector(longHash, shortHash)
     chain.hashesCache.get(2).value is AVector(longHash, shortHash)
   }
@@ -678,16 +678,16 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       // generate `length + 1` blocks to make sure this is the canonical chain
       (0 until length + 1).foreach { k =>
         val parentHash = allMainchainBlocks.lastOption.getOrElse(genesis.hash)
-        val uncleHashes = if (allUncles.size >= 2) {
-          AVector.from(allUncles.takeRight(2).map(_.hash))
+        val uncleHashes = if (allUncles.size >= ALPH.MaxUncleSize) {
+          AVector.from(allUncles.takeRight(ALPH.MaxUncleSize).map(_.hash))
         } else {
           AVector.empty
         }
-        val unclePairs =
+        val selectedUncles =
           uncleHashes.map(hash =>
-            (hash: BlockHash, chain.getBlockUnsafe(hash).minerLockupScript, 1)
+            SelectedUncle(hash, chain.getBlockUnsafe(hash).minerLockupScript, 1)
           )
-        val block     = blockGen(chainIndex, TimeStamp.now(), parentHash, unclePairs).sample.get
+        val block     = blockGen(chainIndex, TimeStamp.now(), parentHash, selectedUncles).sample.get
         val uncleGen  = blockGen(block.chainIndex, block.timestamp, block.parentHash)
         val uncleSize = if (k == length) 0 else ALPH.MaxUncleSize // no uncles for the latest block
         val newUncles = AVector.fill(uncleSize)(uncleGen.sample.get)
@@ -725,6 +725,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getUsedUnclesAndAncestors(bestHeader).rightValue
     usedUncleHashes.isEmpty is true
     ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+    ancestors.contains(bestHeader.hash) is false
   }
 
   it should "get the right used uncles all uncles are used" in new GhostFixture {
@@ -738,6 +739,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getUsedUnclesAndAncestors(bestHeader).rightValue
     usedUncleHashes.toSet is allUncles.map(_.hash)
     ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+    ancestors.contains(bestHeader.hash) is false
   }
 
   it should "select recent available uncles" in new GhostFixture {
@@ -759,10 +761,15 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.selectUncles(currentBlock.header, _ => false).rightValue.isEmpty is true
         val selectedUncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
         selectedUncles.length is ALPH.MaxUncleSize
-        selectedUncles.foreach { case (hash, miner, heightDiff) =>
-          miner is chain.getBlockUnsafe(hash).coinbase.unsigned.fixedOutputs(0).lockupScript
-          chain.getHeightUnsafe(hash) is height
-          heightDiff is 1
+        selectedUncles.foreach { uncle =>
+          uncle.lockupScript is chain
+            .getBlockUnsafe(uncle.blockHash)
+            .coinbase
+            .unsigned
+            .fixedOutputs(0)
+            .lockupScript
+          chain.getHeightUnsafe(uncle.blockHash) is height
+          uncle.heightDiff is 1
         }
       })
     }
@@ -792,13 +799,13 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       if (index >= ALPH.MaxUncleAge + 1 - index) {
         uncles.isEmpty is true
       } else {
-        uncles.map { case (hash, _, _) => chain.getHeightUnsafe(hash) } is AVector.fill(2)(
+        uncles.map { uncle => chain.getHeightUnsafe(uncle.blockHash) } is AVector.fill(2)(
           ALPH.MaxUncleAge + 1 - index
         )
       }
 
       val (usedUncles, ancestors) = chain.getUsedUnclesAndAncestors(block.header).rightValue
-      uncles.foreach(uncle => usedUncles.exists(_ == uncle._1) is true)
+      uncles.foreach(uncle => usedUncles.exists(_ == uncle.blockHash) is true)
       ancestors.length is ALPH.MaxUncleAge
       currentBlock = block
     })
@@ -834,7 +841,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     addBlock(chain, uncle)
     val bestTip        = chain.getBestTipUnsafe()
     val selectedUncles = chain.selectUnclesUnsafe(chain.getBlockHeaderUnsafe(bestTip), _ => true)
-    selectedUncles is AVector((uncle.hash, uncle.minerLockupScript, length - parentHeight))
+    selectedUncles is AVector(
+      SelectedUncle(uncle.hash, uncle.minerLockupScript, length - parentHeight)
+    )
   }
 
   trait GetSyncDataFixture extends Fixture {
@@ -854,7 +863,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           now,
           main.lastOption.getOrElse(genesis).hash,
           fork0.lastOption
-            .map(block => AVector((block.hash, lockupScript, 1)))
+            .map(block => AVector(SelectedUncle(block.hash, lockupScript, 1)))
             .getOrElse(AVector.empty)
         ).sample.get
         val fork0Block = blockGen(
@@ -862,7 +871,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           now,
           fork0.lastOption.getOrElse(genesis).hash,
           fork1.lastOption
-            .map(block => AVector((block.hash, lockupScript, 1)))
+            .map(block => AVector(SelectedUncle(block.hash, lockupScript, 1)))
             .getOrElse(AVector.empty)
         ).sample.get
         val fork1Block =
@@ -884,9 +893,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val length = ALPH.MaxUncleAge + 1
     createBlockChain(length)
 
-    val uncles = AVector((fork1(length - 2).hash, lockupScript, 1))
+    val uncles = AVector(SelectedUncle(fork1.last.hash, lockupScript, 1))
     val block  = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
-    block.uncleHashes.rightValue is fork0.last.uncleHashes.rightValue
     // make sure `main` is the canonical chain
     addBlocks(blockChain, (main :+ block) ++ fork0 ++ fork1)
 
@@ -899,7 +907,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     result0 is expected
 
     val result1 = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
-    result1 is (result0 ++ AVector(uncles.head._1, block.hash))
+    result1 is (result0 ++ AVector(uncles.head.blockHash, block.hash))
 
     val hashes = (0 until ALPH.MaxUncleAge).map { _ =>
       val parentHash = blockChain.getBestTipUnsafe()
@@ -916,7 +924,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val length = ALPH.MaxUncleAge + 1
     createBlockChain(length)
 
-    val uncles = AVector((fork1.last.hash, lockupScript, 1))
+    val uncles = AVector(SelectedUncle(fork1.last.hash, lockupScript, 1))
     val block0 = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
     addBlocks(blockChain, (main :+ block0) ++ fork0 ++ fork1)
 
@@ -951,5 +959,52 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val result4 =
       blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
     result4 is (result1 ++ AVector(block0.hash, block2.hash, block3.hash) ++ AVector.from(hashes))
+  }
+
+  it should "not include duplicate hashes" in new Fixture {
+    val chainIndex   = genesis.chainIndex
+    val lockupScript = assetLockupGen(chainIndex.to).sample.get
+    val blockChain   = buildBlockChain()
+
+    //                /<--- uncle1
+    //               /
+    // genesis <- block0 <- block1 <- block2 <- block3 <- block4
+    //                        \
+    //                         \<---- uncle2
+
+    val blocks = (0 until 3).map { _ =>
+      val parentHash = blockChain.getBestTipUnsafe()
+      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
+      addBlock(blockChain, block)
+      block
+    }
+    blockChain.maxHeightUnsafe is 3
+    val Seq(block0, block1, block2) = blocks
+    val uncle1                      = blockGen(chainIndex, TimeStamp.now(), block0.hash).sample.get
+    addBlock(blockChain, uncle1)
+
+    val selectedUncle1 = AVector(SelectedUncle(uncle1.hash, lockupScript, 1))
+    val block3 = blockGen(chainIndex, TimeStamp.now(), block2.hash, selectedUncle1).sample.get
+    addBlock(blockChain, block3)
+    blockChain.maxHeightUnsafe is 4
+
+    val uncle2 = blockGen(chainIndex, TimeStamp.now(), block1.hash, selectedUncle1).sample.get
+    addBlock(blockChain, uncle2)
+
+    val selectedUncle2 = AVector(SelectedUncle(uncle2.hash, lockupScript, 1))
+    val block4 = blockGen(chainIndex, TimeStamp.now(), block3.hash, selectedUncle2).sample.get
+    addBlock(blockChain, block4)
+    blockChain.maxHeightUnsafe is 5
+
+    val hashes = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeightUnsafe)
+    hashes is AVector(
+      block4.hash,
+      uncle2.hash,
+      uncle1.hash,
+      block3.hash,
+      block2.hash,
+      block1.hash,
+      block0.hash
+    ).reverse
   }
 }

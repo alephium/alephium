@@ -26,7 +26,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.model.{Block, BlockDeps, BlockHash, ChainIndex, FlowData, Nonce}
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 class DependencyHandlerSpec extends AlephiumActorSpec {
@@ -314,7 +314,9 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       val parentIndex = brokerConfig.groups - 1 + chainIndex.to.value
       val newDeps     = template0.deps.replace(parentIndex, parentHash)
       val uncles =
-        uncleHashes.map(hash => (hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1))
+        uncleHashes.map(hash =>
+          SelectedUncle(hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1)
+        )
       val template1 = template0
         .rebuild(template0.transactions.init, uncles, lockupScript)
         .copy(

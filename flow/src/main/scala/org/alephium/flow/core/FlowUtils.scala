@@ -27,6 +27,7 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSettings, MemPoolSetting}
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult, IOUtils}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -208,7 +209,7 @@ trait FlowUtils
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
+  ): AVector[SelectedUncle] = {
     if (hardFork.isGhostEnabled()) {
       getUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
@@ -220,14 +221,14 @@ trait FlowUtils
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): IOResult[AVector[(BlockHash, LockupScript.Asset, Int)]] = {
+  ): IOResult[AVector[SelectedUncle]] = {
     IOUtils.tryExecute(getUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
-  ): IOResult[(BlockFlowTemplate, AVector[(BlockHash, LockupScript.Asset, Int)])] = {
+  ): IOResult[(BlockFlowTemplate, AVector[SelectedUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val bestDeps = getBestDeps(chainIndex.from)
     for {
@@ -257,6 +258,7 @@ trait FlowUtils
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     createBlockTemplate(chainIndex, miner).flatMap { case (template, uncles) =>
+      assume(uncles.length <= ALPH.MaxUncleSize)
       validateTemplate(chainIndex, template, uncles, miner)
     }
   }
@@ -265,7 +267,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      uncles: AVector[(BlockHash, LockupScript.Asset, Int)],
+      uncles: AVector[SelectedUncle],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -294,7 +296,7 @@ trait FlowUtils
   final def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate,
-      uncles: AVector[(BlockHash, LockupScript.Asset, Int)],
+      uncles: AVector[SelectedUncle],
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {

@@ -183,7 +183,7 @@ class TransactionSpec
       val lockupScript = LockupScript.P2PKH(
         Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
       )
-      val tx = coinbaseTransaction(AVector((blockHash, lockupScript, 1)))
+      val tx = coinbaseTransaction(AVector(SelectedUncle(blockHash, lockupScript, 1)))
       tx.verify("ghost-coinbase")
     }
 

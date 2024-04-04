@@ -31,7 +31,7 @@ class CoinbaseSpec extends AlephiumSpec with Generators with GroupConfigFixture.
   }
   it should "check the ghost reward formula" in {
     val double = Random.nextDouble() * Math.pow(10.0, 18) * 3
-    val u256 = U256.unsafe(BigDecimal.valueOf(double).toBigInt)
+    val u256   = U256.unsafe(BigDecimal.valueOf(double).toBigInt)
     checkEqual(
       Coinbase.calcMainChainReward(u256),
       double / (0.05 * 7 / 8 * (1 + 1 / 32) + 1)

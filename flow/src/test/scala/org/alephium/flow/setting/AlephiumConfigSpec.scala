@@ -77,6 +77,25 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
   }
 
+  it should "load ghost config" in {
+    val rootPath = Files.tmpDir
+    val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.ghost.numZerosAtLeastInHash is 37
+    config.consensus.ghost.blockTargetTime is Duration.ofSecondsUnsafe(16)
+    config.consensus.ghost.uncleDependencyGapTime is Duration.ofSecondsUnsafe(8)
+    val initialHashRate =
+      HashRate.from(
+        config.consensus.ghost.maxMiningTarget,
+        config.consensus.ghost.blockTargetTime
+      )(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
+    config.network.ghostHardForkTimestamp is TimeStamp.unsafe(1695571200000L)
+  }
+
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),

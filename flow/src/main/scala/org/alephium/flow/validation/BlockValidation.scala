@@ -25,7 +25,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LockupScript, LogConfig, WorldState}
 import org.alephium.serde._
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{AVector, Bytes, EitherF, U256}
 
 // scalastyle:off number.of.methods
 
@@ -136,7 +136,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     } yield sideResult
   }
 
-  private def checkUncles(
+  private[validation] def checkUncles(
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
@@ -148,7 +148,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         val blockchain = flow.getBlockChain(chainIndex)
         for {
           _ <- checkUncleSize(uncleHashes)
-          _ <- checkDuplicateUncles(uncleHashes)
+          _ <- checkUncleOrder(uncleHashes)
           uncleBlocks <- uncleHashes.mapE(blockchain.getBlock) match {
             case Left(IOError.KeyNotFound(_)) => invalidBlock(UncleDoesNotExist)
             case result                       => from(result)
@@ -183,13 +183,17 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       parentHeader           <- from(blockchain.getBlockHeader(block.uncleHash(chainIndex.to)))
       usedUnclesAndAncestors <- from(blockchain.getUsedUnclesAndAncestors(parentHeader))
       (usedUncles, ancestors) = usedUnclesAndAncestors
-      isValid = uncles.forall { uncle =>
-        uncle.hash != parentHeader.hash &&
-        !ancestors.exists(_ == uncle.hash) &&
-        ancestors.exists(_ == uncle.parentHash) &&
-        !usedUncles.contains(uncle.hash)
+      _ <- uncles.foreachE { uncle =>
+        if (uncle.hash == parentHeader.hash || ancestors.exists(_ == uncle.hash)) {
+          invalidBlock(NotUnclesForTheBlock)
+        } else if (!ancestors.exists(_ == uncle.parentHash)) {
+          invalidBlock(UncleHashConflictWithParentHash)
+        } else if (usedUncles.contains(uncle.hash)) {
+          invalidBlock(UnclesAlreadyUsed)
+        } else {
+          validBlock(())
+        }
       }
-      _ <- if (isValid) validBlock(()) else invalidBlock(InvalidUncles)
     } yield ()
   }
 
@@ -201,13 +205,19 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  @inline private def checkDuplicateUncles(
+  @inline private[validation] def checkUncleOrder(
       uncles: AVector[BlockHash]
   ): BlockValidationResult[Unit] = {
-    if (uncles.toSeq.distinct.length != uncles.length) {
-      invalidBlock(DuplicatedUncles)
-    } else {
-      validBlock(())
+    uncles.foreachWithIndexE { case (hash, index) =>
+      if (index > 0) {
+        if (Bytes.byteStringOrdering.compare(hash.bytes, uncles(index - 1).bytes) <= 0) {
+          invalidBlock(UnsortedUncles)
+        } else {
+          validBlock(())
+        }
+      } else {
+        validBlock(())
+      }
     }
   }
 
@@ -435,21 +445,25 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block
   ): BlockValidationResult[AVector[BlockHash]] = {
     val coinbase = block.coinbase
-    val data     = coinbase.unsigned.fixedOutputs.head.additionalData
-    deserialize[CoinbaseData](data) match {
-      case Right(CoinbaseDataV1(prefix, _)) =>
-        if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-          validBlock(AVector.empty)
-        } else {
-          invalidBlock(InvalidCoinbaseData)
-        }
-      case Right(CoinbaseDataV2(prefix, uncleHashes, _)) =>
-        if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-          validBlock(uncleHashes)
-        } else {
-          invalidBlock(InvalidCoinbaseData)
-        }
-      case Left(_) => invalidBlock(InvalidCoinbaseData)
+    if (coinbase.unsigned.fixedOutputs.isEmpty) {
+      invalidBlock(InvalidCoinbaseFormat)
+    } else {
+      val data = coinbase.unsigned.fixedOutputs.head.additionalData
+      deserialize[CoinbaseData](data) match {
+        case Right(CoinbaseDataV1(prefix, _)) =>
+          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+            validBlock(AVector.empty)
+          } else {
+            invalidBlock(InvalidCoinbaseData)
+          }
+        case Right(CoinbaseDataV2(prefix, uncleHashes, _)) =>
+          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+            validBlock(uncleHashes)
+          } else {
+            invalidBlock(InvalidCoinbaseData)
+          }
+        case Left(_) => invalidBlock(InvalidCoinbaseData)
+      }
     }
   }
 

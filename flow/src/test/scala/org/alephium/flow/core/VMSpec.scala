@@ -3523,7 +3523,7 @@ class VMSpec extends AlephiumSpec with Generators {
     contractState.immFields.isEmpty is true
     contractState.mutFields is AVector[Val](Val.U256(0))
 
-    val subContractId = contractId.subContractId(Hex.unsafe("00"), chainIndex.from)
+    val subContractId    = contractId.subContractId(Hex.unsafe("00"), chainIndex.from)
     val subContractState = worldState.getContractState(subContractId).fold(throw _, identity)
     subContractState.immFields.isEmpty is true
     subContractState.mutFields is AVector[Val](Val.U256(2)) // The field was updated from 1 to 2

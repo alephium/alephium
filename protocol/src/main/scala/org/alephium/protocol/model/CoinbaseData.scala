@@ -97,7 +97,7 @@ object CoinbaseData {
   def from(
       chainIndex: ChainIndex,
       blockTs: TimeStamp,
-      uncleHashes: AVector[BlockHash],
+      sortedUncleHashes: AVector[BlockHash],
       minerData: ByteString
   )(implicit
       networkConfig: NetworkConfig
@@ -105,7 +105,7 @@ object CoinbaseData {
     val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
     val hardFork = networkConfig.getHardFork(blockTs)
     if (hardFork.isGhostEnabled()) {
-      CoinbaseDataV2(prefix, uncleHashes, minerData)
+      CoinbaseDataV2(prefix, sortedUncleHashes, minerData)
     } else {
       CoinbaseDataV1(prefix, minerData)
     }

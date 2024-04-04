@@ -426,7 +426,7 @@ trait FlowFixture
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset, Int)] = AVector.empty
+      uncles: AVector[SelectedUncle] = AVector.empty
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
@@ -451,17 +451,19 @@ trait FlowFixture
   }
 
   implicit class RichBlockFlowTemplate(template: BlockFlowTemplate) {
-    def setUncles(uncles: AVector[(BlockHash, LockupScript.Asset, Int)]): BlockFlowTemplate = {
+    def setUncles(uncles: AVector[SelectedUncle]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
-      val coinbaseTx = Transaction.coinbase(
+      implicit val emissionConfig = consensusConfigs.ghost
+      val gasFee                  = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+      val reward = Coinbase.miningReward(gasFee, template.target, template.templateTs)
+      val coinbaseData = CoinbaseData.from(
         template.index,
-        txs,
-        miner,
-        template.target,
         template.templateTs,
-        uncles
+        uncles.map(_.blockHash),
+        ByteString.empty
       )
+      val coinbaseTx = Coinbase.build(coinbaseData, reward, miner, template.templateTs, uncles)
       template.copy(transactions = txs :+ coinbaseTx)
     }
 
@@ -494,7 +496,7 @@ trait FlowFixture
       deps: AVector[BlockHash],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), txs, blockTs, target)
   }
@@ -516,7 +518,7 @@ trait FlowFixture
       deps: BlockDeps,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     val hardFork = networkConfig.getHardFork(blockTs)
     val loosenDeps =
@@ -536,7 +538,7 @@ trait FlowFixture
       depStateHash: Hash,
       txsHash: Hash,
       blockTs: TimeStamp,
-      target: Target = Target.Max
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
 
