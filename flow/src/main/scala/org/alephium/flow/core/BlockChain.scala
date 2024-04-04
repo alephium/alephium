@@ -85,8 +85,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def getHashWithUncleDepsUnsafe(
       header: BlockHeader,
-      acc: AVector[BlockHash],
-      checkDuplicate: Boolean
+      acc: AVector[BlockHash]
   ): AVector[BlockHash] = {
     val hardFork = networkConfig.getHardFork(header.timestamp)
     if (hardFork.isGhostEnabled()) {
@@ -95,10 +94,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         case Right(hashes) => hashes
         case Left(error)   => throw error
       }
-      val newAcc = if (checkDuplicate && acc.contains(header.hash)) acc else acc :+ header.hash
+      val newAcc = if (acc.contains(header.hash)) acc else acc :+ header.hash
       uncles.fold(newAcc) { case (acc, uncleHash) =>
         val uncleHeader = getBlockHeaderUnsafe(uncleHash)
-        getHashWithUncleDepsUnsafe(uncleHeader, acc, checkDuplicate)
+        getHashWithUncleDepsUnsafe(uncleHeader, acc)
       }
     } else {
       acc :+ header.hash
@@ -114,9 +113,9 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         acc: AVector[BlockHash]
     ): AVector[BlockHash] = {
       if (currentHeight <= heightFrom) {
-        getHashWithUncleDepsUnsafe(currentHeader, acc, checkDuplicate = false)
+        getHashWithUncleDepsUnsafe(currentHeader, acc)
       } else {
-        val newAcc       = getHashWithUncleDepsUnsafe(currentHeader, acc, checkDuplicate = false)
+        val newAcc       = getHashWithUncleDepsUnsafe(currentHeader, acc)
         val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
         iter(parentHeader, currentHeight - 1, newAcc)
       }
@@ -129,14 +128,15 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     // For a block with a height from `heightFrom` to `uncleHeightTo`, its uncle's height may lower than `heightFrom`
     val uncleHeightTo = math.min(heightFrom + ALPH.MaxUncleAge - 1, heightTo)
-    val hashes = AVector.from(heightFrom to uncleHeightTo).fold(AVector.ofCapacity[BlockHash](heightTo - heightFrom + 1)) {
-      case (acc, height) =>
+    val hashes = AVector
+      .from(heightFrom to uncleHeightTo)
+      .fold(AVector.ofCapacity[BlockHash](heightTo - heightFrom + 1)) { case (acc, height) =>
         val hashes = getHashesUnsafe(height)
         hashes.fold(acc) { case (acc, hash) =>
           val header = getBlockHeaderUnsafe(hash)
-          getHashWithUncleDepsUnsafe(header, acc, checkDuplicate = true)
+          getHashWithUncleDepsUnsafe(header, acc)
         }
-    }
+      }
     if (uncleHeightTo < heightTo) {
       hashes ++ AVector.from((uncleHeightTo + 1) to heightTo).flatMap(getHashesUnsafe)
     } else {
@@ -183,7 +183,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
-    val blockHeight     = getHeightUnsafe(parentHeader.hash) + 1
+    val blockHeight             = getHeightUnsafe(parentHeader.hash) + 1
     val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
 
     @tailrec
