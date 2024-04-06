@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF, Math, U256}
+import org.alephium.util.{AVector, EitherF, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -377,13 +377,12 @@ final class StatefulVM(
       val gasFeePaid  = ctx.gasFeePaid
 
       totalGasFee.sub(gasFeePaid) match {
-        case Some(gasFeeRemaining @ _) =>
+        case Some(_) =>
           ctx.txEnv.prevOutputs.headOption match {
             case Some(firstInput) =>
-              val reimbursedGasFee = Math.min(totalGasFee, gasFeePaid)
-              if (reimbursedGasFee > U256.Zero) {
+              if (gasFeePaid > U256.Zero) {
                 ctx.outputBalances
-                  .addAlph(firstInput.lockupScript, reimbursedGasFee)
+                  .addAlph(firstInput.lockupScript, gasFeePaid)
                   .toRight(Right(InvalidBalances))
               } else {
                 okay

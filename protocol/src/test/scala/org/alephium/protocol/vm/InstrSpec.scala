@@ -2571,6 +2571,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     runAndCheckGas(PayGasFee)
 
     frame.ctx.gasFeePaid is gasFeePaid
+    frame.getBalanceState().rightValue.approved.getAttoAlphAmount(from).value is contractBalance
+      .sub(
+        gasFeePaid
+      )
+      .getOrElse(U256.Zero)
     stack.size is 0
   }
 
