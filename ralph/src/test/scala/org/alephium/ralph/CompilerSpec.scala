@@ -5633,7 +5633,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileContract(code0(1)).isRight is true
     Compiler.compileContract(code0(0)).isRight is true
 
-    def code1(index: Int): String =
+    def code1(index0: Int = 0, index1: Int = 2): String =
       s"""
          |Contract Impl() implements Bar {
          |  pub fn f0() -> () {}
@@ -5642,24 +5642,48 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn f3() -> () {}
          |}
          |Interface Foo {
+         |  @using(methodIndex = $index0)
          |  pub fn f0() -> ()
          |  pub fn f1() -> ()
          |}
          |Interface Bar extends Foo {
-         |  @using(methodIndex = $index)
+         |  @using(methodIndex = $index1)
          |  pub fn f2() -> ()
          |}
          |""".stripMargin
-    Compiler.compileContract(code1(0)).leftValue.message is
+    Compiler.compileContract(code1()).isRight is true
+    Compiler.compileContract(code1(index0 = 1)).isRight is true
+    Compiler.compileContract(code1(index0 = 2, index1 = 3)).isRight is true
+    Compiler.compileContract(code1(index0 = 3)).isRight is true
+    Compiler.compileContract(code1(index0 = 4)).leftValue.message is
+      "The method index of these functions is out of bound: f0, total number of methods: 4"
+    Compiler.compileContract(code1(index1 = 0)).leftValue.message is
       "These functions have invalid predefined method indexes in interface Bar: f2"
-    Compiler.compileContract(code1(1)).leftValue.message is
+    Compiler.compileContract(code1(index1 = 1)).leftValue.message is
       "These functions have invalid predefined method indexes in interface Bar: f2"
-    Compiler.compileContract(code1(2)).isRight is true
-    Compiler.compileContract(code1(3)).isRight is true
+    Compiler.compileContract(code1(index1 = 3)).isRight is true
+    Compiler.compileContract(code1(index1 = 4)).leftValue.message is
+      "The method index of these functions is out of bound: f2, total number of methods: 4"
   }
 
   it should "throw an error if there are duplicate method indexes" in {
-    val code =
+    val code0 =
+      s"""
+         |Contract Bar() implements Foo {
+         |  pub fn f0() -> () {}
+         |  pub fn f1() -> () {}
+         |}
+         |Interface Foo {
+         |  @using(methodIndex = 0)
+         |  pub fn f0() -> ()
+         |  @using(methodIndex = 0)
+         |  pub fn f1() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code0).leftValue.message is
+      s"There are duplicate method indexes in contract Bar: 0"
+
+    val code1 =
       s"""
          |Contract FooBar() implements Bar {
          |  pub fn foo() -> () {}
@@ -5674,7 +5698,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn bar() -> ()
          |}
          |""".stripMargin
-    Compiler.compileContract(code).leftValue.message is
+    Compiler.compileContract(code1).leftValue.message is
       s"There are duplicate method indexes in contract FooBar: 1"
   }
 
