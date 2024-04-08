@@ -1543,13 +1543,15 @@ object BuiltIn {
   val payGasFee: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.asset(
       "payGasFee",
-      Seq.empty,
+      Seq[Type](Type.Address, Type.U256),
       Seq.empty,
       PayGasFee,
-      argsName = Seq.empty,
+      argsName = Seq(
+        "payer"  -> "payer of the gas",
+        "amount" -> "the amount of gas to be paid in ALPH"
+      ),
       retComment = "",
-      doc = "Pay gas fee.",
-      usePreapprovedAssets = true
+      doc = "Pay gas fee."
     )
 
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {

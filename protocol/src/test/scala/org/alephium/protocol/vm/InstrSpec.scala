@@ -2556,79 +2556,73 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait PayGasFeeFixture extends ContractOutputFixture {
     def contractBalance: U256
     def gasFeePaid: U256
+    def gasFeePaying: U256 = gasFeePaid
 
     val from  = LockupScript.P2C(contractId)
     val txEnv = genTxEnv(None, AVector.empty)
     def balanceState =
-      MutBalanceState(remaining = MutBalances.empty, approved = alphBalance(from, contractBalance))
+      MutBalanceState(remaining = alphBalance(from, contractBalance), approved = MutBalances.empty)
 
-    override lazy val frame =
-      prepareFrame(
+    override lazy val frame = {
+      val frame = prepareFrame(
         Some(balanceState),
         Some((contractId, contractOutput, contractOutputRef)),
         Some(txEnv)
       )
-    runAndCheckGas(PayGasFee)
+      frame.opStack.push(Val.Address(from))
+      frame.opStack.push(Val.U256(gasFeePaying))
+      frame
+    }
 
-    frame.ctx.gasFeePaid is gasFeePaid
-    frame.getBalanceState().rightValue.approved.getAttoAlphAmount(from).value is contractBalance
-      .sub(
-        gasFeePaid
-      )
-      .getOrElse(U256.Zero)
-    stack.size is 0
+    def success() = {
+      runAndCheckGas(PayGasFee)
+
+      frame.ctx.gasFeePaid is gasFeePaid
+      frame.getBalanceState().rightValue.remaining.getAttoAlphAmount(from).value is contractBalance
+        .sub(
+          gasFeePaid
+        )
+        .getOrElse(U256.Zero)
+      stack.size is 0
+    }
   }
 
   it should "not pay when contract has no available fund [PayGasFee]" in new PayGasFeeFixture {
     override def contractBalance: U256 = U256.Zero
     override def gasFeePaid: U256      = U256.Zero
+
+    success()
   }
 
   it should "pay partial gas that contract has available fund for [PayGasFee]" in new PayGasFeeFixture {
     lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
     override def contractBalance: U256 = halfGas
     override def gasFeePaid: U256      = halfGas
+
+    success()
   }
 
   it should "pay all gas if contract has enough fund [PayGasFee]" in new PayGasFeeFixture {
     lazy val twiceGas                  = txEnv.gasFeeUnsafe.mul(2).get
     override def contractBalance: U256 = minimalAlphInContract.addUnsafe(twiceGas)
     override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+
+    success()
   }
 
-  it should "pay gas from all the approved ALPH, not enough for all gas [PayGasFee]" in new PayGasFeeFixture {
+  it should "pay gas from ALPH, not enough approved balance [PayGasFee]" in new PayGasFeeFixture {
     lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
-    override def contractBalance: U256 = halfGas
-    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe.subUnsafe(1)
+    override def contractBalance: U256 = halfGas.subUnsafe(1)
+    override def gasFeePaid: U256      = halfGas
 
-    override def balanceState =
-      MutBalanceState(
-        remaining = MutBalances.empty,
-        approved = MutBalances(
-          ArrayBuffer(
-            (LockupScript.P2C(contractId), MutBalancesPerLockup.alph(contractBalance)),
-            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas.subUnsafe(1)))
-          )
-        )
-      )
+    PayGasFee.runWith(frame).leftValue.rightValue is a[NotEnoughApprovedBalance]
   }
 
-  it should "pay gas from all the approved ALPH, enough for all gas [PayGasFee]" in new PayGasFeeFixture {
-    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
-    override def contractBalance: U256 = halfGas
-    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+  it should "pay gas from ALPH, paying too much gas [PayGasFee]" in new PayGasFeeFixture {
+    override def contractBalance: U256 = txEnv.gasFeeUnsafe.addUnsafe(1)
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe.addUnsafe(1)
 
-    override def balanceState =
-      MutBalanceState(
-        remaining = MutBalances.empty,
-        approved = MutBalances(
-          ArrayBuffer(
-            (LockupScript.P2C(contractId), MutBalancesPerLockup.alph(contractBalance)),
-            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas)),
-            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas))
-          )
-        )
-      )
+    PayGasFee.runWith(frame).leftValue isE GasOverPaid
   }
 
   trait TransferTokenFixture extends ContractOutputFixture {

@@ -19,7 +19,6 @@ package org.alephium.protocol.vm
 import java.nio.charset.StandardCharsets
 
 import scala.annotation.switch
-import scala.annotation.tailrec
 
 import akka.util.ByteString
 
@@ -531,57 +530,44 @@ case object PayGasFee
     extends GhostInstrWithSimpleGas[StatefulContext]
     with GasBalance
     with StatefulInstrCompanion0 {
+
   def gasFeeToBePaid[C <: StatefulContext](
       frame: Frame[C],
-      approved: MutBalances
-  ): AVector[(LockupScript, U256)] = {
-    val numOfGasPayers                                = approved.all.length
-    var gasFeeToBePaid: AVector[(LockupScript, U256)] = AVector.empty
-    val gasRemainingOpt = frame.ctx.txEnv.gasFeeUnsafe.sub(frame.ctx.gasFeePaid)
-
-    gasRemainingOpt match {
-      case None =>
-        gasFeeToBePaid
-      case Some(gasRemaining) =>
-        var remaining = gasRemaining
-        @tailrec
-        def iter(index: Int): Unit = {
-          if (index == numOfGasPayers || remaining.isZero) {
-            ()
-          } else {
-            val (lockupScript, balance) = approved.all(index)
-            val toBePaid                = Math.min(remaining, balance.attoAlphAmount)
-            gasFeeToBePaid = gasFeeToBePaid :+ (lockupScript, toBePaid)
-            remaining = remaining.subUnsafe(toBePaid)
-            iter(index + 1)
-          }
+      alphAmount: U256
+  ): ExeResult[U256] = {
+    val gasFee     = frame.ctx.txEnv.gasFeeUnsafe
+    val gasFeePaid = frame.ctx.gasFeePaid
+    for {
+      totalGasToPay <- alphAmount.add(gasFeePaid).toRight(Right(GasOverflow))
+      _ <-
+        if (totalGasToPay > gasFee) {
+          failed(GasOverPaid)
+        } else {
+          okay
         }
-
-        iter(0)
-        gasFeeToBePaid
-    }
+      gasRemaining <- gasFee.sub(gasFeePaid).toRight(Right(GasOverPaid))
+    } yield Math.min(gasRemaining, alphAmount)
   }
 
   def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       balanceState <- frame.getBalanceState()
-      _ <- gasFeeToBePaid(frame, balanceState.approved).foreachE { case (lockupScript, gasFee) =>
-        for {
-          _ <- balanceState.approved
-            .subAlph(lockupScript, gasFee)
-            .toRight(
-              Right(
-                NotEnoughApprovedBalance(
-                  lockupScript,
-                  TokenId.alph,
-                  gasFee,
-                  balanceState.approved.getAttoAlphAmount(lockupScript).getOrElse(U256.Zero)
-                )
-              )
+      amount       <- frame.popOpStackU256()
+      payer        <- frame.popOpStackAddress().map(_.lockupScript)
+      gasToBePaid  <- gasFeeToBePaid(frame, amount.v)
+      _ <- balanceState
+        .useAlph(payer, gasToBePaid)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              payer,
+              TokenId.alph,
+              gasToBePaid,
+              balanceState.remaining.getAttoAlphAmount(payer).getOrElse(U256.Zero)
             )
-          _ <- frame.ctx.payGasFee(gasFee)
-        } yield ()
-      }
+          )
+        )
+      _ <- frame.ctx.payGasFee(gasToBePaid)
     } yield ()
   }
 }
