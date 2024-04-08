@@ -27,7 +27,8 @@ import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, Signature}
+import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, PublicKey, Signature}
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, TokenIssuance, UnlockScript}
@@ -1199,6 +1200,97 @@ class TxUtilsSpec extends AlephiumSpec {
       inputs1,
       ALPH.oneAlph
     ).leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
+  }
+
+  trait PoLWCoinbaseTxFixture extends FlowFixture with LockupScriptGenerators {
+    lazy val chainIndex                 = chainIndexGenForBroker(brokerConfig).sample.get
+    lazy val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+
+    val polwReward: Emission.PoLW = Emission.PoLW(ALPH.alph(1), ALPH.cent(10))
+
+    def buildPoLWCoinbaseTx(uncleSize: Int, fromPublicKey: PublicKey = publicKey) = {
+      val uncles = (0 until uncleSize).map { _ =>
+        SelectedUncle(BlockHash.random, assetLockupGen(chainIndex.to).sample.get, 1)
+      }
+      blockFlow
+        .polwCoinbase(
+          chainIndex,
+          fromPublicKey,
+          LockupScript.p2pkh(fromPublicKey),
+          AVector.from(uncles),
+          Emission.PoLW(ALPH.alph(1), ALPH.cent(10)),
+          U256.Zero,
+          TimeStamp.now(),
+          ByteString.empty
+        )
+        .rightValue
+        .rightValue
+    }
+  }
+
+  it should "use minimal gas fee for PoLW coinbase tx" in new PoLWCoinbaseTxFixture {
+    (0 until 2).foreach { uncleSize =>
+      val tx = buildPoLWCoinbaseTx(uncleSize)
+      tx.gasPrice is coinbaseGasPrice
+      tx.gasAmount is minimalGas
+    }
+  }
+
+  it should "not use minimal gas fee for PoLW coinbase tx" in new PoLWCoinbaseTxFixture {
+    val fromPublicKey = chainIndex.from.generateKey._2
+    (0 until 4).foreach { _ =>
+      val block = transfer(blockFlow, privateKey, fromPublicKey, ALPH.cent(3))
+      addAndCheck(blockFlow, block)
+    }
+    val tx = buildPoLWCoinbaseTx(2, fromPublicKey)
+    tx.gasPrice is coinbaseGasPrice
+    (tx.gasAmount > minimalGas) is true
+  }
+
+  it should "return error if not enough ALPH for PoLW coinbase input" in new PoLWCoinbaseTxFixture {
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    val inputs = AVector(
+      input("input-0", ALPH.cent(10), lockupScript),
+      input("input-1", dustUtxoAmount, lockupScript, (TokenId.random, U256.One))
+    )
+    blockFlow
+      .polwCoinbase(
+        lockupScript,
+        UnlockScript.polw(publicKey),
+        AVector.empty,
+        ALPH.cent(10),
+        inputs.map(i => AssetOutputInfo(i._1, i._2, FlowUtils.PersistedOutput)),
+        minimalGas
+      )
+      .leftValue is "Not enough ALPH balance for PoLW input"
+  }
+
+  "PoLW change output amount" should "larger than dust amount" in new PoLWCoinbaseTxFixture {
+    val fromPublicKey = chainIndex.from.generateKey._2
+    val lockupScript  = LockupScript.p2pkh(fromPublicKey)
+    val (_, burntAmount) = Coinbase.calcPoLWCoinbaseRewardOutputs(
+      chainIndex,
+      lockupScript,
+      AVector.empty,
+      polwReward,
+      U256.Zero,
+      TimeStamp.now(),
+      ByteString.empty
+    )
+    val amount = burntAmount.addUnsafe(coinbaseGasPrice * minimalGas).addUnsafe(U256.One)
+    addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, amount))
+    addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, dustUtxoAmount))
+    val utxos = blockFlow.getUsableUtxos(None, lockupScript, Int.MaxValue).rightValue
+    utxos.length is 2
+
+    val tx = buildPoLWCoinbaseTx(0, fromPublicKey)
+    tx.inputs.length is 2
+    tx.inputs.toSet is utxos
+      .map(output => TxInput(output.ref, UnlockScript.polw(fromPublicKey)))
+      .toSet
+
+    tx.fixedOutputs.length is 2
+    tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(U256.One)
   }
 
   private def input(

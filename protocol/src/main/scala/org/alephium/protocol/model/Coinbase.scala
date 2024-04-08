@@ -77,11 +77,8 @@ object Coinbase {
       lockTime: TimeStamp,
       uncles: AVector[SelectedUncle]
   )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
-    val mainChainReward = calcMainChainReward(miningReward)
-    val uncleRewardOutputs = uncles.map { uncle =>
-      val uncleReward = calcUncleReward(mainChainReward, uncle.heightDiff)
-      AssetOutput(uncleReward, uncle.lockupScript, lockTime, AVector.empty, ByteString.empty)
-    }
+    val mainChainReward    = calcMainChainReward(miningReward)
+    val uncleRewardOutputs = uncles.map(_.toAssetOutput(mainChainReward, lockTime))
     val blockRewardOutput = AssetOutput(
       calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount)),
       lockupScript,
@@ -134,5 +131,36 @@ object Coinbase {
       CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
     val reward = miningReward(gasFee, target, blockTs)
     build(coinbaseData, reward, lockupScript, blockTs, sortedUncles)
+  }
+
+  def calcPoLWCoinbaseRewardOutputs(
+      chainIndex: ChainIndex,
+      minerLockupScript: LockupScript.Asset,
+      uncles: AVector[SelectedUncle],
+      reward: Emission.PoLW,
+      gasFee: U256,
+      blockTs: TimeStamp,
+      minerData: ByteString
+  )(implicit networkConfig: NetworkConfig): (AVector[AssetOutput], U256) = {
+    val hardFork           = networkConfig.getHardFork(blockTs)
+    val lockedReward       = Transaction.totalReward(gasFee, reward.miningReward, hardFork)
+    val netReward          = lockedReward.subUnsafe(reward.burntAmount)
+    val mainChainReward    = Coinbase.calcMainChainReward(netReward)
+    val lockTime           = blockTs + networkConfig.coinbaseLockupPeriod
+    val sortedUncles       = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
+    val uncleRewardOutputs = sortedUncles.map(_.toAssetOutput(mainChainReward, lockTime))
+    val blockReward = Coinbase.calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount))
+    val blockRewardLocked = blockReward.mulUnsafe(lockedReward).divUnsafe(netReward)
+    val coinbaseData =
+      CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
+    val blockRewardOutput = AssetOutput(
+      blockRewardLocked,
+      minerLockupScript,
+      lockTime,
+      AVector.empty,
+      serialize(coinbaseData)
+    )
+    val burntAmount = blockRewardLocked.subUnsafe(netReward)
+    (blockRewardOutput +: uncleRewardOutputs, burntAmount)
   }
 }

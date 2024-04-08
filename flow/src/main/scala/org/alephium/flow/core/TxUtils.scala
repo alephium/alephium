@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import TxUtils._
+import akka.util.ByteString
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed, MemPooled, TxStatus}
 import org.alephium.flow.core.FlowUtils._
@@ -27,11 +28,14 @@ import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, PublicKey}
+import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
+// scalastyle:off number.of.methods file.size.limit
 trait TxUtils { Self: FlowUtils =>
 
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
@@ -159,6 +163,101 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice,
       utxoLimit
     )
+  }
+
+  // scalastyle:off parameter.number
+  def polwCoinbase(
+      chainIndex: ChainIndex,
+      fromPublicKey: PublicKey,
+      minerLockupScript: LockupScript.Asset,
+      uncles: AVector[SelectedUncle],
+      reward: Emission.PoLW,
+      gasFee: U256,
+      blockTs: TimeStamp,
+      minerData: ByteString
+  )(implicit networkConfig: NetworkConfig): IOResult[Either[String, UnsignedTransaction]] = {
+    val (rewardOutputs, burntAmount) = Coinbase.calcPoLWCoinbaseRewardOutputs(
+      chainIndex,
+      minerLockupScript,
+      uncles,
+      reward,
+      gasFee,
+      blockTs,
+      minerData
+    )
+    val totalAmount      = burntAmount.addUnsafe(dustUtxoAmount)
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.polw(fromPublicKey)
+    getUsableUtxos(None, fromLockupScript, Int.MaxValue)
+      .map { utxos =>
+        UtxoSelectionAlgo
+          .Build(ProvidedGas(None, coinbaseGasPrice))
+          .select(
+            AssetAmounts(totalAmount, AVector.empty),
+            fromUnlockScript,
+            utxos,
+            rewardOutputs.length + 1,
+            txScriptOpt = None,
+            AssetScriptGasEstimator.Default(Self.blockFlow),
+            TxScriptGasEstimator.NotImplemented
+          )
+      }
+      .map(
+        _.flatMap(selected =>
+          polwCoinbase(
+            fromLockupScript,
+            fromUnlockScript,
+            rewardOutputs,
+            burntAmount,
+            selected.assets,
+            selected.gas
+          )
+        )
+      )
+  }
+  // scalastyle:on parameter.number
+
+  private[flow] def polwCoinbase(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript.PoLW,
+      rewardOutputs: AVector[AssetOutput],
+      burntAmount: U256,
+      utxos: AVector[AssetOutputInfo],
+      gas: GasBox
+  ): Either[String, UnsignedTransaction] = {
+    for {
+      _ <- utxos.foreachE { utxo =>
+        if (utxo.output.tokens.nonEmpty) {
+          Left("Not enough ALPH balance for PoLW input")
+        } else {
+          Right(())
+        }
+      }
+      _ <- checkEstimatedGasAmount(gas)
+      inputSum <- EitherF.foldTry(utxos, U256.Zero) { case (acc, asset) =>
+        acc.add(asset.output.amount).toRight("Input amount overflow")
+      }
+      gasFee = coinbaseGasPrice * gas
+      changeAmount <- inputSum
+        .sub(burntAmount)
+        .flatMap(_.sub(gasFee))
+        .toRight("Change amount overflow")
+    } yield {
+      val changeOutput = AssetOutput(
+        changeAmount,
+        fromLockupScript,
+        TimeStamp.zero,
+        AVector.empty,
+        ByteString.empty
+      )
+      UnsignedTransaction(
+        None,
+        gas,
+        coinbaseGasPrice,
+        utxos.map(output => TxInput(output.ref, fromUnlockScript)),
+        rewardOutputs :+ changeOutput
+      )
+    }
   }
 
   // scalastyle:off method.length
