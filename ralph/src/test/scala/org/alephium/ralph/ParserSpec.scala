@@ -527,7 +527,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
     parsed0.usePreapprovedAssets is false
-    parsed0.useAssetsInContract is None
+    parsed0.useAssetsInContract is Ast.NotUseContractAssets
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
@@ -543,7 +543,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
-    parsed1.useAssetsInContract is None
+    parsed1.useAssetsInContract is Ast.NotUseContractAssets
     parsed1.useCheckExternalCaller is true
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
@@ -568,7 +568,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
-    parsed2.useAssetsInContract is Some(Ast.UseContractAssets(false))
+    parsed2.useAssetsInContract is Ast.UseContractAssets
     parsed2.useCheckExternalCaller is true
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
@@ -591,7 +591,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .get
       .value
     parsed3.usePreapprovedAssets is false
-    parsed3.useAssetsInContract is Some(Ast.UseContractAssets(false))
+    parsed3.useAssetsInContract is Ast.UseContractAssets
     parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
     parsed3.signature is FuncSignature(
@@ -607,7 +607,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
                  |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
     val parsed4 = fastparse.parse(code, StatelessParser.func(_)).get.value
     parsed4.usePreapprovedAssets is false
-    parsed4.useAssetsInContract is Some(Ast.UseContractAssets(true))
+    parsed4.useAssetsInContract is Ast.EnforcedUseContractAssets
     parsed4.useCheckExternalCaller is true
     parsed4.useUpdateFields is false
     parsed4.signature is FuncSignature(
@@ -1109,7 +1109,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = None,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1302,7 +1302,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = None,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1395,7 +1395,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("bar", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = None,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1434,7 +1434,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = None,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1476,7 +1476,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("foo", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = None,
+        useAssetsInContract = Ast.NotUseContractAssets,
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
@@ -1491,7 +1491,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("bar", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = None,
+        useAssetsInContract = Ast.NotUseContractAssets,
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
@@ -1673,7 +1673,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("main", false),
         isPublic = true,
         usePreapprovedAssets,
-        useAssetsInContract = None,
+        useAssetsInContract = Ast.NotUseContractAssets,
         useCheckExternalCaller = true,
         useUpdateFields = false,
         useMethodIndex = None,
@@ -1704,7 +1704,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("main", false),
             true,
             false,
-            None,
+            Ast.NotUseContractAssets,
             true,
             false,
             None,

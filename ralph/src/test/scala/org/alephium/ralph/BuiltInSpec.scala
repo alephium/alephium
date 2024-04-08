@@ -40,9 +40,9 @@ class BuiltInSpec extends AlephiumSpec {
   }
 
   it should "check all functions that can use assets in contract" in {
-    BuiltIn.statelessFuncs.values.count(_.useAssetsInContract.isDefined) is 0
+    BuiltIn.statelessFuncs.values.count(_.useAssetsInContract != Ast.NotUseContractAssets) is 0
     BuiltIn.statefulFuncs.values
-      .filter(_.useAssetsInContract.isDefined)
+      .filter(_.useAssetsInContract != Ast.NotUseContractAssets)
       .flatMap {
         case f: SimpleBuiltIn[_] => f.instrs
         case f: OverloadedSimpleBuiltIn[_] =>

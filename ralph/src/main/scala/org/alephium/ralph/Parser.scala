@@ -386,7 +386,7 @@ abstract class Parser[Ctx <: StatelessContext] {
             annotations,
             Parser.UsingAnnotationFields(
               preapprovedAssets = false,
-              assetsInContract = None,
+              assetsInContract = Ast.NotUseContractAssets,
               checkExternalCaller = true,
               updateFields = false,
               methodIndex = None
@@ -581,7 +581,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     id: FuncId,
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
-    useContractAssets: Option[Ast.UseContractAssets],
+    useContractAssets: Ast.ContractAssetsAnnotation,
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
@@ -650,7 +650,7 @@ object Parser {
 
   final case class UsingAnnotationFields(
       preapprovedAssets: Boolean,
-      assetsInContract: Option[Ast.UseContractAssets],
+      assetsInContract: Ast.ContractAssetsAnnotation,
       checkExternalCaller: Boolean,
       updateFields: Boolean,
       methodIndex: Option[Int]
@@ -671,20 +671,20 @@ object Parser {
       useMethodIndexKey
     )
 
-    private def extractUseContractAsset(annotation: Annotation) = {
+    private def extractUseContractAsset(annotation: Annotation): Ast.ContractAssetsAnnotation = {
       annotation.fields.find(_.ident.name == useContractAssetsKey) match {
         case Some(field @ Ast.AnnotationField(_, value)) =>
           value match {
-            case Val.False    => None
-            case Val.True     => Some(Ast.UseContractAssets(false))
-            case Val.Enforced => Some(Ast.UseContractAssets(true))
+            case Val.False    => Ast.NotUseContractAssets
+            case Val.True     => Ast.UseContractAssets
+            case Val.Enforced => Ast.EnforcedUseContractAssets
             case _ =>
               throw Compiler.Error(
                 "Invalid assetsInContract annotation, expected true/false/enforced",
                 field.sourceIndex
               )
           }
-        case None => None
+        case None => Ast.NotUseContractAssets
       }
     }
 
@@ -866,7 +866,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               annotations,
               Parser.UsingAnnotationFields(
                 preapprovedAssets = true,
-                assetsInContract = None,
+                assetsInContract = Ast.NotUseContractAssets,
                 checkExternalCaller = true,
                 updateFields = false,
                 methodIndex = None

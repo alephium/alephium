@@ -141,7 +141,7 @@ object Compiler {
     def isPublic: Boolean
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
-    def useAssetsInContract: Option[Ast.UseContractAssets]
+    def useAssetsInContract: Ast.ContractAssetsAnnotation
     def useUpdateFields: Boolean
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
@@ -231,7 +231,7 @@ object Compiler {
       id: Ast.FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Option[Ast.UseContractAssets],
+      useAssetsInContract: Ast.ContractAssetsAnnotation,
       useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],

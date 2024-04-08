@@ -137,7 +137,10 @@ object Ast {
     }
   }
 
-  final case class UseContractAssets(enforced: Boolean) extends AnyVal
+  sealed trait ContractAssetsAnnotation
+  case object UseContractAssets         extends ContractAssetsAnnotation
+  case object NotUseContractAssets      extends ContractAssetsAnnotation
+  case object EnforcedUseContractAssets extends ContractAssetsAnnotation
 
   trait ApproveAssets[Ctx <: StatelessContext] extends Positioned {
     def approveAssets: Seq[ApproveAsset[Ctx]]
@@ -769,7 +772,7 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Option[UseContractAssets],
+      useAssetsInContract: Ast.ContractAssetsAnnotation,
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
@@ -797,7 +800,11 @@ object Ast {
         case FuncCall(id, _, _) => id.isBuiltIn && id.name == "migrate"
         case _                  => false
       }
-      !(useUpdateFields || usePreapprovedAssets || useAssetsInContract.isDefined || hasInterfaceFuncCall || hasMigrateSimple)
+      !(useUpdateFields
+        || usePreapprovedAssets
+        || useAssetsInContract != Ast.NotUseContractAssets
+        || hasInterfaceFuncCall
+        || hasMigrateSimple)
     }
 
     def signature: FuncSignature = FuncSignature(
@@ -866,7 +873,7 @@ object Ast {
       Method[Ctx](
         isPublic,
         usePreapprovedAssets,
-        useAssetsInContract.isDefined,
+        useAssetsInContract != Ast.NotUseContractAssets,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = state.flattenTypeLength(rtypes),
@@ -879,7 +886,7 @@ object Ast {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
         usePreapprovedAssets: Boolean,
-        useAssetsInContract: Option[Ast.UseContractAssets],
+        useAssetsInContract: Ast.ContractAssetsAnnotation,
         useUpdateFields: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](

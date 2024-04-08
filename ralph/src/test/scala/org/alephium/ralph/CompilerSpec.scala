@@ -5794,7 +5794,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Ast.FuncId(name, false),
         false,
         false,
-        None,
+        Ast.NotUseContractAssets,
         false,
         false,
         methodIndex,

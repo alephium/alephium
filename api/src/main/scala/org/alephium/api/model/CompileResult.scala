@@ -196,7 +196,7 @@ object CompileResult {
       FunctionSig(
         func.id.name,
         func.usePreapprovedAssets,
-        func.useAssetsInContract.isDefined,
+        func.useAssetsInContract != Ast.NotUseContractAssets,
         func.isPublic,
         func.getArgNames(),
         func.getArgTypeSignatures(),

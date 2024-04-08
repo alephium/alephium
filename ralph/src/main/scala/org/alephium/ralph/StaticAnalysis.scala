@@ -85,7 +85,7 @@ object StaticAnalysis {
       method: vm.Method[vm.StatefulContext]
   ): Unit = {
     if (
-      func.useAssetsInContract == Some(Ast.UseContractAssets(false)) &&
+      func.useAssetsInContract == Ast.UseContractAssets &&
       !method.instrs.exists(contractAssetsInstrs.contains(_))
     ) {
       throw Compiler.Error(
