@@ -2247,7 +2247,7 @@ object Ast {
         .maxOption
         .getOrElse(-1)
       val methodLengthMax = math.max(methodLength, predefinedMethodIndexMax + 1)
-      assume(methodIndexMax <= 0xff)
+      assume(methodLengthMax <= 0xff)
       val usedMethodIndexes = mutable.ArrayBuffer.fill(methodLengthMax)(false)
       var fromMethodIndex   = 0
       sortedInterfaces.foreach { interface =>
