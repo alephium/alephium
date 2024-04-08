@@ -2788,7 +2788,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "check if contract assets is used in the function" in {
-    def code(useAssetsInContract: Boolean = false, instr: String = "return"): String =
+    def code(useAssetsInContract: String = "false", instr: String = "return"): String =
       s"""
          |Contract Foo() {
          |  $$@using(assetsInContract = $useAssetsInContract)
@@ -2800,18 +2800,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileContract(replace(code())).isRight is true
     Compiler
       .compileContract(
-        replace(code(true, "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+        replace(code("true", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
       )
       .isRight is true
     Compiler
       .compileContract(
-        replace(code(false, "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+        replace(code("false", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
       )
       .isRight is true
     testContractError(
-      code(true),
-      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on"
+      code("true"),
+      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on." +
+        "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
+    Compiler.compileContract(replace(code("enforced"))).isRight is true
   }
 
   it should "check types for braces syntax" in {
@@ -5503,5 +5505,347 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     (Seq(0, 1, 2, 3).permutations.toSet - Seq(0, 1, 2, 3)).foreach { permutation =>
       verify(success = false, permutation: _*)
     }
+  }
+
+  it should "rearrange funcs based on predefined method index" in {
+    def checkContractFuncs(code: String, funcs: Seq[String]) = {
+      val result   = Compiler.compileMultiContract(code).rightValue
+      val contract = result.contracts.head
+      contract.funcs.map(_.name) is funcs
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f0", "f1"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 1)
+           |  pub fn f0() -> ()
+           |  @using(methodIndex = 0)
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f1", "f0"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 2)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f1", "f2", "f0"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f4() -> () {}
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |  @using(methodIndex = 4)
+           |  pub fn f2() -> ()
+           |  @using(methodIndex = 0)
+           |  pub fn f3() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f3", "f0", "f1", "f4", "f2"))
+    }
+
+    {
+      def code(index: Int) =
+        s"""
+           |Contract Impl() implements Baz {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |  pub fn f4() -> () {}
+           |  pub fn f5() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 1)
+           |  pub fn f0() -> ()
+           |  @using(methodIndex = 2)
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  pub fn f2() -> ()
+           |}
+           |Interface Baz extends Bar {
+           |  @using(methodIndex = $index)
+           |  pub fn f3() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code(3), Seq("f2", "f0", "f1", "f3", "f4", "f5"))
+      checkContractFuncs(code(4), Seq("f2", "f0", "f1", "f4", "f3", "f5"))
+      checkContractFuncs(code(5), Seq("f2", "f0", "f1", "f4", "f5", "f3"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 2)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = 1)
+           |  pub fn f2() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f1", "f2", "f0"))
+    }
+  }
+
+  it should "throw an error if the predefined method index is invalid" in {
+    {
+      def code(index: Int) =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = $index)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code(3)).leftValue.message is
+        "The method index of these functions is out of bound: f0, total number of methods: 2"
+      Compiler.compileContract(code(4)).leftValue.message is
+        "The method index of these functions is out of bound: f0, total number of methods: 2"
+      Compiler.compileContract(replace(code(1))).isRight is true
+      Compiler.compileContract(replace(code(0))).isRight is true
+    }
+
+    {
+      def code(index0: Int = 0, index1: Int = 2): String =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = $index0)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = $index1)
+           |  pub fn f2() -> ()
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code()).isRight is true
+      Compiler.compileContract(code(index0 = 1)).isRight is true
+      Compiler.compileContract(code(index0 = 2, index1 = 3)).isRight is true
+      Compiler.compileContract(code(index0 = 3)).isRight is true
+      Compiler.compileContract(code(index0 = 4)).leftValue.message is
+        "The method index of these functions is out of bound: f0, total number of methods: 4"
+      Compiler.compileContract(code(index1 = 0)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 0"
+      Compiler.compileContract(code(index1 = 1)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 1"
+      Compiler.compileContract(code(index1 = 3)).isRight is true
+      Compiler.compileContract(code(index1 = 4)).leftValue.message is
+        "The method index of these functions is out of bound: f2, total number of methods: 4"
+    }
+
+    {
+      def code(index: Int) =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = $index)
+           |  pub fn f2() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code(0)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 0"
+      Compiler.compileContract(code(1)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 1"
+      Compiler.compileContract(code(2)).isRight is true
+    }
+
+    {
+      def code(index0: Int, index1: Int = 2) =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = $index1)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |  pub fn f2() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = $index0)
+           |  pub fn f3() -> ()
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code(0)).leftValue.message is
+        "Function Bar.f3 have invalid predefined method index 0"
+      Compiler.compileContract(code(1)).leftValue.message is
+        "Function Bar.f3 have invalid predefined method index 1"
+      Compiler.compileContract(code(2)).leftValue.message is
+        "Function Bar.f3 have invalid predefined method index 2"
+      Compiler.compileContract(code(3)).isRight is true
+      Compiler.compileContract(code(2, 3)).isRight is true
+    }
+  }
+
+  it should "throw an error if there are duplicate method indexes" in {
+    val code0 =
+      s"""
+         |Contract Bar() implements Foo {
+         |  pub fn f0() -> () {}
+         |  pub fn f1() -> () {}
+         |}
+         |Interface Foo {
+         |  @using(methodIndex = 0)
+         |  pub fn f0() -> ()
+         |  @using(methodIndex = 0)
+         |  pub fn f1() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code0).leftValue.message is
+      s"Function Foo.f1 have invalid predefined method index 0"
+
+    val code1 =
+      s"""
+         |Contract FooBar() implements Bar {
+         |  pub fn foo() -> () {}
+         |  pub fn bar() -> () {}
+         |}
+         |Interface Foo {
+         |  @using(methodIndex = 1)
+         |  pub fn foo() -> ()
+         |}
+         |Interface Bar extends Foo {
+         |  @using(methodIndex = 1)
+         |  pub fn bar() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code1).leftValue.message is
+      s"Function Bar.bar have invalid predefined method index 1"
+  }
+
+  it should "assign correct method index to interface functions" in {
+    def createFunc(name: String, methodIndex: Option[Int] = None): Ast.FuncDef[StatefulContext] =
+      Ast.FuncDef(
+        Seq.empty,
+        Ast.FuncId(name, false),
+        false,
+        false,
+        Ast.NotUseContractAssets,
+        false,
+        false,
+        methodIndex,
+        Seq.empty,
+        Seq.empty,
+        None
+      )
+
+    def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
+      val result = Compiler.SimpleFunc.from(funcs, true)
+      result.foreach { func => func.index is indexes(func.name) }
+    }
+
+    val funcs0 = Seq(
+      createFunc("f0"),
+      createFunc("f1"),
+      createFunc("f2")
+    )
+    checkFuncIndexes(funcs0, Map("f0" -> 0, "f1" -> 1, "f2" -> 2))
+
+    val funcs1 = Seq(
+      createFunc("f0"),
+      createFunc("f1", Some(0)),
+      createFunc("f2"),
+      createFunc("f3", Some(1))
+    )
+    checkFuncIndexes(
+      funcs1,
+      Map("f1" -> 0, "f3" -> 1, "f0" -> 2, "f2" -> 3)
+    )
+
+    val funcs2 = Seq(
+      createFunc("f0", Some(3)),
+      createFunc("f1"),
+      createFunc("f2", Some(1)),
+      createFunc("f3")
+    )
+    checkFuncIndexes(
+      funcs2,
+      Map("f1" -> 0, "f2" -> 1, "f3" -> 2, "f0" -> 3)
+    )
+
+    val funcs3 = Seq(
+      createFunc("f0", Some(1)),
+      createFunc("f1"),
+      createFunc("f2"),
+      createFunc("f3", Some(5))
+    )
+    checkFuncIndexes(
+      funcs3,
+      Map("f1" -> 0, "f0" -> 1, "f2" -> 2, "f3" -> 5)
+    )
   }
 }

@@ -217,5 +217,6 @@ object Val {
   val True: Bool                       = Bool(true)
   val False: Bool                      = Bool(false)
   val NullContractAddress: Val.Address = Val.Address(LockupScript.p2c(ContractId.zero))
+  val Enforced: ByteVec                = ByteVec(ByteString.fromString("enforced"))
 }
 // scalastyle:on number.of.methods

@@ -286,7 +286,10 @@ class VMSpec extends AlephiumSpec with Generators {
       worldState.contractImmutableState.exists(contract.hash) isE true // keep history state always
     }
 
-    def getContractAsset(contractId: ContractId, chainIndex: ChainIndex): ContractOutput = {
+    def getContractAsset(
+        contractId: ContractId,
+        chainIndex: ChainIndex = chainIndex
+    ): ContractOutput = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       worldState.getContractAsset(contractId).rightValue
     }
@@ -518,6 +521,44 @@ class VMSpec extends AlephiumSpec with Generators {
       tokens,
       dustUtxoAmount
     )
+  }
+
+  it should "enforce using contract assets" in new ContractFixture {
+    val bar =
+      s"""
+         |Contract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = ALPH.alph(2))
+    getContractAsset(barContractId).amount is ALPH.alph(2)
+
+    val foo =
+      s"""
+         |Contract Foo(bar: Bar) {
+         |  @using(assetsInContract = enforced)
+         |  pub fn foo() -> () {
+         |    bar.bar()
+         |  }
+         |}
+         |$bar
+         |""".stripMargin
+    val (fooContractId, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
+    getContractAsset(fooContractId).amount is ALPH.oneAlph
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooContractId.toHexString}).foo()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script, chainIndex)
+    getContractAsset(barContractId).amount is ALPH.oneAlph
+    getContractAsset(fooContractId).amount is ALPH.alph(2)
   }
 
   it should "burn token" in new ContractFixture {
@@ -4667,6 +4708,65 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph + 1)
   }
 
+  it should "call the correct contract method based on the interface method index" in new ContractFixture {
+    val fooV0 =
+      s"""
+         |Interface FooV0 {
+         |  pub fn f0() -> U256
+         |  pub fn f1() -> U256
+         |}
+         |""".stripMargin
+    val foo0 =
+      s"""
+         |Contract Foo0() implements FooV0 {
+         |  pub fn f0() -> U256 { return 0 }
+         |  pub fn f1() -> U256 { return 1 }
+         |}
+         |$fooV0
+         |""".stripMargin
+    val (foo0ContractId, _) = createContract(foo0)
+
+    val foo =
+      s"""
+         |Interface Foo {
+         |  @using(methodIndex = 1)
+         |  pub fn f1() -> U256
+         |}
+         |""".stripMargin
+    val fooV1 =
+      s"""
+         |Interface FooV1 extends Foo {
+         |  pub fn f2() -> U256
+         |}
+         |$foo
+         |""".stripMargin
+    val foo1 =
+      s"""
+         |Contract Foo1() implements FooV1 {
+         |  pub fn f1() -> U256 { return 1 }
+         |  pub fn f2() -> U256 { return 2 }
+         |}
+         |$fooV1
+         |""".stripMargin
+    val (foo1ContractId, _) = createContract(foo1)
+    val script =
+      s"""
+         |TxScript Main {
+         |  assert!(Foo(#${foo0ContractId.toHexString}).f1() == 1, 0)
+         |  assert!(Foo(#${foo1ContractId.toHexString}).f1() == 1, 0)
+         |
+         |  assert!(FooV0(#${foo0ContractId.toHexString}).f0() == 0, 0)
+         |  assert!(FooV0(#${foo0ContractId.toHexString}).f1() == 1, 0)
+         |
+         |  assert!(FooV1(#${foo1ContractId.toHexString}).f1() == 1, 0)
+         |  assert!(FooV1(#${foo1ContractId.toHexString}).f2() == 2, 0)
+         |}
+         |$fooV0
+         |$fooV1
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   "Mempool" should "remove invalid transaction" in new ContractFixture {
     val code =
       s"""
@@ -4747,6 +4847,52 @@ class VMSpec extends AlephiumSpec with Generators {
       AVector.from(Seq(1, 2, 4, 6)).map(v => Val.U256(U256.unsafe(v))),
       AVector.from(Seq(0, 3, 5)).map(v => Val.U256(U256.unsafe(v)))
     )
+  }
+
+  it should "test maximum method index for CallInternal and CallExternal" in new ContractFixture {
+    val maxMethodSize = 0xff + 1
+    val fooMethods = (0 until maxMethodSize).map { index =>
+      s"""
+         |pub fn func$index() -> U256 {
+         |  return $index
+         |}
+         |""".stripMargin
+    }
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  ${fooMethods.mkString("\n")}
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo)._1
+
+    val barMethods = (0 until maxMethodSize).map { index =>
+      s"""
+         |pub fn func$index() -> U256 {
+         |  return foo.func$index()
+         |}
+         |""".stripMargin
+    }
+    val bar =
+      s"""
+         |Contract Bar(foo: Foo) {
+         |  ${barMethods.mkString("\n")}
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector(Val.ByteVec(fooId.bytes)))._1
+
+    (0 until maxMethodSize).foreach { index =>
+      val script =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Bar(#${barId.toHexString}).func$index() == $index, 0)
+           |}
+           |$bar
+           |""".stripMargin
+      callTxScript(script, chainIndex)
+    }
   }
 
   private def getEvents(

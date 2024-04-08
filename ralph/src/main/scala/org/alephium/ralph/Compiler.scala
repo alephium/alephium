@@ -141,7 +141,7 @@ object Compiler {
     def isPublic: Boolean
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
-    def useAssetsInContract: Boolean
+    def useAssetsInContract: Ast.ContractAssetsAnnotation
     def useUpdateFields: Boolean
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
@@ -231,7 +231,7 @@ object Compiler {
       id: Ast.FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean,
+      useAssetsInContract: Ast.ContractAssetsAnnotation,
       useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
@@ -266,19 +266,52 @@ object Compiler {
     }
   }
   object SimpleFunc {
-    def from[Ctx <: StatelessContext](funcs: Seq[Ast.FuncDef[Ctx]]): Seq[SimpleFunc[Ctx]] = {
-      funcs.view.zipWithIndex.map { case (func, index) =>
-        new SimpleFunc[Ctx](
-          func.id,
-          func.isPublic,
-          func.usePreapprovedAssets,
-          func.useAssetsInContract,
-          func.useUpdateFields,
-          func.args.map(_.tpe),
-          func.rtypes,
-          index.toByte
-        )
-      }.toSeq
+    private def from[Ctx <: StatelessContext](
+        func: Ast.FuncDef[Ctx],
+        index: Byte
+    ): SimpleFunc[Ctx] = {
+      new SimpleFunc[Ctx](
+        func.id,
+        func.isPublic,
+        func.usePreapprovedAssets,
+        func.useAssetsInContract,
+        func.useUpdateFields,
+        func.args.map(_.tpe),
+        func.rtypes,
+        index
+      )
+    }
+
+    @scala.annotation.tailrec
+    private def getNextIndex(fromIndex: Int, preDefinedIndexes: Seq[Int]): Int = {
+      if (preDefinedIndexes.contains(fromIndex)) {
+        getNextIndex(fromIndex + 1, preDefinedIndexes)
+      } else {
+        fromIndex
+      }
+    }
+
+    def from[Ctx <: StatelessContext](
+        funcs: Seq[Ast.FuncDef[Ctx]],
+        isInterface: Boolean
+    ): Seq[SimpleFunc[Ctx]] = {
+      if (isInterface) {
+        val preDefinedIndexes = funcs.collect {
+          case Ast.FuncDef(_, _, _, _, _, _, _, Some(index), _, _, _) => index
+        }
+        var fromIndex: Int = 0
+        funcs.map { func =>
+          func.useMethodIndex match {
+            case Some(index) => from(func, index.toByte)
+            case None =>
+              val funcIndex = getNextIndex(fromIndex, preDefinedIndexes)
+              fromIndex = funcIndex + 1
+              from(func, funcIndex.toByte)
+          }
+        }
+      } else {
+        funcs.view.zipWithIndex.map { case (func, index) => from(func, index.toByte) }.toSeq
+      }
     }
   }
 
