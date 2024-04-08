@@ -2240,6 +2240,7 @@ object Ast {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def checkInterfaceMethodIndex(sortedInterfaces: Seq[ContractInterface]): Unit = {
       val methodLength = sortedInterfaces.map(_.funcs.length).sum
       val predefinedMethodIndexMax = sortedInterfaces
@@ -2247,7 +2248,7 @@ object Ast {
         .maxOption
         .getOrElse(-1)
       val methodLengthMax = math.max(methodLength, predefinedMethodIndexMax + 1)
-      assume(methodLengthMax <= 0xff)
+      assume(methodLengthMax <= 0xff + 1)
       val usedMethodIndexes = mutable.ArrayBuffer.fill(methodLengthMax)(false)
       var fromMethodIndex   = 0
       sortedInterfaces.foreach { interface =>
