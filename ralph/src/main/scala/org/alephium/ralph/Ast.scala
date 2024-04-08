@@ -2138,7 +2138,6 @@ object Ast {
         sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
       ensureChainedInterfaces(sortedInterfaces)
-      checkInterfaceMethodIndex(sortedInterfaces)
 
       val stdId        = getStdId(sortedInterfaces)
       val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
@@ -2148,6 +2147,9 @@ object Ast {
       val (unimplementedFuncs, allUniqueFuncs) = checkFuncs(abstractFuncs, nonAbstractFuncs)
       val constantVars                         = allContracts.flatMap(_.constantVars)
       val enums                                = mergeEnums(allContracts.flatMap(_.enums))
+
+      // call the `checkFuncs` first to avoid duplicate function definition
+      checkInterfaceMethodIndex(sortedInterfaces)
 
       val contractEvents = allContracts.flatMap(_.events)
       val events         = sortedInterfaces.flatMap(_.events) ++ contractEvents
@@ -2166,7 +2168,7 @@ object Ast {
           if (txContract.isAbstract) {
             allUniqueFuncs
           } else {
-            rearrangeFuncs(sortedInterfaces, allUniqueFuncs, txContract.ident)
+            rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
           }
 
         case interface: ContractInterface =>
@@ -2186,26 +2188,16 @@ object Ast {
 
     private def rearrangeFuncs(
         interfaces: Seq[ContractInterface],
-        funcs: Seq[FuncDef[StatefulContext]],
-        contractId: TypeId
+        funcs: Seq[FuncDef[StatefulContext]]
     ): Seq[FuncDef[StatefulContext]] = {
       val interfaceFuncs = interfaces.flatMap(_.funcs)
       val (remains, preDefinedIndexFuncs) = funcs.partitionMap { func =>
         val methodIndex = interfaceFuncs.find(_.id == func.id).flatMap(_.useMethodIndex)
-        if (methodIndex.isDefined) Right(func.copy(useMethodIndex = methodIndex)) else Left(func)
-      }
-
-      if (preDefinedIndexFuncs.distinctBy(_.useMethodIndex).size != preDefinedIndexFuncs.size) {
-        val duplicateIndexes = preDefinedIndexFuncs.view
-          .groupBy(_.useMethodIndex)
-          .filter(_._2.size > 1)
-          .keys
-          .collect { case Some(index) => index }
-          .mkString(",")
-        throw Compiler.Error(
-          s"There are duplicate method indexes in contract ${contractId.name}: $duplicateIndexes",
-          contractId.sourceIndex
-        )
+        if (methodIndex.isDefined) {
+          Right(func.copy(useMethodIndex = methodIndex).atSourceIndex(func.sourceIndex))
+        } else {
+          Left(func)
+        }
       }
 
       val invalidFuncs = preDefinedIndexFuncs.filter(_.useMethodIndex.exists(_ >= funcs.length))
@@ -2242,16 +2234,36 @@ object Ast {
     }
 
     def checkInterfaceMethodIndex(sortedInterfaces: Seq[ContractInterface]): Unit = {
-      var methodIndex = 0
+      val methodLength      = sortedInterfaces.map(_.funcs.length).sum
+      val usedMethodIndexes = mutable.ArrayBuffer.fill(methodLength)(false)
+      var fromMethodIndex   = 0
       sortedInterfaces.foreach { interface =>
-        val invalidFuncs = interface.funcs.filter(_.useMethodIndex.exists(_ < methodIndex))
-        if (invalidFuncs.nonEmpty) {
-          throw Compiler.Error(
-            s"These functions have invalid predefined method indexes in interface ${interface.name}: ${invalidFuncs.map(_.name).mkString(",")}",
-            invalidFuncs.headOption.flatMap(_.id.sourceIndex)
-          )
+        val (preDefinedMethodIndexFuncs, remains) =
+          interface.funcs.partition(_.useMethodIndex.nonEmpty)
+        preDefinedMethodIndexFuncs.foreach { func =>
+          func.useMethodIndex match {
+            case Some(index) =>
+              if (index >= usedMethodIndexes.length) {
+                usedMethodIndexes ++=
+                  mutable.ArrayBuffer.fill(index + 1 - usedMethodIndexes.length)(false)
+              }
+              if (usedMethodIndexes(index)) {
+                throw Compiler.Error(
+                  s"Function ${interface.name}.${func.id.name} have invalid predefined method index $index",
+                  func.id.sourceIndex
+                )
+              } else {
+                usedMethodIndexes(index) = true
+              }
+            case _ => // dead branch
+          }
         }
-        methodIndex += interface.funcs.length
+        remains.foreach { _ =>
+          val methodIndex = usedMethodIndexes.indexOf(false, fromMethodIndex)
+          assume(methodIndex != -1)
+          usedMethodIndexes(methodIndex) = true
+          fromMethodIndex = methodIndex + 1
+        }
       }
     }
 

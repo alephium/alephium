@@ -5586,7 +5586,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      val code =
+      def code(index: Int) =
         s"""
            |Contract Impl() implements Baz {
            |  pub fn f0() -> () {}
@@ -5594,6 +5594,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f2() -> () {}
            |  pub fn f3() -> () {}
            |  pub fn f4() -> () {}
+           |  pub fn f5() -> () {}
            |}
            |Interface Foo {
            |  @using(methodIndex = 1)
@@ -5605,65 +5606,149 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f2() -> ()
            |}
            |Interface Baz extends Bar {
-           |  @using(methodIndex = 4)
+           |  @using(methodIndex = $index)
            |  pub fn f3() -> ()
            |}
            |""".stripMargin
-      checkContractFuncs(code, Seq("f2", "f0", "f1", "f4", "f3"))
+      checkContractFuncs(code(3), Seq("f2", "f0", "f1", "f3", "f4", "f5"))
+      checkContractFuncs(code(4), Seq("f2", "f0", "f1", "f4", "f3", "f5"))
+      checkContractFuncs(code(5), Seq("f2", "f0", "f1", "f4", "f5", "f3"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 2)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = 1)
+           |  pub fn f2() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f1", "f2", "f0"))
     }
   }
 
   it should "throw an error if the predefined method index is invalid" in {
-    def code0(index: Int) =
-      s"""
-         |Contract Bar() implements Foo {
-         |  pub fn f0() -> () {}
-         |  pub fn f1() -> () {}
-         |}
-         |Interface Foo {
-         |  @using(methodIndex = $index)
-         |  pub fn f0() -> ()
-         |  pub fn f1() -> ()
-         |}
-         |""".stripMargin
-    Compiler.compileContract(code0(2)).leftValue.message is
-      "The method index of these functions is out of bound: f0, total number of methods: 2"
-    Compiler.compileContract(code0(3)).leftValue.message is
-      "The method index of these functions is out of bound: f0, total number of methods: 2"
-    Compiler.compileContract(code0(1)).isRight is true
-    Compiler.compileContract(code0(0)).isRight is true
+    {
+      def code(index: Int) =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = $index)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
 
-    def code1(index0: Int = 0, index1: Int = 2): String =
-      s"""
-         |Contract Impl() implements Bar {
-         |  pub fn f0() -> () {}
-         |  pub fn f1() -> () {}
-         |  pub fn f2() -> () {}
-         |  pub fn f3() -> () {}
-         |}
-         |Interface Foo {
-         |  @using(methodIndex = $index0)
-         |  pub fn f0() -> ()
-         |  pub fn f1() -> ()
-         |}
-         |Interface Bar extends Foo {
-         |  @using(methodIndex = $index1)
-         |  pub fn f2() -> ()
-         |}
-         |""".stripMargin
-    Compiler.compileContract(code1()).isRight is true
-    Compiler.compileContract(code1(index0 = 1)).isRight is true
-    Compiler.compileContract(code1(index0 = 2, index1 = 3)).isRight is true
-    Compiler.compileContract(code1(index0 = 3)).isRight is true
-    Compiler.compileContract(code1(index0 = 4)).leftValue.message is
-      "The method index of these functions is out of bound: f0, total number of methods: 4"
-    Compiler.compileContract(code1(index1 = 0)).leftValue.message is
-      "These functions have invalid predefined method indexes in interface Bar: f2"
-    Compiler.compileContract(code1(index1 = 1)).leftValue.message is
-      "These functions have invalid predefined method indexes in interface Bar: f2"
-    Compiler.compileContract(code1(index1 = 3)).isRight is true
-    Compiler.compileContract(code1(index1 = 4)).leftValue.message is
-      "The method index of these functions is out of bound: f2, total number of methods: 4"
+      Compiler.compileContract(code(3)).leftValue.message is
+        "The method index of these functions is out of bound: f0, total number of methods: 2"
+      Compiler.compileContract(code(4)).leftValue.message is
+        "The method index of these functions is out of bound: f0, total number of methods: 2"
+      Compiler.compileContract(replace(code(1))).isRight is true
+      Compiler.compileContract(replace(code(0))).isRight is true
+    }
+
+    {
+      def code(index0: Int = 0, index1: Int = 2): String =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = $index0)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = $index1)
+           |  pub fn f2() -> ()
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code()).isRight is true
+      Compiler.compileContract(code(index0 = 1)).isRight is true
+      Compiler.compileContract(code(index0 = 2, index1 = 3)).isRight is true
+      Compiler.compileContract(code(index0 = 3)).isRight is true
+      Compiler.compileContract(code(index0 = 4)).leftValue.message is
+        "The method index of these functions is out of bound: f0, total number of methods: 4"
+      Compiler.compileContract(code(index1 = 0)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 0"
+      Compiler.compileContract(code(index1 = 1)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 1"
+      Compiler.compileContract(code(index1 = 3)).isRight is true
+      Compiler.compileContract(code(index1 = 4)).leftValue.message is
+        "The method index of these functions is out of bound: f2, total number of methods: 4"
+    }
+
+    {
+      def code(index: Int) =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = $index)
+           |  pub fn f2() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code(0)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 0"
+      Compiler.compileContract(code(1)).leftValue.message is
+        "Function Bar.f2 have invalid predefined method index 1"
+      Compiler.compileContract(code(2)).isRight is true
+    }
+
+    {
+      def code(index0: Int, index1: Int = 2) =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = $index1)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |  pub fn f2() -> ()
+           |}
+           |Interface Bar extends Foo {
+           |  @using(methodIndex = $index0)
+           |  pub fn f3() -> ()
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code(0)).leftValue.message is
+        "Function Bar.f3 have invalid predefined method index 0"
+      Compiler.compileContract(code(1)).leftValue.message is
+        "Function Bar.f3 have invalid predefined method index 1"
+      Compiler.compileContract(code(2)).leftValue.message is
+        "Function Bar.f3 have invalid predefined method index 2"
+      Compiler.compileContract(code(3)).isRight is true
+      Compiler.compileContract(code(2, 3)).isRight is true
+    }
   }
 
   it should "throw an error if there are duplicate method indexes" in {
@@ -5681,7 +5766,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(code0).leftValue.message is
-      s"There are duplicate method indexes in contract Bar: 0"
+      s"Function Foo.f1 have invalid predefined method index 0"
 
     val code1 =
       s"""
@@ -5699,7 +5784,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(code1).leftValue.message is
-      s"There are duplicate method indexes in contract FooBar: 1"
+      s"Function Bar.bar have invalid predefined method index 1"
   }
 
   it should "assign correct method index to interface functions" in {
