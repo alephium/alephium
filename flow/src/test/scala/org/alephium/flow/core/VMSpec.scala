@@ -4849,6 +4849,52 @@ class VMSpec extends AlephiumSpec with Generators {
     )
   }
 
+  it should "test maximum method index for CallInternal and CallExternal" in new ContractFixture {
+    val maxMethodSize = 0xff + 1
+    val fooMethods = (0 until maxMethodSize).map { index =>
+      s"""
+         |pub fn func$index() -> U256 {
+         |  return $index
+         |}
+         |""".stripMargin
+    }
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  ${fooMethods.mkString("\n")}
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo)._1
+
+    val barMethods = (0 until maxMethodSize).map { index =>
+      s"""
+         |pub fn func$index() -> U256 {
+         |  return foo.func$index()
+         |}
+         |""".stripMargin
+    }
+    val bar =
+      s"""
+         |Contract Bar(foo: Foo) {
+         |  ${barMethods.mkString("\n")}
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector(Val.ByteVec(fooId.bytes)))._1
+
+    (0 until maxMethodSize).foreach { index =>
+      val script =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Bar(#${barId.toHexString}).func$index() == $index, 0)
+           |}
+           |$bar
+           |""".stripMargin
+      callTxScript(script, chainIndex)
+    }
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
