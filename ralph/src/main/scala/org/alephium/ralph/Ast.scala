@@ -2241,8 +2241,14 @@ object Ast {
     }
 
     def checkInterfaceMethodIndex(sortedInterfaces: Seq[ContractInterface]): Unit = {
-      val methodLength      = sortedInterfaces.map(_.funcs.length).sum
-      val usedMethodIndexes = mutable.ArrayBuffer.fill(methodLength)(false)
+      val methodLength = sortedInterfaces.map(_.funcs.length).sum
+      val predefinedMethodIndexMax = sortedInterfaces
+        .map(_.funcs.map(_.useMethodIndex.getOrElse(-1)).max)
+        .maxOption
+        .getOrElse(-1)
+      val methodLengthMax = math.max(methodLength, predefinedMethodIndexMax + 1)
+      assume(methodIndexMax <= 0xff)
+      val usedMethodIndexes = mutable.ArrayBuffer.fill(methodLengthMax)(false)
       var fromMethodIndex   = 0
       sortedInterfaces.foreach { interface =>
         val (preDefinedMethodIndexFuncs, remains) =
@@ -2250,10 +2256,6 @@ object Ast {
         preDefinedMethodIndexFuncs.foreach { func =>
           func.useMethodIndex match {
             case Some(index) =>
-              if (index >= usedMethodIndexes.length) {
-                usedMethodIndexes ++=
-                  mutable.ArrayBuffer.fill(index + 1 - usedMethodIndexes.length)(false)
-              }
               if (usedMethodIndexes(index)) {
                 throw Compiler.Error(
                   s"Function ${interface.name}.${func.id.name} have invalid predefined method index $index",
