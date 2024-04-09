@@ -2615,7 +2615,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     override def contractBalance: U256 = halfGas.subUnsafe(1)
     override def gasFeePaid: U256      = halfGas
 
-    PayGasFee.runWith(frame).leftValue.rightValue is a[NotEnoughApprovedBalance]
+    PayGasFee.runWith(frame).leftValue isE a[NotEnoughApprovedBalance]
   }
 
   it should "pay gas from ALPH, paying too much gas [PayGasFee]" in new PayGasFeeFixture {

@@ -34,7 +34,7 @@ import org.alephium.protocol.vm.TokenIssuance.{
   NoIssuance
 }
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
-import org.alephium.util.{AVector, Bytes, Duration, Math, TimeStamp, U256}
+import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
 import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
@@ -531,22 +531,17 @@ case object PayGasFee
     with GasBalance
     with StatefulInstrCompanion0 {
 
-  def gasFeeToBePaid[C <: StatefulContext](
+  def checkGasAmount[C <: StatefulContext](
       frame: Frame[C],
       alphAmount: U256
-  ): ExeResult[U256] = {
+  ): ExeResult[Unit] = {
     val gasFee     = frame.ctx.txEnv.gasFeeUnsafe
     val gasFeePaid = frame.ctx.gasFeePaid
-    for {
-      totalGasToPay <- alphAmount.add(gasFeePaid).toRight(Right(GasOverflow))
-      _ <-
-        if (totalGasToPay > gasFee) {
-          failed(GasOverPaid)
-        } else {
-          okay
-        }
-      gasRemaining <- gasFee.sub(gasFeePaid).toRight(Right(GasOverPaid))
-    } yield Math.min(gasRemaining, alphAmount)
+
+    assume(gasFee >= gasFeePaid) // This should always be true, so we check with assume
+
+    val gasRemainingToPay = gasFee.subUnsafe(gasFeePaid)
+    if (gasRemainingToPay < alphAmount) failed(GasOverPaid) else okay
   }
 
   def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
@@ -554,20 +549,20 @@ case object PayGasFee
       balanceState <- frame.getBalanceState()
       amount       <- frame.popOpStackU256()
       payer        <- frame.popOpStackAddress().map(_.lockupScript)
-      gasToBePaid  <- gasFeeToBePaid(frame, amount.v)
+      _            <- checkGasAmount(frame, amount.v)
       _ <- balanceState
-        .useAlph(payer, gasToBePaid)
+        .useAlph(payer, amount.v)
         .toRight(
           Right(
             NotEnoughApprovedBalance(
               payer,
               TokenId.alph,
-              gasToBePaid,
+              amount.v,
               balanceState.remaining.getAttoAlphAmount(payer).getOrElse(U256.Zero)
             )
           )
         )
-      _ <- frame.ctx.payGasFee(gasToBePaid)
+      _ <- frame.ctx.payGasFee(amount.v)
     } yield ()
   }
 }

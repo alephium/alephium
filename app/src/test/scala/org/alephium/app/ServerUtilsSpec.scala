@@ -2755,56 +2755,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(barContractAddress, ALPH.alph(1))
   }
 
-  it should "charge the contract that pays the for gas the first" in new GasFeeFixture {
-    def barContract: String =
-      s"""
-         |Contract Bar() {
-         |  @using(assetsInContract = true)
-         |  pub fn bar() -> () {
-         |    payGasFee!(selfAddress!(), txGasFee!())
-         |  }
-         |}
-         |""".stripMargin
-
-    val barContractAddress = deployContract(barContract, Amount(ALPH.alph(10)))
-
-    override def fooContract: String =
-      s"""
-         |Contract Foo() {
-         |  @using(assetsInContract = true)
-         |  pub fn foo() -> () {
-         |    Bar(#${barContractAddress.toBase58}).bar()
-         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
-         |    payGasFee!(selfAddress!(), txGasFee!())
-         |  }
-         |}
-         |
-         |$barContract
-         |""".stripMargin
-
-    val fooContractAddress = deployContract(fooContract, Amount(ALPH.alph(10)))
-
-    def script =
-      s"""
-         |TxScript Main {
-         |  Foo(#${fooContractAddress.toBase58}).foo()
-         |}
-         |
-         |$fooContract
-         |""".stripMargin
-
-    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
-    checkAddressBalance(fooContractAddress, ALPH.alph(10))
-    checkAddressBalance(barContractAddress, ALPH.alph(10))
-
-    val scriptBlock    = executeScript(script)
-    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
-
-    checkAddressBalance(scriptCaller, ALPH.alph(1000000).addUnsafe(ALPH.alph(1)))
-    checkAddressBalance(fooContractAddress, ALPH.alph(9))
-    checkAddressBalance(barContractAddress, ALPH.alph(10).subUnsafe(scriptTxGasFee))
-  }
-
   it should "split gas fee between contract and caller depending on approved token amount" in new GasFeeFixture {
     def contract: String =
       s"""

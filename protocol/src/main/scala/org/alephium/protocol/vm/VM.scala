@@ -372,27 +372,19 @@ final class StatefulVM(
   }
 
   def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
-    if (hardFork.isGhostEnabled()) {
+    if (hardFork.isGhostEnabled() && ctx.gasFeePaid > U256.Zero) {
       val totalGasFee = ctx.txEnv.gasFeeUnsafe
       val gasFeePaid  = ctx.gasFeePaid
 
-      totalGasFee.sub(gasFeePaid) match {
-        case Some(_) =>
-          ctx.txEnv.prevOutputs.headOption match {
-            case Some(firstInput) =>
-              if (gasFeePaid > U256.Zero) {
-                ctx.outputBalances
-                  .addAlph(firstInput.lockupScript, gasFeePaid)
-                  .toRight(Right(InvalidBalances))
-              } else {
-                okay
-              }
-            case None =>
-              okay
-          }
+      assume(totalGasFee >= gasFeePaid) // This should always be true, so we check with assume
 
+      ctx.txEnv.prevOutputs.headOption match {
+        case Some(firstInput) =>
+          ctx.outputBalances
+            .addAlph(firstInput.lockupScript, gasFeePaid)
+            .toRight(Right(InvalidBalances))
         case None =>
-          failed(GasOverflow)
+          okay
       }
     } else {
       okay
@@ -402,7 +394,7 @@ final class StatefulVM(
   private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       lockupScript match {
-        case l: LockupScript.P2C if ctx.assetStatus.get(l.contractId).isEmpty =>
+        case l: LockupScript.P2C if !ctx.assetStatus.contains(l.contractId) =>
           failed(ContractAssetUnloaded)
         case _ =>
           balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
