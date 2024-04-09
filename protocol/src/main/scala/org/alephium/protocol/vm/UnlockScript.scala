@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.nio.charset.StandardCharsets
+
 import akka.util.ByteString
 
 import org.alephium.protocol.PublicKey
@@ -52,7 +54,7 @@ object UnlockScript {
           case Staging(2, content) => p2shSerde._deserialize(content)
           case Staging(3, content) => Right(Staging(SameAsPrevious, content))
           case Staging(4, content) =>
-            serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(PoLW))
+            serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(PoLW.apply))
           case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
@@ -76,4 +78,11 @@ object UnlockScript {
   final case class P2SH(script: StatelessScript, params: AVector[Val])  extends UnlockScript
   case object SameAsPrevious                                            extends UnlockScript
   final case class PoLW(publicKey: PublicKey)                           extends UnlockScript
+  object PoLW {
+    private lazy val prefix: ByteString = ByteString("polw".getBytes(StandardCharsets.US_ASCII))
+
+    def buildPreImage(from: LockupScript, to: LockupScript): ByteString = {
+      prefix ++ serialize(from) ++ serialize(to)
+    }
+  }
 }

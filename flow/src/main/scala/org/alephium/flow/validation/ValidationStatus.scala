@@ -69,6 +69,12 @@ final case class ExistInvalidTx(t: Transaction, e: InvalidTxStatus) extends Inva
 final case object InvalidFlowDeps                                   extends InvalidBlockStatus
 final case object InvalidFlowTxs                                    extends InvalidBlockStatus
 
+sealed trait InvalidPoLWStatus                  extends InvalidBlockStatus
+case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus
+case object PoLWUnlockScriptNotSame             extends InvalidPoLWStatus
+case object InvalidPoLWChangeOutputLockupScript extends InvalidPoLWStatus
+case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
+
 sealed trait InvalidUncleStatus              extends InvalidBlockStatus
 case object InvalidUnclesBeforeGhostHardFork extends InvalidUncleStatus
 case object InvalidUncleSize                 extends InvalidUncleStatus
@@ -78,6 +84,7 @@ case object NotUnclesForTheBlock             extends InvalidUncleStatus
 case object UncleHashConflictWithParentHash  extends InvalidUncleStatus
 case object UnclesAlreadyUsed                extends InvalidUncleStatus
 case object UncleDoesNotExist                extends InvalidUncleStatus
+case object InvalidUncleMiner                extends InvalidUncleStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =
@@ -187,3 +194,4 @@ final case object InvalidGeneratedOutputs                       extends InvalidT
 final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus
 final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus
 final case object UsingBreakingInstrs                           extends InvalidTxStatus
+case object InvalidPoLWBeforeGhostHardFork                      extends InvalidTxStatus
