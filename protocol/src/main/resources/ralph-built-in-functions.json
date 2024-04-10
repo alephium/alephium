@@ -395,6 +395,17 @@
     "returns": "@returns "
   },
   {
+    "name": "payGasFee",
+    "category": "Asset",
+    "signature": "fn payGasFee!(payer:Address, amount:U256) -> ()",
+    "doc": "Pay gas fee.",
+    "params": [
+      "@param payer payer of the gas",
+      "@param amount the amount of gas to be paid in ALPH"
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "assert",
     "category": "Utils",
     "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",

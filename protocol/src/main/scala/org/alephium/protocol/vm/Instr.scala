@@ -34,7 +34,7 @@ import org.alephium.protocol.vm.TokenIssuance.{
   NoIssuance
 }
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
-import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
+import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
 import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
@@ -60,6 +60,17 @@ sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait GhostInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkGhostHardFork(this)
+      _ <- runWithGhost(frame)
+    } yield ()
+  }
+
+  def runWithGhost[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
@@ -88,6 +99,20 @@ sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext]
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait GhostInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends GhostInstr[Ctx]
+    with GasSimple {
+  def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
+
+  override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkGhostHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithGhost(frame)
+    } yield ()
+  }
 }
 
 object Instr {
@@ -175,7 +200,9 @@ object Instr {
     LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-    LoadImmField, LoadImmFieldByIndex
+    LoadImmField, LoadImmFieldByIndex,
+    /* Below are instructions for Ghost hard fork */
+    PayGasFee
   )
   // format: on
 
@@ -495,6 +522,47 @@ case object StoreMutFieldByIndex
       index <- popIndex(frame, InvalidMutFieldIndex)
       v     <- frame.popOpStack()
       _     <- frame.setMutField(index, v)
+    } yield ()
+  }
+}
+
+case object PayGasFee
+    extends GhostInstrWithSimpleGas[StatefulContext]
+    with GasBalance
+    with StatefulInstrCompanion0 {
+
+  def checkGasAmount[C <: StatefulContext](
+      frame: Frame[C],
+      alphAmount: U256
+  ): ExeResult[Unit] = {
+    val gasFee     = frame.ctx.txEnv.gasFeeUnsafe
+    val gasFeePaid = frame.ctx.gasFeePaid
+
+    assume(gasFee >= gasFeePaid) // This should always be true, so we check with assume
+
+    val gasRemainingToPay = gasFee.subUnsafe(gasFeePaid)
+    if (gasRemainingToPay < alphAmount) failed(GasOverPaid) else okay
+  }
+
+  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      balanceState <- frame.getBalanceState()
+      amount       <- frame.popOpStackU256()
+      payer        <- frame.popOpStackAddress().map(_.lockupScript)
+      _            <- checkGasAmount(frame, amount.v)
+      _ <- balanceState
+        .useAlph(payer, amount.v)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              payer,
+              TokenId.alph,
+              amount.v,
+              balanceState.remaining.getAttoAlphAmount(payer).getOrElse(U256.Zero)
+            )
+          )
+        )
+      _ <- frame.ctx.payGasFee(amount.v)
     } yield ()
   }
 }

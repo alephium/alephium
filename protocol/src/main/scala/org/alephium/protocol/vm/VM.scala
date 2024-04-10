@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.{AVector, EitherF, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -342,6 +342,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    val hardFork = ctx.getHardFork()
     if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
@@ -353,12 +354,14 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- reimburseGas(hardFork)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       if (ctx.getHardFork().isLemanEnabled()) {
         for {
+          _ <- reimburseGas(hardFork)
           _ <- outputGeneratedBalances(ctx.outputBalances)
           _ <- ctx.checkAllAssetsFlushed()
         } yield ()
@@ -368,10 +371,30 @@ final class StatefulVM(
     }
   }
 
+  def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
+    if (hardFork.isGhostEnabled() && ctx.gasFeePaid > U256.Zero) {
+      val totalGasFee = ctx.txEnv.gasFeeUnsafe
+      val gasFeePaid  = ctx.gasFeePaid
+
+      assume(totalGasFee >= gasFeePaid) // This should always be true, so we check with assume
+
+      ctx.txEnv.prevOutputs.headOption match {
+        case Some(firstInput) =>
+          ctx.outputBalances
+            .addAlph(firstInput.lockupScript, gasFeePaid)
+            .toRight(Right(InvalidBalances))
+        case None =>
+          okay
+      }
+    } else {
+      okay
+    }
+  }
+
   private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       lockupScript match {
-        case l: LockupScript.P2C if ctx.assetStatus.get(l.contractId).isEmpty =>
+        case l: LockupScript.P2C if !ctx.assetStatus.contains(l.contractId) =>
           failed(ContractAssetUnloaded)
         case _ =>
           balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
