@@ -35,8 +35,7 @@ class BuiltInSpec extends AlephiumSpec {
         BuiltIn.createSubContract,
         BuiltIn.createSubContractWithToken,
         BuiltIn.copyCreateSubContract,
-        BuiltIn.copyCreateSubContractWithToken,
-        BuiltIn.payGasFee
+        BuiltIn.copyCreateSubContractWithToken
       )
   }
 
