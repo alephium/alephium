@@ -692,8 +692,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       gasPrice: Option[GasPrice] = None,
       initialImmFields: Option[AVector[vm.Val]] = None,
       initialMutFields: Option[AVector[vm.Val]] = None,
-      issueTokenAmount: Option[U256] = None,
-      initialAttoAlphAmount: Option[U256] = None
+      issueTokenAmount: Option[U256] = None
   ) = {
     val bytecode = code + Hex.toHexString(serialize(initialImmFields.getOrElse(AVector.empty))) +
       Hex.toHexString(serialize(initialMutFields.getOrElse(AVector.empty)))
@@ -705,9 +704,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
          |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
-         |  ${initialAttoAlphAmount
-          .map(v => s""","initialAttoAlphAmount": "${v.v}"""")
-          .getOrElse("")}
          |}
          |""".stripMargin
     }
