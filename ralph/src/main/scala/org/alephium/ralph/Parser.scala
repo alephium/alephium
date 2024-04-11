@@ -141,7 +141,9 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def indexSelector[Unknown: P]: P[Ast.FieldSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
     case (from, expr, to) =>
-      Ast.IndexSelector(expr.overwriteSourceIndex(from, to, fileURI))
+      Ast
+        .IndexSelector(expr.overwriteSourceIndex(from, to, fileURI))
+        .atSourceIndex(from, to, fileURI)
   }
 
   // Optimize chained comparisons
@@ -283,7 +285,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def identSelector[Unknown: P]: P[Ast.FieldSelector] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
-    Ast.IdentSelector(ident).atSourceIndex(from, to)
+    Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
   def fieldSelector[Unknown: P]: P[Ast.FieldSelector] = P(identSelector | indexSelector)
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -779,7 +781,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def mapKeyType[Unknown: P]: P[Type] = {
     P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
       if (!tpe.isPrimitive) {
-        val sourceIndex = Some(SourceIndex(from, to - from))
+        val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
         throw Compiler.Error("The key type of map can only be primitive type", sourceIndex)
       }
       tpe
@@ -809,7 +811,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def mapContains[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(Index ~ (callExpr | variableIdOnly) ~ ".contains!" ~ "(" ~ expr ~ ")" ~~ Index).map {
       case (fromIndex, base, index, endIndex) =>
-        Ast.MapContains(base, index).atSourceIndex(fromIndex, endIndex)
+        Ast.MapContains(base, index).atSourceIndex(fromIndex, endIndex, fileURI)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -846,7 +848,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def removeFromMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(Index ~ Lexer.ident ~ "." ~ "remove!" ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index).map {
       case (fromIndex, ident, exprs, endIndex) =>
-        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
         Ast.RemoveFromMap(ident, exprs).atSourceIndex(sourceIndex)
     }
 
