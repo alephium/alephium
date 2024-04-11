@@ -2157,7 +2157,7 @@ final case class CreateMapEntry(immFields: Byte, mutFields: Byte)
   override def prepareContractCode[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[StatefulContract.HalfDecoded] = {
-    val contract = CreateMapEntry.genContract(immFields.toInt, mutFields.toInt)
+    val contract = CreateMapEntry.genContract(Bytes.toPosInt(immFields), Bytes.toPosInt(mutFields))
     val bytecode = encode(contract)
     frame.ctx
       .chargeContractCodeSize(bytecode, frame.ctx.getHardFork())

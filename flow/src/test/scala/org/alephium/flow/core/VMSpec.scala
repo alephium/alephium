@@ -5668,6 +5668,50 @@ class VMSpec extends AlephiumSpec with Generators {
     subContractNotExist(mapKey)
   }
 
+  it should "test maximum field length for map value" in new ContractFixture {
+    val maxFieldSize = 0xff
+    def code(mutable: Boolean) = {
+      // there is a immutable parent contract id field
+      val fieldSize = if (mutable) maxFieldSize else maxFieldSize - 1
+      val prefix    = if (mutable) "mut " else ""
+      s"""
+         |// use `Bool` to avoid the `FieldsSizeTooLarge` error
+         |struct Foo { $prefix value: [Bool; $fieldSize] }
+         |Contract Bar() {
+         |  mapping[U256, Foo] map
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn test() -> () {
+         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(
+         |      0,
+         |      Foo { value: [true; ${fieldSize}] }
+         |    )
+         |    for (let mut i = 0; i < ${fieldSize}; i = i + 1) {
+         |      assert!(map[0].value[i], 0)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    def test(mutable: Boolean) = {
+      val contractCode = code(mutable)
+      val contractId   = createContract(contractCode)._1
+      val script =
+        s"""
+           |TxScript Main {
+           |  let bar = Bar(#${contractId.toHexString})
+           |  bar.test{@$genesisAddress -> ALPH: mapEntryDeposit!()}()
+           |}
+           |$contractCode
+           |""".stripMargin
+      callTxScript(script)
+    }
+
+    test(true)
+    test(false)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

@@ -4113,7 +4113,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
     def byte: Byte = bytes.sample()
-    val twoBytes   = (byte, byte)
+    val twoBytes   = (bytes.tail.sample(), byte)
     def int: Int   = ints.sample()
     // format: off
     val statelessInstrs: AVector[Instr[StatelessContext]] = AVector(
