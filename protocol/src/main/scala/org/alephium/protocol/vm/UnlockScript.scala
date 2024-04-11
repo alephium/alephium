@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.util.ByteString
 
-import org.alephium.protocol.PublicKey
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -82,7 +82,7 @@ object UnlockScript {
     private lazy val prefix: ByteString = ByteString("polw".getBytes(StandardCharsets.US_ASCII))
 
     def buildPreImage(from: LockupScript, to: LockupScript): ByteString = {
-      prefix ++ serialize(from) ++ serialize(to)
+      Hash.hash(prefix ++ serialize(from) ++ serialize(to)).bytes
     }
   }
 }
