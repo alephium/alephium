@@ -109,19 +109,26 @@ object CompileContractResult {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CompileProjectResult(
     contracts: AVector[CompileContractResult],
-    scripts: AVector[CompileScriptResult]
+    scripts: AVector[CompileScriptResult],
+    structs: Option[AVector[CompileResult.StructSig]] = None
 )
 
 object CompileProjectResult {
   def from(
       contracts: AVector[CompiledContract],
-      scripts: AVector[CompiledScript]
+      scripts: AVector[CompiledScript],
+      structs: AVector[Ast.Struct]
   ): CompileProjectResult = {
     val compiledContracts = contracts.map(c => CompileContractResult.from(c))
     val compiledScripts   = scripts.map(s => CompileScriptResult.from(s))
-    CompileProjectResult(compiledContracts, compiledScripts)
+    CompileProjectResult(
+      compiledContracts,
+      compiledScripts,
+      Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from))
+    )
   }
 
   final case class Patch(value: String) extends AnyVal
@@ -189,7 +196,7 @@ object CompileResult {
       FunctionSig(
         func.id.name,
         func.usePreapprovedAssets,
-        func.useAssetsInContract,
+        func.useAssetsInContract != Ast.NotUseContractAssets,
         func.isPublic,
         func.getArgNames(),
         func.getArgTypeSignatures(),
@@ -231,6 +238,23 @@ object CompileResult {
         event.name,
         event.getFieldNames(),
         event.getFieldTypeSignatures()
+      )
+    }
+  }
+
+  final case class StructSig(
+      name: String,
+      fieldNames: AVector[String],
+      fieldTypes: AVector[String],
+      isMutable: AVector[Boolean]
+  )
+  object StructSig {
+    def from(struct: Ast.Struct): StructSig = {
+      StructSig(
+        struct.id.name,
+        struct.getFieldNames(),
+        struct.getFieldTypeSignatures(),
+        struct.getFieldsMutability()
       )
     }
   }

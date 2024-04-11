@@ -20,7 +20,7 @@ import scala.annotation.{switch, tailrec}
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.{ContractId, TokenId}
+import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.serde.deserialize
@@ -68,31 +68,31 @@ abstract class Frame[Ctx <: StatelessContext] {
   def popOpStackBool(): ExeResult[Val.Bool] =
     popOpStack().flatMap {
       case elem: Val.Bool => Right(elem)
-      case elem           => failed(InvalidType(elem))
+      case elem           => failed(InvalidType(Val.Bool, elem))
     }
 
   def popOpStackI256(): ExeResult[Val.I256] =
     popOpStack().flatMap {
       case elem: Val.I256 => Right(elem)
-      case elem           => failed(InvalidType(elem))
+      case elem           => failed(InvalidType(Val.I256, elem))
     }
 
   def popOpStackU256(): ExeResult[Val.U256] =
     popOpStack().flatMap {
       case elem: Val.U256 => Right(elem)
-      case elem           => failed(InvalidType(elem))
+      case elem           => failed(InvalidType(Val.U256, elem))
     }
 
   def popOpStackByteVec(): ExeResult[Val.ByteVec] =
     popOpStack().flatMap {
       case elem: Val.ByteVec => Right(elem)
-      case elem              => failed(InvalidType(elem))
+      case elem              => failed(InvalidType(Val.ByteVec, elem))
     }
 
   def popOpStackAddress(): ExeResult[Val.Address] =
     popOpStack().flatMap {
       case elem: Val.Address => Right(elem)
-      case elem              => failed(InvalidType(elem))
+      case elem              => failed(InvalidType(Val.Address, elem))
     }
 
   def popAssetAddress[C <: StatefulContext](): ExeResult[LockupScript.Asset] = {
@@ -102,7 +102,7 @@ abstract class Frame[Ctx <: StatelessContext] {
         if (address.lockupScript.isAssetType) {
           Right(address.lockupScript.asInstanceOf[LockupScript.Asset])
         } else {
-          Left(Right(InvalidAssetAddress))
+          Left(Right(InvalidAssetAddress(Address.from(address.lockupScript))))
         }
     } yield lockupScript
   }
@@ -153,6 +153,7 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def createContract(
       contractId: ContractId,
+      parentContractId: Option[ContractId],
       code: StatefulContract.HalfDecoded,
       immFields: AVector[Val],
       mutFields: AVector[Val],
@@ -227,6 +228,7 @@ final class StatelessFrame(
   def balanceStateOpt: Option[MutBalanceState] = None
   def createContract(
       contractId: ContractId,
+      parentContractId: Option[ContractId],
       code: StatefulContract.HalfDecoded,
       immFields: AVector[Val],
       mutFields: AVector[Val],
@@ -374,6 +376,7 @@ final case class StatefulFrame(
 
   def createContract(
       contractId: ContractId,
+      parentContractId: Option[ContractId],
       code: StatefulContract.HalfDecoded,
       immFields: AVector[Val],
       mutFields: AVector[Val],
@@ -385,8 +388,8 @@ final case class StatefulFrame(
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
-        Some(createContractEventId),
-        contractCreationEventFields(contractId, immFields),
+        Some(createContractEventId(ctx.blockEnv.chainIndex.from.value)),
+        contractCreationEventFields(contractId, parentContractId, immFields),
         systemEvent = true
       )
     } yield contractId
@@ -394,14 +397,15 @@ final case class StatefulFrame(
 
   def contractCreationEventFields(
       createdContract: ContractId,
+      parentContract: Option[ContractId],
       immFields: AVector[Val]
   ): AVector[Val] = {
     AVector(
       createContractEventIndex,
       Val.Address(LockupScript.p2c(createdContract)),
-      obj.contractIdOpt match {
-        case Some(contractId) => Val.Address(LockupScript.p2c(contractId))
-        case None             => Val.ByteVec(ByteString.empty)
+      parentContract match {
+        case Some(parent) => Val.Address(LockupScript.p2c(parent))
+        case None         => Val.ByteVec(ByteString.empty)
       },
       contractInterfaceIdGuessed(immFields)
     )
@@ -427,7 +431,7 @@ final case class StatefulFrame(
         .toRight(Right(InvalidBalances))
       _ <- ctx.destroyContract(contractId, contractAssets, refundAddress)
       _ <- ctx.writeLog(
-        Some(destroyContractEventId),
+        Some(destroyContractEventId(ctx.blockEnv.chainIndex.from.value)),
         AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId))),
         systemEvent = true
       )
@@ -481,7 +485,7 @@ final case class StatefulFrame(
   def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] = {
     val notInCallerStrace = checkNonRecursive(address.contractId)
     if (notInCallerStrace) {
-      failed(PayToContractAddressNotInCallerTrace)
+      failed(PayToContractAddressNotInCallerTrace(Address.Contract(address)))
     } else {
       okay
     }
@@ -539,11 +543,11 @@ final case class StatefulFrame(
   @inline private def checkLength(
       expected: Int,
       paramError: ExeFailure,
-      checkError: ExeFailure
+      checkError: (Int, Int) => ExeFailure
   ): ExeResult[Unit] = {
     if (ctx.getHardFork().isLemanEnabled()) {
       popOpStackU256().flatMap(_.v.toInt match {
-        case Some(length) => if (length == expected) okay else failed(checkError)
+        case Some(length) => if (length == expected) okay else failed(checkError(expected, length))
         case None         => failed(paramError)
       })
     } else {
@@ -646,10 +650,10 @@ object Frame {
       method: Method[Ctx],
       frameBuilder: (Stack[Val], VarVector[Val]) => Frame[Ctx]
   ): ExeResult[Frame[Ctx]] = {
-    operandStack.pop(method.argsLength) match {
-      case Right(args) => build(ctx, operandStack, method, args, frameBuilder)
-      case _           => failed(InsufficientArgs)
-    }
+    for {
+      args   <- operandStack.pop(method.argsLength)
+      result <- build(ctx, operandStack, method, args, frameBuilder)
+    } yield result
   }
 
   @inline

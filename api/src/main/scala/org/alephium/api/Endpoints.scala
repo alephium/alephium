@@ -305,6 +305,16 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
+  val buildMultiAddressesTransaction
+      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransactionResult] =
+    transactionsEndpoint.post
+      .in("build-multi-addresses")
+      .in(jsonBodyWithAlph[BuildMultiAddressesTransaction])
+      .out(jsonBody[BuildTransactionResult])
+      .summary(
+        "Build an unsigned transaction with multiple addresses to a number of recipients"
+      )
+
   val buildSweepAddressTransactions
       : BaseEndpoint[BuildSweepAddressTransactions, BuildSweepAddressTransactionsResult] =
     transactionsEndpoint.post
@@ -472,11 +482,10 @@ trait Endpoints
       .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
 
-  lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractState] =
+  lazy val contractState: BaseEndpoint[Address.Contract, ContractState] =
     contractsEndpoint.get
       .in(path[Address.Contract]("address"))
       .in("state")
-      .in(query[GroupIndex]("group"))
       .out(jsonBody[ContractState])
       .summary("Get contract state")
 
@@ -531,6 +540,13 @@ trait Endpoints
     utilsEndpoint.put
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
+
+  val targetToHashrate: BaseEndpoint[TargetToHashrate, TargetToHashrate.Result] =
+    utilsEndpoint.post
+      .in("target-to-hashrate")
+      .in(jsonBody[TargetToHashrate])
+      .out(jsonBody[TargetToHashrate.Result])
+      .summary("Convert a target to hashrate")
 
   lazy val getContractEvents
       : BaseEndpoint[(Address.Contract, CounterRange, Option[GroupIndex]), ContractEvents] =

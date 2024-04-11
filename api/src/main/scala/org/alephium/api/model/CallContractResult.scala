@@ -28,7 +28,8 @@ final case class CallContractSucceeded(
     contracts: AVector[ContractState],
     txInputs: AVector[Address],
     txOutputs: AVector[Output],
-    events: AVector[ContractEventByTxId]
+    events: AVector[ContractEventByTxId],
+    debugMessages: AVector[DebugMessage]
 ) extends CallContractResult
 
 @upickle.implicits.key("CallContractFailed")

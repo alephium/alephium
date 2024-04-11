@@ -558,6 +558,10 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 
   def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
 
+  def getNodesUnsafe(hashes: Seq[Hash]): Seq[Node] = {
+    storage.multiGetUnsafe(hashes)
+  }
+
   def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
     result.toAdd
       .foreachE { node => storage.put(node.hash, node) }
@@ -636,26 +640,34 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
     put(rootHash, nibbles, value).map(applyActions)
   }
 
-  def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
-    @inline def preOrderTraversal(accumulatePut: (Hash, Node) => Unit): Unit = {
-      val queue = mutable.Queue(rootHash)
-      while (queue.nonEmpty) {
-        val current = queue.dequeue()
-        cache.get(current) match {
-          case Some(node: BranchNode) =>
-            accumulatePut(current, node)
-            node.children.foreach { childOpt =>
-              childOpt.foreach(queue.enqueue)
-            }
-          case Some(node: LeafNode) =>
-            accumulatePut(current, node)
-          case None => ()
-        }
+  def getNewTrieNodeKeys(): AVector[Hash] = {
+    var keys = AVector.empty[Hash]
+    preOrderCacheTraversal { (hash, _) =>
+      keys = keys :+ hash
+    }
+    keys
+  }
+
+  @inline private def preOrderCacheTraversal(f: (Hash, Node) => Unit): Unit = {
+    val queue = mutable.Queue(rootHash)
+    while (queue.nonEmpty) {
+      val current = queue.dequeue()
+      cache.get(current) match {
+        case Some(node: BranchNode) =>
+          f(current, node)
+          node.children.foreach { childOpt =>
+            childOpt.foreach(queue.enqueue)
+          }
+        case Some(node: LeafNode) =>
+          f(current, node)
+        case None => ()
       }
     }
+  }
 
+  def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
     storage
-      .putBatch(preOrderTraversal)
+      .putBatch(preOrderCacheTraversal)
       .map(_ => SparseMerkleTrie(rootHash, storage))
   }
 }
