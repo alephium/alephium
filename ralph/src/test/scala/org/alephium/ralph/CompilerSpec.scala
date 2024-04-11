@@ -5425,7 +5425,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  pub fn f(address: Address) -> () {
            |    let map = 0
-           |    $$map$$.insert!{address -> ALPH: mapEntryDeposit!()}(0, 0)
+           |    $$map$$.insert!(0, 0, address)
            |  }
            |}
            |""".stripMargin
@@ -5433,28 +5433,33 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Invalid key or value type for Map.insert")
+      info("Invalid args for Map.insert")
       def code(args: String) =
         s"""
            |Contract Foo() {
            |  mapping[U256, U256] map
            |  pub fn f(address: Address) -> () {
-           |    $$map.insert!{address -> ALPH: mapEntryDeposit!()}($args)$$
+           |    $$map.insert!($args)$$
+           |  }
+           |  pub fn f1(address: Address) -> (U256, U256, Address) {
+           |    return 0, 0, address
            |  }
            |}
            |""".stripMargin
       testContractError(
-        code("1, #00"),
-        "Invalid args type List(U256, ByteVec), expected List(U256, U256)"
+        code("1, #00, address"),
+        "Invalid args type List(U256, ByteVec, Address), expected List(U256, U256, Address)"
       )
       testContractError(
-        code("#00, 1"),
-        "Invalid args type List(ByteVec, U256), expected List(U256, U256)"
+        code("#00, 1, address"),
+        "Invalid args type List(ByteVec, U256, Address), expected List(U256, U256, Address)"
       )
       testContractError(
         code("1, 1, 1"),
-        "Invalid args type List(U256, U256, U256), expected List(U256, U256)"
+        "Invalid args type List(U256, U256, U256), expected List(U256, U256, Address)"
       )
+      testContractError(code("f1(address)"), "Invalid args length, expected 3, got 1")
+      testContractError(code("1, 1, address, 1"), "Invalid args length, expected 3, got 4")
     }
 
     {
@@ -5472,13 +5477,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Invalid key or value type for Map.remove")
+      info("Invalid args for Map.remove")
       def code(args: String) =
         s"""
            |Contract Foo() {
            |  mapping[U256, U256] map
            |  pub fn f(address: Address) -> () {
            |    $$map.remove!($args)$$
+           |  }
+           |  pub fn f1(address: Address) -> (U256, Address) {
+           |    return 0, address
            |  }
            |}
            |""".stripMargin
@@ -5490,10 +5498,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code("#00, address"),
         "Invalid args type List(ByteVec, Address), expected List(U256, Address)"
       )
-      testContractError(
-        code("1, address, 1"),
-        "Invalid args type List(U256, Address, U256), expected List(U256, Address)"
-      )
+      testContractError(code("f1(address)"), "Invalid args length, expected 2, got 1")
+      testContractError(code("1, address, 1"), "Invalid args length, expected 2, got 3")
     }
 
     {
@@ -5680,7 +5686,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Bar() {
            |  mapping[U256, Foo] map
            |  pub fn bar(address: Address) -> () {
-           |    map.insert!{address -> ALPH: mapEntryDeposit!()}(1, $$Foo { a: [0; $size] }$$)
+           |    map.insert!(1, $$Foo { a: [0; $size] }$$, address)
            |  }
            |}
            |""".stripMargin
@@ -5691,38 +5697,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code(255, ""), "The number of struct fields exceeds the maximum limit")
       Compiler.compileContractFull(code(255, "mut").replace("$", "")).isRight is true
       Compiler.compileContractFull(code(254, "").replace("$", "")).isRight is true
-    }
-
-    {
-      info("Check approved assets for map insert")
-      def code(approvedAssets: String) =
-        s"""
-           |Contract Foo(@unused tokenId: ByteVec) {
-           |  mapping[U256, U256] map
-           |  @using(preapprovedAssets = true)
-           |  pub fn foo(address: Address) -> () {
-           |    $$map.insert!$approvedAssets(0, 0)$$
-           |  }
-           |}
-           |""".stripMargin
-
-      testContractError(code(""), "Expected approve `ALPH: mapEntryDeposit!()` for map insert")
-      testContractError(
-        code("{address -> ALPH: minimalContractDeposit!()}"),
-        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
-      )
-      testContractError(
-        code("{address -> ALPH: 1 alph}"),
-        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
-      )
-      testContractError(
-        code("{address -> ALPH: mapEntryDeposit!(), tokenId: 1 alph}"),
-        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
-      )
-      testContractError(
-        code("{address -> tokenId: 1 alph}"),
-        "Expected approve `ALPH: mapEntryDeposit!()` for map insert"
-      )
     }
 
     {

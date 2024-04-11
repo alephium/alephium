@@ -5029,7 +5029,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[$keyType, U256] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$address -> ALPH: mapEntryDeposit!()}($keyValue, 1)
+         |    map.insert!($keyValue, 1, @$address)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5063,8 +5063,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, ByteVec] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, #00)
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, #01)
+         |    map.insert!(0, #00, @$genesisAddress)
+         |    map.insert!(1, #01, @$genesisAddress)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5099,8 +5099,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, [ByteVec; 2]] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [#00, #01])
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(1, [#02, #03])
+         |    map.insert!(0, [#00, #01], @$genesisAddress)
+         |    map.insert!(1, [#02, #03], @$genesisAddress)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5154,7 +5154,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn insert() -> () {
          |    let foo0 = Foo{a: 0, b: 1}
          |    let foo1 = Foo{a: 2, b: 3}
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, [foo0, foo1])
+         |    map.insert!(0, [foo0, foo1], @$genesisAddress)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5211,7 +5211,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
+         |    map.insert!(0, baz, @$genesisAddress)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5315,7 +5315,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, baz)
+         |    map.insert!(0, baz, @$genesisAddress)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5483,11 +5483,11 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, U256] map1
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap0(key: U256, value: U256) -> () {
-         |    map0.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(key, value)
+         |    map0.insert!(key, value, @$genesisAddress)
          |  }
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap1(key: U256, value: U256) -> () {
-         |    map1.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(key, value)
+         |    map1.insert!(key, value, @$genesisAddress)
          |  }
          |  pub fn updateMap0(key: U256, oldValue: U256, newValue: U256) -> () {
          |    assert!(map0[key] == oldValue, 0)
@@ -5587,7 +5587,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(0, Bar { a: 0, b: 0 })
+         |    map.insert!(0, Bar { a: 0, b: 0 }, @$genesisAddress)
          |  }
          |}
          |""".stripMargin
@@ -5682,9 +5682,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn test() -> () {
-         |    map.insert!{@$genesisAddress -> ALPH: mapEntryDeposit!()}(
+         |    map.insert!(
          |      0,
-         |      Foo { value: [true; ${fieldSize}] }
+         |      Foo { value: [true; ${fieldSize}] },
+         |      @$genesisAddress
          |    )
          |    for (let mut i = 0; i < ${fieldSize}; i = i + 1) {
          |      assert!(map[0].value[i], 0)

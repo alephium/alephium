@@ -944,8 +944,14 @@ object Ast {
       }
     }
     def checkArgTypes(state: Compiler.State[StatefulContext], expected: Seq[Type]): Unit = {
+      if (args.length != expected.length) {
+        throw Compiler.Error(
+          s"Invalid args length, expected ${expected.length}, got ${args.length}",
+          sourceIndex
+        )
+      }
       val argTypes = args.flatMap(_.getType(state))
-      if (args.length != 2 || argTypes != expected) {
+      if (argTypes != expected) {
         throw Compiler.Error(s"Invalid args type $argTypes, expected $expected", sourceIndex)
       }
     }
@@ -967,20 +973,11 @@ object Ast {
 
   final case class InsertToMap(
       ident: Ident,
-      approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
-      val mapType        = getMapType(state)
-      val expectedAmount = CallExpr(BuiltIn.mapEntryDeposit.funcId, Seq.empty, Seq.empty)
-      if (approveAssets.flatMap(_.tokenAmounts) != Seq((ALPHTokenId(), expectedAmount))) {
-        throw Compiler.Error(
-          "Expected approve `ALPH: mapEntryDeposit!()` for map insert",
-          sourceIndex
-        )
-      }
-      approveAssets.foreach(_.check(state))
-      checkArgTypes(state, Seq(mapType.key, mapType.value))
+      val mapType = getMapType(state)
+      checkArgTypes(state, Seq(mapType.key, mapType.value, Type.Address))
     }
     private def checkFieldLength(length: Int): Unit = {
       if (length > 0xff) {
@@ -1007,9 +1004,9 @@ object Ast {
         mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val approveAssetCodes   = approveAssets.flatMap(_.genCode(state))
+      val approveALPHCodes    = args(2).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
       val createContractCodes = genCreateContract(state)
-      approveAssetCodes ++ createContractCodes
+      approveALPHCodes ++ createContractCodes
     }
   }
 

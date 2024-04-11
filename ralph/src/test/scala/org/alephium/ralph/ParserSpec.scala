@@ -19,7 +19,7 @@ package org.alephium.ralph
 import akka.util.ByteString
 import fastparse._
 
-import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.ArithOperator._
@@ -1979,17 +1979,15 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
 
     parse(
-      "map.insert!{address -> ALPH: 1 alph}(1, 0)",
+      "map.insert!(1, 0, address)",
       StatefulParser.statement(_)
     ).get.value is Ast.InsertToMap(
       Ident("map"),
-      Seq(
-        ApproveAsset[StatefulContext](
-          Variable(Ident("address")),
-          Seq((ALPHTokenId(), Const(Val.U256(ALPH.oneAlph))))
-        )
-      ),
-      Seq[Expr[StatefulContext]](Const(Val.U256(U256.One)), Const(Val.U256(U256.Zero)))
+      Seq[Expr[StatefulContext]](
+        Const(Val.U256(U256.One)),
+        Const(Val.U256(U256.Zero)),
+        Variable(Ident("address"))
+      )
     )
     parse("map.remove!(1, address)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
       Ident("map"),
