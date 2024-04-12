@@ -1123,12 +1123,17 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
+         |    "Found unused maps in Foo: map",
          |    "Found unused constants in Foo: A,Color.Blue,Color.Red",
          |    "Found unused fields in Foo: cc, ff"
-         |  ]
+         |  ],
+         |  "maps": { "names": ["map"], "types": ["Map[U256,U256]"] }
          |}
          |""".stripMargin
-    write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
+    val jsonString = write(result0)
+    jsonString.filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
+    jsonString.contains("\"maps\"") is true
+    write(result0.copy(maps = None)).contains("\"maps\"") is false
 
     val result1 = CompileScriptResult.from(compiledScript)
     val jsonRaw1 =

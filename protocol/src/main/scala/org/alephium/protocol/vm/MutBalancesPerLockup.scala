@@ -89,7 +89,7 @@ final case class MutBalancesPerLockup(
 
   def toTxOutput(lockupScript: LockupScript, hardFork: HardFork): ExeResult[AVector[TxOutput]] = {
     if (hardFork.isLemanEnabled()) {
-      toTxOutputLeman(lockupScript, TimeStamp.zero)
+      toTxOutputLeman(lockupScript, TimeStamp.zero, hardFork)
     } else {
       toTxOutputDeprecated(lockupScript)
     }
@@ -97,7 +97,8 @@ final case class MutBalancesPerLockup(
 
   def toTxOutputLeman(
       lockupScript: LockupScript,
-      lockTime: TimeStamp
+      lockTime: TimeStamp,
+      hardFork: HardFork
   ): ExeResult[AVector[TxOutput]] = {
     val tokens = tokenVector
     if (attoAlphAmount.isZero) {
@@ -113,7 +114,7 @@ final case class MutBalancesPerLockup(
             .from(attoAlphAmount, tokens, l, lockTime)
             .toRight(Right(InvalidOutputBalances(lockupScript, tokens.length, attoAlphAmount)))
         case l: LockupScript.P2C =>
-          if (attoAlphAmount < minimalAlphInContract) {
+          if (attoAlphAmount < minimalContractStorageDeposit(hardFork)) {
             failed(LowerThanContractMinimalBalance(Address.Contract(l), attoAlphAmount))
           } else if (tokens.length > maxTokenPerContractUtxo) {
             failed(InvalidTokenNumForContractOutput(Address.Contract(l), tokens.length))
@@ -139,9 +140,10 @@ final case class MutBalancesPerLockup(
 
   def toLockedTxOutput(
       lockupScript: LockupScript.Asset,
-      lockTime: TimeStamp
+      lockTime: TimeStamp,
+      hardFork: HardFork
   ): ExeResult[AVector[TxOutput]] = {
-    toTxOutputLeman(lockupScript, lockTime)
+    toTxOutputLeman(lockupScript, lockTime, hardFork)
   }
 }
 

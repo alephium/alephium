@@ -17,6 +17,7 @@
 package org.alephium.ralph
 
 import akka.util.ByteString
+import fastparse._
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
@@ -104,7 +105,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
-      StructFieldSelector[StatefulContext](
+      LoadDataBySelectors[StatefulContext](
         ParenExpr(
           StructCtor(
             TypeId("Foo"),
@@ -114,7 +115,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             )
           )
         ),
-        Ident("x")
+        Seq(IdentSelector(Ident("x")))
       )
     parse("Foo { x: true, bar: Bar { y: false } }", StatefulParser.expr(_)).get.value is
       StructCtor[StatefulContext](
@@ -141,36 +142,37 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     parse("a.b.c", StatefulParser.expr(_)).get.value is
-      StructFieldSelector[StatefulContext](
-        StructFieldSelector(Variable(Ident("a")), Ident("b")),
-        Ident("c")
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(Ast.IdentSelector(Ident("b")), Ast.IdentSelector(Ident("c")))
       )
     parse("a[0].b.c", StatefulParser.expr(_)).get.value is
-      StructFieldSelector[StatefulContext](
-        StructFieldSelector(
-          ArrayElement(Variable(Ident("a")), Const(Val.U256(U256.unsafe(0)))),
-          Ident("b")
-        ),
-        Ident("c")
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(
+          Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+          Ast.IdentSelector(Ident("b")),
+          Ast.IdentSelector(Ident("c"))
+        )
       )
     parse("a.b[0].c", StatefulParser.expr(_)).get.value is
-      StructFieldSelector[StatefulContext](
-        ArrayElement(
-          StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
-          Const(Val.U256(U256.unsafe(0)))
-        ),
-        Ident("c")
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(
+          Ast.IdentSelector(Ident("b")),
+          Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+          Ast.IdentSelector(Ident("c"))
+        )
       )
     parse("a.b[0][1].c", StatefulParser.expr(_)).get.value is
-      StructFieldSelector[StatefulContext](
-        ArrayElement(
-          ArrayElement(
-            StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
-            Const(Val.U256(U256.unsafe(0)))
-          ),
-          Const(Val.U256(U256.unsafe(1)))
-        ),
-        Ident("c")
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(
+          Ast.IdentSelector(Ident("b")),
+          Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+          Ast.IndexSelector(Const(Val.U256(U256.One))),
+          Ast.IdentSelector(Ident("c"))
+        )
       )
   }
 
@@ -756,25 +758,38 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0u][1u]" -> Ast
-        .ArrayElement(
-          ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-          constantIndex(1)
-        ),
-      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Variable(Ast.Ident("i"))),
-      "a[foo()]" -> Ast
-        .ArrayElement(
+        .LoadDataBySelectors(
           Variable(Ast.Ident("a")),
-          CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
+          Seq(
+            IndexSelector(constantIndex(0)),
+            IndexSelector(constantIndex(1))
+          )
         ),
-      "a[i + 1]" -> Ast.ArrayElement(
+      "a[i]" -> LoadDataBySelectors(
+        Variable(Ident("a")),
+        Seq(IndexSelector(Variable(Ident("i"))))
+      ),
+      "a[foo()]" -> Ast
+        .LoadDataBySelectors(
+          Variable(Ast.Ident("a")),
+          Seq(IndexSelector(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)))
+        ),
+      "a[i + 1]" -> Ast.LoadDataBySelectors(
         Variable(Ast.Ident("a")),
-        Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
+        Seq(
+          IndexSelector(
+            Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
+          )
+        )
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(
-          ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-          constantIndex(1)
+        Ast.LoadDataBySelectors(
+          Variable(Ast.Ident("a")),
+          Seq(
+            IndexSelector(constantIndex(0)),
+            IndexSelector(constantIndex(1))
+          )
         )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -796,23 +811,24 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
       "a[0] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Variable(Ident("a")),
-            constantIndex(0)
+            Seq(IndexSelector(constantIndex(0)))
           )
         ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[0][1] = b[0]" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            ArrayElement(Variable(Ident("a")), constantIndex(0)),
-            constantIndex(1)
+            Seq(
+              IndexSelector(constantIndex(0)),
+              IndexSelector(constantIndex(1))
+            )
           )
         ),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
+        Ast.LoadDataBySelectors(Ast.Variable(Ast.Ident("b")), Seq(IndexSelector(constantIndex(0))))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
@@ -820,73 +836,77 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a[i] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Variable(Ident("a")),
-            Variable(Ident("i"))
+            Seq(IndexSelector(Variable(Ident("i"))))
           )
         ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[foo()] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Variable(Ident("a")),
-            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
+            Seq(IndexSelector(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)))
           )
         ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[i + 1] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Variable(Ident("a")),
-            Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1))))
+            Seq(
+              IndexSelector(
+                Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1))))
+              )
+            )
           )
         ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a.b = c" -> Assign(
         Seq(
-          AssignmentStructFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Variable(Ident("a")),
-            Ident("b")
+            Seq(IdentSelector(Ident("b")))
           )
         ),
         Ast.Variable(Ast.Ident("c"))
       ),
       "a[0].b = c" -> Assign(
         Seq(
-          AssignmentStructFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            ArrayElement(Variable(Ident("a")), constantIndex(0)),
-            Ident("b")
+            Seq(
+              IndexSelector(constantIndex(0)),
+              IdentSelector(Ident("b"))
+            )
           )
         ),
         Ast.Variable(Ast.Ident("c"))
       ),
       "a.b[0] = c" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            StructFieldSelector(Variable(Ident("a")), Ident("b")),
-            constantIndex(0)
+            Seq(
+              Ast.IdentSelector(Ident("b")),
+              Ast.IndexSelector(Const(Val.U256(U256.Zero)))
+            )
           )
         ),
         Ast.Variable(Ast.Ident("c"))
       ),
       "a.b[0].c = d" -> Assign(
         Seq(
-          AssignmentStructFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            ArrayElement(
-              StructFieldSelector(Variable(Ident("a")), Ident("b")),
-              constantIndex(0)
-            ),
-            Ident("c")
+            Seq(
+              Ast.IdentSelector(Ident("b")),
+              Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+              Ast.IdentSelector(Ident("c"))
+            )
           )
         ),
         Ast.Variable(Ast.Ident("d"))
@@ -1121,6 +1141,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
+        Seq.empty,
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
           ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
@@ -1217,6 +1238,34 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val fooContract = extended.contracts(1)
       barContract.enums.length is 2
       fooContract.enums.length is 1
+    }
+
+    {
+      info("Contract map inheritance")
+      val foo: String =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map0
+           |
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      val bar: String =
+        s"""
+           |Contract Bar() extends Foo() {
+           |  mapping[U256, U256] map1
+           |
+           |  pub fn bar() -> () {}
+           |}
+           |$foo
+           |""".stripMargin
+      val extended =
+        parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val barContract = extended.contracts(0)
+      val fooContract = extended.contracts(1)
+      barContract.maps.length is 2
+      fooContract.maps.length is 1
     }
 
     {
@@ -1407,6 +1456,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
+        Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
       )
     }
@@ -1443,6 +1493,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             Some(Seq(ReturnStmt(Seq.empty)))
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -1609,6 +1660,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
+        Seq.empty,
         Seq.empty
       )
     }
@@ -1653,6 +1705,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           barFuncDef(true, false).copy(annotations = annotations),
           fooFuncDef(false, false).copy(annotations = annotations)
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -1895,6 +1948,56 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.message is "These struct fields are defined multiple times: a"
       error.position is code.indexOf("$")
     }
+  }
+
+  it should "parse map" in {
+    def fail[T](code: String, parser: P[_] => P[T], errMsg: String) = {
+      val error = intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), parser))
+      error.message is errMsg
+      error.position is code.indexOf("$")
+    }
+
+    fastparse.parse("mapping[U256, U256] map", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
+      Ident("map"),
+      Type.Map(Type.U256, Type.U256)
+    )
+    fastparse.parse("mapping[U256, Foo] map", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
+      Ident("map"),
+      Type.Map(Type.U256, Type.NamedType(TypeId("Foo")))
+    )
+    fastparse.parse("mapping[U256, [U256; 2]] map", StatefulParser.mapDef(_)).get.value is
+      Ast.MapDef(Ident("map"), Type.Map(Type.U256, Type.FixedSizeArray(Type.U256, 2)))
+    fail(
+      s"mapping[$$Foo, Foo] map",
+      StatefulParser.mapDef(_),
+      "The key type of map can only be primitive type"
+    )
+    fail(
+      s"mapping[$$[U256; 2], U256] map",
+      StatefulParser.mapDef(_),
+      "The key type of map can only be primitive type"
+    )
+
+    parse(
+      "map.insert!(address, 1, 0)",
+      StatefulParser.statement(_)
+    ).get.value is Ast.InsertToMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](
+        Variable(Ident("address")),
+        Const(Val.U256(U256.One)),
+        Const(Val.U256(U256.Zero))
+      )
+    )
+    parse("map.remove!(address, 1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](Variable(Ident("address")), Const(Val.U256(U256.One)))
+    )
+
+    parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
+      Ident("map"),
+      constantIndex(0)
+    )
   }
 }
 

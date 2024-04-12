@@ -28,6 +28,7 @@ sealed trait Keyword extends Product {
   override def toString: String =
     name
 }
+// scalastyle:off number.of.methods
 object Keyword {
 
   implicit val ordering: Ordering[Used] = Ordering.by(_.name)
@@ -65,6 +66,7 @@ object Keyword {
     override def name: String =
       "ALPH"
   }
+  case object `mapping` extends Used
 
   case object `@unused` extends Unused
   // scalastyle:on object.name

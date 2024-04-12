@@ -183,7 +183,10 @@ object Ast {
       }
   }
 
-  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] {
+  sealed trait Expr[Ctx <: StatelessContext]
+      extends Typed[Ctx, Seq[Type]]
+      with Product
+      with Serializable {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
 
@@ -226,17 +229,252 @@ object Ast {
       elements.flatMap(_.genCode(state))
     }
   }
-  final case class ArrayElement[Ctx <: StatelessContext](
-      array: Expr[Ctx],
-      index: Ast.Expr[Ctx]
-  ) extends Expr[Ctx] {
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      Seq(state.getArrayElementType(array, index))
+
+  sealed trait AccessDataT[Ctx <: StatelessContext] { self: Positioned =>
+    def selectors: Seq[DataSelector]
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    protected def mapKeyIndex: Expr[Ctx] = {
+      selectors(0).asInstanceOf[IndexSelector[Ctx]].index
+    }
+    protected def _getType(
+        state: Compiler.State[Ctx],
+        rootType: Type,
+        sourceIndex: Option[SourceIndex]
+    ): Type = {
+      selectors
+        .foldLeft((rootType, sourceIndex)) { case ((tpe, sourceIndex), selector) =>
+          (tpe, selector) match {
+            case (array: Type.FixedSizeArray, selector: IndexSelector[Ctx @unchecked]) =>
+              state.checkArrayIndexType(selector.index)
+              (array.baseType, selector.sourceIndex)
+            case (struct: Type.Struct, IdentSelector(ident)) =>
+              val field = state.getStruct(struct.id).getField(ident)
+              (state.resolveType(field.tpe), selector.sourceIndex)
+            case (map: Type.Map, selector: IndexSelector[Ctx @unchecked]) =>
+              state.checkMapKeyType(map, selector.index)
+              (map.value, selector.sourceIndex)
+            case (tpe, _: IndexSelector[Ctx @unchecked]) =>
+              throw Compiler.Error(
+                s"Expected array or map type, got ${quote(tpe)}",
+                SourceIndex(this.sourceIndex, sourceIndex)
+              )
+            case (tpe, _: IdentSelector) =>
+              throw Compiler.Error(
+                s"Expected struct type, got ${quote(tpe)}",
+                SourceIndex(this.sourceIndex, sourceIndex)
+              )
+          }
+        }
+        ._1
+    }
+  }
+
+  object MapOps {
+    private def genMapKey[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        expr: Ast.Expr[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      val codes = expr.genCode(state)
+      expr.getType(state)(0) match {
+        case Type.Bool    => codes :+ BoolToByteVec
+        case Type.U256    => codes :+ U256ToByteVec
+        case Type.I256    => codes :+ I256ToByteVec
+        case Type.Address => codes :+ AddressToByteVec
+        case Type.ByteVec => codes
+        case tpe => // dead branch
+          throw Compiler.Error(s"Invalid key type $tpe", expr.sourceIndex)
+      }
     }
 
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val (arrayRef, codes) = state.getOrCreateArrayRef(array)
-      codes ++ arrayRef.genLoadCode(state, index)
+    @inline def genSubContractPath[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        ident: Ast.Ident,
+        index: Ast.Expr[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      (state.genLoadCode(ident) ++ genMapKey(state, index)) :+ ByteVecConcat
+    }
+
+    @inline def genSubContractPath[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        map: Ast.Expr[Ctx],
+        index: Ast.Expr[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      (map.genCode(state) ++ genMapKey(state, index)) :+ ByteVecConcat
+    }
+
+    @tailrec
+    private def calcDataOffset(
+        state: Compiler.State[StatefulContext],
+        tpe: Type,
+        selectors: Seq[DataSelector],
+        isMutable: Boolean,
+        dataOffset: DataRefOffset[StatefulContext]
+    ): (DataRefOffset[StatefulContext], Boolean) = {
+      (state.resolveType(tpe), selectors.headOption) match {
+        case (_, None) => (dataOffset, isMutable)
+        case (tpe: Type.FixedSizeArray, Some(s: IndexSelector[StatefulContext @unchecked])) =>
+          val newOffset = dataOffset.calcArrayElementOffset(state, tpe, s.index, isMutable)
+          calcDataOffset(state, tpe.baseType, selectors.drop(1), isMutable, newOffset)
+        case (tpe: Type.Struct, Some(IdentSelector(ident))) =>
+          val ast            = state.getStruct(tpe.id)
+          val newOffset      = dataOffset.calcStructFieldOffset(state, ast, ident, isMutable)
+          val field          = ast.getField(ident)
+          val isFieldMutable = isMutable && field.isMutable
+          calcDataOffset(state, field.tpe, selectors.drop(1), isFieldMutable, newOffset)
+        case _ => // dead branch
+          throw Compiler.Error(
+            s"Invalid type $tpe and selectors $selectors",
+            selectors.headOption.flatMap(_.sourceIndex)
+          )
+      }
+    }
+
+    private def calcDataOffset(
+        state: Compiler.State[StatefulContext],
+        rootType: Type,
+        selectors: Seq[DataSelector]
+    ): (VarOffset[StatefulContext], VarOffset[StatefulContext], Boolean) = {
+      val initOffset = DataRefOffset[StatefulContext](ConstantVarOffset(0), ConstantVarOffset(0))
+      val (offset, isMutable) = calcDataOffset(
+        state,
+        rootType,
+        selectors,
+        isMutable = true,
+        initOffset
+      )
+      (offset.immDataOffset, offset.mutDataOffset, isMutable)
+    }
+
+    private def genSubContractId(
+        state: Compiler.State[StatefulContext],
+        objCodes: Seq[Instr[StatefulContext]],
+        size: Int
+    ): (Seq[Instr[StatefulContext]], Seq[Instr[StatefulContext]]) = {
+      if (size == 1) {
+        (Seq.empty, objCodes)
+      } else {
+        val ident = state.getSubContractIdVar()
+        (objCodes ++ state.genStoreCode(ident).flatten, state.genLoadCode(ident))
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genLoad[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        rootType: Type,
+        selectedDataType: Type,
+        pathCodes: Seq[Instr[Ctx]],
+        selectors: Seq[DataSelector]
+    ): Seq[Instr[Ctx]] = {
+      val statefulState                     = state.asInstanceOf[Compiler.State[StatefulContext]]
+      val (immOffset, mutOffset, isMutable) = calcDataOffset(statefulState, rootType, selectors)
+      val mutability = state.flattenTypeMutability(selectedDataType, isMutable)
+      val (initCodes, subContractIdCodes) = genSubContractId(
+        statefulState,
+        pathCodes.asInstanceOf[Seq[Instr[StatefulContext]]] :+ SubContractId,
+        mutability.length
+      )
+      val funcArgLenAndRetLen =
+        Seq(ConstInstr.u256(Val.U256(U256.One)), ConstInstr.u256(Val.U256(U256.One)))
+      val instrs = mutability.indices
+        .foldLeft((Seq.empty[Instr[StatefulContext]], immOffset, mutOffset)) {
+          case ((instrs, immOffset, mutOffset), index) =>
+            val objCodes = if (index == 0) initCodes ++ subContractIdCodes else subContractIdCodes
+            if (mutability(index)) {
+              val loadCodes = mutOffset.genCode() ++ funcArgLenAndRetLen ++
+                objCodes :+ CallExternal(CreateMapEntry.LoadMutFieldMethodIndex)
+              (instrs ++ loadCodes, immOffset, mutOffset.add(1))
+            } else {
+              val loadCodes = immOffset.genCode() ++ funcArgLenAndRetLen ++
+                objCodes :+ CallExternal(CreateMapEntry.LoadImmFieldMethodIndex)
+              (instrs ++ loadCodes, immOffset.add(1), mutOffset)
+            }
+        }
+        ._1
+      instrs.asInstanceOf[Seq[Instr[Ctx]]]
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genStore[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        rootType: Type,
+        selectedDataType: Type,
+        pathCodes: Seq[Instr[Ctx]],
+        selectors: Seq[DataSelector]
+    ): Seq[Seq[Instr[Ctx]]] = {
+      val statefulState     = state.asInstanceOf[Compiler.State[StatefulContext]]
+      val (_, mutOffset, _) = calcDataOffset(statefulState, rootType, selectors)
+      val length            = state.flattenTypeLength(Seq(selectedDataType))
+      val (initCodes, subContractIdCodes) = genSubContractId(
+        statefulState,
+        pathCodes.asInstanceOf[Seq[Instr[StatefulContext]]] :+ SubContractId,
+        length
+      )
+      val instrs = (0 until length).map { index =>
+        val indexCodes = if (index == 0) mutOffset.genCode() else mutOffset.add(index).genCode()
+        val objCodes =
+          if (index == length - 1) initCodes ++ subContractIdCodes else subContractIdCodes
+        indexCodes ++ Seq(
+          ConstInstr.u256(Val.U256(U256.Two)),
+          ConstInstr.u256(Val.U256(U256.Zero))
+        ) ++ objCodes :+ CallExternal(CreateMapEntry.StoreMutFieldMethodIndex)
+      }
+      instrs.asInstanceOf[Seq[Seq[Instr[Ctx]]]]
+    }
+  }
+
+  final case class LoadDataBySelectors[Ctx <: StatelessContext](
+      base: Expr[Ctx],
+      selectors: Seq[DataSelector]
+  ) extends Expr[Ctx]
+      with AccessDataT[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      assume(selectors.nonEmpty)
+      base.getType(state) match {
+        case Seq(t: Type.FixedSizeArray) => Seq(_getType(state, t, base.sourceIndex))
+        case Seq(t: Type.Struct)         => Seq(_getType(state, t, base.sourceIndex))
+        case Seq(t: Type.Map)            => Seq(_getType(state, t, base.sourceIndex))
+        case tpe =>
+          val tpeStr = quoteTypes(tpe)
+          selectors.headOption match {
+            case Some(IndexSelector(_)) =>
+              throw Compiler.Error(s"Expected array or map type, got $tpeStr", base.sourceIndex)
+            case _ =>
+              throw Compiler.Error(s"Expected struct type, got $tpeStr", base.sourceIndex)
+          }
+      }
+    }
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      base.getType(state) match {
+        case Seq(map: Type.Map) =>
+          val pathCodes = MapOps.genSubContractPath(state, base, mapKeyIndex)
+          MapOps.genLoad(state, map.value, getType(state).head, pathCodes, selectors.tail)
+        case _ =>
+          val (ref, codes) = state.getOrCreateVariablesRef(base)
+          val subRef       = ref.subRef(state, selectors.init)
+          codes ++ subRef.genLoadCode(state, selectors.last)
+      }
+    }
+  }
+  final case class MapContains(ident: Ident, index: Expr[StatefulContext])
+      extends Expr[StatefulContext] {
+    def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
+      val mapType = state.getVariable(ident).tpe match {
+        case t: Type.Map => t
+        case t           => throw Compiler.Error(s"Expected map type, got $t", ident.sourceIndex)
+      }
+      val expected = Seq(mapType.key)
+      val argTypes = index.getType(state)
+      if (argTypes != expected) {
+        throw Compiler.Error(s"Invalid args type $argTypes, expected $expected", sourceIndex)
+      }
+      Seq(Type.Bool)
+    }
+
+    def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
+      val pathCodes = MapOps.genSubContractPath(state, ident, index)
+      pathCodes ++ Seq(SubContractId, ContractExists)
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -449,18 +687,12 @@ object Ast {
     ): Seq[Instr[StatefulContext]] = {
       val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
       val func      = state.getFunc(contract.id, callId)
-      val argLength = state.flattenTypeLength(func.argsType)
       val argTypes  = args.flatMap(_.getType(state))
       val retTypes  = func.getReturnType(argTypes, state)
       val retLength = state.flattenTypeLength(retTypes)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
-        Seq(
-          ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
-          ConstInstr.u256(Val.U256(U256.unsafe(retLength)))
-        ) ++
-        obj.genCode(state) ++
-        func.genExternalCallCode(contract.id) ++
+        func.genExternalCallCode(state, obj.genCode(state), contract.id) ++
         (if (popReturnValues) Seq.fill[Instr[StatefulContext]](retLength)(Pop) else Seq.empty)
     }
 
@@ -671,18 +903,14 @@ object Ast {
     }
   }
 
-  final case class StructFieldSelector[Ctx <: StatelessContext](expr: Expr[Ctx], selector: Ident)
-      extends Expr[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      Seq(state.getStructFieldType(expr, selector))
-    }
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val (structRef, codes) = state.getOrCreateStructRef(expr)
-      codes ++ structRef.genLoadCode(state, selector)
-    }
+  final case class MapDef(ident: Ident, tpe: Type.Map) extends UniqueDef with Positioned {
+    def name: String = ident.name
   }
 
-  sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
+  sealed trait Statement[Ctx <: StatelessContext]
+      extends Positioned
+      with Product
+      with Serializable {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
@@ -698,6 +926,106 @@ object Ast {
         case _ =>
           condition.genCode(state) :+ IfFalse(offset)
       }
+    }
+  }
+
+  sealed trait MapFuncCall extends Statement[StatefulContext] {
+    def ident: Ident
+    def args: Seq[Expr[StatefulContext]]
+    private var mapType: Option[Type.Map] = None
+    def getMapType(state: Compiler.State[StatefulContext]): Type.Map = {
+      mapType match {
+        case Some(tpe) => tpe
+        case None =>
+          state.getVariable(ident, isWrite = true).tpe match {
+            case tpe: Type.Map =>
+              mapType = Some(tpe)
+              tpe
+            case t => throw Compiler.Error(s"Expected map type, got $t", ident.sourceIndex)
+          }
+      }
+    }
+    def checkArgTypes(state: Compiler.State[StatefulContext], expected: Seq[Type]): Unit = {
+      if (args.length != expected.length) {
+        throw Compiler.Error(
+          s"Invalid args length, expected ${expected.length}, got ${args.length}",
+          sourceIndex
+        )
+      }
+      val argTypes = args.flatMap(_.getType(state))
+      if (argTypes != expected) {
+        throw Compiler.Error(s"Invalid args type $argTypes, expected $expected", sourceIndex)
+      }
+    }
+  }
+
+  private def genMapDebug(
+      state: Compiler.State[StatefulContext],
+      pathCodes: Seq[Instr[StatefulContext]],
+      isInsert: Boolean
+  ): Seq[Instr[StatefulContext]] = {
+    if (state.allowDebug) {
+      val operation   = if (isInsert) "insert" else "remove"
+      val message     = s"$operation at map path: "
+      val stringParts = AVector(ByteString.fromString(message), ByteString.empty)
+      pathCodes ++ Seq[Instr[StatefulContext]](Dup, DEBUG(stringParts.map(Val.ByteVec.apply)))
+    } else {
+      pathCodes
+    }
+  }
+
+  final case class InsertToMap(
+      ident: Ident,
+      args: Seq[Expr[StatefulContext]]
+  ) extends MapFuncCall {
+    def check(state: Compiler.State[StatefulContext]): Unit = {
+      val mapType = getMapType(state)
+      checkArgTypes(state, Seq(Type.Address, mapType.key, mapType.value))
+    }
+    private def checkFieldLength(length: Int): Unit = {
+      if (length > 0xff) {
+        throw Compiler.Error(
+          s"The number of struct fields exceeds the maximum limit",
+          args(2).sourceIndex
+        )
+      }
+    }
+    private def genCreateContract(
+        state: Compiler.State[StatefulContext]
+    ): Seq[Instr[StatefulContext]] = {
+      val mapType          = getMapType(state)
+      val fieldsMutability = state.flattenTypeMutability(mapType.value, isMutable = true)
+      val mutFieldLength   = fieldsMutability.count(identity)
+      val immFieldLength   = fieldsMutability.length - mutFieldLength + 1 // parent contract id
+      checkFieldLength(mutFieldLength)
+      checkFieldLength(immFieldLength)
+
+      val pathCodes              = MapOps.genSubContractPath(state, ident, args(1))
+      val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(args(2)))
+      val insertWithDebug        = genMapDebug(state, pathCodes, isInsert = true)
+      insertWithDebug ++ (immFields :+ SelfContractId) ++
+        mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)
+    }
+    def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
+      val approveALPHCodes    = args(0).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
+      val createContractCodes = genCreateContract(state)
+      approveALPHCodes ++ createContractCodes
+    }
+  }
+
+  final case class RemoveFromMap(ident: Ident, args: Seq[Expr[StatefulContext]])
+      extends MapFuncCall {
+    def check(state: Compiler.State[StatefulContext]): Unit = {
+      val mapType = getMapType(state)
+      checkArgTypes(state, Seq(Type.Address, mapType.key))
+    }
+    def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
+      val pathCodes = MapOps.genSubContractPath(state, ident, args(1))
+      val objCodes  = genMapDebug(state, pathCodes, isInsert = false) :+ SubContractId
+      args(0).genCode(state) ++ Seq(
+        ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
+        ConstInstr.u256(Val.U256(U256.Zero))
+      ) ++ objCodes :+ CallExternal(CreateMapEntry.DestroyMethodIndex)
     }
   }
 
@@ -908,86 +1236,6 @@ object Ast {
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def ident: Ident
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    protected def isTypeMutable(tpe: Type, state: Compiler.State[Ctx]): Boolean = {
-      state.resolveType(tpe) match {
-        case t: Type.Struct =>
-          val struct = state.getStruct(t.id)
-          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe, state))
-        case t: Type.FixedSizeArray => isTypeMutable(t.baseType, state)
-        case _                      => true
-      }
-    }
-    protected def checkStructField(
-        state: Compiler.State[Ctx],
-        structRef: StructRef[Ctx],
-        selector: Ident,
-        checkType: Boolean,
-        sourceIndex: Option[SourceIndex]
-    ): Unit = {
-      val field = structRef.ast.getField(selector)
-      if (!field.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable field ${field.name} in struct ${structRef.tpe.id.name}.",
-          sourceIndex
-        )
-      }
-      if (checkType && !isTypeMutable(field.tpe, state)) {
-        throw Compiler.Error(
-          s"Cannot assign to field ${field.name} in struct ${structRef.tpe.id.name}." +
-            s" Assignment only works when all of the field selectors are mutable.",
-          sourceIndex
-        )
-      }
-      if (!structRef.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable struct ${structRef.tpe.id.name}. Assignment only works when all of the field selectors are mutable.",
-          sourceIndex
-        )
-      }
-    }
-    def getStructRef(ref: VariablesRef[Ctx], sourceIndex: Option[SourceIndex]): StructRef[Ctx] = {
-      ref match {
-        case ref: StructRef[Ctx @unchecked] => ref
-        case _ =>
-          throw Compiler.Error(s"Expected struct type, got ${ref.tpe}", sourceIndex)
-      }
-    }
-    def getArrayRef(ref: VariablesRef[Ctx], sourceIndex: Option[SourceIndex]): ArrayRef[Ctx] = {
-      ref match {
-        case ref: ArrayRef[Ctx @unchecked] => ref
-        case _ =>
-          throw Compiler.Error(s"Expected array type, got ${ref.tpe}", sourceIndex)
-      }
-    }
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    protected def getRef(
-        state: Compiler.State[Ctx],
-        expr: Expr[Ctx],
-        sourceIndex: Option[SourceIndex]
-    ): VariablesRef[Ctx] = {
-      expr match {
-        case ArrayElement(array @ StructFieldSelector(struct, selector), index) =>
-          val structRef = getStructRef(getRef(state, struct, sourceIndex), struct.sourceIndex)
-          checkStructField(state, structRef, selector, checkType = false, sourceIndex)
-          val arrayRef = getArrayRef(structRef.subRef(state, selector), array.sourceIndex)
-          arrayRef.subRef(state, index)
-        case ArrayElement(array @ Variable(ident), index) =>
-          val ref = state.getVariablesRef(ident)
-          if (!ref.isMutable) {
-            throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
-          }
-          getArrayRef(ref, array.sourceIndex).subRef(state, index)
-        case ArrayElement(array, index) =>
-          getArrayRef(getRef(state, array, sourceIndex), array.sourceIndex).subRef(state, index)
-        case StructFieldSelector(struct, selector) =>
-          val structRef = getStructRef(getRef(state, struct, sourceIndex), struct.sourceIndex)
-          checkStructField(state, structRef, selector, checkType = false, sourceIndex)
-          structRef.subRef(state, selector)
-        case Variable(ident) => state.getVariablesRef(ident)
-        case _ => throw Compiler.Error(s"Invalid selector $expr", sourceIndex) // dead branch
-      }
-    }
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
   }
@@ -998,121 +1246,134 @@ object Ast {
       state.resolveType(variable.tpe)
     }
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      if (!state.getVariable(ident).isMutable) {
+      val variable = state.getVariable(ident)
+      variable match {
+        case _: Compiler.VarInfo.MapVar =>
+          throw Compiler.Error(s"Cannot assign to map variable ${ident.name}.", sourceIndex)
+        case _ =>
+      }
+      if (!variable.isMutable) {
         throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
       }
-      if (!isTypeMutable(getType(state), state)) {
+      if (!state.isTypeMutable(getType(state))) {
         throw Compiler.Error(
-          s"Cannot assign to variable ${ident.name}. Assignment only works when all of the field selectors are mutable.",
+          s"Cannot assign to variable ${ident.name}. Assignment only works when all of the (nested) fields are mutable.",
           sourceIndex
         )
       }
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
-  final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
+  sealed trait DataSelector                                                 extends Positioned
+  final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx]) extends DataSelector
+  final case class IdentSelector(ident: Ident)                              extends DataSelector
+  final case class AssignmentSelectedTarget[Ctx <: StatelessContext](
       ident: Ident,
-      from: Ast.Expr[Ctx],
-      index: Ast.Expr[Ctx]
-  ) extends AssignmentTarget[Ctx] {
-    private var arrayRef: Option[ArrayRef[Ctx]] = None
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    private def getArrayRef(
+      selectors: Seq[DataSelector]
+  ) extends AssignmentTarget[Ctx]
+      with AccessDataT[Ctx] {
+    // scalastyle:off method.length
+    private def checkMap(
         state: Compiler.State[Ctx],
+        mapType: Type.Map,
+        selectors: Seq[DataSelector],
         sourceIndex: Option[SourceIndex]
-    ): ArrayRef[Ctx] = {
-      arrayRef match {
-        case Some(ref) => ref
-        case None =>
-          val ref = getRef(state, from, sourceIndex).asInstanceOf[ArrayRef[Ctx]]
-          arrayRef = Some(ref)
-          ref
+    ): Unit = {
+      if (selectors.isEmpty) {
+        if (!state.isTypeMutable(mapType.value)) {
+          throw Compiler.Error(
+            s"Cannot assign to value in map ${quote(ident.name)}. Assignment only works when all of the (nested) fields are mutable.",
+            sourceIndex
+          )
+        }
+      } else {
+        checkMutable(
+          state,
+          mapType.value,
+          selectors,
+          Ident(s"${ident.name}[${mapType.key.signature}]"),
+          None,
+          sourceIndex
+        )
       }
-    }
-
-    def _getType(state: Compiler.State[Ctx]): Type = {
-      state.getVariable(ident, isWrite = true)
-      state.getArrayElementType(from, index)
     }
 
     @scala.annotation.tailrec
-    private def invalidAssignment(
+    private def checkMutable(
         state: Compiler.State[Ctx],
-        expr: Expr[Ctx],
-        isArrayMutable: Boolean,
+        rootType: Type,
+        selectors: Seq[DataSelector],
+        lastField: Ident,
+        structId: Option[TypeId],
         sourceIndex: Option[SourceIndex]
     ): Unit = {
-      expr match {
-        case StructFieldSelector(struct, selector) =>
-          val structId = struct.getType(state) match {
-            case Seq(Type.Struct(id)) => id
-            case tpe => // dead branch, we have already checked the type
-              throw Compiler.Error(s"Expected struct type, got $tpe", struct.sourceIndex)
+      (rootType, selectors) match {
+        case (array: Type.FixedSizeArray, Seq(IndexSelector(_))) =>
+          if (!state.isTypeMutable(array.baseType)) {
+            val arraySelector =
+              structId.map(id => s"${id.name}.${lastField.name}").getOrElse(lastField.name)
+            throw Compiler.Error(
+              s"Cannot assign to immutable element in array $arraySelector. Assignment only works when all of the (nested) fields are mutable.",
+              sourceIndex
+            )
           }
-          throw Compiler.Error(
-            s"Cannot assign to immutable element in array ${structId.name}.${selector.name}." +
-              s" Assignment only works when all of the field selectors are mutable.",
-            sourceIndex
-          )
-        case ArrayElement(expr, _) =>
-          invalidAssignment(state, expr, isArrayMutable, sourceIndex)
-        case Variable(ident) =>
-          val errorMsg = if (isArrayMutable) {
-            s"Cannot assign to immutable element in array ${ident.name}. Assignment only works when all of the field selectors are mutable."
-          } else {
-            s"Cannot assign to immutable variable ${ident.name}."
+        case (array: Type.FixedSizeArray, IndexSelector(_) +: tail) =>
+          checkMutable(state, array.baseType, tail, lastField, structId, sourceIndex)
+        case (map: Type.Map, (_: IndexSelector[Ctx @unchecked]) +: tail) =>
+          checkMap(state, map, tail, sourceIndex)
+        case (struct: Type.Struct, Seq(IdentSelector(ident))) =>
+          val field = state.getStruct(struct.id).getField(ident)
+          if (!field.isMutable) {
+            throw Compiler.Error(
+              s"Cannot assign to immutable field ${field.name} in struct ${struct.id.name}.",
+              sourceIndex
+            )
           }
-          throw Compiler.Error(errorMsg, sourceIndex)
-        case _ =>
-          throw Compiler.Error(s"Invalid selector $from", from.sourceIndex) // dead branch
+          if (!state.isTypeMutable(field.tpe)) {
+            throw Compiler.Error(
+              s"Cannot assign to field ${field.name} in struct ${struct.id.name}. Assignment only works when all of the (nested) fields are mutable.",
+              sourceIndex
+            )
+          }
+        case (struct: Type.Struct, IdentSelector(ident) +: tail) =>
+          val field = state.getStruct(struct.id).getField(ident)
+          if (!field.isMutable) {
+            throw Compiler.Error(
+              s"Cannot assign to immutable field ${field.name} in struct ${struct.id.name}.",
+              sourceIndex
+            )
+          }
+          val fieldType = state.resolveType(field.tpe)
+          checkMutable(state, fieldType, tail, field.ident, Some(struct.id), sourceIndex)
+        case _ => // dead branch
+          throw Compiler.Error(s"Invalid selectors ${selectors} for type $rootType", sourceIndex)
       }
     }
+    // scalastyle:on method.length
 
-    def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      val arrayRef = getArrayRef(state, sourceIndex)
-      if (!arrayRef.isMutable) {
-        invalidAssignment(state, from, isArrayMutable = false, sourceIndex)
-      }
-      if (!isTypeMutable(arrayRef.tpe.baseType, state)) {
-        invalidAssignment(state, from, isArrayMutable = true, sourceIndex)
-      }
-    }
-
-    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      getArrayRef(state, None).genStoreCode(state, index)
-    }
-  }
-  final case class AssignmentStructFieldTarget[Ctx <: StatelessContext](
-      ident: Ident,
-      from: Ast.Expr[Ctx],
-      selector: Ast.Ident
-  ) extends AssignmentTarget[Ctx] {
-    private var structRef: Option[StructRef[Ctx]] = None
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    private def getStructRef(
-        state: Compiler.State[Ctx],
-        sourceIndex: Option[SourceIndex]
-    ): StructRef[Ctx] = {
-      structRef match {
-        case Some(ref) => ref
-        case None =>
-          val ref = getRef(state, from, sourceIndex).asInstanceOf[StructRef[Ctx]]
-          structRef = Some(ref)
-          ref
-      }
-    }
     def _getType(state: Compiler.State[Ctx]): Type = {
-      state.getVariable(ident, isWrite = true)
-      state.getStructFieldType(from, selector)
+      val variable = state.getVariable(ident, isWrite = true)
+      _getType(state, state.resolveType(variable.tpe), ident.sourceIndex)
     }
-
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      val structRef = getStructRef(state, sourceIndex)
-      checkStructField(state, structRef, selector, checkType = true, sourceIndex)
+      val variable = state.getVariable(ident)
+      if (!variable.isMutable) {
+        throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
+      }
+      checkMutable(state, state.resolveType(variable.tpe), selectors, ident, None, sourceIndex)
     }
-
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      getStructRef(state, None).genStoreCode(state, selector)
+      val variable = state.getVariable(ident)
+      variable.tpe match {
+        case map: Type.Map =>
+          val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
+          MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
+        case _ =>
+          val ref    = state.getVariablesRef(ident)
+          val subRef = ref.subRef(state, selectors.init)
+          subRef.genStoreCode(state, selectors.last)
+      }
     }
   }
 
@@ -1178,7 +1439,10 @@ object Ast {
       val leftTypes  = targets.map(_.getType(state))
       val rightTypes = rhs.getType(state)
       if (leftTypes != rightTypes) {
-        throw Compiler.Error(s"Cannot assign $rightTypes to $leftTypes", sourceIndex)
+        throw Compiler.Error(
+          s"Cannot assign ${quoteTypes(rightTypes)} to ${quoteTypes(leftTypes)}",
+          sourceIndex
+        )
       }
       targets.foreach(_.checkMutable(state, sourceIndex))
     }
@@ -1419,13 +1683,15 @@ object Ast {
           }
         case Type.FixedSizeArray(baseType, size) =>
           Type.FixedSizeArray(resolveType(baseType), size)
+        case Type.Map(key, value) =>
+          Type.Map(resolveType(key), resolveType(value))
         case _ => tpe
       }
     }
 
     @inline def resolveType(tpe: Type): Type = {
       tpe match {
-        case _: Type.NamedType | _: Type.FixedSizeArray =>
+        case _: Type.NamedType | _: Type.FixedSizeArray | _: Type.Map =>
           typeCache.get(tpe) match {
             case Some(tpe) => tpe
             case None =>
@@ -1531,11 +1797,8 @@ object Ast {
       }
     }
 
-    def check(state: Compiler.State[Ctx]): Unit = {
-      state.setCheckPhase()
-      state.checkArguments(fields)
-      addTemplateVars(state)
-      fields.foreach(field =>
+    private def checkAndAddFields(state: Compiler.State[Ctx]): Unit = {
+      fields.foreach { field =>
         state.addFieldVariable(
           field.ident,
           state.resolveType(field.tpe),
@@ -1543,8 +1806,16 @@ object Ast {
           field.isUnused,
           isGenerated = false
         )
-      )
+      }
+    }
+
+    def check(state: Compiler.State[Ctx]): Unit = {
+      state.setCheckPhase()
+      state.checkArguments(fields)
+      addTemplateVars(state)
+      checkAndAddFields(state)
       funcs.foreach(_.check(state))
+      state.checkUnusedMaps()
       state.checkUnusedFields()
       state.checkUnassignedMutableFields()
     }
@@ -1590,6 +1861,7 @@ object Ast {
 
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
+    def maps: Seq[MapDef]
     def events: Seq[EventDef]
     def constantVars: Seq[ConstantVarDef]
     def enums: Seq[EnumDef]
@@ -1619,6 +1891,7 @@ object Ast {
       Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe", sourceIndex)
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
     def enums: Seq[EnumDef]               = throw error("enum")
+    def maps: Seq[MapDef]                 = throw error("map")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): AVector[String] = AVector.from(templateVars.view.map(_.ident.name))
@@ -1679,6 +1952,7 @@ object Ast {
       templateVars: Seq[Argument],
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
+      maps: Seq[MapDef],
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef],
       enums: Seq[EnumDef],
@@ -1696,11 +1970,7 @@ object Ast {
         globalState: GlobalState
     ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
-      Seq(
-        BuiltIn.encodeImmFields(stdInterfaceIdOpt, fields, globalState),
-        BuiltIn.encodeMutFields(fields, globalState),
-        BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState)
-      )
+      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState))
     }
 
     private def checkFuncs(): Unit = {
@@ -1742,8 +2012,17 @@ object Ast {
       }
     }
 
+    private def checkMaps(state: Compiler.State[StatefulContext]): Unit = {
+      UniqueDef.checkDuplicates(maps, "maps")
+      maps.view.zipWithIndex.foreach { case (m, index) =>
+        val mapType = Type.Map(m.tpe.key, state.resolveType(m.tpe.value))
+        state.addMapVar(m.ident, mapType, index)
+      }
+    }
+
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       state.setCheckPhase()
+      checkMaps(state)
       checkFuncs()
       checkConstants(state)
       checkInheritances(state)
@@ -1812,6 +2091,7 @@ object Ast {
 
     def templateVars: Seq[Argument]       = throw error("template variable")
     def fields: Seq[Argument]             = throw error("field")
+    def maps: Seq[MapDef]                 = throw error("map")
     def getFieldsSignature(): String      = throw error("field")
     def getFieldTypes(): Seq[String]      = throw error("field")
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
@@ -1931,7 +2211,7 @@ object Ast {
         case script: TxScript =>
           script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
-          val (stdIdEnabled, stdId, funcs, events, constantVars, enums) =
+          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums) =
             MultiContract.extractDefs(parentsCache, c)
           Contract(
             Some(stdIdEnabled),
@@ -1941,13 +2221,14 @@ object Ast {
             c.templateVars,
             c.fields,
             funcs,
+            maps,
             events,
             constantVars,
             enums,
             c.inheritances
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
-          val (_, stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
+          val (_, stdId, funcs, _, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(stdId, i.ident, funcs, events, i.inheritances).atSourceIndex(
             i.sourceIndex
           )
@@ -2134,6 +2415,7 @@ object Ast {
         Boolean,
         Option[StdInterfaceId],
         Seq[FuncDef[StatefulContext]],
+        Seq[MapDef],
         Seq[EventDef],
         Seq[ConstantVarDef],
         Seq[EnumDef]
@@ -2159,6 +2441,7 @@ object Ast {
       checkInterfaceMethodIndex(sortedInterfaces)
 
       val contractEvents = allContracts.flatMap(_.events)
+      val maps           = allContracts.flatMap(_.maps)
       val events         = sortedInterfaces.flatMap(_.events) ++ contractEvents
 
       val resultFuncs = contract match {
@@ -2189,7 +2472,7 @@ object Ast {
           unimplementedFuncs
       }
 
-      (stdIdEnabled, stdId, resultFuncs, events, constantVars, enums)
+      (stdIdEnabled, stdId, resultFuncs, maps, events, constantVars, enums)
     }
     // scalastyle:on method.length
 

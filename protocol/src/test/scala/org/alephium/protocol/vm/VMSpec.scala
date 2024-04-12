@@ -23,11 +23,12 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
-import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
 
+// scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
   trait BaseFixture[Ctx <: StatelessContext] {
     val baseMethod = Method[Ctx](
@@ -258,7 +259,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val balances1    = MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
-      new StatefulContext with NetworkConfigFixture.Default {
+      new StatefulContext with NetworkConfigFixture.Default with GroupConfigFixture.Default {
         val worldState: WorldState.Staging = cachedWorldState.staging()
         def blockEnv: BlockEnv             = genBlockEnv()
         def txEnv: TxEnv                   = genTxEnv(None, AVector.empty)
@@ -541,6 +542,23 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       ByteString.fromArrayUnsafe(Array.ofDim[Byte](4 * 1024)),
       HardFork.Leman
     ) isE GasBox.zero
+
+    VM
+      .checkCodeSize(
+        minimalGas,
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024 + 1)),
+        HardFork.Ghost
+      )
+      .leftValue
+      .rightValue
+      .toString is "Code size 32769 bytes is too large, max size: 32768 bytes"
+
+    VM
+      .checkCodeSize(
+        GasBox.unsafe(200 + 32 * 1024),
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024)),
+        HardFork.Ghost
+      ) isE GasBox.zero
   }
 
   it should "check field size" in {
@@ -595,21 +613,45 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       )
     }
 
-    val output0 = genAssetOutput(minimalAlphInContract - 1)
-    val output1 = genAssetOutput(minimalAlphInContract)
-    val output2 = genContractOutput(minimalAlphInContract - 1)
-    val output3 = genContractOutput(minimalAlphInContract)
+    val output00 = genAssetOutput(minimalAlphInContractPreRhone - 1)
+    val output01 = genAssetOutput(minimalAlphInContractPreRhone)
+    val output02 = genAssetOutput(minimalAlphInContract - 1)
+    val output03 = genAssetOutput(minimalAlphInContract)
+    val output10 = genContractOutput(minimalAlphInContractPreRhone - 1)
+    val output11 = genContractOutput(minimalAlphInContractPreRhone)
+    val output12 = genContractOutput(minimalAlphInContract - 1)
+    val output13 = genContractOutput(minimalAlphInContract)
 
-    VM.checkContractAttoAlphAmounts(Seq(output0), HardFork.Mainnet) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output1), HardFork.Mainnet) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output2), HardFork.Mainnet) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output3), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output00), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output01), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output02), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output03), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output10), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output11), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output12), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output13), HardFork.Mainnet) isE ()
 
-    VM.checkContractAttoAlphAmounts(Seq(output0), HardFork.Leman) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output1), HardFork.Leman) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output2), HardFork.Leman).leftValue isE
+    VM.checkContractAttoAlphAmounts(Seq(output00), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output01), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output02), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output03), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output10), HardFork.Leman).leftValue isE
       a[LowerThanContractMinimalBalance]
-    VM.checkContractAttoAlphAmounts(Seq(output3), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output11), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output12), HardFork.Leman).leftValue isE
+      a[LowerThanContractMinimalBalance]
+    VM.checkContractAttoAlphAmounts(Seq(output13), HardFork.Leman).leftValue isE
+      a[LowerThanContractMinimalBalance]
+
+    VM.checkContractAttoAlphAmounts(Seq(output00), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output01), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output02), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output03), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output10), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output11), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output12), HardFork.Ghost).leftValue isE
+      a[LowerThanContractMinimalBalance]
+    VM.checkContractAttoAlphAmounts(Seq(output13), HardFork.Ghost) isE ()
   }
 
   it should "check method modifier compatibility" in new NetworkFixture {

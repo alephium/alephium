@@ -23,6 +23,47 @@ sealed trait VarOffset[Ctx <: StatelessContext] {
   def add(offset: VarOffset[Ctx]): VarOffset[Ctx]
   def add(value: Int): VarOffset[Ctx]              = add(ConstantVarOffset[Ctx](value))
   def add(instrs: Seq[Instr[Ctx]]): VarOffset[Ctx] = add(VariableVarOffset[Ctx](instrs))
+  def genCode(): Seq[Instr[Ctx]] = this match {
+    case ConstantVarOffset(index)  => Seq(ConstInstr.u256(Val.U256(U256.unsafe(index))))
+    case VariableVarOffset(instrs) => instrs
+  }
+}
+
+object VarOffset {
+  def calcArrayElementOffset[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      offset: VarOffset[Ctx],
+      index: Ast.Expr[Ctx],
+      arrayType: Type.FixedSizeArray,
+      flattenSize: Int
+  ): VarOffset[Ctx] = {
+    calcArrayElementOffset(state, index, arrayType) match {
+      case ConstantVarOffset(value) =>
+        offset.add(value * flattenSize)
+      case VariableVarOffset(instrs) =>
+        offset.add(instrs ++ Seq(ConstInstr.u256(Val.U256.unsafe(flattenSize)), U256Mul))
+    }
+  }
+
+  def calcArrayElementOffset[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      index: Ast.Expr[Ctx],
+      arrayType: Type.FixedSizeArray
+  ): VarOffset[Ctx] = {
+    Compiler.State.getAndCheckConstantIndex(index) match {
+      case Some(idx) =>
+        ArrayRef.checkArrayIndex(idx, arrayType.size, index.sourceIndex)
+        ConstantVarOffset(idx)
+      case None =>
+        val instrs = index.genCode(state) ++ Seq(
+          Dup,
+          ConstInstr.u256(Val.U256(U256.unsafe(arrayType.size))),
+          U256Lt,
+          Assert
+        )
+        VariableVarOffset(instrs)
+    }
+  }
 }
 
 final case class ConstantVarOffset[Ctx <: StatelessContext](value: Int) extends VarOffset[Ctx] {
@@ -61,27 +102,55 @@ final case class LocalRefOffset[Ctx <: StatelessContext](offset: VarOffset[Ctx])
     extends VariablesRefOffset[Ctx] {
   def getStoreOffset: VarOffset[Ctx] = offset
 }
-final case class FieldRefOffset[Ctx <: StatelessContext](
-    immFieldOffset: VarOffset[Ctx],
-    mutFieldOffset: VarOffset[Ctx]
+final case class DataRefOffset[Ctx <: StatelessContext](
+    immDataOffset: VarOffset[Ctx],
+    mutDataOffset: VarOffset[Ctx]
 ) extends VariablesRefOffset[Ctx] {
-  def getStoreOffset: VarOffset[Ctx] = mutFieldOffset
+  def getStoreOffset: VarOffset[Ctx] = mutDataOffset
+
+  def calcArrayElementOffset(
+      state: Compiler.State[Ctx],
+      tpe: Type.FixedSizeArray,
+      index: Ast.Expr[Ctx],
+      isMutable: Boolean
+  ): DataRefOffset[Ctx] = {
+    val result       = state.flattenTypeMutability(tpe.baseType, isMutable)
+    val mutFieldSize = result.count(identity)
+    val immFieldSize = result.length - mutFieldSize
+    DataRefOffset(
+      VarOffset.calcArrayElementOffset(state, immDataOffset, index, tpe, immFieldSize),
+      VarOffset.calcArrayElementOffset(state, mutDataOffset, index, tpe, mutFieldSize)
+    )
+  }
+
+  def calcStructFieldOffset(
+      state: Compiler.State[Ctx],
+      ast: Ast.Struct,
+      field: Ast.Ident,
+      isMutable: Boolean
+  ): DataRefOffset[Ctx] = {
+    val result = ast.calcFieldOffset(state, field, isMutable)
+    DataRefOffset(immDataOffset.add(result._1), mutDataOffset.add(result._2))
+  }
 }
 
 sealed trait VariablesRef[Ctx <: StatelessContext] {
-  type Selector
-
   def ident: Ast.Ident
   def isLocal: Boolean
   def isMutable: Boolean
   def isTemplate: Boolean
   def tpe: Type
 
-  def subRef(state: Compiler.State[Ctx], selector: Selector): VariablesRef[Ctx]
+  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector): VariablesRef[Ctx]
+  def subRef(state: Compiler.State[Ctx], selectors: Seq[Ast.DataSelector]): VariablesRef[Ctx] = {
+    selectors.foldLeft(this) { case (acc, selector) => acc.subRef(state, selector) }
+  }
   def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
 
   def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.DataSelector): Seq[Instr[Ctx]]
   def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
+  def genStoreCode(state: Compiler.State[Ctx], selector: Ast.DataSelector): Seq[Seq[Instr[Ctx]]]
 }
 
 object VariablesRef {
@@ -103,7 +172,7 @@ object VariablesRef {
     } else if (isTemplate) {
       LocalRefOffset[Ctx](ConstantVarOffset(state.templateVarIndex))
     } else {
-      FieldRefOffset[Ctx](
+      DataRefOffset[Ctx](
         ConstantVarOffset(state.immFieldsIndex),
         ConstantVarOffset(state.mutFieldsIndex)
       )
@@ -154,26 +223,37 @@ object VariablesRef {
 }
 
 sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
-  type Selector = Ast.Ident
   def ast: Ast.Struct
   def tpe: Type.Struct = ast.tpe
   def refOffset: VariablesRefOffset[Ctx]
 
   def calcRefOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VariablesRefOffset[Ctx]
-  def calcFieldOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx]
+  def calcDataOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx]
 
-  def subRef(state: Compiler.State[Ctx], selector: Ast.Ident): VariablesRef[Ctx] = {
-    val field     = ast.getField(selector)
-    val refOffset = calcRefOffset(state, selector)
+  private def getIdentSelector(selector: Ast.DataSelector): Ast.IdentSelector = {
+    selector match {
+      case Ast.IndexSelector(index) =>
+        throw Compiler.Error(s"Expected ident selector, got index selector", index.sourceIndex)
+      case selector: Ast.IdentSelector => selector
+    }
+  }
+
+  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector): VariablesRef[Ctx] = {
+    subRef(state, getIdentSelector(selector).ident)
+  }
+
+  def subRef(state: Compiler.State[Ctx], ident: Ast.Ident): VariablesRef[Ctx] = {
+    val field     = ast.getField(ident)
+    val refOffset = calcRefOffset(state, ident)
     state.resolveType(field.tpe) match {
       case tpe: Type.FixedSizeArray =>
-        ArrayRef.from(selector, tpe, isLocal, isMutable && field.isMutable, isTemplate, refOffset)
+        ArrayRef.from(ident, tpe, isLocal, isMutable && field.isMutable, isTemplate, refOffset)
       case tpe: Type.Struct =>
         val struct       = state.getStruct(tpe.id)
         val isRefMutable = isMutable && field.isMutable
-        StructRef.from(selector, isLocal, isRefMutable, isTemplate, refOffset, struct)
+        StructRef.from(ident, isLocal, isRefMutable, isTemplate, refOffset, struct)
       case tpe =>
-        throw Compiler.Error(s"Expected array or struct type, got $tpe", selector.sourceIndex)
+        throw Compiler.Error(s"Expected array or struct type, got $tpe", ident.sourceIndex)
     }
   }
 
@@ -186,7 +266,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
       case _: Type.FixedSizeArray | _: Type.Struct =>
         subRef(state, selector).genStoreCode(state).reverse.flatten
       case _ =>
-        val offset = calcFieldOffset(state, selector)
+        val offset = calcDataOffset(state, selector)
         state.genStoreCode(offset, isLocal)
     }
   }
@@ -196,8 +276,12 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
     ast.fields.map(field => genStoreCode(state, field.ident, state.resolveType(field.tpe)))
   }
 
-  def genStoreCode(state: Compiler.State[Ctx], selector: Ast.Ident): Seq[Seq[Instr[Ctx]]] = {
-    val field = ast.getField(selector)
+  def genStoreCode(
+      state: Compiler.State[Ctx],
+      selector: Ast.DataSelector
+  ): Seq[Seq[Instr[Ctx]]] = {
+    val ident = getIdentSelector(selector).ident
+    val field = ast.getField(ident)
     Seq(genStoreCode(state, field.ident, state.resolveType(field.tpe)))
   }
 
@@ -211,7 +295,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
         subRef(state, selector).genLoadCode(state)
       case _ =>
         val field  = ast.getField(selector)
-        val offset = calcFieldOffset(state, selector)
+        val offset = calcDataOffset(state, selector)
         state.genLoadCode(ident, isTemplate, isLocal, isMutable && field.isMutable, tpe, offset)
     }
   }
@@ -231,9 +315,13 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
     }
   }
 
-  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.Ident): Seq[Instr[Ctx]] = {
-    val field = ast.getField(selector)
+  @inline def genLoadCode(state: Compiler.State[Ctx], ident: Ast.Ident): Seq[Instr[Ctx]] = {
+    val field = ast.getField(ident)
     genLoadCode(state, field.ident, state.resolveType(field.tpe))
+  }
+
+  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.DataSelector): Seq[Instr[Ctx]] = {
+    genLoadCode(state, getIdentSelector(selector).ident)
   }
 }
 
@@ -242,18 +330,17 @@ final case class FieldStructRef[Ctx <: StatelessContext](
     isLocal: Boolean,
     isMutable: Boolean,
     isTemplate: Boolean,
-    refOffset: FieldRefOffset[Ctx],
+    refOffset: DataRefOffset[Ctx],
     ast: Ast.Struct
 ) extends StructRef[Ctx] {
-  def calcRefOffset(state: Compiler.State[Ctx], selector: Ast.Ident): FieldRefOffset[Ctx] = {
-    val result = ast.calcFieldOffset(state, selector, isMutable)
-    FieldRefOffset(refOffset.immFieldOffset.add(result._1), refOffset.mutFieldOffset.add(result._2))
+  def calcRefOffset(state: Compiler.State[Ctx], selector: Ast.Ident): DataRefOffset[Ctx] = {
+    refOffset.calcStructFieldOffset(state, ast, selector, isMutable)
   }
 
-  def calcFieldOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx] = {
+  def calcDataOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx] = {
     val field     = ast.getField(selector)
     val newOffset = calcRefOffset(state, selector)
-    if (isMutable && field.isMutable) newOffset.mutFieldOffset else newOffset.immFieldOffset
+    if (isMutable && field.isMutable) newOffset.mutDataOffset else newOffset.immDataOffset
   }
 }
 
@@ -269,7 +356,7 @@ final case class LocalStructRef[Ctx <: StatelessContext](
     LocalRefOffset(refOffset.offset.add(ast.calcLocalOffset(state, selector)))
   }
 
-  def calcFieldOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx] = {
+  def calcDataOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx] = {
     calcRefOffset(state, selector).offset
   }
 }
@@ -288,7 +375,7 @@ object StructRef {
     refOffset match {
       case offset: LocalRefOffset[Ctx] =>
         LocalStructRef(ident, isLocal, isMutable, isTemplate, offset, ast)
-      case offset: FieldRefOffset[Ctx] =>
+      case offset: DataRefOffset[Ctx] =>
         FieldStructRef(ident, isLocal, isMutable, isTemplate, offset, ast)
     }
   }
@@ -301,6 +388,14 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
 
   def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRefOffset[Ctx]
 
+  private def getIndexSelector(selector: Ast.DataSelector): Ast.IndexSelector[Ctx] = {
+    selector match {
+      case selector: Ast.IndexSelector[Ctx @unchecked] => selector
+      case Ast.IdentSelector(ident) =>
+        throw Compiler.Error("Expected index selector, got ident selector", ident.sourceIndex)
+    }
+  }
+
   def genLoadCode(
       state: Compiler.State[Ctx],
       index: Ast.Expr[Ctx]
@@ -311,8 +406,8 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
       case _ =>
         val offset = refOffset match {
           case LocalRefOffset(offset) => offset
-          case FieldRefOffset(immFieldOffset, mutFieldOffset) =>
-            if (isMutable) mutFieldOffset else immFieldOffset
+          case DataRefOffset(immDataOffset, mutDataOffset) =>
+            if (isMutable) mutDataOffset else immDataOffset
         }
         state.genLoadCode(
           ident,
@@ -320,20 +415,33 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
           isLocal,
           isMutable,
           tpe.baseType,
-          offset.add(calcOffset(state, index))
+          offset.add(VarOffset.calcArrayElementOffset(state, index, tpe))
         )
     }
   }
 
+  def genLoadCode(
+      state: Compiler.State[Ctx],
+      selector: Ast.DataSelector
+  ): Seq[Instr[Ctx]] = {
+    genLoadCode(state, getIndexSelector(selector).index)
+  }
+
   def genStoreCode(
       state: Compiler.State[Ctx],
-      index: Ast.Expr[Ctx]
+      selector: Ast.DataSelector
   ): Seq[Seq[Instr[Ctx]]] = {
+    val index = getIndexSelector(selector).index
     tpe.baseType match {
       case _: Type.FixedSizeArray | _: Type.Struct => subRef(state, index).genStoreCode(state)
       case _ =>
         val offset = refOffset.getStoreOffset
-        Seq(state.genStoreCode(offset.add(calcOffset(state, index)), isLocal))
+        Seq(
+          state.genStoreCode(
+            offset.add(VarOffset.calcArrayElementOffset(state, index, tpe)),
+            isLocal
+          )
+        )
     }
   }
 
@@ -346,6 +454,10 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
         case _ => acc :+ genLoadCode(state, indexExpr)
       }
     }
+  }
+
+  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector): VariablesRef[Ctx] = {
+    subRef(state, getIndexSelector(selector).index)
   }
 
   def subRef(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRef[Ctx] = {
@@ -363,39 +475,6 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
         )
     }
   }
-
-  protected def calcOffset(
-      state: Compiler.State[Ctx],
-      offset: VarOffset[Ctx],
-      index: Ast.Expr[Ctx],
-      flattenSize: Int
-  ): VarOffset[Ctx] = {
-    calcOffset(state, index) match {
-      case ConstantVarOffset(value) =>
-        offset.add(value * flattenSize)
-      case VariableVarOffset(instrs) =>
-        offset.add(instrs ++ Seq(ConstInstr.u256(Val.U256.unsafe(flattenSize)), U256Mul))
-    }
-  }
-
-  protected def calcOffset(
-      state: Compiler.State[Ctx],
-      index: Ast.Expr[Ctx]
-  ): VarOffset[Ctx] = {
-    Compiler.State.getAndCheckConstantIndex(index) match {
-      case Some(idx) =>
-        ArrayRef.checkArrayIndex(idx, tpe.size, index.sourceIndex)
-        ConstantVarOffset(idx)
-      case None =>
-        val instrs = index.genCode(state) ++ Seq(
-          Dup,
-          ConstInstr.u256(Val.U256(U256.unsafe(tpe.size))),
-          U256Lt,
-          Assert
-        )
-        VariableVarOffset(instrs)
-    }
-  }
 }
 
 final case class FieldArrayRef[Ctx <: StatelessContext](
@@ -404,16 +483,10 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
     isLocal: Boolean,
     isMutable: Boolean,
     isTemplate: Boolean,
-    refOffset: FieldRefOffset[Ctx]
+    refOffset: DataRefOffset[Ctx]
 ) extends ArrayRef[Ctx] {
-  def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): FieldRefOffset[Ctx] = {
-    val result       = state.flattenTypeMutability(tpe.baseType, isMutable)
-    val mutFieldSize = result.count(identity)
-    val immFieldSize = result.length - mutFieldSize
-    FieldRefOffset(
-      calcOffset(state, refOffset.immFieldOffset, index, immFieldSize),
-      calcOffset(state, refOffset.mutFieldOffset, index, mutFieldSize)
-    )
+  def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): DataRefOffset[Ctx] = {
+    refOffset.calcArrayElementOffset(state, tpe, index, isMutable)
   }
 
   private def storeImmFieldArrayIndexVar(
@@ -435,7 +508,7 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
   // scalastyle:off method.length
   def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
     refOffset match {
-      case FieldRefOffset(VariableVarOffset(immInstrs), VariableVarOffset(mutInstrs)) =>
+      case DataRefOffset(VariableVarOffset(immInstrs), VariableVarOffset(mutInstrs)) =>
         val (ident0, codes0) = storeImmFieldArrayIndexVar(state, immInstrs)
         val (ident1, codes1) = storeMutFieldArrayIndexVar(state, mutInstrs)
         val immVarIndex      = state.genLoadCode(ident0)
@@ -470,7 +543,7 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
             }
           }
           ._1
-      case FieldRefOffset(ConstantVarOffset(immIndex), ConstantVarOffset(mutIndex)) =>
+      case DataRefOffset(ConstantVarOffset(immIndex), ConstantVarOffset(mutIndex)) =>
         state
           .flattenTypeMutability(tpe, isMutable)
           .foldLeft((Seq.empty[Instr[Ctx]], immIndex, mutIndex)) {
@@ -506,7 +579,7 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
   def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
     val flattenSize = state.flattenTypeLength(Seq(tpe))
     refOffset match {
-      case FieldRefOffset(_, VariableVarOffset(mutInstrs)) =>
+      case DataRefOffset(_, VariableVarOffset(mutInstrs)) =>
         val (ident, codes) = storeMutFieldArrayIndexVar(state, mutInstrs)
         val mutVarIndex    = state.genLoadCode(ident)
         val storeCodes = (0 until flattenSize) map { idx =>
@@ -517,7 +590,7 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
           state.genStoreCode(VariableVarOffset(calcOffsetCode), isLocal)
         }
         storeCodes :+ codes
-      case FieldRefOffset(_, ConstantVarOffset(value)) =>
+      case DataRefOffset(_, ConstantVarOffset(value)) =>
         (0 until flattenSize) map { idx =>
           state.genStoreCode(ConstantVarOffset(value + idx), isLocal)
         }
@@ -536,7 +609,13 @@ final case class LocalArrayRef[Ctx <: StatelessContext](
 ) extends ArrayRef[Ctx] {
   def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): LocalRefOffset[Ctx] = {
     LocalRefOffset(
-      calcOffset(state, refOffset.offset, index, state.flattenTypeLength(Seq(tpe.baseType)))
+      VarOffset.calcArrayElementOffset(
+        state,
+        refOffset.offset,
+        index,
+        tpe,
+        state.flattenTypeLength(Seq(tpe.baseType))
+      )
     )
   }
 
@@ -629,7 +708,7 @@ object ArrayRef {
     refOffset match {
       case offset: LocalRefOffset[Ctx] =>
         LocalArrayRef(ident, tpe, isLocal, isMutable, isTemplate, offset)
-      case offset: FieldRefOffset[Ctx] =>
+      case offset: DataRefOffset[Ctx] =>
         FieldArrayRef(ident, tpe, isLocal, isMutable, isTemplate, offset)
     }
   }

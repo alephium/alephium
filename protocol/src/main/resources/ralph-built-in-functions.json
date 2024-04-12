@@ -532,6 +532,16 @@
     "returns": "@returns the min value of I256"
   },
   {
+    "name": "groupOfAddress",
+    "category": "Utils",
+    "signature": "fn groupOfAddress!(address:Address) -> (U256)",
+    "doc": "Returns the group of the input address.",
+    "params": [
+      "@param address the input address"
+    ],
+    "returns": "@returns the group of the input address"
+  },
+  {
     "name": "nullContractAddress",
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",
@@ -540,6 +550,26 @@
       
     ],
     "returns": "@returns the null contract address with contract id being zeros"
+  },
+  {
+    "name": "minimalContractDeposit",
+    "category": "Utils",
+    "signature": "fn minimalContractDeposit!() -> (U256)",
+    "doc": "The minimal contract deposit",
+    "params": [
+      
+    ],
+    "returns": "@returns the minimal ALPH amount for contract deposit"
+  },
+  {
+    "name": "mapEntryDeposit",
+    "category": "Utils",
+    "signature": "fn mapEntryDeposit!() -> (U256)",
+    "doc": "The amount of ALPH required to create a map entry",
+    "params": [
+      
+    ],
+    "returns": "@returns the amount of ALPH required to create a map entry"
   },
   {
     "name": "networkId",

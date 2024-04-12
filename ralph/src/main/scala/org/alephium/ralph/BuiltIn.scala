@@ -37,13 +37,6 @@ object BuiltIn {
 
     def isPublic: Boolean        = true
     def useUpdateFields: Boolean = false
-
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
-      throw Compiler.Error(
-        s"Built-in function $name does not belong to contract ${typeId.name}",
-        typeId.sourceIndex
-      )
-    }
   }
 
   sealed trait Category {
@@ -1034,6 +1027,16 @@ object BuiltIn {
     )
   }
 
+  val groupOfAddress: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "groupOfAddress",
+      Seq(Type.Address),
+      Seq(Type.U256),
+      GroupOfAddress,
+      Seq("address" -> "the input address"),
+      retComment = "the group of the input address"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1091,7 +1094,8 @@ object BuiltIn {
     addModN,
     u256Max,
     i256Max,
-    i256Min
+    i256Min,
+    groupOfAddress
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
@@ -1584,6 +1588,28 @@ object BuiltIn {
       doc = "Pay gas fee."
     )
 
+  val minimalContractDeposit: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utils(
+      "minimalContractDeposit",
+      Seq.empty,
+      Seq(Type.U256),
+      MinimalContractDeposit,
+      argsName = Seq.empty,
+      retComment = "the minimal ALPH amount for contract deposit",
+      doc = "The minimal contract deposit"
+    )
+
+  val mapEntryDeposit: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utils(
+      "mapEntryDeposit",
+      Seq.empty,
+      Seq(Type.U256),
+      MinimalContractDeposit,
+      argsName = Seq.empty,
+      retComment = "the amount of ALPH required to create a map entry",
+      doc = "The amount of ALPH required to create a map entry"
+    )
+
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
     def category: Category                                = Category.SubContract
@@ -1834,7 +1860,9 @@ object BuiltIn {
       subContractIdInParentGroup,
       nullContractAddress,
       selfContract,
-      payGasFee
+      payGasFee,
+      minimalContractDeposit,
+      mapEntryDeposit
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
@@ -1846,8 +1874,6 @@ object BuiltIn {
     val useUpdateFields: Boolean                          = false
 
     override def isStatic: Boolean = true
-
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
 
     def returnType: Seq[Type]
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type] = {
@@ -1876,38 +1902,6 @@ object BuiltIn {
     }
   }
 
-  def encodeImmFields[Ctx <: StatelessContext](
-      stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
-      fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
-  ): Compiler.ContractFunc[Ctx] = {
-    val immFieldsTypes = fields.filter(!_.isMutable).map(_.tpe)
-
-    new ContractBuiltIn[Ctx] {
-      val name: String          = "encodeImmFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(immFieldsTypes)
-      val returnType: Seq[Type] = Seq(Type.ByteVec)
-
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        ContractBuiltIn.genCodeForStdId(stdInterfaceIdOpt, globalState.flattenTypeLength(argsType))
-    }
-  }
-
-  def encodeMutFields[Ctx <: StatelessContext](
-      fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
-  ): Compiler.ContractFunc[Ctx] = {
-    val mutFieldsTypes = fields.filter(_.isMutable).map(_.tpe)
-    new ContractBuiltIn[Ctx] {
-      val name: String          = "encodeMutFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(mutFieldsTypes)
-      val returnType: Seq[Type] = Seq(Type.ByteVec)
-
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(globalState.flattenTypeLength(argsType))), Encode)
-    }
-  }
-
   def encodeFields[Ctx <: StatelessContext](
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],
@@ -1926,17 +1920,7 @@ object BuiltIn {
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
-        val (initCodes, argCodes) = state.flattenArgs(args)
-        assume(argCodes.length == fieldsMutability.length)
-        val (immFields, mutFields) = argCodes.view.zipWithIndex
-          .foldLeft[(Seq[Instr[C]], Seq[Instr[C]])]((Seq.empty, Seq.empty)) {
-            case ((immFields, mutFields), (instrs, index)) =>
-              if (fieldsMutability(index)) {
-                (immFields, mutFields ++ instrs)
-              } else {
-                (immFields ++ instrs, mutFields)
-              }
-          }
+        val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, args)
         val immFieldInstrs = immFields ++ ContractBuiltIn.genCodeForStdId(
           stdInterfaceIdOpt,
           immFieldsLength
@@ -1945,7 +1929,7 @@ object BuiltIn {
           U256Const(Val.U256.unsafe(mutFieldsLength)),
           Encode
         )
-        initCodes ++ immFieldInstrs ++ mutFieldInstrs
+        immFieldInstrs ++ mutFieldInstrs
       }
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq.empty

@@ -18,4 +18,7 @@ package org.alephium
 
 package object ralph {
   def quote[T](t: T): String = s"\"${t}\""
+  def quoteTypes(types: Seq[Type]): String = {
+    if (types.length == 1) quote(types(0)) else quote(types)
+  }
 }
