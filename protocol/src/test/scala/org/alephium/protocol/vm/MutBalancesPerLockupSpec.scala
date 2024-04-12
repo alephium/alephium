@@ -306,7 +306,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
   it should "toTxOutput for rhone fork + contract lockup script" in new ToTxOutputFixture {
     override val lockupScript = LockupScript.p2c(ContractId.generate)
     val address               = Address.from(lockupScript)
-    val minimalDeposit = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
+    val minimalDeposit        = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
 
     Test(0).expectRhone()
     Test(minimalDeposit - 1).failRhone(LowerThanContractMinimalBalance(address, minimalDeposit - 1))

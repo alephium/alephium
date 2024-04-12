@@ -28,6 +28,7 @@ import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
 
+// scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
   trait BaseFixture[Ctx <: StatelessContext] {
     val baseMethod = Method[Ctx](

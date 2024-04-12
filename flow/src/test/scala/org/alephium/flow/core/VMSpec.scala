@@ -536,12 +536,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract Bar() {
          |  @using(assetsInContract = true)
          |  pub fn bar() -> () {
-         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, minimalContractDeposit!())
          |  }
          |}
          |""".stripMargin
-    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = ALPH.alph(2))
-    getContractAsset(barContractId).amount is ALPH.alph(2)
+    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
+    getContractAsset(barContractId).amount is minimalAlphInContract * 2
 
     val foo =
       s"""
@@ -554,7 +554,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |$bar
          |""".stripMargin
     val (fooContractId, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
-    getContractAsset(fooContractId).amount is ALPH.oneAlph
+    getContractAsset(fooContractId).amount is minimalAlphInContract
 
     val script =
       s"""
@@ -564,8 +564,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |$foo
          |""".stripMargin
     callTxScript(script, chainIndex)
-    getContractAsset(barContractId).amount is ALPH.oneAlph
-    getContractAsset(fooContractId).amount is ALPH.alph(2)
+    getContractAsset(barContractId).amount is minimalAlphInContract
+    getContractAsset(fooContractId).amount is minimalAlphInContract * 2
   }
 
   it should "burn token" in new ContractFixture {
