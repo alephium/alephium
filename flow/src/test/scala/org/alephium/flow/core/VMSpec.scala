@@ -5713,6 +5713,64 @@ class VMSpec extends AlephiumSpec with Generators {
     test(false)
   }
 
+  it should "insert/remove map entries using contract assets" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  mapping[U256, U256] map
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn insert(key: U256, value: U256) -> () {
+         |    map.insert!(key, value, selfAddress!())
+         |  }
+         |
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn remove(key: U256) -> () {
+         |    map.remove!(key, selfAddress!())
+         |  }
+         |}
+         |""".stripMargin
+    val entrySize     = 4
+    val initialAmount = minimalAlphInContract * entrySize
+    val fooId         = createContract(foo, initialAttoAlphAmount = initialAmount)._1
+
+    def insert(idx: Int) = {
+      val script =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  foo.insert($idx, $idx)
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(script)
+    }
+
+    def remove(key: Int) = {
+      val script =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  foo.remove($key)
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(script)
+    }
+
+    (0 until entrySize - 1).foreach { idx =>
+      insert(idx)
+      getContractAsset(fooId).amount is (initialAmount - minimalAlphInContract * (idx + 1))
+    }
+    intercept[AssertionError](insert(entrySize - 1)).getMessage is
+      s"Right(TxScriptExeFailed($EmptyContractAsset))"
+
+    (0 until entrySize - 1).foreach { idx =>
+      remove(idx)
+      getContractAsset(fooId).amount is minimalAlphInContract * (idx + 2)
+    }
+    getContractAsset(fooId).amount is initialAmount
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

@@ -2136,7 +2136,7 @@ object CreateSubContractAndTransferToken
 }
 
 @ByteCode
-final case class CreateMapEntry(immFields: Byte, mutFields: Byte)
+final case class CreateMapEntry(immFieldsNum: Byte, mutFieldsNum: Byte)
     extends ContractFactory
     with GhostInstrWithSimpleGas[StatefulContext]
     with GasCreate {
@@ -2144,20 +2144,21 @@ final case class CreateMapEntry(immFields: Byte, mutFields: Byte)
   def copyCreate: Boolean  = false
 
   def serialize(): ByteString =
-    ByteString(code) ++ serdeImpl[Byte, Byte].serialize((immFields, mutFields))
+    ByteString(code) ++ serdeImpl[Byte, Byte].serialize((immFieldsNum, mutFieldsNum))
 
   override def prepareMutFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
-    frame.opStack.pop(Bytes.toPosInt(mutFields))
+    frame.opStack.pop(Bytes.toPosInt(mutFieldsNum))
   }
 
   override def prepareImmFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
-    frame.opStack.pop(Bytes.toPosInt(immFields))
+    frame.opStack.pop(Bytes.toPosInt(immFieldsNum))
   }
 
   override def prepareContractCode[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[StatefulContract.HalfDecoded] = {
-    val contract = CreateMapEntry.genContract(Bytes.toPosInt(immFields), Bytes.toPosInt(mutFields))
+    val contract =
+      CreateMapEntry.genContract(Bytes.toPosInt(immFieldsNum), Bytes.toPosInt(mutFieldsNum))
     val bytecode = encode(contract)
     frame.ctx
       .chargeContractCodeSize(bytecode, frame.ctx.getHardFork())

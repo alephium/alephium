@@ -457,12 +457,12 @@ object Ast {
       }
     }
   }
-  final case class MapContains(base: Expr[StatefulContext], index: Expr[StatefulContext])
+  final case class MapContains(ident: Ident, index: Expr[StatefulContext])
       extends Expr[StatefulContext] {
     def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
-      val mapType = base.getType(state) match {
-        case Seq(t: Type.Map) => t
-        case t => throw Compiler.Error(s"Expected map type, got $t", base.sourceIndex)
+      val mapType = state.getVariable(ident).tpe match {
+        case t: Type.Map => t
+        case t           => throw Compiler.Error(s"Expected map type, got $t", ident.sourceIndex)
       }
       val expected = Seq(mapType.key)
       val argTypes = index.getType(state)
@@ -473,7 +473,7 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val pathCodes = MapOps.genSubContractPath(state, base, index)
+      val pathCodes = MapOps.genSubContractPath(state, ident, index)
       pathCodes ++ Seq(SubContractId, ContractExists)
     }
   }
@@ -932,13 +932,15 @@ object Ast {
   sealed trait MapFuncCall extends Statement[StatefulContext] {
     def ident: Ident
     def args: Seq[Expr[StatefulContext]]
-    private val mapType: Option[Type.Map] = None
+    private var mapType: Option[Type.Map] = None
     def getMapType(state: Compiler.State[StatefulContext]): Type.Map = {
       mapType match {
         case Some(tpe) => tpe
         case None =>
           state.getVariable(ident, isWrite = true).tpe match {
-            case t: Type.Map => t
+            case tpe: Type.Map =>
+              mapType = Some(tpe)
+              tpe
             case t => throw Compiler.Error(s"Expected map type, got $t", ident.sourceIndex)
           }
       }
@@ -998,7 +1000,7 @@ object Ast {
       checkFieldLength(immFieldLength)
 
       val pathCodes              = MapOps.genSubContractPath(state, ident, args(0))
-      val (immFields, mutFields) = state.genInitCodes(fieldsMutability, Seq(args(1)))
+      val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(args(1)))
       val insertWithDebug        = genMapDebug(state, pathCodes, isInsert = true)
       insertWithDebug ++ (immFields :+ SelfContractId) ++
         mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)

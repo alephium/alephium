@@ -5630,7 +5630,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Expected map type, got List(U256)")
+      testContractError(code, "Expected map type, got U256")
     }
 
     {

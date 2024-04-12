@@ -184,7 +184,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     })
 
   def loadFieldBySelectors[Unknown: P]: P[Ast.Expr[Ctx]] =
-    PP(atom ~ fieldSelector.rep(0)) { case (expr, selectors) =>
+    PP(atom ~ dataSelector.rep(0)) { case (expr, selectors) =>
       if (selectors.isEmpty) expr else Ast.LoadFieldBySelectors(expr, selectors)
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
@@ -287,10 +287,10 @@ abstract class Parser[Ctx <: StatelessContext] {
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def fieldSelector[Unknown: P]: P[Ast.FieldSelector] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.FieldSelector] = P(identSelector | indexSelector)
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
-    PP(Lexer.ident ~ fieldSelector.rep(0)) { case (ident, selectors) =>
+    PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
       if (selectors.isEmpty) {
         Ast.AssignmentSimpleTarget(ident)
       } else {
@@ -809,9 +809,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
 
   def mapContains[Unknown: P]: P[Ast.Expr[StatefulContext]] =
-    P(Index ~ (callExpr | variableIdOnly) ~ ".contains!" ~ "(" ~ expr ~ ")" ~~ Index).map {
-      case (fromIndex, base, index, endIndex) =>
-        Ast.MapContains(base, index).atSourceIndex(fromIndex, endIndex, fileURI)
+    P(Index ~ Lexer.ident ~ ".contains!" ~ "(" ~ expr ~ ")" ~~ Index).map {
+      case (fromIndex, ident, index, endIndex) =>
+        Ast.MapContains(ident, index).atSourceIndex(fromIndex, endIndex, fileURI)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))

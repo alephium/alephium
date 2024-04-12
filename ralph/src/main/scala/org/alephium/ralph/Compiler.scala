@@ -952,7 +952,7 @@ object Compiler {
       }
     }
 
-    def genInitCodes(
+    def genFieldsInitCodes(
         fieldsMutability: Seq[Boolean],
         exprs: Seq[Ast.Expr[Ctx]]
     ): (Seq[Instr[Ctx]], Seq[Instr[Ctx]]) = {

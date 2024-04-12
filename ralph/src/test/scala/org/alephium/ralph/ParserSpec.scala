@@ -1995,7 +1995,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
 
     parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
-      Variable(Ident("map")),
+      Ident("map"),
       constantIndex(0)
     )
   }

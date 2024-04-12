@@ -1909,7 +1909,7 @@ object BuiltIn {
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
-        val (immFields, mutFields) = state.genInitCodes(fieldsMutability, args)
+        val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, args)
         val immFieldInstrs = immFields ++ ContractBuiltIn.genCodeForStdId(
           stdInterfaceIdOpt,
           immFieldsLength
