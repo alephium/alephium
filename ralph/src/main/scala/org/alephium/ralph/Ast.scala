@@ -230,8 +230,8 @@ object Ast {
     }
   }
 
-  sealed trait AccessFieldBase[Ctx <: StatelessContext] { self: Positioned =>
-    def selectors: Seq[FieldSelector]
+  sealed trait AccessDataT[Ctx <: StatelessContext] { self: Positioned =>
+    def selectors: Seq[DataSelector]
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     protected def mapKeyIndex: Expr[Ctx] = {
       selectors(0).asInstanceOf[IndexSelector[Ctx]].index
@@ -303,24 +303,24 @@ object Ast {
     }
 
     @tailrec
-    private def calcFieldOffset(
+    private def calcDataOffset(
         state: Compiler.State[StatefulContext],
         tpe: Type,
-        selectors: Seq[FieldSelector],
+        selectors: Seq[DataSelector],
         isMutable: Boolean,
-        fieldOffset: FieldRefOffset[StatefulContext]
-    ): (FieldRefOffset[StatefulContext], Boolean) = {
+        dataOffset: DataRefOffset[StatefulContext]
+    ): (DataRefOffset[StatefulContext], Boolean) = {
       (state.resolveType(tpe), selectors.headOption) match {
-        case (_, None) => (fieldOffset, isMutable)
+        case (_, None) => (dataOffset, isMutable)
         case (tpe: Type.FixedSizeArray, Some(s: IndexSelector[StatefulContext @unchecked])) =>
-          val newOffset = fieldOffset.calcArrayElementOffset(state, tpe, s.index, isMutable)
-          calcFieldOffset(state, tpe.baseType, selectors.drop(1), isMutable, newOffset)
+          val newOffset = dataOffset.calcArrayElementOffset(state, tpe, s.index, isMutable)
+          calcDataOffset(state, tpe.baseType, selectors.drop(1), isMutable, newOffset)
         case (tpe: Type.Struct, Some(IdentSelector(ident))) =>
           val ast            = state.getStruct(tpe.id)
-          val newOffset      = fieldOffset.calcStructFieldOffset(state, ast, ident, isMutable)
+          val newOffset      = dataOffset.calcStructFieldOffset(state, ast, ident, isMutable)
           val field          = ast.getField(ident)
           val isFieldMutable = isMutable && field.isMutable
-          calcFieldOffset(state, field.tpe, selectors.drop(1), isFieldMutable, newOffset)
+          calcDataOffset(state, field.tpe, selectors.drop(1), isFieldMutable, newOffset)
         case _ => // dead branch
           throw Compiler.Error(
             s"Invalid type $tpe and selectors $selectors",
@@ -329,20 +329,20 @@ object Ast {
       }
     }
 
-    private def calcFieldOffset(
+    private def calcDataOffset(
         state: Compiler.State[StatefulContext],
         rootType: Type,
-        selectors: Seq[FieldSelector]
+        selectors: Seq[DataSelector]
     ): (VarOffset[StatefulContext], VarOffset[StatefulContext], Boolean) = {
-      val initOffset = FieldRefOffset[StatefulContext](ConstantVarOffset(0), ConstantVarOffset(0))
-      val (offset, isMutable) = calcFieldOffset(
+      val initOffset = DataRefOffset[StatefulContext](ConstantVarOffset(0), ConstantVarOffset(0))
+      val (offset, isMutable) = calcDataOffset(
         state,
         rootType,
         selectors,
         isMutable = true,
         initOffset
       )
-      (offset.immFieldOffset, offset.mutFieldOffset, isMutable)
+      (offset.immDataOffset, offset.mutDataOffset, isMutable)
     }
 
     private def genSubContractId(
@@ -362,30 +362,30 @@ object Ast {
     def genLoad[Ctx <: StatelessContext](
         state: Compiler.State[Ctx],
         rootType: Type,
-        tpe: Type,
+        selectedDataType: Type,
         pathCodes: Seq[Instr[Ctx]],
-        selectors: Seq[FieldSelector]
+        selectors: Seq[DataSelector]
     ): Seq[Instr[Ctx]] = {
       val statefulState                     = state.asInstanceOf[Compiler.State[StatefulContext]]
-      val (immOffset, mutOffset, isMutable) = calcFieldOffset(statefulState, rootType, selectors)
-      val mutability                        = state.flattenTypeMutability(tpe, isMutable)
+      val (immOffset, mutOffset, isMutable) = calcDataOffset(statefulState, rootType, selectors)
+      val mutability = state.flattenTypeMutability(selectedDataType, isMutable)
       val (initCodes, subContractIdCodes) = genSubContractId(
         statefulState,
         pathCodes.asInstanceOf[Seq[Instr[StatefulContext]]] :+ SubContractId,
         mutability.length
       )
-      val funcArgAndRet =
+      val funcArgLenAndRetLen =
         Seq(ConstInstr.u256(Val.U256(U256.One)), ConstInstr.u256(Val.U256(U256.One)))
       val instrs = mutability.indices
         .foldLeft((Seq.empty[Instr[StatefulContext]], immOffset, mutOffset)) {
           case ((instrs, immOffset, mutOffset), index) =>
             val objCodes = if (index == 0) initCodes ++ subContractIdCodes else subContractIdCodes
             if (mutability(index)) {
-              val loadCodes = mutOffset.genCode() ++ funcArgAndRet ++
+              val loadCodes = mutOffset.genCode() ++ funcArgLenAndRetLen ++
                 objCodes :+ CallExternal(CreateMapEntry.LoadMutFieldMethodIndex)
               (instrs ++ loadCodes, immOffset, mutOffset.add(1))
             } else {
-              val loadCodes = immOffset.genCode() ++ funcArgAndRet ++
+              val loadCodes = immOffset.genCode() ++ funcArgLenAndRetLen ++
                 objCodes :+ CallExternal(CreateMapEntry.LoadImmFieldMethodIndex)
               (instrs ++ loadCodes, immOffset.add(1), mutOffset)
             }
@@ -398,13 +398,13 @@ object Ast {
     def genStore[Ctx <: StatelessContext](
         state: Compiler.State[Ctx],
         rootType: Type,
-        tpe: Type,
+        selectedDataType: Type,
         pathCodes: Seq[Instr[Ctx]],
-        selectors: Seq[FieldSelector]
+        selectors: Seq[DataSelector]
     ): Seq[Seq[Instr[Ctx]]] = {
       val statefulState     = state.asInstanceOf[Compiler.State[StatefulContext]]
-      val (_, mutOffset, _) = calcFieldOffset(statefulState, rootType, selectors)
-      val length            = state.flattenTypeLength(Seq(tpe))
+      val (_, mutOffset, _) = calcDataOffset(statefulState, rootType, selectors)
+      val length            = state.flattenTypeLength(Seq(selectedDataType))
       val (initCodes, subContractIdCodes) = genSubContractId(
         statefulState,
         pathCodes.asInstanceOf[Seq[Instr[StatefulContext]]] :+ SubContractId,
@@ -423,11 +423,11 @@ object Ast {
     }
   }
 
-  final case class LoadFieldBySelectors[Ctx <: StatelessContext](
+  final case class LoadDataBySelectors[Ctx <: StatelessContext](
       base: Expr[Ctx],
-      selectors: Seq[FieldSelector]
+      selectors: Seq[DataSelector]
   ) extends Expr[Ctx]
-      with AccessFieldBase[Ctx] {
+      with AccessDataT[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       assume(selectors.nonEmpty)
       base.getType(state) match {
@@ -1264,19 +1264,19 @@ object Ast {
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
-  sealed trait FieldSelector                                                extends Positioned
-  final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx]) extends FieldSelector
-  final case class IdentSelector(ident: Ident)                              extends FieldSelector
-  final case class AssignmentFieldTarget[Ctx <: StatelessContext](
+  sealed trait DataSelector                                                 extends Positioned
+  final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx]) extends DataSelector
+  final case class IdentSelector(ident: Ident)                              extends DataSelector
+  final case class AssignmentSelectedTarget[Ctx <: StatelessContext](
       ident: Ident,
-      selectors: Seq[FieldSelector]
+      selectors: Seq[DataSelector]
   ) extends AssignmentTarget[Ctx]
-      with AccessFieldBase[Ctx] {
+      with AccessDataT[Ctx] {
     // scalastyle:off method.length
     private def checkMap(
         state: Compiler.State[Ctx],
         mapType: Type.Map,
-        selectors: Seq[FieldSelector],
+        selectors: Seq[DataSelector],
         sourceIndex: Option[SourceIndex]
     ): Unit = {
       if (selectors.isEmpty) {
@@ -1302,7 +1302,7 @@ object Ast {
     private def checkMutable(
         state: Compiler.State[Ctx],
         rootType: Type,
-        selectors: Seq[FieldSelector],
+        selectors: Seq[DataSelector],
         lastField: Ident,
         structId: Option[TypeId],
         sourceIndex: Option[SourceIndex]

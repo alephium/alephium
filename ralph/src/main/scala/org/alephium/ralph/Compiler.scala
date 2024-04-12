@@ -562,7 +562,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def getOrCreateVariablesRef(expr: Ast.Expr[Ctx]): (VariablesRef[Ctx], Seq[Instr[Ctx]]) = {
       expr match {
-        case Ast.LoadFieldBySelectors(base, selectors) =>
+        case Ast.LoadDataBySelectors(base, selectors) =>
           val (ref, codes) = getOrCreateVariablesRef(base)
           (ref.subRef(this, selectors), codes)
         case Ast.Variable(ident)  => (getVariablesRef(ident), Seq.empty)

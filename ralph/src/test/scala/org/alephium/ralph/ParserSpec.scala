@@ -105,7 +105,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
-      LoadFieldBySelectors[StatefulContext](
+      LoadDataBySelectors[StatefulContext](
         ParenExpr(
           StructCtor(
             TypeId("Foo"),
@@ -142,12 +142,12 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     parse("a.b.c", StatefulParser.expr(_)).get.value is
-      LoadFieldBySelectors[StatefulContext](
+      LoadDataBySelectors[StatefulContext](
         Variable(Ident("a")),
         Seq(Ast.IdentSelector(Ident("b")), Ast.IdentSelector(Ident("c")))
       )
     parse("a[0].b.c", StatefulParser.expr(_)).get.value is
-      LoadFieldBySelectors[StatefulContext](
+      LoadDataBySelectors[StatefulContext](
         Variable(Ident("a")),
         Seq(
           Ast.IndexSelector(Const(Val.U256(U256.Zero))),
@@ -156,7 +156,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     parse("a.b[0].c", StatefulParser.expr(_)).get.value is
-      LoadFieldBySelectors[StatefulContext](
+      LoadDataBySelectors[StatefulContext](
         Variable(Ident("a")),
         Seq(
           Ast.IdentSelector(Ident("b")),
@@ -165,7 +165,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     parse("a.b[0][1].c", StatefulParser.expr(_)).get.value is
-      LoadFieldBySelectors[StatefulContext](
+      LoadDataBySelectors[StatefulContext](
         Variable(Ident("a")),
         Seq(
           Ast.IdentSelector(Ident("b")),
@@ -758,23 +758,23 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0u][1u]" -> Ast
-        .LoadFieldBySelectors(
+        .LoadDataBySelectors(
           Variable(Ast.Ident("a")),
           Seq(
             IndexSelector(constantIndex(0)),
             IndexSelector(constantIndex(1))
           )
         ),
-      "a[i]" -> LoadFieldBySelectors(
+      "a[i]" -> LoadDataBySelectors(
         Variable(Ident("a")),
         Seq(IndexSelector(Variable(Ident("i"))))
       ),
       "a[foo()]" -> Ast
-        .LoadFieldBySelectors(
+        .LoadDataBySelectors(
           Variable(Ast.Ident("a")),
           Seq(IndexSelector(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)))
         ),
-      "a[i + 1]" -> Ast.LoadFieldBySelectors(
+      "a[i + 1]" -> Ast.LoadDataBySelectors(
         Variable(Ast.Ident("a")),
         Seq(
           IndexSelector(
@@ -784,7 +784,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.LoadFieldBySelectors(
+        Ast.LoadDataBySelectors(
           Variable(Ast.Ident("a")),
           Seq(
             IndexSelector(constantIndex(0)),
@@ -811,7 +811,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
       "a[0] = b" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(IndexSelector(constantIndex(0)))
           )
@@ -820,7 +820,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a[0][1] = b[0]" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(
               IndexSelector(constantIndex(0)),
@@ -828,7 +828,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             )
           )
         ),
-        Ast.LoadFieldBySelectors(Ast.Variable(Ast.Ident("b")), Seq(IndexSelector(constantIndex(0))))
+        Ast.LoadDataBySelectors(Ast.Variable(Ast.Ident("b")), Seq(IndexSelector(constantIndex(0))))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
@@ -836,7 +836,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a[i] = b" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(IndexSelector(Variable(Ident("i"))))
           )
@@ -845,7 +845,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a[foo()] = b" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(IndexSelector(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)))
           )
@@ -854,7 +854,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a[i + 1] = b" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(
               IndexSelector(
@@ -867,7 +867,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a.b = c" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(IdentSelector(Ident("b")))
           )
@@ -876,7 +876,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a[0].b = c" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(
               IndexSelector(constantIndex(0)),
@@ -888,7 +888,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a.b[0] = c" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(
               Ast.IdentSelector(Ident("b")),
@@ -900,7 +900,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       ),
       "a.b[0].c = d" -> Assign(
         Seq(
-          AssignmentFieldTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
             Seq(
               Ast.IdentSelector(Ident("b")),

@@ -139,7 +139,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       idx
   }
 
-  def indexSelector[Unknown: P]: P[Ast.FieldSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
+  def indexSelector[Unknown: P]: P[Ast.DataSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
     case (from, expr, to) =>
       Ast
         .IndexSelector(expr.overwriteSourceIndex(from, to, fileURI))
@@ -185,7 +185,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def loadFieldBySelectors[Unknown: P]: P[Ast.Expr[Ctx]] =
     PP(atom ~ dataSelector.rep(0)) { case (expr, selectors) =>
-      if (selectors.isEmpty) expr else Ast.LoadFieldBySelectors(expr, selectors)
+      if (selectors.isEmpty) expr else Ast.LoadDataBySelectors(expr, selectors)
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 
@@ -282,19 +282,19 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.VarDef(vars, expr).atSourceIndex(sourceIndex)
     }
 
-  def identSelector[Unknown: P]: P[Ast.FieldSelector] = P(
+  def identSelector[Unknown: P]: P[Ast.DataSelector] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def dataSelector[Unknown: P]: P[Ast.FieldSelector] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.DataSelector] = P(identSelector | indexSelector)
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
     PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
       if (selectors.isEmpty) {
         Ast.AssignmentSimpleTarget(ident)
       } else {
-        Ast.AssignmentFieldTarget(ident, selectors)
+        Ast.AssignmentSelectedTarget(ident, selectors)
       }
     }
 
