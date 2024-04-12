@@ -965,9 +965,10 @@ object Ast {
       isInsert: Boolean
   ): Seq[Instr[StatefulContext]] = {
     if (state.allowDebug) {
-      val constant    = if (isInsert) ConstTrue else ConstFalse
-      val stringParts = AVector(ByteString.empty, ByteString.fromString(","), ByteString.empty)
-      pathCodes ++ Seq(Dup, constant, DEBUG(stringParts.map(Val.ByteVec.apply)))
+      val operation   = if (isInsert) "insert" else "remove"
+      val message     = s"$operation at map path: "
+      val stringParts = AVector(ByteString.fromString(message), ByteString.empty)
+      pathCodes ++ Seq[Instr[StatefulContext]](Dup, DEBUG(stringParts.map(Val.ByteVec.apply)))
     } else {
       pathCodes
     }

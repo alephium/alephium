@@ -4932,9 +4932,9 @@ class VMSpec extends AlephiumSpec with Generators {
       prefix ++ key.toByteVec().bytes
     }
 
-    def calcLogPath(key: Val) = {
+    def calcLogMessage(key: Val, prefix: String) = {
       val subPath = calcSubPath(key)
-      ByteString.fromString(Hex.toHexString(subPath)) ++ ByteString.fromString(",")
+      ByteString.fromString(s"$prefix at map path: ") ++ Val.ByteVec(subPath).toDebugString()
     }
 
     def calcSubContractId(key: Val, index: Int = 0) = {
@@ -4988,7 +4988,7 @@ class VMSpec extends AlephiumSpec with Generators {
       mapKeyAndValue.zipWithIndex.foreach { case ((key, (immFields, mutFields)), index) =>
         val logState = insertEvent.states(index)
         logState.index is debugEventIndexInt.toByte
-        logState.fields is AVector[Val](Val.ByteVec(calcLogPath(key) ++ Val.True.toDebugString()))
+        logState.fields is AVector[Val](Val.ByteVec(calcLogMessage(key, "insert")))
         checkSubContractState(key, immFields, mutFields)
       }
       callTxScript(checkAndUpdate)
@@ -5002,7 +5002,7 @@ class VMSpec extends AlephiumSpec with Generators {
       mapKeyAndValue.zipWithIndex.foreach { case ((key, _), index) =>
         val logState = removeEvent.states(index)
         logState.index is debugEventIndexInt.toByte
-        logState.fields is AVector[Val](Val.ByteVec(calcLogPath(key) ++ Val.False.toDebugString()))
+        logState.fields is AVector[Val](Val.ByteVec(calcLogMessage(key, "remove")))
         subContractNotExist(key)
       }
 
