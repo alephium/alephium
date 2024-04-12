@@ -5029,7 +5029,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[$keyType, U256] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!($keyValue, 1, @$address)
+         |    map.insert!(@$address, $keyValue, 1)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5040,7 +5040,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!($keyValue, @$address)
+         |    map.remove!(@$address, $keyValue)
          |  }
          |}
          |""".stripMargin
@@ -5063,8 +5063,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, ByteVec] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!(0, #00, @$genesisAddress)
-         |    map.insert!(1, #01, @$genesisAddress)
+         |    map.insert!(@$genesisAddress, 0, #00)
+         |    map.insert!(@$genesisAddress, 1, #01)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5079,8 +5079,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn remove() -> () {
          |    assert!(map[0] == #02, 0)
          |    assert!(map[1] == #03, 0)
-         |    map.remove!(0, @$genesisAddress)
-         |    map.remove!(1, @$genesisAddress)
+         |    map.remove!(@$genesisAddress, 0)
+         |    map.remove!(@$genesisAddress, 1)
          |  }
          |}
          |""".stripMargin
@@ -5099,8 +5099,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, [ByteVec; 2]] map
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!(0, [#00, #01], @$genesisAddress)
-         |    map.insert!(1, [#02, #03], @$genesisAddress)
+         |    map.insert!(@$genesisAddress, 0, [#00, #01])
+         |    map.insert!(@$genesisAddress, 1, [#02, #03])
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5128,8 +5128,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn remove() -> () {
          |    assert!(map[0][0] == #08 && map[0][1] == #09, 0)
          |    assert!(map[1][0] == #10 && map[1][1] == #11, 0)
-         |    map.remove!(0, @$genesisAddress)
-         |    map.remove!(1, @$genesisAddress)
+         |    map.remove!(@$genesisAddress, 0)
+         |    map.remove!(@$genesisAddress, 1)
          |  }
          |}
          |""".stripMargin
@@ -5154,7 +5154,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn insert() -> () {
          |    let foo0 = Foo{a: 0, b: 1}
          |    let foo1 = Foo{a: 2, b: 3}
-         |    map.insert!(0, [foo0, foo1], @$genesisAddress)
+         |    map.insert!(@$genesisAddress, 0, [foo0, foo1])
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5174,7 +5174,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn remove() -> () {
          |    assert!(map[0][0].a == 4 && map[0][0].b == 1, 0)
          |    assert!(map[0][1].a == 5 && map[0][1].b == 3, 0)
-         |    map.remove!(0, @$genesisAddress)
+         |    map.remove!(@$genesisAddress, 0)
          |  }
          |}
          |""".stripMargin
@@ -5211,7 +5211,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!(0, baz, @$genesisAddress)
+         |    map.insert!(@$genesisAddress, 0, baz)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5270,7 +5270,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!(0, @$genesisAddress)
+         |    map.remove!(@$genesisAddress, 0)
          |  }
          |}
          |""".stripMargin
@@ -5315,7 +5315,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
          |      ]
          |    }
-         |    map.insert!(0, baz, @$genesisAddress)
+         |    map.insert!(@$genesisAddress, 0, baz)
          |  }
          |
          |  pub fn checkAndUpdate() -> () {
@@ -5452,7 +5452,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!(0, @$genesisAddress)
+         |    map.remove!(@$genesisAddress, 0)
          |  }
          |}
          |""".stripMargin
@@ -5483,11 +5483,11 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, U256] map1
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap0(key: U256, value: U256) -> () {
-         |    map0.insert!(key, value, @$genesisAddress)
+         |    map0.insert!(@$genesisAddress, key, value)
          |  }
          |  @using(preapprovedAssets = true)
          |  pub fn insertToMap1(key: U256, value: U256) -> () {
-         |    map1.insert!(key, value, @$genesisAddress)
+         |    map1.insert!(@$genesisAddress, key, value)
          |  }
          |  pub fn updateMap0(key: U256, oldValue: U256, newValue: U256) -> () {
          |    assert!(map0[key] == oldValue, 0)
@@ -5498,10 +5498,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |    map1[key] = newValue
          |  }
          |  pub fn removeFromMap0(key: U256) -> () {
-         |    map0.remove!(key, @$genesisAddress)
+         |    map0.remove!(@$genesisAddress, key)
          |  }
          |  pub fn removeFromMap1(key: U256) -> () {
-         |    map1.remove!(key, @$genesisAddress)
+         |    map1.remove!(@$genesisAddress, key)
          |  }
          |}
          |""".stripMargin
@@ -5582,12 +5582,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |
          |  pub fn remove() -> () {
-         |    map.remove!(0, @$genesisAddress)
+         |    map.remove!(@$genesisAddress, 0)
          |  }
          |
          |  @using(preapprovedAssets = true)
          |  pub fn insert() -> () {
-         |    map.insert!(0, Bar { a: 0, b: 0 }, @$genesisAddress)
+         |    map.insert!(@$genesisAddress, 0, Bar { a: 0, b: 0 })
          |  }
          |}
          |""".stripMargin
@@ -5683,9 +5683,9 @@ class VMSpec extends AlephiumSpec with Generators {
          |  @using(preapprovedAssets = true)
          |  pub fn test() -> () {
          |    map.insert!(
+         |      @$genesisAddress,
          |      0,
-         |      Foo { value: [true; ${fieldSize}] },
-         |      @$genesisAddress
+         |      Foo { value: [true; ${fieldSize}] }
          |    )
          |    for (let mut i = 0; i < ${fieldSize}; i = i + 1) {
          |      assert!(map[0].value[i], 0)
@@ -5720,12 +5720,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |  mapping[U256, U256] map
          |  @using(assetsInContract = true, checkExternalCaller = false)
          |  pub fn insert(key: U256, value: U256) -> () {
-         |    map.insert!(key, value, selfAddress!())
+         |    map.insert!(selfAddress!(), key, value)
          |  }
          |
          |  @using(assetsInContract = true, checkExternalCaller = false)
          |  pub fn remove(key: U256) -> () {
-         |    map.remove!(key, selfAddress!())
+         |    map.remove!(selfAddress!(), key)
          |  }
          |}
          |""".stripMargin

@@ -5425,7 +5425,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  pub fn f(address: Address) -> () {
            |    let map = 0
-           |    $$map$$.insert!(0, 0, address)
+           |    $$map$$.insert!(address, 0, 0)
            |  }
            |}
            |""".stripMargin
@@ -5441,25 +5441,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f(address: Address) -> () {
            |    $$map.insert!($args)$$
            |  }
-           |  pub fn f1(address: Address) -> (U256, U256, Address) {
-           |    return 0, 0, address
+           |  pub fn f1(address: Address) -> (Address, U256, U256) {
+           |    return address, 0, 0
            |  }
            |}
            |""".stripMargin
       testContractError(
-        code("1, #00, address"),
-        "Invalid args type List(U256, ByteVec, Address), expected List(U256, U256, Address)"
+        code("address, 1, #00"),
+        "Invalid args type List(Address, U256, ByteVec), expected List(Address, U256, U256)"
       )
       testContractError(
-        code("#00, 1, address"),
-        "Invalid args type List(ByteVec, U256, Address), expected List(U256, U256, Address)"
+        code("address, #00, 1"),
+        "Invalid args type List(Address, ByteVec, U256), expected List(Address, U256, U256)"
       )
       testContractError(
         code("1, 1, 1"),
-        "Invalid args type List(U256, U256, U256), expected List(U256, U256, Address)"
+        "Invalid args type List(U256, U256, U256), expected List(Address, U256, U256)"
       )
       testContractError(code("f1(address)"), "Invalid args length, expected 3, got 1")
-      testContractError(code("1, 1, address, 1"), "Invalid args length, expected 3, got 4")
+      testContractError(code("address, 1, 1, 1"), "Invalid args length, expected 3, got 4")
     }
 
     {
@@ -5469,7 +5469,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  pub fn f(address: Address) -> () {
            |    let map = 0
-           |    $$map$$.remove!(0, address)
+           |    $$map$$.remove!(address, 0)
            |  }
            |}
            |""".stripMargin
@@ -5485,21 +5485,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f(address: Address) -> () {
            |    $$map.remove!($args)$$
            |  }
-           |  pub fn f1(address: Address) -> (U256, Address) {
-           |    return 0, address
+           |  pub fn f1(address: Address) -> (Address, U256) {
+           |    return address, 0
            |  }
            |}
            |""".stripMargin
       testContractError(
-        code("1, #00"),
-        "Invalid args type List(U256, ByteVec), expected List(U256, Address)"
+        code("#00, 1"),
+        "Invalid args type List(ByteVec, U256), expected List(Address, U256)"
       )
       testContractError(
-        code("#00, address"),
-        "Invalid args type List(ByteVec, Address), expected List(U256, Address)"
+        code("address, #00"),
+        "Invalid args type List(Address, ByteVec), expected List(Address, U256)"
       )
       testContractError(code("f1(address)"), "Invalid args length, expected 2, got 1")
-      testContractError(code("1, address, 1"), "Invalid args length, expected 2, got 3")
+      testContractError(code("address, 1, 1"), "Invalid args length, expected 2, got 3")
     }
 
     {
@@ -5686,7 +5686,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Bar() {
            |  mapping[U256, Foo] map
            |  pub fn bar(address: Address) -> () {
-           |    map.insert!(1, $$Foo { a: [0; $size] }$$, address)
+           |    map.insert!(address, 1, $$Foo { a: [0; $size] }$$)
            |  }
            |}
            |""".stripMargin

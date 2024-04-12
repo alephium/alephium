@@ -979,13 +979,13 @@ object Ast {
   ) extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
       val mapType = getMapType(state)
-      checkArgTypes(state, Seq(mapType.key, mapType.value, Type.Address))
+      checkArgTypes(state, Seq(Type.Address, mapType.key, mapType.value))
     }
     private def checkFieldLength(length: Int): Unit = {
       if (length > 0xff) {
         throw Compiler.Error(
           s"The number of struct fields exceeds the maximum limit",
-          args(1).sourceIndex
+          args(2).sourceIndex
         )
       }
     }
@@ -999,14 +999,14 @@ object Ast {
       checkFieldLength(mutFieldLength)
       checkFieldLength(immFieldLength)
 
-      val pathCodes              = MapOps.genSubContractPath(state, ident, args(0))
-      val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(args(1)))
+      val pathCodes              = MapOps.genSubContractPath(state, ident, args(1))
+      val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(args(2)))
       val insertWithDebug        = genMapDebug(state, pathCodes, isInsert = true)
       insertWithDebug ++ (immFields :+ SelfContractId) ++
         mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val approveALPHCodes    = args(2).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
+      val approveALPHCodes    = args(0).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
       val createContractCodes = genCreateContract(state)
       approveALPHCodes ++ createContractCodes
     }
@@ -1016,12 +1016,12 @@ object Ast {
       extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
       val mapType = getMapType(state)
-      checkArgTypes(state, Seq(mapType.key, Type.Address))
+      checkArgTypes(state, Seq(Type.Address, mapType.key))
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val pathCodes = MapOps.genSubContractPath(state, ident, args(0))
+      val pathCodes = MapOps.genSubContractPath(state, ident, args(1))
       val objCodes  = genMapDebug(state, pathCodes, isInsert = false) :+ SubContractId
-      args(1).genCode(state) ++ Seq(
+      args(0).genCode(state) ++ Seq(
         ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
         ConstInstr.u256(Val.U256(U256.Zero))
       ) ++ objCodes :+ CallExternal(CreateMapEntry.DestroyMethodIndex)
