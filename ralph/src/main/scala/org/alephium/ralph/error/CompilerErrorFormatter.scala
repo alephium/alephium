@@ -44,7 +44,6 @@ final case class CompilerErrorFormatter(
     errorFooter: Option[String],
     sourcePosition: SourcePosition
 ) {
-
   import CompilerErrorFormatter._
 
   /** Formats the error message.
@@ -67,8 +66,19 @@ final case class CompilerErrorFormatter(
     val errorTag    = highlight(s"-- error ${sourcePosition.format}: ", errorColor)
     val errorHeader = highlight(errorTitle, errorColor)
 
-    val paddingLeft   = " " * sourcePosition.colIndex
-    val pointerMarker = CompilerErrorFormatter.pointer * foundLength
+    val paddingLeft = " " * sourcePosition.colIndex
+    val pointerMarker = {
+      // the current CompilerErrorFormatter is not aware of multi-line errors and
+      // can produce some weird results.
+      // This is a quick fix to prevent the pointer from going off the screen.
+      val fixMultiLineLength = errorLine.length - sourcePosition.colIndex
+      val length = if (fixMultiLineLength > 0) {
+        scala.math.min(foundLength, fixMultiLineLength)
+      } else {
+        foundLength
+      }
+      CompilerErrorFormatter.pointer * length
+    }
 
     // Add padding & expected only if there is a message to append at the end.
     val paddingLeftExpected =

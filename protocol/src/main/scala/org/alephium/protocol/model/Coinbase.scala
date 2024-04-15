@@ -47,9 +47,10 @@ object Coinbase {
 
   @inline
   def calcGhostUncleReward(mainChainReward: U256, heightDiff: Int): U256 = {
-    assume(heightDiff > 0 && heightDiff < 8)
-    val numerator = U256.unsafe(8 - heightDiff)
-    mainChainReward.mulUnsafe(numerator).divUnsafe(U256.unsafe(8))
+    val heightDiffMax = ALPH.MaxUncleAge + 1
+    assume(heightDiff > 0 && heightDiff < heightDiffMax)
+    val numerator = U256.unsafe(heightDiffMax - heightDiff)
+    mainChainReward.mulUnsafe(numerator).divUnsafe(U256.unsafe(heightDiffMax))
   }
 
   @inline

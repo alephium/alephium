@@ -42,23 +42,24 @@ trait Server extends Service {
   def storages: Storages
 
   lazy val node: Node = Node.build(storages, flowSystem)
-  lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
-    val walletConfig: WalletConfig = WalletConfig(
-      port = None,
-      config.wallet.secretDir,
-      config.wallet.lockingTimeout,
-      apiConfig.apiKey,
-      WalletConfig.BlockFlow(
-        apiConfig.networkInterface.getHostAddress,
-        config.network.restPort,
-        config.broker.groups,
-        apiConfig.blockflowFetchMaxAge,
-        apiConfig.apiKey
+  lazy val walletApp: Option[WalletApp] =
+    Option.when(config.wallet.enabled && config.network.isCoordinator) {
+      val walletConfig: WalletConfig = WalletConfig(
+        port = None,
+        config.wallet.secretDir,
+        config.wallet.lockingTimeout,
+        apiConfig.apiKey,
+        WalletConfig.BlockFlow(
+          apiConfig.networkInterface.getHostAddress,
+          config.network.restPort,
+          config.broker.groups,
+          apiConfig.blockflowFetchMaxAge,
+          apiConfig.apiKey
+        )
       )
-    )
 
-    new WalletApp(walletConfig)(executionContext)
-  }
+      new WalletApp(walletConfig)(executionContext)
+    }
 
   def blocksExporter: BlocksExporter
 

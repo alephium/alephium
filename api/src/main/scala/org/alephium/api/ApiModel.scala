@@ -262,6 +262,11 @@ trait ApiModelCodec {
   )
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
 
+  implicit val buildMultiAddressesTransactionSourceRW: RW[BuildMultiAddressesTransaction.Source] =
+    macroRW
+
+  implicit val buildMultiAddressesTransactionRW: RW[BuildMultiAddressesTransaction] = macroRW
+
   implicit val buildSweepAddressTransactionsRW: RW[BuildSweepAddressTransactions] = macroRW
 
   implicit val groupRW: RW[Group] = macroRW
@@ -311,10 +316,12 @@ trait ApiModelCodec {
     readwriter[String].bimap(_.value, CompileProjectResult.Patch(_))
   implicit val compileResultFieldsRW: RW[CompileResult.FieldsSig]     = macroRW
   implicit val compileResultFunctionRW: RW[CompileResult.FunctionSig] = macroRW
+  implicit val compileResultMapsRW: RW[CompileResult.MapsSig]         = macroRW
   implicit val compileResultEventRW: RW[CompileResult.EventSig]       = macroRW
   implicit val compileResultConstantRW: RW[CompileResult.Constant]    = macroRW
   implicit val compileResultEnumFieldRW: RW[CompileResult.EnumField]  = macroRW
   implicit val compileResultEnumRW: RW[CompileResult.Enum]            = macroRW
+  implicit val compileResultStructRW: RW[CompileResult.StructSig]     = macroRW
   implicit val compileScriptResultRW: RW[CompileScriptResult]         = macroRW
   implicit val compileContractResultRW: RW[CompileContractResult]     = macroRW
   implicit val compileProjectResultRW: RW[CompileProjectResult]       = macroRW
@@ -439,6 +446,9 @@ trait ApiModelCodec {
   }
 
   implicit val verifySignatureRW: RW[VerifySignature] = macroRW
+
+  implicit val targetToHashrateRW: RW[TargetToHashrate]              = macroRW
+  implicit val targetToHashrateResultRW: RW[TargetToHashrate.Result] = macroRW
 
   implicit val releaseVersionEncoder: Writer[model.ReleaseVersion] = StringWriter.comap(_.toString)
   implicit val releaseVersionDecoder: Reader[model.ReleaseVersion] = StringReader.map { raw =>

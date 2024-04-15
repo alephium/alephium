@@ -87,7 +87,7 @@ class ContextSpec
     val oldOutput  = context.worldState.getContractAsset(contractId).rightValue
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
-    context.generateOutput(newOutput).leftValue isE ContractAssetUnloaded
+    context.generateOutput(newOutput).leftValue isE a[ContractAssetUnloaded]
     context.gasRemaining is initialGas
     context.worldState.getContractAsset(contractId) isE oldOutput
     context.generatedOutputs.size is 1
@@ -276,7 +276,7 @@ class ContextSpec
 
   it should "fail to generate output when contract asset is not loaded for Mainnet hardfork" in new MainnetContractOutputFixture {
     val newContext = genStatefulContext()
-    newContext.generateOutput(output).leftValue isE ContractAssetUnloaded
+    newContext.generateOutput(output).leftValue isE a[ContractAssetUnloaded]
   }
 
   it should "ignore output when the output is the same as input for Leman hardfork" in new LemanContractOutputFixture {
@@ -296,7 +296,7 @@ class ContextSpec
   it should "fail to generate output when contract asset is not loaded for Leman hardfork" in new LemanContractOutputFixture {
     val newContext = genStatefulContext()
     newContext.getHardFork() is HardFork.Leman
-    newContext.generateOutput(output).leftValue isE ContractAssetUnloaded
+    newContext.generateOutput(output).leftValue isE a[ContractAssetUnloaded]
   }
 
   trait AssetOutputFixture extends Fixture {

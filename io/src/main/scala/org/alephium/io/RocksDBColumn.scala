@@ -16,6 +16,8 @@
 
 package org.alephium.io
 
+import scala.jdk.CollectionConverters._
+
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch, WriteOptions}
 
@@ -74,6 +76,24 @@ trait RocksDBColumn extends RawKeyValueStorage {
     db.put(handle, writeOptions, key.toArray, value.toArray)
   }
 
+  override def multiGetRawUnsafe(keys: Seq[ByteString]): Seq[ByteString] = {
+    val convertedKeys = keys.map(_.toArray).asJava
+    val handles       = keys.map(_ => handle).asJava
+    db.multiGetAsList(handles, convertedKeys)
+      .asScala
+      .view
+      .zipWithIndex
+      .map { case (value, index) =>
+        Option(value) match {
+          case Some(v) =>
+            ByteString.fromArrayUnsafe(v)
+          case None =>
+            throw IOError.keyNotFound(keys(index), "RocksDBColumn.multiGetRawUnsafe")
+        }
+      }
+      .toSeq
+  }
+
   override def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit = {
     val writeBatch = new WriteBatch()
     f((x, y) => writeBatch.put(handle, x.toArray, y.toArray))
@@ -88,5 +108,12 @@ trait RocksDBColumn extends RawKeyValueStorage {
 
   override def deleteRawUnsafe(key: ByteString): Unit = {
     db.delete(handle, key.toArray)
+  }
+
+  override def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit = {
+    val writeBatch = new WriteBatch()
+    keys.foreach(key => writeBatch.delete(handle, key.toArray))
+    db.write(writeOptions, writeBatch)
+    writeBatch.close()
   }
 }

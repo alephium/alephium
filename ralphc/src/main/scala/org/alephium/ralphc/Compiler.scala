@@ -120,6 +120,7 @@ final case class Compiler(config: Config) {
             metaInfos.update(s.name, value)
             Compiler.writer(ScriptResult.from(s), value.artifactPath)
           })
+          // TODO: handle struct definitions
           Compiler.writer(
             Artifacts(
               config.compilerOptions,
@@ -132,7 +133,7 @@ final case class Compiler(config: Config) {
             ),
             config.artifactPath.resolve(".project.json")
           )
-          CompileProjectResult.from(p._1, p._2)
+          CompileProjectResult.from(p._1, p._2, p._3)
         })
         .left
         .map(_.toString)

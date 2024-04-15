@@ -105,6 +105,8 @@ alephium {
   }
 
   wallet {
+    enabled = true
+    enabled = ${?ALEPHIUM_WALLET_ENABLE}
     home-dir = ${user.home}
     home-dir = ${?ALEPHIUM_WALLET_HOME}
 
