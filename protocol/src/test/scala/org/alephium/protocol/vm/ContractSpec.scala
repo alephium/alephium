@@ -169,13 +169,25 @@ class ContractSpec extends AlephiumSpec {
     val statefulOldMethod1  = OldMethod[StatefulContext](true, false, 3, 4, 5, AVector.empty)
 
     val statelessMethod0 = Method[StatelessContext](true, true, true, false, 3, 4, 5, AVector.empty)
-    val statelessMethod1 = Method[StatelessContext](true, false, false, false, 3, 4, 5, AVector.empty)
-    val statelessMethod2 = Method[StatelessContext](true, true, false, false, 3, 4, 5, AVector.empty)
-    val statelessMethod3 = Method[StatelessContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statelessMethod1 =
+      Method[StatelessContext](true, false, false, false, 3, 4, 5, AVector.empty)
+    val statelessMethod2 =
+      Method[StatelessContext](true, true, false, false, 3, 4, 5, AVector.empty)
+    val statelessMethod3 =
+      Method[StatelessContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statelessMethod4 = Method[StatelessContext](true, true, true, true, 3, 4, 5, AVector.empty)
+    val statelessMethod5 =
+      Method[StatelessContext](true, false, false, true, 3, 4, 5, AVector.empty)
+    val statelessMethod6 = Method[StatelessContext](true, true, false, true, 3, 4, 5, AVector.empty)
+    val statelessMethod7 = Method[StatelessContext](true, false, true, true, 3, 4, 5, AVector.empty)
     val statefulMethod0  = Method[StatefulContext](true, true, true, false, 3, 4, 5, AVector.empty)
-    val statefulMethod1  = Method[StatefulContext](true, false, false, false, 3, 4, 5, AVector.empty)
-    val statefulMethod2  = Method[StatefulContext](true, true, false, false, 3, 4, 5, AVector.empty)
-    val statefulMethod3  = Method[StatefulContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statefulMethod1 = Method[StatefulContext](true, false, false, false, 3, 4, 5, AVector.empty)
+    val statefulMethod2 = Method[StatefulContext](true, true, false, false, 3, 4, 5, AVector.empty)
+    val statefulMethod3 = Method[StatefulContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statefulMethod4 = Method[StatefulContext](true, true, true, true, 3, 4, 5, AVector.empty)
+    val statefulMethod5 = Method[StatefulContext](true, false, false, true, 3, 4, 5, AVector.empty)
+    val statefulMethod6 = Method[StatefulContext](true, true, false, true, 3, 4, 5, AVector.empty)
+    val statefulMethod7 = Method[StatefulContext](true, false, true, true, 3, 4, 5, AVector.empty)
   }
 
   it should "serialize method examples" in new MethodsFixture {
@@ -188,10 +200,18 @@ class ContractSpec extends AlephiumSpec {
     serialize(statelessMethod1) is serialize(statelessOldMethod1)
     serialize(statelessMethod2) is hex"010303040500"
     serialize(statelessMethod3) is hex"010203040500"
+    serialize(statelessMethod4) is hex"010503040500"
+    serialize(statelessMethod5) is hex"010403040500"
+    serialize(statelessMethod6) is hex"010703040500"
+    serialize(statelessMethod7) is hex"010603040500"
     serialize(statefulMethod0) is serialize(statefulOldMethod0)
     serialize(statefulMethod1) is serialize(statefulOldMethod1)
     serialize(statefulMethod2) is hex"010303040500"
     serialize(statefulMethod3) is hex"010203040500"
+    serialize(statefulMethod4) is hex"010503040500"
+    serialize(statefulMethod5) is hex"010403040500"
+    serialize(statefulMethod6) is hex"010703040500"
+    serialize(statefulMethod7) is hex"010603040500"
   }
 
   it should "serde methods" in {

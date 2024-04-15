@@ -93,11 +93,31 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         )
       genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Leman)
     }
+    def rhoneFrame = {
+      val balanceState =
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
+        )
+      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Ghost)
+    }
 
-    val contract0 = StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
-    val contract1 = StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
-    val contract2 = StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
-    val contract3 = StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+    val contract0 =
+      StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
+    val contract1 =
+      StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 =
+      StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
+    val contract3 =
+      StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+    val contract4 =
+      StatefulContract(0, AVector(Method(true, true, true, true, 0, 0, 0, AVector.empty)))
+    val contract5 =
+      StatefulContract(0, AVector(Method(true, false, false, true, 0, 0, 0, AVector.empty)))
+    val contract6 =
+      StatefulContract(0, AVector(Method(true, true, false, true, 0, 0, 0, AVector.empty)))
+    val contract7 =
+      StatefulContract(0, AVector(Method(true, false, true, true, 0, 0, 0, AVector.empty)))
 
     def test(_frame: => StatefulFrame, contract: StatefulContract, emptyOutput: Boolean) = {
       val contractId = prepareContract()
@@ -128,10 +148,18 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     test(preLemanFrame, contract1, emptyOutput = true)
     test(preLemanFrame, contract2, emptyOutput = false)
     test(preLemanFrame, contract3, emptyOutput = true)
+    test(preLemanFrame, contract4, emptyOutput = false)
+    test(preLemanFrame, contract5, emptyOutput = true)
+    test(preLemanFrame, contract6, emptyOutput = false)
+    test(preLemanFrame, contract7, emptyOutput = true)
     test(lemanFrame, contract0, emptyOutput = false)
     test(lemanFrame, contract1, emptyOutput = true)
     test(lemanFrame, contract2, emptyOutput = false)
     test(lemanFrame, contract3, emptyOutput = false)
+    test(lemanFrame, contract4, emptyOutput = false)
+    test(lemanFrame, contract5, emptyOutput = true)
+    test(lemanFrame, contract6, emptyOutput = false)
+    test(lemanFrame, contract7, emptyOutput = false)
   }
 
   it should "check contract id" in {
@@ -154,7 +182,7 @@ trait FrameFixture extends ContextGenerators {
       localsLength: Int,
       usePreapprovedAssets: Boolean = false,
       useAssetsInContract: Boolean = false,
-      usePayToContractOnly: Boolean = false,
+      usePayToContractOnly: Boolean = false
   ) = Method[Ctx](
     isPublic = true,
     usePreapprovedAssets = usePreapprovedAssets,
