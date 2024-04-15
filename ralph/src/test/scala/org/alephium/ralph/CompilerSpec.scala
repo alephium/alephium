@@ -2813,7 +2813,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       .isRight is true
     testContractError(
       code("true"),
-      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on." +
+      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on. " +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
     Compiler.compileContract(replace(code("enforced"))).isRight is true
@@ -6236,5 +6236,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       funcs3,
       Map("f1" -> 0, "f0" -> 1, "f2" -> 2, "f3" -> 5)
     )
+  }
+
+  it should "generate the right asset modifiers for functions" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = false, assetsInContract = false, payToContractOnly = true)
+         |  pub fn foo0() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+    val method0 = contract.methods(0)
+    method0.usePreapprovedAssets is false
+    method0.useContractAssets is false
+    method0.usePayToContractOnly is true
+    val method1 = contract.methods(1)
+    method1.usePreapprovedAssets is true
+    method1.useContractAssets is true
+    method1.usePayToContractOnly is false
   }
 }

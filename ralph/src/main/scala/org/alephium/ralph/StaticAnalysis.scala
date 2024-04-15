@@ -90,7 +90,7 @@ object StaticAnalysis {
       !method.instrs.exists(contractAssetsInstrs.contains(_))
     ) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but its annotation of contract assets is turn on." +
+        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but its annotation of contract assets is turn on. " +
           "Please remove the `assetsInContract` annotation or set it to `enforced`",
         func.sourceIndex
       )
