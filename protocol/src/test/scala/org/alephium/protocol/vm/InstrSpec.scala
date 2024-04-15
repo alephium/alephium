@@ -3213,11 +3213,26 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val lemanFrame =
       (balanceState: MutBalanceState) =>
         prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+    val rhoneFrame =
+      (balanceState: MutBalanceState) =>
+        prepareFrame(Some(balanceState))(NetworkConfigFixture.Ghost)
 
-    val contract0 = StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
-    val contract1 = StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
-    val contract2 = StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
-    val contract3 = StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+    val contract0 =
+      StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
+    val contract1 =
+      StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 =
+      StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
+    val contract3 =
+      StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+    val contract4 =
+      StatefulContract(0, AVector(Method(true, true, true, true, 0, 0, 0, AVector.empty)))
+    val contract5 =
+      StatefulContract(0, AVector(Method(true, false, false, true, 0, 0, 0, AVector.empty)))
+    val contract6 =
+      StatefulContract(0, AVector(Method(true, true, false, true, 0, 0, 0, AVector.empty)))
+    val contract7 =
+      StatefulContract(0, AVector(Method(true, false, true, true, 0, 0, 0, AVector.empty)))
 
     def testModifier(
         instr: Instr[StatefulContext],
@@ -3240,27 +3255,59 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       if (succeeded) {
         instr.runWith(frame) isE ()
       } else {
-        instr.runWith(frame).leftValue isE InvalidMethodModifierBeforeLeman
+        instr.runWith(frame).leftValue.toString.contains("InvalidMethodModifier") is true
       }
     }
 
+    testModifier(CreateContract, rhoneFrame, contract0, true)
+    testModifier(CreateContract, rhoneFrame, contract1, true)
+    testModifier(CreateContract, rhoneFrame, contract2, true)
+    testModifier(CreateContract, rhoneFrame, contract3, true)
+    testModifier(CreateContract, rhoneFrame, contract4, false)
+    testModifier(CreateContract, rhoneFrame, contract5, true)
+    testModifier(CreateContract, rhoneFrame, contract6, true)
+    testModifier(CreateContract, rhoneFrame, contract7, false)
     testModifier(CreateContract, lemanFrame, contract0, true)
     testModifier(CreateContract, lemanFrame, contract1, true)
     testModifier(CreateContract, lemanFrame, contract2, true)
     testModifier(CreateContract, lemanFrame, contract3, true)
+    testModifier(CreateContract, lemanFrame, contract4, false)
+    testModifier(CreateContract, lemanFrame, contract5, false)
+    testModifier(CreateContract, lemanFrame, contract6, false)
+    testModifier(CreateContract, lemanFrame, contract7, false)
     testModifier(CreateContract, preLemanFrame, contract0, true)
     testModifier(CreateContract, preLemanFrame, contract1, true)
     testModifier(CreateContract, preLemanFrame, contract2, false)
     testModifier(CreateContract, preLemanFrame, contract3, false)
+    testModifier(CreateContract, preLemanFrame, contract4, false)
+    testModifier(CreateContract, preLemanFrame, contract5, false)
+    testModifier(CreateContract, preLemanFrame, contract6, false)
+    testModifier(CreateContract, preLemanFrame, contract7, false)
 
+    testModifier(CreateContractWithToken, rhoneFrame, contract0, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract1, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract2, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract3, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract4, false)
+    testModifier(CreateContractWithToken, rhoneFrame, contract5, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract6, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract7, false)
     testModifier(CreateContractWithToken, lemanFrame, contract0, true)
     testModifier(CreateContractWithToken, lemanFrame, contract1, true)
     testModifier(CreateContractWithToken, lemanFrame, contract2, true)
     testModifier(CreateContractWithToken, lemanFrame, contract3, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract4, false)
+    testModifier(CreateContractWithToken, lemanFrame, contract5, false)
+    testModifier(CreateContractWithToken, lemanFrame, contract6, false)
+    testModifier(CreateContractWithToken, lemanFrame, contract7, false)
     testModifier(CreateContractWithToken, preLemanFrame, contract0, true)
     testModifier(CreateContractWithToken, preLemanFrame, contract1, true)
     testModifier(CreateContractWithToken, preLemanFrame, contract2, false)
     testModifier(CreateContractWithToken, preLemanFrame, contract3, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract4, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract5, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract6, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract7, false)
   }
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {

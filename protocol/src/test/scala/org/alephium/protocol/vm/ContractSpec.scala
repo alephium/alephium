@@ -264,18 +264,42 @@ class ContractSpec extends AlephiumSpec {
   trait ContractFixture extends MethodsFixture with ContextGenerators {
     val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
     val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
+    val rhoneContext    = genStatefulContext(None)(NetworkConfigFixture.Ghost)
   }
 
   it should "check method modifier in contracts" in new ContractFixture {
     val contracts: Seq[Contract[_]] =
-      Seq(statelessMethod0, statelessMethod1, statelessMethod2, statelessMethod3).map(method =>
-        StatelessScript.unsafe(AVector(method))
-      )
-    contracts.foreach(_.checkAssetsModifier(lemanContext) isE ())
+      Seq(
+        statelessMethod0,
+        statelessMethod1,
+        statelessMethod2,
+        statelessMethod3,
+        statelessMethod4,
+        statelessMethod5,
+        statelessMethod6,
+        statelessMethod7
+      ).map(method => StatelessScript.unsafe(AVector(method)))
+
+    contracts.zipWithIndex.foreach { case (method, index) =>
+      if (index == 4 || index == 7) {
+        // Cannot enable useContractAssets and usePayToContractOnly together
+        method.checkAssetsModifier(rhoneContext).leftValue isE InvalidMethodModifierSinceRhone
+      } else {
+        method.checkAssetsModifier(rhoneContext) isE ()
+      }
+    }
+
     contracts(0).checkAssetsModifier(preLemanContext) isE ()
     contracts(1).checkAssetsModifier(preLemanContext) isE ()
     contracts(2).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeLeman
     contracts(3).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeLeman
+    contracts.drop(4).foreach(_.checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
+
+    contracts(0).checkAssetsModifier(lemanContext) isE ()
+    contracts(1).checkAssetsModifier(lemanContext) isE ()
+    contracts(2).checkAssetsModifier(lemanContext) isE ()
+    contracts(3).checkAssetsModifier(lemanContext) isE ()
+    contracts.drop(4).foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
   }
 }
 

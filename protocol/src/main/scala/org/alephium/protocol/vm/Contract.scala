@@ -43,6 +43,14 @@ final case class Method[Ctx <: StatelessContext](
 ) {
   def usesAssets(): Boolean = usePreapprovedAssets || useContractAssets
 
+  def checkModifierSinceRhone(): ExeResult[Unit] = {
+    if (useContractAssets && usePayToContractOnly) {
+      failed(InvalidMethodModifierSinceRhone)
+    } else {
+      okay
+    }
+  }
+
   def checkModifierPreRhone(): ExeResult[Unit] = {
     if (!usePayToContractOnly) {
       okay
@@ -174,7 +182,7 @@ sealed trait Contract[Ctx <: StatelessContext] {
       for {
         method <- getMethod(methodIndex)
         _ <-
-          if (hardFork.isGhostEnabled()) { okay }
+          if (hardFork.isGhostEnabled()) { method.checkModifierSinceRhone() }
           else { method.checkModifierPreRhone() }
         _ <-
           if (hardFork.isLemanEnabled()) { okay }
