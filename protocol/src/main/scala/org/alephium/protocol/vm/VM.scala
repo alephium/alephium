@@ -113,7 +113,6 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Unit] = {
     for {
-      _          <- obj.code.checkAssetsModifier(ctx)
       startFrame <- startFrame(obj, ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
