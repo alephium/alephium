@@ -94,10 +94,10 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Leman)
     }
 
-    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
-    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
-    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
-    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
 
     def test(_frame: => StatefulFrame, contract: StatefulContract, emptyOutput: Boolean) = {
       val contractId = prepareContract()
@@ -153,11 +153,13 @@ trait FrameFixture extends ContextGenerators {
   def baseMethod[Ctx <: StatelessContext](
       localsLength: Int,
       usePreapprovedAssets: Boolean = false,
-      useAssetsInContract: Boolean = false
+      useAssetsInContract: Boolean = false,
+      usePayToContractOnly: Boolean = false,
   ) = Method[Ctx](
     isPublic = true,
     usePreapprovedAssets = usePreapprovedAssets,
     useContractAssets = useAssetsInContract,
+    usePayToContractOnly = usePayToContractOnly,
     argsLength = localsLength - 1,
     localsLength,
     returnLength = 0,

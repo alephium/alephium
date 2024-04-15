@@ -2137,6 +2137,7 @@ class VMSpec extends AlephiumSpec with Generators {
         isPublic = true,
         usePreapprovedAssets = true,
         useContractAssets = true,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -5631,7 +5632,7 @@ class VMSpec extends AlephiumSpec with Generators {
         BytesConst(Val.ByteVec(subContractId.bytes)),
         CallExternal(CreateMapEntry.LoadImmFieldMethodIndex)
       )
-      val loadImmFieldMethod = Method(true, false, false, 0, 0, 0, loadImmFieldInstrs)
+      val loadImmFieldMethod = Method(true, false, false, false, 0, 0, 0, loadImmFieldInstrs)
       val loadMutFieldInstrs = AVector[Instr[StatefulContext]](
         ConstInstr.u256(Val.U256(U256.Zero)), // the index of `Bar.a`
         ConstInstr.u256(Val.U256(U256.One)),
@@ -5639,7 +5640,7 @@ class VMSpec extends AlephiumSpec with Generators {
         BytesConst(Val.ByteVec(subContractId.bytes)),
         CallExternal(CreateMapEntry.LoadMutFieldMethodIndex)
       )
-      val loadMutFieldMethod = Method(true, false, false, 0, 0, 0, loadMutFieldInstrs)
+      val loadMutFieldMethod = Method(true, false, false, false, 0, 0, 0, loadMutFieldInstrs)
       val storeFieldInstrs = AVector[Instr[StatefulContext]](
         ConstInstr.u256(Val.U256(U256.One)),  // new value
         ConstInstr.u256(Val.U256(U256.Zero)), // mutable field index
@@ -5648,7 +5649,7 @@ class VMSpec extends AlephiumSpec with Generators {
         BytesConst(Val.ByteVec(subContractId.bytes)),
         CallExternal(CreateMapEntry.StoreMutFieldMethodIndex)
       )
-      val storeFieldMethod = Method(true, false, false, 0, 0, 0, storeFieldInstrs)
+      val storeFieldMethod = Method(true, false, false, false, 0, 0, 0, storeFieldInstrs)
       val destroyInstrs = AVector[Instr[StatefulContext]](
         AddressConst(Val.Address(genesisAddress.lockupScript)),
         ConstInstr.u256(Val.U256(U256.One)),
@@ -5656,7 +5657,7 @@ class VMSpec extends AlephiumSpec with Generators {
         BytesConst(Val.ByteVec(subContractId.bytes)),
         CallExternal(CreateMapEntry.DestroyMethodIndex)
       )
-      val destroyMethod = Method(true, false, false, 0, 0, 0, destroyInstrs)
+      val destroyMethod = Method(true, false, false, false, 0, 0, 0, destroyInstrs)
       StatefulContract(
         0,
         AVector(loadImmFieldMethod, loadMutFieldMethod, storeFieldMethod, destroyMethod)
@@ -5671,7 +5672,7 @@ class VMSpec extends AlephiumSpec with Generators {
         BytesConst(Val.ByteVec(callerContractId.bytes)),
         CallExternal(methodIndex.toByte)
       )
-      StatefulScript.unsafe(AVector(Method(true, true, false, 0, 0, 0, callInstrs)))
+      StatefulScript.unsafe(AVector(Method(true, true, false, false, 0, 0, 0, callInstrs)))
     }
 
     failCallTxScript(createCallScript(invalidCallerId, 0), AssertionFailed) // load `Bar.b`

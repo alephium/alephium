@@ -35,6 +35,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -110,6 +111,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -176,6 +178,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -207,6 +210,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -228,6 +232,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
@@ -238,6 +243,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         isPublic = false,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -291,6 +297,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
           isPublic = index equals 0,
           usePreapprovedAssets = true,
           useContractAssets = false,
+          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = expected.fold(_ => 0, _.length),
@@ -454,6 +461,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       isPublic = true,
       usePreapprovedAssets = true,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -484,6 +492,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -658,8 +667,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     {
       info("No local variables")
       val method0 =
-        Method[StatefulContext](true, false, false, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
-      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+        Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
     }
@@ -668,8 +677,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       info("Non-empty local variables")
 
       val method0 =
-        Method[StatefulContext](true, false, false, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
-      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+        Method[StatefulContext](true, false, false, false, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
     }

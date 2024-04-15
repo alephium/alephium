@@ -30,6 +30,7 @@ class ContractSpec extends AlephiumSpec {
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -125,6 +126,7 @@ class ContractSpec extends AlephiumSpec {
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -166,14 +168,14 @@ class ContractSpec extends AlephiumSpec {
     val statefulOldMethod0  = OldMethod[StatefulContext](true, true, 3, 4, 5, AVector.empty)
     val statefulOldMethod1  = OldMethod[StatefulContext](true, false, 3, 4, 5, AVector.empty)
 
-    val statelessMethod0 = Method[StatelessContext](true, true, true, 3, 4, 5, AVector.empty)
-    val statelessMethod1 = Method[StatelessContext](true, false, false, 3, 4, 5, AVector.empty)
-    val statelessMethod2 = Method[StatelessContext](true, true, false, 3, 4, 5, AVector.empty)
-    val statelessMethod3 = Method[StatelessContext](true, false, true, 3, 4, 5, AVector.empty)
-    val statefulMethod0  = Method[StatefulContext](true, true, true, 3, 4, 5, AVector.empty)
-    val statefulMethod1  = Method[StatefulContext](true, false, false, 3, 4, 5, AVector.empty)
-    val statefulMethod2  = Method[StatefulContext](true, true, false, 3, 4, 5, AVector.empty)
-    val statefulMethod3  = Method[StatefulContext](true, false, true, 3, 4, 5, AVector.empty)
+    val statelessMethod0 = Method[StatelessContext](true, true, true, false, 3, 4, 5, AVector.empty)
+    val statelessMethod1 = Method[StatelessContext](true, false, false, false, 3, 4, 5, AVector.empty)
+    val statelessMethod2 = Method[StatelessContext](true, true, false, false, 3, 4, 5, AVector.empty)
+    val statelessMethod3 = Method[StatelessContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statefulMethod0  = Method[StatefulContext](true, true, true, false, 3, 4, 5, AVector.empty)
+    val statefulMethod1  = Method[StatefulContext](true, false, false, false, 3, 4, 5, AVector.empty)
+    val statefulMethod2  = Method[StatefulContext](true, true, false, false, 3, 4, 5, AVector.empty)
+    val statefulMethod3  = Method[StatefulContext](true, false, true, false, 3, 4, 5, AVector.empty)
   }
 
   it should "serialize method examples" in new MethodsFixture {
@@ -197,12 +199,14 @@ class ContractSpec extends AlephiumSpec {
       isPublic             <- Seq(true, false)
       usePreapprovedAssets <- Seq(true, false)
       useContractAssetss   <- Seq(true, false)
+      usePayToContractOnly <- Seq(true, false)
     } {
       val statelessMethods =
         Method[StatelessContext](
           isPublic,
           usePreapprovedAssets,
           useContractAssetss,
+          usePayToContractOnly,
           3,
           4,
           5,
@@ -215,6 +219,7 @@ class ContractSpec extends AlephiumSpec {
           isPublic,
           usePreapprovedAssets,
           useContractAssetss,
+          usePayToContractOnly,
           3,
           4,
           5,

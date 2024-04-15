@@ -1202,6 +1202,7 @@ object Ast {
         isPublic,
         usePreapprovedAssets,
         useAssetsInContract != Ast.NotUseContractAssets,
+        usePayToContractOnly = false,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = state.flattenTypeLength(rtypes),
