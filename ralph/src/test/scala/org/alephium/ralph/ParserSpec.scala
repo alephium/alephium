@@ -661,6 +661,15 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
     error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
     error.position is invalidAssetsInContract.indexOf("$")
+
+    val conflictedAnnotations =
+      s"""@using($$assetsInContract = true, payToContractOnly = true)
+         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val error1 = intercept[Compiler.Error](
+      fastparse.parse(conflictedAnnotations.replace("$", ""), StatelessParser.func(_))
+    )
+    error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true) or @using(payToContractOnly = true)"
+    error1.position is invalidAssetsInContract.indexOf("$")
   }
 
   it should "parser contract initial states" in {

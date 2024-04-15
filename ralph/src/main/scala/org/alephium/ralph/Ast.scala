@@ -137,10 +137,18 @@ object Ast {
     }
   }
 
-  sealed trait ContractAssetsAnnotation
-  case object UseContractAssets         extends ContractAssetsAnnotation
-  case object NotUseContractAssets      extends ContractAssetsAnnotation
-  case object EnforcedUseContractAssets extends ContractAssetsAnnotation
+  sealed trait ContractAssetsAnnotation {
+    def assetsEnabled: Boolean
+  }
+  case object NotUseContractAssets extends ContractAssetsAnnotation {
+    val assetsEnabled = false
+  }
+  case object UseContractAssets extends ContractAssetsAnnotation {
+    val assetsEnabled = true
+  }
+  case object EnforcedUseContractAssets extends ContractAssetsAnnotation {
+    val assetsEnabled = true
+  }
 
   trait ApproveAssets[Ctx <: StatelessContext] extends Positioned {
     def approveAssets: Seq[ApproveAsset[Ctx]]
