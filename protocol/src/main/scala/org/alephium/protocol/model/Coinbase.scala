@@ -46,7 +46,7 @@ object Coinbase {
   }
 
   @inline
-  def calcUncleReward(mainChainReward: U256, heightDiff: Int): U256 = {
+  def calcGhostUncleReward(mainChainReward: U256, heightDiff: Int): U256 = {
     val heightDiffMax = ALPH.MaxUncleAge + 1
     assume(heightDiff > 0 && heightDiff < heightDiffMax)
     val numerator = U256.unsafe(heightDiffMax - heightDiff)
@@ -75,11 +75,11 @@ object Coinbase {
       miningReward: U256,
       lockupScript: LockupScript.Asset,
       lockTime: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
     val mainChainReward = calcMainChainReward(miningReward)
     val uncleRewardOutputs = uncles.map { uncle =>
-      val uncleReward = calcUncleReward(mainChainReward, uncle.heightDiff)
+      val uncleReward = calcGhostUncleReward(mainChainReward, uncle.heightDiff)
       AssetOutput(uncleReward, uncle.lockupScript, lockTime, AVector.empty, ByteString.empty)
     }
     val blockRewardOutput = AssetOutput(
@@ -98,7 +98,7 @@ object Coinbase {
       miningReward: U256,
       lockupScript: LockupScript.Asset,
       blockTs: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit networkConfig: NetworkConfig): Transaction = {
     val lockTime = blockTs + networkConfig.coinbaseLockupPeriod
     val hardFork = networkConfig.getHardFork(blockTs)
@@ -127,7 +127,7 @@ object Coinbase {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val sortedUncles = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
     val coinbaseData =

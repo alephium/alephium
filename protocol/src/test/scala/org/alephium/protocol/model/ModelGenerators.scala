@@ -494,7 +494,7 @@ trait BlockGenerators extends TxGenerators {
       chainIndex: ChainIndex,
       blockTs: TimeStamp,
       parentHash: BlockHash,
-      uncles: AVector[SelectedUncle] = AVector.empty
+      uncles: AVector[SelectedGhostUncle] = AVector.empty
   ): Gen[Block] = {
     val parentIndex = (groupConfig.groups * 2 - 1) / 2 + chainIndex.to.value
     for {
@@ -551,7 +551,7 @@ trait BlockGenerators extends TxGenerators {
       depStateHash: Hash,
       blockTs: TimeStamp,
       txs: AVector[Transaction],
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   ): Block = {
     val consensusConfig = consensusConfigs.getConsensusConfig(blockTs)
     val coinbase = Transaction.coinbase(
@@ -585,7 +585,7 @@ trait BlockGenerators extends TxGenerators {
       depStateHash: Hash,
       blockTs: TimeStamp,
       txNumGen: Gen[Int],
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   ): Gen[Block] = {
     for {
       txNum <- txNumGen

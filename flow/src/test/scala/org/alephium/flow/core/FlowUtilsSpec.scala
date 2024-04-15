@@ -222,10 +222,10 @@ class FlowUtilsSpec extends AlephiumSpec {
       blockFlow.getMaxHeight(chainIndex).rightValue is 3
       val block2          = mineBlockTemplate(blockFlow, chainIndex)
       val hashesAtHeight3 = blockFlow.getHashes(chainIndex, 3).rightValue
-      block2.uncleHashes.rightValue is hashesAtHeight3.tail
+      block2.ghostUncleHashes.rightValue is hashesAtHeight3.tail
       block2.coinbase.unsigned.fixedOutputs.length is 2
       val uncleReward = block2.coinbase.unsigned.fixedOutputs(1).amount
-      uncleReward is Coinbase.calcUncleReward(mainChainReward, 1)
+      uncleReward is Coinbase.calcGhostUncleReward(mainChainReward, 1)
       block2.coinbaseReward is mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
       addAndCheck(blockFlow, block2)
     }
@@ -239,20 +239,20 @@ class FlowUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block2, block3)
       val block4 = mineBlockTemplate(blockFlow, chainIndex)
       blockFlow.getMaxHeight(chainIndex).rightValue is 6
-      val hashesAtHeight5 = blockFlow.getHashes(chainIndex, 5).rightValue
-      val hashesAtHeight6 = blockFlow.getHashes(chainIndex, 6).rightValue
-      val uncleHashes     = block4.uncleHashes.rightValue
-      uncleHashes is
+      val hashesAtHeight5  = blockFlow.getHashes(chainIndex, 5).rightValue
+      val hashesAtHeight6  = blockFlow.getHashes(chainIndex, 6).rightValue
+      val ghostUncleHashes = block4.ghostUncleHashes.rightValue
+      ghostUncleHashes is
         AVector(hashesAtHeight6(1), hashesAtHeight5(1)).sortBy(_.bytes)(Bytes.byteStringOrdering)
       block4.coinbase.unsigned.fixedOutputs.length is 3
       val uncle0Reward = block4.coinbase.unsigned.fixedOutputs(1).amount
       val uncle1Reward = block4.coinbase.unsigned.fixedOutputs(2).amount
-      if (uncleHashes == AVector(hashesAtHeight6(1), hashesAtHeight5(1))) {
-        uncle0Reward is Coinbase.calcUncleReward(mainChainReward, 1)
-        uncle1Reward is Coinbase.calcUncleReward(mainChainReward, 2)
+      if (ghostUncleHashes == AVector(hashesAtHeight6(1), hashesAtHeight5(1))) {
+        uncle0Reward is Coinbase.calcGhostUncleReward(mainChainReward, 1)
+        uncle1Reward is Coinbase.calcGhostUncleReward(mainChainReward, 2)
       } else {
-        uncle0Reward is Coinbase.calcUncleReward(mainChainReward, 2)
-        uncle1Reward is Coinbase.calcUncleReward(mainChainReward, 1)
+        uncle0Reward is Coinbase.calcGhostUncleReward(mainChainReward, 2)
+        uncle1Reward is Coinbase.calcGhostUncleReward(mainChainReward, 1)
       }
       block4.coinbaseReward is mainChainReward.addUnsafe(
         uncle0Reward.addUnsafe(uncle1Reward).divUnsafe(32)
@@ -469,21 +469,21 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     val block = mine(blockFlow, blockTemplate)
     block.header.version is DefaultBlockVersion
-    block.uncleHashes.rightValue.isEmpty is true
+    block.ghostUncleHashes.rightValue.isEmpty is true
     addAndCheck(blockFlow, block)
   }
 
   it should "prepare block with uncles after ghost hardfork" in new PrepareBlockFlowFixture {
     def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
 
-    val uncleHash = prepare()
+    val ghostUncleHash = prepare()
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
     networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Ghost
 
     val block = mine(blockFlow, blockTemplate)
     block.header.version is DefaultBlockVersion
-    block.uncleHashes.rightValue is AVector(uncleHash)
+    block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
   }
 
@@ -516,7 +516,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, uncle0, uncle1)
 
     val block2 = mineBlockTemplate(blockFlow, chainIndex)
-    block2.uncleHashes.rightValue is AVector(uncle1.hash)
+    block2.ghostUncleHashes.rightValue is AVector(uncle1.hash)
   }
 
   it should "rebuild block template if there are invalid txs" in new FlowFixture {
@@ -540,9 +540,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
 
     val miner               = getGenesisLockupScript(chainIndex.to)
-    val uncleHash           = prepare()
+    val ghostUncleHash      = prepare()
     val (template0, uncles) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
-    uncles.map(_.blockHash) is AVector(uncleHash)
+    uncles.map(_.blockHash) is AVector(ghostUncleHash)
     blockFlow.validateTemplate(chainIndex, template0, uncles, miner).rightValue is template0
 
     val block = mine(blockFlow, template0)

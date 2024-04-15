@@ -134,17 +134,17 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader =
     getHeaderChain(hash).getBlockHeaderUnsafe(hash)
 
-  def getUncles(
+  def getGhostUncles(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[SelectedUncle]] =
-    getBlockChain(parentHeader.chainIndex).selectUncles(parentHeader, validator)
+  ): IOResult[AVector[SelectedGhostUncle]] =
+    getBlockChain(parentHeader.chainIndex).selectGhostUncles(parentHeader, validator)
 
-  def getUnclesUnsafe(
+  def getGhostUnclesUnsafe(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): AVector[SelectedUncle] =
-    getBlockChain(parentHeader.chainIndex).selectUnclesUnsafe(parentHeader, validator)
+  ): AVector[SelectedGhostUncle] =
+    getBlockChain(parentHeader.chainIndex).selectGhostUnclesUnsafe(parentHeader, validator)
 
   def add(header: BlockHeader): IOResult[Unit]
 
