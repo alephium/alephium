@@ -1904,8 +1904,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val spaces = s"${" " * numSpaces}"
       val str    = s"${num.toString}$spaces"
       val result = fastparse.parse(str, StatelessParser.const(_)).get.value
-      // TODO We want num.length
-      result.sourceIndex.get.width is str.length
+      result.sourceIndex.get.width is num.toString.length
     }
   }
 }
