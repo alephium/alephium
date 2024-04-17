@@ -22,7 +22,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{discard, AVector, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(
     chainIndex: ChainIndex,
@@ -332,6 +332,21 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def generateAssetOutputSimple(assetOutput: AssetOutput): ExeResult[Unit] = {
     generatedOutputs.addOne(assetOutput)
     chargeGeneratedOutput()
+  }
+
+  def outputRemainingContractAssetsForRhone(): ExeResult[Unit] = {
+    if (getHardFork().isGhostEnabled()) {
+      EitherF.foreachTry(assetStatus) {
+        case (contractId, ContractPool.ContractAssetInUsing(balances)) =>
+          outputBalances.add(LockupScript.p2c(contractId), balances) match {
+            case Some(_) => okay
+            case None    => failed(InvalidBalances)
+          }
+        case _ => okay
+      }
+    } else {
+      okay
+    }
   }
 
   def contractExists(contractId: ContractId): ExeResult[Boolean] = {

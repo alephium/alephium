@@ -39,7 +39,8 @@ trait ContractPool extends CostStrategy {
   lazy val contractPool      = mutable.Map.empty[ContractId, StatefulContractObject]
   lazy val contractBlockList = mutable.Set.empty[ContractId]
 
-  lazy val assetStatus = mutable.Map.empty[ContractId, ContractAssetStatus]
+  lazy val assetStatus         = mutable.Map.empty[ContractId, ContractAssetStatus]
+  lazy val assetUsedSinceRhone = mutable.Set.empty[(ContractId, Int)]
 
   lazy val contractInputs: ArrayBuffer[(ContractOutputRef, ContractOutput)] = ArrayBuffer.empty
 
@@ -155,7 +156,39 @@ trait ContractPool extends CostStrategy {
       .map(e => Left(IOErrorUpdateState(e)))
   }
 
-  def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
+  def useContractAssets(
+      contractId: ContractId,
+      methodIndex: Int
+  ): ExeResult[MutBalancesPerLockup] = {
+    if (getHardFork().isGhostEnabled()) {
+      useContractAssetsRhone(contractId, methodIndex)
+    } else {
+      useContractAssetsPreRhone(contractId)
+    }
+  }
+
+  // We track contract assets with assetUsedSinceRhone and contractBalances instead of assetStatusPreRhone
+  def useContractAssetsRhone(
+      contractId: ContractId,
+      methodIndex: Int
+  ): ExeResult[MutBalancesPerLockup] = {
+    if (assetUsedSinceRhone.contains(contractId -> methodIndex)) {
+      failed(FunctionReentrancy)
+    } else {
+      assetUsedSinceRhone.add(contractId -> methodIndex)
+      assetStatus.get(contractId) match {
+        case Some(ContractAssetInUsing(balances)) => Right(balances)
+        case Some(ContractAssetFlushed)           => failed(ContractAssetAlreadyFlushed)
+        case None                                 => loadContractAssets(contractId)
+      }
+    }
+  }
+
+  def useContractAssetsPreRhone(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
+    loadContractAssets(contractId)
+  }
+
+  private def loadContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
     for {
       _ <- chargeContractInput()
       balances <- worldState

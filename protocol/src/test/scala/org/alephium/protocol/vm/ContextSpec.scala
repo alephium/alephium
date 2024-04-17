@@ -101,7 +101,7 @@ class ContextSpec
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.loadContractObj(contractId).isRight is true
-    context.useContractAssets(contractId).isRight is true
+    context.useContractAssets(contractId, 0).isRight is true
     context.generateOutput(newOutput) isE ()
 
     val newOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
@@ -118,7 +118,7 @@ class ContextSpec
     context.getHardFork() is HardFork.Ghost
     val contractId = createContract()
     context.loadContractObj(contractId).isRight is true
-    context.useContractAssets(contractId).leftValue.rightValue is ContractAssetAlreadyFlushed
+    context.useContractAssets(contractId, 0).leftValue.rightValue is ContractAssetAlreadyFlushed
   }
 
   it should "not cache new contract before Rhone upgrade" in new Fixture {

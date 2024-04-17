@@ -128,7 +128,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       val result = frame
         .getNewFrameBalancesState(
           StatefulContractObject.from(contract, AVector.empty, AVector.empty, contractId),
-          method
+          method,
+          0
         )
 
       result.rightValue.isEmpty is emptyOutput

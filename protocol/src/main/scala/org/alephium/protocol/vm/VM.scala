@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{AVector, EitherF, OptionF, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -292,13 +292,13 @@ final class StatefulVM(
       case (None, _) => okay
       case (Some(currentBalances), None) =>
         wrap(for {
-          _ <- ctx.outputBalances.merge(currentBalances.remaining)
-          _ <- ctx.outputBalances.merge(currentBalances.approved)
+          _ <- mergeBack(ctx.outputBalances, currentBalances.remaining, isApproved = false)
+          _ <- mergeBack(ctx.outputBalances, currentBalances.approved, isApproved = true)
         } yield ())
       case (Some(currentBalances), Some(previousBalances)) =>
         wrap(for {
-          _ <- mergeBack(previousBalances.remaining, currentBalances.remaining)
-          _ <- mergeBack(previousBalances.remaining, currentBalances.approved)
+          _ <- mergeBack(previousBalances.remaining, currentBalances.remaining, isApproved = false)
+          _ <- mergeBack(previousBalances.remaining, currentBalances.approved, isApproved = true)
         } yield ())
     }
   }
@@ -311,33 +311,55 @@ final class StatefulVM(
       wrap(for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
-        _                <- mergeBack(previousBalances.remaining, currentBalances.remaining)
-        _                <- mergeBack(previousBalances.remaining, currentBalances.approved)
+        _ <- mergeBack(previousBalances.remaining, currentBalances.remaining, isApproved = false)
+        _ <- mergeBack(previousBalances.remaining, currentBalances.approved, isApproved = true)
       } yield ())
     } else {
       okay
     }
   }
 
-  protected def mergeBack(previous: MutBalances, current: MutBalances): Option[Unit] = {
-    @tailrec
-    def iter(index: Int): Option[Unit] = {
-      if (index >= current.all.length) {
-        Some(())
-      } else {
-        val (lockupScript, balancesPerLockup) = current.all(index)
-        if (balancesPerLockup.scopeDepth <= 0) {
-          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+  @inline private def shouldKeepContractBalances(
+      hardFork: HardFork,
+      isApproved: Boolean,
+      lockupScript: LockupScript
+  ): Boolean = {
+    hardFork.isGhostEnabled() && !isApproved && lockupScript.isInstanceOf[LockupScript.P2C]
+  }
+
+  protected def mergeBack(
+      previous: MutBalances,
+      current: MutBalances,
+      isApproved: Boolean
+  ): Option[Unit] = {
+    val hardFork = ctx.getHardFork()
+
+    OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
+      if (balancesPerLockup.scopeDepth <= 0) {
+        if (shouldKeepContractBalances(hardFork, isApproved, lockupScript)) {
+          Some(())
         } else {
-          previous.add(lockupScript, balancesPerLockup) match {
-            case Some(_) => iter(index + 1)
-            case None    => None
-          }
+          ctx.outputBalances.add(lockupScript, balancesPerLockup)
         }
+      } else {
+        previous.add(lockupScript, balancesPerLockup)
       }
     }
+  }
 
-    iter(0)
+  protected def mergeToOutputExceptContractAssetsForRhone(
+      current: MutBalances,
+      isApproved: Boolean
+  ): Option[Unit] = {
+    val hardFork = ctx.getHardFork()
+
+    OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
+      if (shouldKeepContractBalances(hardFork, isApproved, lockupScript)) {
+        Some(())
+      } else {
+        ctx.outputBalances.add(lockupScript, balancesPerLockup)
+      }
+    }
   }
 
   protected def completeLastFrame(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
@@ -354,8 +376,9 @@ final class StatefulVM(
     if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
-        _        <- ctx.outputBalances.merge(balances.approved)
-        _        <- ctx.outputBalances.merge(balances.remaining)
+
+        _ <- mergeToOutputExceptContractAssetsForRhone(balances.approved, isApproved = true)
+        _ <- mergeToOutputExceptContractAssetsForRhone(balances.remaining, isApproved = false)
       } yield ()
       for {
         _ <- resultOpt match {
@@ -400,16 +423,19 @@ final class StatefulVM(
   }
 
   private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
-    EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-      lockupScript match {
-        case l: LockupScript.P2C if !ctx.assetStatus.contains(l.contractId) =>
-          failed(ContractAssetUnloaded(Address.contract(l.contractId)))
-        case _ =>
-          balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
-            outputs.foreachE(output => ctx.generateOutput(output))
-          }
+    for {
+      _ <- ctx.outputRemainingContractAssetsForRhone()
+      _ <- EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
+        lockupScript match {
+          case l: LockupScript.P2C if !ctx.assetStatus.contains(l.contractId) =>
+            failed(ContractAssetUnloaded(Address.contract(l.contractId)))
+          case _ =>
+            balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
+              outputs.foreachE(output => ctx.generateOutput(output))
+            }
+        }
       }
-    }
+    } yield ()
   }
 }
 

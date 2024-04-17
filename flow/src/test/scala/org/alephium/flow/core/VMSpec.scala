@@ -1615,7 +1615,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |$foo
          |""".stripMargin
-    failCallTxScript(main, ContractAssetAlreadyInUsing)
+    failCallTxScript(main, ContractDestructionShouldNotBeCalledFromSelf)
   }
 
   it should "fetch block env" in new ContractFixture {
