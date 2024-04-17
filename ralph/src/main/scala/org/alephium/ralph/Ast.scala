@@ -96,8 +96,10 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
-  final case class AnnotationField(ident: Ident, value: Val)           extends Positioned
-  final case class Annotation(id: Ident, fields: Seq[AnnotationField]) extends Positioned
+  final case class AnnotationField[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
+      extends Positioned
+  final case class Annotation[Ctx <: StatelessContext](id: Ident, fields: Seq[AnnotationField[Ctx]])
+      extends Positioned
 
   object FuncId {
     lazy val empty: FuncId = FuncId("", isBuiltIn = false)
@@ -769,7 +771,7 @@ object Ast {
   )
 
   final case class FuncDef[Ctx <: StatelessContext](
-      annotations: Seq[Annotation],
+      annotations: Seq[Annotation[Ctx]],
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
