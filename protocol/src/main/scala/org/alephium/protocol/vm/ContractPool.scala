@@ -213,6 +213,15 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  // Load contract assets so that the corresponding inputs are tracked
+  def prepareForPayToContractOnly(contractId: ContractId): ExeResult[Unit] = {
+    assetStatus.get(contractId) match {
+      case None                          => loadContractAssets(contractId).map(_ => ())
+      case Some(ContractAssetInUsing(_)) => okay
+      case Some(ContractAssetFlushed)    => failed(ContractAssetAlreadyFlushed)
+    }
+  }
+
   def markAssetFlushed(contractId: ContractId): ExeResult[Unit] = {
     assetStatus.get(contractId) match {
       case Some(ContractAssetInUsing(_)) =>

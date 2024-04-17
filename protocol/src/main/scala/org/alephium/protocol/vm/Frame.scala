@@ -306,37 +306,58 @@ final case class StatefulFrame(
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
           val newFrameBalances = currentBalances.useApproved()
-          contractObj.contractIdOpt match {
-            case Some(contractId) if method.useContractAssets =>
-              ctx
-                .useContractAssets(contractId, methodIndex)
-                .map { balancesPerLockup =>
-                  newFrameBalances.remaining
-                    .add(LockupScript.p2c(contractId), balancesPerLockup)
-                    .map(_ => newFrameBalances)
-                }
-            case _ =>
-              Right(Some(newFrameBalances))
-          }
+          handleContractAssetsForNewFrame(
+            newFrameBalances,
+            contractObj.contractIdOpt,
+            method,
+            methodIndex,
+            useApprovedAssets = true
+          )
         }
       } yield balanceStateOpt
-    } else if (method.useContractAssets) {
-      contractObj.contractIdOpt match {
-        case Some(contractId) =>
-          ctx
-            .useContractAssets(contractId, methodIndex)
-            .map { balancesPerLockup =>
-              val remaining = MutBalances.empty
-              remaining
-                .add(LockupScript.p2c(contractId), balancesPerLockup)
-                .map(_ => MutBalanceState(remaining, MutBalances.empty))
-            }
-        case _ =>
-          Right(None)
-      }
+    } else if (method.useContractAssets || method.usePayToContractOnly) {
+      handleContractAssetsForNewFrame(
+        MutBalanceState.empty,
+        contractObj.contractIdOpt,
+        method,
+        methodIndex,
+        useApprovedAssets = false
+      )
     } else {
       // Note that we don't check there is no approved assets for this branch
       Right(None)
+    }
+  }
+
+  private def handleContractAssetsForNewFrame(
+      currentBalance: MutBalanceState,
+      contractIdOpt: Option[ContractId],
+      method: Method[StatefulContext],
+      methodIndex: Int,
+      useApprovedAssets: Boolean
+  ): ExeResult[Option[MutBalanceState]] = {
+    val noContractAssetsReturn = if (useApprovedAssets) Right(Some(currentBalance)) else Right(None)
+
+    contractIdOpt match {
+      case Some(contractId) =>
+        if (method.useContractAssets) {
+          assume(!method.usePayToContractOnly, "Must be true")
+          ctx
+            .useContractAssets(contractId, methodIndex)
+            .map { balancesPerLockup =>
+              currentBalance.remaining
+                .add(LockupScript.p2c(contractId), balancesPerLockup)
+                .map(_ => currentBalance)
+            }
+        } else if (method.usePayToContractOnly) {
+          assume(ctx.getHardFork().isGhostEnabled(), "Must be true")
+          ctx.prepareForPayToContractOnly(contractId).map(_ => Some(currentBalance))
+        } else {
+          // Dead branch
+          noContractAssetsReturn
+        }
+      case _ =>
+        noContractAssetsReturn
     }
   }
 

@@ -140,7 +140,14 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         if (method.useContractAssets) {
           frame.ctx.assetStatus(contractId) is a[ContractAssetInUsing]
         }
+        if (method.usePayToContractOnly) {
+          frame.ctx.assetStatus(contractId) is a[ContractAssetInUsing]
+        }
       }
+    }
+
+    def assumptionFail[T](test: => T) = {
+      intercept[AssertionError](test).getMessage is "assumption failed: Must be true"
     }
   }
 
@@ -153,14 +160,24 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     test(preLemanFrame, contract5, emptyOutput = true)
     test(preLemanFrame, contract6, emptyOutput = false)
     test(preLemanFrame, contract7, emptyOutput = true)
+
     test(lemanFrame, contract0, emptyOutput = false)
     test(lemanFrame, contract1, emptyOutput = true)
     test(lemanFrame, contract2, emptyOutput = false)
     test(lemanFrame, contract3, emptyOutput = false)
-    test(lemanFrame, contract4, emptyOutput = false)
-    test(lemanFrame, contract5, emptyOutput = true)
-    test(lemanFrame, contract6, emptyOutput = false)
-    test(lemanFrame, contract7, emptyOutput = false)
+    assumptionFail(test(lemanFrame, contract4, emptyOutput = false))
+    assumptionFail(test(lemanFrame, contract5, emptyOutput = true))
+    assumptionFail(test(lemanFrame, contract6, emptyOutput = false))
+    assumptionFail(test(lemanFrame, contract7, emptyOutput = false))
+
+    test(rhoneFrame, contract0, emptyOutput = false)
+    test(rhoneFrame, contract1, emptyOutput = true)
+    test(rhoneFrame, contract2, emptyOutput = false)
+    test(rhoneFrame, contract3, emptyOutput = false)
+    assumptionFail(test(rhoneFrame, contract4, emptyOutput = false))
+    test(rhoneFrame, contract5, emptyOutput = false)
+    test(rhoneFrame, contract6, emptyOutput = false)
+    assumptionFail(test(rhoneFrame, contract7, emptyOutput = true))
   }
 
   it should "check contract id" in {

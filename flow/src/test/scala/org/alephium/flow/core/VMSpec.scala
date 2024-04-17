@@ -458,7 +458,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |Contract ShinyToken() {
          |  @using(assetsInContract = true)
          |  pub fn transfer(to: Address, amount: U256) -> () {
-         |    transferTokenFromSelf!(to, selfContractId!(), amount)
+         |    transferTokenFromSelf!(to, selfTokenId!(), amount)
          |    transferTokenFromSelf!(to, ALPH, dustAmount!())
          |  }
          |}
