@@ -63,8 +63,6 @@ abstract class Parser[Ctx <: StatelessContext] {
   def const[Unknown: P]: P[Ast.Const[Ctx]] =
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(_.asInstanceOf[Ast.Const[Ctx]])
 
-  def value[Unknown: P]: P[Val] = P(const).map(_.v)
-
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     PP("[" ~ (expr.rep(1, ",")) ~ "]") { elems =>
       Ast.CreateArrayExpr.apply(elems)
