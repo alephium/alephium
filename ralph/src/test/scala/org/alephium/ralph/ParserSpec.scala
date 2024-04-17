@@ -17,6 +17,7 @@
 package org.alephium.ralph
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
@@ -1894,6 +1895,16 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), StatefulParser.struct(_)))
       error.message is "These struct fields are defined multiple times: a"
       error.position is code.indexOf("$")
+    }
+  }
+
+  it should "handle correct const width lexer" in {
+    info("typedNum")
+    forAll(Gen.posNum, Gen.choose(0, 10)) { case (num, numSpaces) =>
+      val spaces = s"${" " * numSpaces}"
+      val str    = s"${num.toString}$spaces"
+      val result = fastparse.parse(str, StatelessParser.const(_)).get.value
+      result.sourceIndex.get.width is num.toString.length
     }
   }
 }

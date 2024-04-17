@@ -59,10 +59,11 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   }
 
-  def value[Unknown: P]: P[Val] = P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address)
-  def const[Unknown: P]: P[Ast.Const[Ctx]] = PP(value) { const =>
-    Ast.Const.apply[Ctx](const)
-  }
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def const[Unknown: P]: P[Ast.Const[Ctx]] =
+    P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(_.asInstanceOf[Ast.Const[Ctx]])
+
+  def value[Unknown: P]: P[Val] = P(const).map(_.v)
 
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     PP("[" ~ (expr.rep(1, ",")) ~ "]") { elems =>
@@ -128,7 +129,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
 
   def nonNegativeNum[Unknown: P](errorMsg: String): P[Int] = P(Index ~ Lexer.num ~~ Index).map {
-    case (fromIndex, value, endIndex) =>
+    case (fromIndex, (value, _), endIndex) =>
       val idx = value.intValue()
       if (idx < 0) {
         throw Compiler.Error(
@@ -285,8 +286,9 @@ abstract class Parser[Ctx <: StatelessContext] {
     varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
-      Ast.VarDef(vars, expr)
+    P(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr).map { case (from, vars, expr) =>
+      val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+      Ast.VarDef(vars, expr).atSourceIndex(sourceIndex)
     }
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
