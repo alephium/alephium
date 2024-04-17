@@ -226,7 +226,7 @@ class ContextSpec
       lazy val context    = genStatefulContext(None, gasLimit = initialGas)
       context.contractInputs.clear()
       context.contractInputs += outputRef -> output
-      context.markAssetInUsing(contractId)
+      context.markAssetInUsing(contractId, MutBalancesPerLockup.empty)
       context.worldState.createContractLegacyUnsafe(
         contractId,
         StatefulContract.forSMT,
@@ -242,7 +242,10 @@ class ContextSpec
         modifiedOutput isnot output
         val initialGas = context.gasRemaining
         context.generatedOutputs.clear()
-        context.assetStatus.put(contractId, ContractPool.ContractAssetInUsing)
+        context.assetStatus.put(
+          contractId,
+          ContractPool.ContractAssetInUsing(MutBalancesPerLockup.empty)
+        )
         context.generateOutput(modifiedOutput) isE ()
         context.contractInputs.toSeq is Seq(outputRef -> output)
         context.generatedOutputs.toSeq is Seq(modifiedOutput)

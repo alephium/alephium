@@ -137,7 +137,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
           frame.balanceStateOpt.get.approved.all.isEmpty is true
         }
         if (method.useContractAssets) {
-          frame.ctx.assetStatus(contractId) is ContractAssetInUsing
+          frame.ctx.assetStatus(contractId) is a[ContractAssetInUsing]
         }
       }
     }

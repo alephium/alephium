@@ -204,8 +204,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   it should "market assets properly" in new Fixture {
     val contractId0 = ContractId.generate
     val contractId1 = ContractId.generate
-    pool.markAssetInUsing(contractId0) isE ()
-    pool.markAssetInUsing(contractId0) is failed(ContractAssetAlreadyInUsing)
+    pool.markAssetInUsing(contractId0, MutBalancesPerLockup.empty) isE ()
+    pool.markAssetInUsing(contractId0, MutBalancesPerLockup.empty) is failed(ContractAssetAlreadyInUsing)
 
     pool.markAssetFlushed(contractId0) isE ()
     pool.markAssetFlushed(contractId0) is failed(ContractAssetAlreadyFlushed)
@@ -214,7 +214,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     )
 
     pool.checkAllAssetsFlushed() isE ()
-    pool.markAssetInUsing(contractId1) isE ()
+    pool.markAssetInUsing(contractId1, MutBalancesPerLockup.empty) isE ()
     pool.checkAllAssetsFlushed() is failed(EmptyContractAsset)
     pool.markAssetFlushed(contractId1) isE ()
     pool.checkAllAssetsFlushed() isE ()
@@ -241,6 +241,6 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.useContractAssets(contractId).isRight is true
     initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
     pool.worldState.getOutputOpt(outputRef) isE a[Some[_]]
-    pool.assetStatus(contractId) is ContractPool.ContractAssetInUsing
+    pool.assetStatus(contractId) is a[ContractPool.ContractAssetInUsing]
   }
 }
