@@ -178,7 +178,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   it should "parse string literals" in {
     def test(testString: String) = {
       parse(s"b`$testString`", StatelessParser.expr(_)).get.value is
-        StringLiteral[StatelessContext](
+        Const[StatelessContext](
           Val.ByteVec(ByteString.fromString(testString))
         )
     }
@@ -252,7 +252,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       CallExpr[StatelessContext](
         FuncId("foo", false),
         Seq.empty,
-        List(StringLiteral(Val.ByteVec(ByteString.fromString("Hello"))))
+        List(Const(Val.ByteVec(ByteString.fromString("Hello"))))
       )
 
     info("Braces syntax")

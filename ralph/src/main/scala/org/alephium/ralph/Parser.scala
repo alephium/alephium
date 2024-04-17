@@ -237,9 +237,9 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw CompilerError.`Expected else statement`(index, fileURI)
     }
 
-  def stringLiteral[Unknown: P]: P[Ast.StringLiteral[Ctx]] =
+  def stringLiteral[Unknown: P]: P[Ast.Const[Ctx]] =
     PP("b" ~ Lexer.string) { s =>
-      Ast.StringLiteral(Val.ByteVec(ByteString.fromString(s)))
+      Ast.Const(Val.ByteVec(ByteString.fromString(s)))
     }
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
@@ -947,8 +947,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       value match {
         case v: Ast.Const[_] =>
           Ast.ConstantVarDef(ident, v)
-        case Ast.StringLiteral(v) =>
-          Ast.ConstantVarDef(ident, Ast.Const(v))
         case v: Ast.CreateArrayExpr[_] =>
           throwConstantVarDefException("arrays", v.sourceIndex)
         case v: Ast.StructCtor[_] =>
@@ -974,8 +972,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
 
   def enumField[Unknown: P]: P[Ast.EnumField[StatefulContext]] =
-    PP(Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(_.string))) { case (ident, value) =>
-      Ast.EnumField(ident, Ast.Const(value))
+    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
+      Ast.EnumField(ident, value)
     }
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {

@@ -588,17 +588,6 @@ object Ast {
     }
   }
 
-  final case class StringLiteral[Ctx <: StatelessContext](
-      string: Val.ByteVec
-  ) extends Expr[Ctx]
-      with Positioned {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
-
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      Seq(BytesConst(string))
-    }
-  }
-
   final case class StructField(ident: Ident, isMutable: Boolean, tpe: Type) extends UniqueDef {
     def name: String      = ident.name
     def signature: String = s"${ident.name}:${tpe.signature}"
