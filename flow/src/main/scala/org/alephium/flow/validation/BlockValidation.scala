@@ -404,7 +404,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         val totalReward = uncleRewards.fold(blockRewardLocked)(_ addUnsafe _)
         CoinbaseNetReward(totalReward.addUnsafe(coinbaseGasFee), isPoLW)
       } else {
-        val totalReward = uncleRewards.fold(U256.Zero)(_ addUnsafe _).addUnsafe(netReward)
+        val burntAmount = lockedReward.subUnsafe(netReward)
+        val totalReward = uncleRewards
+          .fold(U256.Zero)(_ addUnsafe _)
+          .addUnsafe(blockRewardLocked)
+          .subUnsafe(burntAmount)
         CoinbaseNetReward(totalReward, isPoLW)
       }
       for {

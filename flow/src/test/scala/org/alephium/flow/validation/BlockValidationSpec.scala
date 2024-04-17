@@ -1126,7 +1126,7 @@ class BlockValidationSpec extends AlephiumSpec {
     ): Transaction = {
       val emission = consensusConfigs.getConsensusConfig(header.timestamp).emission
       val reward   = emission.reward(header).asInstanceOf[Emission.PoLW]
-      val (rewardOutputs, burntAmount) = Coinbase.calcPoLWCoinbaseRewardOutputs(
+      val rewardOutputs = Coinbase.calcPoLWCoinbaseRewardOutputs(
         chainIndex,
         minerLockupScript,
         uncles,
@@ -1141,7 +1141,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val gas = GasEstimation.estimateWithP2PKHInputs(utxos.length, rewardOutputs.length + 1)
       val unsignedTx =
         blockFlow
-          .polwCoinbase(lockupScript, unlockScript, rewardOutputs, burntAmount, utxos, gas)
+          .polwCoinbase(lockupScript, unlockScript, rewardOutputs, reward.burntAmount, utxos, gas)
           .rightValue
       val preImage  = UnlockScript.PoLW.buildPreImage(lockupScript, minerLockupScript)
       val signature = SignatureSchema.sign(preImage, privateKey)

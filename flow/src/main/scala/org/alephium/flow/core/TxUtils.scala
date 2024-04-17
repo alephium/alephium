@@ -176,7 +176,7 @@ trait TxUtils { Self: FlowUtils =>
       blockTs: TimeStamp,
       minerData: ByteString
   )(implicit networkConfig: NetworkConfig): IOResult[Either[String, UnsignedTransaction]] = {
-    val (rewardOutputs, burntAmount) = Coinbase.calcPoLWCoinbaseRewardOutputs(
+    val rewardOutputs = Coinbase.calcPoLWCoinbaseRewardOutputs(
       chainIndex,
       minerLockupScript,
       uncles,
@@ -185,7 +185,7 @@ trait TxUtils { Self: FlowUtils =>
       blockTs,
       minerData
     )
-    val totalAmount      = burntAmount.addUnsafe(dustUtxoAmount)
+    val totalAmount      = reward.burntAmount.addUnsafe(dustUtxoAmount)
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.polw(fromPublicKey)
     getUsableUtxos(None, fromLockupScript, Int.MaxValue)
@@ -208,7 +208,7 @@ trait TxUtils { Self: FlowUtils =>
             fromLockupScript,
             fromUnlockScript,
             rewardOutputs,
-            burntAmount,
+            reward.burntAmount,
             selected.assets,
             selected.gas
           )

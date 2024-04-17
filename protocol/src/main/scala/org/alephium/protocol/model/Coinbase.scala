@@ -141,7 +141,7 @@ object Coinbase {
       gasFee: U256,
       blockTs: TimeStamp,
       minerData: ByteString
-  )(implicit networkConfig: NetworkConfig): (AVector[AssetOutput], U256) = {
+  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
     val hardFork           = networkConfig.getHardFork(blockTs)
     val lockedReward       = Transaction.totalReward(gasFee, reward.miningReward, hardFork)
     val netReward          = lockedReward.subUnsafe(reward.burntAmount)
@@ -153,14 +153,12 @@ object Coinbase {
     val blockRewardLocked = blockReward.mulUnsafe(lockedReward).divUnsafe(netReward)
     val coinbaseData =
       CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
-    val blockRewardOutput = AssetOutput(
+    AssetOutput(
       blockRewardLocked,
       minerLockupScript,
       lockTime,
       AVector.empty,
       serialize(coinbaseData)
-    )
-    val burntAmount = blockRewardLocked.subUnsafe(netReward)
-    (blockRewardOutput +: uncleRewardOutputs, burntAmount)
+    ) +: uncleRewardOutputs
   }
 }
