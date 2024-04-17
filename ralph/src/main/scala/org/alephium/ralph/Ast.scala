@@ -196,6 +196,7 @@ object Ast {
     )
   }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
+    def toConstInstr: Instr[StatelessContext]                    = v.toConstInstr
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -1116,14 +1117,17 @@ object Ast {
     }
   }
 
-  final case class ConstantVarDef(ident: Ident, value: Val) extends UniqueDef {
+  final case class ConstantVarDef[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
+      extends UniqueDef {
     def name: String = ident.name
   }
 
-  final case class EnumField(ident: Ident, value: Val) extends UniqueDef {
+  final case class EnumField[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
+      extends UniqueDef {
     def name: String = ident.name
   }
-  final case class EnumDef(id: TypeId, fields: Seq[EnumField]) extends UniqueDef {
+  final case class EnumDef[Ctx <: StatelessContext](id: TypeId, fields: Seq[EnumField[Ctx]])
+      extends UniqueDef {
     def name: String = id.name
   }
   object EnumDef {
@@ -1591,8 +1595,8 @@ object Ast {
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def events: Seq[EventDef]
-    def constantVars: Seq[ConstantVarDef]
-    def enums: Seq[EnumDef]
+    def constantVars: Seq[ConstantVarDef[StatefulContext]]
+    def enums: Seq[EnumDef[StatefulContext]]
 
     def builtInContractFuncs(
         globalState: GlobalState
@@ -1617,8 +1621,8 @@ object Ast {
 
     def error(tpe: String): Compiler.Error =
       Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe", sourceIndex)
-    def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
-    def enums: Seq[EnumDef]               = throw error("enum")
+    def constantVars: Seq[ConstantVarDef[StatefulContext]] = throw error("constant variable")
+    def enums: Seq[EnumDef[StatefulContext]]               = throw error("enum")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): AVector[String] = AVector.from(templateVars.view.map(_.ident.name))
@@ -1680,8 +1684,8 @@ object Ast {
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
-      constantVars: Seq[ConstantVarDef],
-      enums: Seq[EnumDef],
+      constantVars: Seq[ConstantVarDef[StatefulContext]],
+      enums: Seq[EnumDef[StatefulContext]],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     lazy val hasStdIdField: Boolean = stdIdEnabled.exists(identity) && stdInterfaceId.nonEmpty
@@ -1718,14 +1722,14 @@ object Ast {
     private def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(constantVars, "constant variables")
       constantVars.foreach(v =>
-        state.addConstantVariable(v.ident, Type.fromVal(v.value.tpe), Seq(v.value.toConstInstr))
+        state.addConstantVariable(v.ident, Type.fromVal(v.value.v.tpe), Seq(v.value.toConstInstr))
       )
       UniqueDef.checkDuplicates(enums, "enums")
       enums.foreach(e =>
         e.fields.foreach(field =>
           state.addConstantVariable(
             EnumDef.fieldIdent(e.id, field.ident),
-            Type.fromVal(field.value.tpe),
+            Type.fromVal(field.value.v.tpe),
             Seq(field.value.toConstInstr)
           )
         )
@@ -1810,12 +1814,12 @@ object Ast {
         sourceIndex
       )
 
-    def templateVars: Seq[Argument]       = throw error("template variable")
-    def fields: Seq[Argument]             = throw error("field")
-    def getFieldsSignature(): String      = throw error("field")
-    def getFieldTypes(): Seq[String]      = throw error("field")
-    def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
-    def enums: Seq[EnumDef]               = throw error("enum")
+    def templateVars: Seq[Argument]                        = throw error("template variable")
+    def fields: Seq[Argument]                              = throw error("field")
+    def getFieldsSignature(): String                       = throw error("field")
+    def getFieldTypes(): Seq[String]                       = throw error("field")
+    def constantVars: Seq[ConstantVarDef[StatefulContext]] = throw error("constant variable")
+    def enums: Seq[EnumDef[StatefulContext]]               = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code", sourceIndex)
@@ -2135,8 +2139,8 @@ object Ast {
         Option[StdInterfaceId],
         Seq[FuncDef[StatefulContext]],
         Seq[EventDef],
-        Seq[ConstantVarDef],
-        Seq[EnumDef]
+        Seq[ConstantVarDef[StatefulContext]],
+        Seq[EnumDef[StatefulContext]]
     ) = {
       val parents                       = parentsCache(contract.ident)
       val (allContracts, allInterfaces) = (parents :+ contract).partition(_.isInstanceOf[Contract])
@@ -2284,14 +2288,14 @@ object Ast {
       allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
     }
 
-    def mergeEnums(enums: Seq[EnumDef]): Seq[EnumDef] = {
-      val mergedEnums = mutable.Map.empty[TypeId, mutable.ArrayBuffer[EnumField]]
+    def mergeEnums(enums: Seq[EnumDef[StatefulContext]]): Seq[EnumDef[StatefulContext]] = {
+      val mergedEnums = mutable.Map.empty[TypeId, mutable.ArrayBuffer[EnumField[StatefulContext]]]
       enums.foreach { enumDef =>
         mergedEnums.get(enumDef.id) match {
           case Some(fields) =>
             // enum fields will never be empty
-            val expectedType = enumDef.fields(0).value.tpe
-            val haveType     = fields(0).value.tpe
+            val expectedType = enumDef.fields(0).value.v.tpe
+            val haveType     = fields(0).value.v.tpe
             if (expectedType != haveType) {
               throw Compiler.Error(
                 s"There are different field types in the enum ${enumDef.id.name}: $expectedType,$haveType",

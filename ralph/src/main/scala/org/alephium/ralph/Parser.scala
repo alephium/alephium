@@ -925,13 +925,13 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
+  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
     PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
       value match {
-        case Ast.Const(v) =>
+        case v: Ast.Const[_] =>
           Ast.ConstantVarDef(ident, v)
         case Ast.StringLiteral(v) =>
-          Ast.ConstantVarDef(ident, v)
+          Ast.ConstantVarDef(ident, Ast.Const(v))
         case v: Ast.CreateArrayExpr[_] =>
           throwConstantVarDefException("arrays", v.sourceIndex)
         case v: Ast.StructCtor[_] =>
@@ -956,11 +956,11 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       Ast.EnumFieldSelector(enumId, field)
     }
 
-  def enumField[Unknown: P]: P[Ast.EnumField] =
+  def enumField[Unknown: P]: P[Ast.EnumField[StatefulContext]] =
     PP(Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(_.string))) { case (ident, value) =>
-      Ast.EnumField(ident, value)
+      Ast.EnumField(ident, Ast.Const(value))
     }
-  def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =
+  def rawEnumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
       case (enumIndex, id, fields) =>
         if (fields.length == 0) {
@@ -968,15 +968,15 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
         }
         Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.tpe).size != 1) {
+        if (fields.distinctBy(_.value.v.tpe).size != 1) {
           throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
         }
-        if (fields.distinctBy(_.value).size != fields.length) {
+        if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
         Ast.EnumDef(id, fields)
     }
-  def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
+  def enumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] = P(Start ~ rawEnumDef ~ End)
 
   // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -1002,8 +1002,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
         val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
         val events                = ArrayBuffer.empty[Ast.EventDef]
-        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
-        val enums                 = ArrayBuffer.empty[Ast.EnumDef]
+        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef[StatefulContext]]
+        val enums                 = ArrayBuffer.empty[Ast.EnumDef[StatefulContext]]
 
         statements.foreach {
           case e: Ast.EventDef =>
@@ -1011,16 +1011,16 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
-          case c: Ast.ConstantVarDef =>
+          case c: Ast.ConstantVarDef[_] =>
             if (funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
-            constantVars += c
-          case e: Ast.EnumDef =>
+            constantVars += c.asInstanceOf[Ast.ConstantVarDef[StatefulContext]]
+          case e: Ast.EnumDef[_] =>
             if (funcs.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
-            enums += e
+            enums += e.asInstanceOf[Ast.EnumDef[StatefulContext]]
           case f: Ast.FuncDef[_] =>
             funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
           case _ =>
