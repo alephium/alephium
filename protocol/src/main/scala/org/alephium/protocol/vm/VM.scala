@@ -319,6 +319,7 @@ final class StatefulVM(
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   @inline private def shouldKeepContractBalances(
       hardFork: HardFork,
       isApproved: Boolean,

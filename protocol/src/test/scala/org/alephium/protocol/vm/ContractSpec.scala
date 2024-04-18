@@ -105,7 +105,7 @@ class ContractSpec extends AlephiumSpec {
   it should "not validate empty scripts" in {
     def check(contract: StatefulContract, result: Any) = {
       val result0 = StatefulContract.check(contract, HardFork.Mainnet)
-      val result1 = StatefulContract.check(contract, HardFork.Leman)
+      val result1 = StatefulContract.check(contract, HardFork.SinceLemanForTest)
 
       result match {
         case error: ExeFailure =>
@@ -293,13 +293,19 @@ class ContractSpec extends AlephiumSpec {
     contracts(1).checkAssetsModifier(preLemanContext) isE ()
     contracts(2).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeLeman
     contracts(3).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeLeman
-    contracts.drop(4).foreach(_.checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
+    contracts
+      .drop(4)
+      .foreach(
+        _.checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeRhone
+      )
 
     contracts(0).checkAssetsModifier(lemanContext) isE ()
     contracts(1).checkAssetsModifier(lemanContext) isE ()
     contracts(2).checkAssetsModifier(lemanContext) isE ()
     contracts(3).checkAssetsModifier(lemanContext) isE ()
-    contracts.drop(4).foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
+    contracts
+      .drop(4)
+      .foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
   }
 }
 

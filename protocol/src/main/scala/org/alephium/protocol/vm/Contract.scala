@@ -83,7 +83,7 @@ final case class Method[Ctx <: StatelessContext](
 }
 
 object Method {
-  val payToContractOnlyMask = 4
+  val payToContractOnlyMask: Int = 4
 
   private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
     val first2bits = (method.usePreapprovedAssets, method.useContractAssets) match {

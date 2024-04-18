@@ -32,5 +32,7 @@ class HardForkSpec extends AlephiumSpec {
     HardFork.Mainnet.isLemanEnabled() is false
     HardFork.Mainnet.isGhostEnabled() is false
     HardFork.Ghost.isGhostEnabled() is true
+
+    Seq(HardFork.Leman, HardFork.Ghost).contains(HardFork.SinceLemanForTest) is true
   }
 }
