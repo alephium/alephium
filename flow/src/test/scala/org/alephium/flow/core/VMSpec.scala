@@ -5840,6 +5840,63 @@ class VMSpec extends AlephiumSpec with Generators {
     failCallTxScript(script, ContractAssetAlreadyInUsing)
   }
 
+  behavior of "Pay to contract only"
+
+  trait PayToContractOnlyFixture extends ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, payToContractOnly = true)
+         |  pub fn deposit(sender: Address) -> () {
+         |    transferTokenToSelf!(sender, ALPH, 10 alph)
+         |  }
+         |  @using(preapprovedAssets = true, payToContractOnly = true)
+         |  pub fn depositN(sender: Address, n: U256) -> () {
+         |    transferTokenToSelf!(sender, ALPH, 10 alph)
+         |    if (n > 0) {
+         |      depositN{sender -> ALPH: 10 alph * n}(sender, n - 1)
+         |    }
+         |  }
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn both(sender: Address, target: Address) -> () {
+         |    transferTokenFromSelf!(target, ALPH, 1 alph)
+         |    depositN{sender -> ALPH: 10 alph * 6}(target, 5)
+         |  }
+         |}
+         |""".stripMargin
+
+    lazy val fooId = createContract(foo, initialAttoAlphAmount = ALPH.alph(100))._1
+
+    lazy val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  let caller = callerAddress!()
+         |  foo.deposit{caller -> ALPH: 10 alph}(caller)
+         |  foo.deposit{caller -> ALPH: 10 alph}(caller)
+         |  foo.both{caller -> ALPH: 10 alph * 6}(caller, caller)
+         |}
+         |$foo
+         |""".stripMargin
+  }
+
+  it should "call the same deposit function multiple times in the same contract: Rhone" in new PayToContractOnlyFixture {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    getContractAsset(fooId).amount is ALPH.alph(100)
+    callTxScript(script)
+    getContractAsset(fooId).amount is ALPH.alph(100 + 20 + 10 * 6 - 1)
+  }
+
+  it should "not call the same deposit function multiple times in the same contract: Leman" in new PayToContractOnlyFixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
+    intercept[AssertionError](callTxScript(script)).getMessage is
+      s"Right(TxScriptExeFailed($InvalidMethodModifierBeforeRhone))"
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
