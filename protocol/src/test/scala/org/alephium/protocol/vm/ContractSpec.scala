@@ -159,7 +159,7 @@ class ContractSpec extends AlephiumSpec {
     check(contract12, ())
     val contract13 = StatefulContract(0xff + 1, AVector(method))
     StatefulContract.check(contract13, HardFork.Mainnet) isE ()
-    StatefulContract.check(contract13, HardFork.Leman).leftValue isE TooManyFields
+    StatefulContract.check(contract13, HardFork.SinceLemanForTest).leftValue isE TooManyFields
   }
 
   trait MethodsFixture {

@@ -127,8 +127,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "load limited number of contracts before Rhone" in new ContractNumFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+  it should "load limited number of contracts before Rhone" in new ContractNumFixture
+    with NetworkConfigFixture.LemanT {
     pool.getHardFork() is HardFork.Leman
 
     val contracts = prepare()
@@ -158,8 +158,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture with NetworkConfigFixture.LemanT {
     pool.getHardFork() is HardFork.Leman
 
     val contractId2 = prepare()

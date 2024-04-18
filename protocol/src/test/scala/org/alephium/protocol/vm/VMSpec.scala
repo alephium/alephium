@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
-import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
@@ -599,13 +599,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   trait NetworkFixture extends ContextGenerators {
-    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
-    val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
-
-    val preLemanStatefulVm =
-      new StatefulVM(preLemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
-    val lemanStatefulVm =
-      new StatefulVM(lemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+    lazy val context = genStatefulContext(None)
+    lazy val vm      = new StatefulVM(context, Stack.ofCapacity(0), Stack.ofCapacity(0))
   }
 
   it should "check the minimal contract balance" in new NetworkFixture {
@@ -667,7 +662,16 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     {
       info("No local variables")
       val method0 =
-        Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          false,
+          0,
+          0,
+          0,
+          AVector(ConstTrue, CallLocal(1))
+        )
       val method1 = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
@@ -677,16 +681,24 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       info("Non-empty local variables")
 
       val method0 =
-        Method[StatefulContext](true, false, false, false, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          false,
+          0,
+          1,
+          0,
+          AVector(ConstTrue, CallLocal(1))
+        )
       val method1 = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
     }
   }
 
-  class SwitchBackFixture(network: NetworkConfig) extends FrameFixture with NetworkFixture {
-    val vm   = if (network.lemanHardForkTimestamp.isZero()) lemanStatefulVm else preLemanStatefulVm
-    val from = lockupScriptGen.sample.get
+  trait SwitchBackFixture extends FrameFixture with NetworkFixture {
+    val from                  = lockupScriptGen.sample.get
     var expectedBalance: U256 = ALPH.alph(0)
     def addAndCheckBalance(delta: U256) = {
       expectedBalance = expectedBalance + delta
@@ -696,7 +708,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       }
     }
 
-    def frameWithoutBalances = genStatefulFrame(None)(network)
+    def frameWithoutBalances = genStatefulFrame(None)
     def frameWithRemainingDepth0 = genStatefulFrame(
       Some(
         MutBalanceState(
@@ -705,7 +717,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         )
       ),
       usePreapprovedAssets = true
-    )(network)
+    )
     def frameWithRemainingDepth1 = genStatefulFrame(
       Some(
         MutBalanceState(
@@ -714,7 +726,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         )
       ),
       usePreapprovedAssets = true
-    )(network)
+    )
     def frameWithApprovedDepth0 = genStatefulFrame(
       Some(
         MutBalanceState(
@@ -723,7 +735,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         )
       ),
       usePreapprovedAssets = true
-    )(network)
+    )
     def frameWithApprovedDepth1 = genStatefulFrame(
       Some(
         MutBalanceState(
@@ -732,7 +744,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         )
       ),
       usePreapprovedAssets = true
-    )(network)
+    )
     def allFrames = Seq(
       frameWithoutBalances,
       frameWithRemainingDepth0,
@@ -742,9 +754,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     )
   }
 
-  it should "switch back frames properly: Leman" in new SwitchBackFixture(
-    NetworkConfigFixture.Leman
-  ) {
+  it should "switch back frames properly: Leman" in new SwitchBackFixture
+    with NetworkConfigFixture.LemanT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
     addAndCheckBalance(0)
     for (previousFrame <- allFrames) {
       vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
@@ -774,9 +787,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     }
   }
 
-  it should "switch back frames properly: PreLeman" in new SwitchBackFixture(
-    NetworkConfigFixture.Genesis
-  ) {
+  it should "switch back frames properly: PreLeman" in new SwitchBackFixture
+    with NetworkConfigFixture.GenesisT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
     addAndCheckBalance(0)
     for (previousFrame <- allFrames) {
       vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()

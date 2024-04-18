@@ -38,7 +38,7 @@ class CostStrategySpec extends AlephiumSpec {
     test(_.chargeContractStateUpdate(Seq(Val.ByteVec(bytes))), 5000 + 123)
     test(_.chargeGas(GasBox.unsafe(100)), 100)
     test(_.chargeContractCodeSize(bytes, HardFork.Mainnet), 200 + 123)
-    test(_.chargeContractCodeSize(bytes, HardFork.Leman), 200 + 123)
+    test(_.chargeContractCodeSize(bytes, HardFork.SinceLemanForTest), 200 + 123)
     test(_.chargeFieldSize(Seq(Val.ByteVec(bytes))), 123)
   }
 }

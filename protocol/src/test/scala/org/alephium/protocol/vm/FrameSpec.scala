@@ -181,8 +181,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   }
 
   it should "check contract id" in {
-    val genesisFrame = genStatefulFrame()(NetworkConfigFixture.Genesis)
-    val lemanFrame   = genStatefulFrame()(NetworkConfigFixture.Leman)
+    val genesisFrame    = genStatefulFrame()(NetworkConfigFixture.Genesis)
+    val sinceLemanFrame = genStatefulFrame()(NetworkConfigFixture.SinceLeman)
 
     val randomContractId = ContractId.generate
     val zeroContractId   = ContractId.unsafe(TokenId.alph.value)
@@ -190,8 +190,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     genesisFrame.checkContractId(randomContractId).rightValue is ()
     genesisFrame.checkContractId(zeroContractId).rightValue is ()
 
-    lemanFrame.checkContractId(randomContractId).rightValue is ()
-    lemanFrame.checkContractId(zeroContractId).leftValue is Right(ZeroContractId)
+    sinceLemanFrame.checkContractId(randomContractId).rightValue is ()
+    sinceLemanFrame.checkContractId(zeroContractId).leftValue is Right(ZeroContractId)
   }
 }
 
