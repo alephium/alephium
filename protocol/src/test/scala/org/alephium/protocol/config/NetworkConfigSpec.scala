@@ -46,7 +46,7 @@ class NetworkConfigSpec extends AlephiumSpec {
   it should "get the right hard fork" in {
     val now = TimeStamp.now()
 
-    NetworkConfigFixture.PreLeman.getHardFork(now) is HardFork.Mainnet
+    NetworkConfigFixture.Genesis.getHardFork(now) is HardFork.Mainnet
     NetworkConfigFixture.Leman.getHardFork(now) is HardFork.Leman
     NetworkConfigFixture.Ghost.getHardFork(now) is HardFork.Ghost
     Seq(HardFork.Leman, HardFork.Ghost).contains(

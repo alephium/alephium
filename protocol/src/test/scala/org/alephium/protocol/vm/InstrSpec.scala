@@ -29,7 +29,7 @@ import org.scalacheck.Gen
 import org.alephium.crypto
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.config.NetworkConfigFixture.{Leman, PreLeman}
+import org.alephium.protocol.config.NetworkConfigFixture.{Leman, Genesis}
 import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
@@ -129,7 +129,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       }
     }
     val frame1 =
-      prepareFrame(AVector.empty)(NetworkConfigFixture.PreLeman) // Leman is not activated yet
+      prepareFrame(AVector.empty)(NetworkConfigFixture.Genesis) // Leman is not activated yet
     lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
   }
 
@@ -2078,7 +2078,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         callerFrameOpt,
         immFields,
         mutFields
-      )(NetworkConfigFixture.PreLeman)
+      )(NetworkConfigFixture.Genesis)
     }
   }
 
@@ -3163,8 +3163,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .rightValue
     }
 
-    prepareFrame(None)(NetworkConfigFixture.PreLeman).execute().isRight is true
-    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.PreLeman)
+    prepareFrame(None)(NetworkConfigFixture.Genesis).execute().isRight is true
+    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.Genesis)
       .execute()
       .isRight is true
 
@@ -3209,7 +3209,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         Some(balanceState),
         immFields = AVector.empty,
         mutFields = AVector(Val.True, Val.False)
-      )(NetworkConfigFixture.PreLeman)
+      )(NetworkConfigFixture.Genesis)
     val lemanFrame =
       (balanceState: MutBalanceState) =>
         prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
@@ -3615,7 +3615,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Before Leman hardfork")
 
-      val frame        = prepareFrame()(PreLeman)
+      val frame        = prepareFrame()(Genesis)
       val destroyFrame = frame.execute().rightValue.value
 
       destroyFrame.opStack.push(Val.Address(contractLockupScriptGen.sample.get))
@@ -3640,7 +3640,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Should fail before Leman hardfork")
 
-      val frame               = prepareFrame()(PreLeman)
+      val frame               = prepareFrame()(Genesis)
       val callingLockupScript = LockupScript.p2c(frame.obj.contractIdOpt.value)
 
       val destroyFrame = frame.execute().rightValue.value
@@ -3670,7 +3670,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Before Leman hardfork")
 
-      val frame = prepareFrame()(PreLeman)
+      val frame = prepareFrame()(Genesis)
 
       checkDestroyRefundBalance(frame) { destroyFrame =>
         val assetLockupScript = assetLockupScriptGen.sample.get

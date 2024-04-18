@@ -47,12 +47,12 @@ object NetworkConfigFixture {
     def ghostHardForkTimestamp: TimeStamp = TimeStamp.zero
   }
 
-  trait PreLemanT extends NetworkConfigFixture {
+  trait GenesisT extends NetworkConfigFixture {
     override def networkId: NetworkId              = NetworkId.AlephiumMainNet
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
     override def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
   }
-  val PreLeman = new PreLemanT {}.networkConfig
+  val Genesis = new GenesisT {}.networkConfig
 
   trait LemanT extends NetworkConfigFixture {
     override def networkId: NetworkId              = NetworkId.AlephiumMainNet

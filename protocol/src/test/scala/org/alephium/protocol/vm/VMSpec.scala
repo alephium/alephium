@@ -599,7 +599,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   trait NetworkFixture extends ContextGenerators {
-    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
     val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
 
     val preLemanStatefulVm =
@@ -775,7 +775,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   it should "switch back frames properly: PreLeman" in new SwitchBackFixture(
-    NetworkConfigFixture.PreLeman
+    NetworkConfigFixture.Genesis
   ) {
     addAndCheckBalance(0)
     for (previousFrame <- allFrames) {

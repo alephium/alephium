@@ -83,7 +83,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
       )
     def preLemanFrame = {
-      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
+      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Genesis)
     }
     def lemanFrame = {
       val balanceState =
@@ -181,7 +181,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   }
 
   it should "check contract id" in {
-    val genesisFrame = genStatefulFrame()(NetworkConfigFixture.PreLeman)
+    val genesisFrame = genStatefulFrame()(NetworkConfigFixture.Genesis)
     val lemanFrame   = genStatefulFrame()(NetworkConfigFixture.Leman)
 
     val randomContractId = ContractId.generate

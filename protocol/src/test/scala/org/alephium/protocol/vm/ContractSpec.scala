@@ -262,7 +262,7 @@ class ContractSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends MethodsFixture with ContextGenerators {
-    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
     val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
     val rhoneContext    = genStatefulContext(None)(NetworkConfigFixture.Ghost)
   }
