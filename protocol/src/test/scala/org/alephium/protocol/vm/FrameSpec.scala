@@ -230,12 +230,14 @@ trait FrameFixture extends ContextGenerators {
   def genStatefulFrame(
       balanceState: Option[MutBalanceState] = None,
       usePreapprovedAssets: Boolean = false,
-      useAssetsInContract: Boolean = false
+      useAssetsInContract: Boolean = false,
+      usePayToContractOnly: Boolean = false
   )(implicit networkConfig: NetworkConfig): StatefulFrame = {
     val method = baseMethod[StatefulContext](
       2,
       usePreapprovedAssets = usePreapprovedAssets,
-      useAssetsInContract = useAssetsInContract
+      useAssetsInContract = useAssetsInContract,
+      usePayToContractOnly = usePayToContractOnly
     )
     val script         = StatefulScript.unsafe(AVector(method))
     val (obj, context) = prepareStatefulScript(script)

@@ -271,7 +271,7 @@ final class StatefulVM(
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
     if (ctx.getHardFork().isLemanEnabled()) {
-      switchBackFrameLeman(currentFrame, previousFrame)
+      switchBackFrameSinceLeman(currentFrame, previousFrame)
     } else {
       switchBackFramePreLeman(currentFrame, previousFrame)
     }
@@ -284,7 +284,7 @@ final class StatefulVM(
     }
   }
 
-  protected def switchBackFrameLeman(
+  protected def switchBackFrameSinceLeman(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {

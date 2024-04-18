@@ -698,60 +698,102 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   trait SwitchBackFixture extends FrameFixture with NetworkFixture {
-    val from                  = lockupScriptGen.sample.get
-    var expectedBalance: U256 = ALPH.alph(0)
-    def addAndCheckBalance(delta: U256) = {
-      expectedBalance = expectedBalance + delta
-      vm.ctx.outputBalances.getBalances(from) match {
+    val group        = groupIndexGen.sample.get
+    val assetFrom    = assetLockupGen(group).sample.get
+    val contractFrom = p2cLockupGen(group).sample.get
+
+    var expectedContractBalance: U256 = ALPH.alph(0)
+    var expectedAssetBalance: U256    = ALPH.alph(0)
+    def addAndCheckBalance(delta: U256, isContract: Boolean = false) = {
+      val expectedBalance = if (isContract) {
+        expectedContractBalance = expectedContractBalance + delta
+        expectedContractBalance
+      } else {
+        expectedAssetBalance = expectedAssetBalance + delta
+        expectedAssetBalance
+      }
+      val address = if (isContract) contractFrom else assetFrom
+      vm.ctx.outputBalances.getBalances(address) match {
         case None           => expectedBalance is U256.Zero
         case Some(balances) => balances.attoAlphAmount is expectedBalance
       }
     }
 
-    def frameWithoutBalances = genStatefulFrame(None)
-    def frameWithRemainingDepth0 = genStatefulFrame(
-      Some(
-        MutBalanceState(
-          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), 0))),
-          MutBalances.empty
-        )
-      ),
-      usePreapprovedAssets = true
-    )
-    def frameWithRemainingDepth1 = genStatefulFrame(
-      Some(
-        MutBalanceState(
-          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), 1))),
-          MutBalances.empty
-        )
-      ),
-      usePreapprovedAssets = true
-    )
-    def frameWithApprovedDepth0 = genStatefulFrame(
-      Some(
-        MutBalanceState(
-          MutBalances.empty,
-          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(2), 0)))
-        )
-      ),
-      usePreapprovedAssets = true
-    )
-    def frameWithApprovedDepth1 = genStatefulFrame(
-      Some(
-        MutBalanceState(
-          MutBalances.empty,
-          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(2), 1)))
-        )
-      ),
-      usePreapprovedAssets = true
-    )
-    def allFrames = Seq(
-      frameWithoutBalances,
-      frameWithRemainingDepth0,
-      frameWithRemainingDepth1,
-      frameWithApprovedDepth0,
-      frameWithApprovedDepth1
-    )
+    sealed trait BalanceType
+    final case object NoBalance            extends BalanceType
+    final case object RemainingBalanceOnly extends BalanceType
+    final case object ApprovedBalanceOnly  extends BalanceType
+
+    sealed trait UseAssetType
+    final case object UsePreapproved       extends UseAssetType
+    final case object UseAssetInContract   extends UseAssetType
+    final case object UsePayToContractOnly extends UseAssetType
+
+    def buildFrame(
+        balanceType: BalanceType,
+        useAssetType: UseAssetType,
+        scopeDept: Int
+    ): StatefulFrame = {
+      val from = if (useAssetType == UsePreapproved) assetFrom else contractFrom
+      val balances = balanceType match {
+        case NoBalance => None
+        case RemainingBalanceOnly =>
+          val bs = MutBalances(
+            ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), scopeDept))
+          )
+          Some(MutBalanceState(bs, MutBalances.empty))
+        case ApprovedBalanceOnly =>
+          val bs = MutBalances(
+            ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneAlph, scopeDept))
+          )
+          Some(MutBalanceState(MutBalances.empty, bs))
+      }
+      genStatefulFrame(
+        balances,
+        usePreapprovedAssets = balanceType != NoBalance && useAssetType == UsePreapproved,
+        useAssetsInContract = balanceType != NoBalance && useAssetType == UseAssetInContract,
+        usePayToContractOnly = balanceType != NoBalance && useAssetType == UsePayToContractOnly
+      )
+    }
+  }
+
+  it should "switch back frames properly: Rhone" in new SwitchBackFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    addAndCheckBalance(0)
+    for {
+      previousBalanceType <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      previousUseAsset    <- Seq(UsePreapproved, UseAssetInContract, UsePayToContractOnly)
+      previousScoptDepth  <- Seq(0, 1)
+      currentBalanceType  <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      currentUseAsset     <- Seq(UsePreapproved, UseAssetInContract, UsePayToContractOnly)
+      currentScoptDepth   <- Seq(0, 1)
+    } yield {
+      val previousFrame = buildFrame(previousBalanceType, previousUseAsset, previousScoptDepth)
+      val currentFrame  = buildFrame(currentBalanceType, currentUseAsset, currentScoptDepth)
+      vm.switchBackFrame(currentFrame, previousFrame) isE ()
+      currentBalanceType match {
+        case NoBalance => addAndCheckBalance(0)
+        case _ =>
+          if (currentScoptDepth == 0) {
+            if (
+              (currentUseAsset == UseAssetInContract || currentUseAsset == UsePayToContractOnly) && currentBalanceType == RemainingBalanceOnly
+            ) {
+              addAndCheckBalance(0, isContract = currentUseAsset != UsePreapproved)
+            } else {
+              addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+            }
+          } else {
+            if (previousBalanceType == NoBalance) {
+              addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+            } else {
+              addAndCheckBalance(0, isContract = true)
+              addAndCheckBalance(0, isContract = false)
+            }
+          }
+      }
+    }
   }
 
   it should "switch back frames properly: Leman" in new SwitchBackFixture
@@ -759,71 +801,66 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     addAndCheckBalance(0)
-    for (previousFrame <- allFrames) {
-      vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
-      addAndCheckBalance(0)
-    }
-
-    for (previousFrame <- allFrames) {
-      vm.switchBackFrame(frameWithRemainingDepth0, previousFrame) isE ()
-      addAndCheckBalance(ALPH.alph(1))
-    }
-    vm.switchBackFrame(frameWithRemainingDepth1, frameWithoutBalances) isE ()
-    addAndCheckBalance(ALPH.alph(1))
-    for (previousFrame <- allFrames.tail) {
-      vm.switchBackFrame(frameWithRemainingDepth1, previousFrame) isE ()
-      addAndCheckBalance(0)
-    }
-
-    for (previousFrame <- allFrames) {
-      vm.switchBackFrame(frameWithApprovedDepth0, previousFrame) isE ()
-      addAndCheckBalance(ALPH.alph(2))
-    }
-    vm.switchBackFrame(frameWithApprovedDepth1, frameWithoutBalances) isE ()
-    addAndCheckBalance(ALPH.alph(2))
-    for (previousFrame <- allFrames.tail) {
-      vm.switchBackFrame(frameWithApprovedDepth1, previousFrame) isE ()
-      addAndCheckBalance(0)
+    for {
+      previousBalanceType <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      previousUseAsset    <- Seq(UsePreapproved, UseAssetInContract)
+      previousScoptDepth  <- Seq(0, 1)
+      currentBalanceType  <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      currentUseAsset     <- Seq(UsePreapproved, UseAssetInContract)
+      currentScoptDepth   <- Seq(0, 1)
+    } yield {
+      val previousFrame = buildFrame(previousBalanceType, previousUseAsset, previousScoptDepth)
+      val currentFrame  = buildFrame(currentBalanceType, currentUseAsset, currentScoptDepth)
+      vm.switchBackFrame(currentFrame, previousFrame) isE ()
+      currentBalanceType match {
+        case NoBalance => addAndCheckBalance(0)
+        case _ =>
+          if (currentScoptDepth == 0) {
+            addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+          } else {
+            if (previousBalanceType == NoBalance) {
+              addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+            } else {
+              addAndCheckBalance(0, isContract = true)
+              addAndCheckBalance(0, isContract = false)
+            }
+          }
+      }
     }
   }
 
   it should "switch back frames properly: PreLeman" in new SwitchBackFixture
     with NetworkConfigFixture.GenesisT {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
-    addAndCheckBalance(0)
-    for (previousFrame <- allFrames) {
-      vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
-      addAndCheckBalance(0)
-    }
 
-    vm.switchBackFrame(frameWithRemainingDepth0, frameWithoutBalances)
-      .leftValue isE BalanceErrorWhenSwitchingBackFrame
     addAndCheckBalance(0)
-    for (previousFrame <- allFrames.tail) {
-      vm.switchBackFrame(frameWithRemainingDepth0, previousFrame) isE ()
-      addAndCheckBalance(ALPH.alph(1))
-    }
-    vm.switchBackFrame(frameWithRemainingDepth1, frameWithoutBalances)
-      .leftValue isE BalanceErrorWhenSwitchingBackFrame
-    addAndCheckBalance(0)
-    for (previousFrame <- allFrames.tail) {
-      vm.switchBackFrame(frameWithRemainingDepth1, previousFrame) isE ()
-      addAndCheckBalance(0)
-    }
+    for {
+      previousBalanceType <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      previousUseAsset    <- Seq(UsePreapproved, UseAssetInContract)
+      previousScoptDepth  <- Seq(0, 1)
+      currentBalanceType  <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      currentUseAsset     <- Seq(UsePreapproved, UseAssetInContract)
+      currentScoptDepth   <- Seq(0, 1)
+    } yield {
+      val previousFrame = buildFrame(previousBalanceType, previousUseAsset, previousScoptDepth)
+      val currentFrame  = buildFrame(currentBalanceType, currentUseAsset, currentScoptDepth)
 
-    vm.switchBackFrame(frameWithApprovedDepth0, frameWithoutBalances)
-      .leftValue isE BalanceErrorWhenSwitchingBackFrame
-    addAndCheckBalance(0)
-    for (previousFrame <- allFrames.tail) {
-      vm.switchBackFrame(frameWithApprovedDepth0, previousFrame) isE ()
-      addAndCheckBalance(ALPH.alph(2))
-    }
-    vm.switchBackFrame(frameWithApprovedDepth1, frameWithoutBalances)
-      .leftValue isE BalanceErrorWhenSwitchingBackFrame
-    addAndCheckBalance(0)
-    for (previousFrame <- allFrames.tail) {
-      vm.switchBackFrame(frameWithApprovedDepth1, previousFrame) isE ()
-      addAndCheckBalance(0)
+      if (previousBalanceType == NoBalance && currentBalanceType != NoBalance) {
+        vm.switchBackFrame(currentFrame, previousFrame)
+          .leftValue isE BalanceErrorWhenSwitchingBackFrame
+      } else {
+        vm.switchBackFrame(currentFrame, previousFrame) isE ()
+        currentBalanceType match {
+          case NoBalance => addAndCheckBalance(0)
+          case _ =>
+            if (currentScoptDepth == 0) {
+              addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+            } else {
+              addAndCheckBalance(0, isContract = true)
+              addAndCheckBalance(0, isContract = false)
+            }
+        }
+      }
     }
   }
 }

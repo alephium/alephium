@@ -158,7 +158,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture with NetworkConfigFixture.LemanT {
+  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture
+    with NetworkConfigFixture.LemanT {
     pool.getHardFork() is HardFork.Leman
 
     val contractId2 = prepare()
@@ -221,10 +222,11 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.checkAllAssetsFlushed() isE ()
   }
 
-  it should "use contract assets" in new Fixture
-    with TxGenerators
-    with GroupConfigFixture.Default
-    with NetworkConfigFixture.Default {
+  trait UseContractAssetsFixture
+      extends Fixture
+      with TxGenerators
+      with GroupConfigFixture.Default
+      with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = ContractId.random
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
@@ -239,9 +241,26 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.gasRemaining is initialGas
     pool.worldState.getOutputOpt(outputRef).rightValue.nonEmpty is true
     pool.assetStatus.contains(contractId) is false
-    pool.useContractAssets(contractId, 0).isRight is true
+
+    val balances = pool.useContractAssets(contractId, 0).rightValue
     initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
     pool.worldState.getOutputOpt(outputRef) isE a[Some[_]]
     pool.assetStatus(contractId) is a[ContractPool.ContractAssetInUsing]
+  }
+
+  it should "use contract assets wth method-level reentrancy protection since Rhone" in new UseContractAssetsFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    pool.assetUsedSinceRhone.toSet is Set(contractId -> 0)
+    pool.useContractAssets(contractId, 0).leftValue isE FunctionReentrancy
+    pool.useContractAssets(contractId, 1).rightValue is balances
+    pool.assetUsedSinceRhone.toSet is Set(contractId -> 0, contractId -> 1)
+  }
+
+  it should "use contract assets wth contract-level reentrancy protection before Rhone" in new UseContractAssetsFixture
+    with NetworkConfigFixture.PreRhoneT {
+    pool.assetUsedSinceRhone.isEmpty is true
+    pool.useContractAssets(contractId, 0).leftValue isE ContractAssetAlreadyInUsing
+    pool.useContractAssets(contractId, 1).leftValue isE ContractAssetAlreadyInUsing
+    pool.assetUsedSinceRhone.isEmpty is true
   }
 }

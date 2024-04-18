@@ -344,4 +344,37 @@ class ContextSpec
       context.generatedOutputs.toSeq is Seq(output)
     }
   }
+
+  trait OutputRemainingContractAssetsFixture extends Fixture {
+    val contractId0 = ContractId.random
+    val contractId1 = ContractId.random
+
+    def prepare(): Unit = {
+      context.assetStatus.isEmpty is true
+      context.assetStatus(contractId0) =
+        ContractPool.ContractAssetInUsing(MutBalancesPerLockup.empty)
+      context.assetStatus(contractId1) = ContractPool.ContractAssetFlushed
+    }
+  }
+
+  it should "output remaining contract assets since Rhone" in new OutputRemainingContractAssetsFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    prepare()
+    context.outputRemainingContractAssetsForRhone() isE ()
+    context.outputBalances.all.length is 1
+    context.outputBalances.all.head._1 is LockupScript.p2c(contractId0)
+  }
+
+  it should "not output remaining contract assets before Rhone" in new OutputRemainingContractAssetsFixture
+    with NetworkConfigFixture.PreRhoneT {
+    Seq(HardFork.Mainnet, HardFork.Leman).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
+
+    prepare()
+    context.outputRemainingContractAssetsForRhone() isE ()
+    context.outputBalances.all.length is 0
+  }
 }
