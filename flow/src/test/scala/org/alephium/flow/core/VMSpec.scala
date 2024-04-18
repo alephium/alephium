@@ -5792,6 +5792,54 @@ class VMSpec extends AlephiumSpec with Generators {
     getContractAsset(fooId).amount is initialAmount
   }
 
+  behavior of "Reentrancy protection"
+
+  trait ReentrancyFixture extends ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw0(target: Address) -> () {
+         |    transferTokenFromSelf!(target, ALPH, 1 alph)
+         |  }
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw1(target: Address) -> () {
+         |    transferTokenFromSelf!(target, ALPH, 1 alph)
+         |  }
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw2(target: Address) -> () {
+         |    transferTokenFromSelf!(target, ALPH, 1 alph)
+         |    withdraw1(target)
+         |  }
+         |}
+         |""".stripMargin
+
+    lazy val fooId = createContract(foo, initialAttoAlphAmount = ALPH.alph(10))._1
+
+    lazy val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.withdraw0(callerAddress!())
+         |  foo.withdraw2(callerAddress!())
+         |}
+         |$foo
+         |""".stripMargin
+  }
+
+  it should "call multiple asset functions in the same contract: Rhone" in new ReentrancyFixture {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    callTxScript(script)
+    getContractAsset(fooId).amount is ALPH.alph(10 - 3)
+  }
+
+  it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    failCallTxScript(script, ContractAssetAlreadyInUsing)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
