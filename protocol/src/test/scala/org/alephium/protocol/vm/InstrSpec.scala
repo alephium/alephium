@@ -29,7 +29,7 @@ import org.scalacheck.Gen
 import org.alephium.crypto
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.config.NetworkConfigFixture.{Leman, Genesis}
+import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
 import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
@@ -3110,6 +3110,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "check external method arg and return length" in new ContextGenerators {
+    // scalastyle:off method.length
     def prepareFrame(lengthOpt: Option[(U256, U256)])(implicit
         networkConfig: NetworkConfig
     ): Frame[StatefulContext] = {

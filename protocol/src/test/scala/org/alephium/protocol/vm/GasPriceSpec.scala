@@ -40,13 +40,25 @@ class GasPriceSpec extends AlephiumSpec with NumericHelpers {
 
   it should "validate gas price bounds for non-coinbase + Leman fork" in {
     GasPrice.validate(coinbaseGasPrice, isCoinbase = false, HardFork.SinceLemanForTest) is false
-    GasPrice.validate(nonCoinbaseMinGasPrice, isCoinbase = false, HardFork.SinceLemanForTest) is true
+    GasPrice.validate(
+      nonCoinbaseMinGasPrice,
+      isCoinbase = false,
+      HardFork.SinceLemanForTest
+    ) is true
     GasPrice.validate(
       GasPrice(nonCoinbaseMinGasPrice.value - 1),
       isCoinbase = false,
       HardFork.SinceLemanForTest
     ) is false
-    GasPrice.validate(GasPrice(ALPH.MaxALPHValue), isCoinbase = false, HardFork.SinceLemanForTest) is false
-    GasPrice.validate(GasPrice(ALPH.MaxALPHValue - 1), isCoinbase = false, HardFork.SinceLemanForTest) is true
+    GasPrice.validate(
+      GasPrice(ALPH.MaxALPHValue),
+      isCoinbase = false,
+      HardFork.SinceLemanForTest
+    ) is false
+    GasPrice.validate(
+      GasPrice(ALPH.MaxALPHValue - 1),
+      isCoinbase = false,
+      HardFork.SinceLemanForTest
+    ) is true
   }
 }

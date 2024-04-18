@@ -6253,7 +6253,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val contract = Compiler.compileContract(code).rightValue
-    val method0 = contract.methods(0)
+    val method0  = contract.methods(0)
     method0.usePreapprovedAssets is false
     method0.useContractAssets is false
     method0.usePayToContractOnly is true
