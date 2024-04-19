@@ -6262,4 +6262,42 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     method1.useContractAssets is true
     method1.usePayToContractOnly is false
   }
+
+  it should "check if the function pay to contract" in {
+    def code(payToContractOnly: String = "false", stmt: String = "return"): String =
+      s"""
+         |Contract Foo() {
+         |  @using(payToContractOnly = $payToContractOnly, checkExternalCaller = false)
+         |  pub fn foo() -> () {
+         |    $stmt
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContractFull(replace(code())).rightValue.warnings.isEmpty is true
+    Compiler
+      .compileContractFull(
+        replace(code("true", "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)"))
+      )
+      .rightValue
+      .warnings
+      .isEmpty is true
+    Compiler
+      .compileContractFull(
+        replace(code("true", "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)"))
+      )
+      .rightValue
+      .warnings
+      .isEmpty is true
+    Compiler
+      .compileContractFull(
+        replace(code("true", "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)"))
+      )
+      .rightValue
+      .warnings
+      .isEmpty is true
+    Compiler.compileContractFull(replace(code("true"))).rightValue.warnings is
+      AVector(
+        "Function \"Foo.foo\" does not pay to contract, but its annotation of pay to contract is turn on."
+      )
+  }
 }

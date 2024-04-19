@@ -47,6 +47,7 @@ object StaticAnalysis {
     checkMethodsStateless(ast, methods, state)
     ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
       checkCodeUsingContractAssets(ast.ident, func, method)
+      checkCodeUsingPayToContract(state, ast.ident, func, method)
     }
   }
 
@@ -94,6 +95,20 @@ object StaticAnalysis {
           "Please remove the `assetsInContract` annotation or set it to `enforced`",
         func.sourceIndex
       )
+    }
+  }
+
+  private val payToContractInstrs: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf, vm.SelfAddress)
+
+  private def checkCodeUsingPayToContract(
+      state: Compiler.State[vm.StatefulContext],
+      contractId: Ast.TypeId,
+      func: Ast.FuncDef[vm.StatefulContext],
+      method: vm.Method[vm.StatefulContext]
+  ): Unit = {
+    if (func.usePayToContractOnly && !method.instrs.exists(payToContractInstrs.contains)) {
+      state.warningUsingPayToContract(contractId, func.id)
     }
   }
 
