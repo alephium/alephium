@@ -307,7 +307,7 @@ final class StatefulVM(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
-    if (currentFrame.method.usesAssets()) {
+    if (currentFrame.method.usesAssetsFromInputs()) {
       wrap(for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
@@ -374,7 +374,7 @@ final class StatefulVM(
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     val hardFork = ctx.getHardFork()
-    if (lastFrame.method.usesAssets()) {
+    if (lastFrame.method.usesAssetsFromInputs()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
 

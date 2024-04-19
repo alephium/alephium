@@ -41,7 +41,7 @@ final case class Method[Ctx <: StatelessContext](
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
-  def usesAssets(): Boolean = usePreapprovedAssets || useContractAssets
+  def usesAssetsFromInputs(): Boolean = usePreapprovedAssets || useContractAssets
 
   def checkModifierSinceRhone(): ExeResult[Unit] = {
     if (useContractAssets && usePayToContractOnly) {
