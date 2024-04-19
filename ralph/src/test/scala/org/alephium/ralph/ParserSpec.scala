@@ -668,7 +668,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val error1 = intercept[Compiler.Error](
       fastparse.parse(conflictedAnnotations.replace("$", ""), StatelessParser.func(_))
     )
-    error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true) or @using(payToContractOnly = true)"
+    error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)"
     error1.position is invalidAssetsInContract.indexOf("$")
   }
 

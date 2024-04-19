@@ -377,7 +377,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           )
           if (usingAnnotation.payToContractOnly && usingAnnotation.assetsInContract.assetsEnabled) {
             throw Compiler.Error(
-              s"Can only enable one of the two annotations: @using(assetsInContract = true) or @using(payToContractOnly = true)",
+              s"Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)",
               SourceIndex(
                 annotations.headOption.flatMap(_.fields.headOption.flatMap(_.sourceIndex)),
                 annotations.lastOption.flatMap(_.fields.lastOption.flatMap(_.sourceIndex))

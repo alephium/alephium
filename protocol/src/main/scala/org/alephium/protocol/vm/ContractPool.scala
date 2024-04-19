@@ -167,7 +167,6 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  // We track contract assets with assetUsedSinceRhone and contractBalances instead of assetStatusPreRhone
   def useContractAssetsRhone(
       contractId: ContractId,
       methodIndex: Int
