@@ -23,7 +23,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{ContractId, TokenId}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.ContractPool.ContractAssetInUsing
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -192,6 +192,57 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
     sinceLemanFrame.checkContractId(randomContractId).rightValue is ()
     sinceLemanFrame.checkContractId(zeroContractId).leftValue is Right(ZeroContractId)
+  }
+
+  it should "test approve contract assets for rhone hardfork" in new FrameFixture {
+    val contract = StatefulContract(
+      0,
+      AVector(
+        Method(
+          true,
+          false,
+          useContractAssets = true,
+          usePayToContractOnly = false,
+          0,
+          0,
+          0,
+          AVector.empty
+        ),
+        Method(
+          true,
+          false,
+          useContractAssets = false,
+          usePayToContractOnly = true,
+          0,
+          0,
+          0,
+          AVector.empty
+        )
+      )
+    )
+
+    val contractId     = ContractId.random
+    val contractOutput = ContractOutput(ALPH.oneAlph, LockupScript.p2c(contractId), AVector.empty)
+    val contractOutputRef = ContractOutputRef.from(TransactionId.random, contractOutput, 0)
+    val (contractObj, _) = prepareContract(
+      contract,
+      AVector.empty,
+      AVector.empty,
+      contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
+    )(NetworkConfigFixture.Ghost)
+    val frame = genStatefulFrame(None)(NetworkConfigFixture.Ghost)
+
+    frame.getNewFrameBalancesState(contractObj, contract.methods.head, 0).rightValue is Some(
+      MutBalanceState(
+        MutBalances(
+          ArrayBuffer(contractOutput.lockupScript -> MutBalancesPerLockup.alph(ALPH.oneAlph))
+        ),
+        MutBalances.empty
+      )
+    )
+    frame.getNewFrameBalancesState(contractObj, contract.methods.last, 1).rightValue is Some(
+      MutBalanceState(MutBalances.empty, MutBalances.empty)
+    )
   }
 }
 
