@@ -1431,27 +1431,33 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not destroy a contract after approving assets" in new DestroyFixture {
-    def buildFoo(useAssetsInContract: Boolean) =
+    val foo =
       s"""
          |Contract Foo() {
-         |  @using(assetsInContract = $useAssetsInContract)
+         |  @using(assetsInContract = true)
          |  pub fn destroy(targetAddress: Address) -> () {
          |    approveToken!(selfAddress!(), ALPH, 2 alph)
          |    destroySelf!(targetAddress)
          |  }
          |}
          |""".stripMargin
-    def main(fooId: ContractId, foo: String) =
+
+    def main(fooId: ContractId) =
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).destroy(@$genesisAddress)
          |}
          |$foo
          |""".stripMargin
+
     def test(useAssetsInContract: Boolean, error: ExeFailure) = {
-      val foo   = buildFoo(useAssetsInContract)
-      val fooId = createContract(foo, initialAttoAlphAmount = ALPH.alph(10))._1
-      failCallTxScript(main(fooId, foo), error)
+      val contract = Compiler.compileContract(foo).rightValue
+      val newContract = contract.copy(methods =
+        contract.methods
+          .replace(0, contract.methods.head.copy(useContractAssets = useAssetsInContract))
+      )
+      val fooId = createCompiledContract(newContract, initialAttoAlphAmount = ALPH.alph(10))._1
+      failCallTxScript(main(fooId), error)
     }
 
     test(useAssetsInContract = true, ContractAssetAlreadyFlushed)
@@ -3652,6 +3658,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    let bar = Bar(barId)
          |    bar.bar(selfContractId!())
          |  }
+         |  @using(assetsInContract = true)
          |  pub fn destroy() -> () {
          |    destroySelf!(callerAddress!())
          |  }
@@ -4328,7 +4335,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn bar() -> () {
-         |    transferTokenToSelf!(selfAddress!(), ALPH, 0.1 alph)
+         |    transferToken!(selfAddress!(), selfAddress!(), ALPH, 0.1 alph)
          |  }
          |}
          |""".stripMargin
@@ -4652,7 +4659,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |Contract Foo() {
            |  @using(assetsInContract=${useContractAsset}, preapprovedAssets = true)
            |  pub fn payMe(amount: U256) -> () {
-           |    transferTokenToSelf!(callerAddress!(), ALPH, amount)
+           |    transferToken!(callerAddress!(), selfAddress!(), ALPH, amount)
            |  }
            |}
            |""".stripMargin

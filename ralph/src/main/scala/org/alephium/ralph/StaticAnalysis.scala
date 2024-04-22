@@ -47,6 +47,7 @@ object StaticAnalysis {
     checkMethodsStateless(ast, methods, state)
     ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
       checkCodeUsingContractAssets(ast.ident, func, method)
+      checkCodeUsingPayToContract(ast.ident, func, method)
     }
   }
 
@@ -69,16 +70,21 @@ object StaticAnalysis {
     }
   }
 
-  val contractAssetsInstrs: Set[vm.Instr[_]] =
+  private[ralph] lazy val contractAssetsInstrs: Set[vm.Instr[_]] =
     Set(
       vm.TransferAlphFromSelf,
       vm.TransferTokenFromSelf,
       vm.TransferAlphToSelf,
       vm.TransferTokenToSelf,
       vm.DestroySelf,
-      vm.SelfAddress,
-      vm.PayGasFee
+      vm.SelfAddress
     )
+  private lazy val payToContractInstrs: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf, vm.SelfAddress)
+  private lazy val spendContractAssetsInstrs: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphFromSelf, vm.TransferTokenFromSelf, vm.DestroySelf)
+  private lazy val payToContractInstrsExceptSelfAddress: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf)
 
   def checkCodeUsingContractAssets(
       contractId: Ast.TypeId,
@@ -90,8 +96,42 @@ object StaticAnalysis {
       !method.instrs.exists(contractAssetsInstrs.contains(_))
     ) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but its annotation of contract assets is turn on. " +
+        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but the annotation `assetsInContract` is enabled. " +
           "Please remove the `assetsInContract` annotation or set it to `enforced`",
+        func.sourceIndex
+      )
+    }
+
+    if (
+      func.useAssetsInContract == Ast.NotUseContractAssets &&
+      method.instrs.exists(spendContractAssetsInstrs.contains)
+    ) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} uses contract assets, please use annotation `assetsInContract = true`.",
+        func.sourceIndex
+      )
+    }
+  }
+
+  private def checkCodeUsingPayToContract(
+      contractId: Ast.TypeId,
+      func: Ast.FuncDef[vm.StatefulContext],
+      method: vm.Method[vm.StatefulContext]
+  ): Unit = {
+    if (func.usePayToContractOnly && !method.instrs.exists(payToContractInstrs.contains)) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} does not pay to the contract, but the annotation `payToContractOnly` is enabled.",
+        func.sourceIndex
+      )
+    }
+
+    if (
+      !func.usePayToContractOnly &&
+      func.useAssetsInContract == Ast.NotUseContractAssets &&
+      method.instrs.exists(payToContractInstrsExceptSelfAddress.contains)
+    ) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true.",
         func.sourceIndex
       )
     }
