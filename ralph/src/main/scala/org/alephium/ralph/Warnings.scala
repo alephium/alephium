@@ -105,11 +105,6 @@ trait Warnings {
     warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
       s" If this is intentional, consider using anonymous variables to suppress this warning."
   }
-
-  def warningUsingPayToContract(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    warnings +=
-      s"Function ${Ast.funcName(typeId, funcId)} does not pay to contract, but its annotation of pay to contract is turn on."
-  }
 }
 
 object Warnings {

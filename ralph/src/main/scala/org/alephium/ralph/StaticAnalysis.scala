@@ -47,7 +47,7 @@ object StaticAnalysis {
     checkMethodsStateless(ast, methods, state)
     ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
       checkCodeUsingContractAssets(ast.ident, func, method)
-      checkCodeUsingPayToContract(state, ast.ident, func, method)
+      checkCodeUsingPayToContract(ast.ident, func, method)
     }
   }
 
@@ -77,9 +77,10 @@ object StaticAnalysis {
       vm.TransferAlphToSelf,
       vm.TransferTokenToSelf,
       vm.DestroySelf,
-      vm.SelfAddress,
-      vm.PayGasFee
+      vm.SelfAddress
     )
+  private val payToContractInstrs: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf, vm.SelfAddress)
 
   def checkCodeUsingContractAssets(
       contractId: Ast.TypeId,
@@ -96,19 +97,42 @@ object StaticAnalysis {
         func.sourceIndex
       )
     }
+
+    val instrs = contractAssetsInstrs -- payToContractInstrs
+    if (
+      func.useAssetsInContract == Ast.NotUseContractAssets &&
+      method.instrs.exists(instrs.contains)
+    ) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} uses contract assets, but its annotation of contract assets is turn off. " +
+          "Please set the `assetsInContract` annotation to true",
+        func.sourceIndex
+      )
+    }
   }
 
-  private val payToContractInstrs: Set[vm.Instr[_]] =
-    Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf, vm.SelfAddress)
-
   private def checkCodeUsingPayToContract(
-      state: Compiler.State[vm.StatefulContext],
       contractId: Ast.TypeId,
       func: Ast.FuncDef[vm.StatefulContext],
       method: vm.Method[vm.StatefulContext]
   ): Unit = {
     if (func.usePayToContractOnly && !method.instrs.exists(payToContractInstrs.contains)) {
-      state.warningUsingPayToContract(contractId, func.id)
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} does not pay to contract, but its annotation of pay to contract is turn on.",
+        func.sourceIndex
+      )
+    }
+
+    val instrs = payToContractInstrs - vm.SelfAddress
+    if (
+      !func.usePayToContractOnly &&
+      func.useAssetsInContract == Ast.NotUseContractAssets &&
+      method.instrs.exists(instrs.contains)
+    ) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} transfers assets to contract, please set either `assetsInContract` or `payToContractOnly` to true.",
+        func.sourceIndex
+      )
     }
   }
 

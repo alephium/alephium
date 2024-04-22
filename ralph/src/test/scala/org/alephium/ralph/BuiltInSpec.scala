@@ -50,7 +50,7 @@ class BuiltInSpec extends AlephiumSpec {
         case _: Any => Seq.empty[Instr[_]]
       }
       .toSet is StaticAnalysis.contractAssetsInstrs.--(
-      Set(SelfAddress, TransferAlphFromSelf, TransferAlphToSelf, PayGasFee)
+      Set(SelfAddress, TransferAlphFromSelf, TransferAlphToSelf)
     )
   }
 

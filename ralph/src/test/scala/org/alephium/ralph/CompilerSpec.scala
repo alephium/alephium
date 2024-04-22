@@ -2187,7 +2187,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) implements Bar {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    transferTokenToSelf!(addr, ALPH, 1)
+           |    approveToken!(selfAddress!(), ALPH, 1 alph)
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2204,7 +2204,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) extends Bar() {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    transferTokenToSelf!(addr, ALPH, 1)
+           |    approveToken!(selfAddress!(), ALPH, 1 alph)
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2801,22 +2801,45 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(replace(code())).isRight is true
-    Compiler
-      .compileContract(
-        replace(code("true", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
-      )
-      .isRight is true
-    Compiler
-      .compileContract(
-        replace(code("false", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
-      )
-      .isRight is true
+
+    val statements = Seq(
+      "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenFromSelf!(callerAddress!(), selfTokenId!(), 1 alph)",
+      "destroySelf!(callerAddress!())",
+      "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)",
+      "approveToken!(selfAddress!(), ALPH, 1 alph)"
+    )
+    statements.foreach { stmt =>
+      Compiler.compileContract(replace(code("true", stmt))).isRight is true
+    }
     testContractError(
       code("true"),
       "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on. " +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
+    testContractError(
+      code("true", "payGasFee!(callerAddress!(), 1 alph)"),
+      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on. " +
+        "Please remove the `assetsInContract` annotation or set it to `enforced`"
+    )
     Compiler.compileContract(replace(code("enforced"))).isRight is true
+    statements.take(3).foreach { stmt =>
+      testContractError(
+        code("false", stmt),
+        "Function \"Foo.foo\" uses contract assets, but its annotation of contract assets is turn off. " +
+          "Please set the `assetsInContract` annotation to true"
+      )
+    }
+    Seq(
+      "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)"
+    ).foreach { stmt =>
+      testContractError(
+        code("false", stmt),
+        "Function \"Foo.foo\" transfers assets to contract, please set either `assetsInContract` or `payToContractOnly` to true."
+      )
+    }
   }
 
   it should "check types for braces syntax" in {
@@ -3765,6 +3788,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
+           |  @using(assetsInContract = true)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
            |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
@@ -6267,37 +6291,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(payToContractOnly: String = "false", stmt: String = "return"): String =
       s"""
          |Contract Foo() {
-         |  @using(payToContractOnly = $payToContractOnly, checkExternalCaller = false)
+         |  $$@using(payToContractOnly = $payToContractOnly, checkExternalCaller = false)
          |  pub fn foo() -> () {
          |    $stmt
-         |  }
+         |  }$$
          |}
          |""".stripMargin
     Compiler.compileContractFull(replace(code())).rightValue.warnings.isEmpty is true
-    Compiler
-      .compileContractFull(
-        replace(code("true", "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)"))
+
+    val statements = Seq(
+      "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)",
+      "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)"
+    )
+    statements.foreach { stmt =>
+      Compiler.compileContractFull(replace(code("true", stmt))).isRight is true
+    }
+    testContractError(
+      code("true"),
+      "Function \"Foo.foo\" does not pay to contract, but its annotation of pay to contract is turn on."
+    )
+    statements.dropRight(1).foreach { stmt =>
+      testContractError(
+        code("false", stmt),
+        "Function \"Foo.foo\" transfers assets to contract, please set either `assetsInContract` or `payToContractOnly` to true."
       )
-      .rightValue
-      .warnings
-      .isEmpty is true
-    Compiler
-      .compileContractFull(
-        replace(code("true", "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)"))
-      )
-      .rightValue
-      .warnings
-      .isEmpty is true
-    Compiler
-      .compileContractFull(
-        replace(code("true", "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)"))
-      )
-      .rightValue
-      .warnings
-      .isEmpty is true
-    Compiler.compileContractFull(replace(code("true"))).rightValue.warnings is
-      AVector(
-        "Function \"Foo.foo\" does not pay to contract, but its annotation of pay to contract is turn on."
-      )
+    }
   }
 }
