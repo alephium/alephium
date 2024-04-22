@@ -2815,20 +2815,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
     testContractError(
       code("true"),
-      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on. " +
+      "Function \"Foo.foo\" does not use contract assets, but the annotation `assetsInContract` is enabled. " +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
     testContractError(
       code("true", "payGasFee!(callerAddress!(), 1 alph)"),
-      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on. " +
+      "Function \"Foo.foo\" does not use contract assets, but the annotation `assetsInContract` is enabled. " +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
     Compiler.compileContract(replace(code("enforced"))).isRight is true
     statements.take(3).foreach { stmt =>
       testContractError(
         code("false", stmt),
-        "Function \"Foo.foo\" uses contract assets, but its annotation of contract assets is turn off. " +
-          "Please set the `assetsInContract` annotation to true"
+        "Function \"Foo.foo\" uses contract assets, please use annotation `assetsInContract = true`."
       )
     }
     Seq(
@@ -2837,7 +2836,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     ).foreach { stmt =>
       testContractError(
         code("false", stmt),
-        "Function \"Foo.foo\" transfers assets to contract, please set either `assetsInContract` or `payToContractOnly` to true."
+        "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
       )
     }
   }
@@ -6309,12 +6308,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
     testContractError(
       code("true"),
-      "Function \"Foo.foo\" does not pay to contract, but its annotation of pay to contract is turn on."
+      "Function \"Foo.foo\" does not pay to the contract, but the annotation `payToContractOnly` is enabled."
     )
     statements.dropRight(1).foreach { stmt =>
       testContractError(
         code("false", stmt),
-        "Function \"Foo.foo\" transfers assets to contract, please set either `assetsInContract` or `payToContractOnly` to true."
+        "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
       )
     }
   }

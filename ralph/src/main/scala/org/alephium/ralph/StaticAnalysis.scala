@@ -70,7 +70,7 @@ object StaticAnalysis {
     }
   }
 
-  val contractAssetsInstrs: Set[vm.Instr[_]] =
+  private[ralph] lazy val contractAssetsInstrs: Set[vm.Instr[_]] =
     Set(
       vm.TransferAlphFromSelf,
       vm.TransferTokenFromSelf,
@@ -79,8 +79,12 @@ object StaticAnalysis {
       vm.DestroySelf,
       vm.SelfAddress
     )
-  private val payToContractInstrs: Set[vm.Instr[_]] =
+  private lazy val payToContractInstrs: Set[vm.Instr[_]] =
     Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf, vm.SelfAddress)
+  private lazy val spendContractAssetsInstrs: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphFromSelf, vm.TransferTokenFromSelf, vm.DestroySelf)
+  private lazy val payToContractInstrsExceptSelfAddress: Set[vm.Instr[_]] =
+    Set(vm.TransferAlphToSelf, vm.TransferTokenToSelf)
 
   def checkCodeUsingContractAssets(
       contractId: Ast.TypeId,
@@ -92,20 +96,18 @@ object StaticAnalysis {
       !method.instrs.exists(contractAssetsInstrs.contains(_))
     ) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but its annotation of contract assets is turn on. " +
+        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but the annotation `assetsInContract` is enabled. " +
           "Please remove the `assetsInContract` annotation or set it to `enforced`",
         func.sourceIndex
       )
     }
 
-    val instrs = contractAssetsInstrs -- payToContractInstrs
     if (
       func.useAssetsInContract == Ast.NotUseContractAssets &&
-      method.instrs.exists(instrs.contains)
+      method.instrs.exists(spendContractAssetsInstrs.contains)
     ) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} uses contract assets, but its annotation of contract assets is turn off. " +
-          "Please set the `assetsInContract` annotation to true",
+        s"Function ${Ast.funcName(contractId, func.id)} uses contract assets, please use annotation `assetsInContract = true`.",
         func.sourceIndex
       )
     }
@@ -118,19 +120,18 @@ object StaticAnalysis {
   ): Unit = {
     if (func.usePayToContractOnly && !method.instrs.exists(payToContractInstrs.contains)) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} does not pay to contract, but its annotation of pay to contract is turn on.",
+        s"Function ${Ast.funcName(contractId, func.id)} does not pay to the contract, but the annotation `payToContractOnly` is enabled.",
         func.sourceIndex
       )
     }
 
-    val instrs = payToContractInstrs - vm.SelfAddress
     if (
       !func.usePayToContractOnly &&
       func.useAssetsInContract == Ast.NotUseContractAssets &&
-      method.instrs.exists(instrs.contains)
+      method.instrs.exists(payToContractInstrsExceptSelfAddress.contains)
     ) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} transfers assets to contract, please set either `assetsInContract` or `payToContractOnly` to true.",
+        s"Function ${Ast.funcName(contractId, func.id)} transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true.",
         func.sourceIndex
       )
     }
