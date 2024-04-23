@@ -178,6 +178,24 @@ object Method {
       }
     }
   }
+
+  def extractSelector(methodBytes: ByteString): Option[Selector] = {
+    val selectorEither = for {
+      isPublicRest      <- serde._deserialize[Boolean](methodBytes)
+      assetModifierRest <- serde._deserialize[Byte](isPublicRest.rest)
+      argsLengthRest    <- serde._deserialize[Int](assetModifierRest.rest)
+      localsLengthRest  <- serde._deserialize[Int](argsLengthRest.rest)
+      returnLengthRest  <- serde._deserialize[Int](localsLengthRest.rest)
+      instrLengthRest   <- serde._deserialize[Int](returnLengthRest.rest)
+      selectorInstrRest <- MethodSelector.deserialize(instrLengthRest.rest)
+    } yield {
+      selectorInstrRest.value.selector
+    }
+    selectorEither match {
+      case Left(_)         => None
+      case Right(selector) => Some(selector)
+    }
+  }
 }
 
 sealed trait Contract[Ctx <: StatelessContext] {
@@ -342,6 +360,7 @@ final case class StatefulContract(
 }
 
 object StatefulContract {
+  final case class SelectorSearchResult(methodIndex: Int, methodSearched: Int)
   @HashSerde
   // We don't need to deserialize the whole contract if we only access part of the methods
   final case class HalfDecoded(
@@ -371,13 +390,56 @@ object StatefulContract {
       }
     }
 
-    private def deserializeMethod(index: Int): SerdeResult[Method[StatefulContext]] = {
-      val methodBytes = if (index == 0) {
+    @inline
+    private def getMethodBytes(index: Int): ByteString = {
+      if (index == 0) {
         methodsBytes.take(methodIndexes(0))
       } else {
         methodsBytes.slice(methodIndexes(index - 1), methodIndexes(index))
       }
+    }
+
+    private def deserializeMethod(index: Int): SerdeResult[Method[StatefulContext]] = {
+      val methodBytes = getMethodBytes(index)
       Method.statefulSerde.deserialize(methodBytes)
+    }
+
+    private[vm] var searchedMethodIndex  = -1
+    private[vm] lazy val cachedSelectors = mutable.HashMap.empty[Method.Selector, Int]
+    def getMethodBySelector(selector: Method.Selector): ExeResult[SelectorSearchResult] = {
+      cachedSelectors.get(selector) match {
+        case Some(methodIndex) => Right(SelectorSearchResult(methodIndex, 0))
+        case None              => findUncachedMethodBySelector(selector)
+      }
+    }
+    def getMethodSelector(methodIndex: Int): Option[Method.Selector] = {
+      val methodBytes = getMethodBytes(methodIndex)
+      Method.extractSelector(methodBytes)
+    }
+    private def findUncachedMethodBySelector(
+        selector: Method.Selector
+    ): ExeResult[SelectorSearchResult] = {
+      var found       = false
+      var methodIndex = searchedMethodIndex + 1
+      while (!found && methodIndex < methodsLength) {
+        getMethodSelector(methodIndex) match {
+          case Some(foundSelector) =>
+            cachedSelectors(foundSelector) = methodIndex
+            if (foundSelector == selector) {
+              found = true
+            } else {
+              methodIndex = methodIndex + 1
+            }
+          case None => methodIndex = methodIndex + 1
+        }
+      }
+      val result = if (found) {
+        Right(SelectorSearchResult(methodIndex, methodIndex - searchedMethodIndex))
+      } else {
+        failed(InvalidMethodSelector(selector))
+      }
+      searchedMethodIndex = methodIndex
+      result
     }
 
     def toContract(): SerdeResult[StatefulContract] = {

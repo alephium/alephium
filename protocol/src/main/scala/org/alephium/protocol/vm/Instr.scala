@@ -1335,7 +1335,7 @@ object MethodSelector extends InstrCompanion[StatefulContext] {
 
   def deserialize[C <: StatefulContext](
       input: ByteString
-  ): SerdeResult[Staging[Instr[StatefulContext]]] = {
+  ): SerdeResult[Staging[MethodSelector]] = {
     implicitly[Serde[Method.Selector]]._deserialize(input).map(_.mapValue(MethodSelector(_)))
   }
 }
