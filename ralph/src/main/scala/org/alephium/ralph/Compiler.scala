@@ -337,53 +337,10 @@ object Compiler {
     def getConstantIndex[Ctx <: StatelessContext](index: Ast.Expr[Ctx]): Ast.Expr[Ctx] = {
       index match {
         case e: Ast.Const[Ctx @unchecked] => e
-        case Ast.Binop(op: ArithOperator, Ast.Const(Val.U256(l)), Ast.Const(Val.U256(r))) =>
-          op match {
-            case ArithOperator.Add =>
-              Ast.Const(
-                Val.U256(
-                  l.add(r)
-                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
-                )
-              )
-            case ArithOperator.Sub =>
-              Ast.Const(
-                Val.U256(
-                  l.sub(r)
-                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
-                )
-              )
-            case ArithOperator.Mul =>
-              Ast.Const(
-                Val.U256(
-                  l.mul(r)
-                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
-                )
-              )
-            case ArithOperator.Div =>
-              Ast.Const(
-                Val.U256(
-                  l.div(r)
-                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
-                )
-              )
-            case ArithOperator.Mod =>
-              Ast.Const(
-                Val.U256(
-                  l.mod(r)
-                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
-                )
-              )
-            case ArithOperator.ModAdd => Ast.Const(Val.U256(l.modAdd(r)))
-            case ArithOperator.ModSub => Ast.Const(Val.U256(l.modSub(r)))
-            case ArithOperator.ModMul => Ast.Const(Val.U256(l.modMul(r)))
-            case ArithOperator.SHL    => Ast.Const(Val.U256(l.shl(r)))
-            case ArithOperator.SHR    => Ast.Const(Val.U256(l.shr(r)))
-            case ArithOperator.BitAnd => Ast.Const(Val.U256(l.bitAnd(r)))
-            case ArithOperator.BitOr  => Ast.Const(Val.U256(l.bitOr(r)))
-            case ArithOperator.Xor    => Ast.Const(Val.U256(l.xor(r)))
-            case _ =>
-              throw new RuntimeException("Dead branch") // https://github.com/scala/bug/issues/9677
+        case Ast.Binop(op: ArithOperator, Ast.Const(left: Val.U256), Ast.Const(right: Val.U256)) =>
+          op.calc(Seq(left, right)) match {
+            case Right(value) => Ast.Const(value)
+            case Left(_)      => throw Error(s"Invalid array index $index", index.sourceIndex)
           }
         case e @ Ast.Binop(op, left, right) =>
           val expr = Ast.Binop(op, getConstantIndex(left), getConstantIndex(right))
