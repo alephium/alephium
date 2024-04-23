@@ -137,6 +137,11 @@ object Ast {
     }
   }
 
+  sealed trait ContractAssetsAnnotation
+  case object UseContractAssets         extends ContractAssetsAnnotation
+  case object NotUseContractAssets      extends ContractAssetsAnnotation
+  case object EnforcedUseContractAssets extends ContractAssetsAnnotation
+
   trait ApproveAssets[Ctx <: StatelessContext] extends Positioned {
     def approveAssets: Seq[ApproveAsset[Ctx]]
 
@@ -775,9 +780,10 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean,
+      useAssetsInContract: Ast.ContractAssetsAnnotation,
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
+      useMethodIndex: Option[Int],
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -802,7 +808,11 @@ object Ast {
         case FuncCall(id, _, _) => id.isBuiltIn && id.name == "migrate"
         case _                  => false
       }
-      !(useUpdateFields || usePreapprovedAssets || useAssetsInContract || hasInterfaceFuncCall || hasMigrateSimple)
+      !(useUpdateFields
+        || usePreapprovedAssets
+        || useAssetsInContract != Ast.NotUseContractAssets
+        || hasInterfaceFuncCall
+        || hasMigrateSimple)
     }
 
     def signature: FuncSignature = FuncSignature(
@@ -871,7 +881,7 @@ object Ast {
       Method[Ctx](
         isPublic,
         usePreapprovedAssets,
-        useAssetsInContract,
+        useAssetsInContract != Ast.NotUseContractAssets,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = state.flattenTypeLength(rtypes),
@@ -884,7 +894,7 @@ object Ast {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
         usePreapprovedAssets: Boolean,
-        useAssetsInContract: Boolean,
+        useAssetsInContract: Ast.ContractAssetsAnnotation,
         useUpdateFields: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
@@ -895,6 +905,7 @@ object Ast {
         useAssetsInContract = useAssetsInContract,
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
+        useMethodIndex = None,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)
@@ -1520,8 +1531,12 @@ object Ast {
         case Some(funcs) => funcs
         case None =>
           val builtInFuncs = builtInContractFuncs(globalState)
+          val isInterface = this match {
+            case _: ContractInterface => true
+            case _                    => false
+          }
           var table = Compiler.SimpleFunc
-            .from(funcs)
+            .from(funcs, isInterface)
             .map(f => f.id -> f)
             .toMap[FuncId, Compiler.ContractFunc[Ctx]]
           builtInFuncs.foreach(func =>
@@ -2177,6 +2192,9 @@ object Ast {
       val constantVars                         = allContracts.flatMap(_.constantVars)
       val enums                                = mergeEnums(allContracts.flatMap(_.enums))
 
+      // call the `checkFuncs` first to avoid duplicate function definition
+      checkInterfaceMethodIndex(sortedInterfaces)
+
       val contractEvents = allContracts.flatMap(_.events)
       val events         = sortedInterfaces.flatMap(_.events) ++ contractEvents
 
@@ -2191,8 +2209,12 @@ object Ast {
               txContract.sourceIndex
             )
           }
+          if (txContract.isAbstract) {
+            allUniqueFuncs
+          } else {
+            rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
+          }
 
-          allUniqueFuncs
         case interface: ContractInterface =>
           if (nonAbstractFuncs.nonEmpty) {
             val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
@@ -2208,6 +2230,37 @@ object Ast {
     }
     // scalastyle:on method.length
 
+    private def rearrangeFuncs(
+        interfaces: Seq[ContractInterface],
+        funcs: Seq[FuncDef[StatefulContext]]
+    ): Seq[FuncDef[StatefulContext]] = {
+      val interfaceFuncs = interfaces.flatMap(_.funcs)
+      val (remains, preDefinedIndexFuncs) = funcs.partitionMap { func =>
+        val methodIndex = interfaceFuncs.find(_.id == func.id).flatMap(_.useMethodIndex)
+        if (methodIndex.isDefined) {
+          Right(func.copy(useMethodIndex = methodIndex).atSourceIndex(func.sourceIndex))
+        } else {
+          Left(func)
+        }
+      }
+
+      val invalidFuncs = preDefinedIndexFuncs.filter(_.useMethodIndex.exists(_ >= funcs.length))
+      if (invalidFuncs.nonEmpty) {
+        throw Compiler.Error(
+          s"The method index of these functions is out of bound: ${invalidFuncs.map(_.name).mkString(",")}, total number of methods: ${funcs.length}",
+          invalidFuncs.headOption.flatMap(_.id.sourceIndex)
+        )
+      }
+
+      val remainFuncsIterator = remains.iterator
+      funcs.indices.map { index =>
+        preDefinedIndexFuncs.find(_.useMethodIndex.contains(index)) match {
+          case Some(func) => func
+          case None       => remainFuncsIterator.next()
+        }
+      }
+    }
+
     @tailrec
     def ensureChainedInterfaces(sortedInterfaces: Seq[ContractInterface]): Unit = {
       if (sortedInterfaces.length >= 2) {
@@ -2221,6 +2274,43 @@ object Ast {
         }
 
         ensureChainedInterfaces(sortedInterfaces.drop(1))
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    def checkInterfaceMethodIndex(sortedInterfaces: Seq[ContractInterface]): Unit = {
+      val methodLength = sortedInterfaces.map(_.funcs.length).sum
+      val predefinedMethodIndexMax = sortedInterfaces
+        .map(_.funcs.map(_.useMethodIndex.getOrElse(-1)).max)
+        .maxOption
+        .getOrElse(-1)
+      val methodLengthMax = math.max(methodLength, predefinedMethodIndexMax + 1)
+      assume(methodLengthMax <= 0xff + 1)
+      val usedMethodIndexes = mutable.ArrayBuffer.fill(methodLengthMax)(false)
+      var fromMethodIndex   = 0
+      sortedInterfaces.foreach { interface =>
+        val (preDefinedMethodIndexFuncs, remains) =
+          interface.funcs.partition(_.useMethodIndex.nonEmpty)
+        preDefinedMethodIndexFuncs.foreach { func =>
+          func.useMethodIndex match {
+            case Some(index) =>
+              if (usedMethodIndexes(index)) {
+                throw Compiler.Error(
+                  s"Function ${interface.name}.${func.id.name} have invalid predefined method index $index",
+                  func.id.sourceIndex
+                )
+              } else {
+                usedMethodIndexes(index) = true
+              }
+            case _ => // dead branch
+          }
+        }
+        remains.foreach { _ =>
+          val methodIndex = usedMethodIndexes.indexOf(false, fromMethodIndex)
+          assume(methodIndex != -1)
+          usedMethodIndexes(methodIndex) = true
+          fromMethodIndex = methodIndex + 1
+        }
       }
     }
 

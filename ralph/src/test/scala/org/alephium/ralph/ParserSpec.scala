@@ -539,7 +539,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
     parsed0.usePreapprovedAssets is false
-    parsed0.useAssetsInContract is false
+    parsed0.useAssetsInContract is Ast.NotUseContractAssets
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
@@ -555,7 +555,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
-    parsed1.useAssetsInContract is false
+    parsed1.useAssetsInContract is Ast.NotUseContractAssets
     parsed1.useCheckExternalCaller is true
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
@@ -580,7 +580,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
-    parsed2.useAssetsInContract is true
+    parsed2.useAssetsInContract is Ast.UseContractAssets
     parsed2.useCheckExternalCaller is true
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
@@ -603,7 +603,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .get
       .value
     parsed3.usePreapprovedAssets is false
-    parsed3.useAssetsInContract is true
+    parsed3.useAssetsInContract is Ast.UseContractAssets
     parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
     parsed3.signature is FuncSignature(
@@ -613,6 +613,36 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       Seq((Type.U256, false), (Type.U256, false)),
       Seq(Type.U256)
     )
+
+    info("Enforce using contract assets")
+    val code = """@using(assetsInContract = enforced)
+                 |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val parsed4 = fastparse.parse(code, StatelessParser.func(_)).get.value
+    parsed4.usePreapprovedAssets is false
+    parsed4.useAssetsInContract is Ast.EnforcedUseContractAssets
+    parsed4.useCheckExternalCaller is true
+    parsed4.useUpdateFields is false
+    parsed4.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      false,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
+
+    val invalidCode = """@using(assetsInContract = enforced, assetsInContract = false)
+                        |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    intercept[Compiler.Error](fastparse.parse(invalidCode, StatelessParser.func(_))).message is
+      "These keys are defined multiple times: assetsInContract"
+
+    val invalidAssetsInContract =
+      s"""@using($$assetsInContract = 1)
+         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val error = intercept[Compiler.Error](
+      fastparse.parse(invalidAssetsInContract.replace("$", ""), StatelessParser.func(_))
+    )
+    error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
+    error.position is invalidAssetsInContract.indexOf("$")
   }
 
   it should "parser contract initial states" in {
@@ -1091,9 +1121,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1283,9 +1314,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             None
@@ -1375,9 +1407,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("bar", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1413,9 +1446,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -1454,9 +1488,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("foo", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = false,
+        useAssetsInContract = Ast.NotUseContractAssets,
         checkExternalCaller,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1468,9 +1503,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("bar", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = false,
+        useAssetsInContract = Ast.NotUseContractAssets,
         checkExternalCaller,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1649,9 +1685,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("main", false),
         isPublic = true,
         usePreapprovedAssets,
-        useAssetsInContract = false,
+        useAssetsInContract = Ast.NotUseContractAssets,
         useCheckExternalCaller = true,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))
@@ -1679,9 +1716,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             FuncId("main", false),
             true,
             false,
-            false,
+            Ast.NotUseContractAssets,
             true,
             false,
+            None,
             Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
             Seq(Type.NamedType(TypeId("Foo"))),
             Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
@@ -1741,6 +1779,49 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
          |""".stripMargin
     intercept[Compiler.Error](parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
+  }
+
+  it should "parse method index annotation" in {
+    def interface(index: String) =
+      s"""
+         |Interface Foo {
+         |  @using(methodIndex = $index, preapprovedAssets = true)
+         |  pub fn f1() -> ()
+         |
+         |  @using(methodIndex = 2)
+         |  pub fn f2() -> ()
+         |}
+         |""".stripMargin
+
+    val funcs = fastparse.parse(interface("1"), StatefulParser.interface(_)).get.value.funcs
+    funcs(0).useMethodIndex is Some(1)
+    funcs(0).usePreapprovedAssets is true
+    funcs(1).useMethodIndex is Some(2)
+
+    intercept[Compiler.Error](
+      fastparse.parse(interface("false"), StatefulParser.interface(_))
+    ).message is
+      "Expect U256 for methodIndex in annotation @using"
+    intercept[Compiler.Error](
+      fastparse.parse(interface("-1"), StatefulParser.interface(_))
+    ).message is
+      "Expect U256 for methodIndex in annotation @using"
+    fastparse.parse(interface("255"), StatefulParser.interface(_)).isSuccess is true
+    intercept[Compiler.Error](
+      fastparse.parse(interface("256"), StatefulParser.interface(_))
+    ).message is
+      "Invalid method index 256, expecting a value in the range [0, 0xff]"
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(methodIndex = 1, preapprovedAssets = true)
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    intercept[Compiler.Error](fastparse.parse(contract, StatefulParser.contract(_))).message is
+      "The `methodIndex` annotation can only be used for interface functions"
   }
 
   it should "parse struct" in {
