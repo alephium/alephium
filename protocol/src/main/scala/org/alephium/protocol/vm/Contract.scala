@@ -29,7 +29,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{ContractId, HardFork}
 import org.alephium.serde
 import org.alephium.serde._
-import org.alephium.util.{AVector, EitherF, Hex}
+import org.alephium.util.{AVector, Bytes, EitherF, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
@@ -163,6 +163,21 @@ object Method {
       returnLength = 0,
       AVector(Pop)
     )
+
+  final case class Selector(index: Int) extends AnyVal
+  object Selector {
+    implicit val serde: Serde[Selector] = new Serde[Selector] {
+      override def serialize(selector: Selector): ByteString = Bytes.from(selector.index)
+
+      override def _deserialize(input: ByteString): SerdeResult[Staging[Selector]] = {
+        if (input.length < 4) {
+          Left(SerdeError.validation(s"Invalid int from bytes: $input, expected 4 bytes"))
+        } else {
+          Right(Staging(Selector(Bytes.toIntUnsafe(input.take(4))), input.drop(4)))
+        }
+      }
+    }
+  }
 }
 
 sealed trait Contract[Ctx <: StatelessContext] {

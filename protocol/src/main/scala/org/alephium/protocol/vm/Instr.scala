@@ -205,7 +205,7 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Ghost hard fork */
-    PayGasFee, MinimalContractDeposit, CreateMapEntry
+    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
   )
   // format: on
 
@@ -1320,6 +1320,45 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
   def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallExternal extends StatefulInstrCompanion1[Byte]
+
+@ByteCode
+final case class MethodSelector(selector: Method.Selector)
+    extends CallInstr
+    with StatefulInstr
+    with GasHigh {
+  def serialize(): ByteString = ByteString(code) ++ encode(selector)
+
+  // The execution is skipped. It's only used to provide method selector
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = okay
+}
+object MethodSelector extends InstrCompanion[StatefulContext] {
+
+  def deserialize[C <: StatefulContext](
+      input: ByteString
+  ): SerdeResult[Staging[Instr[StatefulContext]]] = {
+    implicitly[Serde[Method.Selector]]._deserialize(input).map(_.mapValue(MethodSelector(_)))
+  }
+}
+
+@ByteCode
+final case class CallExternalBySelector(selector: Method.Selector)
+    extends CallInstr
+    with StatefulInstr
+    with GasCall {
+  def serialize(): ByteString = ByteString(code) ++ encode(selector)
+
+  // Implemented in frame instead
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
+}
+object CallExternalBySelector extends InstrCompanion[StatefulContext] {
+  def deserialize[C <: StatefulContext](
+      input: ByteString
+  ): SerdeResult[Staging[Instr[StatefulContext]]] = {
+    implicitly[Serde[Method.Selector]]
+      ._deserialize(input)
+      .map(_.mapValue(CallExternalBySelector(_)))
+  }
+}
 
 case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasZero {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {

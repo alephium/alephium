@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.config.NetworkConfigFixture
@@ -306,6 +307,17 @@ class ContractSpec extends AlephiumSpec {
     contracts
       .drop(4)
       .foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
+  }
+
+  it should "serde Method.Selector" in {
+    def test(index: Int, encoded: ByteString) = {
+      val selector = Method.Selector(index)
+      serialize(selector) is encoded
+      deserialize[Method.Selector](encoded).rightValue is selector
+    }
+
+    test(0, ByteString(0, 0, 0, 0))
+    test(0xffffffff, ByteString(0xff, 0xff, 0xff, 0xff))
   }
 }
 
