@@ -587,7 +587,9 @@ class BlockValidationSpec extends AlephiumSpec {
       implicitly
     )
     val script =
-      StatefulScript.unsafe(AVector(Method(true, false, false, 0, 0, 0, AVector(vm.TxGasFee))))
+      StatefulScript.unsafe(
+        AVector(Method(true, false, false, false, 0, 0, 0, AVector(vm.TxGasFee)))
+      )
     val block = simpleScript(blockflowLeman, chainIndex, script)
     intercept[AssertionError](simpleScript(blockflowGenesis, chainIndex, script)).getMessage is
       s"Right(TxScriptExeFailed(${vm.InactiveInstr(vm.TxGasFee)}))"

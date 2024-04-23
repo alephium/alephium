@@ -83,5 +83,6 @@ final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) 
 }
 
 object MutBalanceState {
+  def empty: MutBalanceState = MutBalanceState(MutBalances.empty, MutBalances.empty)
   def from(balances: MutBalances): MutBalanceState = MutBalanceState(balances, MutBalances.empty)
 }

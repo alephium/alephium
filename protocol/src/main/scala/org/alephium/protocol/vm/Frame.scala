@@ -286,10 +286,11 @@ final case class StatefulFrame(
 
   def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
-      method: Method[StatefulContext]
+      method: Method[StatefulContext],
+      methodIndex: Int
   ): ExeResult[Option[MutBalanceState]] = {
     if (ctx.getHardFork().isLemanEnabled()) {
-      getNewFrameBalancesStateSinceLeman(contractObj, method)
+      getNewFrameBalancesStateSinceLeman(contractObj, method, methodIndex)
     } else {
       getNewFrameBalancesStatePreLeman(contractObj, method)
     }
@@ -297,44 +298,66 @@ final case class StatefulFrame(
 
   private def getNewFrameBalancesStateSinceLeman(
       contractObj: ContractObj[StatefulContext],
-      method: Method[StatefulContext]
+      method: Method[StatefulContext],
+      methodIndex: Int
   ): ExeResult[Option[MutBalanceState]] = {
     if (method.usePreapprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
           val newFrameBalances = currentBalances.useApproved()
-          contractObj.contractIdOpt match {
-            case Some(contractId) if method.useContractAssets =>
-              ctx
-                .useContractAssets(contractId)
-                .map { balancesPerLockup =>
-                  newFrameBalances.remaining
-                    .add(LockupScript.p2c(contractId), balancesPerLockup)
-                    .map(_ => newFrameBalances)
-                }
-            case _ =>
-              Right(Some(newFrameBalances))
-          }
+          handleContractAssetsForNewFrame(
+            newFrameBalances,
+            contractObj.contractIdOpt,
+            method,
+            methodIndex,
+            useApprovedAssets = true
+          )
         }
       } yield balanceStateOpt
-    } else if (method.useContractAssets) {
-      contractObj.contractIdOpt match {
-        case Some(contractId) =>
-          ctx
-            .useContractAssets(contractId)
-            .map { balancesPerLockup =>
-              val remaining = MutBalances.empty
-              remaining
-                .add(LockupScript.p2c(contractId), balancesPerLockup)
-                .map(_ => MutBalanceState(remaining, MutBalances.empty))
-            }
-        case _ =>
-          Right(None)
-      }
+    } else if (method.useContractAssets || method.usePayToContractOnly) {
+      handleContractAssetsForNewFrame(
+        MutBalanceState.empty,
+        contractObj.contractIdOpt,
+        method,
+        methodIndex,
+        useApprovedAssets = false
+      )
     } else {
       // Note that we don't check there is no approved assets for this branch
       Right(None)
+    }
+  }
+
+  private def handleContractAssetsForNewFrame(
+      currentBalance: MutBalanceState,
+      contractIdOpt: Option[ContractId],
+      method: Method[StatefulContext],
+      methodIndex: Int,
+      useApprovedAssets: Boolean
+  ): ExeResult[Option[MutBalanceState]] = {
+    val noContractAssetsReturn = if (useApprovedAssets) Right(Some(currentBalance)) else Right(None)
+
+    contractIdOpt match {
+      case Some(contractId) =>
+        if (method.useContractAssets) {
+          assume(!method.usePayToContractOnly, "Must be true")
+          ctx
+            .useContractAssets(contractId, methodIndex)
+            .map { balancesPerLockup =>
+              currentBalance.remaining
+                .add(LockupScript.p2c(contractId), balancesPerLockup)
+                .map(_ => currentBalance)
+            }
+        } else if (method.usePayToContractOnly) {
+          assume(ctx.getHardFork().isGhostEnabled(), "Must be true")
+          ctx.prepareForPayToContractOnly(contractId).map(_ => Some(currentBalance))
+        } else {
+          // Dead branch
+          noContractAssetsReturn
+        }
+      case _ =>
+        noContractAssetsReturn
     }
   }
 
@@ -351,7 +374,7 @@ final case class StatefulFrame(
           contractObj.contractIdOpt match {
             case Some(contractId) =>
               ctx
-                .useContractAssets(contractId)
+                .useContractAssetsPreRhone(contractId)
                 .map { balancesPerLockup =>
                   newFrameBalances.remaining.add(LockupScript.p2c(contractId), balancesPerLockup)
                   Some(newFrameBalances)
@@ -510,7 +533,7 @@ final case class StatefulFrame(
   override def methodFrame(index: Int): ExeResult[Frame[StatefulContext]] = {
     for {
       method             <- getMethod(index)
-      newBalanceStateOpt <- getNewFrameBalancesState(obj, method)
+      newBalanceStateOpt <- getNewFrameBalancesState(obj, method, index)
       frame <-
         Frame.stateful(ctx, Some(this), newBalanceStateOpt, obj, method, opStack, opStack.push)
     } yield frame
@@ -526,7 +549,7 @@ final case class StatefulFrame(
       _ <- checkLength(method.returnLength, InvalidReturnLength, InvalidExternalMethodReturnLength)
       _ <- checkLength(method.argsLength, InvalidArgLength, InvalidExternalMethodArgLength)
       _ <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
-      newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
+      newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method, index)
       frame <-
         Frame.stateful(
           ctx,

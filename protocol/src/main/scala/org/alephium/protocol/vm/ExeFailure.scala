@@ -145,6 +145,8 @@ final case class InvalidType(expected: Val.Type, got: Val) extends ExeFailure {
 
 case object InvalidMethod                    extends ExeFailure
 case object InvalidMethodModifierBeforeLeman extends ExeFailure
+case object InvalidMethodModifierBeforeRhone extends ExeFailure
+case object InvalidMethodModifierSinceRhone  extends ExeFailure
 
 final case class InvalidMethodIndex(index: Int, methodLength: Int) extends ExeFailure {
   override def toString: String = s"Invalid method index $index, method length: $methodLength"
@@ -306,8 +308,19 @@ case object GasOverPaid                                 extends ExeFailure
 case object ContractPoolOverflow                        extends ExeFailure
 case object ContractFieldOverflow                       extends ExeFailure
 final case class ContractLoadDisallowed(id: ContractId) extends ExeFailure
-case object ContractAssetAlreadyInUsing                 extends ExeFailure
-case object ContractAssetAlreadyFlushed                 extends ExeFailure
+case object ContractAssetAlreadyInUsing extends ExeFailure {
+  override def toString: String = {
+    s"Contract assets can only be loaded once per transaction, to prevent reentrancy attacks! Rhone upgrade will support method-level reentrancy protection."
+  }
+}
+case object ContractAssetAlreadyFlushed extends ExeFailure
+final case class FunctionReentrancy(contractId: ContractId, methodIndex: Int) extends ExeFailure {
+  override def toString: String = {
+    val address = Address.contract(contractId)
+    s"The $methodIndex-th function in the contract (@$address) is called twice and uses contract assets twice, " +
+      s"which is not allowed due to reentrancy protection!"
+  }
+}
 
 final case class ContractAssetUnloaded(address: Address.Contract) extends ExeFailure {
   override def toString: String = {

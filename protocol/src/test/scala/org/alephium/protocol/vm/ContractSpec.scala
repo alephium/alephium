@@ -30,6 +30,7 @@ class ContractSpec extends AlephiumSpec {
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -104,7 +105,7 @@ class ContractSpec extends AlephiumSpec {
   it should "not validate empty scripts" in {
     def check(contract: StatefulContract, result: Any) = {
       val result0 = StatefulContract.check(contract, HardFork.Mainnet)
-      val result1 = StatefulContract.check(contract, HardFork.Leman)
+      val result1 = StatefulContract.check(contract, HardFork.SinceLemanForTest)
 
       result match {
         case error: ExeFailure =>
@@ -125,6 +126,7 @@ class ContractSpec extends AlephiumSpec {
       isPublic = true,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -157,7 +159,7 @@ class ContractSpec extends AlephiumSpec {
     check(contract12, ())
     val contract13 = StatefulContract(0xff + 1, AVector(method))
     StatefulContract.check(contract13, HardFork.Mainnet) isE ()
-    StatefulContract.check(contract13, HardFork.Leman).leftValue isE TooManyFields
+    StatefulContract.check(contract13, HardFork.SinceLemanForTest).leftValue isE TooManyFields
   }
 
   trait MethodsFixture {
@@ -166,14 +168,26 @@ class ContractSpec extends AlephiumSpec {
     val statefulOldMethod0  = OldMethod[StatefulContext](true, true, 3, 4, 5, AVector.empty)
     val statefulOldMethod1  = OldMethod[StatefulContext](true, false, 3, 4, 5, AVector.empty)
 
-    val statelessMethod0 = Method[StatelessContext](true, true, true, 3, 4, 5, AVector.empty)
-    val statelessMethod1 = Method[StatelessContext](true, false, false, 3, 4, 5, AVector.empty)
-    val statelessMethod2 = Method[StatelessContext](true, true, false, 3, 4, 5, AVector.empty)
-    val statelessMethod3 = Method[StatelessContext](true, false, true, 3, 4, 5, AVector.empty)
-    val statefulMethod0  = Method[StatefulContext](true, true, true, 3, 4, 5, AVector.empty)
-    val statefulMethod1  = Method[StatefulContext](true, false, false, 3, 4, 5, AVector.empty)
-    val statefulMethod2  = Method[StatefulContext](true, true, false, 3, 4, 5, AVector.empty)
-    val statefulMethod3  = Method[StatefulContext](true, false, true, 3, 4, 5, AVector.empty)
+    val statelessMethod0 = Method[StatelessContext](true, true, true, false, 3, 4, 5, AVector.empty)
+    val statelessMethod1 =
+      Method[StatelessContext](true, false, false, false, 3, 4, 5, AVector.empty)
+    val statelessMethod2 =
+      Method[StatelessContext](true, true, false, false, 3, 4, 5, AVector.empty)
+    val statelessMethod3 =
+      Method[StatelessContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statelessMethod4 = Method[StatelessContext](true, true, true, true, 3, 4, 5, AVector.empty)
+    val statelessMethod5 =
+      Method[StatelessContext](true, false, false, true, 3, 4, 5, AVector.empty)
+    val statelessMethod6 = Method[StatelessContext](true, true, false, true, 3, 4, 5, AVector.empty)
+    val statelessMethod7 = Method[StatelessContext](true, false, true, true, 3, 4, 5, AVector.empty)
+    val statefulMethod0  = Method[StatefulContext](true, true, true, false, 3, 4, 5, AVector.empty)
+    val statefulMethod1 = Method[StatefulContext](true, false, false, false, 3, 4, 5, AVector.empty)
+    val statefulMethod2 = Method[StatefulContext](true, true, false, false, 3, 4, 5, AVector.empty)
+    val statefulMethod3 = Method[StatefulContext](true, false, true, false, 3, 4, 5, AVector.empty)
+    val statefulMethod4 = Method[StatefulContext](true, true, true, true, 3, 4, 5, AVector.empty)
+    val statefulMethod5 = Method[StatefulContext](true, false, false, true, 3, 4, 5, AVector.empty)
+    val statefulMethod6 = Method[StatefulContext](true, true, false, true, 3, 4, 5, AVector.empty)
+    val statefulMethod7 = Method[StatefulContext](true, false, true, true, 3, 4, 5, AVector.empty)
   }
 
   it should "serialize method examples" in new MethodsFixture {
@@ -186,10 +200,18 @@ class ContractSpec extends AlephiumSpec {
     serialize(statelessMethod1) is serialize(statelessOldMethod1)
     serialize(statelessMethod2) is hex"010303040500"
     serialize(statelessMethod3) is hex"010203040500"
+    serialize(statelessMethod4) is hex"010503040500"
+    serialize(statelessMethod5) is hex"010403040500"
+    serialize(statelessMethod6) is hex"010703040500"
+    serialize(statelessMethod7) is hex"010603040500"
     serialize(statefulMethod0) is serialize(statefulOldMethod0)
     serialize(statefulMethod1) is serialize(statefulOldMethod1)
     serialize(statefulMethod2) is hex"010303040500"
     serialize(statefulMethod3) is hex"010203040500"
+    serialize(statefulMethod4) is hex"010503040500"
+    serialize(statefulMethod5) is hex"010403040500"
+    serialize(statefulMethod6) is hex"010703040500"
+    serialize(statefulMethod7) is hex"010603040500"
   }
 
   it should "serde methods" in {
@@ -197,12 +219,14 @@ class ContractSpec extends AlephiumSpec {
       isPublic             <- Seq(true, false)
       usePreapprovedAssets <- Seq(true, false)
       useContractAssetss   <- Seq(true, false)
+      usePayToContractOnly <- Seq(true, false)
     } {
       val statelessMethods =
         Method[StatelessContext](
           isPublic,
           usePreapprovedAssets,
           useContractAssetss,
+          usePayToContractOnly,
           3,
           4,
           5,
@@ -215,6 +239,7 @@ class ContractSpec extends AlephiumSpec {
           isPublic,
           usePreapprovedAssets,
           useContractAssetss,
+          usePayToContractOnly,
           3,
           4,
           5,
@@ -237,20 +262,50 @@ class ContractSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends MethodsFixture with ContextGenerators {
-    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
     val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
+    val rhoneContext    = genStatefulContext(None)(NetworkConfigFixture.Ghost)
   }
 
   it should "check method modifier in contracts" in new ContractFixture {
     val contracts: Seq[Contract[_]] =
-      Seq(statelessMethod0, statelessMethod1, statelessMethod2, statelessMethod3).map(method =>
-        StatelessScript.unsafe(AVector(method))
-      )
-    contracts.foreach(_.checkAssetsModifier(lemanContext) isE ())
+      Seq(
+        statelessMethod0,
+        statelessMethod1,
+        statelessMethod2,
+        statelessMethod3,
+        statelessMethod4,
+        statelessMethod5,
+        statelessMethod6,
+        statelessMethod7
+      ).map(method => StatelessScript.unsafe(AVector(method)))
+
+    contracts.zipWithIndex.foreach { case (method, index) =>
+      if (index == 4 || index == 7) {
+        // Cannot enable useContractAssets and usePayToContractOnly together
+        method.checkAssetsModifier(rhoneContext).leftValue isE InvalidMethodModifierSinceRhone
+      } else {
+        method.checkAssetsModifier(rhoneContext) isE ()
+      }
+    }
+
     contracts(0).checkAssetsModifier(preLemanContext) isE ()
     contracts(1).checkAssetsModifier(preLemanContext) isE ()
     contracts(2).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeLeman
     contracts(3).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeLeman
+    contracts
+      .drop(4)
+      .foreach(
+        _.checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifierBeforeRhone
+      )
+
+    contracts(0).checkAssetsModifier(lemanContext) isE ()
+    contracts(1).checkAssetsModifier(lemanContext) isE ()
+    contracts(2).checkAssetsModifier(lemanContext) isE ()
+    contracts(3).checkAssetsModifier(lemanContext) isE ()
+    contracts
+      .drop(4)
+      .foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
   }
 }
 

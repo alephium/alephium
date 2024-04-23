@@ -23,7 +23,11 @@ import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
 class GasPriceSpec extends AlephiumSpec with NumericHelpers {
   it should "validate gas price bounds deprecated" in {
     val (isCoinbase, hardfork) =
-      AVector(true -> HardFork.Mainnet, true -> HardFork.Leman, false -> HardFork.Mainnet).sample()
+      AVector(
+        true  -> HardFork.Mainnet,
+        true  -> HardFork.SinceLemanForTest,
+        false -> HardFork.Mainnet
+      ).sample()
     GasPrice.validate(coinbaseGasPrice, isCoinbase, hardfork) is true
     GasPrice.validate(
       GasPrice(coinbaseGasPrice.value - 1),
@@ -35,14 +39,26 @@ class GasPriceSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "validate gas price bounds for non-coinbase + Leman fork" in {
-    GasPrice.validate(coinbaseGasPrice, isCoinbase = false, HardFork.Leman) is false
-    GasPrice.validate(nonCoinbaseMinGasPrice, isCoinbase = false, HardFork.Leman) is true
+    GasPrice.validate(coinbaseGasPrice, isCoinbase = false, HardFork.SinceLemanForTest) is false
+    GasPrice.validate(
+      nonCoinbaseMinGasPrice,
+      isCoinbase = false,
+      HardFork.SinceLemanForTest
+    ) is true
     GasPrice.validate(
       GasPrice(nonCoinbaseMinGasPrice.value - 1),
       isCoinbase = false,
-      HardFork.Leman
+      HardFork.SinceLemanForTest
     ) is false
-    GasPrice.validate(GasPrice(ALPH.MaxALPHValue), isCoinbase = false, HardFork.Leman) is false
-    GasPrice.validate(GasPrice(ALPH.MaxALPHValue - 1), isCoinbase = false, HardFork.Leman) is true
+    GasPrice.validate(
+      GasPrice(ALPH.MaxALPHValue),
+      isCoinbase = false,
+      HardFork.SinceLemanForTest
+    ) is false
+    GasPrice.validate(
+      GasPrice(ALPH.MaxALPHValue - 1),
+      isCoinbase = false,
+      HardFork.SinceLemanForTest
+    ) is true
   }
 }

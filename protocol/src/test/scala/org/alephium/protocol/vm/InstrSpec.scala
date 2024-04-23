@@ -29,7 +29,7 @@ import org.scalacheck.Gen
 import org.alephium.crypto
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.config.NetworkConfigFixture.{Leman, PreLeman}
+import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
 import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
@@ -129,7 +129,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       }
     }
     val frame1 =
-      prepareFrame(AVector.empty)(NetworkConfigFixture.PreLeman) // Leman is not activated yet
+      prepareFrame(AVector.empty)(NetworkConfigFixture.Genesis) // Leman is not activated yet
     lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
   }
 
@@ -189,6 +189,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = localsLength,
         returnLength = 0,
@@ -1994,6 +1995,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -2076,7 +2078,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         callerFrameOpt,
         immFields,
         mutFields
-      )(NetworkConfigFixture.PreLeman)
+      )(NetworkConfigFixture.Genesis)
     }
   }
 
@@ -3108,6 +3110,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "check external method arg and return length" in new ContextGenerators {
+    // scalastyle:off method.length
     def prepareFrame(lengthOpt: Option[(U256, U256)])(implicit
         networkConfig: NetworkConfig
     ): Frame[StatefulContext] = {
@@ -3115,6 +3118,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -3130,6 +3134,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -3159,8 +3164,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .rightValue
     }
 
-    prepareFrame(None)(NetworkConfigFixture.PreLeman).execute().isRight is true
-    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.PreLeman)
+    prepareFrame(None)(NetworkConfigFixture.Genesis).execute().isRight is true
+    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.Genesis)
       .execute()
       .isRight is true
 
@@ -3205,15 +3210,30 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         Some(balanceState),
         immFields = AVector.empty,
         mutFields = AVector(Val.True, Val.False)
-      )(NetworkConfigFixture.PreLeman)
+      )(NetworkConfigFixture.Genesis)
     val lemanFrame =
       (balanceState: MutBalanceState) =>
         prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+    val rhoneFrame =
+      (balanceState: MutBalanceState) =>
+        prepareFrame(Some(balanceState))(NetworkConfigFixture.Ghost)
 
-    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
-    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
-    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
-    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+    val contract0 =
+      StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
+    val contract1 =
+      StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 =
+      StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
+    val contract3 =
+      StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+    val contract4 =
+      StatefulContract(0, AVector(Method(true, true, true, true, 0, 0, 0, AVector.empty)))
+    val contract5 =
+      StatefulContract(0, AVector(Method(true, false, false, true, 0, 0, 0, AVector.empty)))
+    val contract6 =
+      StatefulContract(0, AVector(Method(true, true, false, true, 0, 0, 0, AVector.empty)))
+    val contract7 =
+      StatefulContract(0, AVector(Method(true, false, true, true, 0, 0, 0, AVector.empty)))
 
     def testModifier(
         instr: Instr[StatefulContext],
@@ -3236,27 +3256,59 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       if (succeeded) {
         instr.runWith(frame) isE ()
       } else {
-        instr.runWith(frame).leftValue isE InvalidMethodModifierBeforeLeman
+        instr.runWith(frame).leftValue.toString.contains("InvalidMethodModifier") is true
       }
     }
 
+    testModifier(CreateContract, rhoneFrame, contract0, true)
+    testModifier(CreateContract, rhoneFrame, contract1, true)
+    testModifier(CreateContract, rhoneFrame, contract2, true)
+    testModifier(CreateContract, rhoneFrame, contract3, true)
+    testModifier(CreateContract, rhoneFrame, contract4, false)
+    testModifier(CreateContract, rhoneFrame, contract5, true)
+    testModifier(CreateContract, rhoneFrame, contract6, true)
+    testModifier(CreateContract, rhoneFrame, contract7, false)
     testModifier(CreateContract, lemanFrame, contract0, true)
     testModifier(CreateContract, lemanFrame, contract1, true)
     testModifier(CreateContract, lemanFrame, contract2, true)
     testModifier(CreateContract, lemanFrame, contract3, true)
+    testModifier(CreateContract, lemanFrame, contract4, false)
+    testModifier(CreateContract, lemanFrame, contract5, false)
+    testModifier(CreateContract, lemanFrame, contract6, false)
+    testModifier(CreateContract, lemanFrame, contract7, false)
     testModifier(CreateContract, preLemanFrame, contract0, true)
     testModifier(CreateContract, preLemanFrame, contract1, true)
     testModifier(CreateContract, preLemanFrame, contract2, false)
     testModifier(CreateContract, preLemanFrame, contract3, false)
+    testModifier(CreateContract, preLemanFrame, contract4, false)
+    testModifier(CreateContract, preLemanFrame, contract5, false)
+    testModifier(CreateContract, preLemanFrame, contract6, false)
+    testModifier(CreateContract, preLemanFrame, contract7, false)
 
+    testModifier(CreateContractWithToken, rhoneFrame, contract0, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract1, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract2, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract3, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract4, false)
+    testModifier(CreateContractWithToken, rhoneFrame, contract5, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract6, true)
+    testModifier(CreateContractWithToken, rhoneFrame, contract7, false)
     testModifier(CreateContractWithToken, lemanFrame, contract0, true)
     testModifier(CreateContractWithToken, lemanFrame, contract1, true)
     testModifier(CreateContractWithToken, lemanFrame, contract2, true)
     testModifier(CreateContractWithToken, lemanFrame, contract3, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract4, false)
+    testModifier(CreateContractWithToken, lemanFrame, contract5, false)
+    testModifier(CreateContractWithToken, lemanFrame, contract6, false)
+    testModifier(CreateContractWithToken, lemanFrame, contract7, false)
     testModifier(CreateContractWithToken, preLemanFrame, contract0, true)
     testModifier(CreateContractWithToken, preLemanFrame, contract1, true)
     testModifier(CreateContractWithToken, preLemanFrame, contract2, false)
     testModifier(CreateContractWithToken, preLemanFrame, contract3, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract4, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract5, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract6, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract7, false)
   }
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {
@@ -3504,6 +3556,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = true,
         useContractAssets = true,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -3519,6 +3572,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           isPublic = true,
           usePreapprovedAssets = false,
           useContractAssets = false,
+          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
@@ -3562,7 +3616,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Before Leman hardfork")
 
-      val frame        = prepareFrame()(PreLeman)
+      val frame        = prepareFrame()(Genesis)
       val destroyFrame = frame.execute().rightValue.value
 
       destroyFrame.opStack.push(Val.Address(contractLockupScriptGen.sample.get))
@@ -3587,7 +3641,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Should fail before Leman hardfork")
 
-      val frame               = prepareFrame()(PreLeman)
+      val frame               = prepareFrame()(Genesis)
       val callingLockupScript = LockupScript.p2c(frame.obj.contractIdOpt.value)
 
       val destroyFrame = frame.execute().rightValue.value
@@ -3617,7 +3671,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Before Leman hardfork")
 
-      val frame = prepareFrame()(PreLeman)
+      val frame = prepareFrame()(Genesis)
 
       checkDestroyRefundBalance(frame) { destroyFrame =>
         val assetLockupScript = assetLockupScriptGen.sample.get

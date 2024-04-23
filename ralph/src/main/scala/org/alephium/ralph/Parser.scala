@@ -337,6 +337,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("->" ~ parseType(Type.NamedType)).map(tpe => Seq(tpe))
   def bracketReturnType[Unknown: P]: P[Seq[Type]] =
     P("->" ~ "(" ~ parseType(Type.NamedType).rep(0, ",") ~ ")")
+  // scalastyle:off method.length
   def funcTmp[Unknown: P]: P[FuncDefTmp[Ctx]] =
     PP(
       annotation.rep(0) ~
@@ -368,17 +369,28 @@ abstract class Parser[Ctx <: StatelessContext] {
             Parser.UsingAnnotationFields(
               preapprovedAssets = false,
               assetsInContract = Ast.NotUseContractAssets,
+              payToContractOnly = false,
               checkExternalCaller = true,
               updateFields = false,
               methodIndex = None
             )
           )
+          if (usingAnnotation.payToContractOnly && usingAnnotation.assetsInContract.assetsEnabled) {
+            throw Compiler.Error(
+              s"Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)",
+              SourceIndex(
+                annotations.headOption.flatMap(_.fields.headOption.flatMap(_.sourceIndex)),
+                annotations.lastOption.flatMap(_.fields.lastOption.flatMap(_.sourceIndex))
+              )
+            )
+          }
           FuncDefTmp(
             annotations,
             funcId,
             isPublic,
             usingAnnotation.preapprovedAssets,
             usingAnnotation.assetsInContract,
+            usingAnnotation.payToContractOnly,
             usingAnnotation.checkExternalCaller,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
@@ -402,6 +414,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         f.isPublic,
         f.usePreapprovedAssets,
         f.useContractAssets,
+        f.usePayToContractOnly,
         f.useCheckExternalCaller,
         f.useUpdateFields,
         f.useMethodIndex,
@@ -563,6 +576,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
     useContractAssets: Ast.ContractAssetsAnnotation,
+    usePayToContractOnly: Boolean,
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
@@ -632,6 +646,7 @@ object Parser {
   final case class UsingAnnotationFields(
       preapprovedAssets: Boolean,
       assetsInContract: Ast.ContractAssetsAnnotation,
+      payToContractOnly: Boolean,
       checkExternalCaller: Boolean,
       updateFields: Boolean,
       methodIndex: Option[Int]
@@ -641,12 +656,14 @@ object Parser {
     val id: String                = "using"
     val usePreapprovedAssetsKey   = "preapprovedAssets"
     val useContractAssetsKey      = "assetsInContract"
+    val usePayToContractOnly      = "payToContractOnly"
     val useCheckExternalCallerKey = "checkExternalCaller"
     val useUpdateFieldsKey        = "updateFields"
     val useMethodIndexKey         = "methodIndex"
     val keys: AVector[String] = AVector(
       usePreapprovedAssetsKey,
       useContractAssetsKey,
+      usePayToContractOnly,
       useCheckExternalCallerKey,
       useUpdateFieldsKey,
       useMethodIndexKey
@@ -688,6 +705,7 @@ object Parser {
       UsingAnnotationFields(
         extractField(annotation, usePreapprovedAssetsKey, Val.Bool(default.preapprovedAssets)).v,
         extractUseContractAsset(annotation),
+        extractField(annotation, usePayToContractOnly, Val.Bool(default.payToContractOnly)).v,
         extractField(
           annotation,
           useCheckExternalCallerKey,
@@ -892,6 +910,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               Parser.UsingAnnotationFields(
                 preapprovedAssets = true,
                 assetsInContract = Ast.NotUseContractAssets,
+                payToContractOnly = false,
                 checkExternalCaller = true,
                 updateFields = false,
                 methodIndex = None
@@ -1101,6 +1120,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               f.isPublic,
               f.usePreapprovedAssets,
               f.useContractAssets,
+              f.usePayToContractOnly,
               f.useCheckExternalCaller,
               f.useUpdateFields,
               f.useMethodIndex,

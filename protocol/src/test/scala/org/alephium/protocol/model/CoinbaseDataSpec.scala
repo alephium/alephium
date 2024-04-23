@@ -32,7 +32,7 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
       val data = CoinbaseDataV1(prefix, minerData)
 
       {
-        implicit val networkConfig = NetworkConfigFixture.PreLeman
+        implicit val networkConfig = NetworkConfigFixture.Genesis
         deserialize[CoinbaseData](serialize[CoinbaseData](data)).rightValue is data
       }
       {

@@ -46,6 +46,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -126,8 +127,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "load limited number of contracts before Rhone" in new ContractNumFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+  it should "load limited number of contracts before Rhone" in new ContractNumFixture
+    with NetworkConfigFixture.LemanT {
     pool.getHardFork() is HardFork.Leman
 
     val contracts = prepare()
@@ -157,8 +158,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture
+    with NetworkConfigFixture.LemanT {
     pool.getHardFork() is HardFork.Leman
 
     val contractId2 = prepare()
@@ -203,8 +204,10 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   it should "market assets properly" in new Fixture {
     val contractId0 = ContractId.generate
     val contractId1 = ContractId.generate
-    pool.markAssetInUsing(contractId0) isE ()
-    pool.markAssetInUsing(contractId0) is failed(ContractAssetAlreadyInUsing)
+    pool.markAssetInUsing(contractId0, MutBalancesPerLockup.empty) isE ()
+    pool.markAssetInUsing(contractId0, MutBalancesPerLockup.empty) is failed(
+      ContractAssetAlreadyInUsing
+    )
 
     pool.markAssetFlushed(contractId0) isE ()
     pool.markAssetFlushed(contractId0) is failed(ContractAssetAlreadyFlushed)
@@ -213,16 +216,17 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     )
 
     pool.checkAllAssetsFlushed() isE ()
-    pool.markAssetInUsing(contractId1) isE ()
+    pool.markAssetInUsing(contractId1, MutBalancesPerLockup.empty) isE ()
     pool.checkAllAssetsFlushed() is failed(EmptyContractAsset)
     pool.markAssetFlushed(contractId1) isE ()
     pool.checkAllAssetsFlushed() isE ()
   }
 
-  it should "use contract assets" in new Fixture
-    with TxGenerators
-    with GroupConfigFixture.Default
-    with NetworkConfigFixture.Default {
+  trait UseContractAssetsFixture
+      extends Fixture
+      with TxGenerators
+      with GroupConfigFixture.Default
+      with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = ContractId.random
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
@@ -237,9 +241,26 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.gasRemaining is initialGas
     pool.worldState.getOutputOpt(outputRef).rightValue.nonEmpty is true
     pool.assetStatus.contains(contractId) is false
-    pool.useContractAssets(contractId).isRight is true
+
+    val balances = pool.useContractAssets(contractId, 0).rightValue
     initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
     pool.worldState.getOutputOpt(outputRef) isE a[Some[_]]
-    pool.assetStatus(contractId) is ContractPool.ContractAssetInUsing
+    pool.assetStatus(contractId) is a[ContractPool.ContractAssetInUsing]
+  }
+
+  it should "use contract assets wth method-level reentrancy protection since Rhone" in new UseContractAssetsFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    pool.assetUsedSinceRhone.toSet is Set(contractId -> 0)
+    pool.useContractAssets(contractId, 0).leftValue isE FunctionReentrancy(contractId, 0)
+    pool.useContractAssets(contractId, 1).rightValue is balances
+    pool.assetUsedSinceRhone.toSet is Set(contractId -> 0, contractId -> 1)
+  }
+
+  it should "use contract assets wth contract-level reentrancy protection before Rhone" in new UseContractAssetsFixture
+    with NetworkConfigFixture.PreRhoneT {
+    pool.assetUsedSinceRhone.isEmpty is true
+    pool.useContractAssets(contractId, 0).leftValue isE ContractAssetAlreadyInUsing
+    pool.useContractAssets(contractId, 1).leftValue isE ContractAssetAlreadyInUsing
+    pool.assetUsedSinceRhone.isEmpty is true
   }
 }

@@ -291,8 +291,8 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       // Compiled from the script above
       val script = StatefulScript.unsafe(
         AVector(
-          vm.Method(true, true, false, 0, 0, 0, AVector(vm.Return)),
-          vm.Method(true, false, false, 0, 0, 0, AVector())
+          vm.Method(true, true, false, false, 0, 0, 0, AVector(vm.Return)),
+          vm.Method(true, false, false, false, 0, 0, 0, AVector())
         )
       )
 
@@ -335,6 +335,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
             isPublic = true,
             usePreapprovedAssets = true,
             useContractAssets = true,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,

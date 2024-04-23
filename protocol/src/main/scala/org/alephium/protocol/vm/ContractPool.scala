@@ -37,8 +37,10 @@ trait ContractPool extends CostStrategy {
   def worldState: WorldState.Staging
 
   lazy val contractPool      = mutable.Map.empty[ContractId, StatefulContractObject]
-  lazy val assetStatus       = mutable.Map.empty[ContractId, ContractAssetStatus]
   lazy val contractBlockList = mutable.Set.empty[ContractId]
+
+  lazy val assetStatus         = mutable.Map.empty[ContractId, ContractAssetStatus]
+  lazy val assetUsedSinceRhone = mutable.Set.empty[(ContractId, Int)]
 
   lazy val contractInputs: ArrayBuffer[(ContractOutputRef, ContractOutput)] = ArrayBuffer.empty
 
@@ -154,7 +156,38 @@ trait ContractPool extends CostStrategy {
       .map(e => Left(IOErrorUpdateState(e)))
   }
 
-  def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
+  def useContractAssets(
+      contractId: ContractId,
+      methodIndex: Int
+  ): ExeResult[MutBalancesPerLockup] = {
+    if (getHardFork().isGhostEnabled()) {
+      useContractAssetsRhone(contractId, methodIndex)
+    } else {
+      useContractAssetsPreRhone(contractId)
+    }
+  }
+
+  def useContractAssetsRhone(
+      contractId: ContractId,
+      methodIndex: Int
+  ): ExeResult[MutBalancesPerLockup] = {
+    if (assetUsedSinceRhone.contains(contractId -> methodIndex)) {
+      failed(FunctionReentrancy(contractId, methodIndex))
+    } else {
+      assetUsedSinceRhone.add(contractId -> methodIndex)
+      assetStatus.get(contractId) match {
+        case Some(ContractAssetInUsing(balances)) => Right(balances)
+        case Some(ContractAssetFlushed)           => failed(ContractAssetAlreadyFlushed)
+        case None                                 => loadContractAssets(contractId)
+      }
+    }
+  }
+
+  def useContractAssetsPreRhone(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
+    loadContractAssets(contractId)
+  }
+
+  private def loadContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
     for {
       _ <- chargeContractInput()
       balances <- worldState
@@ -165,23 +198,33 @@ trait ContractPool extends CostStrategy {
         }
         .left
         .map(e => Left(IOErrorLoadContract(e)))
-      _ <- markAssetInUsing(contractId)
+      _ <- markAssetInUsing(contractId, balances)
     } yield balances
   }
 
-  def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {
+  def markAssetInUsing(contractId: ContractId, balances: MutBalancesPerLockup): ExeResult[Unit] = {
     assetStatus.get(contractId) match {
       case None =>
-        assetStatus.put(contractId, ContractAssetInUsing)
+        assetStatus.put(contractId, ContractAssetInUsing(balances))
         Right(())
-      case Some(ContractAssetInUsing) => failed(ContractAssetAlreadyInUsing)
-      case Some(ContractAssetFlushed) => failed(ContractAssetAlreadyFlushed)
+      case Some(ContractAssetInUsing(_)) => failed(ContractAssetAlreadyInUsing)
+      case Some(ContractAssetFlushed)    => failed(ContractAssetAlreadyFlushed)
+    }
+  }
+
+  // Load contract assets so that the corresponding inputs are tracked
+  def prepareForPayToContractOnly(contractId: ContractId): ExeResult[Unit] = {
+    assetStatus.get(contractId) match {
+      case None                          => loadContractAssets(contractId).map(_ => ())
+      case Some(ContractAssetInUsing(_)) => okay
+      case Some(ContractAssetFlushed)    => failed(ContractAssetAlreadyFlushed)
     }
   }
 
   def markAssetFlushed(contractId: ContractId): ExeResult[Unit] = {
     assetStatus.get(contractId) match {
-      case Some(ContractAssetInUsing) => Right(assetStatus.update(contractId, ContractAssetFlushed))
+      case Some(ContractAssetInUsing(_)) =>
+        Right(assetStatus.update(contractId, ContractAssetFlushed))
       case Some(ContractAssetFlushed) => failed(ContractAssetAlreadyFlushed)
       case None                       => failed(ContractAssetUnloaded(Address.contract(contractId)))
     }
@@ -189,7 +232,7 @@ trait ContractPool extends CostStrategy {
 
   def checkAllAssetsFlushed(): ExeResult[Unit] = {
     if (assetStatus.forall(_._2 == ContractAssetFlushed)) {
-      Right(())
+      okay
     } else {
       failed(EmptyContractAsset)
     }
@@ -198,6 +241,6 @@ trait ContractPool extends CostStrategy {
 
 object ContractPool {
   sealed trait ContractAssetStatus
-  case object ContractAssetInUsing extends ContractAssetStatus
-  case object ContractAssetFlushed extends ContractAssetStatus
+  final case class ContractAssetInUsing(balances: MutBalancesPerLockup) extends ContractAssetStatus
+  case object ContractAssetFlushed                                      extends ContractAssetStatus
 }
