@@ -5823,12 +5823,11 @@ class VMSpec extends AlephiumSpec with Generators {
 
     lazy val fooId = createContract(foo, initialAttoAlphAmount = ALPH.alph(10))._1
 
-    lazy val script =
+    def script(statements: String) =
       s"""
          |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
-         |  foo.withdraw0(callerAddress!())
-         |  foo.withdraw2(callerAddress!())
+         |  $statements
          |}
          |$foo
          |""".stripMargin
@@ -5836,15 +5835,56 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "call multiple asset functions in the same contract: Rhone" in new ReentrancyFixture {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
-    callTxScript(script)
+    callTxScript(script(s"""
+                           |  foo.withdraw0(callerAddress!())
+                           |  foo.withdraw2(callerAddress!())
+                           |""".stripMargin))
     getContractAsset(fooId).amount is ALPH.alph(10 - 3)
+
+    failCallTxScript(
+      script(s"""
+                |  foo.withdraw0(callerAddress!())
+                |  foo.withdraw0(callerAddress!())
+                |""".stripMargin),
+      FunctionReentrancy(fooId, 0)
+    )
+
+    failCallTxScript(
+      script(s"""
+                |  foo.withdraw2(callerAddress!())
+                |  foo.withdraw2(callerAddress!())
+                |""".stripMargin),
+      FunctionReentrancy(fooId, 0)
+    )
   }
 
   it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
     override val configValues =
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-    failCallTxScript(script, ContractAssetAlreadyInUsing)
+    failCallTxScript(
+      script(s"""
+                |  foo.withdraw0(callerAddress!())
+                |  foo.withdraw2(callerAddress!())
+                |""".stripMargin),
+      ContractAssetAlreadyInUsing
+    )
+
+    failCallTxScript(
+      script(s"""
+                |  foo.withdraw0(callerAddress!())
+                |  foo.withdraw0(callerAddress!())
+                |""".stripMargin),
+      ContractAssetAlreadyInUsing
+    )
+
+    failCallTxScript(
+      script(s"""
+                |  foo.withdraw2(callerAddress!())
+                |  foo.withdraw2(callerAddress!())
+                |""".stripMargin),
+      ContractAssetAlreadyInUsing
+    )
   }
 
   behavior of "Pay to contract only"

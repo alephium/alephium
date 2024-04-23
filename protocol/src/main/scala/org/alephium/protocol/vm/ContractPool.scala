@@ -172,7 +172,7 @@ trait ContractPool extends CostStrategy {
       methodIndex: Int
   ): ExeResult[MutBalancesPerLockup] = {
     if (assetUsedSinceRhone.contains(contractId -> methodIndex)) {
-      failed(FunctionReentrancy)
+      failed(FunctionReentrancy(contractId, methodIndex))
     } else {
       assetUsedSinceRhone.add(contractId -> methodIndex)
       assetStatus.get(contractId) match {

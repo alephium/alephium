@@ -251,7 +251,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   it should "use contract assets wth method-level reentrancy protection since Rhone" in new UseContractAssetsFixture
     with NetworkConfigFixture.SinceRhoneT {
     pool.assetUsedSinceRhone.toSet is Set(contractId -> 0)
-    pool.useContractAssets(contractId, 0).leftValue isE FunctionReentrancy
+    pool.useContractAssets(contractId, 0).leftValue isE FunctionReentrancy(contractId, 0)
     pool.useContractAssets(contractId, 1).rightValue is balances
     pool.assetUsedSinceRhone.toSet is Set(contractId -> 0, contractId -> 1)
   }

@@ -314,9 +314,11 @@ case object ContractAssetAlreadyInUsing extends ExeFailure {
   }
 }
 case object ContractAssetAlreadyFlushed extends ExeFailure
-case object FunctionReentrancy extends ExeFailure {
+final case class FunctionReentrancy(contractId: ContractId, methodIndex: Int) extends ExeFailure {
   override def toString: String = {
-    s"A function using contract assets can only be called once per transaction, to prevent reentrancy attacks!"
+    val address = Address.contract(contractId)
+    s"The $methodIndex-th function in the contract (@$address) is called twice and uses contract assets twice, " +
+      s"which is not allowed due to reentrancy protection!"
   }
 }
 
