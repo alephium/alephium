@@ -63,8 +63,6 @@ abstract class Parser[Ctx <: StatelessContext] {
   def const[Unknown: P]: P[Ast.Const[Ctx]] =
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(_.asInstanceOf[Ast.Const[Ctx]])
 
-  def value[Unknown: P]: P[Val] = P(const).map(_.v)
-
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     PP("[" ~ (expr.rep(1, ",")) ~ "]") { elems =>
       Ast.CreateArrayExpr.apply(elems)
@@ -237,9 +235,9 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw CompilerError.`Expected else statement`(index, fileURI)
     }
 
-  def stringLiteral[Unknown: P]: P[Ast.StringLiteral[Ctx]] =
+  def stringLiteral[Unknown: P]: P[Ast.Const[Ctx]] =
     PP("b" ~ Lexer.string) { s =>
-      Ast.StringLiteral(Val.ByteVec(ByteString.fromString(s)))
+      Ast.Const(Val.ByteVec(ByteString.fromString(s)))
     }
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
@@ -550,26 +548,29 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
-  def enforceUsingContractAssets[Unknown: P]: P[Ast.AnnotationField] =
-    P(Index ~ Parser.UsingAnnotation.useContractAssetsKey ~ "=" ~ "enforced" ~~ Index).map {
-      case (from, to) =>
+  def enforceUsingContractAssets[Unknown: P]: P[Ast.AnnotationField[Ctx]] =
+    P(Index ~ Parser.UsingAnnotation.useContractAssetsKey ~ "=" ~ Index ~ "enforced" ~~ Index)
+      .map { case (from, valueFrom, to) =>
         Ast
-          .AnnotationField(Ast.Ident(Parser.UsingAnnotation.useContractAssetsKey), Val.Enforced)
+          .AnnotationField(
+            Ast.Ident(Parser.UsingAnnotation.useContractAssetsKey),
+            Ast.Const[Ctx](Val.Enforced).atSourceIndex(valueFrom, to, fileURI)
+          )
           .atSourceIndex(from, to, fileURI)
-    }
-  def annotationField[Unknown: P]: P[Ast.AnnotationField] =
+      }
+  def annotationField[Unknown: P]: P[Ast.AnnotationField[Ctx]] =
     P(Index ~ Lexer.ident ~ "=" ~ expr ~~ Index).map {
       case (fromIndex, ident, expr: Ast.Const[_], endIndex) =>
-        Ast.AnnotationField(ident, expr.v).atSourceIndex(fromIndex, endIndex, fileURI)
+        Ast.AnnotationField(ident, expr).atSourceIndex(fromIndex, endIndex, fileURI)
       case (_, _, expr, _) =>
         throw Compiler.Error(
           s"Expect const value for annotation field, got ${expr}",
           expr.sourceIndex
         )
     }
-  def annotationFields[Unknown: P]: P[Seq[Ast.AnnotationField]] =
+  def annotationFields[Unknown: P]: P[Seq[Ast.AnnotationField[Ctx]]] =
     P("(" ~ (enforceUsingContractAssets | annotationField).rep(1, ",") ~ ")")
-  def annotation[Unknown: P]: P[Ast.Annotation] =
+  def annotation[Unknown: P]: P[Ast.Annotation[Ctx]] =
     P(Index ~ "@" ~ Lexer.ident ~ annotationFields.? ~~ Index).map {
       case (fromIndex, id, fieldsOpt, endIndex) =>
         Ast
@@ -579,7 +580,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 }
 
 final case class FuncDefTmp[Ctx <: StatelessContext](
-    annotations: Seq[Annotation],
+    annotations: Seq[Annotation[Ctx]],
     id: FuncId,
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
@@ -597,7 +598,9 @@ object Parser {
   sealed trait RalphAnnotation[T] {
     def id: String
     def keys: AVector[String]
-    def validate(annotations: Seq[Ast.Annotation]): Option[Annotation] = {
+    def validate[Ctx <: StatelessContext](
+        annotations: Seq[Ast.Annotation[Ctx]]
+    ): Option[Annotation[Ctx]] = {
       annotations.find(_.id.name != id) match {
         case Some(annotation) =>
           throw Compiler.Error(
@@ -627,27 +630,35 @@ object Parser {
       }
     }
 
-    final def extractField[V <: Val](
-        annotation: Ast.Annotation,
+    final def extractField[V <: Val, Ctx <: StatelessContext](
+        annotation: Ast.Annotation[Ctx],
         key: String,
         tpe: Val.Type
     ): Option[V] = {
       annotation.fields.find(_.ident.name == key) match {
-        case Some(Ast.AnnotationField(_, value: V @unchecked)) if tpe == value.tpe => Some(value)
+        case Some(Ast.AnnotationField(_, Ast.Const(value: V @unchecked))) if tpe == value.tpe =>
+          Some(value)
         case Some(field) =>
           throw Compiler.Error(s"Expect $tpe for $key in annotation @$id", field.sourceIndex)
         case None => None
       }
     }
 
-    final def extractField[V <: Val](annotation: Ast.Annotation, key: String, default: V): V = {
-      extractField[V](annotation, key, default.tpe).getOrElse(default)
+    final def extractField[V <: Val, Ctx <: StatelessContext](
+        annotation: Ast.Annotation[Ctx],
+        key: String,
+        default: V
+    ): V = {
+      extractField[V, Ctx](annotation, key, default.tpe).getOrElse(default)
     }
 
-    final def extractFields(annotations: Seq[Ast.Annotation], default: T): T = {
+    final def extractFields[Ctx <: StatelessContext](
+        annotations: Seq[Ast.Annotation[Ctx]],
+        default: T
+    ): T = {
       validate(annotations).map(extractFields(_, default)).getOrElse(default)
     }
-    def extractFields(annotation: Ast.Annotation, default: T): T
+    def extractFields[Ctx <: StatelessContext](annotation: Ast.Annotation[Ctx], default: T): T
   }
 
   final case class UsingAnnotationFields(
@@ -673,10 +684,12 @@ object Parser {
       useMethodIndexKey
     )
 
-    private def extractUseContractAsset(annotation: Annotation): Ast.ContractAssetsAnnotation = {
+    private def extractUseContractAsset[Ctx <: StatelessContext](
+        annotation: Annotation[Ctx]
+    ): Ast.ContractAssetsAnnotation = {
       annotation.fields.find(_.ident.name == useContractAssetsKey) match {
-        case Some(field @ Ast.AnnotationField(_, value)) =>
-          value match {
+        case Some(field @ Ast.AnnotationField(_, const)) =>
+          const.v match {
             case Val.False    => Ast.NotUseContractAssets
             case Val.True     => Ast.UseContractAssets
             case Val.Enforced => Ast.EnforcedUseContractAssets
@@ -690,12 +703,12 @@ object Parser {
       }
     }
 
-    def extractFields(
-        annotation: Ast.Annotation,
+    def extractFields[Ctx <: StatelessContext](
+        annotation: Ast.Annotation[Ctx],
         default: UsingAnnotationFields
     ): UsingAnnotationFields = {
       val methodIndex =
-        extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toInt)
+        extractField[Val.U256, Ctx](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toInt)
       methodIndex match {
         case Some(index) =>
           if (index < 0 || index > 0xff) {
@@ -726,11 +739,11 @@ object Parser {
     val id: String            = "std"
     val keys: AVector[String] = AVector("id")
 
-    def extractFields(
-        annotation: Annotation,
+    def extractFields[Ctx <: StatelessContext](
+        annotation: Annotation[Ctx],
         default: Option[InterfaceStdFields]
     ): Option[InterfaceStdFields] = {
-      extractField[Val.ByteVec](annotation, keys(0), Val.ByteVec).map { stdId =>
+      extractField[Val.ByteVec, Ctx](annotation, keys(0), Val.ByteVec).map { stdId =>
         if (stdId.bytes.isEmpty) {
           throw Compiler.Error(
             "The field id of the @std annotation must be a non-empty ByteVec",
@@ -748,11 +761,13 @@ object Parser {
     val id: String            = "std"
     val keys: AVector[String] = AVector("enabled")
 
-    def extractFields(
-        annotation: Annotation,
+    def extractFields[Ctx <: StatelessContext](
+        annotation: Annotation[Ctx],
         default: Option[ContractStdFields]
     ): Option[ContractStdFields] = {
-      extractField[Val.Bool](annotation, keys(0), Val.Bool).map(field => ContractStdFields(field.v))
+      extractField[Val.Bool, Ctx](annotation, keys(0), Val.Bool).map(field =>
+        ContractStdFields(field.v)
+      )
     }
   }
 }
@@ -925,12 +940,10 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
+  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
     PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
       value match {
-        case Ast.Const(v) =>
-          Ast.ConstantVarDef(ident, v)
-        case Ast.StringLiteral(v) =>
+        case v: Ast.Const[_] =>
           Ast.ConstantVarDef(ident, v)
         case v: Ast.CreateArrayExpr[_] =>
           throwConstantVarDefException("arrays", v.sourceIndex)
@@ -956,11 +969,11 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       Ast.EnumFieldSelector(enumId, field)
     }
 
-  def enumField[Unknown: P]: P[Ast.EnumField] =
-    PP(Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(_.string))) { case (ident, value) =>
+  def enumField[Unknown: P]: P[Ast.EnumField[StatefulContext]] =
+    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
       Ast.EnumField(ident, value)
     }
-  def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =
+  def rawEnumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
       case (enumIndex, id, fields) =>
         if (fields.length == 0) {
@@ -968,15 +981,15 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
         }
         Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.tpe).size != 1) {
+        if (fields.distinctBy(_.value.v.tpe).size != 1) {
           throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
         }
-        if (fields.distinctBy(_.value).size != fields.length) {
+        if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
         Ast.EnumDef(id, fields)
     }
-  def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
+  def enumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] = P(Start ~ rawEnumDef ~ End)
 
   // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -1002,8 +1015,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
         val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
         val events                = ArrayBuffer.empty[Ast.EventDef]
-        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
-        val enums                 = ArrayBuffer.empty[Ast.EnumDef]
+        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef[StatefulContext]]
+        val enums                 = ArrayBuffer.empty[Ast.EnumDef[StatefulContext]]
 
         statements.foreach {
           case e: Ast.EventDef =>
@@ -1011,16 +1024,16 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
-          case c: Ast.ConstantVarDef =>
+          case c: Ast.ConstantVarDef[_] =>
             if (funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
-            constantVars += c
-          case e: Ast.EnumDef =>
+            constantVars += c.asInstanceOf[Ast.ConstantVarDef[StatefulContext]]
+          case e: Ast.EnumDef[_] =>
             if (funcs.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
-            enums += e
+            enums += e.asInstanceOf[Ast.EnumDef[StatefulContext]]
           case f: Ast.FuncDef[_] =>
             funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
           case _ =>
