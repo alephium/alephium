@@ -5050,21 +5050,39 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Invalid var length in struct destruction")
-      def code(vars: String) =
+      info("Invalid struct field in struct destruction")
+      def code(varDeclaration: String, stmt: String = "") =
         s"""
            |struct Foo { x: U256, y: U256 }
            |Contract Baz() {
            |  pub fn func() -> U256 {
-           |    $$let Foo { $vars } = Foo { x: 0, y: 0 }$$
+           |    let Foo { $varDeclaration } = Foo { x: 0, y: 0 }
+           |    $stmt
            |    return 0
            |  }
            |}
            |""".stripMargin
-      testContractError(code(""), "Struct field length mismatch: expected 2, got 0")
-      testContractError(code("a"), "Struct field length mismatch: expected 2, got 1")
-      testContractError(code("a, b, c"), "Struct field length mismatch: expected 2, got 3")
-      testContractError(code("_, _, _"), "Struct field length mismatch: expected 2, got 3")
+      testContractError(code(s"$$a$$: x1"), "Field a does not exist in struct Foo")
+      testContractError(code(s"mut $$a$$: x1"), "Field a does not exist in struct Foo")
+      Compiler.compileContract(code("x")).isRight is true
+      Compiler.compileContract(code("mut x: x1", "x1 = 2")).isRight is true
+    }
+
+    {
+      info("Variable already exists")
+      def code(varDeclaration: String) =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |Contract Baz() {
+           |  pub fn func() -> U256 {
+           |    let x = 0
+           |    let Foo { $varDeclaration } = Foo { x: 0, y: 0 }
+           |    return x
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$x$$"), "Local variables have the same name: x")
+      Compiler.compileContract(code("x: x1")).isRight is true
     }
 
     {
@@ -5074,7 +5092,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Foo { x: U256, y: U256 }
            |Contract Bar() {
            |  pub fn func(foo: Foo) -> () {
-           |    let Foo { $mut x, _ } = foo
+           |    let Foo { $mut x } = foo
            |    $$x = 0$$
            |  }
            |}
@@ -5533,29 +5551,34 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Bar { a: U256, b: [U256; 2], foo: Foo }
            |Contract Baz() {
            |  pub fn func() -> () {
-           |    let foo = Foo { x: 0, y: 1 }
-           |    let Foo { x0, y0 } = foo
+           |    let fooInstance = Foo { x: 0, y: 1 }
+           |    let Foo { x, y } = fooInstance
+           |    assert!(x == 0 && y == 1, 0)
+           |
+           |    let Foo { x: x0, y: y0 } = fooInstance
            |    assert!(x0 == 0 && y0 == 1, 0)
            |
-           |    let Foo { mut x1, mut y1 } = foo
+           |    let Foo { mut x: x1, mut y: y1 } = fooInstance
            |    assert!(x1 == 0 && y1 == 1, 0)
            |    x1 = 1
            |    y1 = 2
            |    assert!(x1 == 1 && y1 == 2, 0)
            |
-           |    let Foo { x2, y2 } = Foo { y: 2, x: 1 }
+           |    let Foo { x: x2, y: y2 } = Foo { y: 2, x: 1 }
            |    assert!(x2 == 1 && y2 == 2, 0)
            |
            |    let bar = Bar { a: 0, b: [1, 2], foo: Foo { x: 3, y: 4 } }
-           |    let Bar { a0, b0, foo0 } = bar
+           |    let Bar { a, b, foo } = bar
+           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && foo.x == 3 && foo.y == 4, 0)
+           |    let Bar { a: a0, b: b0, foo: foo0 } = bar
            |    assert!(a0 == 0 && b0[0] == 1 && b0[1] == 2 && foo0.x == 3 && foo0.y == 4, 0)
-           |    let Bar { _, b1, foo1 } = bar
+           |    let Bar { b: b1, foo: foo1 } = bar
            |    assert!(b1[0] == 1 && b1[1] == 2 && foo1.x == 3 && foo1.y == 4, 0)
-           |    let Bar { _, _, foo2 } = bar
+           |    let Bar { foo: foo2 } = bar
            |    assert!(foo2.x == 3 && foo2.y == 4, 0)
-           |    let Bar { a3, _, foo3 } = bar
+           |    let Bar { a: a3, foo: foo3 } = bar
            |    assert!(a3 == 0 && foo3.x == 3 && foo3.y == 4, 0)
-           |    let Bar { a4, mut b4, mut foo4 } = bar
+           |    let Bar { a: a4, mut b: b4, mut foo: foo4 } = bar
            |    assert!(a4 == 0 && b4[0] == 1 && b4[1] == 2 && foo4.x == 3 && foo4.y == 4, 0)
            |    b4 = [5, 6]
            |    foo4.x = 7

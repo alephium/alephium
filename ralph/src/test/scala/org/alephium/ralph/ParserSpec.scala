@@ -728,36 +728,6 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       "let (mut a, _, _) = foo()" -> Ast.VarDef(
         Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.AnonymousVar, Ast.AnonymousVar),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
-      ),
-      "let Foo { x, y } = foo" -> StructDestruction(
-        TypeId("Foo"),
-        Seq(NamedVar(false, Ident("x")), NamedVar(false, Ident("y"))),
-        Variable(Ident("foo"))
-      ),
-      "let Foo { x, y } = Foo { a, b }" -> StructDestruction(
-        TypeId("Foo"),
-        Seq(NamedVar(false, Ident("x")), NamedVar(false, Ident("y"))),
-        StructCtor(TypeId("Foo"), Seq((Ident("a"), None), (Ident("b"), None)))
-      ),
-      "let Foo { x, _ } = foo" -> StructDestruction(
-        TypeId("Foo"),
-        Seq(NamedVar(false, Ident("x")), AnonymousVar),
-        Variable(Ident("foo"))
-      ),
-      "let Foo { mut x, mut y } = foo" -> StructDestruction(
-        TypeId("Foo"),
-        Seq(NamedVar(true, Ident("x")), NamedVar(true, Ident("y"))),
-        Variable(Ident("foo"))
-      ),
-      "let Foo { _, mut y } = foo" -> StructDestruction(
-        TypeId("Foo"),
-        Seq(AnonymousVar, NamedVar(true, Ident("y"))),
-        Variable(Ident("foo"))
-      ),
-      "let Foo { _, _ } = foo" -> StructDestruction(
-        TypeId("Foo"),
-        Seq(AnonymousVar, AnonymousVar),
-        Variable(Ident("foo"))
       )
     )
     states.foreach { case (code, ast) =>
@@ -1856,6 +1826,60 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.message is "These struct fields are defined multiple times: a"
       error.position is code.indexOf("$")
     }
+  }
+
+  it should "parse struct destruction" in {
+    checkParseStat(
+      "let Foo { x, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = false, Ident("x"), None),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { mut x, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = true, Ident("x"), None),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { x: x1, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = false, Ident("x"), Some(Ident("x1"))),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { mut x: x1, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = true, Ident("x"), Some(Ident("x1"))),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+
+    val invalidStmt = s"$$let Foo { } = foo"
+    val error = intercept[Compiler.Error](
+      fastparse.parse(invalidStmt.replace("$", ""), StatefulParser.structDestruction(_))
+    )
+    error.message is "No variable declaration"
+    error.position is invalidStmt.indexOf("$")
   }
 }
 

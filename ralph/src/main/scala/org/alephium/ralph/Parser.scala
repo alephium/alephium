@@ -275,7 +275,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
 
   def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = PP("_")(_ => Ast.AnonymousVar)
-  def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
+  def namedVar[Unknown: P]: P[Ast.NamedVar] =
     P(Index ~ Lexer.mut ~ Lexer.ident ~~ Index).map { case (from, mutable, id, to) =>
       Ast.NamedVar(mutable, id).atSourceIndex(from, to, fileURI)
     }
@@ -288,11 +288,21 @@ abstract class Parser[Ctx <: StatelessContext] {
     PP(Lexer.token(Keyword.let) ~ varDeclarations ~/ "=" ~ expr) { case (_, vars, expr) =>
       Ast.VarDef(vars, expr)
     }
+  def structFieldAlias[Unknown: P]: P[Ast.StructFieldAlias] =
+    P(Lexer.mut ~ Lexer.ident ~ P(":" ~ Lexer.ident).?).map { case (isMutable, ident, alias) =>
+      Ast.StructFieldAlias(isMutable, ident, alias)
+    }
   def structDestruction[Unknown: P]: P[Ast.StructDestruction[Ctx]] =
     P(
-      Lexer.token(Keyword.let) ~ Lexer.typeId ~/ "{" ~ varDeclaration.rep(0, ",") ~ "}" ~ "=" ~ expr
+      Lexer.token(Keyword.let) ~ Lexer.typeId ~/ "{" ~ structFieldAlias.rep(
+        0,
+        ","
+      ) ~ "}" ~ "=" ~ expr
     ).map { case (from, id, vars, expr) =>
       val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+      if (vars.isEmpty) {
+        throw Compiler.Error("No variable declaration", sourceIndex)
+      }
       Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
