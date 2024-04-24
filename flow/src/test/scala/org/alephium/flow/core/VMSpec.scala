@@ -4019,45 +4019,6 @@ class VMSpec extends AlephiumSpec with Generators {
 
       callTxScript(main)
     }
-
-    {
-      info("fail with multiple inheritance")
-
-      val interface1 =
-        s"""
-           |Interface I1 {
-           |  pub fn f1() -> U256
-           |}
-           |""".stripMargin
-
-      val interface2 =
-        s"""
-           |Interface I2 {
-           |  pub fn f2() -> U256
-           |}
-           |""".stripMargin
-
-      val contract =
-        s"""
-           |Contract Foo() implements I1, I2 {
-           |  pub fn f2() -> U256 {
-           |    return 2
-           |  }
-           |
-           |  pub fn f1() -> U256 {
-           |    return 1
-           |  }
-           |}
-           |
-           |$interface1
-           |$interface2
-           |""".stripMargin
-
-      Compiler
-        .compileContract(contract)
-        .leftValue
-        .message is "Contract only supports implementing single interface: I1, I2"
-    }
   }
 
   it should "not instantiate with abstract contract" in new ContractFixture {

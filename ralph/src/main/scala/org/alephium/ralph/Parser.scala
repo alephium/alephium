@@ -961,18 +961,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     ).map { case (_, extendings) => extendings }
 
   def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
-    P(Index ~ contractExtending.? ~ interfaceImplementing.? ~~ Index).map {
-      case (fromIndex, extendingsOpt, implementingOpt, endIndex) => {
-        val implementedInterfaces = implementingOpt.getOrElse(Seq.empty)
-        if (implementedInterfaces.length > 1) {
-          val interfaceNames = implementedInterfaces.map(_.parentId.name).mkString(", ")
-          throw Compiler.Error(
-            s"Contract only supports implementing single interface: $interfaceNames",
-            Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-          )
-        }
-
-        extendingsOpt.getOrElse(Seq.empty) ++ implementedInterfaces
+    P(contractExtending.? ~ interfaceImplementing.?).map {
+      case (extendingsOpt, implementingOpt) => {
+        extendingsOpt.getOrElse(Seq.empty) ++ implementingOpt.getOrElse(Seq.empty)
       }
     }
   }
@@ -1155,14 +1146,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         "{" ~ eventDef.rep ~ interfaceFunc.rep ~ "}"
         ~~ Index
     ).map { case (annotations, fromIndex, typeId, inheritances, events, funcs, endIndex) =>
-      inheritances match {
-        case Some((index, parents)) if parents.length > 1 =>
-          throw Compiler.Error(
-            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(", ")}",
-            Some(index)
-          )
-        case _ => ()
-      }
       if (funcs.length < 1) {
         throw Compiler.Error(
           s"No function definition in Interface ${typeId.name}",
@@ -1176,7 +1159,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           typeId,
           funcs,
           events,
-          inheritances.map { case (_, inher) => inher }.getOrElse(Seq.empty)
+          inheritances.map(_._2).getOrElse(Seq.empty)
         )
         .atSourceIndex(fromIndex.index, endIndex, fileURI)
     }

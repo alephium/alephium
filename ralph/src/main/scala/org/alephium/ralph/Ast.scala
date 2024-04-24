@@ -2463,8 +2463,6 @@ object Ast {
       val sortedInterfaces =
         sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
-      ensureChainedInterfaces(sortedInterfaces)
-
       val stdId        = getStdId(sortedInterfaces)
       val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
 
@@ -2551,22 +2549,6 @@ object Ast {
       }
     }
 
-    @tailrec
-    def ensureChainedInterfaces(sortedInterfaces: Seq[ContractInterface]): Unit = {
-      if (sortedInterfaces.length >= 2) {
-        val parent = sortedInterfaces(0)
-        val child  = sortedInterfaces(1)
-        if (!child.inheritances.exists(_.parentId.name == parent.ident.name)) {
-          throw Compiler.Error(
-            s"Only single inheritance is allowed. Interface ${child.ident.name} does not inherit from ${parent.ident.name}",
-            child.sourceIndex
-          )
-        }
-
-        ensureChainedInterfaces(sortedInterfaces.drop(1))
-      }
-    }
-
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def checkInterfaceMethodIndex(sortedInterfaces: Seq[ContractInterface]): Unit = {
       val methodLength = sortedInterfaces.map(_.funcs.length).sum
@@ -2608,7 +2590,10 @@ object Ast {
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         allInterfaces: Seq[ContractInterface]
     ): Seq[ContractInterface] = {
-      allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
+      val ordering = Ordering
+        .by[ContractInterface, Int](interface => parentsCache(interface.ident).length)
+        .orElse(Ordering.by[ContractInterface, String](_.name))
+      allInterfaces.sorted(ordering)
     }
 
     def mergeEnums(enums: Seq[EnumDef]): Seq[EnumDef] = {

@@ -1453,15 +1453,18 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     }
 
     {
-      info("Interface supports single inheritance")
+      info("Interface supports multiple inheritance")
       val code =
         s"""
            |Interface Child extends Parent0, Parent1 {
            |  fn foo() -> ()
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](parse(code, StatefulParser.interface(_)))
-      error.message is "Interface only supports single inheritance: Parent0, Parent1"
+      parse(code, StatefulParser.interface(_)).get.value.inheritances is
+        Seq(
+          InterfaceInheritance(TypeId("Parent0")),
+          InterfaceInheritance(TypeId("Parent1"))
+        )
     }
 
     {
@@ -1551,7 +1554,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     }
 
     {
-      info("Contract can only implement single interface")
+      info("Contract supports multiple inheritance")
       val code =
         s"""
            |Contract Child() extends Parent0(), Parent1() implements Parent3, Parent4 {
@@ -1560,8 +1563,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](parse(code, StatefulParser.contract(_)))
-      error.message is "Contract only supports implementing single interface: Parent3, Parent4"
+      parse(code, StatefulParser.contract(_)).get.value.inheritances is
+        Seq(
+          ContractInheritance(TypeId("Parent0"), Seq.empty),
+          ContractInheritance(TypeId("Parent1"), Seq.empty),
+          InterfaceInheritance(TypeId("Parent3")),
+          InterfaceInheritance(TypeId("Parent4"))
+        )
     }
   }
 
