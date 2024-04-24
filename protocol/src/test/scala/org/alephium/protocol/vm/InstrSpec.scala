@@ -4067,11 +4067,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000,
+      MethodSelector(Method.Selector(0)) -> 10 /* CallExternalBySelector(selector) -> ??? */
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
-    statefulCases.length is Instr.statefulInstrs0.length - 1
+    statefulCases.length is Instr.statefulInstrs0.length - 2
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {

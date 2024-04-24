@@ -5854,7 +5854,7 @@ class VMSpec extends AlephiumSpec with Generators {
                 |  foo.withdraw2(callerAddress!())
                 |  foo.withdraw2(callerAddress!())
                 |""".stripMargin),
-      FunctionReentrancy(fooId, 0)
+      FunctionReentrancy(fooId, 2)
     )
   }
 

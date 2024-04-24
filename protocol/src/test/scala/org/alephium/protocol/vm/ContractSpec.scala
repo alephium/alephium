@@ -16,13 +16,17 @@
 
 package org.alephium.protocol.vm
 
+import scala.util.Random
+
 import akka.util.ByteString
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.HardFork
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes}
 import org.alephium.util.Hex.HexStringSyntax
 
 class ContractSpec extends AlephiumSpec {
@@ -318,6 +322,103 @@ class ContractSpec extends AlephiumSpec {
 
     test(0, ByteString(0, 0, 0, 0))
     test(0xffffffff, ByteString(0xff, 0xff, 0xff, 0xff))
+  }
+
+  it should "search method by selector" in {
+    val instrs = Instr.statelessInstrs0.filter(_.isInstanceOf[Instr[_]])
+    def methodGen: Gen[Method[StatefulContext]] = {
+      val size         = Random.nextInt(instrs.length)
+      val methodInstrs = instrs.take(size)
+      Gen.const(()).map { _ =>
+        Method(
+          isPublic = Random.nextBoolean(),
+          usePreapprovedAssets = Random.nextBoolean(),
+          useContractAssets = Random.nextBoolean(),
+          usePayToContractOnly = false,
+          argsLength = Random.nextInt(3),
+          localsLength = Random.nextInt(3),
+          returnLength = Random.nextInt(3),
+          instrs = methodInstrs.asInstanceOf[AVector[Instr[StatefulContext]]]
+        )
+      }
+    }
+
+    @scala.annotation.tailrec
+    def genContract(): (StatefulContract, Seq[Option[Method.Selector]]) = {
+      val generated = (0 until 20).map { index =>
+        val hasSelector = Random.nextBoolean()
+        val method      = methodGen.sample.get
+        if (hasSelector) {
+          val selector =
+            Method.Selector(Bytes.toIntUnsafe(Hash.hash(serialize(index)).bytes.take(4)))
+          val newInstrs = MethodSelector(selector) +: method.instrs.toSeq
+          val newMethod = method.copy(instrs = AVector.from(newInstrs))
+          Method.extractSelector(serialize(newMethod)) is Some(selector)
+          (newMethod, Some(selector))
+        } else {
+          Method.extractSelector(serialize(method)) is None
+          (method, None)
+        }
+      }
+      val methods   = AVector.from(generated.map(_._1))
+      val selectors = generated.map(_._2)
+      val contract  = StatefulContract(Random.nextInt(5), methods)
+      if (selectors.count(_.isDefined) >= 2) (contract, selectors) else genContract()
+    }
+
+    val (contract, selectors) = genContract()
+
+    {
+      info("search by order")
+      val halfDecoded = contract.toHalfDecoded()
+      halfDecoded.searchedMethodIndex is -1
+      selectors.zipWithIndex.foreach {
+        case (Some(selector), index) =>
+          val lastIndex = selectors.take(index).lastIndexWhere(_.isDefined)
+          val expected  = StatefulContract.SelectorSearchResult(index, index - lastIndex)
+          halfDecoded.getMethodBySelector(selector).rightValue is expected
+          halfDecoded.searchedMethodIndex is index
+        case _ => ()
+      }
+    }
+
+    {
+      info("search the last one first")
+      val halfDecoded = contract.toHalfDecoded()
+      halfDecoded.searchedMethodIndex is -1
+      val selector = selectors.findLast(_.isDefined).value.value
+      val index    = selectors.lastIndexWhere(_.isDefined)
+      val expected = StatefulContract.SelectorSearchResult(index, index + 1)
+      halfDecoded.getMethodBySelector(selector).rightValue is expected
+      selectors.take(index).zipWithIndex.foreach {
+        case (Some(selector), index) =>
+          halfDecoded.getMethodBySelector(selector).rightValue is StatefulContract
+            .SelectorSearchResult(index, 0)
+        case _ => ()
+      }
+    }
+
+    {
+      info("search by random order")
+      val halfDecoded = contract.toHalfDecoded()
+      halfDecoded.searchedMethodIndex is -1
+      AVector.from(selectors.zipWithIndex).shuffle().foreach {
+        case (Some(selector), index) =>
+          halfDecoded.getMethodBySelector(selector).rightValue.methodIndex is index
+        case _ => ()
+      }
+    }
+
+    {
+      info("selector does not exist")
+      val halfDecoded    = contract.toHalfDecoded()
+      val randomSelector = Method.Selector(Random.nextInt())
+      selectors.exists(_.contains(randomSelector)) is false
+      halfDecoded
+        .getMethodBySelector(randomSelector)
+        .leftValue
+        .rightValue is a[InvalidMethodSelector]
+    }
   }
 }
 

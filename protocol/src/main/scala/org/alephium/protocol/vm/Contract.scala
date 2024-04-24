@@ -187,7 +187,12 @@ object Method {
       localsLengthRest  <- serde._deserialize[Int](argsLengthRest.rest)
       returnLengthRest  <- serde._deserialize[Int](localsLengthRest.rest)
       instrLengthRest   <- serde._deserialize[Int](returnLengthRest.rest)
-      selectorInstrRest <- MethodSelector.deserialize(instrLengthRest.rest)
+      selectorInstrRest <-
+        if (instrLengthRest.rest.headOption.contains(MethodSelector.code)) {
+          MethodSelector.deserialize(instrLengthRest.rest.drop(1))
+        } else {
+          Left(SerdeError.other("selector does not exist"))
+        }
     } yield {
       selectorInstrRest.value.selector
     }
