@@ -37,9 +37,10 @@ package object model {
   val nonCoinbaseMinGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(100))
   val nonCoinbaseMinGasFee: U256       = nonCoinbaseMinGasPrice * minimalGas
 
-  val maximalTxsInOneBlock: Int  = 2000
-  val maximalGasPerBlock: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
-  val maximalGasPerTx: GasBox    = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock / 64)
+  val maximalTxsInOneBlock: Int       = 2000
+  val maximalGasPerBlock: GasBox      = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
+  val maximalGasPerTxPreRhone: GasBox = GasBox.unsafe(maximalGasPerBlock.value / 64)
+  val maximalGasPerTx: GasBox         = GasBox.unsafe(maximalGasPerBlock.value / 8)
 
   val maximalCodeSizePreLeman: Int = 12 * 1024 // 12KB
   val maximalCodeSizeLeman: Int    = 4 * 1024  // 4KB

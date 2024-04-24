@@ -784,12 +784,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         fromPublicKey,
         outputRefsOpt = Some(outputRefs),
         destinations,
-        gasOpt = Some(GasBox.unsafe(625001)),
+        gasOpt = Some(GasBox.unsafe(5000001)),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
-      .detail is "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
+      .detail is "Provided gas GasBox(5000001) too large, maximal GasBox(5000000)"
   }
 
   it should "not create transaction with invalid gas price" in new MultipleUtxos {
@@ -1931,7 +1931,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(937500000000000000L),
+      Amount(500000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -1984,7 +1984,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(937500000000000000L),
+      Amount(500000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2038,7 +2038,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(2) is AssetOutput(
       result0.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(90937500000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(90500000000L) - dustUtxoAmount),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2087,7 +2087,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(110937500000L)),
+      Amount(ALPH.nanoAlph(110500000000L)),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2132,7 +2132,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(105937500000L)),
+      Amount(ALPH.nanoAlph(105500000000L)),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2190,7 +2190,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(2) is AssetOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(95937500000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(95500000000L) - dustUtxoAmount),
       lp,
       AVector.empty,
       TimeStamp.zero,
