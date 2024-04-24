@@ -1171,6 +1171,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            useMethodSelector = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1394,6 +1395,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            useMethodSelector = false,
             Seq.empty,
             Seq.empty,
             None
@@ -1488,6 +1490,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            useMethodSelector = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1529,6 +1532,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            useMethodSelector = false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -1573,6 +1577,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
+        useMethodSelector = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1589,6 +1594,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
+        useMethodSelector = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1774,6 +1780,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useCheckExternalCaller = true,
         useUpdateFields = false,
         useMethodIndex = None,
+        useMethodSelector = false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))
@@ -1805,7 +1812,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
-            None,
+            useMethodIndex = None,
+            useMethodSelector = false,
             Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
             Seq(Type.NamedType(TypeId("Foo"))),
             Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))

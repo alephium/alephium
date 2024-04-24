@@ -187,7 +187,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   @tailrec final def execute(): ExeResult[Option[Frame[Ctx]]] = {
     if (pc < pcMax) {
       val instr = method.instrs(pc)
-      (instr.code: @switch) match {
+      (Bytes.toPosInt(instr.code): @switch) match {
         case 0   => callLocal(instr.asInstanceOf[CallLocal].index)
         case 1   => callExternal(instr.asInstanceOf[CallExternal].index)
         case 2   => runReturn()

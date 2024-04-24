@@ -822,4 +822,30 @@ class AstSpec extends AlephiumSpec {
       )
     ).message is "There are different std id enabled options on the inheritance chain of contract Foo"
   }
+
+  it should "calc method selector" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo(a: U256) -> U256 {
+         |    return a
+         |  }
+         |  pub fn bar(a: U256, b: U256) -> () {
+         |    let _ = a + b
+         |  }
+         |  pub fn baz() -> (U256, U256) {
+         |    return 0, 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract = Compiler.compileMultiContract(code).rightValue.contracts.head
+    val funcs    = contract.funcs.map(_.copy(useMethodSelector = true))
+    funcs(0).signature.toString is "foo(U256)->(U256)"
+    funcs(1).signature.toString is "bar(U256,U256)->()"
+    funcs(2).signature.toString is "baz()->(U256,U256)"
+    funcs(0).methodSelector.index is -350026854
+    funcs(1).methodSelector.index is -2145816137
+    funcs(2).methodSelector.index is 1234348095
+  }
 }

@@ -248,7 +248,8 @@ object Compiler {
       useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      index: Byte
+      index: Byte,
+      methodSelector: Option[Method.Selector]
   ) extends ContractFunc[Ctx] {
     def name: String = id.name
 
@@ -276,12 +277,18 @@ object Compiler {
         typeId: Ast.TypeId
     ): Seq[Instr[StatefulContext]] = {
       if (isPublic) {
+        val contractInfo = state.getContractInfo(typeId)
+        val callInstr: Instr[StatefulContext] = methodSelector match {
+          case Some(selector) if contractInfo.kind == ContractKind.Interface =>
+            CallExternalBySelector(selector)
+          case _ => CallExternal(index)
+        }
         val argLength = state.flattenTypeLength(argsType)
         val retLength = state.flattenTypeLength(returnType)
         Seq(
           ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
           ConstInstr.u256(Val.U256(U256.unsafe(retLength)))
-        ) ++ objCodes :+ CallExternal(index)
+        ) ++ objCodes :+ callInstr
       } else {
         throw Error(s"Call external private function of ${typeId.name}", typeId.sourceIndex)
       }
@@ -300,7 +307,8 @@ object Compiler {
         func.useUpdateFields,
         func.args.map(_.tpe),
         func.rtypes,
-        index
+        index,
+        Option.when(func.useMethodSelector)(func.methodSelector)
       )
     }
 
@@ -318,9 +326,10 @@ object Compiler {
         isInterface: Boolean
     ): Seq[SimpleFunc[Ctx]] = {
       if (isInterface) {
-        val preDefinedIndexes = funcs.collect {
-          case Ast.FuncDef(_, _, _, _, _, _, _, _, Some(index), _, _, _) => index
-        }
+        val preDefinedIndexes = funcs.view
+          .map(_.useMethodIndex)
+          .collect { case Some(index) => index }
+          .toSeq
         var fromIndex: Int = 0
         funcs.map { func =>
           func.useMethodIndex match {

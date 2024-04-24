@@ -6210,6 +6210,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         useCheckExternalCaller = false,
         useUpdateFields = false,
         methodIndex,
+        useMethodSelector = false,
         Seq.empty,
         Seq.empty,
         None
@@ -6316,5 +6317,97 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
       )
     }
+  }
+
+  trait MethodSelectorFixture {
+    implicit class RichCode(code: String) {
+      def useMethodSelector(name: String, index: Int): Ast.MultiContract = {
+        val multiContract =
+          fastparse.parse(code, new StatefulParser(None).multiContract(_)).get.value
+        val interface = multiContract.getInterface(Ast.TypeId(name))
+        val newFuncs =
+          interface.funcs.updated(index, interface.funcs(index).copy(useMethodSelector = true))
+        val newInterface   = interface.copy(funcs = newFuncs)
+        val interfaceIndex = multiContract.contracts.indexWhere(_.name == name)
+        multiContract
+          .copy(contracts = multiContract.contracts.updated(interfaceIndex, newInterface))
+          .extendedContracts()
+      }
+    }
+  }
+
+  it should "generate method selector instr" in new MethodSelectorFixture {
+    val code =
+      s"""
+         |Interface I {
+         |  pub fn foo() -> ()
+         |  pub fn bar() -> ()
+         |}
+         |Contract Foo() implements I {
+         |  pub fn foo() -> () { return }
+         |  pub fn bar() -> () { return }
+         |}
+         |""".stripMargin
+
+    val multiContract0 = Compiler.compileMultiContract(code).rightValue
+    val compiled0      = multiContract0.genStatefulContract(1)(CompilerOptions.Default).code
+    compiled0.methods(0).instrs.head isnot a[MethodSelector]
+    compiled0.methods(1).instrs.head isnot a[MethodSelector]
+
+    val multiContract1 = code.useMethodSelector("I", 1)
+    val compiled1      = multiContract1.genStatefulContract(1)(CompilerOptions.Default).code
+    val interface      = multiContract1.getInterface(Ast.TypeId("I"))
+    compiled1.methods(0).instrs.head isnot a[MethodSelector]
+    compiled1.methods(1).instrs.head is MethodSelector(interface.funcs(1).methodSelector)
+  }
+
+  it should "call by method selector" in new MethodSelectorFixture {
+    val fooCode =
+      s"""
+         |Interface I {
+         |  pub fn f0() -> U256
+         |  pub fn f1() -> U256
+         |}
+         |Contract Foo() implements I {
+         |  pub fn f0() -> U256 { return 0 }
+         |  pub fn f1() -> U256 { return 1 }
+         |}
+         |""".stripMargin
+
+    val multiContract  = fooCode.useMethodSelector("I", 1)
+    val methodSelector = multiContract.contracts.head.funcs(1).methodSelector
+    val compiledFoo    = multiContract.genStatefulContract(1)(CompilerOptions.Default).code
+    compiledFoo.methods(1).instrs.head is MethodSelector(methodSelector)
+    val fooObj = prepareContract(compiledFoo, AVector.empty, AVector.empty)._1
+
+    def bar(expr: String) = {
+      val barCode =
+        s"""
+           |Contract Bar(fooId: ByteVec) {
+           |  pub fn bar() -> () {
+           |    let foo = $expr
+           |    assert!(foo.f0() == 0, 0)
+           |    assert!(foo.f1() == 1, 0)
+           |  }
+           |}
+           |$fooCode
+           |""".stripMargin
+
+      val multiContract = barCode.useMethodSelector("I", 1)
+      multiContract.genStatefulContract(0)(CompilerOptions.Default).code
+    }
+
+    val instr = CallExternalBySelector(methodSelector)
+    val bar0  = bar("Foo(fooId)")
+    bar0.methods.head.instrs.contains(instr) is false
+    val (bar0Obj, context0) =
+      prepareContract(bar0, AVector(Val.ByteVec(fooObj.contractId.bytes)), AVector.empty)
+    StatefulVM.execute(context0, bar0Obj, AVector.empty).isRight is true
+
+    val bar1 = bar("I(fooId)")
+    bar1.methods.head.instrs.contains(instr) is true
+    val (bar1Obj, context1) =
+      prepareContract(bar1, AVector(Val.ByteVec(fooObj.contractId.bytes)), AVector.empty)
+    StatefulVM.execute(context1, bar1Obj, AVector.empty).isRight is true
   }
 }

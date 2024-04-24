@@ -372,7 +372,8 @@ abstract class Parser[Ctx <: StatelessContext] {
               payToContractOnly = false,
               checkExternalCaller = true,
               updateFields = false,
-              methodIndex = None
+              methodIndex = None,
+              methodSelector = false
             )
           )
           if (usingAnnotation.payToContractOnly && usingAnnotation.assetsInContract.assetsEnabled) {
@@ -394,6 +395,7 @@ abstract class Parser[Ctx <: StatelessContext] {
             usingAnnotation.checkExternalCaller,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
+            usingAnnotation.methodSelector,
             params,
             returnType,
             statements
@@ -418,6 +420,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         f.useCheckExternalCaller,
         f.useUpdateFields,
         f.useMethodIndex,
+        f.useMethodSelector,
         f.args,
         f.rtypes,
         f.body
@@ -580,6 +583,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
+    useMethodSelector: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -649,7 +653,8 @@ object Parser {
       payToContractOnly: Boolean,
       checkExternalCaller: Boolean,
       updateFields: Boolean,
-      methodIndex: Option[Int]
+      methodIndex: Option[Int],
+      methodSelector: Boolean
   )
 
   object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
@@ -660,13 +665,15 @@ object Parser {
     val useCheckExternalCallerKey = "checkExternalCaller"
     val useUpdateFieldsKey        = "updateFields"
     val useMethodIndexKey         = "methodIndex"
+    val useMethodSelectorKey      = "methodSelector"
     val keys: AVector[String] = AVector(
       usePreapprovedAssetsKey,
       useContractAssetsKey,
       usePayToContractOnly,
       useCheckExternalCallerKey,
       useUpdateFieldsKey,
-      useMethodIndexKey
+      useMethodIndexKey,
+      useMethodSelectorKey
     )
 
     private def extractUseContractAsset(annotation: Annotation): Ast.ContractAssetsAnnotation = {
@@ -712,7 +719,9 @@ object Parser {
           Val.Bool(default.checkExternalCaller)
         ).v,
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
-        methodIndex
+        methodIndex,
+        // TODO: Support for parsing @using(methodSelector = true/false) after the Rhone upgrade is activated
+        methodSelector = false
       )
     }
   }
@@ -913,7 +922,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
                 payToContractOnly = false,
                 checkExternalCaller = true,
                 updateFields = false,
-                methodIndex = None
+                methodIndex = None,
+                methodSelector = false
               )
             )
             val mainFunc = Ast.FuncDef.main(
@@ -1124,6 +1134,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               f.useCheckExternalCaller,
               f.useUpdateFields,
               f.useMethodIndex,
+              f.useMethodSelector,
               f.args,
               f.rtypes,
               None

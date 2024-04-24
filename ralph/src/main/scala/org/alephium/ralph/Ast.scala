@@ -27,7 +27,7 @@ import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
 import org.alephium.ralph.Parser.UsingAnnotation
-import org.alephium.util.{AVector, Hex, I256, U256}
+import org.alephium.util.{AVector, DjbHash, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
@@ -1101,7 +1101,11 @@ object Ast {
       usePreapprovedAssets: Boolean,
       args: Seq[(Type, Boolean)],
       rtypes: Seq[Type]
-  )
+  ) {
+    override def toString: String = {
+      s"${id.name}(${args.map(_._1.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
+    }
+  }
 
   final case class FuncDef[Ctx <: StatelessContext](
       annotations: Seq[Annotation],
@@ -1113,6 +1117,7 @@ object Ast {
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
+      useMethodSelector: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -1122,6 +1127,12 @@ object Ast {
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
     private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
+
+    lazy val methodSelector: Method.Selector = {
+      assume(useMethodSelector)
+      val bytes = ByteString.fromString(signature.toString)
+      Method.Selector(DjbHash.intHash(bytes))
+    }
 
     def hasCheckExternalCallerAnnotation: Boolean = {
       annotations.find(_.id.name == UsingAnnotation.id) match {
@@ -1237,6 +1248,7 @@ object Ast {
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         useMethodIndex = None,
+        useMethodSelector = false,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)
@@ -2040,6 +2052,20 @@ object Ast {
       super.check(state)
     }
 
+    override def genMethods(
+        state: Compiler.State[StatefulContext]
+    ): AVector[Method[StatefulContext]] = {
+      AVector.from(funcs.view.map { func =>
+        val method = func.genMethod(state)
+        if (func.useMethodSelector) {
+          val methodSelectorInstr = MethodSelector(func.methodSelector)
+          method.copy(instrs = methodSelectorInstr +: method.instrs)
+        } else {
+          method
+        }
+      })
+    }
+
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
@@ -2466,10 +2492,17 @@ object Ast {
               txContract.sourceIndex
             )
           }
-          if (txContract.isAbstract) {
+          val funcs = if (txContract.isAbstract) {
             allUniqueFuncs
           } else {
             rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
+          }
+          val allInterfaceFuncs = sortedInterfaces.flatMap(_.funcs)
+          funcs.map { funcDef =>
+            allInterfaceFuncs.find(_.id == funcDef.id) match {
+              case Some(func) if func.useMethodSelector => funcDef.copy(useMethodSelector = true)
+              case _                                    => funcDef
+            }
           }
 
         case interface: ContractInterface =>
