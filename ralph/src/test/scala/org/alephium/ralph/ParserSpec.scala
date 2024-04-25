@@ -1464,15 +1464,37 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
            |""".stripMargin
 
       fastparse.parse(interface(""), StatefulParser.interface(_)).isSuccess is true
-      val result = fastparse
+      val result0 = fastparse.parse(interface(), StatefulParser.interface(_)).get.value
+      result0.stdId is None
+      result0.useMethodSelector is false
+
+      val result1 = fastparse
+        .parse(interface("@using(methodSelector = false)"), StatefulParser.interface(_))
+        .get
+        .value
+      result1.stdId is None
+      result1.useMethodSelector is false
+
+      val result2 = fastparse
         .parse(
           interface("@std(id = #0001)", "@using(methodSelector = true)"),
           StatefulParser.interface(_)
         )
         .get
         .value
-      result.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
-      result.useMethodSelector is false
+      result2.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      result2.useMethodSelector is true
+
+      intercept[Compiler.Error](
+        parse(
+          interface("@using(updateFields = true)"),
+          StatefulParser.interface(_)
+        )
+      ).message is "Invalid keys for @using annotation: updateFields"
+
+      intercept[Compiler.Error](
+        parse(interface("@using(methodSelector = 0)"), StatefulParser.interface(_))
+      ).message is "Expect Bool for methodSelector in annotation @using"
     }
 
     {

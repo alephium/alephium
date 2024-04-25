@@ -1169,11 +1169,14 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       val annotationIds = AVector(Parser.InterfaceStdAnnotation.id, Parser.UsingAnnotation.id)
       Parser.checkAnnotations(annotations, annotationIds, "interface")
       val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
+      val usingFields = Parser.InterfaceUsingAnnotation.extractFields(
+        annotations,
+        Parser.InterfaceUsingAnnotationFields(methodSelector = false)
+      )
       Ast
         .ContractInterface(
           stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),
-          // TODO: Support for parsing @using(methodSelector = true/false) after the Rhone upgrade is activated
-          useMethodSelector = false,
+          usingFields.methodSelector,
           typeId,
           funcs,
           events,
