@@ -18,8 +18,10 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
+import akka.util.ByteString
+
 import org.alephium.protocol.vm.Val
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}
 
 //scalastyle:off file.size.limit
 class AstSpec extends AlephiumSpec {
@@ -826,26 +828,53 @@ class AstSpec extends AlephiumSpec {
   it should "calc method selector" in {
     val code =
       s"""
+         |struct Numbers { x: U256, y: U256 }
+         |Contract Bar() {
+         |  pub fn bar() -> () {}
+         |}
          |Contract Foo() {
-         |  pub fn foo(a: U256) -> U256 {
+         |  pub fn func0(a: U256) -> U256 {
          |    return a
          |  }
-         |  pub fn bar(a: U256, b: U256) -> () {
-         |    let _ = a + b
+         |  pub fn func1(@unused a: ByteVec, @unused b: U256) -> () {
          |  }
-         |  pub fn baz() -> (U256, U256) {
-         |    return 0, 1
+         |  pub fn func2() -> (U256, Address) {
+         |    return 0, zeroAddress!()
+         |  }
+         |  pub fn func3(bar: Bar) -> () {
+         |    bar.bar()
+         |  }
+         |  pub fn func4(nums: Numbers) -> Numbers {
+         |    return nums
+         |  }
+         |  pub fn func5(array: [U256; 2]) -> [U256; 2] {
+         |    return array
+         |  }
+         |  pub fn func6(arg0: Numbers, arg1: [U256; 2]) -> (Numbers, [U256; 2]) {
+         |    return arg0, arg1
          |  }
          |}
          |""".stripMargin
 
-    val contract = Compiler.compileMultiContract(code).rightValue.contracts.head
-    val funcs    = contract.funcs.map(_.copy(useMethodSelector = true))
-    funcs(0).signature.toString is "foo(U256)->(U256)"
-    funcs(1).signature.toString is "bar(U256,U256)->()"
-    funcs(2).signature.toString is "baz()->(U256,U256)"
-    funcs(0).methodSelector.index is -350026854
-    funcs(1).methodSelector.index is -2145816137
-    funcs(2).methodSelector.index is 1234348095
+    val multiContract = Compiler.compileMultiContract(code).rightValue
+    val funcs         = multiContract.contracts(1).funcs.map(_.copy(useMethodSelector = true))
+
+    def test(signature: String, funcIndex: Int) = {
+      val func           = funcs(funcIndex)
+      val methodSelector = func.getMethodSelector(multiContract.globalState)
+      DjbHash.intHash(ByteString.fromString(signature)) is methodSelector.index
+      func.methodSelector is Some(methodSelector)
+    }
+
+    test("func0(U256)->(U256)", 0)
+    test("func1(ByteVec,U256)->()", 1)
+    test("func2()->(U256,Address)", 2)
+    test("func3(ByteVec)->()", 3)
+    test("func4(U256,U256)->(U256,U256)", 4)
+    test("func5(U256,U256)->(U256,U256)", 5)
+    test("func6(U256,U256,U256,U256)->(U256,U256,U256,U256)", 6)
+
+    val allSelectors = funcs.map(_.methodSelector.get.index)
+    allSelectors.toSet.size is allSelectors.size
   }
 }

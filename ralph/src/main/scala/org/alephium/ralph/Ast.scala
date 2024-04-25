@@ -1101,11 +1101,7 @@ object Ast {
       usePreapprovedAssets: Boolean,
       args: Seq[(Type, Boolean)],
       rtypes: Seq[Type]
-  ) {
-    override def toString: String = {
-      s"${id.name}(${args.map(_._1.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
-    }
-  }
+  )
 
   final case class FuncDef[Ctx <: StatelessContext](
       annotations: Seq[Annotation],
@@ -1128,10 +1124,22 @@ object Ast {
 
     private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
 
-    lazy val methodSelector: Method.Selector = {
+    private[ralph] var methodSelector: Option[Method.Selector] = None
+    def getMethodSelector(globalState: GlobalState): Method.Selector = {
       assume(useMethodSelector)
-      val bytes = ByteString.fromString(signature.toString)
-      Method.Selector(DjbHash.intHash(bytes))
+      methodSelector match {
+        case Some(selector) => selector
+        case None =>
+          val argTypes = args.view
+            .flatMap(arg => globalState.flattenType(arg.tpe))
+            .map(_.signature)
+            .mkString(",")
+          val retTypes = rtypes.view.flatMap(globalState.flattenType).map(_.signature).mkString(",")
+          val bytes    = ByteString.fromString(s"$name($argTypes)->($retTypes)")
+          val selector = Method.Selector(DjbHash.intHash(bytes))
+          methodSelector = Some(selector)
+          selector
+      }
     }
 
     def hasCheckExternalCallerAnnotation: Boolean = {
@@ -1738,6 +1746,18 @@ object Ast {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def flattenType(tpe: Type): Seq[Type] = {
+      resolveType(tpe) match {
+        case Type.Struct(id) =>
+          getStruct(id).fields.flatMap(field => flattenType(field.tpe))
+        case Type.FixedSizeArray(tpe, size) =>
+          val baseTypes = flattenType(tpe)
+          Seq.fill(size)(baseTypes).flatten
+        case tpe => Seq(tpe)
+      }
+    }
+
     def getStruct(typeId: Ast.TypeId): Ast.Struct = {
       structs.find(_.id == typeId) match {
         case Some(struct) => struct
@@ -1788,7 +1808,7 @@ object Ast {
             case _                    => false
           }
           var table = Compiler.SimpleFunc
-            .from(funcs, isInterface)
+            .from(globalState, funcs, isInterface)
             .map(f => f.id -> f)
             .toMap[FuncId, Compiler.ContractFunc[Ctx]]
           builtInFuncs.foreach(func =>
@@ -2058,7 +2078,8 @@ object Ast {
       AVector.from(funcs.view.map { func =>
         val method = func.genMethod(state)
         if (func.useMethodSelector) {
-          val methodSelectorInstr = MethodSelector(func.methodSelector)
+          val methodSelector      = func.getMethodSelector(state.globalState)
+          val methodSelectorInstr = MethodSelector(methodSelector)
           method.copy(instrs = methodSelectorInstr +: method.instrs)
         } else {
           method

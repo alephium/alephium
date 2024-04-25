@@ -6149,7 +6149,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
 
     def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
-      val result = Compiler.SimpleFunc.from(funcs, true)
+      val globalState = Ast.GlobalState(Seq.empty)
+      val result      = Compiler.SimpleFunc.from(globalState, funcs, true)
       result.foreach { func => func.index is indexes(func.name) }
     }
 
@@ -6310,8 +6311,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val multiContract1 = code.useMethodSelector("I")
     val compiled1      = multiContract1.genStatefulContract(1).code
     val interface      = multiContract1.getInterface(Ast.TypeId("I"))
-    compiled1.methods(0).instrs.head is MethodSelector(interface.funcs(0).methodSelector)
-    compiled1.methods(1).instrs.head is MethodSelector(interface.funcs(1).methodSelector)
+    compiled1.methods(0).instrs.head is MethodSelector(interface.funcs(0).methodSelector.get)
+    compiled1.methods(1).instrs.head is MethodSelector(interface.funcs(1).methodSelector.get)
   }
 
   it should "call by method selector" in new MethodSelectorFixture {
@@ -6329,8 +6330,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val multiContract   = fooCode.useMethodSelector("I")
     val funcs           = multiContract.contracts.head.funcs
-    val methodSelector0 = funcs(0).methodSelector
-    val methodSelector1 = funcs(1).methodSelector
+    val methodSelector0 = funcs(0).getMethodSelector(multiContract.globalState)
+    val methodSelector1 = funcs(1).getMethodSelector(multiContract.globalState)
     val compiledFoo     = multiContract.genStatefulContract(1).code
     compiledFoo.methods(0).instrs.head is MethodSelector(methodSelector0)
     compiledFoo.methods(1).instrs.head is MethodSelector(methodSelector1)
@@ -6536,7 +6537,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       result.ast.funcs.map(_.name) is Seq("foo", "bar")
       val compiled = result.code
       compiled.methods(0).instrs.head isnot a[MethodSelector]
-      compiled.methods(1).instrs.head is MethodSelector(result.ast.funcs(1).methodSelector)
+      compiled.methods(1).instrs.head is MethodSelector(result.ast.funcs(1).methodSelector.get)
 
       val contractId = createContract(compiled)
       val script0 =

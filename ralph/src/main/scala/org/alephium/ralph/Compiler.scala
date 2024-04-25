@@ -296,6 +296,7 @@ object Compiler {
   }
   object SimpleFunc {
     private def from[Ctx <: StatelessContext](
+        globalState: Ast.GlobalState,
         func: Ast.FuncDef[Ctx],
         index: Byte
     ): SimpleFunc[Ctx] = {
@@ -308,7 +309,7 @@ object Compiler {
         func.args.map(_.tpe),
         func.rtypes,
         index,
-        Option.when(func.useMethodSelector)(func.methodSelector)
+        Option.when(func.useMethodSelector)(func.getMethodSelector(globalState))
       )
     }
 
@@ -322,6 +323,7 @@ object Compiler {
     }
 
     def from[Ctx <: StatelessContext](
+        globalState: Ast.GlobalState,
         funcs: Seq[Ast.FuncDef[Ctx]],
         isInterface: Boolean
     ): Seq[SimpleFunc[Ctx]] = {
@@ -333,15 +335,17 @@ object Compiler {
         var fromIndex: Int = 0
         funcs.map { func =>
           func.useMethodIndex match {
-            case Some(index) => from(func, index.toByte)
+            case Some(index) => from(globalState, func, index.toByte)
             case None =>
               val funcIndex = getNextIndex(fromIndex, preDefinedIndexes)
               fromIndex = funcIndex + 1
-              from(func, funcIndex.toByte)
+              from(globalState, func, funcIndex.toByte)
           }
         }
       } else {
-        funcs.view.zipWithIndex.map { case (func, index) => from(func, index.toByte) }.toSeq
+        funcs.view.zipWithIndex.map { case (func, index) =>
+          from(globalState, func, index.toByte)
+        }.toSeq
       }
     }
   }
