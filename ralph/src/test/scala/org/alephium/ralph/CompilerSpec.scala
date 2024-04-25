@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable
+
 import akka.util.ByteString
 import org.scalatest.Assertion
 
@@ -6255,12 +6257,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     implicit class RichCode(code: String) {
       private val multiContract =
         fastparse.parse(code, new StatefulParser(None).multiContract(_)).get.value
-      def useMethodSelector(name: String, index: Int): Ast.MultiContract = {
-        val interface = multiContract.getInterface(Ast.TypeId(name))
-        val newFuncs =
-          interface.funcs.updated(index, interface.funcs(index).copy(useMethodSelector = true))
-        val newInterface   = interface.copy(funcs = newFuncs)
-        val interfaceIndex = multiContract.contracts.indexWhere(_.name == name)
+      def useMethodSelector(interfaceName: String): Ast.MultiContract = {
+        val interface      = multiContract.getInterface(Ast.TypeId(interfaceName))
+        val newInterface   = interface.copy(useMethodSelector = true)
+        val interfaceIndex = multiContract.contracts.indexWhere(_.name == interfaceName)
         multiContract
           .copy(contracts = multiContract.contracts.updated(interfaceIndex, newInterface))
           .extendedContracts()
@@ -6268,20 +6268,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       def useMethodSelector: Ast.MultiContract = {
         val newContracts = multiContract.contracts.map {
-          case interface: Ast.ContractInterface =>
-            val newFuncs = interface.funcs.map(_.copy(useMethodSelector = true))
-            interface.copy(funcs = newFuncs)
-          case other => other
+          case interface: Ast.ContractInterface => interface.copy(useMethodSelector = true)
+          case other                            => other
         }
         multiContract.copy(contracts = newContracts).extendedContracts()
       }
     }
 
-    def test(code: String) = {
-      val multiContract        = code.useMethodSelector
+    def test(multiContract: Ast.MultiContract): Assertion = {
       val script               = multiContract.genStatefulScript(0).code
       val (scriptObj, context) = prepareStatefulScript(script)
       StatefulVM.execute(context, scriptObj, AVector.empty[Val]) isE ()
+    }
+
+    def test(code: String): Assertion = {
+      test(code.useMethodSelector)
+    }
+
+    def createContract(contract: StatefulContract): String = {
+      prepareContract(contract, AVector.empty, AVector.empty)._1.contractId.toHexString
     }
   }
 
@@ -6300,13 +6305,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val multiContract0 = Compiler.compileMultiContract(code).rightValue
     val compiled0      = multiContract0.genStatefulContract(1).code
-    compiled0.methods(0).instrs.head isnot a[MethodSelector]
-    compiled0.methods(1).instrs.head isnot a[MethodSelector]
+    compiled0.methods.foreach(_.instrs.head isnot a[MethodSelector])
 
-    val multiContract1 = code.useMethodSelector("I", 1)
+    val multiContract1 = code.useMethodSelector("I")
     val compiled1      = multiContract1.genStatefulContract(1).code
     val interface      = multiContract1.getInterface(Ast.TypeId("I"))
-    compiled1.methods(0).instrs.head isnot a[MethodSelector]
+    compiled1.methods(0).instrs.head is MethodSelector(interface.funcs(0).methodSelector)
     compiled1.methods(1).instrs.head is MethodSelector(interface.funcs(1).methodSelector)
   }
 
@@ -6323,10 +6327,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val multiContract  = fooCode.useMethodSelector("I", 1)
-    val methodSelector = multiContract.contracts.head.funcs(1).methodSelector
-    val compiledFoo    = multiContract.genStatefulContract(1).code
-    compiledFoo.methods(1).instrs.head is MethodSelector(methodSelector)
+    val multiContract   = fooCode.useMethodSelector("I")
+    val funcs           = multiContract.contracts.head.funcs
+    val methodSelector0 = funcs(0).methodSelector
+    val methodSelector1 = funcs(1).methodSelector
+    val compiledFoo     = multiContract.genStatefulContract(1).code
+    compiledFoo.methods(0).instrs.head is MethodSelector(methodSelector0)
+    compiledFoo.methods(1).instrs.head is MethodSelector(methodSelector1)
     val fooObj = prepareContract(compiledFoo, AVector.empty, AVector.empty)._1
 
     def bar(expr: String) = {
@@ -6342,72 +6349,220 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$fooCode
            |""".stripMargin
 
-      val multiContract = barCode.useMethodSelector("I", 1)
+      val multiContract = barCode.useMethodSelector("I")
       multiContract.genStatefulContract(0).code
     }
 
-    val instr = CallExternalBySelector(methodSelector)
-    val bar0  = bar("Foo(fooId)")
-    bar0.methods.head.instrs.contains(instr) is false
+    val instrs =
+      Seq(CallExternalBySelector(methodSelector0), CallExternalBySelector(methodSelector1))
+    val bar0 = bar("Foo(fooId)")
+    bar0.methods.head.instrs.exists(instrs.contains) is false
     val (bar0Obj, context0) =
       prepareContract(bar0, AVector(Val.ByteVec(fooObj.contractId.bytes)), AVector.empty)
     StatefulVM.execute(context0, bar0Obj, AVector.empty).isRight is true
 
     val bar1 = bar("I(fooId)")
-    bar1.methods.head.instrs.contains(instr) is true
+    bar1.methods.head.instrs.exists(instrs.contains) is true
     val (bar1Obj, context1) =
       prepareContract(bar1, AVector(Val.ByteVec(fooObj.contractId.bytes)), AVector.empty)
     StatefulVM.execute(context1, bar1Obj, AVector.empty).isRight is true
   }
 
-  "interface" should "support multiple inheritance" in {
-    {
-      info("sort functions by the parent length of interface")
-      val code =
-        s"""
-           |Contract Impl() implements Foo, Bar {
-           |  pub fn foo() -> () {}
-           |  pub fn bar() -> () {}
-           |  pub fn baz() -> () {}
-           |}
-           |Interface Foo {
-           |  pub fn foo() -> ()
-           |}
-           |Interface Bar extends Baz {
-           |  pub fn bar() -> ()
-           |}
-           |Interface Baz {
-           |  pub fn baz() -> ()
-           |}
-           |""".stripMargin
-      val contract = Compiler.compileContractFull(code).rightValue.ast
-      contract.funcs(0).name is "baz"
-      contract.funcs(1).name is "foo"
-      contract.funcs(2).name is "bar"
+  it should "test sort interfaces" in new MethodSelectorFixture {
+    def createInterface(name: String, useMethodSelector: Boolean): Ast.ContractInterface = {
+      Ast.ContractInterface(
+        None,
+        useMethodSelector,
+        Ast.TypeId(name),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty
+      )
+    }
+
+    def test(
+        parentsCache: mutable.Map[Ast.TypeId, Seq[Ast.ContractWithState]],
+        interfaces: Seq[Ast.ContractInterface],
+        result: Seq[Ast.ContractInterface]
+    ) = {
+      val newInterfaces = interfaces.map { i =>
+        i.copy(inheritances = parentsCache(i.ident).map(p => Ast.InterfaceInheritance(p.ident)))
+      }
+      Ast.MultiContract
+        .sortInterfaces(
+          parentsCache,
+          newInterfaces
+        )
+        .map(_.ident) is result.map(_.ident)
     }
 
     {
-      info("sort functions by interface name")
+      info("sort interfaces by the method selector annotation")
+      val foo = createInterface("Foo", true)
+      val bar = createInterface("Bar", true)
+      val baz = createInterface("Baz", false)
+      test(
+        mutable.Map(bar.ident -> Seq.empty, baz.ident -> Seq.empty, foo.ident -> Seq(bar, baz)),
+        Seq(foo, bar, baz),
+        Seq(baz, bar, foo)
+      )
+    }
+
+    {
+      info("sort interfaces by the parent length")
+      val foo = createInterface("Foo", true)
+      val bar = createInterface("Bar", true)
+      val baz = createInterface("Baz", true)
+      val qux = createInterface("Qux", true)
+      test(
+        mutable.Map(
+          foo.ident -> Seq(bar, baz, qux),
+          bar.ident -> Seq(baz, qux),
+          baz.ident -> Seq(qux),
+          qux.ident -> Seq.empty
+        ),
+        Seq(foo, bar, baz, qux),
+        Seq(qux, baz, bar, foo)
+      )
+    }
+
+    {
+      info("sort interfaces by name")
+      val foo = createInterface("Foo", true)
+      val bar = createInterface("Bar", true)
+      val baz = createInterface("Baz", true)
+      test(
+        mutable.Map(foo.ident -> Seq.empty, bar.ident -> Seq.empty, baz.ident -> Seq.empty),
+        Seq(foo, bar, baz),
+        Seq(bar, baz, foo)
+      )
+    }
+
+    {
+      info("sort interfaces by order")
+      val foo  = createInterface("Foo", true)
+      val bar  = createInterface("Bar", false)
+      val baz  = createInterface("Baz", false)
+      val qux  = createInterface("Qux", true)
+      val quz  = createInterface("Quz", true)
+      val fred = createInterface("Fred", true)
+      test(
+        mutable.Map(
+          foo.ident  -> Seq(bar, baz, qux, quz, fred),
+          bar.ident  -> Seq(baz),
+          baz.ident  -> Seq.empty,
+          qux.ident  -> Seq(quz),
+          quz.ident  -> Seq.empty,
+          fred.ident -> Seq.empty
+        ),
+        Seq(foo, bar, baz, qux, quz, fred),
+        Seq(baz, bar, fred, quz, qux, foo)
+      )
+    }
+
+    {
+      info("interfaces are chained and not use method selector")
+      val foo = createInterface("Foo", false)
+      val bar = createInterface("Bar", false)
+      val baz = createInterface("Baz", false)
+      val qux = createInterface("Qux", false)
+      test(
+        mutable.Map(
+          foo.ident -> Seq(bar, baz, qux),
+          bar.ident -> Seq(baz, qux),
+          baz.ident -> Seq(qux),
+          qux.ident -> Seq.empty
+        ),
+        Seq(foo, bar, baz, qux),
+        Seq(qux, baz, bar, foo)
+      )
+    }
+
+    {
+      info("throw an error if parents are not chained")
+      val foo = createInterface("Foo", false)
+      val bar = createInterface("Bar", false)
+      val baz = createInterface("Baz", false)
+      val qux = createInterface("Qux", false)
+      intercept[Compiler.Error](
+        test(
+          mutable.Map(
+            foo.ident -> Seq(bar, baz, qux),
+            bar.ident -> Seq(qux),
+            baz.ident -> Seq(qux),
+            qux.ident -> Seq.empty
+          ),
+          Seq(foo, bar, baz, qux),
+          Seq(qux, baz, bar, foo)
+        )
+      ).message is "Interface Baz does not inherit from Bar"
+    }
+
+    {
+      info("throw an error if the interface not use method selector but parents does")
       val code =
         s"""
-           |Contract Impl() implements Foo, Bar {
-           |  pub fn foo() -> () {}
-           |  pub fn bar() -> () {}
-           |}
-           |Interface Foo {
+           |Interface Foo extends Bar {
            |  pub fn foo() -> ()
            |}
            |Interface Bar {
            |  pub fn bar() -> ()
            |}
            |""".stripMargin
-      val contract = Compiler.compileContractFull(code).rightValue.ast
-      contract.funcs(0).name is "bar"
-      contract.funcs(1).name is "foo"
+
+      intercept[Compiler.Error](code.useMethodSelector("Bar")).message is
+        "Interface Foo does not use method selector, but it's parents List(Bar) use method selector"
     }
   }
 
   "contract" should "support multiple inheritance" in new MethodSelectorFixture {
+    {
+      info("inherit from both interfaces that use and not use method selector")
+      val code: String =
+        s"""
+           |Contract Impl() implements Foo, Bar {
+           |  pub fn bar() -> U256 { return 0 }
+           |  pub fn foo() -> U256 { return 1 }
+           |}
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |""".stripMargin
+      val multiContract = code.useMethodSelector("Bar")
+      val result        = multiContract.genStatefulContract(0)
+      result.ast.funcs.map(_.name) is Seq("foo", "bar")
+      val compiled = result.code
+      compiled.methods(0).instrs.head isnot a[MethodSelector]
+      compiled.methods(1).instrs.head is MethodSelector(result.ast.funcs(1).methodSelector)
+
+      val contractId = createContract(compiled)
+      val script0 =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let impl = Impl(#$contractId)
+           |  assert!(impl.foo() == 1, 5)
+           |  assert!(impl.bar() == 0, 1)
+           |}
+           |$code
+           |""".stripMargin
+      test(script0.useMethodSelector("Bar"))
+
+      val script1 =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Foo(#$contractId).foo() == 1, 2)
+           |  assert!(Bar(#$contractId).bar() == 0, 3)
+           |}
+           |$code
+           |""".stripMargin
+      test(script1.useMethodSelector("Bar"))
+    }
+
     {
       info("inherit from multiple interfaces")
       val code: String =
@@ -6432,8 +6587,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
       compiled.methods.last.instrs isnot a[MethodSelector]
 
-      val contractId =
-        prepareContract(compiled, AVector.empty, AVector.empty)._1.contractId.toHexString
+      val contractId = createContract(compiled)
       test(
         s"""
            |@using(preapprovedAssets = false)
@@ -6498,8 +6652,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val compiled = multiContract.genStatefulContract(0).code
       compiled.methods.foreach(_.instrs.head is a[MethodSelector])
 
-      val contractId =
-        prepareContract(compiled, AVector.empty, AVector.empty)._1.contractId.toHexString
+      val contractId = createContract(compiled)
       test(
         s"""
            |@using(preapprovedAssets = false)
@@ -6561,8 +6714,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
       compiled.methods.last.instrs isnot a[MethodSelector]
 
-      val contractId =
-        prepareContract(compiled, AVector.empty, AVector.empty)._1.contractId.toHexString
+      val contractId = createContract(compiled)
       test(
         s"""
            |@using(preapprovedAssets = false)
