@@ -2115,6 +2115,7 @@ object Ast {
 
   final case class ContractInterface(
       stdId: Option[StdInterfaceId],
+      useMethodSelector: Boolean,
       ident: TypeId,
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
@@ -2266,9 +2267,8 @@ object Ast {
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
           val (_, stdId, funcs, _, events, _, _) = MultiContract.extractDefs(parentsCache, i)
-          ContractInterface(stdId, i.ident, funcs, events, i.inheritances).atSourceIndex(
-            i.sourceIndex
-          )
+          ContractInterface(stdId, i.useMethodSelector, i.ident, funcs, events, i.inheritances)
+            .atSourceIndex(i.sourceIndex)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
       MultiContract(newContracts, structs, Some(dependencies))

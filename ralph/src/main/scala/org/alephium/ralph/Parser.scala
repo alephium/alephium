@@ -372,8 +372,7 @@ abstract class Parser[Ctx <: StatelessContext] {
               payToContractOnly = false,
               checkExternalCaller = true,
               updateFields = false,
-              methodIndex = None,
-              methodSelector = false
+              methodIndex = None
             )
           )
           if (usingAnnotation.payToContractOnly && usingAnnotation.assetsInContract.assetsEnabled) {
@@ -395,7 +394,6 @@ abstract class Parser[Ctx <: StatelessContext] {
             usingAnnotation.checkExternalCaller,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
-            usingAnnotation.methodSelector,
             params,
             returnType,
             statements
@@ -420,7 +418,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         f.useCheckExternalCaller,
         f.useUpdateFields,
         f.useMethodIndex,
-        f.useMethodSelector,
+        useMethodSelector = false,
         f.args,
         f.rtypes,
         f.body
@@ -583,7 +581,6 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
-    useMethodSelector: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -595,15 +592,7 @@ object Parser {
     def id: String
     def keys: AVector[String]
     def validate(annotations: Seq[Ast.Annotation]): Option[Annotation] = {
-      annotations.find(_.id.name != id) match {
-        case Some(annotation) =>
-          throw Compiler.Error(
-            s"Invalid annotation, expect @$id annotation",
-            annotation.sourceIndex
-          )
-        case None => ()
-      }
-      annotations.headOption match {
+      annotations.find(_.id.name == id) match {
         case result @ Some(annotation) =>
           val duplicateKeys = keys.filter(key => annotation.fields.count(_.ident.name == key) > 1)
           if (duplicateKeys.nonEmpty) {
@@ -653,8 +642,7 @@ object Parser {
       payToContractOnly: Boolean,
       checkExternalCaller: Boolean,
       updateFields: Boolean,
-      methodIndex: Option[Int],
-      methodSelector: Boolean
+      methodIndex: Option[Int]
   )
 
   object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
@@ -665,15 +653,13 @@ object Parser {
     val useCheckExternalCallerKey = "checkExternalCaller"
     val useUpdateFieldsKey        = "updateFields"
     val useMethodIndexKey         = "methodIndex"
-    val useMethodSelectorKey      = "methodSelector"
     val keys: AVector[String] = AVector(
       usePreapprovedAssetsKey,
       useContractAssetsKey,
       usePayToContractOnly,
       useCheckExternalCallerKey,
       useUpdateFieldsKey,
-      useMethodIndexKey,
-      useMethodSelectorKey
+      useMethodIndexKey
     )
 
     private def extractUseContractAsset(annotation: Annotation): Ast.ContractAssetsAnnotation = {
@@ -719,9 +705,7 @@ object Parser {
           Val.Bool(default.checkExternalCaller)
         ).v,
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
-        methodIndex,
-        // TODO: Support for parsing @using(methodSelector = true/false) after the Rhone upgrade is activated
-        methodSelector = false
+        methodIndex
       )
     }
   }
@@ -748,6 +732,20 @@ object Parser {
     }
   }
 
+  final case class InterfaceUsingAnnotationFields(methodSelector: Boolean)
+  object InterfaceUsingAnnotation extends RalphAnnotation[InterfaceUsingAnnotationFields] {
+    val id: String            = "using"
+    val keys: AVector[String] = AVector("methodSelector")
+
+    def extractFields(
+        annotation: Annotation,
+        default: InterfaceUsingAnnotationFields
+    ): InterfaceUsingAnnotationFields = {
+      val value = extractField[Val.Bool](annotation, keys(0), Val.Bool(default.methodSelector)).v
+      InterfaceUsingAnnotationFields(value)
+    }
+  }
+
   final case class ContractStdFields(enabled: Boolean)
 
   object ContractStdAnnotation extends RalphAnnotation[Option[ContractStdFields]] {
@@ -759,6 +757,22 @@ object Parser {
         default: Option[ContractStdFields]
     ): Option[ContractStdFields] = {
       extractField[Val.Bool](annotation, keys(0), Val.Bool).map(field => ContractStdFields(field.v))
+    }
+  }
+
+  def checkAnnotations(
+      annotations: Seq[Annotation],
+      ids: AVector[String],
+      label: String
+  ): Unit = {
+    annotations.find(a => !ids.contains(a.id.name)) match {
+      case Some(annotation) =>
+        throw Compiler.Error(
+          s"Invalid annotation ${annotation.id.name}, $label only supports these annotations: ${ids
+              .mkString(",")}",
+          annotation.sourceIndex
+        )
+      case None => ()
     }
   }
 }
@@ -922,8 +936,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
                 payToContractOnly = false,
                 checkExternalCaller = true,
                 updateFields = false,
-                methodIndex = None,
-                methodSelector = false
+                methodIndex = None
               )
             )
             val mainFunc = Ast.FuncDef.main(
@@ -1043,6 +1056,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             statements,
             endIndex
           ) =>
+        Parser.checkAnnotations(annotations, AVector(Parser.ContractStdAnnotation.id), "contract")
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
         val maps                  = ArrayBuffer.empty[Ast.MapDef]
         val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
@@ -1125,7 +1139,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               f.useCheckExternalCaller,
               f.useUpdateFields,
               f.useMethodIndex,
-              f.useMethodSelector,
+              useMethodSelector = false,
               f.args,
               f.rtypes,
               None
@@ -1152,10 +1166,14 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           typeId.sourceIndex
         )
       }
+      val annotationIds = AVector(Parser.InterfaceStdAnnotation.id, Parser.UsingAnnotation.id)
+      Parser.checkAnnotations(annotations, annotationIds, "interface")
       val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
       Ast
         .ContractInterface(
           stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),
+          // TODO: Support for parsing @using(methodSelector = true/false) after the Rhone upgrade is activated
+          useMethodSelector = false,
           typeId,
           funcs,
           events,

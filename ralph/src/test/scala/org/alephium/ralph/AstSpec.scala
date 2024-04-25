@@ -725,7 +725,7 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "check interface std id" in {
-    val foo = Ast.ContractInterface(None, Ast.TypeId("Foo"), Seq.empty, Seq.empty, Seq.empty)
+    val foo = Ast.ContractInterface(None, false, Ast.TypeId("Foo"), Seq.empty, Seq.empty, Seq.empty)
     val bar = foo.copy(ident = Ast.TypeId("Bar"))
     val baz = foo.copy(ident = Ast.TypeId("Baz"))
 

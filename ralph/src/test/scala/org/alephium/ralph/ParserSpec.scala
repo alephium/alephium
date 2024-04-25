@@ -1383,6 +1383,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
            |""".stripMargin
       parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
         None,
+        useMethodSelector = false,
         TypeId("Child"),
         Seq(
           FuncDef(
@@ -1427,14 +1428,14 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         .value
         .stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
       intercept[Compiler.Error](
-        parse(interface("@using(updateFields = true)"), StatefulParser.interface(_))
-      ).message is "Invalid annotation, expect @std annotation"
+        parse(interface("@unknown(updateFields = true)"), StatefulParser.interface(_))
+      ).message is "Invalid annotation unknown, interface only supports these annotations: std,using"
       intercept[Compiler.Error](
         parse(
-          interface("@std(id = #0001)", "@using(updateFields = true)"),
+          interface("@std(id = #0001)", "@unknown(updateFields = true)"),
           StatefulParser.interface(_)
         )
-      ).message is "Invalid annotation, expect @std annotation"
+      ).message is "Invalid annotation unknown, interface only supports these annotations: std,using"
       intercept[Compiler.Error](
         parse(
           interface("@std(id = #0001, updateFields = true)"),
@@ -1450,6 +1451,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       intercept[Compiler.Error](
         parse(interface("@std(updateFields = 0)"), StatefulParser.interface(_))
       ).message is "Invalid keys for @std annotation: updateFields"
+    }
+
+    {
+      info("Parse method selector annotation")
+      def interface(annotations: String*): String =
+        s"""
+           |${annotations.mkString("\n")}
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+
+      fastparse.parse(interface(""), StatefulParser.interface(_)).isSuccess is true
+      val result = fastparse
+        .parse(
+          interface("@std(id = #0001)", "@using(methodSelector = true)"),
+          StatefulParser.interface(_)
+        )
+        .get
+        .value
+      result.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      result.useMethodSelector is false
     }
 
     {
@@ -1635,8 +1658,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         .value
         .stdIdEnabled is Some(false)
       intercept[Compiler.Error](
-        parse(contract("@using(updateFields = true)"), StatefulParser.contract(_))
-      ).message is "Invalid annotation, expect @std annotation"
+        parse(contract("@unknown(updateFields = true)"), StatefulParser.contract(_))
+      ).message is "Invalid annotation unknown, contract only supports these annotations: std"
       intercept[Compiler.Error](
         parse(
           contract("@std(enabled = true, updateFields = true)"),
