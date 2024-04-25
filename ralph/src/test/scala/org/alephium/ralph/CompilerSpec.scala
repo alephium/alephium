@@ -6480,16 +6480,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   "contract" should "support multiple inheritance" in {
-    def test(code: String): Assertion = {
-      val script               = Compiler.compileTxScript(code).rightValue
-      val (scriptObj, context) = prepareStatefulScript(script)
-      StatefulVM.execute(context, scriptObj, AVector.empty[Val]) isE ()
-    }
-
-    def createContract(contract: StatefulContract): String = {
-      prepareContract(contract, AVector.empty, AVector.empty)._1.contractId.toHexString
-    }
-
     {
       info("inherit from both interfaces that use and not use method selector")
       val code: String =
@@ -6511,30 +6501,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val compiled = result.code
       compiled.methods(0).instrs.head isnot a[MethodSelector]
       compiled.methods(1).instrs.head is MethodSelector(result.ast.funcs(1).methodSelector.get)
-
-      val contractId = createContract(compiled)
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  let impl = Impl(#$contractId)
-           |  assert!(impl.foo() == 1, 0)
-           |  assert!(impl.bar() == 0, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
-
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  assert!(Foo(#$contractId).foo() == 1, 0)
-           |  assert!(Bar(#$contractId).bar() == 0, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
     }
 
     {
@@ -6560,32 +6526,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.ast.funcs.map(_.name) is Seq("bar", "foo", "baz")
       compiled.code.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
       compiled.code.methods.last.instrs isnot a[MethodSelector]
-
-      val contractId = createContract(compiled.code)
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  let impl = Impl(#$contractId)
-           |  assert!(impl.foo() == 1, 0)
-           |  assert!(impl.bar() == 2, 0)
-           |  assert!(impl.baz() == 0, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
-
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  assert!(Foo(#$contractId).foo() == 1, 0)
-           |  assert!(Bar(#$contractId).bar() == 2, 0)
-           |  assert!(Impl(#$contractId).baz() == 0, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
     }
 
     {
@@ -6623,32 +6563,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val compiled = Compiler.compileContractFull(code).rightValue
       compiled.ast.funcs.map(_.name) is Seq("foo", "bar", "baz")
       compiled.code.methods.foreach(_.instrs.head is a[MethodSelector])
-
-      val contractId = createContract(compiled.code)
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  let impl = Impl(#$contractId)
-           |  assert!(impl.foo() == 0, 0)
-           |  assert!(impl.bar() == 1, 0)
-           |  assert!(impl.baz() == 2, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
-
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  assert!(Foo(#$contractId).foo() == 0, 0)
-           |  assert!(FooBar(#$contractId).bar() == 1, 0)
-           |  assert!(FooBaz(#$contractId).baz() == 2, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
     }
 
     {
@@ -6683,34 +6597,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.ast.funcs.map(_.name) is Seq("bar", "foo", "baz")
       compiled.code.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
       compiled.code.methods.last.instrs isnot a[MethodSelector]
-
-      val contractId = createContract(compiled.code)
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  let impl = Impl(#$contractId)
-           |  assert!(impl.foo() == 0, 0)
-           |  assert!(impl.bar() == 1, 0)
-           |  let (a, b) = impl.baz()
-           |  assert!(a == 1 && b == 2, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
-
-      test(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  assert!(Foo(#$contractId).foo() == 0, 0)
-           |  assert!(Bar(#$contractId).bar() == 1, 0)
-           |  let (a, b) = Impl(#$contractId).baz()
-           |  assert!(a == 1 && b == 2, 0)
-           |}
-           |$code
-           |""".stripMargin
-      )
     }
   }
 }
