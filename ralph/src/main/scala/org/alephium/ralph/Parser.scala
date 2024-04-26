@@ -797,9 +797,8 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
-        templateParams.? ~ "{" ~ func(false).rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput(
-          fileURI
-        )
+        templateParams.? ~ "{" ~ func(false).rep(1) ~ "}" ~~ Index ~
+        rawStruct.rep(0) ~ endOfInput(fileURI)
     ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
       Ast
         .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)

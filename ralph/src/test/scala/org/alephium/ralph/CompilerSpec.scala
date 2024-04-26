@@ -70,6 +70,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     error
   }
 
+  def methodSelectorOf(signature: String): MethodSelector = {
+    MethodSelector(Method.Selector(DjbHash.intHash(ByteString.fromString(signature))))
+  }
+
   it should "compile asset script" in {
     def runScript(assetScript: StatelessScript, args: AVector[Val]): AVector[Val] = {
       val (scriptObj, statelessContext) = prepareStatelessScript(assetScript)
@@ -1370,6 +1374,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       localsLength = 6,
       returnLength = 0,
       instrs = AVector[Instr[StatefulContext]](
+        methodSelectorOf("func0()->()"),
         U256Const0, U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), StoreLocal(0),
         U256Const0, StoreLocal(3),
         LoadLocal(3), U256Const3, U256Lt, IfFalse(15),
@@ -1391,6 +1396,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       localsLength = 14,
       returnLength = 0,
       instrs = AVector[Instr[StatefulContext]](
+        methodSelectorOf("func1()->()"),
         U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, StoreLocal(5), StoreLocal(4), StoreLocal(3), StoreLocal(2), StoreLocal(1), StoreLocal(0),
         U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, StoreLocal(11), StoreLocal(10), StoreLocal(9), StoreLocal(8), StoreLocal(7), StoreLocal(6),
         U256Const0, StoreLocal(12),
@@ -1834,6 +1840,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         localsLength = 5,
         returnLength = 0,
         instrs = AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
           U256Const1,
           U256Const2,
           U256Const3,
@@ -2844,7 +2851,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
-        AVector[Instr[StatefulContext]](ConstTrue, IfFalse(1), Return)
+        AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
+          ConstTrue,
+          IfFalse(1),
+          Return
+        )
     }
 
     {
@@ -2894,7 +2906,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
-        AVector[Instr[StatefulContext]](ConstTrue, IfFalse(2), Return, Jump(1), Return)
+        AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
+          ConstTrue,
+          IfFalse(2),
+          Return,
+          Jump(1),
+          Return
+        )
     }
 
     {
@@ -2915,6 +2934,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
           ConstTrue,
           IfFalse(2),
           Return,
@@ -2983,6 +3003,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->(U256)"),
           ConstTrue,
           IfFalse(2),
           U256Const0,
@@ -3005,6 +3026,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->(U256)"),
           ConstFalse,
           IfFalse(2),
           U256Const0,
@@ -3536,6 +3558,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
           U256Const0,
           Pop
         )
@@ -3558,6 +3581,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->(U256)"),
           CallLocal(1),
           Pop,
           StoreLocal(0),
@@ -3617,14 +3641,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val bar =
       s"""
-         |Contract Bar() {
+         |Contract Foo() {
          |  const C0 = 0
          |  const C1 = 1
          |  enum Errors {
          |    Error0 = 0
          |    Error1 = 1
          |  }
-         |  pub fn bar() -> () {}
+         |  pub fn foo() -> () {}
          |}
          |""".stripMargin
 
@@ -3984,6 +4008,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           1,
           0,
           AVector[Instr[StatefulContext]](
+            methodSelectorOf("foo(I256)->()"),
             U256Const0,
             StoreMutField(0.toByte),
             U256Const0,
@@ -4005,6 +4030,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           1,
           0,
           AVector[Instr[StatefulContext]](
+            methodSelectorOf("bar(ByteVec)->()"),
             LoadImmField(2.toByte),
             U256Const0,
             AssertWithErrorCode
@@ -4051,6 +4077,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           localsLength = 2,
           returnLength = 0,
           instrs = AVector[Instr[StatefulContext]](
+            methodSelectorOf("foo(I256,U256)->()"),
             U256Const0,
             StoreMutField(0.toByte),
             U256Const0,
@@ -4081,6 +4108,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           2,
           0,
           AVector[Instr[StatefulContext]](
+            methodSelectorOf("bar(ByteVec,U256)->()"),
             LoadLocal(1.toByte),
             U256Const1,
             U256Add,
