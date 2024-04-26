@@ -180,25 +180,28 @@ object Method {
   }
 
   def extractSelector(methodBytes: ByteString): Option[Selector] = {
-    val selectorEither = for {
-      isPublicRest      <- serde._deserialize[Boolean](methodBytes)
-      assetModifierRest <- serde._deserialize[Byte](isPublicRest.rest)
-      argsLengthRest    <- serde._deserialize[Int](assetModifierRest.rest)
-      localsLengthRest  <- serde._deserialize[Int](argsLengthRest.rest)
-      returnLengthRest  <- serde._deserialize[Int](localsLengthRest.rest)
-      instrLengthRest   <- serde._deserialize[Int](returnLengthRest.rest)
-      selectorInstrRest <-
-        if (instrLengthRest.rest.headOption.contains(MethodSelector.code)) {
-          MethodSelector.deserialize(instrLengthRest.rest.drop(1))
-        } else {
-          Left(SerdeError.other("selector does not exist"))
+    serde._deserialize[Boolean](methodBytes) match {
+      case Right(isPublicRest) if isPublicRest.value =>
+        val selectorEither = for {
+          assetModifierRest <- serde._deserialize[Byte](isPublicRest.rest)
+          argsLengthRest    <- serde._deserialize[Int](assetModifierRest.rest)
+          localsLengthRest  <- serde._deserialize[Int](argsLengthRest.rest)
+          returnLengthRest  <- serde._deserialize[Int](localsLengthRest.rest)
+          instrLengthRest   <- serde._deserialize[Int](returnLengthRest.rest)
+          selectorInstrRest <-
+            if (instrLengthRest.rest.headOption.contains(MethodSelector.code)) {
+              MethodSelector.deserialize(instrLengthRest.rest.drop(1))
+            } else {
+              Left(SerdeError.other("selector does not exist"))
+            }
+        } yield {
+          selectorInstrRest.value.selector
         }
-    } yield {
-      selectorInstrRest.value.selector
-    }
-    selectorEither match {
-      case Left(_)         => None
-      case Right(selector) => Some(selector)
+        selectorEither match {
+          case Left(_)         => None
+          case Right(selector) => Some(selector)
+        }
+      case _ => None
     }
   }
 }

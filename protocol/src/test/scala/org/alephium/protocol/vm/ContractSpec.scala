@@ -324,8 +324,8 @@ class ContractSpec extends AlephiumSpec {
     test(0xffffffff, ByteString(0xff, 0xff, 0xff, 0xff))
   }
 
-  it should "search method by selector" in {
-    val instrs = Instr.statelessInstrs0.filter(_.isInstanceOf[Instr[_]])
+  trait MethodSelectorFixture {
+    private val instrs = Instr.statelessInstrs0.filter(_.isInstanceOf[Instr[_]])
     def methodGen: Gen[Method[StatefulContext]] = {
       val size         = Random.nextInt(instrs.length)
       val methodInstrs = instrs.take(size)
@@ -342,7 +342,20 @@ class ContractSpec extends AlephiumSpec {
         )
       }
     }
+  }
 
+  it should "not extract method selector for private functions" in new MethodSelectorFixture {
+    val method0 = methodGen.sample.get.copy(isPublic = false)
+    method0.instrs.head isnot a[MethodSelector]
+    Method.extractSelector(serialize(method0)) is None
+
+    val instrs  = MethodSelector(Method.Selector(1)) +: method0.instrs.toSeq
+    val method1 = method0.copy(isPublic = false, instrs = AVector.from(instrs))
+    method1.instrs.head is a[MethodSelector]
+    Method.extractSelector(serialize(method1)) is None
+  }
+
+  it should "search method by selector" in new MethodSelectorFixture {
     @scala.annotation.tailrec
     def genContract(): (StatefulContract, Seq[Option[Method.Selector]]) = {
       val generated = (0 until 20).map { index =>
@@ -353,8 +366,13 @@ class ContractSpec extends AlephiumSpec {
             Method.Selector(Bytes.toIntUnsafe(Hash.hash(serialize(index)).bytes.take(4)))
           val newInstrs = MethodSelector(selector) +: method.instrs.toSeq
           val newMethod = method.copy(instrs = AVector.from(newInstrs))
-          Method.extractSelector(serialize(newMethod)) is Some(selector)
-          (newMethod, Some(selector))
+          if (method.isPublic) {
+            Method.extractSelector(serialize(newMethod)) is Some(selector)
+            (newMethod, Some(selector))
+          } else {
+            Method.extractSelector(serialize(newMethod)) is None
+            (newMethod, None)
+          }
         } else {
           Method.extractSelector(serialize(method)) is None
           (method, None)

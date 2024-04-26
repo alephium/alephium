@@ -248,8 +248,10 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   it should "charge gas for method selector" in {
     val method   = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector.empty)
     val selector = Method.Selector(0)
-    val methods = AVector.fill(3)(method) :+
+    val methods = AVector.fill(2)(method) ++ AVector(
+      method.copy(isPublic = false),
       method.copy(instrs = AVector[Instr[StatefulContext]](MethodSelector(selector)))
+    )
     val contract               = StatefulContract(0, methods)
     val (contractObj, context) = prepareContract(contract, AVector.empty, AVector.empty)
     val frame = StatefulFrame(
