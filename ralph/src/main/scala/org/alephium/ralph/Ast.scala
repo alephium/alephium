@@ -1113,7 +1113,6 @@ object Ast {
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
-      var useMethodSelector: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -1126,7 +1125,6 @@ object Ast {
 
     private[ralph] var methodSelector: Option[Method.Selector] = None
     def getMethodSelector(globalState: GlobalState): Method.Selector = {
-      assume(useMethodSelector)
       methodSelector match {
         case Some(selector) => selector
         case None =>
@@ -1256,7 +1254,6 @@ object Ast {
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         useMethodIndex = None,
-        useMethodSelector = false,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)
@@ -1808,8 +1805,8 @@ object Ast {
             case _                    => false
           }
           var table = Compiler.SimpleFunc
-            .from(globalState, funcs, isInterface)
-            .map(f => f.id -> f)
+            .from(funcs, isInterface)
+            .map(f => f.funcDef.id -> f)
             .toMap[FuncId, Compiler.ContractFunc[Ctx]]
           builtInFuncs.foreach(func =>
             table = table + (FuncId(func.name, isBuiltIn = true) -> func)
@@ -2077,7 +2074,7 @@ object Ast {
     ): AVector[Method[StatefulContext]] = {
       AVector.from(funcs.view.map { func =>
         val method = func.genMethod(state)
-        if (func.useMethodSelector) {
+        if (func.isPublic && state.isUseMethodSelector(ident, func.id)) {
           val methodSelector      = func.getMethodSelector(state.globalState)
           val methodSelectorInstr = MethodSelector(methodSelector)
           method.copy(instrs = methodSelectorInstr +: method.instrs)
@@ -2164,7 +2161,8 @@ object Ast {
   final case class MultiContract(
       contracts: Seq[ContractWithState],
       structs: Seq[Struct],
-      dependencies: Option[Map[TypeId, Seq[TypeId]]]
+      dependencies: Option[Map[TypeId, Seq[TypeId]]],
+      methodSelectorTable: Option[Map[(TypeId, FuncId), Boolean]]
   ) extends Positioned {
     lazy val globalState = GlobalState(structs)
 
@@ -2265,13 +2263,14 @@ object Ast {
     def extendedContracts(): MultiContract = {
       UniqueDef.checkDuplicates(contracts ++ structs, "TxScript/Contract/Interface/Struct")
 
-      val parentsCache = buildDependencies()
+      val methodSelectorTable = mutable.Map.empty[(TypeId, Ast.FuncId), Boolean]
+      val parentsCache        = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case script: TxScript =>
           script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
           val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums) =
-            MultiContract.extractContract(parentsCache, c)
+            MultiContract.extractContract(parentsCache, methodSelectorTable, c)
           Contract(
             Some(stdIdEnabled),
             stdId,
@@ -2287,12 +2286,13 @@ object Ast {
             c.inheritances
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
-          val (stdId, funcs, events) = MultiContract.extractInterface(parentsCache, i)
+          val (stdId, funcs, events) =
+            MultiContract.extractInterface(parentsCache, methodSelectorTable, i)
           ContractInterface(stdId, i.useMethodSelector, i.ident, funcs, events, i.inheritances)
             .atSourceIndex(i.sourceIndex)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
-      MultiContract(newContracts, structs, Some(dependencies))
+      MultiContract(newContracts, structs, Some(dependencies), Some(methodSelectorTable.toMap))
     }
 
     def genStatefulScripts()(implicit compilerOptions: CompilerOptions): AVector[CompiledScript] = {
@@ -2464,15 +2464,9 @@ object Ast {
         .getOrElse(true)
     }
 
-    @inline private def getInterfaceFuncs(sortedInterfaces: Seq[ContractInterface]) = {
-      sortedInterfaces.flatMap { interface =>
-        interface.funcs.foreach(_.useMethodSelector = interface.useMethodSelector)
-        interface.funcs
-      }
-    }
-
     def extractInterface(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
+        methodSelectorTable: mutable.Map[(TypeId, FuncId), Boolean],
         interface: ContractInterface
     ): (Option[StdInterfaceId], Seq[FuncDef[StatefulContext]], Seq[EventDef]) = {
       val parents = parentsCache(interface.ident).map {
@@ -2490,7 +2484,12 @@ object Ast {
       }
       val sortedInterfaces = sortInterfaces(parentsCache, parents :+ interface)
       val stdId            = getStdId(sortedInterfaces)
-      val allFuncs         = getInterfaceFuncs(sortedInterfaces)
+      val allFuncs = sortedInterfaces.flatMap { parent =>
+        parent.funcs.foreach(func =>
+          methodSelectorTable.update((interface.ident, func.id), parent.useMethodSelector)
+        )
+        parent.funcs
+      }
       val nonAbstractFuncs = allFuncs.filter(_.bodyOpt.nonEmpty)
       if (nonAbstractFuncs.nonEmpty) {
         val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
@@ -2510,6 +2509,7 @@ object Ast {
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extractContract(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
+        methodSelectorTable: mutable.Map[(TypeId, FuncId), Boolean],
         contract: Contract
     ): (
         Boolean,
@@ -2527,7 +2527,12 @@ object Ast {
       val stdId        = getStdId(sortedInterfaces)
       val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
 
-      val interfaceFuncs                       = getInterfaceFuncs(sortedInterfaces)
+      val interfaceFuncs = sortedInterfaces.flatMap { interface =>
+        interface.funcs.foreach(func =>
+          methodSelectorTable.update((contract.ident, func.id), interface.useMethodSelector)
+        )
+        interface.funcs
+      }
       val allFuncs                             = interfaceFuncs ++ allContracts.flatMap(_.funcs)
       val (unimplementedFuncs, allUniqueFuncs) = checkFuncs(allFuncs)
       val constantVars                         = allContracts.flatMap(_.constantVars)
@@ -2552,18 +2557,6 @@ object Ast {
       } else {
         rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
       }
-      funcs.foreach { funcDef =>
-        if (funcDef.isPublic) {
-          interfaceFuncs.find(_.id == funcDef.id) match {
-            case Some(func) if !func.useMethodSelector =>
-              funcDef.useMethodSelector = false
-            case _ => ()
-          }
-        } else {
-          funcDef.useMethodSelector = false
-        }
-      }
-
       (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums)
     }
     // scalastyle:on method.length

@@ -6163,15 +6163,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         useCheckExternalCaller = false,
         useUpdateFields = false,
         methodIndex,
-        useMethodSelector = false,
         Seq.empty,
         Seq.empty,
         None
       )
 
     def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
-      val globalState = Ast.GlobalState(Seq.empty)
-      val result      = Compiler.SimpleFunc.from(globalState, funcs, true)
+      val result = Compiler.SimpleFunc.from(funcs, true)
       result.foreach { func => func.index is indexes(func.name) }
     }
 
@@ -6306,7 +6304,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
 
     val result0 = Compiler.compileContractFull(code0).rightValue
-    result0.ast.funcs.foreach(_.useMethodSelector is true)
     result0.code.methods.foreach(_.instrs.head is a[MethodSelector])
 
     val code1 =
@@ -6321,8 +6318,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val result1 = Compiler.compileContractFull(code1).rightValue
-    result1.ast.funcs(0).useMethodSelector is false
-    result1.ast.funcs(1).useMethodSelector is true
     result1.code.methods(0).instrs.head isnot a[MethodSelector]
     result1.code.methods(1).instrs.head is a[MethodSelector]
 
@@ -6338,7 +6333,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val result2 = Compiler.compileContractFull(code2).rightValue
-    result2.ast.funcs.foreach(_.useMethodSelector is true)
     result2.code.methods.foreach(_.instrs.head is a[MethodSelector])
   }
 
@@ -6353,8 +6347,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val result0 = Compiler.compileContractFull(code0).rightValue
-    result0.ast.funcs(0).useMethodSelector is true
-    result0.ast.funcs(1).useMethodSelector is false
     result0.code.methods(0).instrs.head is a[MethodSelector]
     result0.code.methods(1).instrs.head isnot a[MethodSelector]
 
@@ -6373,8 +6365,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val result1 = Compiler.compileContractFull(code1).rightValue
-    result1.ast.funcs(0).useMethodSelector is true
-    result1.ast.funcs(1).useMethodSelector is false
     result1.code.methods(0).instrs.head is a[MethodSelector]
     result1.code.methods(1).instrs.head isnot a[MethodSelector]
   }
@@ -6586,6 +6576,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("interface use method selector inherit from an interface not use method selector")
       val code =
         s"""
+           |Contract Baz(id: ByteVec) {
+           |  pub fn func0() -> U256 {
+           |    return Foo(id).func0()
+           |  }
+           |  pub fn func1() -> U256 {
+           |    return Foo(id).func1()
+           |  }
+           |  pub fn func2() -> U256 {
+           |    return Bar(id).func0()
+           |  }
+           |  pub fn func3() -> U256 {
+           |    return Bar(id).func1()
+           |  }
+           |  pub fn func4() -> U256 {
+           |    return Bar(id).func2()
+           |  }
+           |  pub fn func5() -> U256 {
+           |    return Bar(id).func3()
+           |  }
+           |}
            |@using(methodSelector = false)
            |Interface Foo {
            |  pub fn func0() -> U256
@@ -6598,18 +6608,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val multiContract = Compiler.compileMultiContract(code).rightValue
-      val foo           = multiContract.getInterface(Ast.TypeId("Foo"))
-      foo.useMethodSelector is false
-      foo.funcs.size is 2
-      foo.funcs.foreach(_.useMethodSelector is false)
-
-      val bar = multiContract.getInterface(Ast.TypeId("Bar"))
-      bar.useMethodSelector is true
-      bar.funcs.size is 4
-      bar.funcs.take(2).foreach(_.useMethodSelector is false)
-      bar.funcs.drop(2).foreach(_.useMethodSelector is true)
+      val compiled = Compiler.compileContractFull(code).rightValue.code
+      compiled.methods
+        .take(4)
+        .foreach(_.instrs.exists(_.isInstanceOf[CallExternalBySelector]) is false)
+      compiled.methods
+        .drop(4)
+        .foreach(_.instrs.exists(_.isInstanceOf[CallExternalBySelector]) is true)
     }
+  }
+
+  it should "not generate method selector instr for TxScript" in {
+    val code =
+      s"""
+         |TxScript Main {
+         |  foo()
+         |
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileTxScriptFull(code).rightValue.code
+    compiled.methods.foreach(_.instrs.head isnot a[MethodSelector])
   }
 
   "contract" should "support multiple inheritance" in {

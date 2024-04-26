@@ -857,7 +857,7 @@ class AstSpec extends AlephiumSpec {
          |""".stripMargin
 
     val multiContract = Compiler.compileMultiContract(code).rightValue
-    val funcs         = multiContract.contracts(1).funcs.map(_.copy(useMethodSelector = true))
+    val funcs         = multiContract.contracts(1).funcs
 
     def test(signature: String, funcIndex: Int) = {
       val func           = funcs(funcIndex)

@@ -400,7 +400,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           )
         }
     }
-  def func[Unknown: P](useMethodSelector: Boolean): P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
+  def func[Unknown: P]: P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
     if (f.useMethodIndex.nonEmpty) {
       throw Compiler.Error(
         "The `methodIndex` annotation can only be used for interface functions",
@@ -418,7 +418,6 @@ abstract class Parser[Ctx <: StatelessContext] {
         f.useCheckExternalCaller,
         f.useUpdateFields,
         f.useMethodIndex,
-        useMethodSelector,
         f.args,
         f.rtypes,
         f.body
@@ -797,8 +796,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
-        templateParams.? ~ "{" ~ func(false).rep(1) ~ "}" ~~ Index ~
-        rawStruct.rep(0) ~ endOfInput(fileURI)
+        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput(fileURI)
     ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
       Ast
         .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
@@ -907,7 +905,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         Lexer.token(
           Keyword.TxScript
         ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~~ Index ~ statement
-          .rep(0) ~ func(false)
+          .rep(0) ~ func
           .rep(0) ~ "}"
         ~~ Index
     )
@@ -1044,8 +1042,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~
-        (mapDef | eventDef | constantVarDef | rawEnumDef | func(true)).rep ~
-        "}" ~~ Index
+        (mapDef | eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
+        ~~ Index
     ).map {
       case (
             annotations,
@@ -1141,7 +1139,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               f.useCheckExternalCaller,
               f.useUpdateFields,
               f.useMethodIndex,
-              useMethodSelector = false,
               f.args,
               f.rtypes,
               None
@@ -1200,7 +1197,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           .filter(_.isInstanceOf[Ast.ContractWithState])
           .asInstanceOf[Seq[Ast.ContractWithState]]
         val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
-        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex, fileURI)
+        Ast
+          .MultiContract(contracts, structs, None, None)
+          .atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =
