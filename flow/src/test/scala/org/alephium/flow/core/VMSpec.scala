@@ -5907,7 +5907,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "test multiple inheritance" in new ContractFixture {
     {
-      info("use contract as interface")
+      info("use contract as interface (case 1)")
       val foo =
         s"""
            |Contract Foo() {
@@ -5917,7 +5917,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
 
       val fooId = createContract(foo)._1.toHexString
-      val script =
+      def script(useMethodSelector: String) =
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
@@ -5925,13 +5925,50 @@ class VMSpec extends AlephiumSpec with Generators {
            |  assert!(foo.f0() == 0, 0)
            |  assert!(foo.f1() == 1, 0)
            |}
+           |@using(methodSelector = $useMethodSelector)
            |Interface IFoo {
            |  pub fn f0() -> U256
            |  pub fn f1() -> U256
            |}
            |""".stripMargin
 
-      testSimpleScript(script)
+      testSimpleScript(script("false"))
+      testSimpleScript(script("true"))
+    }
+
+    {
+      info("use contract as interface (case 2)")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f0() -> U256 { return 0 }
+           |  pub fn f1() -> U256 { return 1 }
+           |  pub fn f2() -> U256 { return 2 }
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(IFoo0(#$contractId).f1() == 1, 0)
+           |  assert!(IFoo0(#$contractId).f2() == 2, 0)
+           |  assert!(IFoo1(#$contractId).f1() == 1, 0)
+           |  assert!(IFoo1(#$contractId).f2() == 2, 0)
+           |}
+           |@using(methodSelector = true)
+           |Interface IFoo0 {
+           |  pub fn f1() -> U256
+           |  pub fn f2() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface IFoo1 {
+           |  pub fn f2() -> U256
+           |  pub fn f1() -> U256
+           |}
+           |""".stripMargin
+      )
     }
 
     {
@@ -5942,6 +5979,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |  pub fn bar() -> U256 { return 0 }
            |  pub fn foo() -> U256 { return 1 }
            |}
+           |@using(methodSelector = false)
            |Interface Foo {
            |  pub fn foo() -> U256
            |}

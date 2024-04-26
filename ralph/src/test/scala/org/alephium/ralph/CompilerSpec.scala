@@ -6275,6 +6275,52 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     compiled1.code.methods(1).instrs.head is MethodSelector(funcs(1).methodSelector.get)
   }
 
+  "contract" should "use method selector by default" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |""".stripMargin
+
+    val result0 = Compiler.compileContractFull(code0).rightValue
+    result0.ast.funcs.foreach(_.useMethodSelector is true)
+    result0.code.methods.foreach(_.instrs.head is a[MethodSelector])
+
+    val code1 =
+      s"""
+         |Contract Foo() implements Bar {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |@using(methodSelector = false)
+         |Interface Bar {
+         |  pub fn func0() -> ()
+         |}
+         |""".stripMargin
+    val result1 = Compiler.compileContractFull(code1).rightValue
+    result1.ast.funcs(0).useMethodSelector is false
+    result1.ast.funcs(1).useMethodSelector is true
+    result1.code.methods(0).instrs.head isnot a[MethodSelector]
+    result1.code.methods(1).instrs.head is a[MethodSelector]
+
+    val code2 =
+      s"""
+         |Contract Foo() implements Bar {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |@using(methodSelector = true)
+         |Interface Bar {
+         |  pub fn func0() -> ()
+         |}
+         |""".stripMargin
+    val result2 = Compiler.compileContractFull(code2).rightValue
+    result2.ast.funcs.foreach(_.useMethodSelector is true)
+    result2.code.methods.foreach(_.instrs.head is a[MethodSelector])
+  }
+
   it should "call by method selector" in {
     val fooCode =
       s"""
@@ -6517,6 +6563,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn bar() -> U256 { return 0 }
            |  pub fn foo() -> U256 { return 1 }
            |}
+           |@using(methodSelector = false)
            |Interface Foo {
            |  pub fn foo() -> U256
            |}

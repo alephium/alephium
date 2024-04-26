@@ -2555,8 +2555,8 @@ object Ast {
       }
       val resultFuncs = funcs.map { funcDef =>
         interfaceFuncs.find(_.id == funcDef.id) match {
-          case Some(func) if func.useMethodSelector =>
-            funcDef.copy(useMethodSelector = true).atSourceIndex(funcDef.sourceIndex)
+          case Some(func) if !func.useMethodSelector =>
+            funcDef.copy(useMethodSelector = false).atSourceIndex(funcDef.sourceIndex)
           case _ => funcDef
         }
       }
