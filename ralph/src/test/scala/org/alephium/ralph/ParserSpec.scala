@@ -1786,7 +1786,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq(
           barFuncDef(true, false).copy(annotations = annotations, useMethodSelector = false),
-          fooFuncDef(false, false).copy(annotations = annotations)
+          fooFuncDef(false, false).copy(annotations = annotations, useMethodSelector = false)
         ),
         Seq.empty,
         Seq.empty,

@@ -1374,7 +1374,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       localsLength = 6,
       returnLength = 0,
       instrs = AVector[Instr[StatefulContext]](
-        methodSelectorOf("func0()->()"),
         U256Const0, U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), StoreLocal(0),
         U256Const0, StoreLocal(3),
         LoadLocal(3), U256Const3, U256Lt, IfFalse(15),
@@ -1396,7 +1395,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       localsLength = 14,
       returnLength = 0,
       instrs = AVector[Instr[StatefulContext]](
-        methodSelectorOf("func1()->()"),
         U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, StoreLocal(5), StoreLocal(4), StoreLocal(3), StoreLocal(2), StoreLocal(1), StoreLocal(0),
         U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, StoreLocal(11), StoreLocal(10), StoreLocal(9), StoreLocal(8), StoreLocal(7), StoreLocal(6),
         U256Const0, StoreLocal(12),
@@ -2852,7 +2850,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
-          methodSelectorOf("foo()->()"),
           ConstTrue,
           IfFalse(1),
           Return
@@ -2907,7 +2904,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
-          methodSelectorOf("foo()->()"),
           ConstTrue,
           IfFalse(2),
           Return,
@@ -2934,7 +2930,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
-          methodSelectorOf("foo()->()"),
           ConstTrue,
           IfFalse(2),
           Return,
@@ -3003,7 +2998,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
-          methodSelectorOf("foo()->(U256)"),
           ConstTrue,
           IfFalse(2),
           U256Const0,
@@ -3026,7 +3020,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
-          methodSelectorOf("foo()->(U256)"),
           ConstFalse,
           IfFalse(2),
           U256Const0,
@@ -6347,6 +6340,43 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val result2 = Compiler.compileContractFull(code2).rightValue
     result2.ast.funcs.foreach(_.useMethodSelector is true)
     result2.code.methods.foreach(_.instrs.head is a[MethodSelector])
+  }
+
+  it should "not use method selector for private functions" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  pub fn func0() -> () {
+         |    func1()
+         |  }
+         |  fn func1() -> () { return }
+         |}
+         |""".stripMargin
+    val result0 = Compiler.compileContractFull(code0).rightValue
+    result0.ast.funcs(0).useMethodSelector is true
+    result0.ast.funcs(1).useMethodSelector is false
+    result0.code.methods(0).instrs.head is a[MethodSelector]
+    result0.code.methods(1).instrs.head isnot a[MethodSelector]
+
+    val code1 =
+      s"""
+         |Contract Foo() implements IFoo {
+         |  pub fn func0() -> () {
+         |    func1()
+         |  }
+         |  fn func1() -> () { return }
+         |}
+         |@using(methodSelector = true)
+         |Interface IFoo {
+         |  pub fn func0() -> ()
+         |  fn func1() -> ()
+         |}
+         |""".stripMargin
+    val result1 = Compiler.compileContractFull(code1).rightValue
+    result1.ast.funcs(0).useMethodSelector is true
+    result1.ast.funcs(1).useMethodSelector is false
+    result1.code.methods(0).instrs.head is a[MethodSelector]
+    result1.code.methods(1).instrs.head isnot a[MethodSelector]
   }
 
   it should "call by method selector" in {
