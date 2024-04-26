@@ -1113,7 +1113,7 @@ object Ast {
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
-      useMethodSelector: Boolean,
+      var useMethodSelector: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -2466,9 +2466,8 @@ object Ast {
 
     @inline private def getInterfaceFuncs(sortedInterfaces: Seq[ContractInterface]) = {
       sortedInterfaces.flatMap { interface =>
-        interface.funcs.map(func =>
-          func.copy(useMethodSelector = interface.useMethodSelector).atSourceIndex(func.sourceIndex)
-        )
+        interface.funcs.foreach(_.useMethodSelector = interface.useMethodSelector)
+        interface.funcs
       }
     }
 
@@ -2553,19 +2552,19 @@ object Ast {
       } else {
         rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
       }
-      val resultFuncs = funcs.map { funcDef =>
+      funcs.foreach { funcDef =>
         if (funcDef.isPublic) {
           interfaceFuncs.find(_.id == funcDef.id) match {
             case Some(func) if !func.useMethodSelector =>
-              funcDef.copy(useMethodSelector = false).atSourceIndex(funcDef.sourceIndex)
-            case _ => funcDef
+              funcDef.useMethodSelector = false
+            case _ => ()
           }
         } else {
-          funcDef.copy(useMethodSelector = false).atSourceIndex(funcDef.sourceIndex)
+          funcDef.useMethodSelector = false
         }
       }
 
-      (stdIdEnabled, stdId, resultFuncs, maps, events, constantVars, enums)
+      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums)
     }
     // scalastyle:on method.length
 
