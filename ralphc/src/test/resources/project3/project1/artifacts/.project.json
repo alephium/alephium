@@ -12,7 +12,7 @@
       "sourceFile": "add/add.ral",
       "sourceCodeHash": "6089a405f7c0596fb72ec2bd0cea578422be360371c4c5d3e5a72e1acb8d4751",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "7d87a1cdba71ab4b89f3b053f2627a5c8a8a1be78c94e7991ed781126fd27cd8",
+      "codeHashDebug": "ced886ef883695e3fef889195680afbffbd2cf7eba7fb3c018e1b4e58a59b61b",
       "warnings": [
         "No external caller check for function \"Add.add\". Please use \"checkCaller!(...)\" in the function or its callees, or disable it with \"@using(checkExternalCaller = false)\".",
         "Function \"Add.addPrivate\" updates fields. Please use \"@using(updateFields = true)\" for the function."
