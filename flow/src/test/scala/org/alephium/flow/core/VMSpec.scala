@@ -6023,6 +6023,46 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     {
+      info("interface use method selector inherit from an interface not use method selector")
+      val code: String =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn func0() -> U256 { return 0 }
+           |  pub fn func1() -> U256 { return 1 }
+           |  pub fn func2() -> U256 { return 2 }
+           |  pub fn func3() -> U256 { return 3 }
+           |}
+           |@using(methodSelector = false)
+           |Interface Foo {
+           |  pub fn func0() -> U256
+           |  pub fn func1() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar extends Foo {
+           |  pub fn func2() -> U256
+           |  pub fn func3() -> U256
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Foo(#$contractId).func0() == 0, 0)
+           |  assert!(Foo(#$contractId).func1() == 1, 0)
+           |  assert!(Bar(#$contractId).func0() == 0, 0)
+           |  assert!(Bar(#$contractId).func1() == 1, 0)
+           |  assert!(Bar(#$contractId).func2() == 2, 0)
+           |  assert!(Bar(#$contractId).func3() == 3, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+    }
+
+    {
       info("diamond shaped parent interfaces")
       val code: String =
         s"""

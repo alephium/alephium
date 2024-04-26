@@ -6477,6 +6477,35 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Interface Foo does not use method selector, but it's parents List(Bar) use method selector"
       )
     }
+
+    {
+      info("interface use method selector inherit from an interface not use method selector")
+      val code =
+        s"""
+           |@using(methodSelector = false)
+           |Interface Foo {
+           |  pub fn func0() -> U256
+           |  pub fn func1() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar extends Foo {
+           |  pub fn func2() -> U256
+           |  pub fn func3() -> U256
+           |}
+           |""".stripMargin
+
+      val multiContract = Compiler.compileMultiContract(code).rightValue
+      val foo           = multiContract.getInterface(Ast.TypeId("Foo"))
+      foo.useMethodSelector is false
+      foo.funcs.size is 2
+      foo.funcs.foreach(_.useMethodSelector is false)
+
+      val bar = multiContract.getInterface(Ast.TypeId("Bar"))
+      bar.useMethodSelector is true
+      bar.funcs.size is 4
+      bar.funcs.take(2).foreach(_.useMethodSelector is false)
+      bar.funcs.drop(2).foreach(_.useMethodSelector is true)
+    }
   }
 
   "contract" should "support multiple inheritance" in {
