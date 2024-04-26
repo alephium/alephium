@@ -2490,14 +2490,6 @@ object Ast {
         )
         parent.funcs
       }
-      val nonAbstractFuncs = allFuncs.filter(_.bodyOpt.nonEmpty)
-      if (nonAbstractFuncs.nonEmpty) {
-        val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
-        throw Compiler.Error(
-          s"Interface ${interface.name} has implemented methods: $methodNames",
-          interface.sourceIndex
-        )
-      }
       val (unimplementedFuncs, _) = checkFuncs(allFuncs)
       // call the `checkFuncs` first to avoid duplicate function definition
       checkInterfaceMethodIndex(sortedInterfaces)

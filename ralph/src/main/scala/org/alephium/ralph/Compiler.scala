@@ -330,8 +330,8 @@ object Compiler {
       if (isInterface) {
         val preDefinedIndexes = funcs.view
           .map(_.useMethodIndex)
-          .collect { case Some(index) => index }
           .toSeq
+          .collect { case Some(index) => index }
         var fromIndex: Int = 0
         funcs.map { func =>
           func.useMethodIndex match {

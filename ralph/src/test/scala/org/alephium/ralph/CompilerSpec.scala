@@ -6334,6 +6334,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     val result2 = Compiler.compileContractFull(code2).rightValue
     result2.code.methods.foreach(_.instrs.head is a[MethodSelector])
+
+    val code3 =
+      s"""
+         |Contract Foo() implements Bar {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |Interface Bar {
+         |  pub fn func0() -> ()
+         |}
+         |""".stripMargin
+    val result3 = Compiler.compileContractFull(code3).rightValue
+    result3.code.methods(0).instrs.head isnot a[MethodSelector]
+    result3.code.methods(1).instrs.head is a[MethodSelector]
   }
 
   it should "not use method selector for private functions" in {

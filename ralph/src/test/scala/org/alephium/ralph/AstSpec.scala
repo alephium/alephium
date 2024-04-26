@@ -828,7 +828,7 @@ class AstSpec extends AlephiumSpec {
   it should "calc method selector" in {
     val code =
       s"""
-         |struct Numbers { x: U256, y: U256 }
+         |struct Numbers { x: U256, y: Address }
          |Contract Bar() {
          |  pub fn bar() -> () {}
          |}
@@ -870,9 +870,9 @@ class AstSpec extends AlephiumSpec {
     test("func1(ByteVec,U256)->()", 1)
     test("func2()->(U256,Address)", 2)
     test("func3(ByteVec)->()", 3)
-    test("func4(U256,U256)->(U256,U256)", 4)
+    test("func4(U256,Address)->(U256,Address)", 4)
     test("func5(U256,U256)->(U256,U256)", 5)
-    test("func6(U256,U256,U256,U256)->(U256,U256,U256,U256)", 6)
+    test("func6(U256,Address,U256,U256)->(U256,Address,U256,U256)", 6)
 
     val allSelectors = funcs.map(_.methodSelector.get.index)
     allSelectors.toSet.size is allSelectors.size
