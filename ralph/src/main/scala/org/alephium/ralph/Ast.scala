@@ -1163,7 +1163,7 @@ object Ast {
         || hasMigrateSimple)
     }
 
-    def signature: FuncSignature = FuncSignature(
+    lazy val signature: FuncSignature = FuncSignature(
       id,
       isPublic,
       usePreapprovedAssets,

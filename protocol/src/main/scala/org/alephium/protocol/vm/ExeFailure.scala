@@ -151,8 +151,11 @@ final case class InvalidMethodIndex(index: Int, methodLength: Int) extends ExeFa
   override def toString: String = s"Invalid method index $index, method length: $methodLength"
 }
 final case class InvalidMethodSelector(selector: Method.Selector) extends ExeFailure {
-  override def toString: String =
-    s"Invalid method selector: ${Hex.toHexString(Bytes.from(selector.index))}"
+  override def toString: String = {
+    s"Invalid method selector: ${Hex.toHexString(Bytes.from(selector.index))}. " +
+      "This method might have been created before the Rhone upgrade and does not support dynamic calling. " +
+      "You'll need to call it directly using the method index."
+  }
 }
 
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure {

@@ -187,11 +187,11 @@ abstract class Frame[Ctx <: StatelessContext] {
   @tailrec final def execute(): ExeResult[Option[Frame[Ctx]]] = {
     if (pc < pcMax) {
       val instr = method.instrs(pc)
-      (Bytes.toPosInt(instr.code): @switch) match {
+      (instr.code: @switch) match {
         case 0   => callLocal(instr.asInstanceOf[CallLocal].index)
         case 1   => callExternal(instr.asInstanceOf[CallExternal].index)
         case 2   => runReturn()
-        case 212 => callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
+        case -44 => callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
         case _   =>
           // No flatMap for tailrec
           instr.runWith(this) match {
