@@ -2372,24 +2372,56 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "AlphRemaining" in new StatefulInstrFixture {
-    val lockupScript = lockupScriptGen.sample.get
+    val lockupScript       = lockupScriptGen.sample.get
+    val randomLockupScript = lockupScriptGen.sample.get
+
+    def test(
+        frame: Frame[StatefulContext],
+        amount: U256,
+        lockupScriptOpt: Option[LockupScript] = None
+    ) = {
+      frame.opStack.push(Val.Address(lockupScriptOpt.getOrElse(lockupScript)))
+      runAndCheckGas(AlphRemaining, None, frame)
+
+      frame.opStack.size is 1
+      frame.opStack.top.get is Val.U256(amount)
+      frame.opStack.pop()
+    }
+    def fail(
+        frame: Frame[StatefulContext],
+        amount: U256,
+        lockupScriptTest: LockupScript
+    ) = {
+      intercept[AssertionError](
+        test(frame, amount, Option(lockupScriptTest))
+      ).getMessage is Right(
+        NoAlphBalanceForTheAddress(Address.from(lockupScriptTest))
+      ).toString
+    }
+
     val balanceState =
       MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
-    override lazy val frame = prepareFrame(Some(balanceState))
 
-    stack.push(Val.Address(lockupScript))
+    val preRhoneFrame = prepareFrame(Option(balanceState))(NetworkConfigFixture.PreRhone)
+    test(preRhoneFrame, ALPH.oneAlph)
+    fail(preRhoneFrame, U256.Zero, randomLockupScript)
 
-    runAndCheckGas(AlphRemaining)
-
-    stack.size is 1
-    stack.top.get is Val.U256(ALPH.oneAlph)
+    val rhoneFrame = prepareFrame(Option(balanceState))(NetworkConfigFixture.SinceRhone)
+    test(rhoneFrame, ALPH.oneAlph)
+    test(rhoneFrame, U256.Zero, Option(randomLockupScript))
   }
 
   it should "TokenRemaining" in new StatefulInstrFixture {
-    val lockupScript = lockupScriptGen.sample.get
+    val lockupScript       = lockupScriptGen.sample.get
+    val randomLockupScript = lockupScriptGen.sample.get
 
-    def test(frame: Frame[StatefulContext], tokenId: TokenId, amount: U256) = {
-      frame.opStack.push(Val.Address(lockupScript))
+    def test(
+        frame: Frame[StatefulContext],
+        tokenId: TokenId,
+        amount: U256,
+        lockupScriptOpt: Option[LockupScript] = None
+    ) = {
+      frame.opStack.push(Val.Address(lockupScriptOpt.getOrElse(lockupScript)))
       frame.opStack.push(Val.ByteVec(tokenId.bytes))
 
       runAndCheckGas(TokenRemaining, None, frame)
@@ -2399,25 +2431,45 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       frame.opStack.pop()
     }
 
-    val balanceState0 =
-      MutBalanceState.from(
-        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph))
-      )
-    val genesisFrame = preparePreLemanFrame(Some(balanceState0))
-    test(genesisFrame, tokenId, ALPH.oneAlph)
-    test(genesisFrame, TokenId.alph, ALPH.oneAlph)
+    def fail(
+        frame: Frame[StatefulContext],
+        tokenId: TokenId,
+        amount: U256,
+        lockupScriptOpt: Option[LockupScript] = None
+    ) = {
+      val address = Address.from(lockupScriptOpt.getOrElse(lockupScript))
+      intercept[AssertionError](
+        test(frame, tokenId, amount, lockupScriptOpt)
+      ).getMessage is Right(
+        if (tokenId == TokenId.alph) {
+          NoAlphBalanceForTheAddress(address)
+        } else {
+          NoTokenBalanceForTheAddress(tokenId, address)
+        }
+      ).toString
+    }
 
-    val balanceState1 =
-      MutBalanceState.from(
-        balances(
-          lockupScript,
-          Some(ALPH.oneAlph),
-          Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneNanoAlph)
-        )
-      )
-    val lemanFrame = prepareFrame(Some(balanceState1))(NetworkConfigFixture.Leman)
+    val balanceState = MutBalanceState.from(
+      balances(lockupScript, Option(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph))
+    )
+
+    val genesisFrame = preparePreLemanFrame(Option(balanceState))
+    test(genesisFrame, tokenId, ALPH.oneAlph)
+    fail(genesisFrame, tokenId, U256.Zero, Option(randomLockupScript))
+    fail(genesisFrame, TokenId.alph, ALPH.oneAlph)
+    fail(genesisFrame, TokenId.alph, U256.Zero, Option(randomLockupScript))
+
+    val lemanFrame = prepareFrame(Option(balanceState))(NetworkConfigFixture.Leman)
     test(lemanFrame, tokenId, ALPH.oneAlph)
+    fail(lemanFrame, tokenId, U256.Zero, Option(randomLockupScript))
     test(lemanFrame, TokenId.alph, ALPH.oneAlph)
+    fail(lemanFrame, TokenId.alph, U256.Zero, Option(randomLockupScript))
+
+    val rhoneFrame = prepareFrame(Option(balanceState))(NetworkConfigFixture.SinceRhone)
+    test(rhoneFrame, tokenId, ALPH.oneAlph)
+    test(rhoneFrame, tokenId, U256.Zero, Option(randomLockupScript))
+    test(rhoneFrame, TokenId.alph, ALPH.oneAlph)
+    test(rhoneFrame, TokenId.alph, U256.Zero, Option(randomLockupScript))
   }
 
   it should "IsPaying" in new StatefulFixture {

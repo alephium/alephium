@@ -28,7 +28,7 @@ import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex, TokenId}
+import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex, HardFork, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
@@ -1757,38 +1757,63 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
 }
 
 object AlphRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def getAmount(
+      hardFork: HardFork,
+      balanceState: MutBalanceState,
+      address: Val.Address
+  ): ExeResult[U256] = {
+    val amountOpt = balanceState.alphRemaining(address.lockupScript)
+    if (hardFork.isGhostEnabled()) {
+      Right(amountOpt.getOrElse(U256.Zero))
+    } else {
+      amountOpt.toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
+    }
+  }
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      amount <- balanceState
-        .alphRemaining(address.lockupScript)
-        .toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
-      _ <- frame.pushOpStack(Val.U256(amount))
+      amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address)
+      _            <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
 }
 
 object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def getAmount(
+      hardFork: HardFork,
+      balanceState: MutBalanceState,
+      address: Val.Address,
+      tokenId: TokenId
+  ): ExeResult[U256] = {
+    val isALPH = tokenId == TokenId.alph
+    val amountOpt = if (hardFork.isLemanEnabled() && isALPH) {
+      balanceState.alphRemaining(address.lockupScript)
+    } else {
+      balanceState.tokenRemaining(address.lockupScript, tokenId)
+    }
+    if (hardFork.isGhostEnabled()) {
+      Right(amountOpt.getOrElse(U256.Zero))
+    } else {
+      amountOpt.toRight(
+        if (isALPH) {
+          Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript)))
+        } else {
+          Right(NoTokenBalanceForTheAddress(tokenId, Address.from(address.lockupScript)))
+        }
+      )
+    }
+  }
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       tokenIdRaw   <- frame.popOpStackByteVec()
       address      <- frame.popOpStackAddress()
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
-      amount <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState
-            .alphRemaining(address.lockupScript)
-            .toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
-        } else {
-          balanceState
-            .tokenRemaining(address.lockupScript, tokenId)
-            .toRight(
-              Right(NoTokenBalanceForTheAddress(tokenId, Address.from(address.lockupScript)))
-            )
-        }
-      _ <- frame.pushOpStack(Val.U256(amount))
+      amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address, tokenId)
+      _            <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
 }
