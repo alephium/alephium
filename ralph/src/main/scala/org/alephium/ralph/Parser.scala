@@ -942,31 +942,12 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
-    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
-      value match {
-        case Ast.Const(v) =>
-          Ast.ConstantVarDef(ident, v)
-        case Ast.StringLiteral(v) =>
-          Ast.ConstantVarDef(ident, v)
-        case v: Ast.CreateArrayExpr[_] =>
-          throwConstantVarDefException("arrays", v.sourceIndex)
-        case v: Ast.StructCtor[_] =>
-          throwConstantVarDefException("structs", v.sourceIndex)
-        case v: Ast.ContractConv[_] =>
-          throwConstantVarDefException("contract instances", v.sourceIndex)
-        case v: Ast.Positioned =>
-          throwConstantVarDefException("other expressions", v.sourceIndex)
+  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
+    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
+      .map { case (from, ident, expr) =>
+        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
       }
-    }
-
-  private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
-  private def throwConstantVarDefException(label: String, sourceIndex: Option[SourceIndex]) = {
-    throw Compiler.Error(
-      s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
-      sourceIndex
-    )
-  }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
@@ -1019,7 +1000,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
         val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
         val events                = ArrayBuffer.empty[Ast.EventDef]
-        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
+        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef[StatefulContext]]
         val enums                 = ArrayBuffer.empty[Ast.EnumDef]
 
         statements.foreach {
@@ -1028,7 +1009,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
-          case c: Ast.ConstantVarDef =>
+          case c: Ast.ConstantVarDef[StatefulContext @unchecked] =>
             if (funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }

@@ -1153,7 +1153,10 @@ object Ast {
     }
   }
 
-  final case class ConstantVarDef(ident: Ident, value: Val) extends UniqueDef {
+  final case class ConstantVarDef[Ctx <: StatelessContext](
+      ident: Ident,
+      expr: Expr[Ctx]
+  ) extends UniqueDef {
     def name: String = ident.name
   }
 
@@ -1568,6 +1571,8 @@ object Ast {
       }
     }
 
+    protected def checkConstants(state: Compiler.State[Ctx]): Unit = {}
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()
       state.checkArguments(fields)
@@ -1581,6 +1586,7 @@ object Ast {
           isGenerated = false
         )
       )
+      checkConstants(state)
       funcs.foreach(_.check(state))
       state.checkUnusedFields()
       state.checkUnassignedMutableFields()
@@ -1628,7 +1634,7 @@ object Ast {
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def events: Seq[EventDef]
-    def constantVars: Seq[ConstantVarDef]
+    def constantVars: Seq[ConstantVarDef[StatefulContext]]
     def enums: Seq[EnumDef]
 
     def builtInContractFuncs(
@@ -1654,8 +1660,8 @@ object Ast {
 
     def error(tpe: String): Compiler.Error =
       Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe", sourceIndex)
-    def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
-    def enums: Seq[EnumDef]               = throw error("enum")
+    def constantVars: Seq[ConstantVarDef[StatefulContext]] = throw error("constant variable")
+    def enums: Seq[EnumDef]                                = throw error("enum")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): AVector[String] = AVector.from(templateVars.view.map(_.ident.name))
@@ -1717,7 +1723,7 @@ object Ast {
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
-      constantVars: Seq[ConstantVarDef],
+      constantVars: Seq[ConstantVarDef[StatefulContext]],
       enums: Seq[EnumDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
@@ -1752,19 +1758,26 @@ object Ast {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def getFuncUnsafe(funcId: FuncId): FuncDef[StatefulContext] = funcs.find(_.id == funcId).get
 
-    private def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
+    private var calculatedConstants: Option[Seq[(Ident, Val)]] = None
+    def getCalculatedConstants(): Seq[(Ident, Val)] = calculatedConstants.getOrElse(Seq.empty)
+
+    override def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(constantVars, "constant variables")
-      constantVars.foreach(v =>
-        state.addConstantVariable(v.ident, Type.fromVal(v.value.tpe), Seq(v.value.toConstInstr))
-      )
+      val constants = constantVars.map { v =>
+        v.expr.getType(state) match {
+          case Seq(tpe) if Type.primitives.contains(tpe) =>
+            val value = Compiler.State.calcConstant(state, v.expr)
+            state.addConstantVariable(v.ident, value)
+            v.ident -> value
+          case _ =>
+            Compiler.State.throwConstantVarDefException(v.expr)
+        }
+      }
+      if (constants.nonEmpty) calculatedConstants = Some(constants)
       UniqueDef.checkDuplicates(enums, "enums")
       enums.foreach(e =>
         e.fields.foreach(field =>
-          state.addConstantVariable(
-            EnumDef.fieldIdent(e.id, field.ident),
-            Type.fromVal(field.value.tpe),
-            Seq(field.value.toConstInstr)
-          )
+          state.addConstantVariable(EnumDef.fieldIdent(e.id, field.ident), field.value)
         )
       )
     }
@@ -1782,7 +1795,6 @@ object Ast {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       state.setCheckPhase()
       checkFuncs()
-      checkConstants(state)
       checkInheritances(state)
       super.check(state)
     }
@@ -1847,12 +1859,12 @@ object Ast {
         sourceIndex
       )
 
-    def templateVars: Seq[Argument]       = throw error("template variable")
-    def fields: Seq[Argument]             = throw error("field")
-    def getFieldsSignature(): String      = throw error("field")
-    def getFieldTypes(): Seq[String]      = throw error("field")
-    def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
-    def enums: Seq[EnumDef]               = throw error("enum")
+    def templateVars: Seq[Argument]                        = throw error("template variable")
+    def fields: Seq[Argument]                              = throw error("field")
+    def getFieldsSignature(): String                       = throw error("field")
+    def getFieldTypes(): Seq[String]                       = throw error("field")
+    def constantVars: Seq[ConstantVarDef[StatefulContext]] = throw error("constant variable")
+    def enums: Seq[EnumDef]                                = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code", sourceIndex)
@@ -2172,7 +2184,7 @@ object Ast {
         Option[StdInterfaceId],
         Seq[FuncDef[StatefulContext]],
         Seq[EventDef],
-        Seq[ConstantVarDef],
+        Seq[ConstantVarDef[StatefulContext]],
         Seq[EnumDef]
     ) = {
       val parents                       = parentsCache(contract.ident)

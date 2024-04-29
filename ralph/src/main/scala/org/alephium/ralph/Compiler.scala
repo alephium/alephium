@@ -214,6 +214,7 @@ object Compiler {
     }
     final case class Constant[Ctx <: StatelessContext](
         tpe: Type,
+        value: Val,
         instrs: Seq[Instr[Ctx]]
     ) extends VarInfo {
       def isMutable: Boolean   = false
@@ -330,6 +331,64 @@ object Compiler {
 
   object State {
     private[ralph] val maxVarIndex: Int = 0xff
+
+    private[ralph] def throwConstantVarDefException[Ctx <: StatelessContext](
+        expr: Ast.Expr[Ctx]
+    ) = {
+      val label = expr match {
+        case _: Ast.CreateArrayExpr[_] => "arrays"
+        case _: Ast.StructCtor[_]      => "structs"
+        case _: Ast.ContractConv[_]    => "contract instances"
+        case _: Ast.Positioned         => "other expressions"
+      }
+      val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
+      throw Error(
+        s"Expected constant value with primitive types $primitiveTypes, $label are not supported",
+        expr.sourceIndex
+      )
+    }
+
+    @scala.annotation.tailrec
+    def calcConstant[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        expr: Ast.Expr[Ctx]
+    ): Val = {
+      expr match {
+        case e: Ast.Const[Ctx @unchecked] => e.v
+        case Ast.StringLiteral(bytes)     => bytes
+        case Ast.Variable(ident) =>
+          state.getConstant(ident).value
+        case Ast.ParenExpr(expr) => calcConstant(state, expr)
+        case expr: Ast.Binop[Ctx @unchecked] =>
+          calcBinOp(state, expr)
+        case expr: Ast.UnaryOp[Ctx @unchecked] =>
+          calcUnaryOp(state, expr)
+        case _ => throwConstantVarDefException(expr)
+      }
+    }
+
+    private def calcBinOp[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        expr: Ast.Binop[Ctx]
+    ): Val = {
+      val left  = calcConstant(state, expr.left)
+      val right = calcConstant(state, expr.right)
+      expr.op.calc(Seq(left, right)) match {
+        case Right(value) => value
+        case Left(error)  => throw Error(error, expr.sourceIndex)
+      }
+    }
+
+    private def calcUnaryOp[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        expr: Ast.UnaryOp[Ctx]
+    ): Val = {
+      val value = calcConstant(state, expr.expr)
+      expr.op.calc(Seq(value)) match {
+        case Right(value) => value
+        case Left(error)  => throw Error(error, expr.sourceIndex)
+      }
+    }
 
     // scalastyle:off cyclomatic.complexity method.length
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -685,9 +744,9 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstantVariable(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
+    def addConstantVariable(ident: Ast.Ident, value: Val): Unit = {
       val sname = checkNewVariable(ident)
-      varTable(sname) = VarInfo.Constant(tpe, instrs)
+      varTable(sname) = VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr))
     }
 
     private def checkNewVariable(ident: Ast.Ident): String = {
@@ -704,6 +763,17 @@ object Compiler {
         throw Error(s"Number of variables more than ${State.maxVarIndex}", ident.sourceIndex)
       }
       sname
+    }
+
+    def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx] = {
+      getVariable(ident) match {
+        case v: VarInfo.Constant[Ctx @unchecked] => v
+        case _ =>
+          throw Error(
+            s"Constant variable ${ident.name} does not exist or is used before declaration",
+            ident.sourceIndex
+          )
+      }
     }
 
     def getVariable(ident: Ast.Ident, isWrite: Boolean = false): VarInfo = {

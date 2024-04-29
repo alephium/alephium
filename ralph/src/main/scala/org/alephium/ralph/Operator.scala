@@ -20,6 +20,7 @@ import org.alephium.protocol.vm._
 import org.alephium.util.{I256, U256}
 
 sealed trait Operator {
+  def operatorName: String
   def calc(values: Seq[Val]): Either[String, Val]
   def getReturnType(argsType: Seq[Type]): Seq[Type]
   def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]]
@@ -28,7 +29,7 @@ sealed trait Operator {
 sealed trait ArithOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
-      throw Compiler.Error(s"Invalid param types $argsType for ArithOperator", None)
+      throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
     } else {
       Seq(argsType(0))
     }
@@ -36,20 +37,22 @@ sealed trait ArithOperator extends Operator {
 }
 object ArithOperator {
   private def binary(
-      operator: String,
+      name: String,
       i256Instr: BinaryArithmeticInstr[Val.I256],
       u256Instr: BinaryArithmeticInstr[Val.U256],
       i256Func: (I256, I256) => Option[I256],
       u256Func: (U256, U256) => Option[U256]
   ): ArithOperator = {
     new ArithOperator {
+      def operatorName: String = name
+
       def calc(values: Seq[Val]): Either[String, Val] = {
         values match {
           case Seq(left: Val.I256, right: Val.I256) =>
             i256Func(left.v, right.v).map(Val.I256(_)).toRight("I256 overflow")
           case Seq(left: Val.U256, right: Val.U256) =>
             u256Func(left.v, right.v).map(Val.U256(_)).toRight("U256 overflow")
-          case _ => Left(s"Expect two I256 or two U256 values for $operator operator")
+          case _ => Left(s"Expect two I256 or two U256 values for $name operator")
         }
       }
 
@@ -57,7 +60,7 @@ object ArithOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator", None)
+          case _         => throw Compiler.Error(s"Expect I256/U256 for $name operator", None)
         }
       }
     }
@@ -69,6 +72,8 @@ object ArithOperator {
       func: (U256, U256) => U256
   ): ArithOperator = {
     new ArithOperator {
+      def operatorName: String = name
+
       def calc(values: Seq[Val]): Either[String, Val] = {
         values match {
           case Seq(left: Val.U256, right: Val.U256) => Right(Val.U256(func(left.v, right.v)))
@@ -92,9 +97,11 @@ object ArithOperator {
       u256Func: (U256, U256) => Option[U256]
   ): ArithOperator =
     new ArithOperator {
+      def operatorName: String = "**"
+
       override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
         if (argsType.length != 2 || !argsType(0).toVal.isNumeric || argsType(1) != Type.U256) {
-          throw Compiler.Error(s"Invalid param types $argsType for ** operator", None)
+          throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
         } else {
           Seq(argsType(0))
         }
@@ -106,7 +113,7 @@ object ArithOperator {
             i256Func(left.v, right.v).map(Val.I256(_)).toRight("I256 overflow")
           case Seq(left: Val.U256, right: Val.U256) =>
             u256Func(left.v, right.v).map(Val.U256(_)).toRight("U256 overflow")
-          case _ => Left(s"Expect (I256, U256) or (U256, U256) for ** operator")
+          case _ => Left(s"Expect (I256, U256) or (U256, U256) for $operatorName operator")
         }
       }
 
@@ -114,7 +121,7 @@ object ArithOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw Compiler.Error(s"Expect I256/U256 for ** operator", None)
+          case _ => throw Compiler.Error(s"Expect I256/U256 for $operatorName operator", None)
         }
       }
     }
@@ -126,28 +133,30 @@ object ArithOperator {
   val Div: ArithOperator = binary("/", I256Div, U256Div, _ div _, _ div _)
   val Mod: ArithOperator = binary("%", I256Mod, U256Mod, _ mod _, _ mod _)
 
-  val ModAdd: ArithOperator = u256Binary("ModAdd", U256ModAdd, _ modAdd _)
-  val ModSub: ArithOperator = u256Binary("ModSub", U256ModSub, _ modSub _)
-  val ModMul: ArithOperator = u256Binary("ModMul", U256ModMul, _ modMul _)
-  val ModExp: ArithOperator = u256Binary("ModExp", U256ModExp, _ modPow _)
-  val SHL: ArithOperator    = u256Binary("SHL", U256SHL, _ shl _)
-  val SHR: ArithOperator    = u256Binary("SHR", U256SHR, _ shr _)
-  val BitAnd: ArithOperator = u256Binary("BitAnd", U256BitAnd, _ bitAnd _)
-  val BitOr: ArithOperator  = u256Binary("BitOr", U256BitOr, _ bitOr _)
-  val Xor: ArithOperator    = u256Binary("Xor", U256Xor, _ xor _)
+  val ModAdd: ArithOperator = u256Binary("|+|", U256ModAdd, _ modAdd _)
+  val ModSub: ArithOperator = u256Binary("|-|", U256ModSub, _ modSub _)
+  val ModMul: ArithOperator = u256Binary("|*|", U256ModMul, _ modMul _)
+  val ModExp: ArithOperator = u256Binary("|**|", U256ModExp, _ modPow _)
+  val SHL: ArithOperator    = u256Binary("<<", U256SHL, _ shl _)
+  val SHR: ArithOperator    = u256Binary(">>", U256SHR, _ shr _)
+  val BitAnd: ArithOperator = u256Binary("&", U256BitAnd, _ bitAnd _)
+  val BitOr: ArithOperator  = u256Binary("|", U256BitOr, _ bitOr _)
+  val Xor: ArithOperator    = u256Binary("^", U256Xor, _ xor _)
 
   val Concat: Operator = new Operator {
+    def operatorName: String = "++"
+
     def calc(values: Seq[Val]): Either[String, Val] = {
       values match {
         case Seq(left: Val.ByteVec, right: Val.ByteVec) =>
           Right(Val.ByteVec(left.bytes ++ right.bytes))
-        case _ => Left(s"Expect two ByteVec values for ++ operator")
+        case _ => Left(s"Expect two ByteVec values for $operatorName operator")
       }
     }
 
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 2 || argsType(0) != Type.ByteVec || argsType(1) != Type.ByteVec) {
-        throw Compiler.Error(s"Invalid param types $argsType for $this", None)
+        throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
       } else {
         Seq(Type.ByteVec)
       }
@@ -162,7 +171,7 @@ object ArithOperator {
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).isPrimitive) {
-      throw Compiler.Error(s"Invalid param types $argsType for $this", None)
+      throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
     } else {
       Seq(Type.Bool)
     }
@@ -170,10 +179,12 @@ sealed trait TestOperator extends Operator {
 }
 object TestOperator {
   case object Eq extends TestOperator {
+    def operatorName: String = "=="
+
     def calc(values: Seq[Val]): Either[String, Val] = {
       values match {
         case Seq(left, right) => Right(Val.Bool(left == right))
-        case _                => Left(s"Expect two values for == operator")
+        case _                => Left(s"Expect two values for $operatorName operator")
       }
     }
 
@@ -185,15 +196,20 @@ object TestOperator {
         case Type.ByteVec => Seq(ByteVecEq)
         case Type.Address => Seq(AddressEq)
         case _ =>
-          throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for == operator", None)
+          throw Compiler.Error(
+            s"Expect I256/U256/Bool/ByteVec/Address for $operatorName operator",
+            None
+          )
       }
     }
   }
   case object Ne extends TestOperator {
+    def operatorName: String = "!="
+
     def calc(values: Seq[Val]): Either[String, Val] = {
       values match {
         case Seq(left, right) => Right(Val.Bool(left != right))
-        case _                => Left(s"Expect two values for != operator")
+        case _                => Left(s"Expect two values for $operatorName operator")
       }
     }
 
@@ -205,26 +221,31 @@ object TestOperator {
         case Type.ByteVec => Seq(ByteVecNeq)
         case Type.Address => Seq(AddressNeq)
         case _ =>
-          throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for != operator", None)
+          throw Compiler.Error(
+            s"Expect I256/U256/Bool/ByteVec/Address for $operatorName operator",
+            None
+          )
       }
     }
   }
 
   private def inequality(
-      operator: String,
+      name: String,
       i256Instr: BinaryArithmeticInstr[Val.I256],
       u256Instr: BinaryArithmeticInstr[Val.U256],
       i256Func: (I256, I256) => Boolean,
       u256Func: (U256, U256) => Boolean
   ): TestOperator = {
     new TestOperator {
+      def operatorName: String = name
+
       def calc(values: Seq[Val]): Either[String, Val] = {
         values match {
           case Seq(left: Val.I256, right: Val.I256) =>
             Right(Val.Bool(i256Func(left.v, right.v)))
           case Seq(left: Val.U256, right: Val.U256) =>
             Right(Val.Bool(u256Func(left.v, right.v)))
-          case _ => Left(s"Expect two I256 or two U256 values for $operator operator")
+          case _ => Left(s"Expect two I256 or two U256 values for $name operator")
         }
       }
 
@@ -232,7 +253,7 @@ object TestOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator", None)
+          case _         => throw Compiler.Error(s"Expect I256/U256 for $name operator", None)
         }
       }
     }
@@ -248,16 +269,18 @@ sealed trait LogicalOperator extends TestOperator
 
 object LogicalOperator {
   case object Not extends LogicalOperator {
+    def operatorName: String = "!"
+
     def calc(values: Seq[Val]): Either[String, Val] = {
       values match {
         case Seq(left: Val.Bool) => Right(Val.Bool(!left.v))
-        case _                   => Left(s"Expect a Bool value for ! operator")
+        case _                   => Left(s"Expect a Bool value for $operatorName operator")
       }
     }
 
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 1 || argsType(0) != Type.Bool) {
-        throw Compiler.Error(s"Invalid param types $argsType for $this", None)
+        throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
       } else {
         Seq(Type.Bool)
       }
@@ -269,29 +292,33 @@ object LogicalOperator {
   sealed trait BinaryLogicalOperator extends LogicalOperator {
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 2 || argsType(0) != Type.Bool || argsType(1) != Type.Bool) {
-        throw Compiler.Error(s"Invalid param types $argsType for $this", None)
+        throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
       } else {
         Seq(Type.Bool)
       }
     }
   }
   case object And extends BinaryLogicalOperator {
+    def operatorName: String = "&&"
+
     def calc(values: Seq[Val]): Either[String, Val] = {
       values match {
         case Seq(left: Val.Bool, right: Val.Bool) =>
           Right(Val.Bool(left.v && right.v))
-        case _ => Left("Expect two Bool values for && operator")
+        case _ => Left(s"Expect two Bool values for $operatorName operator")
       }
     }
 
     override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolAnd)
   }
   case object Or extends BinaryLogicalOperator {
+    def operatorName: String = "||"
+
     def calc(values: Seq[Val]): Either[String, Val] = {
       values match {
         case Seq(left: Val.Bool, right: Val.Bool) =>
           Right(Val.Bool(left.v || right.v))
-        case _ => Left("Expect two Bool values for || operator")
+        case _ => Left(s"Expect two Bool values for $operatorName operator")
       }
     }
 
