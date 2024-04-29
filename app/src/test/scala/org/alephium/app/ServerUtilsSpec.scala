@@ -908,7 +908,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransaction(fromPublicKey.bytes, None, tooManyDestinations)
       )
       .leftValue
-      .detail is "Too many transaction outputs, maximal value: 256"
+      .detail is "Too many transaction outputs, maximal value: 512"
   }
 
   it should "check the minimal amount deposit for contract creation" in new Fixture {

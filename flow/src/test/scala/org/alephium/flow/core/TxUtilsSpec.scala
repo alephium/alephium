@@ -926,7 +926,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
-        Some(GasBox.unsafe(600000)),
+        Some(GasBox.unsafe(5000000)),
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
@@ -943,7 +943,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         ALPH.alph(ALPH.MaxTxInputNum.toLong),
-        Some(GasBox.unsafe(600000)),
+        Some(GasBox.unsafe(5000000)),
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )

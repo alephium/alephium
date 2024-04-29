@@ -40,11 +40,13 @@ object ALPH {
     TimeStamp.unsafe(1670612400000L) // Dec 09 2022 19:00:00 GMT+0000
   val DifficultyBombPatchHeightDiff: Int = 2700 // around 2 days
 
-  val MaxTxInputNum: Int     = 256
-  val MaxTxOutputNum: Int    = 256
-  val MaxOutputDataSize: Int = 256
-  val MaxScriptSigNum: Int   = 32
-  val MaxKeysInP2MPK: Int    = 16
+  val MaxTxInputNumPreRhone: Int  = 256
+  val MaxTxInputNum: Int          = 512
+  val MaxTxOutputNumPreRhone: Int = 256
+  val MaxTxOutputNum: Int         = 512
+  val MaxOutputDataSize: Int      = 256
+  val MaxScriptSigNum: Int        = 32
+  val MaxKeysInP2MPK: Int         = 16
 
   val MaxUncleAge: Int  = 7
   val MaxUncleSize: Int = 2
