@@ -29,6 +29,7 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     isPublic = true,
     usePreapprovedAssets = false,
     useContractAssets = false,
+    usePayToContractOnly = false,
     argsLength = 0,
     localsLength = 0,
     returnLength = 0,

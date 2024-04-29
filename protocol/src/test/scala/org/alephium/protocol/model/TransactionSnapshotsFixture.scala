@@ -65,7 +65,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
   }
 
   def coinbaseTransaction(
-      uncles: AVector[SelectedUncle],
+      uncles: AVector[SelectedGhostUncle],
       transactions: Transaction*
   )(implicit networkConfig: NetworkConfig) = {
     val ts = TimeStamp.unsafe(1640879601000L)

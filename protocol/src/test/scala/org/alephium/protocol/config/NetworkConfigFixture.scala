@@ -16,6 +16,9 @@
 
 package org.alephium.protocol.config
 
+import scala.collection.immutable.ArraySeq
+import scala.util.Random
+
 import akka.util.ByteString
 
 import org.alephium.protocol.model.NetworkId
@@ -23,8 +26,8 @@ import org.alephium.util.TimeStamp
 
 trait NetworkConfigFixture { self =>
   def networkId: NetworkId
-  def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
-  def ghostHardForkTimestamp: TimeStamp = TimeStamp.zero
+  def lemanHardForkTimestamp: TimeStamp
+  def ghostHardForkTimestamp: TimeStamp
 
   implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
     val networkId: NetworkId       = self.networkId
@@ -36,28 +39,58 @@ trait NetworkConfigFixture { self =>
 }
 
 object NetworkConfigFixture {
+  lazy val All = ArraySeq(Genesis, Leman, Ghost)
+
   trait Default extends NetworkConfigFixture {
-    def networkId: NetworkId = NetworkId.AlephiumDevNet
+    def networkId: NetworkId              = NetworkId.AlephiumDevNet
+    def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.zero
   }
 
-  val PreLeman = new NetworkConfig {
+  trait GenesisT extends NetworkConfigFixture {
     override def networkId: NetworkId              = NetworkId.AlephiumMainNet
-    override def noPreMineProof: ByteString        = ByteString.empty
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
-    def ghostHardForkTimestamp: TimeStamp          = TimeStamp.unsafe(Long.MaxValue)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
   }
+  val Genesis = new GenesisT {}.networkConfig
 
-  val Leman = new NetworkConfig {
+  trait LemanT extends NetworkConfigFixture {
     override def networkId: NetworkId              = NetworkId.AlephiumMainNet
-    override def noPreMineProof: ByteString        = ByteString.empty
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
-    def ghostHardForkTimestamp: TimeStamp          = TimeStamp.unsafe(Long.MaxValue)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
   }
+  val Leman = new LemanT {}.networkConfig
 
-  val Ghost = new NetworkConfig {
-    def networkId: NetworkId              = NetworkId.AlephiumMainNet
-    def noPreMineProof: ByteString        = ByteString.empty
-    def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
-    def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+  trait GhostT extends NetworkConfigFixture {
+    override def networkId: NetworkId              = NetworkId.AlephiumMainNet
+    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+  }
+  val Ghost = new GhostT {}.networkConfig
+
+  lazy val sinceLemanForks = All.drop(1)
+  trait SinceLemanT extends NetworkConfigFixture {
+    override def networkId: NetworkId = NetworkId.AlephiumMainNet
+    private lazy val fork             = sinceLemanForks(Random.nextInt(sinceLemanForks.length))
+    override def lemanHardForkTimestamp: TimeStamp = fork.lemanHardForkTimestamp
+    override def ghostHardForkTimestamp: TimeStamp = fork.ghostHardForkTimestamp
+  }
+  val SinceLeman = new SinceLemanT {}.networkConfig
+
+  lazy val sinceRhoneForks = All.takeRight(1)
+  trait SinceRhoneT extends NetworkConfigFixture {
+    override def networkId: NetworkId = NetworkId.AlephiumMainNet
+    private lazy val fork             = sinceRhoneForks(Random.nextInt(sinceRhoneForks.length))
+    override def lemanHardForkTimestamp: TimeStamp = fork.lemanHardForkTimestamp
+    override def ghostHardForkTimestamp: TimeStamp = fork.ghostHardForkTimestamp
+  }
+  val SinceRhone = new SinceRhoneT {}.networkConfig
+
+  lazy val preRhoneForks = All.dropRight(1)
+  trait PreRhoneT extends NetworkConfigFixture {
+    override def networkId: NetworkId = NetworkId.AlephiumMainNet
+    private lazy val fork             = preRhoneForks(Random.nextInt(preRhoneForks.length))
+    override def lemanHardForkTimestamp: TimeStamp = fork.lemanHardForkTimestamp
+    override def ghostHardForkTimestamp: TimeStamp = fork.ghostHardForkTimestamp
   }
 }

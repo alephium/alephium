@@ -38,7 +38,7 @@ class CoinbaseSpec extends AlephiumSpec with Generators with GroupConfigFixture.
     )
     (1 to 7) foreach { heightDiff =>
       checkEqual(
-        Coinbase.calcUncleReward(u256, heightDiff),
+        Coinbase.calcGhostUncleReward(u256, heightDiff),
         double * (8 - heightDiff) / 8
       )
     }

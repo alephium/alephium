@@ -319,7 +319,7 @@ object Compiler {
     ): Seq[SimpleFunc[Ctx]] = {
       if (isInterface) {
         val preDefinedIndexes = funcs.collect {
-          case Ast.FuncDef(_, _, _, _, _, _, _, Some(index), _, _, _) => index
+          case Ast.FuncDef(_, _, _, _, _, _, _, _, Some(index), _, _, _) => index
         }
         var fromIndex: Int = 0
         funcs.map { func =>

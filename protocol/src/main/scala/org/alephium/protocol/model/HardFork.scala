@@ -17,6 +17,7 @@
 package org.alephium.protocol.model
 
 import scala.collection.immutable.ArraySeq
+import scala.util.Random
 
 sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
@@ -29,5 +30,8 @@ object HardFork {
   object Leman   extends HardFork(1)
   object Ghost   extends HardFork(2)
 
-  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman)
+  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman, Ghost)
+
+  // TestOnly
+  def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(2))
 }

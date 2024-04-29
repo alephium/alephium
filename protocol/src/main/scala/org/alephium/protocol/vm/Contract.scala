@@ -35,12 +35,29 @@ final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
+    usePayToContractOnly: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
-  def usesAssets(): Boolean = usePreapprovedAssets || useContractAssets
+  def usesAssetsFromInputs(): Boolean = usePreapprovedAssets || useContractAssets
+
+  def checkModifierSinceRhone(): ExeResult[Unit] = {
+    if (useContractAssets && usePayToContractOnly) {
+      failed(InvalidMethodModifierSinceRhone)
+    } else {
+      okay
+    }
+  }
+
+  def checkModifierPreRhone(): ExeResult[Unit] = {
+    if (!usePayToContractOnly) {
+      okay
+    } else {
+      failed(InvalidMethodModifierBeforeRhone)
+    }
+  }
 
   def checkModifierPreLeman(): ExeResult[Unit] = {
     if (usePreapprovedAssets == useContractAssets) {
@@ -66,23 +83,27 @@ final case class Method[Ctx <: StatelessContext](
 }
 
 object Method {
+  val payToContractOnlyMask: Int = 4
+
   private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
-    (method.usePreapprovedAssets, method.useContractAssets) match {
-      case (false, false) => ByteString(0) // isPayble = false before Leman fork
-      case (true, true)   => ByteString(1) //  isPayable = true before Leman fork
-      case (false, true)  => ByteString(2)
-      case (true, false)  => ByteString(3)
+    val first2bits = (method.usePreapprovedAssets, method.useContractAssets) match {
+      case (false, false) => 0 // isPayble = false before Leman fork
+      case (true, true)   => 1 //  isPayable = true before Leman fork
+      case (false, true)  => 2
+      case (true, false)  => 3
     }
+    ByteString(first2bits | (if (method.usePayToContractOnly) payToContractOnlyMask else 0))
   }
 
   private def deserializeAssetModifier[Ctx <: StatelessContext](
       input: Byte
-  ): SerdeResult[(Boolean, Boolean)] = {
-    (input: @switch) match {
-      case 0 => Right((false, false))
-      case 1 => Right((true, true))
-      case 2 => Right((false, true))
-      case 3 => Right((true, false))
+  ): SerdeResult[(Boolean, Boolean, Boolean)] = {
+    val payToContractOnlyFlag = (input & payToContractOnlyMask) != 0
+    (input & ~payToContractOnlyMask: @switch) match {
+      case 0 => Right((false, false, payToContractOnlyFlag))
+      case 1 => Right((true, true, payToContractOnlyFlag))
+      case 2 => Right((false, true, payToContractOnlyFlag))
+      case 3 => Right((true, false, payToContractOnlyFlag))
       case _ => Left(SerdeError.wrongFormat("Invalid assets modifier"))
     }
   }
@@ -113,6 +134,7 @@ object Method {
               isPublicRest.value,
               assetModifier._1,
               assetModifier._2,
+              assetModifier._3,
               argsLengthRest.value,
               localsLengthRest.value,
               returnLengthRest.value,
@@ -135,6 +157,7 @@ object Method {
       isPublic = false,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -154,12 +177,17 @@ sealed trait Contract[Ctx <: StatelessContext] {
     )
 
   def checkAssetsModifier(ctx: StatelessContext): ExeResult[Unit] = {
-    if (ctx.getHardFork().isLemanEnabled()) {
-      okay
-    } else {
-      EitherF.foreachTry(0 until methodsLength) { methodIndex =>
-        getMethod(methodIndex).flatMap(_.checkModifierPreLeman())
-      }
+    val hardFork = ctx.getHardFork()
+    EitherF.foreachTry(0 until methodsLength) { methodIndex =>
+      for {
+        method <- getMethod(methodIndex)
+        _ <-
+          if (hardFork.isGhostEnabled()) { method.checkModifierSinceRhone() }
+          else { method.checkModifierPreRhone() }
+        _ <-
+          if (hardFork.isLemanEnabled()) { okay }
+          else { method.checkModifierPreLeman() }
+      } yield ()
     }
   }
 
@@ -260,6 +288,7 @@ object StatefulScript {
           isPublic = true,
           usePreapprovedAssets = true,
           useContractAssets = true,
+          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,

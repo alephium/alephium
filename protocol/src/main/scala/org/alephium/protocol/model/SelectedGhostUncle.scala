@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.vm.LockupScript
 
-final case class SelectedUncle(
+final case class SelectedGhostUncle(
     blockHash: BlockHash,
     lockupScript: LockupScript.Asset,
     heightDiff: Int

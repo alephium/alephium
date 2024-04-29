@@ -137,10 +137,18 @@ object Ast {
     }
   }
 
-  sealed trait ContractAssetsAnnotation
-  case object UseContractAssets         extends ContractAssetsAnnotation
-  case object NotUseContractAssets      extends ContractAssetsAnnotation
-  case object EnforcedUseContractAssets extends ContractAssetsAnnotation
+  sealed trait ContractAssetsAnnotation {
+    def assetsEnabled: Boolean
+  }
+  case object NotUseContractAssets extends ContractAssetsAnnotation {
+    val assetsEnabled = false
+  }
+  case object UseContractAssets extends ContractAssetsAnnotation {
+    val assetsEnabled = true
+  }
+  case object EnforcedUseContractAssets extends ContractAssetsAnnotation {
+    val assetsEnabled = true
+  }
 
   trait ApproveAssets[Ctx <: StatelessContext] extends Positioned {
     def approveAssets: Seq[ApproveAsset[Ctx]]
@@ -1101,6 +1109,7 @@ object Ast {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Ast.ContractAssetsAnnotation,
+      usePayToContractOnly: Boolean,
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
@@ -1202,6 +1211,7 @@ object Ast {
         isPublic,
         usePreapprovedAssets,
         useAssetsInContract != Ast.NotUseContractAssets,
+        usePayToContractOnly = usePayToContractOnly,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = state.flattenTypeLength(rtypes),
@@ -1223,6 +1233,7 @@ object Ast {
         isPublic = true,
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
+        usePayToContractOnly = false,
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         useMethodIndex = None,

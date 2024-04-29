@@ -93,15 +93,15 @@ class ContextSpec
     context.generatedOutputs.size is 1
   }
 
-  it should "generate contract output when the contract is loaded before Rhone upgrade" in new Fixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+  it should "generate contract output when the contract is loaded before Rhone upgrade" in new Fixture
+    with NetworkConfigFixture.LemanT {
     context.getHardFork() is HardFork.Leman
     val contractId   = createContract()
     val oldOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.loadContractObj(contractId).isRight is true
-    context.useContractAssets(contractId).isRight is true
+    context.useContractAssets(contractId, 0).isRight is true
     context.generateOutput(newOutput) isE ()
 
     val newOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
@@ -118,11 +118,11 @@ class ContextSpec
     context.getHardFork() is HardFork.Ghost
     val contractId = createContract()
     context.loadContractObj(contractId).isRight is true
-    context.useContractAssets(contractId).leftValue.rightValue is ContractAssetAlreadyFlushed
+    context.useContractAssets(contractId, 0).leftValue.rightValue is ContractAssetAlreadyFlushed
   }
 
-  it should "not cache new contract before Rhone upgrade" in new Fixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+  it should "not cache new contract before Rhone upgrade" in new Fixture
+    with NetworkConfigFixture.LemanT {
     context.getHardFork() is HardFork.Leman
     val contractId = createContract(unblock = false)
     context.contractBlockList.contains(contractId) is true
@@ -178,9 +178,8 @@ class ContextSpec
     newObj.contractId is contractId
   }
 
-  it should "charge gas based on mainnet hardfork" in new Fixture {
-    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+  it should "charge gas based on mainnet hardfork" in new Fixture
+    with NetworkConfigFixture.GenesisT {
     context.getHardFork() is HardFork.Mainnet
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
@@ -192,9 +191,9 @@ class ContextSpec
     context.gasRemaining is expected1
   }
 
-  it should "charge gas based on leman hardfork" in new Fixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
-    context.getHardFork() is HardFork.Leman
+  it should "charge gas based on leman hardfork" in new Fixture
+    with NetworkConfigFixture.SinceLemanT {
+    Seq(HardFork.Leman, HardFork.Ghost).contains(context.getHardFork()) is true
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
     val expected0 = initialGas.use(GasBox.unsafe(4)).rightValue
@@ -206,11 +205,10 @@ class ContextSpec
   }
 
   trait ContractOutputFixture extends NetworkConfigFixture.Default {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
-    val contractId                                 = ContractId.random
-    val tokenId0                                   = TokenId.random
-    val tokenId1                                   = TokenId.random
-    val outputRef = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
+    val contractId = ContractId.random
+    val tokenId0   = TokenId.random
+    val tokenId1   = TokenId.random
+    val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val output =
       ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 200, tokenId1 -> 300))
     val modifiedOutputs = Seq(
@@ -226,7 +224,7 @@ class ContextSpec
       lazy val context    = genStatefulContext(None, gasLimit = initialGas)
       context.contractInputs.clear()
       context.contractInputs += outputRef -> output
-      context.markAssetInUsing(contractId)
+      context.markAssetInUsing(contractId, MutBalancesPerLockup.empty)
       context.worldState.createContractLegacyUnsafe(
         contractId,
         StatefulContract.forSMT,
@@ -242,7 +240,10 @@ class ContextSpec
         modifiedOutput isnot output
         val initialGas = context.gasRemaining
         context.generatedOutputs.clear()
-        context.assetStatus.put(contractId, ContractPool.ContractAssetInUsing)
+        context.assetStatus.put(
+          contractId,
+          ContractPool.ContractAssetInUsing(MutBalancesPerLockup.empty)
+        )
         context.generateOutput(modifiedOutput) isE ()
         context.contractInputs.toSeq is Seq(outputRef -> output)
         context.generatedOutputs.toSeq is Seq(modifiedOutput)
@@ -251,15 +252,16 @@ class ContextSpec
     }
   }
 
-  trait MainnetContractOutputFixture extends ContractOutputFixture {
-    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+  trait MainnetContractOutputFixture
+      extends ContractOutputFixture
+      with NetworkConfigFixture.GenesisT {
     context.getHardFork() is HardFork.Mainnet
   }
 
-  trait LemanContractOutputFixture extends ContractOutputFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
-    context.getHardFork() is HardFork.Leman
+  trait LemanContractOutputFixture
+      extends ContractOutputFixture
+      with NetworkConfigFixture.SinceLemanT {
+    Seq(HardFork.Leman, HardFork.Ghost).contains(context.getHardFork()) is true
   }
 
   it should "generate output when the output is the same as input for Mainnet hardfork" in new MainnetContractOutputFixture {
@@ -281,7 +283,6 @@ class ContextSpec
 
   it should "ignore output when the output is the same as input for Leman hardfork" in new LemanContractOutputFixture {
     val initialGas = context.gasRemaining
-    context.getHardFork() is HardFork.Leman
     context.generateOutput(output) isE ()
     context.contractInputs.isEmpty is true
     context.generatedOutputs.isEmpty is true
@@ -289,13 +290,11 @@ class ContextSpec
   }
 
   it should "generate output when the output is not the same as input for Leman hardfork" in new LemanContractOutputFixture {
-    context.getHardFork() is HardFork.Leman
     testOutputDifferentFromInput()
   }
 
   it should "fail to generate output when contract asset is not loaded for Leman hardfork" in new LemanContractOutputFixture {
     val newContext = genStatefulContext()
-    newContext.getHardFork() is HardFork.Leman
     newContext.generateOutput(output).leftValue isE a[ContractAssetUnloaded]
   }
 
@@ -311,15 +310,12 @@ class ContextSpec
     }
   }
 
-  trait MainnetAssetOutputFixture extends AssetOutputFixture {
-    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+  trait MainnetAssetOutputFixture extends AssetOutputFixture with NetworkConfigFixture.GenesisT {
     context.getHardFork() is HardFork.Mainnet
   }
 
-  trait LemanAssetOutputFixture extends AssetOutputFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
-    context.getHardFork() is HardFork.Leman
+  trait LemanAssetOutputFixture extends AssetOutputFixture with NetworkConfigFixture.SinceLemanT {
+    Seq(HardFork.Leman, HardFork.Ghost).contains(context.getHardFork()) is true
   }
 
   it should "generate single output when token number <= maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
@@ -347,5 +343,38 @@ class ContextSpec
       context.generateOutput(output) isE ()
       context.generatedOutputs.toSeq is Seq(output)
     }
+  }
+
+  trait OutputRemainingContractAssetsFixture extends Fixture {
+    val contractId0 = ContractId.random
+    val contractId1 = ContractId.random
+
+    def prepare(): Unit = {
+      context.assetStatus.isEmpty is true
+      context.assetStatus(contractId0) =
+        ContractPool.ContractAssetInUsing(MutBalancesPerLockup.empty)
+      context.assetStatus(contractId1) = ContractPool.ContractAssetFlushed
+    }
+  }
+
+  it should "output remaining contract assets since Rhone" in new OutputRemainingContractAssetsFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    prepare()
+    context.outputRemainingContractAssetsForRhone() isE ()
+    context.outputBalances.all.length is 1
+    context.outputBalances.all.head._1 is LockupScript.p2c(contractId0)
+  }
+
+  it should "not output remaining contract assets before Rhone" in new OutputRemainingContractAssetsFixture
+    with NetworkConfigFixture.PreRhoneT {
+    Seq(HardFork.Mainnet, HardFork.Leman).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
+
+    prepare()
+    context.outputRemainingContractAssetsForRhone() isE ()
+    context.outputBalances.all.length is 0
   }
 }

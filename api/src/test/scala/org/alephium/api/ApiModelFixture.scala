@@ -31,7 +31,7 @@ trait ApiModelFixture
 
   val instrs: AVector[vm.Instr[vm.StatefulContext]] =
     AVector(vm.ConstTrue, vm.ConstFalse, vm.I256Const3)
-  val method  = vm.Method[vm.StatefulContext](true, true, true, 1, 2, 3, instrs)
+  val method  = vm.Method[vm.StatefulContext](true, true, true, true, 1, 2, 3, instrs)
   val methods = AVector(method, method)
   val script  = vm.StatefulScript.unsafe(methods)
   val assetTxOutputRef = AssetOutputRef.unsafe(
