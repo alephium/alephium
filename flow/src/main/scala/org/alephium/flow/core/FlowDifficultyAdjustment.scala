@@ -73,7 +73,8 @@ trait FlowDifficultyAdjustment {
 
   private def getNextHashTargetSinceLeman(
       chainIndex: ChainIndex,
-      deps: BlockDeps
+      deps: BlockDeps,
+      hardFork: HardFork
   )(implicit consensusConfig: ConsensusSetting): IOResult[Target] = IOUtils.tryExecute {
     val commonIntraGroupDeps             = calCommonIntraGroupDepsUnsafe(deps, chainIndex.from)
     val (diffSum, timeSpanSum, oldestTs) = getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)
@@ -82,7 +83,7 @@ trait FlowDifficultyAdjustment {
 
     val chainDep   = deps.getOutDep(chainIndex.to)
     val heightGap  = calHeightDiffUnsafe(chainDep, oldestTs)
-    val targetDiff = consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap)
+    val targetDiff = consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap, hardFork)
     ChainDifficultyAdjustment.calNextHashTargetRaw(targetDiff.getTarget(), timeSpanAverage)
   }
 
@@ -90,13 +91,13 @@ trait FlowDifficultyAdjustment {
       chainIndex: ChainIndex,
       deps: BlockDeps
   ): IOResult[Target] =
-    getNextHashTargetSinceLeman(chainIndex, deps)(consensusConfigs.mainnet)
+    getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Leman)(consensusConfigs.mainnet)
 
   def getNextHashTargetGhost(
       chainIndex: ChainIndex,
       deps: BlockDeps
   ): IOResult[Target] =
-    getNextHashTargetSinceLeman(chainIndex, deps)(consensusConfigs.ghost)
+    getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Ghost)(consensusConfigs.ghost)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {
