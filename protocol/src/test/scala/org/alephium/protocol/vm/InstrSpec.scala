@@ -2216,54 +2216,108 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "ApproveAlph" in new StatefulInstrFixture {
-    val lockupScript        = lockupScriptGen.sample.get
-    val balanceState        = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
-    override lazy val frame = prepareFrame(Some(balanceState))
-
-    frame.balanceStateOpt.get is balanceState
-    stack.push(Val.Address(lockupScript))
-    stack.push(Val.U256(ALPH.oneNanoAlph))
-
-    runAndCheckGas(ApproveAlph)
-
-    frame.balanceStateOpt.get is MutBalanceState(
-      alphBalance(lockupScript, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
-      alphBalance(lockupScript, ALPH.oneNanoAlph)
-    )
-
-    stack.push(Val.Address(lockupScript))
-    stack.push(Val.U256(ALPH.alph(2)))
-
-    ApproveAlph.runWith(frame).leftValue isE NotEnoughApprovedBalance(
-      lockupScript,
-      TokenId.alph,
-      ALPH.alph(2),
-      ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)
-    )
-  }
-
-  it should "ApproveToken" in new StatefulInstrFixture {
-    val lockupScript = lockupScriptGen.sample.get
+    val lockupScript       = lockupScriptGen.sample.get
+    val randomLockupScript = lockupScriptGen.sample.get
 
     def test(
         frame: Frame[StatefulContext],
-        initBalanceState: MutBalanceState,
+        amount: U256,
+        balanceState: MutBalanceState,
+        lockupScriptOpt: Option[LockupScript] = None
+    ) = {
+      frame.opStack.push(Val.Address(lockupScriptOpt.getOrElse(lockupScript)))
+      frame.opStack.push(Val.U256(amount))
+      runAndCheckGas(ApproveAlph, None, frame)
+
+      frame.opStack.size is 0
+      frame.getBalanceState() isE balanceState
+    }
+    def fail(
+        frame: Frame[StatefulContext],
+        amount: U256,
+        remain: U256,
+        lockupScriptOpt: Option[LockupScript] = None
+    ) = {
+      val from = lockupScriptOpt.getOrElse(lockupScript)
+      intercept[AssertionError](
+        test(frame, amount, MutBalanceState.empty, lockupScriptOpt)
+      ).getMessage is Right(
+        NotEnoughApprovedBalance(from, TokenId.alph, amount, remain)
+      ).toString
+    }
+
+    val balanceState0 = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
+    val preRhoneFrame = prepareFrame(Some(balanceState0))(NetworkConfigFixture.PreRhone)
+    test(
+      preRhoneFrame,
+      U256.Zero,
+      MutBalanceState(
+        alphBalance(lockupScript, ALPH.oneAlph),
+        alphBalance(lockupScript, U256.Zero)
+      )
+    )
+    test(
+      preRhoneFrame,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        alphBalance(lockupScript, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
+        alphBalance(lockupScript, ALPH.oneNanoAlph)
+      )
+    )
+    fail(preRhoneFrame, U256.Zero, U256.Zero, Some(randomLockupScript))
+    fail(preRhoneFrame, U256.One, U256.Zero, Some(randomLockupScript))
+    fail(preRhoneFrame, ALPH.alph(2), ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+
+    val balanceState1      = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
+    val remainBalanceState = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
+    val rhoneFrame         = prepareFrame(Some(balanceState1))(NetworkConfigFixture.Ghost)
+    test(rhoneFrame, U256.Zero, remainBalanceState)
+    test(rhoneFrame, U256.Zero, remainBalanceState, Some(randomLockupScript))
+    fail(rhoneFrame, U256.One, U256.Zero, Some(randomLockupScript))
+    test(
+      rhoneFrame,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        alphBalance(lockupScript, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
+        alphBalance(lockupScript, ALPH.oneNanoAlph)
+      )
+    )
+    fail(rhoneFrame, ALPH.alph(2), ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+  }
+
+  it should "ApproveToken" in new StatefulInstrFixture {
+    val lockupScript       = lockupScriptGen.sample.get
+    val randomLockupScript = lockupScriptGen.sample.get
+    val randomTokenId      = TokenId.generate
+
+    def test(
+        frame: Frame[StatefulContext],
         tokenId: TokenId,
         amount: U256,
-        remainBalanceState: MutBalanceState,
-        error: Option[ExeFailure] = None
+        balanceState: MutBalanceState,
+        lockupScriptOpt: Option[LockupScript] = None
     ) = {
-      frame.opStack.push(Val.Address(lockupScript))
+      frame.opStack.push(Val.Address(lockupScriptOpt.getOrElse(lockupScript)))
       frame.opStack.push(Val.ByteVec(tokenId.bytes))
       frame.opStack.push(Val.U256(amount))
-      frame.balanceStateOpt.get is initBalanceState
+      runAndCheckGas(ApproveToken, None, frame)
 
-      if (error.isEmpty) {
-        runAndCheckGas(ApproveToken, None, frame)
-        frame.balanceStateOpt.get is remainBalanceState
-      } else {
-        ApproveToken.runWith(frame).leftValue isE error.get
-      }
+      frame.opStack.size is 0
+      frame.getBalanceState() isE balanceState
+    }
+    def fail(
+        frame: Frame[StatefulContext],
+        tokenId: TokenId,
+        amount: U256,
+        remain: U256,
+        lockupScriptOpt: Option[LockupScript] = None
+    ) = {
+      val from = lockupScriptOpt.getOrElse(lockupScript)
+      intercept[AssertionError](
+        test(frame, tokenId, amount, MutBalanceState.empty, lockupScriptOpt)
+      ).getMessage is Right(
+        NotEnoughApprovedBalance(from, tokenId, amount, remain)
+      ).toString
     }
 
     val initBalanceState0 =
@@ -2271,24 +2325,30 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph))
       )
     val genesisFrame = preparePreLemanFrame(Some(initBalanceState0))
+    fail(genesisFrame, tokenId, ALPH.alph(2), ALPH.oneAlph)
+    fail(genesisFrame, tokenId, U256.Zero, U256.Zero, Some(randomLockupScript))
+    fail(genesisFrame, TokenId.alph, U256.Zero, U256.Zero, Some(randomLockupScript))
+    fail(genesisFrame, randomTokenId, U256.Zero, U256.Zero, Some(randomLockupScript))
     test(
       genesisFrame,
-      initBalanceState0,
       tokenId,
-      ALPH.alph(2),
-      MutBalanceState.from(MutBalances.empty),
-      Option(
-        NotEnoughApprovedBalance(
-          lockupScript,
-          tokenId,
-          ALPH.alph(2),
-          ALPH.oneAlph
-        )
+      U256.Zero,
+      MutBalanceState(
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph)),
+        balances(lockupScript, None, Map(tokenId -> U256.Zero))
       )
     )
     test(
       genesisFrame,
-      initBalanceState0,
+      TokenId.alph,
+      U256.Zero,
+      MutBalanceState(
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph)),
+        balances(lockupScript, None, Map(tokenId -> U256.Zero, TokenId.alph -> U256.Zero))
+      )
+    )
+    test(
+      genesisFrame,
       tokenId,
       ALPH.oneNanoAlph,
       MutBalanceState(
@@ -2297,12 +2357,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           None,
           Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph), TokenId.alph -> ALPH.oneAlph)
         ),
-        tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneNanoAlph, TokenId.alph -> U256.Zero))
       )
     )
     test(
       genesisFrame,
-      initBalanceState0,
       TokenId.alph,
       ALPH.oneNanoAlph,
       MutBalanceState(
@@ -2325,24 +2384,30 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val initBalanceState1 =
       MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
     val lemanFrame = prepareFrame(Some(initBalanceState1))(NetworkConfigFixture.Leman)
+    fail(lemanFrame, tokenId, ALPH.alph(2), ALPH.oneAlph)
+    fail(lemanFrame, tokenId, U256.Zero, U256.Zero, Some(randomLockupScript))
+    fail(lemanFrame, TokenId.alph, U256.Zero, U256.Zero, Some(randomLockupScript))
+    fail(lemanFrame, randomTokenId, U256.One, U256.Zero, Some(randomLockupScript))
     test(
       lemanFrame,
-      initBalanceState1,
-      TokenId.alph,
-      ALPH.alph(2),
-      MutBalanceState.from(MutBalances.empty),
-      Option(
-        NotEnoughApprovedBalance(
-          lockupScript,
-          TokenId.alph,
-          ALPH.alph(2),
-          ALPH.oneAlph
-        )
+      tokenId,
+      U256.Zero,
+      MutBalanceState(
+        balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)),
+        balances(lockupScript, None, Map(tokenId -> U256.Zero))
       )
     )
     test(
       lemanFrame,
-      initBalanceState1,
+      TokenId.alph,
+      U256.Zero,
+      MutBalanceState(
+        balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)),
+        balances(lockupScript, Some(U256.Zero), Map(tokenId -> U256.Zero))
+      )
+    )
+    test(
+      lemanFrame,
       tokenId,
       ALPH.oneNanoAlph,
       MutBalanceState(
@@ -2351,12 +2416,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           Some(ALPH.oneAlph),
           Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
         ),
-        tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
+        balances(lockupScript, Some(U256.Zero), Map(tokenId -> ALPH.oneNanoAlph))
       )
     )
     test(
       lemanFrame,
-      initBalanceState1,
       TokenId.alph,
       ALPH.oneNanoAlph,
       MutBalanceState(
@@ -2369,6 +2433,46 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
     )
 
+    val initBalanceState2 =
+      MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
+    val remainBalanceState =
+      MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
+    val rhoneFrame = prepareFrame(Some(initBalanceState2))(NetworkConfigFixture.Ghost)
+    fail(rhoneFrame, tokenId, ALPH.alph(2), ALPH.oneAlph)
+    test(rhoneFrame, tokenId, U256.Zero, remainBalanceState, Some(randomLockupScript))
+    fail(rhoneFrame, tokenId, U256.One, U256.Zero, Some(randomLockupScript))
+    test(rhoneFrame, TokenId.alph, U256.Zero, remainBalanceState, Some(randomLockupScript))
+    fail(rhoneFrame, TokenId.alph, U256.One, U256.Zero, Some(randomLockupScript))
+    test(rhoneFrame, randomTokenId, U256.Zero, remainBalanceState, Some(randomLockupScript))
+    fail(rhoneFrame, randomTokenId, U256.One, U256.Zero, Some(randomLockupScript))
+    test(rhoneFrame, tokenId, U256.Zero, remainBalanceState)
+    test(rhoneFrame, TokenId.alph, U256.Zero, remainBalanceState)
+    test(
+      rhoneFrame,
+      tokenId,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        balances(
+          lockupScript,
+          Some(ALPH.oneAlph),
+          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+        ),
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneNanoAlph))
+      )
+    )
+    test(
+      rhoneFrame,
+      TokenId.alph,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        balances(
+          lockupScript,
+          Some(ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
+          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+        ),
+        balances(lockupScript, Some(ALPH.oneNanoAlph), Map(tokenId -> ALPH.oneNanoAlph))
+      )
+    )
   }
 
   it should "AlphRemaining" in new StatefulInstrFixture {

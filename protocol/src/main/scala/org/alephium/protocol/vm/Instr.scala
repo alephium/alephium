@@ -1680,7 +1680,58 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
   }
 }
 
-object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
+sealed trait ApproveAssetBase {
+  @inline protected def approveALPH(
+      balanceState: MutBalanceState,
+      from: LockupScript,
+      amount: U256,
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    if (amount.isZero && hardFork.isGhostEnabled()) {
+      okay
+    } else {
+      balanceState
+        .approveALPH(from, amount)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              TokenId.alph,
+              amount,
+              balanceState.alphRemainingUnsafe(from)
+            )
+          )
+        )
+    }
+  }
+
+  @inline protected def approveToken(
+      balanceState: MutBalanceState,
+      from: LockupScript,
+      tokenId: TokenId,
+      amount: U256,
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    if (amount.isZero && hardFork.isGhostEnabled()) {
+      okay
+    } else {
+      balanceState
+        .approveToken(from, tokenId, amount)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              tokenId,
+              amount,
+              balanceState.tokenRemainingUnsafe(from, tokenId)
+            )
+          )
+        )
+    }
+  }
+}
+
+object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 with ApproveAssetBase {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -1693,23 +1744,12 @@ object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
       amount       <- frame.popOpStackU256()
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .approveALPH(address.lockupScript, amount.v)
-        .toRight(
-          Right(
-            NotEnoughApprovedBalance(
-              address.lockupScript,
-              TokenId.alph,
-              amount.v,
-              balanceState.alphRemainingUnsafe(address.lockupScript)
-            )
-          )
-        )
+      _ <- approveALPH(balanceState, address.lockupScript, amount.v, frame.ctx.getHardFork())
     } yield ()
   }
 }
 
-object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
+object ApproveToken extends AssetInstr with StatefulInstrCompanion0 with ApproveAssetBase {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -1724,33 +1764,12 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
+      hardFork = frame.ctx.getHardFork()
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState
-            .approveALPH(address.lockupScript, amount.v)
-            .toRight(
-              Right(
-                NotEnoughApprovedBalance(
-                  address.lockupScript,
-                  tokenId,
-                  amount.v,
-                  balanceState.alphRemainingUnsafe(address.lockupScript)
-                )
-              )
-            )
+        if (hardFork.isLemanEnabled() && tokenId == TokenId.alph) {
+          approveALPH(balanceState, address.lockupScript, amount.v, hardFork)
         } else {
-          balanceState
-            .approveToken(address.lockupScript, tokenId, amount.v)
-            .toRight(
-              Right(
-                NotEnoughApprovedBalance(
-                  address.lockupScript,
-                  tokenId,
-                  amount.v,
-                  balanceState.tokenRemainingUnsafe(address.lockupScript, tokenId)
-                )
-              )
-            )
+          approveToken(balanceState, address.lockupScript, tokenId, amount.v, hardFork)
         }
     } yield ()
   }
