@@ -2297,6 +2297,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
     )
     fail(rhoneFrame, ALPH.alph(2), ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+
+    val frameWithEmptyBalanceState = prepareFrame(Some(MutBalanceState.empty))
+    test(frameWithEmptyBalanceState, U256.Zero, MutBalanceState.empty)
+    fail(frameWithEmptyBalanceState, U256.One, U256.Zero)
   }
 
   it should "ApproveToken" in new StatefulInstrFixture {
@@ -2870,6 +2874,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     fail(sinceLemanFrame, ALPH.alph(2), ALPH.oneAlph)
     test(sinceLemanFrame, ALPH.oneNanoAlph, ALPH.oneNanoAlph)
     fail(sinceLemanFrame, ALPH.oneNanoAlph, U256.Zero, Some(contractAddress))
+
+    val frameWithEmptyBalanceState =
+      prepareFrame(
+        Some(MutBalanceState.empty),
+        Some((contractId, contractOutput, contractOutputRef))
+      )
+    test(frameWithEmptyBalanceState, U256.Zero, U256.Zero)
+    fail(frameWithEmptyBalanceState, U256.One, U256.Zero)
   }
 
   it should "TransferAlphToSelf" in new ContractOutputFixture {
@@ -3087,6 +3099,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
       )
       test(rhoneFrame1, TokenId.alph, ALPH.oneNanoAlph, outputBalances5)
+
+      val rhoneFrame2 =
+        prepareFrame(Some(MutBalanceState.empty), contractOutputOpt)(NetworkConfigFixture.Ghost)
+      test(rhoneFrame2, tokenId, U256.Zero, MutBalances.empty)
+      fail(rhoneFrame2, tokenId, U256.One)
+      test(rhoneFrame2, TokenId.alph, U256.Zero, MutBalances.empty)
+      fail(rhoneFrame2, TokenId.alph, U256.One)
+      test(rhoneFrame2, randomTokenId, U256.Zero, MutBalances.empty)
+      fail(rhoneFrame2, randomTokenId, U256.One)
     }
     // scalastyle:on method.length
   }

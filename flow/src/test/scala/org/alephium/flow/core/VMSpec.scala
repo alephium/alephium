@@ -1640,7 +1640,8 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "approve and transfer zero coins" in new ContractFixture {
-    val randomTokenId = TokenId.generate.toHexString
+    val randomTokenId         = TokenId.generate.toHexString
+    val randomContractAddress = Address.from(LockupScript.p2c(ContractId.generate))
     val code =
       s"""
          |Contract Foo() {
@@ -1657,6 +1658,11 @@ class VMSpec extends AlephiumSpec with Generators {
          |  @using(assetsInContract = true)
          |  pub fn func2(tokenId: ByteVec, amount: U256) -> () {
          |    transferTokenToSelf!(@$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func3() -> () {
+         |    transferTokenFromSelf!(@$randomContractAddress, ALPH, 0)
          |  }
          |}
          |""".stripMargin
@@ -1689,6 +1695,10 @@ class VMSpec extends AlephiumSpec with Generators {
     callTxScript(script(s"foo.func2(ALPH, 0)"))
     callTxScript(script(s"foo.func2(#$randomTokenId, 0)"))
     fail(script(s"foo.func2(#$randomTokenId, 1)"))
+
+    intercept[AssertionError](callTxScript(script("foo.func3()"))).getMessage.startsWith(
+      s"Right(TxScriptExeFailed(Pay to contract address $randomContractAddress is not allowed when this contract address is not in the call stack))"
+    ) is true
   }
 
   it should "fetch block env" in new ContractFixture {
