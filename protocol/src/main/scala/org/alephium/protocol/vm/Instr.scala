@@ -1871,24 +1871,28 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    for {
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useAlph(from, amount.v)
-        .toRight(
-          Right(
-            NotEnoughApprovedBalance(
-              from,
-              TokenId.alph,
-              amount.v,
-              balanceState.alphRemainingUnsafe(from)
+    if (amount.v.isZero && frame.ctx.getHardFork().isGhostEnabled()) {
+      okay
+    } else {
+      for {
+        balanceState <- frame.getBalanceState()
+        _ <- balanceState
+          .useAlph(from, amount.v)
+          .toRight(
+            Right(
+              NotEnoughApprovedBalance(
+                from,
+                TokenId.alph,
+                amount.v,
+                balanceState.alphRemainingUnsafe(from)
+              )
             )
           )
-        )
-      _ <- frame.ctx.outputBalances
-        .addAlph(to, amount.v)
-        .toRight(Right(BalanceOverflow))
-    } yield ()
+        _ <- frame.ctx.outputBalances
+          .addAlph(to, amount.v)
+          .toRight(Right(BalanceOverflow))
+      } yield ()
+    }
   }
 
   @inline def transferAlph[C <: StatefulContext](
@@ -1911,24 +1915,28 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    for {
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(from, tokenId, amount.v)
-        .toRight(
-          Right(
-            NotEnoughApprovedBalance(
-              from,
-              tokenId,
-              amount.v,
-              balanceState.tokenRemainingUnsafe(from, tokenId)
+    if (amount.v.isZero && frame.ctx.getHardFork().isGhostEnabled()) {
+      okay
+    } else {
+      for {
+        balanceState <- frame.getBalanceState()
+        _ <- balanceState
+          .useToken(from, tokenId, amount.v)
+          .toRight(
+            Right(
+              NotEnoughApprovedBalance(
+                from,
+                tokenId,
+                amount.v,
+                balanceState.tokenRemainingUnsafe(from, tokenId)
+              )
             )
           )
-        )
-      _ <- frame.ctx.outputBalances
-        .addToken(to, tokenId, amount.v)
-        .toRight(Right(BalanceOverflow))
-    } yield ()
+        _ <- frame.ctx.outputBalances
+          .addToken(to, tokenId, amount.v)
+          .toRight(Right(BalanceOverflow))
+      } yield ()
+    }
   }
 
   @inline def transferToken[C <: StatefulContext](
