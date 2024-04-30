@@ -341,13 +341,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     pass(instrs, AVector[Val](Val.U256(ALPH.alph(100)), Val.U256(ALPH.oneAlph), Val.U256(99)))
   }
 
-  it should "fail when there is no token balances" in new BalancesFixture {
+  it should "succeed when there is no token balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
       BytesConst(Val.ByteVec(tokenId.bytes)),
       TokenRemaining
     )
-    fail(instrs, NoTokenBalanceForTheAddress(tokenId, Address.from(LockupScript.p2pkh(pubKey0))))
+    pass(instrs, AVector[Val](Val.U256(0)))
   }
 
   it should "approve balances" in new BalancesFixture {

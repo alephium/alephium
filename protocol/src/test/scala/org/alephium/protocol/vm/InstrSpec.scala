@@ -2063,6 +2063,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .rightValue
     }
 
+    def preparePreRhoneFrame(
+        balanceState: Option[MutBalanceState] = None,
+        contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
+        txEnvOpt: Option[TxEnv] = None,
+        callerFrameOpt: Option[StatefulFrame] = None
+    ) = {
+      val config = NetworkConfigFixture.PreRhone
+      if (config.getHardFork(TimeStamp.now()).isLemanEnabled()) {
+        prepareFrame(balanceState, contractOutputOpt, txEnvOpt, callerFrameOpt)(config)
+      } else {
+        preparePreLemanFrame(balanceState, contractOutputOpt, txEnvOpt, callerFrameOpt)
+      }
+    }
+
     def preparePreLemanFrame(
         balanceState: Option[MutBalanceState] = None,
         contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
@@ -2247,7 +2261,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
 
     val balanceState0 = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
-    val preRhoneFrame = prepareFrame(Some(balanceState0))(NetworkConfigFixture.PreRhone)
+    val preRhoneFrame = preparePreRhoneFrame(Some(balanceState0))
     test(
       preRhoneFrame,
       U256.Zero,
@@ -2506,7 +2520,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val balanceState =
       MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
 
-    val preRhoneFrame = prepareFrame(Option(balanceState))(NetworkConfigFixture.PreRhone)
+    val preRhoneFrame = preparePreRhoneFrame(Option(balanceState))
     test(preRhoneFrame, ALPH.oneAlph)
     fail(preRhoneFrame, U256.Zero, randomLockupScript)
 
@@ -2891,8 +2905,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val balanceState0 = MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     val preRhoneFrame =
-      prepareFrame(Some(balanceState0), Some((contractId, contractOutput, contractOutputRef)))(
-        NetworkConfigFixture.PreRhone
+      preparePreRhoneFrame(
+        Some(balanceState0),
+        Some((contractId, contractOutput, contractOutputRef))
       )
     test(preRhoneFrame, U256.Zero, U256.Zero)
     test(preRhoneFrame, ALPH.oneNanoAlph, ALPH.oneNanoAlph)
