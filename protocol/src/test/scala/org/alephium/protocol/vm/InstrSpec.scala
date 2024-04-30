@@ -3104,7 +3104,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     testTransferToken()
 
-    override lazy val frame = prepareFrame(Some(createBalanceState(tokenId, from, ALPH.oneAlph)))
+    override lazy val frame = prepareFrame(Some(createBalanceState(tokenId, from, ALPH.oneAlph)))(
+      NetworkConfigFixture.SinceLeman
+    )
 
     stack.push(Val.Address(from))
     stack.push(Val.Address(contractAddress))
@@ -3137,7 +3139,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     testTransferToken()
 
     override lazy val frame =
-      prepareFrame(Some(createBalanceState(tokenId, from, ALPH.oneAlph)), contractOutputOpt)
+      prepareFrame(Some(createBalanceState(tokenId, from, ALPH.oneAlph)), contractOutputOpt)(
+        NetworkConfigFixture.SinceLeman
+      )
 
     stack.push(Val.Address(contractAddress))
     stack.push(Val.ByteVec(tokenId.bytes))
