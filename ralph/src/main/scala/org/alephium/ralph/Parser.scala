@@ -364,9 +364,9 @@ abstract class Parser[Ctx <: StatelessContext] {
           )
         } else {
           val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-          val usingAnnotation = Parser.UsingAnnotation.extractFields(
+          val usingAnnotation = Parser.FunctionUsingAnnotation.extractFields(
             annotations,
-            Parser.UsingAnnotationFields(
+            Parser.FunctionUsingAnnotationFields(
               preapprovedAssets = false,
               assetsInContract = Ast.NotUseContractAssets,
               payToContractOnly = false,
@@ -543,10 +543,13 @@ abstract class Parser[Ctx <: StatelessContext] {
   def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
   def enforceUsingContractAssets[Unknown: P]: P[Ast.AnnotationField] =
-    P(Index ~ Parser.UsingAnnotation.useContractAssetsKey ~ "=" ~ "enforced" ~~ Index).map {
+    P(Index ~ Parser.FunctionUsingAnnotation.useContractAssetsKey ~ "=" ~ "enforced" ~~ Index).map {
       case (from, to) =>
         Ast
-          .AnnotationField(Ast.Ident(Parser.UsingAnnotation.useContractAssetsKey), Val.Enforced)
+          .AnnotationField(
+            Ast.Ident(Parser.FunctionUsingAnnotation.useContractAssetsKey),
+            Val.Enforced
+          )
           .atSourceIndex(from, to, fileURI)
     }
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
@@ -635,7 +638,7 @@ object Parser {
     def extractFields(annotation: Ast.Annotation, default: T): T
   }
 
-  final case class UsingAnnotationFields(
+  final case class FunctionUsingAnnotationFields(
       preapprovedAssets: Boolean,
       assetsInContract: Ast.ContractAssetsAnnotation,
       payToContractOnly: Boolean,
@@ -644,7 +647,7 @@ object Parser {
       methodIndex: Option[Int]
   )
 
-  object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
+  object FunctionUsingAnnotation extends RalphAnnotation[FunctionUsingAnnotationFields] {
     val id: String                = "using"
     val usePreapprovedAssetsKey   = "preapprovedAssets"
     val useContractAssetsKey      = "assetsInContract"
@@ -680,8 +683,8 @@ object Parser {
 
     def extractFields(
         annotation: Ast.Annotation,
-        default: UsingAnnotationFields
-    ): UsingAnnotationFields = {
+        default: FunctionUsingAnnotationFields
+    ): FunctionUsingAnnotationFields = {
       val methodIndex =
         extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toInt)
       methodIndex match {
@@ -694,7 +697,7 @@ object Parser {
           }
         case None => ()
       }
-      UsingAnnotationFields(
+      FunctionUsingAnnotationFields(
         extractField(annotation, usePreapprovedAssetsKey, Val.Bool(default.preapprovedAssets)).v,
         extractUseContractAsset(annotation),
         extractField(annotation, usePayToContractOnly, Val.Bool(default.payToContractOnly)).v,
@@ -927,9 +930,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               fileURI
             )
           } else {
-            val usingAnnotation = Parser.UsingAnnotation.extractFields(
+            val usingAnnotation = Parser.FunctionUsingAnnotation.extractFields(
               annotations,
-              Parser.UsingAnnotationFields(
+              Parser.FunctionUsingAnnotationFields(
                 preapprovedAssets = true,
                 assetsInContract = Ast.NotUseContractAssets,
                 payToContractOnly = false,
@@ -1165,7 +1168,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           typeId.sourceIndex
         )
       }
-      val annotationIds = AVector(Parser.InterfaceStdAnnotation.id, Parser.UsingAnnotation.id)
+      val annotationIds =
+        AVector(Parser.InterfaceStdAnnotation.id, Parser.FunctionUsingAnnotation.id)
       Parser.checkAnnotations(annotations, annotationIds, "interface")
       val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
       val usingFields = Parser.InterfaceUsingAnnotation.extractFields(

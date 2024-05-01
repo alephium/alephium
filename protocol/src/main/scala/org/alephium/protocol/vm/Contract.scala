@@ -197,10 +197,7 @@ object Method {
         } yield {
           selectorInstrRest.value.selector
         }
-        selectorEither match {
-          case Left(_)         => None
-          case Right(selector) => Some(selector)
-        }
+        selectorEither.toOption
       case _ => None
     }
   }

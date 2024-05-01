@@ -2249,10 +2249,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       }
 
       Seq(interface, abstractContract).foreach(code => {
-        test(Parser.UsingAnnotation.usePreapprovedAssetsKey, true, code)
-        test(Parser.UsingAnnotation.useContractAssetsKey, false, code)
-        test(Parser.UsingAnnotation.useCheckExternalCallerKey, false, code)
-        test(Parser.UsingAnnotation.useUpdateFieldsKey, false, code)
+        test(Parser.FunctionUsingAnnotation.usePreapprovedAssetsKey, true, code)
+        test(Parser.FunctionUsingAnnotation.useContractAssetsKey, false, code)
+        test(Parser.FunctionUsingAnnotation.useCheckExternalCallerKey, false, code)
+        test(Parser.FunctionUsingAnnotation.useUpdateFieldsKey, false, code)
       })
     }
 
@@ -6564,7 +6564,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           Seq(foo, bar, baz, qux),
           Seq(qux, baz, bar, foo)
         )
-      ).message is "Interface Baz does not inherit from Bar"
+      ).message is "Interface Baz does not inherit from Bar, please annotate Baz with @using(methodSelector = true) annotation"
     }
 
     {
@@ -6582,7 +6582,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testMultiContractError(
         code,
-        "Interface Foo does not use method selector, but it's parents List(Bar) use method selector"
+        "Interface Foo does not use method selector, but it's parent Bar use method selector"
       )
     }
 

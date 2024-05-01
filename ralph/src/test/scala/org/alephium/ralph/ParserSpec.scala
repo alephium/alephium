@@ -1767,8 +1767,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val fooContract = extended.contracts(0)
       val annotations = Seq(
         Annotation(
-          Ident(Parser.UsingAnnotation.id),
-          Seq(AnnotationField(Ident(Parser.UsingAnnotation.useCheckExternalCallerKey), Val.False))
+          Ident(Parser.FunctionUsingAnnotation.id),
+          Seq(
+            AnnotationField(
+              Ident(Parser.FunctionUsingAnnotation.useCheckExternalCallerKey),
+              Val.False
+            )
+          )
         )
       )
       fooContract is Contract(

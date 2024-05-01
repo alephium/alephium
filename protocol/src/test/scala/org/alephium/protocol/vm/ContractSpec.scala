@@ -420,11 +420,14 @@ class ContractSpec extends AlephiumSpec {
       info("search by random order")
       val halfDecoded = contract.toHalfDecoded()
       halfDecoded.searchedMethodIndex is -1
-      AVector.from(selectors.zipWithIndex).shuffle().foreach {
+      val allMethodSearched = AVector.from(selectors.zipWithIndex).shuffle().map {
         case (Some(selector), index) =>
-          halfDecoded.getMethodBySelector(selector).rightValue.methodIndex is index
-        case _ => ()
+          val result = halfDecoded.getMethodBySelector(selector).rightValue
+          result.methodIndex is index
+          result.methodSearched
+        case _ => 0
       }
+      allMethodSearched.sum is (selectors.lastIndexWhere(_.isDefined) + 1)
     }
 
     {

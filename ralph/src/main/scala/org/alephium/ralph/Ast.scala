@@ -26,7 +26,7 @@ import akka.util.ByteString
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
-import org.alephium.ralph.Parser.UsingAnnotation
+import org.alephium.ralph.Parser.FunctionUsingAnnotation
 import org.alephium.util.{AVector, DjbHash, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
@@ -1141,9 +1141,11 @@ object Ast {
     }
 
     def hasCheckExternalCallerAnnotation: Boolean = {
-      annotations.find(_.id.name == UsingAnnotation.id) match {
+      annotations.find(_.id.name == FunctionUsingAnnotation.id) match {
         case Some(usingAnnotation) =>
-          usingAnnotation.fields.exists(_.ident.name == UsingAnnotation.useCheckExternalCallerKey)
+          usingAnnotation.fields.exists(
+            _.ident.name == FunctionUsingAnnotation.useCheckExternalCallerKey
+          )
         case None => false
       }
     }
@@ -2474,21 +2476,23 @@ object Ast {
         case p =>
           throw Compiler.Error(s"${p.ident.name} is not an interface", p.ident.sourceIndex)
       }
-      val parentsUseMethodSelector = parents.filter(_.useMethodSelector)
-      if (!interface.useMethodSelector && parentsUseMethodSelector.nonEmpty) {
-        val names = parents.map(_.name)
-        throw Compiler.Error(
-          s"Interface ${interface.name} does not use method selector, but it's parents $names use method selector",
-          interface.ident.sourceIndex
-        )
+      if (!interface.useMethodSelector) {
+        parents.find(_.useMethodSelector) match {
+          case Some(parent) =>
+            throw Compiler.Error(
+              s"Interface ${interface.name} does not use method selector, but it's parent ${parent.name} use method selector",
+              interface.ident.sourceIndex
+            )
+          case None => ()
+        }
       }
       val sortedInterfaces = sortInterfaces(parentsCache, parents :+ interface)
       val stdId            = getStdId(sortedInterfaces)
-      val allFuncs = sortedInterfaces.flatMap { parent =>
-        parent.funcs.foreach(func =>
-          methodSelectorTable.update((interface.ident, func.id), parent.useMethodSelector)
+      val allFuncs = sortedInterfaces.flatMap { parentOrSelf =>
+        parentOrSelf.funcs.foreach(func =>
+          methodSelectorTable.update((interface.ident, func.id), parentOrSelf.useMethodSelector)
         )
-        parent.funcs
+        parentOrSelf.funcs
       }
       val (unimplementedFuncs, _) = checkFuncs(allFuncs)
       // call the `checkFuncs` first to avoid duplicate function definition
@@ -2591,7 +2595,8 @@ object Ast {
         val child  = sortedInterfaces(1)
         if (!child.inheritances.exists(_.parentId.name == parent.ident.name)) {
           throw Compiler.Error(
-            s"Interface ${child.ident.name} does not inherit from ${parent.ident.name}",
+            s"Interface ${child.name} does not inherit from ${parent.name}, " +
+              s"please annotate ${child.name} with @using(methodSelector = true) annotation",
             child.sourceIndex
           )
         }
