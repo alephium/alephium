@@ -96,8 +96,10 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
-  final case class AnnotationField(ident: Ident, value: Val)           extends Positioned
-  final case class Annotation(id: Ident, fields: Seq[AnnotationField]) extends Positioned
+  final case class AnnotationField[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
+      extends Positioned
+  final case class Annotation[Ctx <: StatelessContext](id: Ident, fields: Seq[AnnotationField[Ctx]])
+      extends Positioned
 
   object FuncId {
     lazy val empty: FuncId = FuncId("", isBuiltIn = false)
@@ -196,6 +198,7 @@ object Ast {
     )
   }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
+    def toConstInstr: Instr[StatelessContext]                    = v.toConstInstr
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -585,17 +588,6 @@ object Ast {
     }
   }
 
-  final case class StringLiteral[Ctx <: StatelessContext](
-      string: Val.ByteVec
-  ) extends Expr[Ctx]
-      with Positioned {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
-
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      Seq(BytesConst(string))
-    }
-  }
-
   final case class StructField(ident: Ident, isMutable: Boolean, tpe: Type) extends UniqueDef {
     def name: String      = ident.name
     def signature: String = s"${ident.name}:${tpe.signature}"
@@ -776,7 +768,7 @@ object Ast {
   )
 
   final case class FuncDef[Ctx <: StatelessContext](
-      annotations: Seq[Annotation],
+      annotations: Seq[Annotation[Ctx]],
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
@@ -1160,10 +1152,12 @@ object Ast {
     def name: String = ident.name
   }
 
-  final case class EnumField(ident: Ident, value: Val) extends UniqueDef {
+  final case class EnumField[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
+      extends UniqueDef {
     def name: String = ident.name
   }
-  final case class EnumDef(id: TypeId, fields: Seq[EnumField]) extends UniqueDef {
+  final case class EnumDef[Ctx <: StatelessContext](id: TypeId, fields: Seq[EnumField[Ctx]])
+      extends UniqueDef {
     def name: String = id.name
   }
   object EnumDef {
@@ -1635,7 +1629,7 @@ object Ast {
     def fields: Seq[Argument]
     def events: Seq[EventDef]
     def constantVars: Seq[ConstantVarDef[StatefulContext]]
-    def enums: Seq[EnumDef]
+    def enums: Seq[EnumDef[StatefulContext]]
 
     def builtInContractFuncs(
         globalState: GlobalState
@@ -1661,7 +1655,7 @@ object Ast {
     def error(tpe: String): Compiler.Error =
       Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe", sourceIndex)
     def constantVars: Seq[ConstantVarDef[StatefulContext]] = throw error("constant variable")
-    def enums: Seq[EnumDef]                                = throw error("enum")
+    def enums: Seq[EnumDef[StatefulContext]]               = throw error("enum")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): AVector[String] = AVector.from(templateVars.view.map(_.ident.name))
@@ -1724,7 +1718,7 @@ object Ast {
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef[StatefulContext]],
-      enums: Seq[EnumDef],
+      enums: Seq[EnumDef[StatefulContext]],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     lazy val hasStdIdField: Boolean = stdIdEnabled.exists(identity) && stdInterfaceId.nonEmpty
@@ -1777,7 +1771,7 @@ object Ast {
       UniqueDef.checkDuplicates(enums, "enums")
       enums.foreach(e =>
         e.fields.foreach(field =>
-          state.addConstantVariable(EnumDef.fieldIdent(e.id, field.ident), field.value)
+          state.addConstantVariable(EnumDef.fieldIdent(e.id, field.ident), field.value.v)
         )
       )
     }
@@ -1792,8 +1786,22 @@ object Ast {
       }
     }
 
+    private def checkFields(state: Compiler.State[StatefulContext]): Unit = {
+      fields.foreach { case Argument(fieldId, tpe, isFieldMutable, _) =>
+        state.resolveType(tpe) match {
+          case Type.Struct(structId) =>
+            val isStructImmutable = state.flattenTypeMutability(tpe, isMutable = true).forall(!_)
+            if (isFieldMutable && isStructImmutable) {
+              state.warningMutableStructField(ident, fieldId, structId)
+            }
+          case _ => ()
+        }
+      }
+    }
+
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       state.setCheckPhase()
+      checkFields(state)
       checkFuncs()
       checkInheritances(state)
       super.check(state)
@@ -1864,7 +1872,7 @@ object Ast {
     def getFieldsSignature(): String                       = throw error("field")
     def getFieldTypes(): Seq[String]                       = throw error("field")
     def constantVars: Seq[ConstantVarDef[StatefulContext]] = throw error("constant variable")
-    def enums: Seq[EnumDef]                                = throw error("enum")
+    def enums: Seq[EnumDef[StatefulContext]]               = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code", sourceIndex)
@@ -2185,7 +2193,7 @@ object Ast {
         Seq[FuncDef[StatefulContext]],
         Seq[EventDef],
         Seq[ConstantVarDef[StatefulContext]],
-        Seq[EnumDef]
+        Seq[EnumDef[StatefulContext]]
     ) = {
       val parents                       = parentsCache(contract.ident)
       val (allContracts, allInterfaces) = (parents :+ contract).partition(_.isInstanceOf[Contract])
@@ -2333,14 +2341,14 @@ object Ast {
       allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
     }
 
-    def mergeEnums(enums: Seq[EnumDef]): Seq[EnumDef] = {
-      val mergedEnums = mutable.Map.empty[TypeId, mutable.ArrayBuffer[EnumField]]
+    def mergeEnums(enums: Seq[EnumDef[StatefulContext]]): Seq[EnumDef[StatefulContext]] = {
+      val mergedEnums = mutable.Map.empty[TypeId, mutable.ArrayBuffer[EnumField[StatefulContext]]]
       enums.foreach { enumDef =>
         mergedEnums.get(enumDef.id) match {
           case Some(fields) =>
             // enum fields will never be empty
-            val expectedType = enumDef.fields(0).value.tpe
-            val haveType     = fields(0).value.tpe
+            val expectedType = enumDef.fields(0).value.v.tpe
+            val haveType     = fields(0).value.v.tpe
             if (expectedType != haveType) {
               throw Compiler.Error(
                 s"There are different field types in the enum ${enumDef.id.name}: $expectedType,$haveType",

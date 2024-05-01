@@ -355,7 +355,6 @@ object Compiler {
     ): Val = {
       expr match {
         case e: Ast.Const[Ctx @unchecked] => e.v
-        case Ast.StringLiteral(bytes)     => bytes
         case Ast.Variable(ident) =>
           state.getConstant(ident).value
         case Ast.ParenExpr(expr) => calcConstant(state, expr)

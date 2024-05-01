@@ -217,14 +217,14 @@ object CompileResult {
 
   final case class EnumField(name: String, value: Val)
   object EnumField {
-    def from(enumFieldDef: Ast.EnumField): EnumField = {
-      EnumField(enumFieldDef.name, Val.from(enumFieldDef.value))
+    def from(enumFieldDef: Ast.EnumField[StatefulContext]): EnumField = {
+      EnumField(enumFieldDef.name, Val.from(enumFieldDef.value.v))
     }
   }
 
   final case class Enum(name: String, fields: AVector[EnumField])
   object Enum {
-    def from(enumDef: Ast.EnumDef): Enum = {
+    def from(enumDef: Ast.EnumDef[StatefulContext]): Enum = {
       Enum(enumDef.name, AVector.from(enumDef.fields.map(EnumField.from)))
     }
   }
