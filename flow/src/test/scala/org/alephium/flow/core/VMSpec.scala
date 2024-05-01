@@ -1639,6 +1639,74 @@ class VMSpec extends AlephiumSpec with Generators {
     failCallTxScript(main, ContractDestructionShouldNotBeCalledFromSelf)
   }
 
+  it should "approve and transfer zero coins" in new ContractFixture {
+    val randomTokenId         = TokenId.generate.toHexString
+    val randomContractAddress = Address.from(LockupScript.p2c(ContractId.generate))
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn func0(tokenId: ByteVec, amount: U256) -> () {
+         |    transferToken!(callerAddress!(), @$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func1(tokenId: ByteVec, amount: U256) -> () {
+         |    transferTokenFromSelf!(@$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func2(tokenId: ByteVec, amount: U256) -> () {
+         |    transferTokenToSelf!(@$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func3(from: Address, amount: U256) -> () {
+         |    transferTokenToSelf!(from, ALPH, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func4() -> () {
+         |    transferTokenFromSelf!(@$randomContractAddress, ALPH, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(code)._1.toHexString
+
+    def script(stmt: String) =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$contractId)
+         |  $stmt
+         |}
+         |$code
+         |""".stripMargin
+
+    def fail(code: String) = {
+      intercept[AssertionError](callTxScript(code)).getMessage.startsWith(
+        "Right(TxScriptExeFailed(Not enough approved balance"
+      ) is true
+    }
+
+    callTxScript(script(s"foo.func0{@$genesisAddress -> ALPH: 0}(ALPH, 0)"))
+    fail(script(s"foo.func0{@$genesisAddress -> ALPH: 0}(ALPH, 1)"))
+    callTxScript(script(s"foo.func0{@$genesisAddress -> #$randomTokenId: 0}(#$randomTokenId, 0)"))
+    fail(script(s"foo.func0{@$genesisAddress -> #$randomTokenId: 1}(#$randomTokenId, 1)"))
+    fail(script(s"foo.func0{@$genesisAddress -> #$randomTokenId: 0}(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func1(ALPH, 0)"))
+    callTxScript(script(s"foo.func1(#$randomTokenId, 0)"))
+    fail(script(s"foo.func1(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func2(ALPH, 0)"))
+    callTxScript(script(s"foo.func2(#$randomTokenId, 0)"))
+    fail(script(s"foo.func2(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func3(@$randomContractAddress, 0)"))
+    fail(script(s"foo.func3(@$randomContractAddress, 1)"))
+
+    intercept[AssertionError](callTxScript(script("foo.func4()"))).getMessage is
+      s"Right(TxScriptExeFailed(Pay to contract address $randomContractAddress is not allowed when this contract address is not in the call stack))"
+  }
+
   it should "fetch block env" in new ContractFixture {
     def main(latestHeader: BlockHeader) =
       s"""
