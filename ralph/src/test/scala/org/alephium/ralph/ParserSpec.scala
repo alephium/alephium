@@ -17,6 +17,7 @@
 package org.alephium.ralph
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
@@ -189,7 +190,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   it should "parse string literals" in {
     def test(testString: String) = {
       parse(s"b`$testString`", StatelessParser.expr(_)).get.value is
-        StringLiteral[StatelessContext](
+        Const[StatelessContext](
           Val.ByteVec(ByteString.fromString(testString))
         )
     }
@@ -263,7 +264,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       CallExpr[StatelessContext](
         FuncId("foo", false),
         Seq.empty,
-        List(StringLiteral(Val.ByteVec(ByteString.fromString("Hello"))))
+        List(Const(Val.ByteVec(ByteString.fromString("Hello"))))
       )
 
     info("Braces syntax")
@@ -968,7 +969,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     definitions.foreach { definition =>
       val constantVar = parse(definition._1, StatefulParser.constantVarDef(_)).get.value
       constantVar.ident.name is "C"
-      constantVar.value is definition._2
+      constantVar.value.v is definition._2
     }
   }
 
@@ -1049,8 +1050,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
         TypeId("ErrorCodes"),
         Seq(
-          EnumField(Ident("Error0"), Val.U256(U256.Zero)),
-          EnumField(Ident("Error1"), Val.U256(U256.One))
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.U256(U256.Zero))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.U256(U256.One)))
         )
       )
     }
@@ -1067,8 +1068,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
         TypeId("ErrorCodes"),
         Seq(
-          EnumField(Ident("Error0"), Val.ByteVec(Hex.unsafe("00"))),
-          EnumField(Ident("Error1"), Val.ByteVec(Hex.unsafe("01")))
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.ByteVec(Hex.unsafe("00")))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.ByteVec(Hex.unsafe("01"))))
         )
       )
     }
@@ -1086,9 +1087,15 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
         TypeId("ErrorCodes"),
         Seq(
-          EnumField(Ident("Error0"), Val.ByteVec(Hex.unsafe("00"))),
-          EnumField(Ident("Error1"), Val.ByteVec(ByteString.fromString("hello"))),
-          EnumField(Ident("Error2"), Val.ByteVec(ByteString.fromString("world")))
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.ByteVec(Hex.unsafe("00")))),
+          EnumField(
+            Ident("Error1"),
+            Const[StatefulContext](Val.ByteVec(ByteString.fromString("hello")))
+          ),
+          EnumField(
+            Ident("Error2"),
+            Const[StatefulContext](Val.ByteVec(ByteString.fromString("world")))
+          )
         )
       )
     }
@@ -1651,7 +1658,12 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val annotations = Seq(
         Annotation(
           Ident(Parser.UsingAnnotation.id),
-          Seq(AnnotationField(Ident(Parser.UsingAnnotation.useCheckExternalCallerKey), Val.False))
+          Seq(
+            AnnotationField(
+              Ident(Parser.UsingAnnotation.useCheckExternalCallerKey),
+              Const[StatefulContext](Val.False)
+            )
+          )
         )
       )
       fooContract is Contract(
@@ -1961,6 +1973,16 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
     error.message is "No variable declaration"
     error.position is invalidStmt.indexOf("$")
+  }
+
+  it should "handle correct const width lexer" in {
+    info("typedNum")
+    forAll(Gen.posNum, Gen.choose(0, 10)) { case (num, numSpaces) =>
+      val spaces = s"${" " * numSpaces}"
+      val str    = s"${num.toString}$spaces"
+      val result = fastparse.parse(str, StatelessParser.const(_)).get.value
+      result.sourceIndex.get.width is num.toString.length
+    }
   }
 }
 

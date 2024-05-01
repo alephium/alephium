@@ -4566,11 +4566,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     }
     testContractFullError(
-      code(s"let x = bar.$$encodeImmFields$$!()"),
+      code(s"let x = bar.$$encodeImmFields!$$()"),
       s"""Expected non-static function, got "Bar.encodeImmFields""""
     )
     testContractFullError(
-      code(s"bar.$$encodeImmFields$$!()"),
+      code(s"bar.$$encodeImmFields!$$()"),
       s"""Expected non-static function, got "Bar.encodeImmFields""""
     )
     testContractFullError(

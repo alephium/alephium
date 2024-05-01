@@ -17,7 +17,8 @@
 package org.alephium.ralph
 
 final case class SourceIndex(index: Int, width: Int, fileURI: Option[java.net.URI]) {
-  val endIndex: Int = index + width
+  val endIndex: Int                       = index + width
+  def addToWidth(width: Int): SourceIndex = copy(width = this.width + width)
 }
 
 object SourceIndex {
