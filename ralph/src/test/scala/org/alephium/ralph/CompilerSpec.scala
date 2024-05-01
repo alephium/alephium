@@ -6582,7 +6582,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testMultiContractError(
         code,
-        "Interface Foo does not use method selector, but it's parent Bar use method selector"
+        "Interface Foo does not use method selector, but its parent Bar use method selector"
       )
     }
 

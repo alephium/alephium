@@ -2480,7 +2480,7 @@ object Ast {
         parents.find(_.useMethodSelector) match {
           case Some(parent) =>
             throw Compiler.Error(
-              s"Interface ${interface.name} does not use method selector, but it's parent ${parent.name} use method selector",
+              s"Interface ${interface.name} does not use method selector, but its parent ${parent.name} use method selector",
               interface.ident.sourceIndex
             )
           case None => ()
