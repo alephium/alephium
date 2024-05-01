@@ -4987,10 +4987,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Unassigned mutable struct field")
-      val code =
+      info("Immutable struct field")
+      def code(fields: String) =
         s"""
-           |struct Foo { x: U256 }
+           |struct Baz { a: U256 }
+           |struct Qux { mut a: U256 }
+           |struct Foo { x: U256, $fields }
            |Contract Bar(mut foo: Foo) {
            |  pub fn f() -> U256 {
            |    return foo.x
@@ -4998,7 +5000,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContractFull(code).rightValue.warnings.isEmpty is true
+      Compiler.compileContractFull(code("y: U256")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: [U256; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: Baz")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: [Baz; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("mut y: Baz")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("mut y: [Baz; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: Qux")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: [Qux; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("mut y: U256")).rightValue.warnings.isEmpty is true
+      Compiler.compileContractFull(code("mut y: Qux")).rightValue.warnings.isEmpty is true
+      Compiler.compileContractFull(code("mut y: [Qux; 2]")).rightValue.warnings.isEmpty is true
     }
 
     {

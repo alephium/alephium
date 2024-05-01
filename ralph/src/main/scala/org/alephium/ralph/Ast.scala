@@ -1774,8 +1774,22 @@ object Ast {
       }
     }
 
+    private def checkFields(state: Compiler.State[StatefulContext]): Unit = {
+      fields.foreach { case Argument(fieldId, tpe, isFieldMutable, _) =>
+        state.resolveType(tpe) match {
+          case Type.Struct(structId) =>
+            val isStructImmutable = state.flattenTypeMutability(tpe, isMutable = true).forall(!_)
+            if (isFieldMutable && isStructImmutable) {
+              state.warningMutableStructField(ident, fieldId, structId)
+            }
+          case _ => ()
+        }
+      }
+    }
+
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       state.setCheckPhase()
+      checkFields(state)
       checkFuncs()
       checkConstants(state)
       checkInheritances(state)
