@@ -24,8 +24,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
-import org.alephium.util.{Hex, U256}
-import org.alephium.util.TimeStamp
+import org.alephium.util.{Bytes, Hex, TimeStamp, U256}
 
 // scalastyle:off number.of.types
 trait ExeFailure extends Product {
@@ -150,6 +149,13 @@ case object InvalidMethodModifierSinceRhone  extends ExeFailure
 
 final case class InvalidMethodIndex(index: Int, methodLength: Int) extends ExeFailure {
   override def toString: String = s"Invalid method index $index, method length: $methodLength"
+}
+final case class InvalidMethodSelector(selector: Method.Selector) extends ExeFailure {
+  override def toString: String = {
+    s"Invalid method selector: ${Hex.toHexString(Bytes.from(selector.index))}. " +
+      "This method might have been created before the Rhone upgrade and does not support dynamic calling. " +
+      "You'll need to call it directly using the method index."
+  }
 }
 
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure {

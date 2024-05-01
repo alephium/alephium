@@ -244,6 +244,44 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       MutBalanceState(MutBalances.empty, MutBalances.empty)
     )
   }
+
+  it should "charge gas for method selector" in {
+    val method    = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector.empty)
+    val selector0 = Method.Selector(0)
+    val selector1 = Method.Selector(1)
+    val methods = AVector(
+      method,
+      method.copy(instrs = AVector[Instr[StatefulContext]](MethodSelector(selector0))),
+      method.copy(isPublic = false),
+      method.copy(instrs = AVector[Instr[StatefulContext]](MethodSelector(selector1)))
+    )
+    val contract               = StatefulContract(0, methods)
+    val (contractObj, context) = prepareContract(contract, AVector.empty, AVector.empty)
+    val stackValues =
+      AVector[Val](Val.U256(0), Val.U256(0), Val.ByteVec(contractObj.contractId.bytes))
+    val frame = StatefulFrame(
+      0,
+      contractObj,
+      Stack.popOnly(stackValues),
+      methods.head,
+      VarVector.emptyVal,
+      _ => okay,
+      context,
+      None,
+      None
+    )
+    val initialGas = context.gasRemaining
+    frame.callExternalBySelector(selector1).isRight is true
+    val usedGas = GasSchedule.callGas
+      .addUnsafe(GasSchedule.contractLoadGas(contractObj.estimateContractLoadByteSize()))
+      .addUnsafe(GasSchedule.selectorCallSearchGas(methods.length))
+    initialGas.subUnsafe(context.gasRemaining) is usedGas
+    val gasRemaining = context.gasRemaining
+
+    frame.opStack.push(stackValues)
+    frame.callExternalBySelector(selector0).isRight is true
+    gasRemaining.subUnsafe(context.gasRemaining) is GasSchedule.callGas
+  }
 }
 
 trait FrameFixture extends ContextGenerators {

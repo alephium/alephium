@@ -12,7 +12,7 @@
       "sourceFile": "action.ral",
       "sourceCodeHash": "90e91b024b215506f579b59cb06e4d820327a87e28663ddb17c1d193118dc4f4",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
+      "codeHashDebug": "6b18a8b0fe1aaa38b0c187c798cbcd2d2a40e6ee718f7668eedd40d927daa0f0",
       "warnings": [
         
       ]
@@ -21,7 +21,7 @@
       "sourceFile": "foo.ral",
       "sourceCodeHash": "31c215eef9b9bb6faeeb0b6de689cabe4097716a15470ed0766b1bf5e4174b24",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "f15f45440cd5b020dfbe06bb8e4f930d82daf6134ee0f84c296b51686a659d0c",
+      "codeHashDebug": "5e770de7380fd93ffc4f3a02462d4fd3ac4e624252421e25041c113381a1e175",
       "warnings": [
         
       ]
@@ -39,7 +39,7 @@
       "sourceFile": "math.ral",
       "sourceCodeHash": "bf6305b5f82a1267b36f72b25c4f01d5fe27b3be0edff7b16200951bc0ab3c20",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "649e6f9fd0e73759cd506bc05aa80bfbf709748f2782aaa83001634ed978b4b0",
+      "codeHashDebug": "f5773744dafc81efaf82b27f1fe6bad1292d88a7f33ee053835c68ad77c787f3",
       "warnings": [
         
       ]

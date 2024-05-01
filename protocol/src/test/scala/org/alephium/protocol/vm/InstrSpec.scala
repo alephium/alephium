@@ -32,7 +32,7 @@ import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
 import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
-import org.alephium.serde.{serialize, RandomBytes}
+import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit no.equal number.of.methods number.of.types
@@ -2192,6 +2192,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  "MethodSelector" should "run successfully with empty stack" in new StatefulInstrFixture {
+    MethodSelector(Method.Selector(0xffffffff)).runWith(frame).isRight is true
+  }
+
+  "CallExternalBySelector(bytes)" should "not run" in new StatefulInstrFixture {
+    intercept[NotImplementedError] {
+      CallExternalBySelector(Method.Selector(0)).runWith(frame)
+    }
+  }
+
+  it should "serde" in new StatefulInstrFixture {
+    def test(selector: Int, encoded: ByteString) = {
+      val instr = CallExternalBySelector(Method.Selector(selector))
+      val bytes = ByteString(CallExternalBySelector.code) ++ encoded
+      instr.serialize() is bytes
+      deserialize[Instr[StatefulContext]](bytes).rightValue is instr
+    }
+    CallExternalBySelector.code is 212.toByte
+    CallExternalBySelector.code.toInt is -44
+    test(0, ByteString(0, 0, 0, 0))
+    test(0xffffffff, ByteString(0xff, 0xff, 0xff, 0xff))
+  }
+
   it should "ApproveAlph" in new StatefulInstrFixture {
     val lockupScript        = lockupScriptGen.sample.get
     val balanceState        = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
@@ -4044,11 +4067,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000,
+      MethodSelector(Method.Selector(0)) -> 10 /* CallExternalBySelector(selector) -> ??? */
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
-    statefulCases.length is Instr.statefulInstrs0.length - 1
+    statefulCases.length is Instr.statefulInstrs0.length - 2
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {
@@ -4176,7 +4200,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(byte, byte) -> 210
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(byte, byte) -> 210,
+      MethodSelector(Method.Selector(0)) -> 211, CallExternalBySelector(Method.Selector(0)) -> 212
     )
     // format: on
 
@@ -4240,7 +4265,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes)
+      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes),
+      MethodSelector(Method.Selector(0)), CallExternalBySelector(Method.Selector(0))
     )
     // format: on
   }

@@ -241,7 +241,7 @@ object Compiler {
     ): Seq[Instr[StatefulContext]] = ???
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
-      id: Ast.FuncId,
+      funcDef: Ast.FuncDef[Ctx],
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Ast.ContractAssetsAnnotation,
@@ -250,7 +250,7 @@ object Compiler {
       returnType: Seq[Type],
       index: Byte
   ) extends ContractFunc[Ctx] {
-    def name: String = id.name
+    def name: String = funcDef.name
 
     override def getReturnType[C <: Ctx](
         inputType: Seq[Type],
@@ -276,12 +276,22 @@ object Compiler {
         typeId: Ast.TypeId
     ): Seq[Instr[StatefulContext]] = {
       if (isPublic) {
+        val contractInfo = state.getContractInfo(typeId)
+        val callInstr: Instr[StatefulContext] =
+          if (
+            contractInfo.kind == ContractKind.Interface &&
+            state.isUseMethodSelector(typeId, funcDef.id)
+          ) {
+            CallExternalBySelector(funcDef.getMethodSelector(state.globalState))
+          } else {
+            CallExternal(index)
+          }
         val argLength = state.flattenTypeLength(argsType)
         val retLength = state.flattenTypeLength(returnType)
         Seq(
           ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
           ConstInstr.u256(Val.U256(U256.unsafe(retLength)))
-        ) ++ objCodes :+ CallExternal(index)
+        ) ++ objCodes :+ callInstr
       } else {
         throw Error(s"Call external private function of ${typeId.name}", typeId.sourceIndex)
       }
@@ -293,7 +303,7 @@ object Compiler {
         index: Byte
     ): SimpleFunc[Ctx] = {
       new SimpleFunc[Ctx](
-        func.id,
+        func,
         func.isPublic,
         func.usePreapprovedAssets,
         func.useAssetsInContract,
@@ -318,9 +328,10 @@ object Compiler {
         isInterface: Boolean
     ): Seq[SimpleFunc[Ctx]] = {
       if (isInterface) {
-        val preDefinedIndexes = funcs.collect {
-          case Ast.FuncDef(_, _, _, _, _, _, _, _, Some(index), _, _, _) => index
-        }
+        val preDefinedIndexes = funcs.view
+          .map(_.useMethodIndex)
+          .collect { case Some(index) => index }
+          .toSeq
         var fromIndex: Int = 0
         funcs.map { func =>
           func.useMethodIndex match {
@@ -460,6 +471,7 @@ object Compiler {
         0,
         contract.funcTable(multiContract.globalState),
         contract.eventsInfo(),
+        multiContract.methodSelectorTable.getOrElse(Map.empty),
         multiContract.contractsTable,
         multiContract.globalState
       )
@@ -550,6 +562,10 @@ object Compiler {
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
       hasInterfaceFuncCallSet.addOne(funcId)
     }
+
+    def methodSelectorTable: immutable.Map[(Ast.TypeId, Ast.FuncId), Boolean]
+    @inline def isUseMethodSelector(typeId: Ast.TypeId, funcId: Ast.FuncId): Boolean =
+      methodSelectorTable.getOrElse((typeId, funcId), true)
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
@@ -1091,6 +1107,8 @@ object Compiler {
       extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
 
+    def methodSelectorTable: Map[(Ast.TypeId, Ast.FuncId), Boolean] = ???
+
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatelessContext] = {
       BuiltIn.statelessFuncs
         .getOrElse(
@@ -1176,6 +1194,7 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
+      methodSelectorTable: immutable.Map[(Ast.TypeId, Ast.FuncId), Boolean],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]],
       globalState: Ast.GlobalState
   )(implicit val compilerOptions: CompilerOptions)
