@@ -17,6 +17,6 @@
 package org.alephium.flow
 
 package object core {
-  val maxForkDepth: Int          = 100
+  val maxForkDepth: Int          = 200
   val maxSyncBlocksPerChain: Int = 50
 }
