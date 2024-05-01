@@ -415,6 +415,21 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "support zero amount with tokenRemaining!()" in new ContractFixture {
+    val randomAddress = Address.contract(ContractId.random)
+    val script =
+      s"""
+         |TxScript Main {
+         |  assert!(tokenRemaining!(@$genesisAddress, ALPH) > 0, 0)
+         |  assert!(tokenRemaining!(@$genesisAddress, #${TokenId.random.toHexString}) == 0, 0)
+         |  assert!(tokenRemaining!(@$randomAddress, ALPH) == 0, 0)
+         |  assert!(tokenRemaining!(@$randomAddress, #${TokenId.random.toHexString}) == 0, 0)
+         |}
+         |""".stripMargin
+
+    callTxScript(script)
+  }
+
   it should "transfer ALPH by token id" in new ContractFixture {
     val foo =
       s"""

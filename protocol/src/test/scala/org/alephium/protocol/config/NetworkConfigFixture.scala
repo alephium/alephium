@@ -93,4 +93,5 @@ object NetworkConfigFixture {
     override def lemanHardForkTimestamp: TimeStamp = fork.lemanHardForkTimestamp
     override def ghostHardForkTimestamp: TimeStamp = fork.ghostHardForkTimestamp
   }
+  val PreRhone = new PreRhoneT {}.networkConfig
 }
