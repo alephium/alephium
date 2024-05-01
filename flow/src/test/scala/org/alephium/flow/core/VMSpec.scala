@@ -1661,7 +1661,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |
          |  @using(assetsInContract = true)
-         |  pub fn func3() -> () {
+         |  pub fn func3(from: Address, amount: U256) -> () {
+         |    transferTokenToSelf!(from, ALPH, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func4() -> () {
          |    transferTokenFromSelf!(@$randomContractAddress, ALPH, 0)
          |  }
          |}
@@ -1695,10 +1700,11 @@ class VMSpec extends AlephiumSpec with Generators {
     callTxScript(script(s"foo.func2(ALPH, 0)"))
     callTxScript(script(s"foo.func2(#$randomTokenId, 0)"))
     fail(script(s"foo.func2(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func3(@$randomContractAddress, 0)"))
+    fail(script(s"foo.func3(@$randomContractAddress, 1)"))
 
-    intercept[AssertionError](callTxScript(script("foo.func3()"))).getMessage.startsWith(
+    intercept[AssertionError](callTxScript(script("foo.func4()"))).getMessage is
       s"Right(TxScriptExeFailed(Pay to contract address $randomContractAddress is not allowed when this contract address is not in the call stack))"
-    ) is true
   }
 
   it should "fetch block env" in new ContractFixture {
