@@ -1145,8 +1145,10 @@ object Ast {
     }
   }
 
-  final case class ConstantVarDef[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
-      extends UniqueDef {
+  final case class ConstantVarDef[Ctx <: StatelessContext](
+      ident: Ident,
+      expr: Expr[Ctx]
+  ) extends UniqueDef {
     def name: String = ident.name
   }
 
@@ -1563,6 +1565,8 @@ object Ast {
       }
     }
 
+    protected def checkConstants(state: Compiler.State[Ctx]): Unit = {}
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()
       state.checkArguments(fields)
@@ -1576,6 +1580,7 @@ object Ast {
           isGenerated = false
         )
       )
+      checkConstants(state)
       funcs.foreach(_.check(state))
       state.checkUnusedFields()
       state.checkUnassignedMutableFields()
@@ -1747,19 +1752,26 @@ object Ast {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def getFuncUnsafe(funcId: FuncId): FuncDef[StatefulContext] = funcs.find(_.id == funcId).get
 
-    private def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
+    private var calculatedConstants: Option[Seq[(Ident, Val)]] = None
+    def getCalculatedConstants(): Seq[(Ident, Val)] = calculatedConstants.getOrElse(Seq.empty)
+
+    override def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(constantVars, "constant variables")
-      constantVars.foreach(v =>
-        state.addConstantVariable(v.ident, Type.fromVal(v.value.v.tpe), Seq(v.value.toConstInstr))
-      )
+      val constants = constantVars.map { v =>
+        v.expr.getType(state) match {
+          case Seq(tpe) if Type.primitives.contains(tpe) =>
+            val value = Compiler.State.calcConstant(state, v.expr)
+            state.addConstantVariable(v.ident, value)
+            v.ident -> value
+          case _ =>
+            Compiler.State.throwConstantVarDefException(v.expr)
+        }
+      }
+      if (constants.nonEmpty) calculatedConstants = Some(constants)
       UniqueDef.checkDuplicates(enums, "enums")
       enums.foreach(e =>
         e.fields.foreach(field =>
-          state.addConstantVariable(
-            EnumDef.fieldIdent(e.id, field.ident),
-            Type.fromVal(field.value.v.tpe),
-            Seq(field.value.toConstInstr)
-          )
+          state.addConstantVariable(EnumDef.fieldIdent(e.id, field.ident), field.value.v)
         )
       )
     }
@@ -1791,7 +1803,6 @@ object Ast {
       state.setCheckPhase()
       checkFields(state)
       checkFuncs()
-      checkConstants(state)
       checkInheritances(state)
       super.check(state)
     }

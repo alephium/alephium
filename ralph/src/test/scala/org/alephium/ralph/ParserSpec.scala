@@ -958,18 +958,19 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     failure.trace().longMsg.contains("constant variables must start with an uppercase letter")
 
     val address = Address.p2pkh(PublicKey.generate)
-    val definitions = Seq[(String, Val)](
-      ("const C = true", Val.True),
-      ("const C = 1", Val.U256(U256.One)),
-      ("const C = 1i", Val.I256(I256.One)),
-      ("const C = #11", Val.ByteVec(Hex.unsafe("11"))),
-      ("const C = b`hello`", Val.ByteVec(ByteString.fromString("hello"))),
-      (s"const C = @${address.toBase58}", Val.Address(address.lockupScript))
+    val definitions = Seq[(String, Expr[StatefulContext])](
+      ("const C = true", Const(Val.True)),
+      ("const C = 1", Const(Val.U256(U256.One))),
+      ("const C = 1i", Const(Val.I256(I256.One))),
+      ("const C = #11", Const(Val.ByteVec(Hex.unsafe("11")))),
+      ("const C = b`hello`", Const(Val.ByteVec(ByteString.fromString("hello")))),
+      (s"const C = @${address.toBase58}", Const(Val.Address(address.lockupScript))),
+      ("const C = A + B", Binop(ArithOperator.Add, Variable(Ident("A")), Variable(Ident("B"))))
     )
     definitions.foreach { definition =>
       val constantVar = parse(definition._1, StatefulParser.constantVarDef(_)).get.value
       constantVar.ident.name is "C"
-      constantVar.value.v is definition._2
+      constantVar.expr is definition._2
     }
   }
 

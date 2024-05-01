@@ -960,28 +960,11 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   }
 
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
-    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
-      value match {
-        case v: Ast.Const[_] =>
-          Ast.ConstantVarDef(ident, v)
-        case v: Ast.CreateArrayExpr[_] =>
-          throwConstantVarDefException("arrays", v.sourceIndex)
-        case v: Ast.StructCtor[_] =>
-          throwConstantVarDefException("structs", v.sourceIndex)
-        case v: Ast.ContractConv[_] =>
-          throwConstantVarDefException("contract instances", v.sourceIndex)
-        case v: Ast.Positioned =>
-          throwConstantVarDefException("other expressions", v.sourceIndex)
+    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
+      .map { case (from, ident, expr) =>
+        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
       }
-    }
-
-  private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
-  private def throwConstantVarDefException(label: String, sourceIndex: Option[SourceIndex]) = {
-    throw Compiler.Error(
-      s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
-      sourceIndex
-    )
-  }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>

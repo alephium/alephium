@@ -20,6 +20,7 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ReleaseVersion
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm.StatefulContext
 import org.alephium.ralph.{Ast, CompiledContract, CompiledScript}
 import org.alephium.serde.serialize
@@ -95,7 +96,8 @@ object CompileContractResult {
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
-      constants = AVector.from(contractAst.constantVars.map(CompileResult.Constant.from)),
+      constants =
+        AVector.from(contractAst.getCalculatedConstants().map(CompileResult.Constant.from.tupled)),
       enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
       warnings = compiled.warnings,
       stdInterfaceId = if (contractAst.hasStdIdField) {
@@ -208,8 +210,8 @@ object CompileResult {
 
   final case class Constant(name: String, value: Val)
   object Constant {
-    def from(constantDef: Ast.ConstantVarDef[StatefulContext]): Constant = {
-      Constant(constantDef.name, Val.from(constantDef.value.v))
+    def from(ident: Ast.Ident, value: vm.Val): Constant = {
+      Constant(ident.name, Val.from(value))
     }
   }
 

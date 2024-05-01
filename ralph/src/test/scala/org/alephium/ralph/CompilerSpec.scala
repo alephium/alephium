@@ -998,7 +998,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for Eq",
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for == operator",
       s"""
          |// invalid binary expression(add array)
          |Contract Foo() {
@@ -1007,7 +1007,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}""".stripMargin ->
-        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for ArithOperator",
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for + operator",
       s"""
          |// assign array element with invalid type
          |Contract Foo() {
@@ -4166,10 +4166,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
 
     Compiler.compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
-      "ModExp accepts U256 only"
+      "|**| accepts U256 only"
     Compiler.compileContract(code("U256", "U256", "|**|", "U256")).isRight is true
     Compiler.compileContract(code("I256", "U256", "|**|", "U256")).leftValue.message is
-      "Invalid param types List(I256, U256) for ArithOperator"
+      "Invalid param types List(I256, U256) for |**| operator"
     Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
       """Invalid return types "List(U256)" for func foo, expected "List(I256)""""
   }
@@ -4937,7 +4937,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContractFull(code).leftValue.message is
-        s"Invalid param types List(Foo, Foo) for Eq"
+        s"Invalid param types List(Foo, Foo) for == operator"
     }
 
     {
@@ -4954,7 +4954,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileContractFull(code)
         .leftValue
-        .message is "Invalid param types List(Foo, Foo) for Eq"
+        .message is "Invalid param types List(Foo, Foo) for == operator"
     }
 
     {
@@ -5665,7 +5665,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract C() {
-           |  const V = $$if (1) 2 else 3$$
+           |  const V = $$if (true) 2 else 3$$
            |  pub fn f() -> () {}
            |}
            |""".stripMargin
@@ -5674,6 +5674,123 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, other expressions are not supported"
       )
+    }
+  }
+
+  it should "test constant expressions" in {
+    def code(expr: String) =
+      s"""
+         |Contract Foo(b: U256) {
+         |  const A = 1
+         |  const B = 2
+         |  const C = -1i
+         |  const D = 2i
+         |  const E = #00
+         |  const F = false
+         |  const G = $expr
+         |  const H = @${Address.p2pkh(PublicKey.generate).toBase58}
+         |
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    {
+      info("invalid const expressions")
+      testContractError(code(s"$$G$$"), "Variable G does not exist or is used before declaration")
+      testContractError(code(s"$$H$$"), "Variable H does not exist or is used before declaration")
+      testContractError(
+        code(s"A + $$I$$"),
+        "Variable I does not exist or is used before declaration"
+      )
+      testContractError(
+        code(s"A + $$b$$"),
+        "Constant variable b does not exist or is used before declaration"
+      )
+      testContractError(code(s"$$A + C$$"), "Invalid param types List(U256, I256) for + operator")
+      testContractError(code(s"$$A - B$$"), "U256 overflow")
+      testContractError(code(s"$$A - C$$"), "Invalid param types List(U256, I256) for - operator")
+      testContractError(code(s"$$A * C$$"), "Invalid param types List(U256, I256) for * operator")
+      testContractError(code(s"$$A / C$$"), "Invalid param types List(U256, I256) for / operator")
+      testContractError(code(s"$$A % C$$"), "Invalid param types List(U256, I256) for % operator")
+      testContractError(
+        code(s"$$A |+| C$$"),
+        "Invalid param types List(U256, I256) for |+| operator"
+      )
+      testContractError(
+        code(s"$$A |-| C$$"),
+        "Invalid param types List(U256, I256) for |-| operator"
+      )
+      testContractError(
+        code(s"$$A |*| C$$"),
+        "Invalid param types List(U256, I256) for |*| operator"
+      )
+      testContractError(
+        code(s"$$A |**| C$$"),
+        "Invalid param types List(U256, I256) for |**| operator"
+      )
+      testContractError(code(s"$$B + D$$"), "Invalid param types List(U256, I256) for + operator")
+      testContractError(code(s"$$B - D$$"), "Invalid param types List(U256, I256) for - operator")
+      testContractError(
+        code(s"$$E ++ F$$"),
+        "Invalid param types List(ByteVec, Bool) for ++ operator"
+      )
+      testContractError(
+        code(s"$$B ** E$$"),
+        "Invalid param types List(U256, ByteVec) for ** operator"
+      )
+      testContractError(
+        code(s"$$E << 2$$"),
+        "Invalid param types List(ByteVec, U256) for << operator"
+      )
+      testContractError(code(s"$$F >> 2$$"), "Invalid param types List(Bool, U256) for >> operator")
+      testContractError(code(s"$$A ^ C$$"), "Invalid param types List(U256, I256) for ^ operator")
+      testContractError(code(s"$$!E$$"), "Invalid param types List(ByteVec) for ! operator")
+      testContractError(code(s"$$A == C$$"), "Invalid param types List(U256, I256) for == operator")
+      testContractError(code(s"$$B != D$$"), "Invalid param types List(U256, I256) for != operator")
+      testContractError(
+        code(s"$$F && E$$"),
+        "Invalid param types List(Bool, ByteVec) for && operator"
+      )
+      testContractError(
+        code(s"$$F || E$$"),
+        "Invalid param types List(Bool, ByteVec) for || operator"
+      )
+      testContractError(
+        code(s"$$A <= E$$"),
+        "Invalid param types List(U256, ByteVec) for <= operator"
+      )
+      testContractError(code(s"$$A < F$$"), "Invalid param types List(U256, Bool) for < operator")
+      testContractError(code(s"$$C >= B$$"), "Invalid param types List(I256, U256) for >= operator")
+      testContractError(code(s"$$C > B$$"), "Invalid param types List(I256, U256) for > operator")
+    }
+
+    {
+      info("valid constant expressions")
+      Compiler.compileContract(code("A + B")).isRight is true
+      Compiler.compileContract(code("C + D")).isRight is true
+      Compiler.compileContract(code("B - A")).isRight is true
+      Compiler.compileContract(code("C - D")).isRight is true
+      Compiler.compileContract(code("A * B")).isRight is true
+      Compiler.compileContract(code("A / B")).isRight is true
+      Compiler.compileContract(code("A % B")).isRight is true
+      Compiler.compileContract(code(s"""b`hello` ++ E""")).isRight is true
+      Compiler.compileContract(code("A ** B")).isRight is true
+      Compiler.compileContract(code("A |+| B")).isRight is true
+      Compiler.compileContract(code("A |-| B")).isRight is true
+      Compiler.compileContract(code("A |*| B")).isRight is true
+      Compiler.compileContract(code("A |**| B")).isRight is true
+      Compiler.compileContract(code("A << 2")).isRight is true
+      Compiler.compileContract(code("B << 2")).isRight is true
+      Compiler.compileContract(code("A ^ B")).isRight is true
+      Compiler.compileContract(code("!F")).isRight is true
+      Compiler.compileContract(code("A == 2")).isRight is true
+      Compiler.compileContract(code("A != B")).isRight is true
+      Compiler.compileContract(code("(A == 2) && F")).isRight is true
+      Compiler.compileContract(code("(A > 2) || F")).isRight is true
+      Compiler.compileContract(code("A <= B")).isRight is true
+      Compiler.compileContract(code("C < D")).isRight is true
+      Compiler.compileContract(code("A >= B")).isRight is true
+      Compiler.compileContract(code("C > D")).isRight is true
     }
   }
 
