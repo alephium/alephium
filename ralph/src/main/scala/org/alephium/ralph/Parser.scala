@@ -197,7 +197,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 
   def structCtor[Unknown: P]: P[Ast.StructCtor[Ctx]] =
-    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ ":" ~ expr).rep(0, ",") ~ "}") {
+    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ P(":" ~ expr).?).rep(0, ",") ~ "}") {
       case (typeId, fields) =>
         if (fields.isEmpty) {
           throw Compiler.Error(s"No field definition in struct ${typeId.name}", typeId.sourceIndex)
@@ -274,7 +274,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
 
   def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = PP("_")(_ => Ast.AnonymousVar)
-  def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
+  def namedVar[Unknown: P]: P[Ast.NamedVar] =
     P(Index ~ Lexer.mut ~ Lexer.ident ~~ Index).map { case (from, mutable, id, to) =>
       Ast.NamedVar(mutable, id).atSourceIndex(from, to, fileURI)
     }
@@ -284,9 +284,26 @@ abstract class Parser[Ctx <: StatelessContext] {
     varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    P(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr).map { case (from, vars, expr) =>
+    P(Lexer.token(Keyword.let) ~ varDeclarations ~/ "=" ~ expr).map { case (from, vars, expr) =>
       val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
       Ast.VarDef(vars, expr).atSourceIndex(sourceIndex)
+    }
+  def structFieldAlias[Unknown: P]: P[Ast.StructFieldAlias] =
+    P(Lexer.mut ~ Lexer.ident ~ P(":" ~ Lexer.ident).?).map { case (isMutable, ident, alias) =>
+      Ast.StructFieldAlias(isMutable, ident, alias)
+    }
+  def structDestruction[Unknown: P]: P[Ast.StructDestruction[Ctx]] =
+    P(
+      Lexer.token(Keyword.let) ~ Lexer.typeId ~/ "{" ~ structFieldAlias.rep(
+        0,
+        ","
+      ) ~ "}" ~ "=" ~ expr
+    ).map { case (from, id, vars, expr) =>
+      val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+      if (vars.isEmpty) {
+        throw Compiler.Error("No variable declaration", sourceIndex)
+      }
+      Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
@@ -787,7 +804,9 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
+    P(
+      varDef | structDestruction | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
+    )
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
@@ -843,7 +862,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def contractFields[Unknown: P]: P[Seq[Ast.Argument]] =
@@ -941,28 +960,11 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   }
 
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
-    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
-      value match {
-        case v: Ast.Const[_] =>
-          Ast.ConstantVarDef(ident, v)
-        case v: Ast.CreateArrayExpr[_] =>
-          throwConstantVarDefException("arrays", v.sourceIndex)
-        case v: Ast.StructCtor[_] =>
-          throwConstantVarDefException("structs", v.sourceIndex)
-        case v: Ast.ContractConv[_] =>
-          throwConstantVarDefException("contract instances", v.sourceIndex)
-        case v: Ast.Positioned =>
-          throwConstantVarDefException("other expressions", v.sourceIndex)
+    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
+      .map { case (from, ident, expr) =>
+        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
       }
-    }
-
-  private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
-  private def throwConstantVarDefException(label: String, sourceIndex: Option[SourceIndex]) = {
-    throw Compiler.Error(
-      s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
-      sourceIndex
-    )
-  }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>

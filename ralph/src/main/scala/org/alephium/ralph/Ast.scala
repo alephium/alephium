@@ -636,16 +636,21 @@ object Ast {
     }
   }
 
-  final case class StructCtor[Ctx <: StatelessContext](id: TypeId, fields: Seq[(Ident, Expr[Ctx])])
-      extends Expr[Ctx] {
+  final case class StructCtor[Ctx <: StatelessContext](
+      id: TypeId,
+      fields: Seq[(Ident, Option[Expr[Ctx]])]
+  ) extends Expr[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       val struct   = state.getStruct(id)
       val expected = struct.fields.map(field => (field.ident, Seq(state.resolveType(field.tpe))))
-      val have     = fields.map { case (ident, expr) => (ident, expr.getType(state)) }
+      val have = fields.map { case (ident, expr) =>
+        val tpe = expr.map(_.getType(state)).getOrElse(Seq(state.getVariable(ident).tpe))
+        (ident, tpe)
+      }
       if (expected.length != have.length || have.exists(f => !expected.contains(f))) {
         throw Compiler.Error(
           s"Invalid struct fields, expect ${struct.fields.map(_.signature)}",
-          id.sourceIndex
+          sourceIndex
         )
       }
       Seq(struct.tpe)
@@ -659,7 +664,10 @@ object Ast {
             throw Compiler.Error(s"Struct field ${field.ident} does not exist", id.sourceIndex)
           )
       }
-      sortedFields.flatMap(_._2.genCode(state))
+      sortedFields.flatMap {
+        case (_, Some(expr)) => expr.genCode(state)
+        case (field, None)   => state.genLoadCode(field)
+      }
     }
   }
 
@@ -897,19 +905,48 @@ object Ast {
     }
   }
 
+  final case class StructFieldAlias(isMutable: Boolean, ident: Ident, alias: Option[Ident])
+
+  final case class StructDestruction[Ctx <: StatelessContext](
+      id: TypeId,
+      vars: Seq[StructFieldAlias],
+      expr: Expr[Ctx]
+  ) extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      val struct = expr.getType(state) match {
+        case Seq(tpe: Type.Struct) if tpe.id == id => state.getStruct(id)
+        case types =>
+          throw Compiler.Error(
+            s"Expected struct type ${quote(id.name)}, got ${quoteTypes(types)}",
+            expr.sourceIndex
+          )
+      }
+      vars.foreach { v =>
+        val fieldType = state.resolveType(struct.getField(v.ident).tpe)
+        val varIdent  = v.alias.getOrElse(v.ident)
+        state.addLocalVariable(
+          varIdent,
+          fieldType,
+          v.isMutable,
+          isUnused = false,
+          isGenerated = false
+        )
+      }
+    }
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val (structRef, instrs) = state.getOrCreateStructRef(expr)
+      instrs ++ vars.flatMap { v =>
+        val varIdent   = v.alias.getOrElse(v.ident)
+        val loadCodes  = structRef.genLoadCode(state, v.ident)
+        val storeCodes = state.genStoreCode(varIdent).reverse.flatten
+        loadCodes ++ storeCodes
+      }
+    }
+  }
+
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def ident: Ident
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    protected def isTypeMutable(tpe: Type, state: Compiler.State[Ctx]): Boolean = {
-      state.resolveType(tpe) match {
-        case t: Type.Struct =>
-          val struct = state.getStruct(t.id)
-          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe, state))
-        case t: Type.FixedSizeArray => isTypeMutable(t.baseType, state)
-        case _                      => true
-      }
-    }
     protected def checkStructField(
         state: Compiler.State[Ctx],
         structRef: StructRef[Ctx],
@@ -924,7 +961,7 @@ object Ast {
           sourceIndex
         )
       }
-      if (checkType && !isTypeMutable(field.tpe, state)) {
+      if (checkType && !state.isTypeMutable(field.tpe)) {
         throw Compiler.Error(
           s"Cannot assign to field ${field.name} in struct ${structRef.tpe.id.name}." +
             s" Assignment only works when all of the field selectors are mutable.",
@@ -993,7 +1030,7 @@ object Ast {
       if (!state.getVariable(ident).isMutable) {
         throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
       }
-      if (!isTypeMutable(getType(state), state)) {
+      if (!state.isTypeMutable(getType(state))) {
         throw Compiler.Error(
           s"Cannot assign to variable ${ident.name}. Assignment only works when all of the field selectors are mutable.",
           sourceIndex
@@ -1065,7 +1102,7 @@ object Ast {
       if (!arrayRef.isMutable) {
         invalidAssignment(state, from, isArrayMutable = false, sourceIndex)
       }
-      if (!isTypeMutable(arrayRef.tpe.baseType, state)) {
+      if (!state.isTypeMutable(arrayRef.tpe.baseType)) {
         invalidAssignment(state, from, isArrayMutable = true, sourceIndex)
       }
     }
@@ -1108,8 +1145,10 @@ object Ast {
     }
   }
 
-  final case class ConstantVarDef[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
-      extends UniqueDef {
+  final case class ConstantVarDef[Ctx <: StatelessContext](
+      ident: Ident,
+      expr: Expr[Ctx]
+  ) extends UniqueDef {
     def name: String = ident.name
   }
 
@@ -1526,6 +1565,8 @@ object Ast {
       }
     }
 
+    protected def checkConstants(state: Compiler.State[Ctx]): Unit = {}
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()
       state.checkArguments(fields)
@@ -1539,6 +1580,7 @@ object Ast {
           isGenerated = false
         )
       )
+      checkConstants(state)
       funcs.foreach(_.check(state))
       state.checkUnusedFields()
       state.checkUnassignedMutableFields()
@@ -1710,19 +1752,26 @@ object Ast {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def getFuncUnsafe(funcId: FuncId): FuncDef[StatefulContext] = funcs.find(_.id == funcId).get
 
-    private def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
+    private var calculatedConstants: Option[Seq[(Ident, Val)]] = None
+    def getCalculatedConstants(): Seq[(Ident, Val)] = calculatedConstants.getOrElse(Seq.empty)
+
+    override def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(constantVars, "constant variables")
-      constantVars.foreach(v =>
-        state.addConstantVariable(v.ident, Type.fromVal(v.value.v.tpe), Seq(v.value.toConstInstr))
-      )
+      val constants = constantVars.map { v =>
+        v.expr.getType(state) match {
+          case Seq(tpe) if Type.primitives.contains(tpe) =>
+            val value = Compiler.State.calcConstant(state, v.expr)
+            state.addConstantVariable(v.ident, value)
+            v.ident -> value
+          case _ =>
+            Compiler.State.throwConstantVarDefException(v.expr)
+        }
+      }
+      if (constants.nonEmpty) calculatedConstants = Some(constants)
       UniqueDef.checkDuplicates(enums, "enums")
       enums.foreach(e =>
         e.fields.foreach(field =>
-          state.addConstantVariable(
-            EnumDef.fieldIdent(e.id, field.ident),
-            Type.fromVal(field.value.v.tpe),
-            Seq(field.value.toConstInstr)
-          )
+          state.addConstantVariable(EnumDef.fieldIdent(e.id, field.ident), field.value.v)
         )
       )
     }
@@ -1737,10 +1786,23 @@ object Ast {
       }
     }
 
+    private def checkFields(state: Compiler.State[StatefulContext]): Unit = {
+      fields.foreach { case Argument(fieldId, tpe, isFieldMutable, _) =>
+        state.resolveType(tpe) match {
+          case Type.Struct(structId) =>
+            val isStructImmutable = state.flattenTypeMutability(tpe, isMutable = true).forall(!_)
+            if (isFieldMutable && isStructImmutable) {
+              state.warningMutableStructField(ident, fieldId, structId)
+            }
+          case _ => ()
+        }
+      }
+    }
+
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       state.setCheckPhase()
+      checkFields(state)
       checkFuncs()
-      checkConstants(state)
       checkInheritances(state)
       super.check(state)
     }

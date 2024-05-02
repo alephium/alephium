@@ -998,7 +998,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for Eq",
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for == operator",
       s"""
          |// invalid binary expression(add array)
          |Contract Foo() {
@@ -1007,7 +1007,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}""".stripMargin ->
-        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for ArithOperator",
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for + operator",
       s"""
          |// assign array element with invalid type
          |Contract Foo() {
@@ -4166,10 +4166,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
 
     Compiler.compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
-      "ModExp accepts U256 only"
+      "|**| accepts U256 only"
     Compiler.compileContract(code("U256", "U256", "|**|", "U256")).isRight is true
     Compiler.compileContract(code("I256", "U256", "|**|", "U256")).leftValue.message is
-      "Invalid param types List(I256, U256) for ArithOperator"
+      "Invalid param types List(I256, U256) for |**| operator"
     Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
       """Invalid return types "List(U256)" for func foo, expected "List(I256)""""
   }
@@ -4912,10 +4912,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |
            |Contract C() {
            |  fn func() -> () {
-           |    let foo = $$Foo$$ {
+           |    let foo = $$Foo {
            |      x: 1,
            |      y: 2
-           |    }
+           |    }$$
            |  }
            |}
            |""".stripMargin
@@ -4937,7 +4937,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContractFull(code).leftValue.message is
-        s"Invalid param types List(Foo, Foo) for Eq"
+        s"Invalid param types List(Foo, Foo) for == operator"
     }
 
     {
@@ -4954,7 +4954,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileContractFull(code)
         .leftValue
-        .message is "Invalid param types List(Foo, Foo) for Eq"
+        .message is "Invalid param types List(Foo, Foo) for == operator"
     }
 
     {
@@ -4984,6 +4984,143 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code1, "These structs \"List(Foo)\" have circular references")
+    }
+
+    {
+      info("Immutable struct field")
+      def code(fields: String) =
+        s"""
+           |struct Baz { a: U256 }
+           |struct Qux { mut a: U256 }
+           |struct Foo { x: U256, $fields }
+           |Contract Bar(mut foo: Foo) {
+           |  pub fn f() -> U256 {
+           |    return foo.x
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContractFull(code("y: U256")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: [U256; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: Baz")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: [Baz; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("mut y: Baz")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("mut y: [Baz; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: Qux")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("y: [Qux; 2]")).rightValue.warnings is
+        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
+      Compiler.compileContractFull(code("mut y: U256")).rightValue.warnings.isEmpty is true
+      Compiler.compileContractFull(code("mut y: Qux")).rightValue.warnings.isEmpty is true
+      Compiler.compileContractFull(code("mut y: [Qux; 2]")).rightValue.warnings.isEmpty is true
+    }
+
+    {
+      info("Variable does not exist")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract Bar() {
+           |  pub fn func() -> Foo {
+           |    return Foo { $$x$$ }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Variable func.x does not exist or is used before declaration")
+    }
+
+    {
+      info("Invalid variable type")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract Bar() {
+           |  pub fn func() -> Foo {
+           |    let x = true
+           |    return $$Foo { x }$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Invalid struct fields, expect List(x:U256)")
+    }
+
+    {
+      info("Invalid expr type in struct destruction")
+      def code(expr: String) =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |struct Bar { a: U256 }
+           |Contract Baz() {
+           |  pub fn func() -> U256 {
+           |    let Foo { a, b } = $$$expr$$
+           |    return a + b
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code("0"), "Expected struct type \"Foo\", got \"U256\"")
+      testContractError(code("Bar { a: 0 }"), "Expected struct type \"Foo\", got \"Bar\"")
+      testContractError(
+        code("[0; 2]"),
+        "Expected struct type \"Foo\", got \"FixedSizeArray(U256,2)\""
+      )
+    }
+
+    {
+      info("Invalid struct field in struct destruction")
+      def code(varDeclaration: String, stmt: String = "") =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |Contract Baz() {
+           |  pub fn func() -> U256 {
+           |    let Foo { $varDeclaration } = Foo { x: 0, y: 0 }
+           |    $stmt
+           |    return 0
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$a$$: x1"), "Field a does not exist in struct Foo")
+      testContractError(code(s"mut $$a$$: x1"), "Field a does not exist in struct Foo")
+      Compiler.compileContract(code("x")).isRight is true
+      Compiler.compileContract(code("mut x: x1", "x1 = 2")).isRight is true
+    }
+
+    {
+      info("Variable already exists")
+      def code(varDeclaration: String) =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |Contract Baz() {
+           |  pub fn func() -> U256 {
+           |    let x = 0
+           |    let Foo { $varDeclaration } = Foo { x: 0, y: 0 }
+           |    return x
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$x$$"), "Local variables have the same name: x")
+      Compiler.compileContract(code("x: x1")).isRight is true
+    }
+
+    {
+      info("Assign to immutable variable")
+      def code(mut: String = "") =
+        s"""
+           |struct Foo { x: U256, y: U256 }
+           |Contract Bar() {
+           |  pub fn func(foo: Foo) -> () {
+           |    let Foo { $mut x } = foo
+           |    $$x = 0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(), "Cannot assign to immutable variable x.")
+      Compiler.compileContractFull(code("mut").replace("$", "")).isRight is true
     }
   }
 
@@ -5404,6 +5541,75 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         )
       )
     }
+
+    {
+      info("Create a struct using variables as fields")
+      val code =
+        s"""
+           |struct Foo { x: U256, y: ByteVec }
+           |struct Bar { a: Bool, b: U256, foo: Foo }
+           |Contract Baz() {
+           |  pub fn f() -> () {
+           |    let x = 0
+           |    let y = #00
+           |    let foo = Foo { x, y }
+           |    let a = true
+           |    let bar = Bar { a, b: 1, foo }
+           |    assert!(bar.a, 0)
+           |    assert!(bar.b == 1, 0)
+           |    assert!(bar.foo.x == 0, 0)
+           |    assert!(bar.foo.y == #00, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("Struct destruction")
+      val code =
+        s"""
+           |struct Foo { mut x: U256, y: U256 }
+           |struct Bar { a: U256, b: [U256; 2], foo: Foo }
+           |Contract Baz() {
+           |  pub fn func() -> () {
+           |    let fooInstance = Foo { x: 0, y: 1 }
+           |    let Foo { x, y } = fooInstance
+           |    assert!(x == 0 && y == 1, 0)
+           |
+           |    let Foo { x: x0, y: y0 } = fooInstance
+           |    assert!(x0 == 0 && y0 == 1, 0)
+           |
+           |    let Foo { mut x: x1, mut y: y1 } = fooInstance
+           |    assert!(x1 == 0 && y1 == 1, 0)
+           |    x1 = 1
+           |    y1 = 2
+           |    assert!(x1 == 1 && y1 == 2, 0)
+           |
+           |    let Foo { x: x2, y: y2 } = Foo { y: 2, x: 1 }
+           |    assert!(x2 == 1 && y2 == 2, 0)
+           |
+           |    let bar = Bar { a: 0, b: [1, 2], foo: Foo { x: 3, y: 4 } }
+           |    let Bar { a, b, foo } = bar
+           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && foo.x == 3 && foo.y == 4, 0)
+           |    let Bar { a: a0, b: b0, foo: foo0 } = bar
+           |    assert!(a0 == 0 && b0[0] == 1 && b0[1] == 2 && foo0.x == 3 && foo0.y == 4, 0)
+           |    let Bar { b: b1, foo: foo1 } = bar
+           |    assert!(b1[0] == 1 && b1[1] == 2 && foo1.x == 3 && foo1.y == 4, 0)
+           |    let Bar { foo: foo2 } = bar
+           |    assert!(foo2.x == 3 && foo2.y == 4, 0)
+           |    let Bar { a: a3, foo: foo3 } = bar
+           |    assert!(a3 == 0 && foo3.x == 3 && foo3.y == 4, 0)
+           |    let Bar { a: a4, mut b: b4, mut foo: foo4 } = bar
+           |    assert!(a4 == 0 && b4[0] == 1 && b4[1] == 2 && foo4.x == 3 && foo4.y == 4, 0)
+           |    b4 = [5, 6]
+           |    foo4.x = 7
+           |    assert!(a4 == 0 && b4[0] == 5 && b4[1] == 6 && foo4.x == 7 && foo4.y == 4, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
@@ -5459,7 +5665,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract C() {
-           |  const V = $$if (1) 2 else 3$$
+           |  const V = $$if (true) 2 else 3$$
            |  pub fn f() -> () {}
            |}
            |""".stripMargin
@@ -5468,6 +5674,123 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, other expressions are not supported"
       )
+    }
+  }
+
+  it should "test constant expressions" in {
+    def code(expr: String) =
+      s"""
+         |Contract Foo(b: U256) {
+         |  const A = 1
+         |  const B = 2
+         |  const C = -1i
+         |  const D = 2i
+         |  const E = #00
+         |  const F = false
+         |  const G = $expr
+         |  const H = @${Address.p2pkh(PublicKey.generate).toBase58}
+         |
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    {
+      info("invalid const expressions")
+      testContractError(code(s"$$G$$"), "Variable G does not exist or is used before declaration")
+      testContractError(code(s"$$H$$"), "Variable H does not exist or is used before declaration")
+      testContractError(
+        code(s"A + $$I$$"),
+        "Variable I does not exist or is used before declaration"
+      )
+      testContractError(
+        code(s"A + $$b$$"),
+        "Constant variable b does not exist or is used before declaration"
+      )
+      testContractError(code(s"$$A + C$$"), "Invalid param types List(U256, I256) for + operator")
+      testContractError(code(s"$$A - B$$"), "U256 overflow")
+      testContractError(code(s"$$A - C$$"), "Invalid param types List(U256, I256) for - operator")
+      testContractError(code(s"$$A * C$$"), "Invalid param types List(U256, I256) for * operator")
+      testContractError(code(s"$$A / C$$"), "Invalid param types List(U256, I256) for / operator")
+      testContractError(code(s"$$A % C$$"), "Invalid param types List(U256, I256) for % operator")
+      testContractError(
+        code(s"$$A |+| C$$"),
+        "Invalid param types List(U256, I256) for |+| operator"
+      )
+      testContractError(
+        code(s"$$A |-| C$$"),
+        "Invalid param types List(U256, I256) for |-| operator"
+      )
+      testContractError(
+        code(s"$$A |*| C$$"),
+        "Invalid param types List(U256, I256) for |*| operator"
+      )
+      testContractError(
+        code(s"$$A |**| C$$"),
+        "Invalid param types List(U256, I256) for |**| operator"
+      )
+      testContractError(code(s"$$B + D$$"), "Invalid param types List(U256, I256) for + operator")
+      testContractError(code(s"$$B - D$$"), "Invalid param types List(U256, I256) for - operator")
+      testContractError(
+        code(s"$$E ++ F$$"),
+        "Invalid param types List(ByteVec, Bool) for ++ operator"
+      )
+      testContractError(
+        code(s"$$B ** E$$"),
+        "Invalid param types List(U256, ByteVec) for ** operator"
+      )
+      testContractError(
+        code(s"$$E << 2$$"),
+        "Invalid param types List(ByteVec, U256) for << operator"
+      )
+      testContractError(code(s"$$F >> 2$$"), "Invalid param types List(Bool, U256) for >> operator")
+      testContractError(code(s"$$A ^ C$$"), "Invalid param types List(U256, I256) for ^ operator")
+      testContractError(code(s"$$!E$$"), "Invalid param types List(ByteVec) for ! operator")
+      testContractError(code(s"$$A == C$$"), "Invalid param types List(U256, I256) for == operator")
+      testContractError(code(s"$$B != D$$"), "Invalid param types List(U256, I256) for != operator")
+      testContractError(
+        code(s"$$F && E$$"),
+        "Invalid param types List(Bool, ByteVec) for && operator"
+      )
+      testContractError(
+        code(s"$$F || E$$"),
+        "Invalid param types List(Bool, ByteVec) for || operator"
+      )
+      testContractError(
+        code(s"$$A <= E$$"),
+        "Invalid param types List(U256, ByteVec) for <= operator"
+      )
+      testContractError(code(s"$$A < F$$"), "Invalid param types List(U256, Bool) for < operator")
+      testContractError(code(s"$$C >= B$$"), "Invalid param types List(I256, U256) for >= operator")
+      testContractError(code(s"$$C > B$$"), "Invalid param types List(I256, U256) for > operator")
+    }
+
+    {
+      info("valid constant expressions")
+      Compiler.compileContract(code("A + B")).isRight is true
+      Compiler.compileContract(code("C + D")).isRight is true
+      Compiler.compileContract(code("B - A")).isRight is true
+      Compiler.compileContract(code("C - D")).isRight is true
+      Compiler.compileContract(code("A * B")).isRight is true
+      Compiler.compileContract(code("A / B")).isRight is true
+      Compiler.compileContract(code("A % B")).isRight is true
+      Compiler.compileContract(code(s"""b`hello` ++ E""")).isRight is true
+      Compiler.compileContract(code("A ** B")).isRight is true
+      Compiler.compileContract(code("A |+| B")).isRight is true
+      Compiler.compileContract(code("A |-| B")).isRight is true
+      Compiler.compileContract(code("A |*| B")).isRight is true
+      Compiler.compileContract(code("A |**| B")).isRight is true
+      Compiler.compileContract(code("A << 2")).isRight is true
+      Compiler.compileContract(code("B << 2")).isRight is true
+      Compiler.compileContract(code("A ^ B")).isRight is true
+      Compiler.compileContract(code("!F")).isRight is true
+      Compiler.compileContract(code("A == 2")).isRight is true
+      Compiler.compileContract(code("A != B")).isRight is true
+      Compiler.compileContract(code("(A == 2) && F")).isRight is true
+      Compiler.compileContract(code("(A > 2) || F")).isRight is true
+      Compiler.compileContract(code("A <= B")).isRight is true
+      Compiler.compileContract(code("C < D")).isRight is true
+      Compiler.compileContract(code("A >= B")).isRight is true
+      Compiler.compileContract(code("C > D")).isRight is true
     }
   }
 

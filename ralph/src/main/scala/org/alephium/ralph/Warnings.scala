@@ -99,6 +99,15 @@ trait Warnings {
     warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
       s" If this is intentional, consider using anonymous variables to suppress this warning."
   }
+
+  def warningMutableStructField(
+      typeId: Ast.TypeId,
+      fieldId: Ast.Ident,
+      structId: Ast.TypeId
+  ): Unit = {
+    warnings +=
+      s"The struct ${structId.name} is immutable, you can remove the `mut` from ${typeId.name}.${fieldId.name}"
+  }
 }
 
 object Warnings {

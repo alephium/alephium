@@ -100,8 +100,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       StructCtor[StatefulContext](
         TypeId("Foo"),
         Seq(
-          (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
-          (Ident("y"), Const(Val.False))
+          (Ident("x"), Some(Const(Val.U256(U256.unsafe(1))))),
+          (Ident("y"), Some(Const(Val.False)))
         )
       )
     parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
@@ -110,8 +110,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           StructCtor(
             TypeId("Foo"),
             Seq(
-              (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
-              (Ident("y"), Const(Val.False))
+              (Ident("x"), Some(Const(Val.U256(U256.unsafe(1))))),
+              (Ident("y"), Some(Const(Val.False)))
             )
           )
         ),
@@ -121,25 +121,37 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       StructCtor[StatefulContext](
         TypeId("Foo"),
         Seq(
-          (Ident("x"), Const(Val.True)),
-          (Ident("bar"), StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))))
+          (Ident("x"), Some(Const(Val.True))),
+          (Ident("bar"), Some(StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False)))))))
         )
       )
     parse("Foo { x: true, bar: [Bar { y: false }; 2] }", StatefulParser.expr(_)).get.value is
       StructCtor[StatefulContext](
         TypeId("Foo"),
         Seq(
-          (Ident("x"), Const(Val.True)),
+          (Ident("x"), Some(Const(Val.True))),
           (
             Ident("bar"),
-            CreateArrayExpr(
-              Seq(
-                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))),
-                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False))))
+            Some(
+              CreateArrayExpr(
+                Seq(
+                  StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False))))),
+                  StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False)))))
+                )
               )
             )
           )
         )
+      )
+    parse("Foo { x, y }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq((Ident("x"), None), (Ident("y"), None))
+      )
+    parse("Foo { x: true, y }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq((Ident("x"), Some(Const(Val.True))), (Ident("y"), None))
       )
     parse("a.b.c", StatefulParser.expr(_)).get.value is
       StructFieldSelector[StatefulContext](
@@ -946,18 +958,19 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     failure.trace().longMsg.contains("constant variables must start with an uppercase letter")
 
     val address = Address.p2pkh(PublicKey.generate)
-    val definitions = Seq[(String, Val)](
-      ("const C = true", Val.True),
-      ("const C = 1", Val.U256(U256.One)),
-      ("const C = 1i", Val.I256(I256.One)),
-      ("const C = #11", Val.ByteVec(Hex.unsafe("11"))),
-      ("const C = b`hello`", Val.ByteVec(ByteString.fromString("hello"))),
-      (s"const C = @${address.toBase58}", Val.Address(address.lockupScript))
+    val definitions = Seq[(String, Expr[StatefulContext])](
+      ("const C = true", Const(Val.True)),
+      ("const C = 1", Const(Val.U256(U256.One))),
+      ("const C = 1i", Const(Val.I256(I256.One))),
+      ("const C = #11", Const(Val.ByteVec(Hex.unsafe("11")))),
+      ("const C = b`hello`", Const(Val.ByteVec(ByteString.fromString("hello")))),
+      (s"const C = @${address.toBase58}", Const(Val.Address(address.lockupScript))),
+      ("const C = A + B", Binop(ArithOperator.Add, Variable(Ident("A")), Variable(Ident("B"))))
     )
     definitions.foreach { definition =>
       val constantVar = parse(definition._1, StatefulParser.constantVarDef(_)).get.value
       constantVar.ident.name is "C"
-      constantVar.value.v is definition._2
+      constantVar.expr is definition._2
     }
   }
 
@@ -1907,6 +1920,60 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.message is "These struct fields are defined multiple times: a"
       error.position is code.indexOf("$")
     }
+  }
+
+  it should "parse struct destruction" in {
+    checkParseStat(
+      "let Foo { x, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = false, Ident("x"), None),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { mut x, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = true, Ident("x"), None),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { x: x1, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = false, Ident("x"), Some(Ident("x1"))),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { mut x: x1, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = true, Ident("x"), Some(Ident("x1"))),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+
+    val invalidStmt = s"$$let Foo { } = foo"
+    val error = intercept[Compiler.Error](
+      fastparse.parse(invalidStmt.replace("$", ""), StatefulParser.structDestruction(_))
+    )
+    error.message is "No variable declaration"
+    error.position is invalidStmt.indexOf("$")
   }
 
   it should "handle correct const width lexer" in {
