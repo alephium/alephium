@@ -107,20 +107,20 @@ class MemPoolSpec
     tx1.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
     pool.isDoubleSpending(index0, tx0) is true
     pool.isDoubleSpending(index0, tx1) is true
-    tx0.assetOutputRefs.foreach(output =>
+    tx0.fixedOutputRefs.foreach(output =>
       pool.sharedTxIndexes.outputIndex.contains(output) is
         (output.fromGroup equals mainGroup)
     )
-    tx1.assetOutputRefs.foreach(output =>
+    tx1.fixedOutputRefs.foreach(output =>
       pool.sharedTxIndexes.outputIndex.contains(output) is
         (output.fromGroup equals mainGroup)
     )
-    tx0.assetOutputRefs.foreachWithIndex((output, index) =>
+    tx0.fixedOutputRefs.foreachWithIndex((output, index) =>
       if (output.fromGroup equals mainGroup) {
         pool.getOutput(output) is Some(tx0.getOutput(index))
       }
     )
-    tx1.assetOutputRefs.foreachWithIndex((output, index) =>
+    tx1.fixedOutputRefs.foreachWithIndex((output, index) =>
       if (output.fromGroup equals mainGroup) {
         pool.getOutput(output) is Some(tx1.getOutput(index))
       }
@@ -139,12 +139,12 @@ class MemPoolSpec
 
     pool.add(chainIndex, tx2, TimeStamp.now())
     pool.add(chainIndex, tx3, now)
-    val tx2Outputs = tx2.assetOutputRefs
+    val tx2Outputs = tx2.fixedOutputRefs
     tx2Outputs.length is 2
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.head) is true
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.last) is true
     pool.isSpent(tx2Outputs.last) is true
-    tx3.assetOutputRefs.foreach(output => pool.isSpent(output) is false)
+    tx3.fixedOutputRefs.foreach(output => pool.isSpent(output) is false)
   }
 
   it should "work for sequential txs for inter-group chain" in new Fixture {
@@ -159,12 +159,12 @@ class MemPoolSpec
 
     pool.add(chainIndex, tx2, TimeStamp.now())
     pool.add(chainIndex, tx3, now)
-    val tx2Outputs = tx2.assetOutputRefs
+    val tx2Outputs = tx2.fixedOutputRefs
     tx2Outputs.length is 2
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.head) is false
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.last) is true
     pool.isSpent(tx2Outputs.last) is true
-    tx3.assetOutputRefs.foreach { output =>
+    tx3.fixedOutputRefs.foreach { output =>
       if (output.fromGroup.value == 0) {
         pool.isSpent(output) is false
       } else {
@@ -241,7 +241,7 @@ class MemPoolSpec
     val timeStamp = TimeStamp.now()
     Random.shuffle(txs).foreach(tx => pool.add(index, tx, timeStamp))
 
-    pool.collectForBlock(index, Int.MaxValue) is AVector.from(
+    pool.collectNonSequentialTxs(index, Int.MaxValue) is AVector.from(
       txs.sortBy(_.unsigned.gasPrice.value).reverse
     )
   }
@@ -253,7 +253,7 @@ class MemPoolSpec
     val tx        = transactionGen().retryUntil(_.chainIndex == index).sample.get.toTemplate
     pool.addXGroupTx(index, tx, TimeStamp.now())
     pool.size is 1
-    pool.collectForBlock(ChainIndex(mainGroup, mainGroup), Int.MaxValue).isEmpty is true
+    pool.collectNonSequentialTxs(ChainIndex(mainGroup, mainGroup), Int.MaxValue).isEmpty is true
 
     pool.cleanInvalidTxs(blockFlow, TimeStamp.now().plusHoursUnsafe(1)) is 1
     pool.size is 0

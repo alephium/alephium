@@ -120,7 +120,7 @@ class GrandPoolSpec extends AlephiumSpec {
         if (groupIndex == chainIndex.from) {
           memPool.size is 1
           tx.unsigned.inputs.foreach(input => memPool.isSpent(input.outputRef) is true)
-          tx.assetOutputRefs.foreach(ref => memPool.getOutput(ref).nonEmpty is true)
+          tx.fixedOutputRefs.foreach(ref => memPool.getOutput(ref).nonEmpty is true)
         } else {
           memPool.size is 0
         }
@@ -146,7 +146,7 @@ class GrandPoolSpec extends AlephiumSpec {
             memPool.sharedTxIndexes.inputIndex.contains(input.outputRef) is true
           )
           tx.unsigned.inputs.foreach(input => memPool.isSpent(input.outputRef) is true)
-          tx.assetOutputRefs.foreach(ref =>
+          tx.fixedOutputRefs.foreach(ref =>
             if (ref.fromGroup == chainIndex.from) {
               memPool.getOutput(ref).nonEmpty is true
             } else {
@@ -158,7 +158,7 @@ class GrandPoolSpec extends AlephiumSpec {
           tx.unsigned.inputs.foreach(input =>
             memPool.sharedTxIndexes.inputIndex.contains(input.outputRef) is false
           )
-          tx.assetOutputRefs
+          tx.fixedOutputRefs
             .foreach(ref =>
               if (ref.fromGroup == chainIndex.to) {
                 memPool.getOutput(ref).nonEmpty is true

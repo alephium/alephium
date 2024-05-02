@@ -396,7 +396,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       addWithoutViewUpdate(blockFlow, block0)
       val newDeps = blockFlow.calBestDepsUnsafe(chainIndex.from)
       blockFlow.updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps, heightGap)
-      mempool.collectForBlock(chainIndex, Int.MaxValue) is expected
+      mempool.collectNonSequentialTxs(chainIndex, Int.MaxValue) is expected
     }
 
     test(0, AVector(tx0))

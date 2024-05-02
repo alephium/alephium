@@ -66,8 +66,14 @@ class MemPool private (
     _contains(txId) && flow.unsafe(txId).isSource()
   }
 
-  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
-    flow.takeSourceNodes(index.flattenIndex, maxNum, _.tx)
+  // No inter-dependent transactions
+  def collectNonSequentialTxs(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
+    readOnly {
+      flow.takeSourceNodes(index.flattenIndex, maxNum, _.tx)
+    }
+
+  def collectAllTxs(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
+    flow.takeAllTxs(index.flattenIndex, maxNum)
   }
 
   def getAll(): AVector[TransactionTemplate] = readOnly {
@@ -368,7 +374,11 @@ object MemPool {
   ) extends KeyedFlow[TransactionId, FlowNode](
         sourceTxs.as[SimpleMap[TransactionId, FlowNode]],
         allTxs
-      ) {}
+      ) {
+    def takeAllTxs(sourceIndex: Int, maxNum: Int): AVector[TransactionTemplate] = {
+      AVector.from(allTxs.values().filter(_.chainIndex == sourceIndex).map(_.tx).take(maxNum))
+    }
+  }
 
   object Flow {
     def empty(implicit groupConfig: GroupConfig): Flow =

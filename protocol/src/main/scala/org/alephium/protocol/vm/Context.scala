@@ -30,7 +30,8 @@ final case class BlockEnv(
     timeStamp: TimeStamp,
     target: Target,
     blockId: Option[BlockHash],
-    hardFork: HardFork
+    hardFork: HardFork,
+    newOutputRefCache: Option[scala.collection.mutable.HashMap[AssetOutputRef, AssetOutput]]
 ) {
   @inline def getHardFork(): HardFork = hardFork
 }
@@ -48,7 +49,8 @@ object BlockEnv {
       timeStamp,
       target,
       blockId,
-      networkConfig.getHardFork(timeStamp)
+      networkConfig.getHardFork(timeStamp),
+      None
     )
 
   def from(chainIndex: ChainIndex, header: BlockHeader)(implicit
@@ -60,7 +62,8 @@ object BlockEnv {
       header.timestamp,
       header.target,
       Some(header.hash),
-      networkConfig.getHardFork(header.timestamp)
+      networkConfig.getHardFork(header.timestamp),
+      Some(scala.collection.mutable.HashMap.empty)
     )
 }
 

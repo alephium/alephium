@@ -34,8 +34,8 @@ class KeyedFlow[K, N <: KeyedFlow.Node[K, N]](
 
   def unsafe(key: K): N = allNodes.unsafe(key)
 
-  def takeSourceNodes[T: ClassTag](sourceGroup: Int, maxNum: Int, f: N => T): AVector[T] = {
-    AVector.from(sourceNodeGroups(sourceGroup).values().map(f).take(maxNum))
+  def takeSourceNodes[T: ClassTag](sourceIndex: Int, maxNum: Int, f: N => T): AVector[T] = {
+    AVector.from(sourceNodeGroups(sourceIndex).values().map(f).take(maxNum))
   }
 
   def clear(): Unit = {

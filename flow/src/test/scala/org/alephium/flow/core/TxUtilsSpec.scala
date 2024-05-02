@@ -162,7 +162,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
       groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
-      tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+      tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
           if (chainIndex.isIntraGroup) {
@@ -191,7 +191,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
-        tx.assetOutputRefs.foreach { outputRef =>
+        tx.fixedOutputRefs.foreach { outputRef =>
           groupView.getPreOutput(outputRef) isE None
         }
       }
@@ -199,7 +199,7 @@ class TxUtilsSpec extends AlephiumSpec {
       {
         val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
         groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
-        tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+        tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
           val output = tx.unsigned.fixedOutputs(index)
           if (output.toGroup equals chainIndex.from) {
             groupView.getPreOutput(outputRef) isE Some(output)

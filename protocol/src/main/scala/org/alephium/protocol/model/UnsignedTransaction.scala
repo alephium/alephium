@@ -77,6 +77,11 @@ final case class UnsignedTransaction(
 
   // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
+
+  lazy val fixedOutputRefs: AVector[AssetOutputRef] = fixedOutputs.mapWithIndex {
+    case (output, outputIndex) =>
+      AssetOutputRef.from(output, TxOutputRef.key(id, outputIndex))
+  }
 }
 
 object UnsignedTransaction {

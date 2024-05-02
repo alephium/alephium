@@ -519,8 +519,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       groupView: BlockFlowGroupView[WorldState.Cached],
       hardFork: HardFork
   ): BlockValidationResult[Unit] = {
-    val blockEnv       = BlockEnv.from(chainIndex, block.header)
-    val parentHash     = block.blockDeps.uncleHash(chainIndex.to)
+    val blockEnv          = BlockEnv.from(chainIndex, block.header)
+    val newOutputRefCache = blockEnv.newOutputRefCache.get
+    val parentHash        = block.blockDeps.uncleHash(chainIndex.to)
     val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase, hardFork)
     EitherF.foreachTry(executionOrder) { index =>
       val tx = block.transactions(index)
@@ -531,6 +532,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         blockEnv,
         None
       )
+      tx.unsigned.fixedOutputRefs.foreachWithIndex { case (outputRef, outputIndex) =>
+        newOutputRefCache(outputRef) = tx.unsigned.fixedOutputs(outputIndex)
+      }
       txValidationResult match {
         case Right(_) => Right(())
         case Left(Right(TxScriptExeFailed(_))) =>
