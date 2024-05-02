@@ -926,7 +926,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
-        Some(GasBox.unsafe(5000000)),
+        Some(GasBox.unsafe(600000)),
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
@@ -943,7 +943,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         ALPH.alph(ALPH.MaxTxInputNum.toLong),
-        Some(GasBox.unsafe(5000000)),
+        Some(GasBox.unsafe(600000)),
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
@@ -952,7 +952,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer with large amount of UTXOs with estimated gas" in new LargeUtxos {
-    val maxP2PKHInputsAllowedByGas = 512
+    val maxP2PKHInputsAllowedByGas = 151
 
     info("With provided Utxos")
 
@@ -970,7 +970,7 @@ class TxUtilsSpec extends AlephiumSpec {
       )
     )
 
-    val tx0 = blockFlow
+    blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
         availableInputs.take(maxP2PKHInputsAllowedByGas),
@@ -980,30 +980,24 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    tx0.inputs.length is 512
-    tx0.fixedOutputs.length is 2
-    tx0.gasAmount is GasBox.unsafe(2088720)
+      .inputs
+      .length is maxP2PKHInputsAllowedByGas
 
-    val outputInfos = AVector.fill(ALPH.MaxTxOutputNum - 1)(
-      TxOutputInfo(output.lockupScript, ALPH.oneAlph, AVector.empty, None)
-    )
-    val tx1 = blockFlow
+    blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
-        availableInputs.take(maxP2PKHInputsAllowedByGas),
-        outputInfos,
+        availableInputs.take(maxP2PKHInputsAllowedByGas + 1),
+        outputInfo,
         None,
         nonCoinbaseMinGasPrice
       )
       .rightValue
       .rightValue
-    tx1.inputs.length is 512
-    tx1.fixedOutputs.length is 512
-    tx1.gasAmount is GasBox.unsafe(4383720)
+      .gasAmount is GasBox.unsafe(627120)
 
     info("Without provided Utxos")
 
-    val tx2 = blockFlow
+    blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
@@ -1015,23 +1009,22 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    tx2.inputs.length is 512
-    tx2.fixedOutputs.length is 2
-    tx2.gasAmount is GasBox.unsafe(2088720)
+      .inputs
+      .length is maxP2PKHInputsAllowedByGas
 
-    val tx3 = blockFlow
+    blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
-        outputInfos,
+        output.lockupScript,
+        None,
+        ALPH.alph(maxP2PKHInputsAllowedByGas.toLong),
         None,
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
       .rightValue
-    tx3.inputs.length is 512
-    tx3.fixedOutputs.length is 512
-    tx3.gasAmount is GasBox.unsafe(4383720)
+      .gasAmount is GasBox.unsafe(627120)
   }
 
   it should "sweep as much as we can" in new LargeUtxos {

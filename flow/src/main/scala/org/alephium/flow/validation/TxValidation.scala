@@ -257,8 +257,8 @@ trait TxValidation {
     for {
       _ <- checkVersion(tx)
       _ <- checkNetworkId(tx)
-      _ <- checkInputNum(tx, chainIndex.isIntraGroup, hardFork)
-      _ <- checkOutputNum(tx, chainIndex.isIntraGroup, hardFork)
+      _ <- checkInputNum(tx, chainIndex.isIntraGroup)
+      _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkScriptSigNum(tx, chainIndex.isIntraGroup)
       _ <- checkGasBound(tx, isCoinbase, hardFork)
       _ <- checkOutputStats(tx, hardFork)
@@ -305,8 +305,8 @@ trait TxValidation {
   // format: off
   protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit]
   protected[validation] def checkNetworkId(tx: Transaction): TxValidationResult[Unit]
-  protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean, hardFork: HardFork): TxValidationResult[Unit]
-  protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean, hardFork: HardFork): TxValidationResult[Unit]
+  protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
+  protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkScriptSigNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkGasBound(tx: TransactionAbstract, isCoinbase: Boolean, hardFork: HardFork): TxValidationResult[Unit]
   protected[validation] def checkOutputStats(tx: Transaction, hardFork: HardFork): TxValidationResult[U256]
@@ -363,42 +363,23 @@ object TxValidation {
 
     protected[validation] def checkInputNum(
         tx: Transaction,
-        isIntraGroup: Boolean,
-        hardFork: HardFork
+        isIntraGroup: Boolean
     ): TxValidationResult[Unit] = {
-      if (isIntraGroup) {
-        checkIntraGroupInputNum(tx, hardFork)
-      } else {
-        checkInterGroupInputNum(tx, hardFork)
-      }
+      if (isIntraGroup) checkIntraGroupInputNum(tx) else checkInterGroupInputNum(tx)
     }
-    @inline protected[validation] def checkIntraGroupInputNum(
-        tx: Transaction,
-        hardFork: HardFork
-    ): TxValidationResult[Unit] = {
-      checkInputNumCommon(tx.inputsLength, hardFork)
+    protected[validation] def checkIntraGroupInputNum(tx: Transaction): TxValidationResult[Unit] = {
+      checkInputNumCommon(tx.inputsLength)
     }
-    @inline protected[validation] def checkInterGroupInputNum(
-        tx: Transaction,
-        hardFork: HardFork
-    ): TxValidationResult[Unit] = {
+    protected[validation] def checkInterGroupInputNum(tx: Transaction): TxValidationResult[Unit] = {
       if (tx.contractInputs.nonEmpty) {
         invalidTx(ContractInputForInterGroupTx)
       } else {
-        checkInputNumCommon(tx.unsigned.inputs.length, hardFork)
+        checkInputNumCommon(tx.unsigned.inputs.length)
       }
     }
-    @inline protected[validation] def checkInputNumCommon(
-        inputNum: Int,
-        hardFork: HardFork
-    ): TxValidationResult[Unit] = {
-      val maxTxInputNum = if (hardFork.isGhostEnabled()) {
-        ALPH.MaxTxInputNum
-      } else {
-        ALPH.MaxTxInputNumPreRhone
-      }
+    protected[validation] def checkInputNumCommon(inputNum: Int): TxValidationResult[Unit] = {
       // inputNum can be 0 due to coinbase tx
-      if (inputNum > maxTxInputNum) {
+      if (inputNum > ALPH.MaxTxInputNum) {
         invalidTx(TooManyInputs)
       } else {
         validTx(())
@@ -407,43 +388,30 @@ object TxValidation {
 
     protected[validation] def checkOutputNum(
         tx: Transaction,
-        isIntraGroup: Boolean,
-        hardFork: HardFork
+        isIntraGroup: Boolean
     ): TxValidationResult[Unit] = {
-      if (isIntraGroup) {
-        checkIntraGroupOutputNum(tx, hardFork)
-      } else {
-        checkInterGroupOutputNum(tx, hardFork)
-      }
+      if (isIntraGroup) checkIntraGroupOutputNum(tx) else checkInterGroupOutputNum(tx)
     }
     @inline protected[validation] def checkIntraGroupOutputNum(
-        tx: Transaction,
-        hardFork: HardFork
+        tx: Transaction
     ): TxValidationResult[Unit] = {
-      checkOutputNumCommon(tx.outputsLength, hardFork)
+      checkOutputNumCommon(tx.outputsLength)
     }
     @inline protected[validation] def checkInterGroupOutputNum(
-        tx: Transaction,
-        hardFork: HardFork
+        tx: Transaction
     ): TxValidationResult[Unit] = {
       if (tx.generatedOutputs.nonEmpty) {
         invalidTx(GeneratedOutputForInterGroupTx)
       } else {
-        checkOutputNumCommon(tx.unsigned.fixedOutputs.length, hardFork)
+        checkOutputNumCommon(tx.unsigned.fixedOutputs.length)
       }
     }
     @inline protected[validation] def checkOutputNumCommon(
-        outputNum: Int,
-        hardFork: HardFork
+        outputNum: Int
     ): TxValidationResult[Unit] = {
-      val maxTxOutputNum = if (hardFork.isGhostEnabled()) {
-        ALPH.MaxTxOutputNum
-      } else {
-        ALPH.MaxTxOutputNumPreRhone
-      }
       if (outputNum == 0) {
         invalidTx(NoOutputs)
-      } else if (outputNum > maxTxOutputNum) {
+      } else if (outputNum > ALPH.MaxTxOutputNum) {
         invalidTx(TooManyOutputs)
       } else {
         validTx(())

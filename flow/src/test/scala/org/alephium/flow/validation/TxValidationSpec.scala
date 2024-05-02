@@ -335,65 +335,37 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx    = transactionGen().sample.get
     val input = tx.unsigned.inputs.head
 
-    val maxContractInputPreRhone = ALPH.MaxTxInputNumPreRhone - tx.inputsLength
-    val modified0                = tx.inputs(AVector.fill(ALPH.MaxTxInputNumPreRhone)(input))
-    val modified1                = tx.inputs(AVector.fill(ALPH.MaxTxInputNumPreRhone + 1)(input))
+    val modified0 = tx.inputs(AVector.fill(ALPH.MaxTxInputNum)(input))
+    val modified1 = tx.inputs(AVector.fill(ALPH.MaxTxInputNum + 1)(input))
     val contractOutputRef =
       ContractOutputRef.unsafe(Hint.unsafe(1), TxOutputRef.unsafeKey(Hash.zero))
-    val modified2 =
-      tx.copy(contractInputs = AVector.fill(maxContractInputPreRhone)(contractOutputRef))
+    val modified2 = tx.copy(contractInputs = AVector(contractOutputRef))
     val modified3 =
-      tx.copy(contractInputs = AVector.fill(maxContractInputPreRhone + 1)(contractOutputRef))
-
-    val maxContractInput = ALPH.MaxTxInputNum - tx.inputsLength
-    val modified4        = tx.inputs(AVector.fill(ALPH.MaxTxInputNum)(input))
-    val modified5        = tx.inputs(AVector.fill(ALPH.MaxTxInputNum + 1)(input))
-    val modified6 = tx.copy(contractInputs = AVector.fill(maxContractInput)(contractOutputRef))
-    val modified7 =
-      tx.copy(contractInputs = AVector.fill(maxContractInput + 1)(contractOutputRef))
+      tx.copy(contractInputs = AVector.fill(ALPH.MaxTxInputNum + 1)(contractOutputRef))
 
     {
-      val preRhoneValidator = checkInputNum(_, isIntraGroup = false, HardFork.PreRhoneForTest)
-      modified0.pass()(preRhoneValidator)
-      modified1.fail(TooManyInputs)(preRhoneValidator)
-      modified2.fail(ContractInputForInterGroupTx)(preRhoneValidator)
-      modified3.fail(ContractInputForInterGroupTx)(preRhoneValidator)
+      implicit val validator = checkInputNum(_, isIntraGroup = false)
 
-      val rhoneValidator = checkInputNum(_, isIntraGroup = false, HardFork.Ghost)
-      modified0.pass()(rhoneValidator)
-      modified1.pass()(rhoneValidator)
-      modified2.fail(ContractInputForInterGroupTx)(rhoneValidator)
-      modified3.fail(ContractInputForInterGroupTx)(rhoneValidator)
-      modified4.pass()(rhoneValidator)
-      modified5.fail(TooManyInputs)(rhoneValidator)
-      modified6.fail(ContractInputForInterGroupTx)(rhoneValidator)
-      modified7.fail(ContractInputForInterGroupTx)(rhoneValidator)
+      modified0.pass()
+      modified1.fail(TooManyInputs)
+      modified2.fail(ContractInputForInterGroupTx)
+      modified3.fail(ContractInputForInterGroupTx)
     }
 
     {
-      val preRhoneValidator = checkInputNum(_, isIntraGroup = true, HardFork.PreRhoneForTest)
-      modified0.pass()(preRhoneValidator)
-      modified1.fail(TooManyInputs)(preRhoneValidator)
-      modified2.pass()(preRhoneValidator)
-      modified3.fail(TooManyInputs)(preRhoneValidator)
+      implicit val validator = checkInputNum(_, isIntraGroup = true)
 
-      val rhoneValidator = checkInputNum(_, isIntraGroup = true, HardFork.Ghost)
-      modified0.pass()(rhoneValidator)
-      modified1.pass()(rhoneValidator)
-      modified2.pass()(rhoneValidator)
-      modified3.pass()(rhoneValidator)
-      modified4.pass()(rhoneValidator)
-      modified5.fail(TooManyInputs)(rhoneValidator)
-      modified6.pass()(rhoneValidator)
-      modified7.fail(TooManyInputs)(rhoneValidator)
+      modified0.pass()
+      modified1.fail(TooManyInputs)
+      modified2.pass()
+      modified3.fail(TooManyInputs)
     }
   }
 
   it should "check empty outputs" in new Fixture {
     forAll(transactionGenWithPreOutputs(2, 1)) { case (tx, preOutputs) =>
-      val hardFork = HardFork.All.apply(Random.nextInt(HardFork.All.length))
       implicit val validator =
-        nestedValidator(checkOutputNum(_, tx.chainIndex.isIntraGroup, hardFork), preOutputs)
+        nestedValidator(checkOutputNum(_, tx.chainIndex.isIntraGroup), preOutputs)
 
       tx.updateUnsigned(_.copy(fixedOutputs = AVector.empty)).fail(NoOutputs)
     }
@@ -404,53 +376,29 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val output = tx.unsigned.fixedOutputs.head
     tx.generatedOutputs.isEmpty is true
 
-    val maxGeneratedOutputsPreRhone = ALPH.MaxTxOutputNumPreRhone - tx.outputsLength
-    val modified0 = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNumPreRhone)(output))
-    val modified1 = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNumPreRhone + 1)(output))
-    val modified2 = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputsPreRhone)(output))
-    val modified3 =
-      tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputsPreRhone + 1)(output))
+    val maxGeneratedOutputsNum = ALPH.MaxTxOutputNum - tx.outputsLength
 
-    val maxGeneratedOutputs = ALPH.MaxTxOutputNum - tx.outputsLength
-    val modified4           = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNum)(output))
-    val modified5           = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNum + 1)(output))
-    val modified6           = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputs)(output))
-    val modified7 = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputs + 1)(output))
+    val modified0 = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNum)(output))
+    val modified1 = tx.fixedOutputs(AVector.fill(ALPH.MaxTxOutputNum + 1)(output))
+    val modified2 = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputsNum)(output))
+    val modified3 = tx.copy(generatedOutputs = AVector.fill(maxGeneratedOutputsNum + 1)(output))
 
     {
-      val preRhoneValidator = checkOutputNum(_, isIntraGroup = true, HardFork.PreRhoneForTest)
-      modified0.pass()(preRhoneValidator)
-      modified1.fail(TooManyOutputs)(preRhoneValidator)
-      modified2.pass()(preRhoneValidator)
-      modified3.fail(TooManyOutputs)(preRhoneValidator)
+      implicit val validator = checkOutputNum(_, isIntraGroup = true)
 
-      val rhoneValidator = checkOutputNum(_, isIntraGroup = true, HardFork.Ghost)
-      modified0.pass()(rhoneValidator)
-      modified1.pass()(rhoneValidator)
-      modified2.pass()(rhoneValidator)
-      modified3.pass()(rhoneValidator)
-      modified4.pass()(rhoneValidator)
-      modified5.fail(TooManyOutputs)(rhoneValidator)
-      modified6.pass()(rhoneValidator)
-      modified7.fail(TooManyOutputs)(rhoneValidator)
+      modified0.pass()
+      modified1.fail(TooManyOutputs)
+      modified2.pass()
+      modified3.fail(TooManyOutputs)
     }
 
     {
-      val preRhoneValidator = checkOutputNum(_, isIntraGroup = false, HardFork.PreRhoneForTest)
-      modified0.pass()(preRhoneValidator)
-      modified1.fail(TooManyOutputs)(preRhoneValidator)
-      modified2.fail(GeneratedOutputForInterGroupTx)(preRhoneValidator)
-      modified3.fail(GeneratedOutputForInterGroupTx)(preRhoneValidator)
+      implicit val validator = checkOutputNum(_, isIntraGroup = false)
 
-      val rhoneValidator = checkOutputNum(_, isIntraGroup = false, HardFork.Ghost)
-      modified0.pass()(rhoneValidator)
-      modified1.pass()(rhoneValidator)
-      modified2.fail(GeneratedOutputForInterGroupTx)(rhoneValidator)
-      modified3.fail(GeneratedOutputForInterGroupTx)(rhoneValidator)
-      modified4.pass()(rhoneValidator)
-      modified5.fail(TooManyOutputs)(rhoneValidator)
-      modified6.fail(GeneratedOutputForInterGroupTx)(rhoneValidator)
-      modified7.fail(GeneratedOutputForInterGroupTx)(rhoneValidator)
+      modified0.pass()
+      modified1.fail(TooManyOutputs)
+      modified2.fail(GeneratedOutputForInterGroupTx)
+      modified3.fail(GeneratedOutputForInterGroupTx)
     }
   }
 
