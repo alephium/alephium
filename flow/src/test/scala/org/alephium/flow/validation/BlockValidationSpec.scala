@@ -1085,8 +1085,9 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "invalidate blocks with sequential txs for pre-ghost hardfork" in new Fixture {
     override val configValues =
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
     override lazy val chainIndex = ChainIndex.unsafe(0, 0)
-    networkConfig.getHardFork(TimeStamp.now()).isGhostEnabled() is false
 
     val genesisKey              = genesisKeys(chainIndex.from.value)._1
     val (privateKey, publicKey) = chainIndex.from.generateKey

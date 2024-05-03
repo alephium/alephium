@@ -261,9 +261,10 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "prepare block template when txs are inter-dependent" in new FlowFixture {
+  it should "prepare block template when txs are inter-dependent: pre-rhone" in new FlowFixture {
     override val configValues =
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     val blockFlow1 = isolatedBlockFlow()
     val index      = ChainIndex.unsafe(0, 0)
