@@ -41,7 +41,7 @@ package object model {
   val maximalGasPerBlockPreRhone: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
   val maximalGasPerBlock: GasBox         = GasBox.unsafe(maximalGasPerBlockPreRhone.value / 4)
   val maximalGasPerTxPreRhone: GasBox    = GasBox.unsafe(maximalGasPerBlockPreRhone.value / 64)
-  val maximalGasPerTx: GasBox            = GasBox.unsafe(maximalGasPerBlock.value / 8)
+  val maximalGasPerTx: GasBox            = GasBox.unsafe(maximalGasPerBlock.value / 4)
 
   val maximalCodeSizePreLeman: Int = 12 * 1024 // 12KB
   val maximalCodeSizeLeman: Int    = 4 * 1024  // 4KB

@@ -952,7 +952,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer with large amount of UTXOs with estimated gas" in new LargeUtxos {
-    val maxP2PKHInputsAllowedByGas = 146
+    val maxP2PKHInputsAllowedByGas = 256
 
     info("With provided Utxos")
 
@@ -961,7 +961,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
-    val outputInfos = AVector.fill(144)(
+    val outputInfos = AVector.fill(255)(
       TxOutputInfo(
         output.lockupScript,
         ALPH.alph(1),
@@ -980,20 +980,9 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    tx0.gasAmount is GasBox.unsafe(1246260)
+    tx0.gasAmount is GasBox.unsafe(2192360)
     tx0.inputs.length is maxP2PKHInputsAllowedByGas
-    tx0.fixedOutputs.length is 145
-
-    blockFlow
-      .transfer(
-        keyManager(output.lockupScript).publicKey,
-        availableInputs.take(maxP2PKHInputsAllowedByGas + 1),
-        outputInfos,
-        None,
-        nonCoinbaseMinGasPrice
-      )
-      .rightValue
-      .leftValue is "Estimated gas GasBox(1250320) too large, maximal GasBox(1250000). Consider consolidating UTXOs using the sweep endpoints or sending to less addresses"
+    tx0.fixedOutputs.length is 256
 
     info("Without provided Utxos")
 
@@ -1007,20 +996,9 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    tx1.gasAmount is GasBox.unsafe(1242200)
-    tx1.inputs.length is maxP2PKHInputsAllowedByGas - 1
-    tx1.fixedOutputs.length is 145
-
-    blockFlow
-      .transfer(
-        keyManager(output.lockupScript).publicKey,
-        outputInfos :+ outputInfos.head,
-        None,
-        nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
-      )
-      .rightValue
-      .leftValue is "Estimated gas GasBox(1250760) too large, maximal GasBox(1250000). Consider consolidating UTXOs using the sweep endpoints or sending to less addresses"
+    tx1.gasAmount is GasBox.unsafe(2192360)
+    tx1.inputs.length is maxP2PKHInputsAllowedByGas
+    tx1.fixedOutputs.length is 256
   }
 
   it should "sweep as much as we can" in new LargeUtxos {

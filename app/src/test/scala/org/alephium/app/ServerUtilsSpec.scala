@@ -784,12 +784,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         fromPublicKey,
         outputRefsOpt = Some(outputRefs),
         destinations,
-        gasOpt = Some(GasBox.unsafe(1250001)),
+        gasOpt = Some(GasBox.unsafe(2500001)),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
-      .detail is "Provided gas GasBox(1250001) too large, maximal GasBox(1250000)"
+      .detail is "Provided gas GasBox(2500001) too large, maximal GasBox(2500000)"
   }
 
   it should "not create transaction with invalid gas price" in new MultipleUtxos {
