@@ -180,15 +180,19 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def callExternal(index: Byte): ExeResult[Option[Frame[Ctx]]]
 
+  def callExternalBySelector(selector: Method.Selector): ExeResult[Option[Frame[Ctx]]]
+
+  // scalastyle:off magic.number
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   @tailrec final def execute(): ExeResult[Option[Frame[Ctx]]] = {
     if (pc < pcMax) {
       val instr = method.instrs(pc)
       (instr.code: @switch) match {
-        case 0 => callLocal(instr.asInstanceOf[CallLocal].index)
-        case 1 => callExternal(instr.asInstanceOf[CallExternal].index)
-        case 2 => runReturn()
-        case _ =>
+        case 0   => callLocal(instr.asInstanceOf[CallLocal].index)
+        case 1   => callExternal(instr.asInstanceOf[CallExternal].index)
+        case 2   => runReturn()
+        case -44 => callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
+        case _   =>
           // No flatMap for tailrec
           instr.runWith(this) match {
             case Right(_) =>
@@ -203,6 +207,7 @@ abstract class Frame[Ctx <: StatelessContext] {
       failed(PcOverflow)
     }
   }
+  // scalastyle:on magic.number
 
   protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
     Return.runWith(this).map(_ => None)
@@ -246,6 +251,10 @@ final class StatelessFrame(
   def getCallerAddress(): ExeResult[Val.Address]           = StatelessFrame.notAllowed
   def getCallAddress(): ExeResult[Val.Address]             = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
+    StatelessFrame.notAllowed
+  def callExternalBySelector(
+      selector: Method.Selector
+  ): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
 }
 
@@ -540,12 +549,11 @@ final case class StatefulFrame(
   }
 
   def externalMethodFrame(
-      contractId: ContractId,
+      contractObj: StatefulContractObject,
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj <- ctx.loadContractObj(contractId)
-      method      <- contractObj.getMethod(index)
+      method <- contractObj.getMethod(index)
       _ <- checkLength(method.returnLength, InvalidReturnLength, InvalidExternalMethodReturnLength)
       _ <- checkLength(method.argsLength, InvalidArgLength, InvalidExternalMethodArgLength)
       _ <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
@@ -581,9 +589,24 @@ final case class StatefulFrame(
   def callExternal(index: Byte): ExeResult[Option[Frame[StatefulContext]]] = {
     advancePC()
     for {
-      _          <- ctx.chargeGas(GasSchedule.callGas)
-      contractId <- popContractId()
-      newFrame   <- externalMethodFrame(contractId, Bytes.toPosInt(index))
+      _           <- ctx.chargeGas(GasSchedule.callGas)
+      contractId  <- popContractId()
+      contractObj <- ctx.loadContractObj(contractId)
+      newFrame    <- externalMethodFrame(contractObj, Bytes.toPosInt(index))
+    } yield Some(newFrame)
+  }
+
+  def callExternalBySelector(
+      selector: Method.Selector
+  ): ExeResult[Option[Frame[StatefulContext]]] = {
+    advancePC()
+    for {
+      _              <- ctx.chargeGas(GasSchedule.callGas)
+      contractId     <- popContractId()
+      contractObj    <- ctx.loadContractObj(contractId)
+      selectedMethod <- contractObj.code.getMethodBySelector(selector)
+      _        <- ctx.chargeGas(GasSchedule.selectorCallSearchGas(selectedMethod.methodSearched))
+      newFrame <- externalMethodFrame(contractObj, selectedMethod.methodIndex)
     } yield Some(newFrame)
   }
 }

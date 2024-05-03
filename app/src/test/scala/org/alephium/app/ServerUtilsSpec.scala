@@ -1341,7 +1341,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callContractResult0 =
       serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractSucceeded]
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 23203
+    callContractResult0.gasUsed is 23206
     callContractResult0.txOutputs.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
@@ -1363,7 +1363,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callContractResult1 =
       serverUtils.callContract(blockFlow, params1).asInstanceOf[CallContractSucceeded]
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 23203
+    callContractResult1.gasUsed is 23206
     callContractResult1.txOutputs.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
@@ -1386,7 +1386,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.callContract(blockFlow, params2).asInstanceOf[CallContractSucceeded]
 
     callContractResult2.returns is AVector[Val](ValByteVec(ByteString("Class Foo".getBytes())))
-    callContractResult2.gasUsed is 5588
+    callContractResult2.gasUsed is 5590
   }
 
   it should "multiple call contract" in new CallContractFixture {
@@ -1912,7 +1912,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17467
+    result0.gasUsed is 17469
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -1965,7 +1965,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18575
+    result1.gasUsed is 18578
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -2010,7 +2010,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 21976
+    result0.gasUsed is 21978
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -2068,7 +2068,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18546
+    result1.gasUsed is 18549
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -2113,7 +2113,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17476
+    result0.gasUsed is 17478
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -2162,7 +2162,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 23007
+    result1.gasUsed is 23010
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -2303,7 +2303,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val compiledCode = result.bytecode
     compiledCode is Hex.toHexString(serialize(code))
     compiledCode is {
-      val bytecode     = "0100000100070c17000dce01300c7b"
+      val bytecode     = "010000010008d38d0b36360c17000dce01300c7b"
       val methodLength = Hex.toHexString(IndexedSeq((bytecode.length / 2).toByte))
       s"0201$methodLength" + bytecode
     }

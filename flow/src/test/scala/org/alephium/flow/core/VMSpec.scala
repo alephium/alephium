@@ -415,6 +415,21 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "support zero amount with tokenRemaining!()" in new ContractFixture {
+    val randomAddress = Address.contract(ContractId.random)
+    val script =
+      s"""
+         |TxScript Main {
+         |  assert!(tokenRemaining!(@$genesisAddress, ALPH) > 0, 0)
+         |  assert!(tokenRemaining!(@$genesisAddress, #${TokenId.random.toHexString}) == 0, 0)
+         |  assert!(tokenRemaining!(@$randomAddress, ALPH) == 0, 0)
+         |  assert!(tokenRemaining!(@$randomAddress, #${TokenId.random.toHexString}) == 0, 0)
+         |}
+         |""".stripMargin
+
+    callTxScript(script)
+  }
+
   it should "transfer ALPH by token id" in new ContractFixture {
     val foo =
       s"""
@@ -1622,6 +1637,74 @@ class VMSpec extends AlephiumSpec with Generators {
          |$foo
          |""".stripMargin
     failCallTxScript(main, ContractDestructionShouldNotBeCalledFromSelf)
+  }
+
+  it should "approve and transfer zero coins" in new ContractFixture {
+    val randomTokenId         = TokenId.generate.toHexString
+    val randomContractAddress = Address.from(LockupScript.p2c(ContractId.generate))
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn func0(tokenId: ByteVec, amount: U256) -> () {
+         |    transferToken!(callerAddress!(), @$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func1(tokenId: ByteVec, amount: U256) -> () {
+         |    transferTokenFromSelf!(@$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func2(tokenId: ByteVec, amount: U256) -> () {
+         |    transferTokenToSelf!(@$genesisAddress, tokenId, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func3(from: Address, amount: U256) -> () {
+         |    transferTokenToSelf!(from, ALPH, amount)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn func4() -> () {
+         |    transferTokenFromSelf!(@$randomContractAddress, ALPH, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(code)._1.toHexString
+
+    def script(stmt: String) =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$contractId)
+         |  $stmt
+         |}
+         |$code
+         |""".stripMargin
+
+    def fail(code: String) = {
+      intercept[AssertionError](callTxScript(code)).getMessage.startsWith(
+        "Right(TxScriptExeFailed(Not enough approved balance"
+      ) is true
+    }
+
+    callTxScript(script(s"foo.func0{@$genesisAddress -> ALPH: 0}(ALPH, 0)"))
+    fail(script(s"foo.func0{@$genesisAddress -> ALPH: 0}(ALPH, 1)"))
+    callTxScript(script(s"foo.func0{@$genesisAddress -> #$randomTokenId: 0}(#$randomTokenId, 0)"))
+    fail(script(s"foo.func0{@$genesisAddress -> #$randomTokenId: 1}(#$randomTokenId, 1)"))
+    fail(script(s"foo.func0{@$genesisAddress -> #$randomTokenId: 0}(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func1(ALPH, 0)"))
+    callTxScript(script(s"foo.func1(#$randomTokenId, 0)"))
+    fail(script(s"foo.func1(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func2(ALPH, 0)"))
+    callTxScript(script(s"foo.func2(#$randomTokenId, 0)"))
+    fail(script(s"foo.func2(#$randomTokenId, 1)"))
+    callTxScript(script(s"foo.func3(@$randomContractAddress, 0)"))
+    fail(script(s"foo.func3(@$randomContractAddress, 1)"))
+
+    intercept[AssertionError](callTxScript(script("foo.func4()"))).getMessage is
+      s"Right(TxScriptExeFailed(Pay to contract address $randomContractAddress is not allowed when this contract address is not in the call stack))"
   }
 
   it should "fetch block env" in new ContractFixture {
@@ -4019,45 +4102,6 @@ class VMSpec extends AlephiumSpec with Generators {
 
       callTxScript(main)
     }
-
-    {
-      info("fail with multiple inheritance")
-
-      val interface1 =
-        s"""
-           |Interface I1 {
-           |  pub fn f1() -> U256
-           |}
-           |""".stripMargin
-
-      val interface2 =
-        s"""
-           |Interface I2 {
-           |  pub fn f2() -> U256
-           |}
-           |""".stripMargin
-
-      val contract =
-        s"""
-           |Contract Foo() implements I1, I2 {
-           |  pub fn f2() -> U256 {
-           |    return 2
-           |  }
-           |
-           |  pub fn f1() -> U256 {
-           |    return 1
-           |  }
-           |}
-           |
-           |$interface1
-           |$interface2
-           |""".stripMargin
-
-      Compiler
-        .compileContract(contract)
-        .leftValue
-        .message is "Contract only supports implementing single interface: I1, I2"
-    }
   }
 
   it should "not instantiate with abstract contract" in new ContractFixture {
@@ -5854,7 +5898,7 @@ class VMSpec extends AlephiumSpec with Generators {
                 |  foo.withdraw2(callerAddress!())
                 |  foo.withdraw2(callerAddress!())
                 |""".stripMargin),
-      FunctionReentrancy(fooId, 0)
+      FunctionReentrancy(fooId, 2)
     )
   }
 
@@ -5942,6 +5986,261 @@ class VMSpec extends AlephiumSpec with Generators {
 
     intercept[AssertionError](callTxScript(script)).getMessage is
       s"Right(TxScriptExeFailed($InvalidMethodModifierBeforeRhone))"
+  }
+
+  it should "test multiple inheritance" in new ContractFixture {
+    {
+      info("use contract as interface (case 1)")
+      val foo =
+        s"""
+           |Contract Foo() {
+           |  pub fn f0() -> U256 { return 0 }
+           |  pub fn f1() -> U256 { return 1 }
+           |}
+           |""".stripMargin
+
+      val fooId = createContract(foo)._1.toHexString
+      def script(useMethodSelector: String) =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let foo = IFoo(#$fooId)
+           |  assert!(foo.f0() == 0, 0)
+           |  assert!(foo.f1() == 1, 0)
+           |}
+           |@using(methodSelector = $useMethodSelector)
+           |Interface IFoo {
+           |  pub fn f0() -> U256
+           |  pub fn f1() -> U256
+           |}
+           |""".stripMargin
+
+      testSimpleScript(script("false"))
+      testSimpleScript(script("true"))
+    }
+
+    {
+      info("use contract as interface (case 2)")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f0() -> U256 { return 0 }
+           |  pub fn f1() -> U256 { return 1 }
+           |  pub fn f2() -> U256 { return 2 }
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(IFoo0(#$contractId).f1() == 1, 0)
+           |  assert!(IFoo0(#$contractId).f2() == 2, 0)
+           |  assert!(IFoo1(#$contractId).f1() == 1, 0)
+           |  assert!(IFoo1(#$contractId).f2() == 2, 0)
+           |}
+           |@using(methodSelector = true)
+           |Interface IFoo0 {
+           |  pub fn f1() -> U256
+           |  pub fn f2() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface IFoo1 {
+           |  pub fn f2() -> U256
+           |  pub fn f1() -> U256
+           |}
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("inherit from both interfaces that use and not use method selector")
+      val code: String =
+        s"""
+           |Contract Impl() implements Foo, Bar {
+           |  pub fn bar() -> U256 { return 0 }
+           |  pub fn foo() -> U256 { return 1 }
+           |}
+           |@using(methodSelector = false)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let impl = Impl(#$contractId)
+           |  assert!(impl.foo() == 1, 0)
+           |  assert!(impl.bar() == 0, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Foo(#$contractId).foo() == 1, 0)
+           |  assert!(Bar(#$contractId).bar() == 0, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("inherit from multiple interfaces")
+      val code: String =
+        s"""
+           |Contract Impl() implements Foo, Bar {
+           |  pub fn baz() -> U256 { return 0 }
+           |  pub fn foo() -> U256 { return 1 }
+           |  pub fn bar() -> U256 { return 2 }
+           |}
+           |@using(methodSelector = true)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let impl = Impl(#$contractId)
+           |  assert!(impl.foo() == 1, 0)
+           |  assert!(impl.bar() == 2, 0)
+           |  assert!(impl.baz() == 0, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Foo(#$contractId).foo() == 1, 0)
+           |  assert!(Bar(#$contractId).bar() == 2, 0)
+           |  assert!(Impl(#$contractId).baz() == 0, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("interface use method selector inherit from an interface not use method selector")
+      val code: String =
+        s"""
+           |Contract Impl() implements Bar {
+           |  pub fn func0() -> U256 { return 0 }
+           |  pub fn func1() -> U256 { return 1 }
+           |  pub fn func2() -> U256 { return 2 }
+           |  pub fn func3() -> U256 { return 3 }
+           |}
+           |@using(methodSelector = false)
+           |Interface Foo {
+           |  pub fn func0() -> U256
+           |  pub fn func1() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar extends Foo {
+           |  pub fn func2() -> U256
+           |  pub fn func3() -> U256
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Foo(#$contractId).func0() == 0, 0)
+           |  assert!(Foo(#$contractId).func1() == 1, 0)
+           |  assert!(Bar(#$contractId).func0() == 0, 0)
+           |  assert!(Bar(#$contractId).func1() == 1, 0)
+           |  assert!(Bar(#$contractId).func2() == 2, 0)
+           |  assert!(Bar(#$contractId).func3() == 3, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("diamond shaped parent interfaces")
+      val code: String =
+        s"""
+           |Contract Impl() extends FooBarContract() implements FooBaz {
+           |  pub fn baz() -> U256 {
+           |     return 2
+           |  }
+           |}
+           |@using(methodSelector = true)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface FooBar extends Foo {
+           |  pub fn bar() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface FooBaz extends Foo {
+           |  pub fn baz() -> U256
+           |}
+           |
+           |Abstract Contract FooBarContract() implements FooBar {
+           |   pub fn foo() -> U256 {
+           |      return 0
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let impl = Impl(#$contractId)
+           |  assert!(impl.foo() == 0, 0)
+           |  assert!(impl.bar() == 1, 0)
+           |  assert!(impl.baz() == 2, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(Foo(#$contractId).foo() == 0, 0)
+           |  assert!(FooBar(#$contractId).bar() == 1, 0)
+           |  assert!(FooBaz(#$contractId).baz() == 2, 0)
+           |}
+           |$code
+           |""".stripMargin
+      )
+    }
   }
 
   private def getEvents(

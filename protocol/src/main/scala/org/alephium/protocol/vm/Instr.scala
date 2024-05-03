@@ -28,7 +28,7 @@ import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex, TokenId}
+import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex, HardFork, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
@@ -205,7 +205,7 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Ghost hard fork */
-    PayGasFee, MinimalContractDeposit, CreateMapEntry
+    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
   )
   // format: on
 
@@ -1321,6 +1321,45 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
 }
 object CallExternal extends StatefulInstrCompanion1[Byte]
 
+@ByteCode
+final case class MethodSelector(selector: Method.Selector)
+    extends CallInstr
+    with StatefulInstr
+    with GasHigh {
+  def serialize(): ByteString = ByteString(code) ++ encode(selector)
+
+  // The execution is skipped. It's only used to provide method selector
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = okay
+}
+object MethodSelector extends InstrCompanion[StatefulContext] {
+
+  def deserialize[C <: StatefulContext](
+      input: ByteString
+  ): SerdeResult[Staging[MethodSelector]] = {
+    implicitly[Serde[Method.Selector]]._deserialize(input).map(_.mapValue(MethodSelector(_)))
+  }
+}
+
+@ByteCode
+final case class CallExternalBySelector(selector: Method.Selector)
+    extends CallInstr
+    with StatefulInstr
+    with GasCall {
+  def serialize(): ByteString = ByteString(code) ++ encode(selector)
+
+  // Implemented in frame instead
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
+}
+object CallExternalBySelector extends InstrCompanion[StatefulContext] {
+  def deserialize[C <: StatefulContext](
+      input: ByteString
+  ): SerdeResult[Staging[Instr[StatefulContext]]] = {
+    implicitly[Serde[Method.Selector]]
+      ._deserialize(input)
+      .map(_.mapValue(CallExternalBySelector(_)))
+  }
+}
+
 case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasZero {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -1641,7 +1680,58 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
   }
 }
 
-object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
+sealed trait ApproveAssetBase {
+  @inline protected def approveALPH(
+      balanceState: MutBalanceState,
+      from: LockupScript,
+      amount: U256,
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    if (amount.isZero && hardFork.isGhostEnabled()) {
+      okay
+    } else {
+      balanceState
+        .approveALPH(from, amount)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              TokenId.alph,
+              amount,
+              balanceState.alphRemainingUnsafe(from)
+            )
+          )
+        )
+    }
+  }
+
+  @inline protected def approveToken(
+      balanceState: MutBalanceState,
+      from: LockupScript,
+      tokenId: TokenId,
+      amount: U256,
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    if (amount.isZero && hardFork.isGhostEnabled()) {
+      okay
+    } else {
+      balanceState
+        .approveToken(from, tokenId, amount)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              tokenId,
+              amount,
+              balanceState.tokenRemainingUnsafe(from, tokenId)
+            )
+          )
+        )
+    }
+  }
+}
+
+object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 with ApproveAssetBase {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -1654,23 +1744,12 @@ object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
       amount       <- frame.popOpStackU256()
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .approveALPH(address.lockupScript, amount.v)
-        .toRight(
-          Right(
-            NotEnoughApprovedBalance(
-              address.lockupScript,
-              TokenId.alph,
-              amount.v,
-              balanceState.alphRemainingUnsafe(address.lockupScript)
-            )
-          )
-        )
+      _ <- approveALPH(balanceState, address.lockupScript, amount.v, frame.ctx.getHardFork())
     } yield ()
   }
 }
 
-object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
+object ApproveToken extends AssetInstr with StatefulInstrCompanion0 with ApproveAssetBase {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -1685,71 +1764,75 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
+      hardFork = frame.ctx.getHardFork()
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState
-            .approveALPH(address.lockupScript, amount.v)
-            .toRight(
-              Right(
-                NotEnoughApprovedBalance(
-                  address.lockupScript,
-                  tokenId,
-                  amount.v,
-                  balanceState.alphRemainingUnsafe(address.lockupScript)
-                )
-              )
-            )
+        if (hardFork.isLemanEnabled() && tokenId == TokenId.alph) {
+          approveALPH(balanceState, address.lockupScript, amount.v, hardFork)
         } else {
-          balanceState
-            .approveToken(address.lockupScript, tokenId, amount.v)
-            .toRight(
-              Right(
-                NotEnoughApprovedBalance(
-                  address.lockupScript,
-                  tokenId,
-                  amount.v,
-                  balanceState.tokenRemainingUnsafe(address.lockupScript, tokenId)
-                )
-              )
-            )
+          approveToken(balanceState, address.lockupScript, tokenId, amount.v, hardFork)
         }
     } yield ()
   }
 }
 
 object AlphRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def getAmount(
+      hardFork: HardFork,
+      balanceState: MutBalanceState,
+      address: Val.Address
+  ): ExeResult[U256] = {
+    val amountOpt = balanceState.alphRemaining(address.lockupScript)
+    if (hardFork.isGhostEnabled()) {
+      Right(amountOpt.getOrElse(U256.Zero))
+    } else {
+      amountOpt.toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
+    }
+  }
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      amount <- balanceState
-        .alphRemaining(address.lockupScript)
-        .toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
-      _ <- frame.pushOpStack(Val.U256(amount))
+      amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address)
+      _            <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
 }
 
 object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def getAmount(
+      hardFork: HardFork,
+      balanceState: MutBalanceState,
+      address: Val.Address,
+      tokenId: TokenId
+  ): ExeResult[U256] = {
+    val isALPH = tokenId == TokenId.alph
+    val amountOpt = if (hardFork.isLemanEnabled() && isALPH) {
+      balanceState.alphRemaining(address.lockupScript)
+    } else {
+      balanceState.tokenRemaining(address.lockupScript, tokenId)
+    }
+    if (hardFork.isGhostEnabled()) {
+      Right(amountOpt.getOrElse(U256.Zero))
+    } else {
+      amountOpt.toRight(
+        if (isALPH) {
+          Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript)))
+        } else {
+          Right(NoTokenBalanceForTheAddress(tokenId, Address.from(address.lockupScript)))
+        }
+      )
+    }
+  }
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       tokenIdRaw   <- frame.popOpStackByteVec()
       address      <- frame.popOpStackAddress()
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
-      amount <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState
-            .alphRemaining(address.lockupScript)
-            .toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
-        } else {
-          balanceState
-            .tokenRemaining(address.lockupScript, tokenId)
-            .toRight(
-              Right(NoTokenBalanceForTheAddress(tokenId, Address.from(address.lockupScript)))
-            )
-        }
-      _ <- frame.pushOpStack(Val.U256(amount))
+      amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address, tokenId)
+      _            <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
 }
@@ -1788,24 +1871,28 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    for {
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useAlph(from, amount.v)
-        .toRight(
-          Right(
-            NotEnoughApprovedBalance(
-              from,
-              TokenId.alph,
-              amount.v,
-              balanceState.alphRemainingUnsafe(from)
+    if (amount.v.isZero && frame.ctx.getHardFork().isGhostEnabled()) {
+      okay
+    } else {
+      for {
+        balanceState <- frame.getBalanceState()
+        _ <- balanceState
+          .useAlph(from, amount.v)
+          .toRight(
+            Right(
+              NotEnoughApprovedBalance(
+                from,
+                TokenId.alph,
+                amount.v,
+                balanceState.alphRemainingUnsafe(from)
+              )
             )
           )
-        )
-      _ <- frame.ctx.outputBalances
-        .addAlph(to, amount.v)
-        .toRight(Right(BalanceOverflow))
-    } yield ()
+        _ <- frame.ctx.outputBalances
+          .addAlph(to, amount.v)
+          .toRight(Right(BalanceOverflow))
+      } yield ()
+    }
   }
 
   @inline def transferAlph[C <: StatefulContext](
@@ -1828,24 +1915,28 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    for {
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(from, tokenId, amount.v)
-        .toRight(
-          Right(
-            NotEnoughApprovedBalance(
-              from,
-              tokenId,
-              amount.v,
-              balanceState.tokenRemainingUnsafe(from, tokenId)
+    if (amount.v.isZero && frame.ctx.getHardFork().isGhostEnabled()) {
+      okay
+    } else {
+      for {
+        balanceState <- frame.getBalanceState()
+        _ <- balanceState
+          .useToken(from, tokenId, amount.v)
+          .toRight(
+            Right(
+              NotEnoughApprovedBalance(
+                from,
+                tokenId,
+                amount.v,
+                balanceState.tokenRemainingUnsafe(from, tokenId)
+              )
             )
           )
-        )
-      _ <- frame.ctx.outputBalances
-        .addToken(to, tokenId, amount.v)
-        .toRight(Right(BalanceOverflow))
-    } yield ()
+        _ <- frame.ctx.outputBalances
+          .addToken(to, tokenId, amount.v)
+          .toRight(Right(BalanceOverflow))
+      } yield ()
+    }
   }
 
   @inline def transferToken[C <: StatefulContext](
