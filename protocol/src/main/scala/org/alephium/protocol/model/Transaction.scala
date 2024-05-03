@@ -48,10 +48,9 @@ sealed trait TransactionAbstract {
 
   def getOutput(index: Int): TxOutput
 
-  def assetOutputRefs: AVector[AssetOutputRef] = {
-    unsigned.fixedOutputs.mapWithIndex { case (output, index) =>
-      AssetOutputRef.from(output, TxOutputRef.key(id, index))
-    }
+  @inline
+  def fixedOutputRefs: AVector[AssetOutputRef] = {
+    unsigned.fixedOutputRefs
   }
 
   def isEntryMethodPayable: Boolean = unsigned.scriptOpt.exists(_.entryMethod.usePreapprovedAssets)
@@ -92,6 +91,17 @@ final case class Transaction(
       unsigned.fixedOutputs(index)
     } else {
       generatedOutputs(index - unsigned.fixedOutputs.length)
+    }
+  }
+
+  lazy val outputRefs: AVector[TxOutputRef] = {
+    AVector.tabulate(outputsLength) { outputIndex =>
+      if (outputIndex < unsigned.fixedOutputs.length) {
+        unsigned.fixedOutputRefs(outputIndex)
+      } else {
+        val output = generatedOutputs(outputIndex - unsigned.fixedOutputs.length)
+        TxOutputRef.from(id, outputIndex, output)
+      }
     }
   }
 
