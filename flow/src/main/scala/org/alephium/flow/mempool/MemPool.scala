@@ -354,7 +354,13 @@ object MemPool {
       .reverse // reverse the order so that higher gas tx can be at the front of an ordered collection
 
   implicit val nodeOrdering: Ordering[FlowNode] = {
-    Ordering.by[FlowNode, TransactionTemplate](_.tx)(txOrdering)
+    // sort the tx by timestamp in order to make sure that the parent tx
+    // is in the front of the child tx if the gas prices are the same
+    Ordering
+      .by[FlowNode, U256](_.tx.unsigned.gasPrice.value)
+      .reverse
+      .orElse(Ordering.by[FlowNode, TimeStamp](_.timestamp))
+      .orElse(Ordering.by[FlowNode, Hash](_.tx.id.value).reverse)
   }
 
   final case class FlowNode(

@@ -34,6 +34,11 @@ final case class BlockEnv(
     newOutputRefCache: Option[scala.collection.mutable.HashMap[AssetOutputRef, AssetOutput]]
 ) {
   @inline def getHardFork(): HardFork = hardFork
+
+  def addOutputRef(ref: AssetOutputRef, output: AssetOutput): Unit = {
+    assume(hardFork.isGhostEnabled())
+    newOutputRefCache.foreach(_.addOne(ref -> output))
+  }
 }
 object BlockEnv {
   def apply(
