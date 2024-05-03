@@ -162,7 +162,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       hardFork: HardFork
   ): AVector[TransactionTemplate] = {
-    val newOutputRefs = mutable.HashSet.empty[TxOutputRef]
+    val newOutputRefs = mutable.HashSet.empty[AssetOutputRef]
     txs.filter { tx =>
       if (isSequentialTxSupported(chainIndex, hardFork)) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)

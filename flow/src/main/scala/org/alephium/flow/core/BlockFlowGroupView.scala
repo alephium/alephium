@@ -45,7 +45,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
     }
   }
 
-  def getPreOutputs(
+  private def getPreOutputs(
       inputs: AVector[TxInput],
       additionalCacheOpt: Option[scala.collection.Map[AssetOutputRef, AssetOutput]]
   ): IOResult[Option[AVector[AssetOutput]]] = {
@@ -61,7 +61,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
 
   def exists(
       inputs: AVector[TxInput],
-      additionalCache: scala.collection.Set[TxOutputRef]
+      additionalCache: scala.collection.Set[AssetOutputRef]
   ): IOResult[Boolean] = {
     inputs.forallE { input =>
       getAsset(input.outputRef).map {

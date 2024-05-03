@@ -6243,6 +6243,64 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "use pre-output for transfer tx" in new ContractFixture {
+    val (privateKey, publicKey) = chainIndex.from.generateKey
+    val lockupScript            = LockupScript.p2pkh(publicKey)
+    keyManager.addOne(lockupScript -> privateKey)
+
+    val genesisKey = genesisKeys(chainIndex.from.value)._1
+    val block0     = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+    addAndCheck(blockFlow, block0)
+
+    def buildCreateContractTx(input: String, outputAmount: U256) = {
+      val unlockScript = UnlockScript.p2pkh(publicKey)
+      val contract     = Compiler.compileContract(input).rightValue
+      val txScript =
+        contractCreation(
+          contract,
+          AVector.empty,
+          AVector.empty,
+          lockupScript,
+          minimalAlphInContract,
+          None
+        )
+      val balances = blockFlow.getUsableUtxos(lockupScript, defaultUtxoLimit).rightValue
+      val inputs   = balances.map(_.ref).map(TxInput(_, unlockScript))
+      val outputs = AVector(
+        AssetOutput(outputAmount, lockupScript, TimeStamp.zero, AVector.empty, ByteString.empty)
+      )
+      val unsignedTx = UnsignedTransaction(Some(txScript), inputs, outputs).copy(gasAmount = 200000)
+      TransactionTemplate.from(unsignedTx, privateKey)
+    }
+
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val tx0 = buildCreateContractTx(foo, ALPH.alph(5))
+    blockFlow.grandPool.add(chainIndex, tx0, TimeStamp.now())
+
+    val tx1 = transferTx(blockFlow, chainIndex, lockupScript, ALPH.oneAlph, None).toTemplate
+    tx1.unsigned.inputs.length is 1
+    tx1.unsigned.inputs.head.outputRef is tx0.fixedOutputRefs.head
+    blockFlow.grandPool.add(chainIndex, tx1, TimeStamp.now())
+
+    val block1 = mineFromMemPool(blockFlow, chainIndex)
+    block1.nonCoinbase.map(_.toTemplate) is AVector(tx0, tx1)
+    addAndCheck(blockFlow, block1)
+
+    val fooId         = ContractId.from(tx0.id, 1, chainIndex.from)
+    val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val contractAsset = worldState.getContractAsset(fooId).rightValue
+    contractAsset.amount is minimalAlphInContract
+
+    val receiver = tx1.unsigned.fixedOutputs.head.lockupScript
+    getAlphBalance(blockFlow, receiver) is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
