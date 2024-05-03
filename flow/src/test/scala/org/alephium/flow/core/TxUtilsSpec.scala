@@ -952,7 +952,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer with large amount of UTXOs with estimated gas" in new LargeUtxos {
-    val maxP2PKHInputsAllowedByGas = 151
+    val maxP2PKHInputsAllowedByGas = 146
 
     info("With provided Utxos")
 
@@ -961,7 +961,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
-    val outputInfo = AVector(
+    val outputInfos = AVector.fill(144)(
       TxOutputInfo(
         output.lockupScript,
         ALPH.alph(1),
@@ -970,61 +970,57 @@ class TxUtilsSpec extends AlephiumSpec {
       )
     )
 
-    blockFlow
+    val tx0 = blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
         availableInputs.take(maxP2PKHInputsAllowedByGas),
-        outputInfo,
+        outputInfos,
         None,
         nonCoinbaseMinGasPrice
       )
       .rightValue
       .rightValue
-      .inputs
-      .length is maxP2PKHInputsAllowedByGas
+    tx0.gasAmount is GasBox.unsafe(1246260)
+    tx0.inputs.length is maxP2PKHInputsAllowedByGas
+    tx0.fixedOutputs.length is 145
 
     blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
         availableInputs.take(maxP2PKHInputsAllowedByGas + 1),
-        outputInfo,
+        outputInfos,
         None,
         nonCoinbaseMinGasPrice
       )
       .rightValue
-      .rightValue
-      .gasAmount is GasBox.unsafe(627120)
+      .leftValue is "Estimated gas GasBox(1250320) too large, maximal GasBox(1250000). Consider consolidating UTXOs using the sweep endpoints or sending to less addresses"
 
     info("Without provided Utxos")
 
-    blockFlow
+    val tx1 = blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        ALPH.alph(maxP2PKHInputsAllowedByGas.toLong - 1),
+        outputInfos,
         None,
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
       .rightValue
-      .inputs
-      .length is maxP2PKHInputsAllowedByGas
+    tx1.gasAmount is GasBox.unsafe(1242200)
+    tx1.inputs.length is maxP2PKHInputsAllowedByGas - 1
+    tx1.fixedOutputs.length is 145
 
     blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        ALPH.alph(maxP2PKHInputsAllowedByGas.toLong),
+        outputInfos :+ outputInfos.head,
         None,
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
-      .rightValue
-      .gasAmount is GasBox.unsafe(627120)
+      .leftValue is "Estimated gas GasBox(1250760) too large, maximal GasBox(1250000). Consider consolidating UTXOs using the sweep endpoints or sending to less addresses"
   }
 
   it should "sweep as much as we can" in new LargeUtxos {
