@@ -66,8 +66,14 @@ class MemPool private (
     _contains(txId) && flow.unsafe(txId).isSource()
   }
 
-  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
-    flow.takeSourceNodes(index.flattenIndex, maxNum, _.tx)
+  // No inter-dependent transactions
+  def collectNonSequentialTxs(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
+    readOnly {
+      flow.takeSourceNodes(index.flattenIndex, maxNum, _.tx)
+    }
+
+  def collectAllTxs(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
+    flow.takeAllTxs(index.flattenIndex, maxNum)
   }
 
   def getAll(): AVector[TransactionTemplate] = readOnly {
@@ -348,7 +354,13 @@ object MemPool {
       .reverse // reverse the order so that higher gas tx can be at the front of an ordered collection
 
   implicit val nodeOrdering: Ordering[FlowNode] = {
-    Ordering.by[FlowNode, TransactionTemplate](_.tx)(txOrdering)
+    // sort the tx by timestamp in order to make sure that the parent tx
+    // is in the front of the child tx if the gas prices are the same
+    Ordering
+      .by[FlowNode, U256](_.tx.unsigned.gasPrice.value)
+      .reverse
+      .orElse(Ordering.by[FlowNode, TimeStamp](_.timestamp))
+      .orElse(Ordering.by[FlowNode, Hash](_.tx.id.value).reverse)
   }
 
   final case class FlowNode(
@@ -368,7 +380,11 @@ object MemPool {
   ) extends KeyedFlow[TransactionId, FlowNode](
         sourceTxs.as[SimpleMap[TransactionId, FlowNode]],
         allTxs
-      ) {}
+      ) {
+    def takeAllTxs(sourceIndex: Int, maxNum: Int): AVector[TransactionTemplate] = {
+      AVector.from(allTxs.values().filter(_.chainIndex == sourceIndex).map(_.tx).take(maxNum))
+    }
+  }
 
   object Flow {
     def empty(implicit groupConfig: GroupConfig): Flow =

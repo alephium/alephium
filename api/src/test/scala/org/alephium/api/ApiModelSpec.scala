@@ -1315,7 +1315,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "calc output ref correctly" in {
     val tx = api.Transaction.fromProtocol(transaction)
     tx.unsigned.fixedOutputs.zipWithIndex.foreach { case (output, index) =>
-      output.key is transaction.assetOutputRefs(index).key.value
+      output.key is transaction.fixedOutputRefs(index).key.value
     }
     tx.generatedOutputs.length is 2
     tx.generatedOutputs.zipWithIndex.foreach { case (output, index) =>

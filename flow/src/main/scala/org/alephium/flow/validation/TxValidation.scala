@@ -205,7 +205,7 @@ trait TxValidation {
         blockEnv.getHardFork(),
         isCoinbase = coinbaseNetReward.nonEmpty
       )
-      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx))
+      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx, blockEnv.newOutputRefCache))
       _ <- checkStateful(
         chainIndex,
         tx,

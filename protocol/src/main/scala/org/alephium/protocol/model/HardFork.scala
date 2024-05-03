@@ -34,5 +34,5 @@ object HardFork {
 
   // TestOnly
   def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(2))
-  def PreRhoneForTest: HardFork   = All.dropRight(1).apply(Random.nextInt(2))
+  def PreGhostForTest: HardFork   = All.take(2).apply(Random.nextInt(2))
 }

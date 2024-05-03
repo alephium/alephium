@@ -536,6 +536,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         blockEnv,
         None
       )
+      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
+        tx.unsigned.fixedOutputRefs.foreachWithIndex { case (outputRef, outputIndex) =>
+          blockEnv.addOutputRef(outputRef, tx.unsigned.fixedOutputs(outputIndex))
+        }
+      }
       txValidationResult match {
         case Right(_) => Right(())
         case Left(Right(TxScriptExeFailed(_))) =>

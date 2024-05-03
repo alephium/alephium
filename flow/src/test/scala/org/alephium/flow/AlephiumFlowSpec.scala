@@ -725,11 +725,20 @@ trait FlowFixture
     val chainIndex = block.chainIndex
     val worldState =
       blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val hardFork = networkConfig.getHardFork(block.timestamp)
+    val usedRefs =
+      block.nonCoinbase
+        .flatMap(_.unsigned.inputs.map(_.outputRef))
+        .toSet
+        .asInstanceOf[Set[TxOutputRef]]
     if (chainIndex.isIntraGroup) {
       block.nonCoinbase.foreach { tx =>
         tx.allOutputs.foreachWithIndex { case (output, index) =>
           val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
-          worldState.existOutput(outputRef) isE true
+          val exist = worldState.existOutput(outputRef).rightValue || (
+            ALPH.isSequentialTxSupported(chainIndex, hardFork) && usedRefs.contains(outputRef)
+          )
+          exist is true
         }
       }
     }
