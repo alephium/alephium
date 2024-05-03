@@ -409,24 +409,29 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check the amount of gas" in new Fixture {
-    implicit val validator = checkTotalGas _
-
     val block = transfer(blockFlow, chainIndex)
     val tx    = block.nonCoinbase.head
     tx.unsigned.gasAmount is minimalGas
 
-    val higherGas   = GasBox.unsafe(minimalGas.value + 1)
-    val higherGasTx = tx.copy(unsigned = tx.unsigned.copy(gasAmount = higherGas))
+    def test(txsNum: Int)(implicit validator: Block => BlockValidationResult[Unit]) = {
+      val higherGas   = GasBox.unsafe(minimalGas.value + 1)
+      val higherGasTx = tx.copy(unsigned = tx.unsigned.copy(gasAmount = higherGas))
 
-    val maxTxs = AVector.fill(maximalTxsInOneBlock)(tx)
+      val maxTxs = AVector.fill(txsNum)(tx)
 
-    block.pass()
-    block.copy(transactions = maxTxs).pass()
-    block.copy(transactions = higherGasTx +: maxTxs.tail).fail(TooMuchGasUsed)
+      block.pass()
+      block.copy(transactions = maxTxs).pass()
+      block.copy(transactions = higherGasTx +: maxTxs.tail).fail(TooMuchGasUsed)
 
-    block
-      .copy(transactions = higherGasTx +: maxTxs.tail)
-      .fail(TooMuchGasUsed)(checkBlockUnit(_, blockFlow))
+      block
+        .copy(transactions = higherGasTx +: maxTxs.tail)
+        .fail(TooMuchGasUsed)(checkBlockUnit(_, blockFlow))
+    }
+
+    val preRhoneValidator = checkTotalGas(_, HardFork.PreRhoneForTest)
+    test(maximalTxsInOneBlock)(preRhoneValidator)
+    val rhoneValidator = checkTotalGas(_, HardFork.Ghost)
+    test(maximalTxsInOneBlock / 4)(rhoneValidator)
   }
 
   it should "check double spending in a same tx" in new Fixture {

@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.model.{maximalGasPerTx, minimalGas}
+import org.alephium.protocol.model.{maximalGasPerTx, maximalGasPerTxPreRhone, minimalGas, HardFork}
 import org.alephium.serde.Serde
 import org.alephium.util.U256
 
@@ -79,7 +79,8 @@ object GasBox {
 
   def unsafeTest(gas: Int): GasBox = new GasBox(gas)
 
-  @inline def validate(box: GasBox): Boolean = {
-    box >= minimalGas && box <= maximalGasPerTx
+  @inline def validate(box: GasBox, hardFork: HardFork): Boolean = {
+    val maximalGas = if (hardFork.isGhostEnabled()) maximalGasPerTx else maximalGasPerTxPreRhone
+    box >= minimalGas && box <= maximalGas
   }
 }

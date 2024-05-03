@@ -448,7 +448,7 @@ object TxValidation {
         isCoinbase: Boolean,
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
-      if (!GasBox.validate(tx.unsigned.gasAmount)) {
+      if (!GasBox.validate(tx.unsigned.gasAmount, hardFork)) {
         invalidTx(InvalidStartGas)
       } else if (!GasPrice.validate(tx.unsigned.gasPrice, isCoinbase, hardFork)) {
         invalidTx(InvalidGasPrice)

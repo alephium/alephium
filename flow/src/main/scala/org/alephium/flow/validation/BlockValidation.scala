@@ -72,7 +72,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
 //      _ <- checkNonEmptyTransactions(block)
       _ <- checkTxNumber(block)
       _ <- checkGasPriceDecreasing(block)
-      _ <- checkTotalGas(block)
+      _ <- checkTotalGas(block, networkConfig.getHardFork(block.timestamp))
 //      _ <- checkMerkleRoot(block)
 //      _ <- checkFlow(block, flow)
       sideResult <- checkTxs(chainIndex, block, flow)
@@ -129,7 +129,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       _          <- checkNonEmptyTransactions(block)
       _          <- checkTxNumber(block)
       _          <- checkGasPriceDecreasing(block)
-      _          <- checkTotalGas(block)
+      _          <- checkTotalGas(block, networkConfig.getHardFork(block.timestamp))
       _          <- checkMerkleRoot(block)
       _          <- checkFlow(block, flow)
       sideResult <- checkTxs(block.chainIndex, block, flow)
@@ -298,9 +298,14 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   // Let's check the gas is decreasing as well
-  private[validation] def checkTotalGas(block: Block): BlockValidationResult[Unit] = {
+  private[validation] def checkTotalGas(
+      block: Block,
+      hardFork: HardFork
+  ): BlockValidationResult[Unit] = {
     val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
-    if (totalGas <= maximalGasPerBlock.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
+    val maximalGas =
+      if (hardFork.isGhostEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
+    if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
   }
 
   private[validation] def checkCoinbase(
