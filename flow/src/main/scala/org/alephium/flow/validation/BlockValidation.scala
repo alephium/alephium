@@ -531,7 +531,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         blockEnv,
         None
       )
-      if (hardFork.isGhostEnabled() && chainIndex.isIntraGroup) {
+      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
         tx.unsigned.fixedOutputRefs.foreachWithIndex { case (outputRef, outputIndex) =>
           blockEnv.addOutputRef(outputRef, tx.unsigned.fixedOutputs(outputIndex))
         }

@@ -142,14 +142,9 @@ trait FlowUtils
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
-  @inline
-  private def isSequentialTxSupported(chainIndex: ChainIndex, hardFork: HardFork): Boolean = {
-    hardFork.isGhostEnabled() && chainIndex.isIntraGroup
-  }
-
   def collectPooledTxs(chainIndex: ChainIndex, hardFork: HardFork): AVector[TransactionTemplate] = {
     val mempool = getMemPool(chainIndex)
-    if (isSequentialTxSupported(chainIndex, hardFork)) {
+    if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
       mempool.collectAllTxs(chainIndex, mempoolSetting.txMaxNumberPerBlock)
     } else {
       mempool.collectNonSequentialTxs(chainIndex, mempoolSetting.txMaxNumberPerBlock)
@@ -164,7 +159,7 @@ trait FlowUtils
   ): AVector[TransactionTemplate] = {
     val newOutputRefs = mutable.HashSet.empty[AssetOutputRef]
     txs.filter { tx =>
-      if (isSequentialTxSupported(chainIndex, hardFork)) {
+      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)
       }
       Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))

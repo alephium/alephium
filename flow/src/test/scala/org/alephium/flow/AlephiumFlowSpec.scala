@@ -736,7 +736,7 @@ trait FlowFixture
         tx.allOutputs.foreachWithIndex { case (output, index) =>
           val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
           val exist = worldState.existOutput(outputRef).rightValue || (
-            hardFork.isGhostEnabled() && usedRefs.contains(outputRef)
+            ALPH.isSequentialTxSupported(chainIndex, hardFork) && usedRefs.contains(outputRef)
           )
           exist is true
         }

@@ -21,7 +21,7 @@ import scala.util.Random
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
-import org.alephium.util.{AVector, LockFixture, TimeStamp, UnsecureRandom}
+import org.alephium.util.{AVector, Duration, LockFixture, TimeStamp, UnsecureRandom}
 
 class MemPoolSpec
     extends AlephiumFlowSpec
@@ -232,12 +232,8 @@ class MemPoolSpec
     val pool = MemPool.empty(mainGroup)
     pool.size is 0
 
-    val index = ChainIndex.unsafe(0)
-    val txs = Seq.tabulate(10) { k =>
-      val tx = transactionGen().sample.get
-      tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(nonCoinbaseMinGasPrice.value + k)))
-        .toTemplate
-    }
+    val index     = ChainIndex.unsafe(0)
+    val txs       = Seq.tabulate(10)(k => genTx(GasPrice(nonCoinbaseMinGasPrice.value + k)))
     val timeStamp = TimeStamp.now()
     Random.shuffle(txs).foreach(tx => pool.add(index, tx, timeStamp))
 
@@ -257,5 +253,56 @@ class MemPoolSpec
 
     pool.cleanInvalidTxs(blockFlow, TimeStamp.now().plusHoursUnsafe(1)) is 1
     pool.size is 0
+  }
+
+  def genTx(gasPrice: GasPrice): TransactionTemplate = {
+    val tx = transactionGen().sample.get
+    tx.copy(unsigned = tx.unsigned.copy(gasPrice = gasPrice)).toTemplate
+  }
+
+  it should "sort txs by order" in {
+    val pool         = MemPool.empty(mainGroup)
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val txNum        = 10
+    val now          = TimeStamp.now()
+    val baseGasPrice = nonCoinbaseMinGasPrice
+    val txs = AVector.tabulate(txNum) { index =>
+      val ts = now.plusMillisUnsafe(index.toLong)
+      val tx = genTx(GasPrice(baseGasPrice.value + index))
+      pool.add(chainIndex, tx, ts)
+      tx
+    }
+
+    val sorted0 = txs.reverse
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted0
+
+    val tx0 = genTx(GasPrice(baseGasPrice.value + 20))
+    pool.add(chainIndex, tx0, now.plusMinutesUnsafe(1))
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is (tx0 +: sorted0)
+
+    val tx1 = genTx(GasPrice(baseGasPrice.value + 40))
+    pool.add(chainIndex, tx1, now.minusUnsafe(Duration.ofMinutesUnsafe(1)))
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is (AVector(tx1, tx0) ++ sorted0)
+
+    val gasPrice = GasPrice(baseGasPrice.value - 10)
+    val tx2      = genTx(gasPrice)
+    pool.add(chainIndex, tx2, now)
+    val sorted1 = AVector(tx1, tx0) ++ (sorted0 :+ tx2)
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted1
+
+    val tx3 = genTx(gasPrice)
+    pool.add(chainIndex, tx3, now.minusUnsafe(Duration.ofMillisUnsafe(1)))
+    val sorted2 = AVector(tx1, tx0) ++ sorted0 ++ AVector(tx3, tx2)
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted2
+
+    val tx4 = genTx(gasPrice)
+    pool.add(chainIndex, tx4, now)
+    val sorted3 = AVector(tx1, tx0) ++ (sorted0 :+ tx3) ++
+      (if (hashOrdering.lt(tx4.id.value, tx2.id.value)) AVector(tx2, tx4) else AVector(tx4, tx2))
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted3
+
+    (0 until sorted3.length).foreach { num =>
+      pool.flow.takeAllTxs(chainIndex.flattenIndex, num) is sorted3.take(num)
+    }
   }
 }

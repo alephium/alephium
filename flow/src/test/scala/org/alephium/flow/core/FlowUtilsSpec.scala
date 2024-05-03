@@ -632,7 +632,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val (_, toPublicKey1) = chainIndex.to.generateKey
     val tx1               = transferTx(fromPrivateKey0, toPublicKey1, ALPH.alph(5))
 
-    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef))
+    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef)) is true
     collectTxs() is AVector(tx0, tx1)
     val block = mineFromMemPool(blockFlow, chainIndex)
     block.nonCoinbase.map(_.toTemplate) is AVector(tx0, tx1)
@@ -648,7 +648,10 @@ class FlowUtilsSpec extends AlephiumSpec {
     val (_, toPublicKey1) = chainIndex.to.generateKey
     val tx1               = transferTx(fromPrivateKey0, toPublicKey1, ALPH.alph(11))
 
-    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef))
+    tx1.unsigned.inputs.length is 2
+    val groupView = blockFlow.getImmutableGroupView(chainIndex.from).rightValue
+    groupView.getAsset(tx1.unsigned.inputs.head.outputRef).rightValue.isDefined is true
+    tx1.unsigned.inputs.last.outputRef is tx0.unsigned.fixedOutputRefs(1)
     collectTxs() is AVector(tx0, tx1)
     val block = mineFromMemPool(blockFlow, chainIndex)
     block.nonCoinbase.map(_.toTemplate) is AVector(tx0, tx1)
@@ -663,7 +666,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx1               = transferTx(fromPrivateKey0, toPublicKey1, ALPH.alph(5), gasPrice)
 
     (tx1.unsigned.gasPrice.value > tx0.unsigned.gasPrice.value) is true
-    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef))
+    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef)) is true
     collectTxs() is AVector(tx0)
     val block = mineFromMemPool(blockFlow, chainIndex)
     block.nonCoinbase.map(_.toTemplate) is AVector(tx0)
@@ -681,7 +684,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx1               = transferTx(fromPrivateKey1, toPublicKey2, ALPH.alph(5), gasPrice)
 
     (tx1.unsigned.gasPrice.value > tx0.unsigned.gasPrice.value) is true
-    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef))
+    tx1.unsigned.inputs.exists(input => tx0.fixedOutputRefs.contains(input.outputRef)) is false
     collectTxs() is AVector(tx1, tx0)
     val block = mineFromMemPool(blockFlow, chainIndex)
     block.nonCoinbase.map(_.toTemplate) is AVector(tx1, tx0)
