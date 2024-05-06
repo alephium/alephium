@@ -225,6 +225,7 @@ trait TxUtils { Self: FlowUtils =>
       utxos: AVector[AssetOutputInfo],
       gas: GasBox
   ): Either[String, UnsignedTransaction] = {
+    assume(gas >= minimalGas)
     for {
       _ <- utxos.foreachE { utxo =>
         if (utxo.output.tokens.nonEmpty) {
@@ -237,7 +238,8 @@ trait TxUtils { Self: FlowUtils =>
       inputSum <- EitherF.foldTry(utxos, U256.Zero) { case (acc, asset) =>
         acc.add(asset.output.amount).toRight("Input amount overflow")
       }
-      gasFee = coinbaseGasPrice * gas
+      gasUsed = if (gas > minimalGas) gas.subUnsafe(minimalGas) else GasBox.unsafe(0)
+      gasFee  = coinbaseGasPrice * gasUsed
       changeAmount <- inputSum
         .sub(burntAmount)
         .flatMap(_.sub(gasFee))

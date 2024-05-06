@@ -150,7 +150,7 @@ object Coinbase {
     val sortedUncles       = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
     val uncleRewardOutputs = sortedUncles.map(_.toAssetOutput(mainChainReward, lockTime))
     val blockReward = Coinbase.calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount))
-    val blockRewardLocked = blockReward.mulUnsafe(lockedReward).divUnsafe(netReward)
+    val blockRewardLocked = blockReward.addUnsafe(reward.burntAmount)
     val coinbaseData =
       CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
     AssetOutput(

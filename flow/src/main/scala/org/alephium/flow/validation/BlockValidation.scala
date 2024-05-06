@@ -382,14 +382,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       uncles: AVector[(LockupScript.Asset, Int)],
       isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
-    val mainChainReward = Coinbase.calcMainChainReward(netReward)
-    val uncleRewards    = uncles.map(uncle => Coinbase.calcUncleReward(mainChainReward, uncle._2))
-    val blockReward     = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
-    val blockRewardLocked = if (!isPoLW) {
-      blockReward
-    } else {
-      blockReward.mulUnsafe(lockedReward).divUnsafe(netReward)
-    }
+    val mainChainReward   = Coinbase.calcMainChainReward(netReward)
+    val uncleRewards      = uncles.map(uncle => Coinbase.calcUncleReward(mainChainReward, uncle._2))
+    val blockReward       = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
+    val blockRewardLocked = blockReward.addUnsafe(lockedReward).subUnsafe(netReward)
 
     val coinbase = block.coinbase.unsigned
     // we have checked the `fixedOutputs.length` in `checkCoinbaseEasy`
@@ -400,17 +396,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       uncleRewardOutputs(index).lockupScript == uncle._1
     }
     if (isUncleMinerValid) {
-      val coinbaseNetReward = if (!isPoLW) {
-        val totalReward = uncleRewards.fold(blockRewardLocked)(_ addUnsafe _)
-        CoinbaseNetReward(totalReward.addUnsafe(coinbaseGasFee), isPoLW)
-      } else {
-        val burntAmount = lockedReward.subUnsafe(netReward)
-        val totalReward = uncleRewards
-          .fold(U256.Zero)(_ addUnsafe _)
-          .addUnsafe(blockRewardLocked)
-          .subUnsafe(burntAmount)
-        CoinbaseNetReward(totalReward, isPoLW)
-      }
+      val totalReward       = uncleRewards.fold(blockReward)(_ addUnsafe _)
+      val coinbaseNetReward = CoinbaseNetReward(totalReward.addUnsafe(coinbaseGasFee), isPoLW)
       for {
         _ <-
           if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncleRewards.length) else validBlock(())

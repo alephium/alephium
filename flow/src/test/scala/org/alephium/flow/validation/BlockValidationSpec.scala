@@ -65,6 +65,10 @@ class BlockValidationSpec extends AlephiumSpec {
           val inputs = block.coinbase.unsigned.inputs
           unsignedTx(_.copy(inputs = inputs.replace(index, f(inputs(index)))))
         }
+
+        def gasAmount(f: GasBox => GasBox): Block = {
+          tx(tx => tx.copy(unsigned = tx.unsigned.copy(gasAmount = f(tx.unsigned.gasAmount))))
+        }
       }
 
       def pass()(implicit validator: (Block) => BlockValidationResult[Unit]) = {
@@ -1275,6 +1279,9 @@ class BlockValidationSpec extends AlephiumSpec {
     block2.Coinbase
       .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 3)
       .fail(InvalidCoinbaseReward)
+
+    block2.Coinbase.gasAmount(_.subUnsafe(1)).fail(InvalidCoinbaseReward)
+    block2.Coinbase.gasAmount(_.addUnsafe(1)).fail(InvalidCoinbaseReward)
   }
 
   it should "check PoLW coinbase tx pre-ghost" in new PoLWCoinbaseFixture {
