@@ -1809,11 +1809,12 @@ class TxUtilsSpec extends AlephiumSpec {
   "PoLW change output amount" should "larger than dust amount" in new PoLWCoinbaseTxFixture {
     val fromPublicKey = chainIndex.from.generateKey._2
     val lockupScript  = LockupScript.p2pkh(fromPublicKey)
-    val amount        = polwReward.burntAmount.addUnsafe(coinbaseGasFeeSubsidy).addUnsafe(U256.One)
+    val amount        = polwReward.burntAmount.addUnsafe(coinbaseGasFeeSubsidy)
     addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, amount))
     addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, dustUtxoAmount))
     val utxos = blockFlow.getUsableUtxos(None, lockupScript, Int.MaxValue).rightValue
     utxos.length is 2
+    utxos.map(_.output.amount).toSet is Set(amount, dustUtxoAmount)
 
     val tx = buildPoLWCoinbaseTx(0, fromPublicKey)
     tx.inputs.length is 2
@@ -1822,7 +1823,11 @@ class TxUtilsSpec extends AlephiumSpec {
       .toSet
 
     tx.fixedOutputs.length is 2
-    tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy).addUnsafe(U256.One)
+    tx.gasAmount is minimalGas
+    tx.fixedOutputs(0).amount is Coinbase
+      .calcMainChainReward(polwReward.netRewardUnsafe())
+      .addUnsafe(polwReward.burntAmount)
+    tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy)
   }
 
   private def input(

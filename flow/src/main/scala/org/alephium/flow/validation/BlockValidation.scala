@@ -399,14 +399,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
       lockedReward: U256,
-      burntAmount: Option[U256],
+      burntAmountOpt: Option[U256],
       uncles: AVector[(LockupScript.Asset, Int)]
   ): BlockValidationResult[Unit] = {
-    val netReward       = lockedReward.subUnsafe(burntAmount.getOrElse(U256.Zero))
+    val burntAmount     = burntAmountOpt.getOrElse(U256.Zero)
+    val netReward       = lockedReward.subUnsafe(burntAmount)
     val mainChainReward = Coinbase.calcMainChainReward(netReward)
     val uncleRewards = uncles.map(uncle => Coinbase.calcGhostUncleReward(mainChainReward, uncle._2))
     val blockReward  = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
-    val blockRewardLocked = blockReward.addUnsafe(lockedReward).subUnsafe(netReward)
+    val blockRewardLocked = blockReward.addUnsafe(burntAmount)
 
     val coinbase = block.coinbase.unsigned
     // we have checked the `fixedOutputs.length` in `checkCoinbaseEasy`

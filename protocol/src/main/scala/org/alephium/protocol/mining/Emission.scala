@@ -236,7 +236,9 @@ object Emission {
     def miningReward: U256
   }
   final case class PoW(miningReward: U256)                     extends RewardType
-  final case class PoLW(miningReward: U256, burntAmount: U256) extends RewardType
+  final case class PoLW(miningReward: U256, burntAmount: U256) extends RewardType {
+    def  netRewardUnsafe(): U256 = miningReward.subUnsafe(burntAmount)
+  }
 
   @inline def rank(hashRate: HashRate): Int = {
     hashRate.value.bitLength() - 1

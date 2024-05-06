@@ -204,6 +204,7 @@ class BlockValidationSpec extends AlephiumSpec {
       .unsignedTx(_.copy(inputs = inputs))
 
     commonTest(block)
+
     info("gasAmount")
     block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas)).pass()
     block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas.subUnsafe(GasBox.unsafe(1)))).fail()
