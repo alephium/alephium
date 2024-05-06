@@ -23,7 +23,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.{NetworkId => _, _}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes, EitherF, U256}
 
@@ -433,6 +433,21 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
+  private[validation] def checkTestnetMiner(
+      block: Block,
+      hardFork: HardFork
+  ): BlockValidationResult[Unit] = {
+    if (
+      hardFork.isGhostEnabled() &&
+      networkConfig.networkId == NetworkId.AlephiumTestNet &&
+      !ALPH.testnetWhitelistedMiners.contains(block.minerLockupScript)
+    ) {
+      invalidBlock(InvalidTestnetMiner)
+    } else {
+      validBlock(())
+    }
+  }
+
   private[validation] def checkCoinbase(
       flow: BlockFlow,
       chainIndex: ChainIndex,
@@ -454,6 +469,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else {
           checkRewardPreGhost(chainIndex, block, groupView, lockedReward)
         }
+      _ <- checkTestnetMiner(block, hardFork)
     } yield ()
   }
 
