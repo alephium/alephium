@@ -27,9 +27,9 @@ package object model {
   val cliqueIdLength: Int = PublicKey.length
 
   // scalastyle:off magic.number
-  val minimalGas: GasBox         = GasBox.unsafe(20000)
-  val coinbaseGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(1))
-  val coinbaseGasFee: U256       = coinbaseGasPrice * minimalGas
+  val minimalGas: GasBox          = GasBox.unsafe(20000)
+  val coinbaseGasPrice: GasPrice  = GasPrice(ALPH.nanoAlph(1))
+  val coinbaseGasFeeSubsidy: U256 = coinbaseGasPrice * minimalGas
 
   val defaultGasPerInput: GasBox  = GasBox.unsafe(2500)
   val defaultGasPerOutput: GasBox = GasBox.unsafe(6000)

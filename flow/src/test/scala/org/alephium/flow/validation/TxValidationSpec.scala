@@ -1166,8 +1166,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
       val hardFork   = networkConfig.getHardFork(TimeStamp.now())
       val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue.copy(hardFork = hardFork)
-      val coinbaseNetReward = CoinbaseNetReward(U256.Zero, isPoLW = true)
-      validateTx(tx, chainIndex, groupView, blockEnv, Some(coinbaseNetReward), true)
+      validateTx(tx, chainIndex, groupView, blockEnv, Some(U256.Zero), true)
     }
 
     val (priKey, pubKey) = keypairGen.sample.value
@@ -1190,6 +1189,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unsigned1 = unsignedTx.copy(inputs = inputs1)
     val tx2       = Transaction.from(unsigned1, AVector(signature))
     tx2.fail(InvalidPublicKeyHash)
+
+    val invalidMiner = LockupScript.p2pkh(invalidPubKey)
+    val assetOutput  = unsignedTx.fixedOutputs.head.copy(lockupScript = invalidMiner)
+    val unsigned2 = unsignedTx.copy(fixedOutputs = unsignedTx.fixedOutputs.replace(0, assetOutput))
+    val tx3       = Transaction.from(unsigned2, AVector(signature))
+    tx3.fail(InvalidSignature)
   }
 
   it should "invalidate polw" in new Fixture {

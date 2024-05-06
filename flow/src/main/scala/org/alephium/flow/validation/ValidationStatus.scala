@@ -74,6 +74,7 @@ case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus
 case object PoLWUnlockScriptNotSame             extends InvalidPoLWStatus
 case object InvalidPoLWChangeOutputLockupScript extends InvalidPoLWStatus
 case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
+case object InvalidPoLWBeforeGhostHardFork      extends InvalidPoLWStatus
 
 sealed trait InvalidGhostUncleStatus              extends InvalidBlockStatus
 case object InvalidGhostUnclesBeforeGhostHardFork extends InvalidGhostUncleStatus
@@ -194,4 +195,3 @@ final case object InvalidGeneratedOutputs                       extends InvalidT
 final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus
 final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus
 final case object UsingBreakingInstrs                           extends InvalidTxStatus
-case object InvalidPoLWBeforeGhostHardFork                      extends InvalidTxStatus

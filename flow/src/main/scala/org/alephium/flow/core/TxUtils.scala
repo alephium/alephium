@@ -307,7 +307,7 @@ trait TxUtils { Self: FlowUtils =>
       changeAmount <- inputSum
         .sub(burntAmount)
         .flatMap(_.sub(gasFee))
-        .toRight("Change amount overflow")
+        .toRight("Change amount underflow")
     } yield {
       val changeOutput = AssetOutput(
         changeAmount,

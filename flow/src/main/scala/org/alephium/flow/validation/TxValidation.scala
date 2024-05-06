@@ -196,7 +196,7 @@ trait TxValidation {
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
-      coinbaseNetReward: Option[CoinbaseNetReward],
+      coinbaseNetReward: Option[U256],
       checkDoubleSpending: Boolean // for block txs, this has been checked in block validation
   ): TxValidationResult[Unit] = {
     for {
@@ -234,7 +234,7 @@ trait TxValidation {
       tx: Transaction,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
-      coinbaseNetReward: Option[CoinbaseNetReward]
+      coinbaseNetReward: Option[U256]
   ): TxValidationResult[Unit] = {
     for {
       _ <- validateTx(
@@ -273,7 +273,7 @@ trait TxValidation {
       tx: Transaction,
       worldState: WorldState.Cached,
       preOutputs: AVector[TxOutput],
-      coinbaseNetReward: Option[CoinbaseNetReward],
+      coinbaseNetReward: Option[U256],
       blockEnv: BlockEnv
   ): TxValidationResult[Unit] = {
     for {
@@ -282,32 +282,17 @@ trait TxValidation {
       _ <- checkTxScript(chainIndex, tx, gasRemaining, worldState, preAssetOutputs, blockEnv)
     } yield ()
   }
-  @inline private def checkPoLWCoinbaseTx(
-      hardFork: HardFork,
-      coinbaseNetReward: Option[CoinbaseNetReward]
-  ): TxValidationResult[Boolean] = {
-    val isPoLWCoinbaseTx = coinbaseNetReward match {
-      case Some(CoinbaseNetReward(_, isPoLW)) => isPoLW
-      case _                                  => false
-    }
-    if (isPoLWCoinbaseTx && !hardFork.isGhostEnabled()) {
-      invalidTx(InvalidPoLWBeforeGhostHardFork)
-    } else {
-      validTx(isPoLWCoinbaseTx)
-    }
-  }
   protected[validation] def checkStatefulExceptTxScript(
       tx: Transaction,
       blockEnv: BlockEnv,
       preOutputs: AVector[TxOutput],
-      coinbaseNetReward: Option[CoinbaseNetReward]
+      coinbaseNetReward: Option[U256]
   ): TxValidationResult[GasBox] = {
     for {
-      _                <- checkLockTime(preOutputs, blockEnv.timeStamp)
-      _                <- checkAlphBalance(tx, preOutputs, coinbaseNetReward.map(_.amount))
-      _                <- checkTokenBalance(tx, preOutputs)
-      isPoLWCoinbaseTx <- checkPoLWCoinbaseTx(blockEnv.hardFork, coinbaseNetReward)
-      gasRemaining     <- checkGasAndWitnesses(tx, preOutputs, blockEnv, isPoLWCoinbaseTx)
+      _            <- checkLockTime(preOutputs, blockEnv.timeStamp)
+      _            <- checkAlphBalance(tx, preOutputs, coinbaseNetReward)
+      _            <- checkTokenBalance(tx, preOutputs)
+      gasRemaining <- checkGasAndWitnesses(tx, preOutputs, blockEnv, coinbaseNetReward.isDefined)
     } yield gasRemaining
   }
 
@@ -334,7 +319,7 @@ trait TxValidation {
   protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlphBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv, isPoLW: Boolean): TxValidationResult[GasBox]
+  def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv, isCoinbase: Boolean): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
       chainIndex: ChainIndex,
       tx: Transaction,
@@ -727,11 +712,11 @@ object TxValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv,
-        isPoLWCoinbaseTx: Boolean
+        isCoinbase: Boolean
     ): TxValidationResult[GasBox] = {
       for {
         gasRemaining0 <- checkBasicGas(tx, tx.unsigned.gasAmount)
-        gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0, isPoLWCoinbaseTx)
+        gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0, isCoinbase)
       } yield gasRemaining1
     }
 
@@ -763,7 +748,7 @@ object TxValidation {
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv,
         gasRemaining: GasBox,
-        isPoLWCoinbaseTx: Boolean
+        isCoinbase: Boolean
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
@@ -789,7 +774,7 @@ object TxValidation {
               gasRemaining,
               preOutputs(idx).lockupScript,
               unlockScript,
-              isPoLWCoinbaseTx
+              isCoinbase
             )
           }
         }
@@ -803,7 +788,7 @@ object TxValidation {
         gasRemaining: GasBox,
         lockupScript: LockupScript,
         unlockScript: UnlockScript,
-        isPoLWCoinbaseTx: Boolean
+        isCoinbase: Boolean
     ): TxValidationResult[GasBox] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
@@ -812,7 +797,7 @@ object TxValidation {
           checkP2mpkh(txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
           checkP2SH(blockEnv, txEnv, gasRemaining, lock, unlock)
-        case (lock: LockupScript.P2PKH, unlock: UnlockScript.PoLW) if isPoLWCoinbaseTx =>
+        case (lock: LockupScript.P2PKH, unlock: UnlockScript.PoLW) if isCoinbase =>
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)

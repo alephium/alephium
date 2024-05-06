@@ -1788,7 +1788,7 @@ class TxUtilsSpec extends AlephiumSpec {
     (tx.gasAmount > minimalGas) is true
   }
 
-  it should "return error if not enough ALPH for PoLW coinbase input" in new PoLWCoinbaseTxFixture {
+  it should "return error if there are tokens in PoLW coinbase input" in new PoLWCoinbaseTxFixture {
     val lockupScript = LockupScript.p2pkh(publicKey)
     val inputs = AVector(
       input("input-0", ALPH.cent(10), lockupScript),
@@ -1809,7 +1809,7 @@ class TxUtilsSpec extends AlephiumSpec {
   "PoLW change output amount" should "larger than dust amount" in new PoLWCoinbaseTxFixture {
     val fromPublicKey = chainIndex.from.generateKey._2
     val lockupScript  = LockupScript.p2pkh(fromPublicKey)
-    val amount        = polwReward.burntAmount.addUnsafe(coinbaseGasFee).addUnsafe(U256.One)
+    val amount        = polwReward.burntAmount.addUnsafe(coinbaseGasFeeSubsidy).addUnsafe(U256.One)
     addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, amount))
     addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, dustUtxoAmount))
     val utxos = blockFlow.getUsableUtxos(None, lockupScript, Int.MaxValue).rightValue
@@ -1822,7 +1822,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .toSet
 
     tx.fixedOutputs.length is 2
-    tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFee).addUnsafe(U256.One)
+    tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy).addUnsafe(U256.One)
   }
 
   private def input(

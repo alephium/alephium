@@ -197,8 +197,11 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "validate PoLW coinbase transaction simple format" in new CoinbaseFormatFixture {
     implicit val validator = (blk: Block) => checkCoinbaseEasy(blk, 0, isPoLW = true)
     implicit val error: InvalidBlockStatus = InvalidPoLWCoinbaseFormat
-    override val block =
-      emptyBlock(blockFlow, chainIndex).Coinbase.tx(_.copy(inputSignatures = testSignatures))
+    val inputs                             = AVector(txInputGen.sample.get)
+    override val block = emptyBlock(blockFlow, chainIndex).Coinbase
+      .tx(_.copy(inputSignatures = testSignatures))
+      .Coinbase
+      .unsignedTx(_.copy(inputs = inputs))
 
     commonTest(block)
     info("gasAmount")
@@ -210,6 +213,10 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0, output0))).pass()
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = emptyOutputs)).fail()
+
+    info("input size")
+    block.Coinbase.unsignedTx(_.copy(inputs = AVector.empty)).fail()
+    block.Coinbase.unsignedTx(_.copy(inputs = inputs ++ inputs)).pass()
 
     info("input signature")
     block.Coinbase.tx(_.copy(inputSignatures = emptySignatures)).fail()
@@ -1404,15 +1411,12 @@ class BlockValidationSpec extends AlephiumSpec {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     implicit val validator = (block: Block) => {
-      val coinbaseTx = block.coinbase
-      val rewardAmount =
-        coinbaseTx.unsigned.fixedOutputs.head.amount.addUnsafe(coinbaseTx.gasFeeUnsafe)
-      val coinbaseReward = CoinbaseNetReward(rewardAmount, isPoLW = true)
+      val hardFork  = networkConfig.getHardFork(block.timestamp)
       val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
-      checkCoinbaseAsTx(chainIndex, block, groupView, coinbaseReward)
+      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 
-    val block = emptyBlock(blockFlow, chainIndex)
-    block.fail(ExistInvalidTx(block.coinbase, InvalidPoLWBeforeGhostHardFork))
+    val block = emptyPoLWBlock(0)
+    block.fail(InvalidPoLWBeforeGhostHardFork)
   }
 }

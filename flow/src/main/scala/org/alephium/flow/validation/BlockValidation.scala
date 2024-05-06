@@ -321,9 +321,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
         checkCoinbase(flow, chainIndex, block, groupView, netReward, netReward, hardFork, false)
       case Emission.PoLW(miningReward, burntAmount) =>
-        val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
-        val netReward    = lockedReward.subUnsafe(burntAmount)
-        checkCoinbase(flow, chainIndex, block, groupView, netReward, lockedReward, hardFork, true)
+        if (hardFork.isGhostEnabled()) {
+          val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
+          val netReward    = lockedReward.subUnsafe(burntAmount)
+          checkCoinbase(flow, chainIndex, block, groupView, netReward, lockedReward, hardFork, true)
+        } else {
+          invalidBlock(InvalidPoLWBeforeGhostHardFork)
+        }
     }
 
     result match {
@@ -339,10 +343,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       netRewardAmount: U256,
       lockedReward: U256
   ): BlockValidationResult[Unit] = {
-    val coinbaseNetReward =
-      CoinbaseNetReward(netRewardAmount.addUnsafe(coinbaseGasFee), isPoLW = false)
     for {
-      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, coinbaseNetReward)
+      _ <- checkCoinbaseAsTx(
+        chainIndex,
+        block,
+        groupView,
+        netRewardAmount.addUnsafe(coinbaseGasFeeSubsidy)
+      )
       _ <- checkLockedReward(block, AVector(lockedReward))
     } yield ()
   }
@@ -386,8 +393,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       groupView: BlockFlowGroupView[WorldState.Cached],
       netReward: U256,
       lockedReward: U256,
-      uncles: AVector[(LockupScript.Asset, Int)],
-      isPoLW: Boolean
+      uncles: AVector[(LockupScript.Asset, Int)]
   ): BlockValidationResult[Unit] = {
     val mainChainReward = Coinbase.calcMainChainReward(netReward)
     val uncleRewards = uncles.map(uncle => Coinbase.calcGhostUncleReward(mainChainReward, uncle._2))
@@ -399,16 +405,18 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     assume(coinbase.fixedOutputs.length >= uncles.length + 1)
     val uncleRewardOutputs = coinbase.fixedOutputs.slice(1, uncles.length + 1)
     // the reward amount will be checked within `checkLockedReward`
-    val isUncleMinerValid = uncles.zipWithIndex.forall { case (uncle, index) =>
+    val isUncleMinerValid = uncles.forallWithIndex { case (uncle, index) =>
       uncleRewardOutputs(index).lockupScript == uncle._1
     }
     if (isUncleMinerValid) {
-      val totalReward       = uncleRewards.fold(blockReward)(_ addUnsafe _)
-      val coinbaseNetReward = CoinbaseNetReward(totalReward.addUnsafe(coinbaseGasFee), isPoLW)
+      val totalReward = uncleRewards.fold(blockReward)(_ addUnsafe _)
       for {
-        _ <-
-          if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncleRewards.length) else validBlock(())
-        _ <- checkCoinbaseAsTx(chainIndex, block, groupView, coinbaseNetReward)
+        _ <- checkCoinbaseAsTx(
+          chainIndex,
+          block,
+          groupView,
+          totalReward.addUnsafe(coinbaseGasFeeSubsidy)
+        )
         _ <- checkLockedReward(block, blockRewardLocked +: uncleRewards)
       } yield ()
     } else {
@@ -430,9 +438,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       ghostUncleHashes <- checkCoinbaseData(chainIndex, block)
       _                <- checkCoinbaseEasy(block, ghostUncleHashes.length, isPoLW)
       uncles           <- checkGhostUncles(flow, chainIndex, block, ghostUncleHashes)
+      _ <- if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncles.length) else validBlock(())
       _ <-
         if (hardFork.isGhostEnabled()) {
-          checkRewardGhost(chainIndex, block, groupView, netReward, lockedReward, uncles, isPoLW)
+          checkRewardGhost(chainIndex, block, groupView, netReward, lockedReward, uncles)
         } else {
           checkRewardPreGhost(chainIndex, block, groupView, netReward, lockedReward)
         }
@@ -443,7 +452,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      coinbaseNetReward: CoinbaseNetReward
+      netReward: U256
   ): BlockValidationResult[Unit] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val blockEnv = BlockEnv.from(chainIndex, block.header)
@@ -454,7 +463,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           block.coinbase,
           groupView,
           blockEnv,
-          Some(coinbaseNetReward)
+          Some(netReward)
         )
       )
     } else {
@@ -514,6 +523,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       checkCoinbaseEasyCommon(block) &&
       unsigned.gasAmount >= minimalGas &&
       unsigned.fixedOutputs.length >= uncleRewardLength + 1 &&
+      unsigned.inputs.nonEmpty &&
       coinbase.inputSignatures.length == 1
     ) {
       validBlock(())
