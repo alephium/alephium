@@ -1,8 +1,8 @@
 {
-  "version": "v2.5.8",
+  "version": "v2.11.0",
   "name": "Foo",
-  "bytecode": "050111010000000506ce00ce01ce02ce03ce0402",
-  "codeHash": "f15f45440cd5b020dfbe06bb8e4f930d82daf6134ee0f84c296b51686a659d0c",
+  "bytecode": "050116010000000507d3a326e9e2ce00ce01ce02ce03ce0402",
+  "codeHash": "5e770de7380fd93ffc4f3a02462d4fd3ac4e624252421e25041c113381a1e175",
   "fieldsSig": {
     "names": [
       "a",

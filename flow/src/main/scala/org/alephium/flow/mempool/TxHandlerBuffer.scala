@@ -31,7 +31,7 @@ class TxHandlerBuffer private (
   }
 
   def getRootTxs(): AVector[TransactionTemplate] = {
-    pool.collectForBlock(TxHandlerBuffer.bufferChainIndex, Int.MaxValue)
+    pool.collectNonSequentialTxs(TxHandlerBuffer.bufferChainIndex, Int.MaxValue)
   }
 
   def removeInvalidTx(tx: TransactionTemplate): Unit = {

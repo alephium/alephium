@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class SelectedUncle(
+final case class SelectedGhostUncle(
     blockHash: BlockHash,
     lockupScript: LockupScript.Asset,
     heightDiff: Int
@@ -30,7 +30,7 @@ final case class SelectedUncle(
       mainChainReward: U256,
       lockTime: TimeStamp
   ): AssetOutput = {
-    val uncleReward = Coinbase.calcUncleReward(mainChainReward, heightDiff)
+    val uncleReward = Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
     AssetOutput(uncleReward, lockupScript, lockTime, AVector.empty, ByteString.empty)
   }
 }

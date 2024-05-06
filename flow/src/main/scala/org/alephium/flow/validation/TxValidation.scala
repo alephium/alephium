@@ -207,7 +207,7 @@ trait TxValidation {
         blockEnv.getHardFork(),
         isCoinbase = coinbaseNetReward.nonEmpty
       )
-      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx))
+      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx, blockEnv.newOutputRefCache))
       _ <- checkStateful(
         chainIndex,
         tx,
@@ -465,7 +465,7 @@ object TxValidation {
         isCoinbase: Boolean,
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
-      if (!GasBox.validate(tx.unsigned.gasAmount)) {
+      if (!GasBox.validate(tx.unsigned.gasAmount, hardFork)) {
         invalidTx(InvalidStartGas)
       } else if (!GasPrice.validate(tx.unsigned.gasPrice, isCoinbase, hardFork)) {
         invalidTx(InvalidGasPrice)

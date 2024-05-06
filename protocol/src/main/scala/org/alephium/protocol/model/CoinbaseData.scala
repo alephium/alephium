@@ -51,7 +51,7 @@ final case class CoinbaseDataV1(
 
 final case class CoinbaseDataV2(
     prefix: CoinbaseDataPrefix,
-    uncleHashes: AVector[BlockHash],
+    ghostUncleHashes: AVector[BlockHash],
     minerData: ByteString
 ) extends CoinbaseData
 
@@ -65,12 +65,12 @@ object CoinbaseData {
           coinbaseData <-
             if (hardFork.isGhostEnabled()) {
               for {
-                uncleHashesResult <- _decode[AVector[BlockHash]](prefixResult.rest)
+                ghostUncleHashesResult <- _decode[AVector[BlockHash]](prefixResult.rest)
               } yield Staging[CoinbaseData](
                 CoinbaseDataV2(
                   prefixResult.value,
-                  uncleHashesResult.value,
-                  uncleHashesResult.rest
+                  ghostUncleHashesResult.value,
+                  ghostUncleHashesResult.rest
                 ),
                 ByteString.empty
               )
@@ -89,7 +89,7 @@ object CoinbaseData {
         d match {
           case data: CoinbaseDataV1 => encode(data.prefix) ++ data.minerData
           case data: CoinbaseDataV2 =>
-            encode(data.prefix) ++ encode(data.uncleHashes) ++ data.minerData
+            encode(data.prefix) ++ encode(data.ghostUncleHashes) ++ data.minerData
         }
       }
     }
@@ -97,7 +97,7 @@ object CoinbaseData {
   def from(
       chainIndex: ChainIndex,
       blockTs: TimeStamp,
-      sortedUncleHashes: AVector[BlockHash],
+      sortedGhostUncleHashes: AVector[BlockHash],
       minerData: ByteString
   )(implicit
       networkConfig: NetworkConfig
@@ -105,7 +105,7 @@ object CoinbaseData {
     val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
     val hardFork = networkConfig.getHardFork(blockTs)
     if (hardFork.isGhostEnabled()) {
-      CoinbaseDataV2(prefix, sortedUncleHashes, minerData)
+      CoinbaseDataV2(prefix, sortedGhostUncleHashes, minerData)
     } else {
       CoinbaseDataV1(prefix, minerData)
     }

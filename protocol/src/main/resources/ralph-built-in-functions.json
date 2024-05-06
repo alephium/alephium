@@ -102,6 +102,16 @@
     "returns": "@returns the id of the contract"
   },
   {
+    "name": "contractAddress",
+    "category": "Contract",
+    "signature": "fn contractAddress!(contract:<Contract>) -> (Address)",
+    "doc": "Returns the address of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the address of the contract"
+  },
+  {
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",
@@ -395,6 +405,17 @@
     "returns": "@returns "
   },
   {
+    "name": "payGasFee",
+    "category": "Asset",
+    "signature": "fn payGasFee!(payer:Address, amount:U256) -> ()",
+    "doc": "Pay gas fee.",
+    "params": [
+      "@param payer payer of the gas",
+      "@param amount the amount of gas to be paid in ALPH"
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "assert",
     "category": "Utils",
     "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",
@@ -511,6 +532,16 @@
     "returns": "@returns the min value of I256"
   },
   {
+    "name": "groupOfAddress",
+    "category": "Utils",
+    "signature": "fn groupOfAddress!(address:Address) -> (U256)",
+    "doc": "Returns the group of the input address.",
+    "params": [
+      "@param address the input address"
+    ],
+    "returns": "@returns the group of the input address"
+  },
+  {
     "name": "nullContractAddress",
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",
@@ -519,6 +550,26 @@
       
     ],
     "returns": "@returns the null contract address with contract id being zeros"
+  },
+  {
+    "name": "minimalContractDeposit",
+    "category": "Utils",
+    "signature": "fn minimalContractDeposit!() -> (U256)",
+    "doc": "The minimal contract deposit",
+    "params": [
+      
+    ],
+    "returns": "@returns the minimal ALPH amount for contract deposit"
+  },
+  {
+    "name": "mapEntryDeposit",
+    "category": "Utils",
+    "signature": "fn mapEntryDeposit!() -> (U256)",
+    "doc": "The amount of ALPH required to create a map entry",
+    "params": [
+      
+    ],
+    "returns": "@returns the amount of ALPH required to create a map entry"
   },
   {
     "name": "networkId",
@@ -887,11 +938,11 @@
     "name": "blake2b",
     "category": "Cryptography",
     "signature": "fn blake2b!(data:ByteVec) -> (ByteVec)",
-    "doc": "Computes the Blake2b hash of the input.",
+    "doc": "Computes the Blake2b-256 hash of the input.",
     "params": [
       "@param data the input data to be hashed"
     ],
-    "returns": "@returns the hash result"
+    "returns": "@returns the 32 bytes hash result"
   },
   {
     "name": "keccak256",

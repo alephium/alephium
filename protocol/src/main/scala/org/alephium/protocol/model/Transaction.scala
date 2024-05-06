@@ -48,10 +48,9 @@ sealed trait TransactionAbstract {
 
   def getOutput(index: Int): TxOutput
 
-  def assetOutputRefs: AVector[AssetOutputRef] = {
-    unsigned.fixedOutputs.mapWithIndex { case (output, index) =>
-      AssetOutputRef.from(output, TxOutputRef.key(id, index))
-    }
+  @inline
+  def fixedOutputRefs: AVector[AssetOutputRef] = {
+    unsigned.fixedOutputRefs
   }
 
   def isEntryMethodPayable: Boolean = unsigned.scriptOpt.exists(_.entryMethod.usePreapprovedAssets)
@@ -92,6 +91,17 @@ final case class Transaction(
       unsigned.fixedOutputs(index)
     } else {
       generatedOutputs(index - unsigned.fixedOutputs.length)
+    }
+  }
+
+  lazy val outputRefs: AVector[TxOutputRef] = {
+    AVector.tabulate(outputsLength) { outputIndex =>
+      if (outputIndex < unsigned.fixedOutputs.length) {
+        unsigned.fixedOutputRefs(outputIndex)
+      } else {
+        val output = generatedOutputs(outputIndex - unsigned.fixedOutputs.length)
+        TxOutputRef.from(id, outputIndex, output)
+      }
     }
   }
 
@@ -251,7 +261,7 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
@@ -264,7 +274,7 @@ object Transaction {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
     coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)
@@ -276,7 +286,7 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
@@ -288,7 +298,7 @@ object Transaction {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[SelectedUncle]
+      uncles: AVector[SelectedGhostUncle]
   )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     val emissionConfig = consensusConfigs.getConsensusConfig(blockTs)
     Coinbase.build(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)(

@@ -183,7 +183,7 @@ class TransactionSpec
       val lockupScript = LockupScript.P2PKH(
         Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
       )
-      val tx = coinbaseTransaction(AVector(SelectedUncle(blockHash, lockupScript, 1)))
+      val tx = coinbaseTransaction(AVector(SelectedGhostUncle(blockHash, lockupScript, 1)))
       tx.verify("ghost-coinbase")
     }
 
@@ -275,6 +275,7 @@ class TransactionSpec
             isPublic = true,
             usePreapprovedAssets = true,
             useContractAssets = true,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -425,6 +426,7 @@ class TransactionSpec
             isPublic = true,
             usePreapprovedAssets = false,
             useContractAssets = false,
+            usePayToContractOnly = false,
             argsLength = 2,
             localsLength = 2,
             returnLength = 0,
@@ -506,6 +508,7 @@ class TransactionSpec
             isPublic = true,
             usePreapprovedAssets = true,
             useContractAssets = true,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,

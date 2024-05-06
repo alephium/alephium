@@ -56,7 +56,8 @@ object FastParseErrorUtil {
       message = expectedMessage,
       found = foundNoQuotes,
       tracedMsg = traceMsg,
-      program = program
+      program = program,
+      None
     )
   }
 

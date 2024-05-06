@@ -76,11 +76,11 @@ trait ServerFixture
       Some(AVector(Token(TokenId.hash("token2"), U256.Two))),
       0
     )
-  lazy val dummyGroup         = Group(Gen.choose(0, brokerConfig.groups - 1).sample.get)
-  lazy val dummyContract      = counterContract
-  lazy val dummyContractGroup = Group(brokerConfig.groups - 1)
+  lazy val dummyGroup    = Group(Gen.choose(0, brokerConfig.groups - 1).sample.get)
+  lazy val dummyContract = counterContract
   lazy val dummyContractAddress =
-    Address.Contract(LockupScript.P2C(ContractId.zero)).toBase58
+    Address.Contract(LockupScript.P2C(ContractId.zero))
+  lazy val dummyContractGroup = dummyContractAddress.groupIndex
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(dummyGroup.group)
   ).sample.get
@@ -472,13 +472,7 @@ object ServerFixture {
 
     // scalastyle:off no.equal
     override def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
-      val contractGroup = brokerConfig.groups - 1
-      if (
-        brokerConfig.groupRange
-          .contains(groupIndex.value) && brokerConfig.groupRange.contains(
-          contractGroup
-        ) && (groupIndex.value == contractGroup)
-      ) {
+      if (brokerConfig.groupRange.contains(groupIndex.value)) {
         val contractId: ContractId = ContractId.zero
         storages.emptyWorldState
           .createContractLegacyUnsafe(

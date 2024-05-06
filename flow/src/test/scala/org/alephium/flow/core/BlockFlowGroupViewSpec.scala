@@ -16,9 +16,14 @@
 
 package org.alephium.flow.core
 
+import scala.collection.mutable
+
+import akka.util.ByteString
+
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.{AlephiumSpec, TimeStamp}
+import org.alephium.protocol.ALPH
+import org.alephium.protocol.model.{AssetOutput, ChainIndex, GroupIndex}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class BlockFlowGroupViewSpec extends AlephiumSpec {
   it should "fetch preOutputs" in new FlowFixture {
@@ -67,5 +72,25 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block2.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView3.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block2.nonCoinbase.head.unsigned.fixedOutputs.tail
+
+    val outputInfos = tx1.unsigned.inputs.map { input =>
+      input.outputRef -> AssetOutput(
+        ALPH.oneAlph,
+        lockupScript,
+        TimeStamp.zero,
+        AVector.empty,
+        ByteString.empty
+      )
+    }
+    val additionalCache = mutable.Map.from(outputInfos)
+    groupView3.getPreOutputs(block1.nonCoinbase.head, None).rightValue.isDefined is false
+    groupView3
+      .getPreOutputs(block1.nonCoinbase.head, Some(additionalCache))
+      .rightValue
+      .isDefined is true
+    groupView2.exists(block1.nonCoinbase.head.unsigned.inputs, Set.empty).rightValue is false
+    groupView2
+      .exists(block1.nonCoinbase.head.unsigned.inputs, additionalCache.keySet)
+      .rightValue is true
   }
 }

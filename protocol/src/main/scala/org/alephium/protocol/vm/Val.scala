@@ -59,12 +59,12 @@ object Val {
 
     private def _deserialize(tpe: Type, content: ByteString): SerdeResult[Staging[Val]] =
       tpe match {
-        case Bool              => decode[Boolean](content).map(_.mapValue(Bool(_)))
-        case I256              => decode[util.I256](content).map(_.mapValue(I256(_)))
-        case U256              => decode[util.U256](content).map(_.mapValue(U256(_)))
-        case ByteVec           => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
-        case Address           => decode[LockupScript](content).map(_.mapValue(Address(_)))
-        case _: FixedSizeArray => Left(SerdeError.Other("Unexpected type"))
+        case Bool    => decode[Boolean](content).map(_.mapValue(Bool(_)))
+        case I256    => decode[util.I256](content).map(_.mapValue(I256(_)))
+        case U256    => decode[util.U256](content).map(_.mapValue(U256(_)))
+        case ByteVec => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
+        case Address => decode[LockupScript](content).map(_.mapValue(Address(_)))
+        case _: FixedSizeArray | _: Struct | _: Map => Left(SerdeError.Other("Unexpected type"))
       }
   }
 
@@ -130,7 +130,7 @@ object Val {
 
     override def toByteVec(): ByteVec = this
 
-    override def toDebugString(): ByteString = bytes
+    override def toDebugString(): ByteString = ByteString.fromString(Hex.toHexString(bytes))
 
     override def estimateByteSize(): Int = bytes.length
 
@@ -207,9 +207,22 @@ object Val {
     override def isNumeric: Boolean = false
     override def toString: String   = s"[$baseType;$size]"
   }
+  final case class Struct(name: String) extends Type {
+    override def id: scala.Byte     = throw new RuntimeException("Struct has no type id")
+    override def default: Val       = throw new RuntimeException("Struct has no default value")
+    override def isNumeric: Boolean = false
+    override def toString: String   = name
+  }
+  final case class Map(key: Type, value: Type) extends Type {
+    override def id: scala.Byte     = throw new RuntimeException("Map has no type id")
+    override def default: Val       = throw new RuntimeException("Map has no default value")
+    override def isNumeric: Boolean = false
+    override def toString: String   = s"Map[$key,$value]"
+  }
 
   val True: Bool                       = Bool(true)
   val False: Bool                      = Bool(false)
   val NullContractAddress: Val.Address = Val.Address(LockupScript.p2c(ContractId.zero))
+  val Enforced: ByteVec                = ByteVec(ByteString.fromString("enforced"))
 }
 // scalastyle:on number.of.methods

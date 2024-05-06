@@ -75,16 +75,16 @@ case object PoLWUnlockScriptNotSame             extends InvalidPoLWStatus
 case object InvalidPoLWChangeOutputLockupScript extends InvalidPoLWStatus
 case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
 
-sealed trait InvalidUncleStatus              extends InvalidBlockStatus
-case object InvalidUnclesBeforeGhostHardFork extends InvalidUncleStatus
-case object InvalidUncleSize                 extends InvalidUncleStatus
-case object UnsortedUncles                   extends InvalidUncleStatus
-case object InvalidUncleDeps                 extends InvalidUncleStatus
-case object NotUnclesForTheBlock             extends InvalidUncleStatus
-case object UncleHashConflictWithParentHash  extends InvalidUncleStatus
-case object UnclesAlreadyUsed                extends InvalidUncleStatus
-case object UncleDoesNotExist                extends InvalidUncleStatus
-case object InvalidUncleMiner                extends InvalidUncleStatus
+sealed trait InvalidGhostUncleStatus              extends InvalidBlockStatus
+case object InvalidGhostUnclesBeforeGhostHardFork extends InvalidGhostUncleStatus
+case object InvalidGhostUncleSize                 extends InvalidGhostUncleStatus
+case object UnsortedGhostUncles                   extends InvalidGhostUncleStatus
+case object InvalidGhostUncleDeps                 extends InvalidGhostUncleStatus
+case object NotGhostUnclesForTheBlock             extends InvalidGhostUncleStatus
+case object GhostUncleHashConflictWithParentHash  extends InvalidGhostUncleStatus
+case object GhostUnclesAlreadyUsed                extends InvalidGhostUncleStatus
+case object GhostUncleDoesNotExist                extends InvalidGhostUncleStatus
+case object InvalidGhostUncleMiner                extends InvalidGhostUncleStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

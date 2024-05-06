@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import org.alephium.protocol.model.Weight
+import org.alephium.protocol.model.{ChainIndex, HardFork, Weight}
 import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALPH {
@@ -86,5 +86,18 @@ object ALPH {
       // scalastyle:on magic.number
       case _ => None
     }
+  }
+
+  def prettifyAmount(amount: U256): String = {
+    if (amount == U256.Zero) {
+      "0 alph"
+    } else {
+      val converted = (BigDecimal(amount.v) / BigDecimal(oneAlph.v)).toDouble
+      s"$converted alph"
+    }
+  }
+
+  @inline def isSequentialTxSupported(chainIndex: ChainIndex, hardFork: HardFork): Boolean = {
+    hardFork.isGhostEnabled() && chainIndex.isIntraGroup
   }
 }

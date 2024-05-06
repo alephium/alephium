@@ -437,8 +437,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
     tx.gasAmount(minimalGas).pass()
     tx.gasAmount(minimalGas.use(1).rightValue).fail(InvalidStartGas)
-    tx.gasAmount(maximalGasPerTx).pass()
-    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTxPreRhone).pass()
+    tx.gasAmount(maximalGasPerTxPreRhone.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
     tx.gasPrice(coinbaseGasPrice).pass()
@@ -457,8 +457,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
     tx.gasAmount(minimalGas).pass()
     tx.gasAmount(minimalGas.use(1).rightValue).fail(InvalidStartGas)
-    tx.gasAmount(maximalGasPerTx).pass()
-    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTxPreRhone).pass()
+    tx.gasAmount(maximalGasPerTxPreRhone.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
     tx.gasPrice(coinbaseGasPrice).fail(InvalidGasPrice)
@@ -466,6 +466,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasPrice(GasPrice(nonCoinbaseMinGasPrice.value - 1)).fail(InvalidGasPrice)
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
+  }
+
+  it should "check gas bounds for rhone-hardfork" in new Fixture {
+    implicit val validator = checkGasBound(_, isCoinbase = Random.nextBoolean(), HardFork.Ghost)
+
+    val tx = transactionGen(2, 1).sample.value
+    tx.pass()
+
+    tx.gasAmount(GasBox.unsafeTest(-1)).fail(InvalidStartGas)
+    tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
+    tx.gasAmount(minimalGas).pass()
+    tx.gasAmount(minimalGas.subUnsafe(1)).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTxPreRhone).pass()
+    tx.gasAmount(maximalGasPerTxPreRhone.addUnsafe(1)).pass()
+    tx.gasAmount(maximalGasPerTx).pass()
+    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
   }
 
   it should "check ALPH balance stats" in new Fixture {
@@ -743,6 +759,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       isPublic = true,
       usePreapprovedAssets = useAssets,
       useContractAssets = useAssets,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -878,6 +895,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
             isPublic = true,
             usePreapprovedAssets = useAssets,
             useContractAssets = useAssets,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,

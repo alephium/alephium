@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import com.typesafe.scalalogging.LazyLogging
@@ -141,16 +142,27 @@ trait FlowUtils
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
-  def collectPooledTxs(chainIndex: ChainIndex): AVector[TransactionTemplate] = {
-    getMemPool(chainIndex).collectForBlock(chainIndex, mempoolSetting.txMaxNumberPerBlock)
+  def collectPooledTxs(chainIndex: ChainIndex, hardFork: HardFork): AVector[TransactionTemplate] = {
+    val mempool = getMemPool(chainIndex)
+    if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
+      mempool.collectAllTxs(chainIndex, mempoolSetting.txMaxNumberPerBlock)
+    } else {
+      mempool.collectNonSequentialTxs(chainIndex, mempoolSetting.txMaxNumberPerBlock)
+    }
   }
 
   def filterValidInputsUnsafe(
       txs: AVector[TransactionTemplate],
-      groupView: BlockFlowGroupView[WorldState.Cached]
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      chainIndex: ChainIndex,
+      hardFork: HardFork
   ): AVector[TransactionTemplate] = {
+    val newOutputRefs = mutable.HashSet.empty[AssetOutputRef]
     txs.filter { tx =>
-      Utils.unsafe(groupView.getPreOutputs(tx.unsigned.inputs)).nonEmpty
+      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
+        tx.fixedOutputRefs.foreach(newOutputRefs += _)
+      }
+      Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
     }
   }
 
@@ -158,13 +170,14 @@ trait FlowUtils
   def collectTransactions(
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      bestDeps: BlockDeps
+      bestDeps: BlockDeps,
+      hardFork: HardFork
   ): IOResult[AVector[TransactionTemplate]] = {
     IOUtils.tryExecute {
-      val candidates0 = collectPooledTxs(chainIndex)
+      val candidates0 = collectPooledTxs(chainIndex, hardFork)
       val candidates1 = FlowUtils.filterDoubleSpending(candidates0)
       // some tx inputs might from bestDeps, but not loosenDeps
-      val candidates2 = filterValidInputsUnsafe(candidates1, groupView)
+      val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
       FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, maximalGasPerBlock)
@@ -205,30 +218,30 @@ trait FlowUtils
     }
   }
 
-  private def getUnclesUnsafe(
+  private def getGhostUnclesUnsafe(
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): AVector[SelectedUncle] = {
+  ): AVector[SelectedGhostUncle] = {
     if (hardFork.isGhostEnabled()) {
-      getUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
+      getGhostUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
       AVector.empty
     }
   }
 
-  @inline private def getUncles(
+  @inline private def getGhostUncles(
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): IOResult[AVector[SelectedUncle]] = {
-    IOUtils.tryExecute(getUnclesUnsafe(hardFork, deps, parentHeader))
+  ): IOResult[AVector[SelectedGhostUncle]] = {
+    IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
-  ): IOResult[(BlockFlowTemplate, AVector[SelectedUncle])] = {
+  ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val bestDeps = getBestDeps(chainIndex.from)
     for {
@@ -238,8 +251,8 @@ trait FlowUtils
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
       target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
       groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
-      uncles       <- getUncles(hardFork, loosenDeps, parentHeader)
-      txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
+      uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
+      txCandidates <- collectTransactions(chainIndex, groupView, bestDeps, hardFork)
       template <- prepareBlockFlow(
         chainIndex,
         loosenDeps,
@@ -267,7 +280,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      uncles: AVector[SelectedUncle],
+      uncles: AVector[SelectedGhostUncle],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -296,14 +309,14 @@ trait FlowUtils
   final def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate,
-      uncles: AVector[SelectedUncle],
+      uncles: AVector[SelectedGhostUncle],
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {
       case Left(Left(error)) => Left(error)
       case Left(Right(error)) =>
         error match {
-          case _: InvalidUncleStatus =>
+          case _: InvalidGhostUncleStatus =>
             logger.warn("Assemble block with empty uncles due to invalid uncles")
             Right(template.rebuild(template.transactions.init, AVector.empty, miner))
           case ExistInvalidTx(t, _) =>

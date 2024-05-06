@@ -43,7 +43,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val ghost         = toConsensusSetting(configFixture.ghost)
       ConsensusSettings(mainnet, ghost, 25)
     }
-    implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
+    implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.SinceLeman
     implicit val consensusConfig =
       if (Random.nextBoolean()) consensusConfigs.ghost else consensusConfigs.mainnet
 

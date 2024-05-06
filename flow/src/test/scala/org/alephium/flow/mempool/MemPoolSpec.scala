@@ -21,7 +21,7 @@ import scala.util.Random
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
-import org.alephium.util.{AVector, LockFixture, TimeStamp, UnsecureRandom}
+import org.alephium.util.{AVector, Duration, LockFixture, TimeStamp, UnsecureRandom}
 
 class MemPoolSpec
     extends AlephiumFlowSpec
@@ -107,20 +107,20 @@ class MemPoolSpec
     tx1.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
     pool.isDoubleSpending(index0, tx0) is true
     pool.isDoubleSpending(index0, tx1) is true
-    tx0.assetOutputRefs.foreach(output =>
+    tx0.fixedOutputRefs.foreach(output =>
       pool.sharedTxIndexes.outputIndex.contains(output) is
         (output.fromGroup equals mainGroup)
     )
-    tx1.assetOutputRefs.foreach(output =>
+    tx1.fixedOutputRefs.foreach(output =>
       pool.sharedTxIndexes.outputIndex.contains(output) is
         (output.fromGroup equals mainGroup)
     )
-    tx0.assetOutputRefs.foreachWithIndex((output, index) =>
+    tx0.fixedOutputRefs.foreachWithIndex((output, index) =>
       if (output.fromGroup equals mainGroup) {
         pool.getOutput(output) is Some(tx0.getOutput(index))
       }
     )
-    tx1.assetOutputRefs.foreachWithIndex((output, index) =>
+    tx1.fixedOutputRefs.foreachWithIndex((output, index) =>
       if (output.fromGroup equals mainGroup) {
         pool.getOutput(output) is Some(tx1.getOutput(index))
       }
@@ -139,12 +139,12 @@ class MemPoolSpec
 
     pool.add(chainIndex, tx2, TimeStamp.now())
     pool.add(chainIndex, tx3, now)
-    val tx2Outputs = tx2.assetOutputRefs
+    val tx2Outputs = tx2.fixedOutputRefs
     tx2Outputs.length is 2
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.head) is true
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.last) is true
     pool.isSpent(tx2Outputs.last) is true
-    tx3.assetOutputRefs.foreach(output => pool.isSpent(output) is false)
+    tx3.fixedOutputRefs.foreach(output => pool.isSpent(output) is false)
   }
 
   it should "work for sequential txs for inter-group chain" in new Fixture {
@@ -159,12 +159,12 @@ class MemPoolSpec
 
     pool.add(chainIndex, tx2, TimeStamp.now())
     pool.add(chainIndex, tx3, now)
-    val tx2Outputs = tx2.assetOutputRefs
+    val tx2Outputs = tx2.fixedOutputRefs
     tx2Outputs.length is 2
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.head) is false
     pool.sharedTxIndexes.outputIndex.contains(tx2Outputs.last) is true
     pool.isSpent(tx2Outputs.last) is true
-    tx3.assetOutputRefs.foreach { output =>
+    tx3.fixedOutputRefs.foreach { output =>
       if (output.fromGroup.value == 0) {
         pool.isSpent(output) is false
       } else {
@@ -232,16 +232,12 @@ class MemPoolSpec
     val pool = MemPool.empty(mainGroup)
     pool.size is 0
 
-    val index = ChainIndex.unsafe(0)
-    val txs = Seq.tabulate(10) { k =>
-      val tx = transactionGen().sample.get
-      tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(nonCoinbaseMinGasPrice.value + k)))
-        .toTemplate
-    }
+    val index     = ChainIndex.unsafe(0)
+    val txs       = Seq.tabulate(10)(k => genTx(GasPrice(nonCoinbaseMinGasPrice.value + k)))
     val timeStamp = TimeStamp.now()
     Random.shuffle(txs).foreach(tx => pool.add(index, tx, timeStamp))
 
-    pool.collectForBlock(index, Int.MaxValue) is AVector.from(
+    pool.collectNonSequentialTxs(index, Int.MaxValue) is AVector.from(
       txs.sortBy(_.unsigned.gasPrice.value).reverse
     )
   }
@@ -253,9 +249,60 @@ class MemPoolSpec
     val tx        = transactionGen().retryUntil(_.chainIndex == index).sample.get.toTemplate
     pool.addXGroupTx(index, tx, TimeStamp.now())
     pool.size is 1
-    pool.collectForBlock(ChainIndex(mainGroup, mainGroup), Int.MaxValue).isEmpty is true
+    pool.collectNonSequentialTxs(ChainIndex(mainGroup, mainGroup), Int.MaxValue).isEmpty is true
 
     pool.cleanInvalidTxs(blockFlow, TimeStamp.now().plusHoursUnsafe(1)) is 1
     pool.size is 0
+  }
+
+  def genTx(gasPrice: GasPrice): TransactionTemplate = {
+    val tx = transactionGen().sample.get
+    tx.copy(unsigned = tx.unsigned.copy(gasPrice = gasPrice)).toTemplate
+  }
+
+  it should "sort txs by order" in {
+    val pool         = MemPool.empty(mainGroup)
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val txNum        = 10
+    val now          = TimeStamp.now()
+    val baseGasPrice = nonCoinbaseMinGasPrice
+    val txs = AVector.tabulate(txNum) { index =>
+      val ts = now.plusMillisUnsafe(index.toLong)
+      val tx = genTx(GasPrice(baseGasPrice.value + index))
+      pool.add(chainIndex, tx, ts)
+      tx
+    }
+
+    val sorted0 = txs.reverse
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted0
+
+    val tx0 = genTx(GasPrice(baseGasPrice.value + 20))
+    pool.add(chainIndex, tx0, now.plusMinutesUnsafe(1))
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is (tx0 +: sorted0)
+
+    val tx1 = genTx(GasPrice(baseGasPrice.value + 40))
+    pool.add(chainIndex, tx1, now.minusUnsafe(Duration.ofMinutesUnsafe(1)))
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is (AVector(tx1, tx0) ++ sorted0)
+
+    val gasPrice = GasPrice(baseGasPrice.value - 10)
+    val tx2      = genTx(gasPrice)
+    pool.add(chainIndex, tx2, now)
+    val sorted1 = AVector(tx1, tx0) ++ (sorted0 :+ tx2)
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted1
+
+    val tx3 = genTx(gasPrice)
+    pool.add(chainIndex, tx3, now.minusUnsafe(Duration.ofMillisUnsafe(1)))
+    val sorted2 = AVector(tx1, tx0) ++ sorted0 ++ AVector(tx3, tx2)
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted2
+
+    val tx4 = genTx(gasPrice)
+    pool.add(chainIndex, tx4, now)
+    val sorted3 = AVector(tx1, tx0) ++ (sorted0 :+ tx3) ++
+      (if (hashOrdering.lt(tx4.id.value, tx2.id.value)) AVector(tx2, tx4) else AVector(tx4, tx2))
+    pool.flow.takeAllTxs(chainIndex.flattenIndex, Int.MaxValue) is sorted3
+
+    (0 until sorted3.length).foreach { num =>
+      pool.flow.takeAllTxs(chainIndex.flattenIndex, num) is sorted3.take(num)
+    }
   }
 }

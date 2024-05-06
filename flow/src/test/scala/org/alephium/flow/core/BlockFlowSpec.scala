@@ -678,9 +678,14 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  it should "handle sequential txs" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
-    val fromGroup             = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
+  it should "handle sequential txs: pre-rhone" in new FlowFixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
+    val fromGroup = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
     val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
     val fromLockup                              = LockupScript.p2pkh(fromPubKey)
     val theGrandPool                            = blockFlow.getGrandPool()

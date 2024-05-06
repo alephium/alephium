@@ -12,7 +12,7 @@
       "sourceFile": "add/add.ral",
       "sourceCodeHash": "6089a405f7c0596fb72ec2bd0cea578422be360371c4c5d3e5a72e1acb8d4751",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "45e656eed4bb10a58632b9ee6b25f03cc729b33a32271040ddae258fa3759a63",
+      "codeHashDebug": "ced886ef883695e3fef889195680afbffbd2cf7eba7fb3c018e1b4e58a59b61b",
       "warnings": [
         "No external caller check for function \"Add.add\". Please use \"checkCaller!(...)\" in the function or its callees, or disable it with \"@using(checkExternalCaller = false)\".",
         "Function \"Add.addPrivate\" updates fields. Please use \"@using(updateFields = true)\" for the function."
@@ -42,14 +42,14 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "",
       "warnings": [
-        
+        "The return values of the function \"Add.add\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
       ]
     },
     "Sub": {
       "sourceFile": "sub/sub.ral",
       "sourceCodeHash": "c8b669babea2f36bdb8f92afb17747bfb9eecb13ac17c5a02388426c91a4434e",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
+      "codeHashDebug": "3461ebfaca02ad0a3f587a5b67a461c0cbd82d14261407b1d9277ed4ad129234",
       "warnings": [
         
       ]

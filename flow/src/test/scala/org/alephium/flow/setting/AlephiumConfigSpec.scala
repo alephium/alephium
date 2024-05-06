@@ -33,7 +33,14 @@ import org.alephium.conf._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
-import org.alephium.protocol.model.{Address, ContractId, Difficulty, GroupIndex, NetworkId}
+import org.alephium.protocol.model.{
+  Address,
+  ContractId,
+  Difficulty,
+  GroupIndex,
+  HardFork,
+  NetworkId
+}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
@@ -297,17 +304,35 @@ class AlephiumConfigSpec extends AlephiumSpec {
     val N               = 123456
     val diff            = Difficulty.unsafe(N)
     val consensusConfig = consensusConfigs.mainnet
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18) is
+
+    intercept[AssertionError](
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Mainnet) is diff
+    ).getMessage is "assumption failed"
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18, HardFork.Leman) is
       Difficulty.unsafe(N * 105 / 100)
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19) is
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19, HardFork.Leman) is
       Difficulty.unsafe(N * 110 / 100)
     (20 until 18 * 3).foreach { gap =>
-      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap) is
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Leman) is
         Difficulty.unsafe(N * (100 + 5 * (gap - 17)) / 100)
+    }
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Ghost) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Ghost) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Ghost) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 8, HardFork.Ghost) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 9, HardFork.Ghost) is
+      Difficulty.unsafe(N * 103 / 100)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 10, HardFork.Ghost) is
+      Difficulty.unsafe(N * 106 / 100)
+    (11 until 18 * 3).foreach { gap =>
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Ghost) is
+        Difficulty.unsafe(N * (100 + 3 * (gap - 8)) / 100)
     }
   }
 }

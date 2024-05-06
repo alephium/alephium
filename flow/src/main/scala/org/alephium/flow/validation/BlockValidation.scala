@@ -72,7 +72,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
 //      _ <- checkNonEmptyTransactions(block)
       _ <- checkTxNumber(block)
       _ <- checkGasPriceDecreasing(block)
-      _ <- checkTotalGas(block)
+      _ <- checkTotalGas(block, networkConfig.getHardFork(block.timestamp))
 //      _ <- checkMerkleRoot(block)
 //      _ <- checkFlow(block, flow)
       sideResult <- checkTxs(chainIndex, block, flow)
@@ -129,40 +129,40 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       _          <- checkNonEmptyTransactions(block)
       _          <- checkTxNumber(block)
       _          <- checkGasPriceDecreasing(block)
-      _          <- checkTotalGas(block)
+      _          <- checkTotalGas(block, networkConfig.getHardFork(block.timestamp))
       _          <- checkMerkleRoot(block)
       _          <- checkFlow(block, flow)
       sideResult <- checkTxs(block.chainIndex, block, flow)
     } yield sideResult
   }
 
-  private[validation] def checkUncles(
+  private[validation] def checkGhostUncles(
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
-      uncleHashes: AVector[BlockHash]
+      ghostUncleHashes: AVector[BlockHash]
   ): BlockValidationResult[AVector[(LockupScript.Asset, Int)]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val hardFork = networkConfig.getHardFork(block.timestamp)
-      if (hardFork.isGhostEnabled() && uncleHashes.nonEmpty) {
+      if (hardFork.isGhostEnabled() && ghostUncleHashes.nonEmpty) {
         val blockchain = flow.getBlockChain(chainIndex)
         for {
-          _ <- checkUncleSize(uncleHashes)
-          _ <- checkUncleOrder(uncleHashes)
-          uncleBlocks <- uncleHashes.mapE(blockchain.getBlock) match {
-            case Left(IOError.KeyNotFound(_)) => invalidBlock(UncleDoesNotExist)
+          _ <- checkGhostUncleSize(ghostUncleHashes)
+          _ <- checkGhostUncleOrder(ghostUncleHashes)
+          uncleBlocks <- ghostUncleHashes.mapE(blockchain.getBlock) match {
+            case Left(IOError.KeyNotFound(_)) => invalidBlock(GhostUncleDoesNotExist)
             case result                       => from(result)
           }
-          _            <- validateUncles(flow, chainIndex, block, uncleBlocks)
-          _            <- checkUncleDeps(block, flow, uncleBlocks)
+          _            <- validateGhostUncles(flow, chainIndex, block, uncleBlocks)
+          _            <- checkGhostUncleDeps(block, flow, uncleBlocks)
           parentHeight <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)))
-          uncleHeights <- from(uncleHashes.mapE(blockchain.getHeight))
+          uncleHeights <- from(ghostUncleHashes.mapE(blockchain.getHeight))
         } yield uncleBlocks.zipWithIndex.map { case (uncleBlock, index) =>
           val uncleHeight = uncleHeights(index)
           (uncleBlock.minerLockupScript, parentHeight + 1 - uncleHeight)
         }
-      } else if (uncleHashes.nonEmpty) {
-        invalidBlock(InvalidUnclesBeforeGhostHardFork)
+      } else if (ghostUncleHashes.nonEmpty) {
+        invalidBlock(InvalidGhostUnclesBeforeGhostHardFork)
       } else {
         validBlock(AVector.empty)
       }
@@ -171,7 +171,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private def validateUncles(
+  private def validateGhostUncles(
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
@@ -181,15 +181,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     val blockchain = flow.getBlockChain(chainIndex)
     for {
       parentHeader           <- from(blockchain.getBlockHeader(block.uncleHash(chainIndex.to)))
-      usedUnclesAndAncestors <- from(blockchain.getUsedUnclesAndAncestors(parentHeader))
+      usedUnclesAndAncestors <- from(blockchain.getUsedGhostUnclesAndAncestors(parentHeader))
       (usedUncles, ancestors) = usedUnclesAndAncestors
       _ <- uncles.foreachE { uncle =>
         if (uncle.hash == parentHeader.hash || ancestors.exists(_ == uncle.hash)) {
-          invalidBlock(NotUnclesForTheBlock)
+          invalidBlock(NotGhostUnclesForTheBlock)
         } else if (!ancestors.exists(_ == uncle.parentHash)) {
-          invalidBlock(UncleHashConflictWithParentHash)
+          invalidBlock(GhostUncleHashConflictWithParentHash)
         } else if (usedUncles.contains(uncle.hash)) {
-          invalidBlock(UnclesAlreadyUsed)
+          invalidBlock(GhostUnclesAlreadyUsed)
         } else {
           validBlock(())
         }
@@ -197,21 +197,23 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     } yield ()
   }
 
-  @inline private def checkUncleSize(uncles: AVector[BlockHash]): BlockValidationResult[Unit] = {
+  @inline private def checkGhostUncleSize(
+      uncles: AVector[BlockHash]
+  ): BlockValidationResult[Unit] = {
     if (uncles.length > ALPH.MaxUncleSize) {
-      invalidBlock(InvalidUncleSize)
+      invalidBlock(InvalidGhostUncleSize)
     } else {
       validBlock(())
     }
   }
 
-  @inline private[validation] def checkUncleOrder(
+  @inline private[validation] def checkGhostUncleOrder(
       uncles: AVector[BlockHash]
   ): BlockValidationResult[Unit] = {
     uncles.foreachWithIndexE { case (hash, index) =>
       if (index > 0) {
         if (Bytes.byteStringOrdering.compare(hash.bytes, uncles(index - 1).bytes) <= 0) {
-          invalidBlock(UnsortedUncles)
+          invalidBlock(UnsortedGhostUncles)
         } else {
           validBlock(())
         }
@@ -221,7 +223,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  @inline private def checkUncleDeps(
+  @inline private def checkGhostUncleDeps(
       block: Block,
       flow: BlockFlow,
       uncles: AVector[Block]
@@ -236,7 +238,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         if (isValid) {
           validBlock(())
         } else {
-          invalidBlock(InvalidUncleDeps)
+          invalidBlock(InvalidGhostUncleDeps)
         }
     } yield ()
   }
@@ -296,9 +298,14 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   // Let's check the gas is decreasing as well
-  private[validation] def checkTotalGas(block: Block): BlockValidationResult[Unit] = {
+  private[validation] def checkTotalGas(
+      block: Block,
+      hardFork: HardFork
+  ): BlockValidationResult[Unit] = {
     val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
-    if (totalGas <= maximalGasPerBlock.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
+    val maximalGas =
+      if (hardFork.isGhostEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
+    if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
   }
 
   private[validation] def checkCoinbase(
@@ -382,9 +389,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       uncles: AVector[(LockupScript.Asset, Int)],
       isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
-    val mainChainReward   = Coinbase.calcMainChainReward(netReward)
-    val uncleRewards      = uncles.map(uncle => Coinbase.calcUncleReward(mainChainReward, uncle._2))
-    val blockReward       = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
+    val mainChainReward = Coinbase.calcMainChainReward(netReward)
+    val uncleRewards = uncles.map(uncle => Coinbase.calcGhostUncleReward(mainChainReward, uncle._2))
+    val blockReward  = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
     val blockRewardLocked = blockReward.addUnsafe(lockedReward).subUnsafe(netReward)
 
     val coinbase = block.coinbase.unsigned
@@ -405,7 +412,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         _ <- checkLockedReward(block, blockRewardLocked +: uncleRewards)
       } yield ()
     } else {
-      invalidBlock(InvalidUncleMiner)
+      invalidBlock(InvalidGhostUncleMiner)
     }
   }
 
@@ -420,9 +427,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
     for {
-      uncleHashes <- checkCoinbaseData(chainIndex, block)
-      _           <- checkCoinbaseEasy(block, uncleHashes.length, isPoLW)
-      uncles      <- checkUncles(flow, chainIndex, block, uncleHashes)
+      ghostUncleHashes <- checkCoinbaseData(chainIndex, block)
+      _                <- checkCoinbaseEasy(block, ghostUncleHashes.length, isPoLW)
+      uncles           <- checkGhostUncles(flow, chainIndex, block, ghostUncleHashes)
       _ <-
         if (hardFork.isGhostEnabled()) {
           checkRewardGhost(chainIndex, block, groupView, netReward, lockedReward, uncles, isPoLW)
@@ -531,9 +538,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           } else {
             invalidBlock(InvalidCoinbaseData)
           }
-        case Right(CoinbaseDataV2(prefix, uncleHashes, _)) =>
+        case Right(CoinbaseDataV2(prefix, ghostUncleHashes, _)) =>
           if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-            validBlock(uncleHashes)
+            validBlock(ghostUncleHashes)
           } else {
             invalidBlock(InvalidCoinbaseData)
           }
@@ -604,6 +611,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         blockEnv,
         None
       )
+      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
+        tx.unsigned.fixedOutputRefs.foreachWithIndex { case (outputRef, outputIndex) =>
+          blockEnv.addOutputRef(outputRef, tx.unsigned.fixedOutputs(outputIndex))
+        }
+      }
       txValidationResult match {
         case Right(_) => Right(())
         case Left(Right(TxScriptExeFailed(_))) =>
