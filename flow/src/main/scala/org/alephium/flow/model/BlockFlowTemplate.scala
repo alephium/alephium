@@ -50,4 +50,14 @@ final case class BlockFlowTemplate(
     )
     this.copy(transactions = txs :+ coinbase)
   }
+
+  def dummyHeader(): BlockHeader =
+    BlockHeader.unsafe(
+      BlockDeps.unsafe(deps),
+      depStateHash,
+      txsHash,
+      templateTs,
+      target,
+      Nonce.zero
+    )
 }

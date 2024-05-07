@@ -33,7 +33,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.mining.{Emission, HashRate}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{BlockHash => _, _}
+import org.alephium.protocol.vm.{BlockHash => _, NetworkId => _, _}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp, U256}
 
@@ -1416,5 +1416,59 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val block = emptyPoLWBlock(0)
     block.fail(InvalidPoLWBeforeRhoneHardFork)
+  }
+
+  trait TestnetFixture extends Fixture {
+    override lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val whitelistedMiner =
+      ALPH.testnetWhitelistedMiners
+        .filter(_.groupIndex == chainIndex.to)
+        .head
+        .asInstanceOf[LockupScript.Asset]
+    lazy val randomMiner = assetLockupGen(chainIndex.from).sample.get
+
+    def newBlock(miner: LockupScript.Asset): Block = {
+      val template   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val emptyBlock = Block(template.dummyHeader(), template.transactions)
+      emptyBlock.Coinbase.output(o => o.copy(lockupScript = miner))
+    }
+
+    implicit lazy val validator = (block: Block) => {
+      val hardFork  = networkConfig.getHardFork(block.timestamp)
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
+    }
+  }
+
+  it should "check miner for tesnet" in new TestnetFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+
+    newBlock(whitelistedMiner).pass()
+    newBlock(randomMiner).fail(InvalidTestnetMiner)
+  }
+
+  it should "not check miner for testnet pre-Rhone" in new TestnetFixture {
+    override val configValues: Map[String, Any] =
+      Map(
+        ("alephium.network.network-id", 1),
+        ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+      )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+
+    newBlock(whitelistedMiner).pass()
+    newBlock(randomMiner).pass()
+  }
+
+  it should "not check miner for devnet" in new TestnetFixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    networkConfig.networkId is NetworkId.AlephiumDevNet
+
+    newBlock(whitelistedMiner).pass()
+    newBlock(randomMiner).pass()
   }
 }

@@ -68,6 +68,10 @@ final case object BlockDoubleSpending                               extends Inva
 final case class ExistInvalidTx(t: Transaction, e: InvalidTxStatus) extends InvalidBlockStatus
 final case object InvalidFlowDeps                                   extends InvalidBlockStatus
 final case object InvalidFlowTxs                                    extends InvalidBlockStatus
+final case object InvalidTestnetMiner extends InvalidBlockStatus {
+  override def toString: String =
+    "The testnet is currently limited to whitelisted miners only. To test miners or pools, please set up a local testnet following the documentation."
+}
 
 sealed trait InvalidPoLWStatus                  extends InvalidBlockStatus
 case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus

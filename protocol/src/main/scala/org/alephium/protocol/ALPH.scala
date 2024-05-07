@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import org.alephium.protocol.model.{ChainIndex, HardFork, Weight}
+import org.alephium.protocol.model.{Address, ChainIndex, HardFork, Weight}
 import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALPH {
@@ -99,5 +99,17 @@ object ALPH {
 
   @inline def isSequentialTxSupported(chainIndex: ChainIndex, hardFork: HardFork): Boolean = {
     hardFork.isGhostEnabled() && chainIndex.isIntraGroup
+  }
+
+  lazy val testnetWhitelistedMiners = {
+    def miner(address: String) = {
+      Address.fromBase58(address).get.lockupScript
+    }
+    Set(
+      miner("1AuWeE5Cwt2ES3473qnpKFV96z57CYL6mbTY7hva9Xz3h"),
+      miner("12sxfxraVoU8FcSVd7P2SVr2cd2vi8d17KtrprrL7cBbV"),
+      miner("1E3vV7rFCgq5jo4NszxH5PqzyxvNXH5pvk2aQfMwmSxPB"),
+      miner("147nW43BH137TYjqEnvA9YfH1oFXKQxcvLZFwZauo7Ahy")
+    )
   }
 }
