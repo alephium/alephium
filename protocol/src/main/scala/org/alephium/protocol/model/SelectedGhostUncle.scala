@@ -16,10 +16,21 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
+
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class SelectedGhostUncle(
     blockHash: BlockHash,
     lockupScript: LockupScript.Asset,
     heightDiff: Int
-)
+) {
+  def toAssetOutput(
+      mainChainReward: U256,
+      lockTime: TimeStamp
+  ): AssetOutput = {
+    val uncleReward = Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
+    AssetOutput(uncleReward, lockupScript, lockTime, AVector.empty, ByteString.empty)
+  }
+}

@@ -16,6 +16,8 @@
 
 package org.alephium.flow.validation
 
+import java.math.BigInteger
+
 import scala.util.Random
 
 import akka.util.ByteString
@@ -23,15 +25,17 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{BlockFlow, FlowUtils}
+import org.alephium.flow.gasestimation.GasEstimation
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
+import org.alephium.protocol.mining.{Emission, HashRate}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, Method, StatefulScript}
+import org.alephium.protocol.vm.{BlockHash => _, NetworkId => _, _}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
 class BlockValidationSpec extends AlephiumSpec {
@@ -55,6 +59,15 @@ class BlockValidationSpec extends AlephiumSpec {
         def output(f: AssetOutput => AssetOutput, index: Int = 0): Block = {
           val outputs = block.coinbase.unsigned.fixedOutputs
           unsignedTx(_.copy(fixedOutputs = outputs.replace(index, f(outputs(index)))))
+        }
+
+        def input(f: TxInput => TxInput, index: Int): Block = {
+          val inputs = block.coinbase.unsigned.inputs
+          unsignedTx(_.copy(inputs = inputs.replace(index, f(inputs(index)))))
+        }
+
+        def gasAmount(f: GasBox => GasBox): Block = {
+          tx(tx => tx.copy(unsigned = tx.unsigned.copy(gasAmount = f(tx.unsigned.gasAmount))))
         }
       }
 
@@ -122,56 +135,94 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "validate coinbase transaction simple format" in new Fixture {
-    val block           = emptyBlock(blockFlow, chainIndex)
-    val (privateKey, _) = SignatureSchema.generatePriPub()
+  trait CoinbaseFormatFixture extends Fixture {
     val output0         = assetOutputGen.sample.get
     val emptyOutputs    = AVector.empty[AssetOutput]
     val emptySignatures = AVector.empty[Signature]
     val script          = StatefulScript.alwaysFail
-    val testSignatures =
-      AVector[Signature](SignatureSchema.sign(block.coinbase.unsigned.id, privateKey))
+    val testSignatures  = AVector(Signature.generate)
+    val block           = emptyBlock(blockFlow, chainIndex)
 
-    implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 1)
+    def commonTest(block: Block = block)(implicit
+        validator: Block => BlockValidationResult[Unit],
+        error: InvalidBlockStatus
+    ) = {
+      info("script")
+      block.Coinbase.unsignedTx(_.copy(scriptOpt = None)).pass()
+      block.Coinbase.unsignedTx(_.copy(scriptOpt = Some(script))).fail()
+
+      info("gasPrice")
+      block.Coinbase.unsignedTx(_.copy(gasPrice = coinbaseGasPrice)).pass()
+      block.Coinbase.unsignedTx(_.copy(gasPrice = GasPrice(U256.Zero))).fail()
+
+      info("output token")
+      block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
+      val outputsWithTokens = AVector(output0.copy(tokens = AVector(TokenId.zero -> 10)))
+      block.Coinbase.unsignedTx(_.copy(fixedOutputs = outputsWithTokens)).fail()
+
+      info("contract input")
+      block.Coinbase.tx(_.copy(contractInputs = AVector.empty)).pass()
+      val invalidContractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)
+      block.Coinbase.tx(_.copy(contractInputs = invalidContractInputs)).fail()
+
+      info("generated output")
+      block.Coinbase.tx(_.copy(generatedOutputs = emptyOutputs.as[TxOutput])).pass()
+      block.Coinbase.tx(_.copy(generatedOutputs = AVector(output0))).fail()
+
+      info("contract signature")
+      block.Coinbase.tx(_.copy(scriptSignatures = emptySignatures)).pass()
+      block.Coinbase.tx(_.copy(scriptSignatures = testSignatures)).fail()
+    }
+  }
+
+  it should "validate coinbase transaction simple format" in new CoinbaseFormatFixture {
+    implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 0, false)
     implicit val error: InvalidBlockStatus = InvalidCoinbaseFormat
 
-    info("script")
-    block.Coinbase.unsignedTx(_.copy(scriptOpt = None)).pass()
-    block.Coinbase.unsignedTx(_.copy(scriptOpt = Some(script))).fail()
+    commonTest(block)
 
     info("gasAmount")
     block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas)).pass()
     block.Coinbase.unsignedTx(_.copy(gasAmount = GasBox.from(0).value)).fail()
 
-    info("gasPrice")
-    block.Coinbase.unsignedTx(_.copy(gasPrice = coinbaseGasPrice)).pass()
-    block.Coinbase.unsignedTx(_.copy(gasPrice = GasPrice(U256.Zero))).fail()
-
     info("output length")
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = emptyOutputs)).fail()
 
-    info("output token")
-    block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
-    val outputsWithTokens = AVector(output0.copy(tokens = AVector(TokenId.zero -> 10)))
-    block.Coinbase.unsignedTx(_.copy(fixedOutputs = outputsWithTokens)).fail()
-
-    info("contract input")
-    block.Coinbase.tx(_.copy(contractInputs = AVector.empty)).pass()
-    val invalidContractInputs = AVector(contractOutputRefGen(GroupIndex.unsafe(0)).sample.get)
-    block.Coinbase.tx(_.copy(contractInputs = invalidContractInputs)).fail()
-
-    info("generated output")
-    block.Coinbase.tx(_.copy(generatedOutputs = emptyOutputs.as[TxOutput])).pass()
-    block.Coinbase.tx(_.copy(generatedOutputs = AVector(output0))).fail()
-
     info("input signature")
     block.Coinbase.tx(_.copy(inputSignatures = emptySignatures)).pass()
     block.Coinbase.tx(_.copy(inputSignatures = testSignatures)).fail()
+  }
 
-    info("contract signature")
-    block.Coinbase.tx(_.copy(scriptSignatures = emptySignatures)).pass()
-    block.Coinbase.tx(_.copy(scriptSignatures = testSignatures)).fail()
+  it should "validate PoLW coinbase transaction simple format" in new CoinbaseFormatFixture {
+    implicit val validator = (blk: Block) => checkCoinbaseEasy(blk, 0, isPoLW = true)
+    implicit val error: InvalidBlockStatus = InvalidPoLWCoinbaseFormat
+    val inputs                             = AVector(txInputGen.sample.get)
+    override val block = emptyBlock(blockFlow, chainIndex).Coinbase
+      .tx(_.copy(inputSignatures = testSignatures))
+      .Coinbase
+      .unsignedTx(_.copy(inputs = inputs))
+
+    commonTest(block)
+
+    info("gasAmount")
+    block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas)).pass()
+    block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas.subUnsafe(GasBox.unsafe(1)))).fail()
+    block.Coinbase.unsignedTx(_.copy(gasAmount = minimalGas.addUnsafe(GasBox.unsafe(1)))).pass()
+
+    info("output length")
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0, output0))).pass()
+    block.Coinbase.unsignedTx(_.copy(fixedOutputs = emptyOutputs)).fail()
+
+    info("input size")
+    block.Coinbase.unsignedTx(_.copy(inputs = AVector.empty)).fail()
+    block.Coinbase.unsignedTx(_.copy(inputs = inputs ++ inputs)).pass()
+
+    info("input signature")
+    block.Coinbase.tx(_.copy(inputSignatures = emptySignatures)).fail()
+    block.Coinbase.tx(_.copy(inputSignatures = testSignatures)).pass()
+    block.Coinbase.tx(_.copy(inputSignatures = testSignatures ++ testSignatures)).fail()
   }
 
   trait PreGhostForkFixture extends Fixture {
@@ -794,7 +845,7 @@ class BlockValidationSpec extends AlephiumSpec {
       info("invalid uncle miner lockup script")
       block.Coinbase
         .output(_.copy(lockupScript = randomLockupScript), 1)
-        .fail(InvalidCoinbaseReward)
+        .fail(InvalidGhostUncleMiner)
     }
 
     {
@@ -823,10 +874,10 @@ class BlockValidationSpec extends AlephiumSpec {
       info("invalid uncle miner lockup script")
       block.Coinbase
         .output(_.copy(lockupScript = randomLockupScript), 1)
-        .fail(InvalidCoinbaseReward)
+        .fail(InvalidGhostUncleMiner)
       block.Coinbase
         .output(_.copy(lockupScript = randomLockupScript), 2)
-        .fail(InvalidCoinbaseReward)
+        .fail(InvalidGhostUncleMiner)
     }
   }
 
@@ -1091,7 +1142,6 @@ class BlockValidationSpec extends AlephiumSpec {
     override val configValues =
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
     override lazy val chainIndex = ChainIndex.unsafe(0, 0)
 
     val genesisKey              = genesisKeys(chainIndex.from.value)._1
@@ -1174,5 +1224,251 @@ class BlockValidationSpec extends AlephiumSpec {
     val tx1   = transfer(blockFlow, privateKey, toPublicKey1, ALPH.alph(5)).nonCoinbase.head
     val block = mineWithTxs(blockFlow, chainIndex, AVector(tx0, tx1))
     checkBlock(block, blockFlow).leftValue isE ExistInvalidTx(tx1, NonExistInput)
+  }
+
+  trait PoLWCoinbaseFixture extends Fixture {
+    lazy val (minerPrivateKey, minerPublicKey) = chainIndex.to.generateKey
+    lazy val minerLockupScript                 = LockupScript.p2pkh(minerPublicKey)
+    lazy val (genesisPrivateKey, _, _)         = genesisKeys(chainIndex.from.value)
+
+    private def prepareUtxos() = {
+      val (privateKey, publicKey) = chainIndex.from.generateKey
+      val utxoLength              = 2
+      (0 until utxoLength).foreach { _ =>
+        val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
+        addAndCheck(blockFlow, block)
+      }
+      val lockupScript = LockupScript.p2pkh(publicKey)
+      val utxos        = blockFlow.getUsableUtxos(None, lockupScript, Int.MaxValue).rightValue
+      utxos.length is utxoLength
+      (utxos, privateKey)
+    }
+
+    def buildPoLWCoinbaseTx(
+        header: BlockHeader,
+        uncles: AVector[SelectedGhostUncle],
+        utxos: AVector[FlowUtils.AssetOutputInfo],
+        privateKey: PrivateKey
+    ): Transaction = {
+      val emission = consensusConfigs.getConsensusConfig(header.timestamp).emission
+      val reward   = emission.reward(header).asInstanceOf[Emission.PoLW]
+      val rewardOutputs = Coinbase.calcPoLWCoinbaseRewardOutputs(
+        chainIndex,
+        minerLockupScript,
+        uncles,
+        reward,
+        U256.Zero,
+        header.timestamp,
+        ByteString.empty
+      )
+      val publicKey    = privateKey.publicKey
+      val lockupScript = LockupScript.p2pkh(publicKey)
+      val unlockScript = UnlockScript.polw(publicKey)
+      val gas = GasEstimation.estimateWithP2PKHInputs(utxos.length, rewardOutputs.length + 1)
+      val unsignedTx =
+        blockFlow
+          .polwCoinbase(lockupScript, unlockScript, rewardOutputs, reward.burntAmount, utxos, gas)
+          .rightValue
+      val preImage  = UnlockScript.PoLW.buildPreImage(lockupScript, minerLockupScript)
+      val signature = SignatureSchema.sign(preImage, privateKey)
+      Transaction.from(unsignedTx, AVector(signature))
+    }
+
+    private def randomPoLWTarget(blockTargetTime: Duration): Target = {
+      val from = Target.from(HashRate.unsafe(BigInteger.ONE.shiftLeft(62)), blockTargetTime)
+      val to   = Target.from(HashRate.unsafe(BigInteger.ONE.shiftLeft(61)), blockTargetTime)
+      Target.unsafe(nextU256(U256.unsafe(from.value), U256.unsafe(to.value)).v)
+    }
+
+    def emptyPoLWBlock(uncleSize: Int): Block = {
+      val (utxos, privateKey) = prepareUtxos()
+      val blocks = (0 until (uncleSize + 1)).map(_ => emptyBlock(blockFlow, chainIndex))
+      blocks.foreach(addAndCheck(blockFlow, _))
+      val block           = mineBlockTemplate(blockFlow, chainIndex)
+      val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+      val polwTarget      = randomPoLWTarget(consensusConfig.blockTargetTime)
+      assume(consensusConfig.emission.shouldEnablePoLW(polwTarget))
+      val header      = block.header.copy(target = polwTarget)
+      val blockHeight = blockFlow.getMaxHeight(chainIndex).rightValue + 1
+      val uncles = block.ghostUncleHashes.rightValue.take(uncleSize).map { hash =>
+        val uncleMiner  = blockFlow.getBlockUnsafe(hash).minerLockupScript
+        val uncleHeight = blockFlow.getHeightUnsafe(hash)
+        SelectedGhostUncle(hash, uncleMiner, blockHeight - uncleHeight)
+      }
+      uncles.length is uncleSize
+      val coinbaseTx = buildPoLWCoinbaseTx(header, uncles, utxos, privateKey)
+      block.copy(header = header, transactions = AVector(coinbaseTx))
+    }
+
+    def emptyPoLWBlock(): Block = {
+      emptyPoLWBlock(nextInt(0, ALPH.MaxUncleSize))
+    }
+  }
+
+  it should "check PoLW coinbase tx" in new PoLWCoinbaseFixture {
+    implicit val validator = (block: Block) => {
+      val hardFork  = networkConfig.getHardFork(block.timestamp)
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
+    }
+
+    val block = emptyPoLWBlock()
+    block.pass()
+
+    info("invalid input unlock script")
+    val invalidUnlockScript = p2pkhUnlockGen(chainIndex.from).sample.get
+    (block.coinbase.unsigned.inputs.length > 1) is true
+    block.Coinbase
+      .input(_.copy(unlockScript = invalidUnlockScript), 0)
+      .fail(InvalidPoLWInputUnlockScript)
+    block.Coinbase
+      .input(_.copy(unlockScript = invalidUnlockScript), 1)
+      .fail(PoLWUnlockScriptNotTheSame)
+
+    info("invalid output lockup script")
+    val invalidLockupScript = assetLockupGen(chainIndex.from).sample.get
+    val changeOutputIndex   = block.coinbase.unsigned.fixedOutputs.length - 1
+    block.Coinbase
+      .output(_.copy(lockupScript = invalidLockupScript), changeOutputIndex)
+      .fail(InvalidPoLWChangeOutputLockupScript)
+
+    info("invalid block reward")
+    block.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)))
+      .fail(InvalidCoinbaseReward)
+    block.Coinbase
+      .output(o => o.copy(lockTime = o.lockTime.plusSecondsUnsafe(1)))
+      .fail(InvalidCoinbaseLockupPeriod)
+    block.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)))
+      .Coinbase
+      .output(o => o.copy(amount = o.amount.addUnsafe(U256.One)), 1)
+      .fail(InvalidCoinbaseLockedAmount)
+
+    info("invalid uncle reward")
+    val block1 = emptyPoLWBlock(1)
+    block1.pass()
+    block1.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 1)
+      .fail(InvalidCoinbaseReward)
+    block1.Coinbase
+      .output(o => o.copy(lockupScript = invalidLockupScript), 1)
+      .fail(InvalidGhostUncleMiner)
+    block1.Coinbase
+      .output(o => o.copy(lockTime = o.lockTime.plusSecondsUnsafe(1)), 1)
+      .fail(InvalidCoinbaseLockupPeriod)
+    block1.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 1)
+      .Coinbase
+      .output(o => o.copy(amount = o.amount.addUnsafe(U256.One)), 2)
+      .fail(InvalidCoinbaseLockedAmount)
+
+    val block2 = emptyPoLWBlock(2)
+    block2.pass()
+    block2.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 1)
+      .fail(InvalidCoinbaseReward)
+    block2.Coinbase
+      .output(o => o.copy(lockupScript = invalidLockupScript), 1)
+      .fail(InvalidGhostUncleMiner)
+    block2.Coinbase
+      .output(o => o.copy(lockTime = o.lockTime.plusSecondsUnsafe(1)), 1)
+      .fail(InvalidCoinbaseLockupPeriod)
+    block2.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 1)
+      .Coinbase
+      .output(o => o.copy(amount = o.amount.addUnsafe(U256.One)), 2)
+      .fail(InvalidCoinbaseLockedAmount)
+
+    block2.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 2)
+      .fail(InvalidCoinbaseReward)
+    block2.Coinbase
+      .output(o => o.copy(lockTime = o.lockTime.plusSecondsUnsafe(1)), 2)
+      .fail(InvalidCoinbaseLockupPeriod)
+    block2.Coinbase
+      .output(o => o.copy(lockupScript = invalidLockupScript), 2)
+      .fail(InvalidGhostUncleMiner)
+    block2.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 2)
+      .Coinbase
+      .output(o => o.copy(amount = o.amount.addUnsafe(U256.One)), 3)
+      .fail(InvalidCoinbaseLockedAmount)
+
+    block2.Coinbase
+      .output(o => o.copy(amount = o.amount.subUnsafe(U256.One)), 3)
+      .fail(InvalidCoinbaseReward)
+
+    block2.Coinbase.gasAmount(_.subUnsafe(1)).fail(InvalidCoinbaseReward)
+    block2.Coinbase.gasAmount(_.addUnsafe(1)).fail(InvalidCoinbaseReward)
+  }
+
+  it should "check PoLW coinbase tx pre-ghost" in new PoLWCoinbaseFixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
+    implicit val validator = (block: Block) => {
+      val hardFork  = networkConfig.getHardFork(block.timestamp)
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
+    }
+
+    val block = emptyPoLWBlock(0)
+    block.fail(InvalidPoLWBeforeRhoneHardFork)
+  }
+
+  trait TestnetFixture extends Fixture {
+    override lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val whitelistedMiner =
+      ALPH.testnetWhitelistedMiners
+        .filter(_.groupIndex == chainIndex.to)
+        .head
+        .asInstanceOf[LockupScript.Asset]
+    lazy val randomMiner = assetLockupGen(chainIndex.from).sample.get
+
+    def newBlock(miner: LockupScript.Asset): Block = {
+      val template   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val emptyBlock = Block(template.dummyHeader(), template.transactions)
+      emptyBlock.Coinbase.output(o => o.copy(lockupScript = miner))
+    }
+
+    implicit lazy val validator = (block: Block) => {
+      val hardFork  = networkConfig.getHardFork(block.timestamp)
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
+    }
+  }
+
+  it should "check miner for tesnet" in new TestnetFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+
+    newBlock(whitelistedMiner).pass()
+    newBlock(randomMiner).fail(InvalidTestnetMiner)
+  }
+
+  it should "not check miner for testnet pre-Rhone" in new TestnetFixture {
+    override val configValues: Map[String, Any] =
+      Map(
+        ("alephium.network.network-id", 1),
+        ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+      )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+
+    newBlock(whitelistedMiner).pass()
+    newBlock(randomMiner).pass()
+  }
+
+  it should "not check miner for devnet" in new TestnetFixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    networkConfig.networkId is NetworkId.AlephiumDevNet
+
+    newBlock(whitelistedMiner).pass()
+    newBlock(randomMiner).pass()
   }
 }

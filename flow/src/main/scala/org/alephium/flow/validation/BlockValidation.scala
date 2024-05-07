@@ -23,7 +23,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{BlockEnv, GasPrice, LockupScript, LogConfig, WorldState}
+import org.alephium.protocol.vm.{NetworkId => _, _}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes, EitherF, U256}
 
@@ -318,12 +318,24 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     val consensusConfig = consensusConfigs.getConsensusConfig(hardFork)
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
-        val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
-        checkCoinbase(flow, chainIndex, block, groupView, 1, netReward, netReward, hardFork)
-      case Emission.PoLW(miningReward, burntAmount) =>
         val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
-        val netReward    = lockedReward.subUnsafe(burntAmount)
-        checkCoinbase(flow, chainIndex, block, groupView, 2, netReward, lockedReward, hardFork)
+        checkCoinbase(flow, chainIndex, block, groupView, lockedReward, None, hardFork, false)
+      case Emission.PoLW(miningReward, burntAmount) =>
+        if (hardFork.isGhostEnabled()) {
+          val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
+          checkCoinbase(
+            flow,
+            chainIndex,
+            block,
+            groupView,
+            lockedReward,
+            Some(burntAmount),
+            hardFork,
+            true
+          )
+        } else {
+          invalidBlock(InvalidPoLWBeforeRhoneHardFork)
+        }
     }
 
     result match {
@@ -336,44 +348,103 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      netReward: U256,
       lockedReward: U256
   ): BlockValidationResult[Unit] = {
     for {
-      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, netReward.addUnsafe(coinbaseGasFee))
+      _ <- checkCoinbaseAsTx(
+        chainIndex,
+        block,
+        groupView,
+        lockedReward.addUnsafe(coinbaseGasFeeSubsidy)
+      )
       _ <- checkLockedReward(block, AVector(lockedReward))
     } yield ()
+  }
+
+  private[validation] def preCheckPoLWCoinbase(
+      coinbase: Transaction,
+      uncleRewardLength: Int
+  ): BlockValidationResult[Unit] = {
+    val inputs = coinbase.unsigned.inputs
+    assume(inputs.nonEmpty)
+    // we have checked the `fixedOutputs.length` in `checkCoinbaseEasy`
+    assume(coinbase.unsigned.fixedOutputs.length >= uncleRewardLength + 1)
+    val changeOutputs = coinbase.unsigned.fixedOutputs.drop(uncleRewardLength + 1)
+    val unlockScript  = inputs(0).unlockScript
+    unlockScript match {
+      case UnlockScript.PoLW(publicKey) =>
+        for {
+          _ <- inputs.tail.foreachE { input =>
+            if (input.unlockScript != unlockScript) {
+              invalidBlock(PoLWUnlockScriptNotTheSame)
+            } else {
+              validBlock(())
+            }
+          }
+          lockupScript = LockupScript.p2pkh(publicKey)
+          _ <- changeOutputs.foreachE { output =>
+            if (output.lockupScript != lockupScript) {
+              invalidBlock(InvalidPoLWChangeOutputLockupScript)
+            } else {
+              validBlock(())
+            }
+          }
+        } yield ()
+      case _ => invalidBlock(InvalidPoLWInputUnlockScript)
+    }
   }
 
   private[validation] def checkRewardGhost(
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      netReward: U256,
       lockedReward: U256,
+      burntAmountOpt: Option[U256],
       uncles: AVector[(LockupScript.Asset, Int)]
   ): BlockValidationResult[Unit] = {
+    val burntAmount     = burntAmountOpt.getOrElse(U256.Zero)
+    val netReward       = lockedReward.subUnsafe(burntAmount)
     val mainChainReward = Coinbase.calcMainChainReward(netReward)
     val uncleRewards = uncles.map(uncle => Coinbase.calcGhostUncleReward(mainChainReward, uncle._2))
     val blockReward  = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
-    val blockRewardLocked = blockReward.mulUnsafe(lockedReward).divUnsafe(netReward)
+    val blockRewardLocked = blockReward.addUnsafe(burntAmount)
 
-    val coinbase           = block.coinbase.unsigned
-    val isBlockRewardValid = coinbase.fixedOutputs.head.amount == blockReward
-    val uncleRewardOutputs = coinbase.fixedOutputs.tail
-    val isUncleRewardValid = uncleRewards.length == uncleRewardOutputs.length &&
-      uncleRewards.zipWithIndex.forall { case (reward, index) =>
-        val output = uncleRewardOutputs(index)
-        uncles(index)._1 == output.lockupScript && reward == output.amount
-      }
-    if (isBlockRewardValid && isUncleRewardValid) {
+    val coinbase = block.coinbase.unsigned
+    // we have checked the `fixedOutputs.length` in `checkCoinbaseEasy`
+    assume(coinbase.fixedOutputs.length >= uncles.length + 1)
+    val uncleRewardOutputs = coinbase.fixedOutputs.slice(1, uncles.length + 1)
+    // the reward amount will be checked within `checkLockedReward`
+    val isUncleMinerValid = uncles.forallWithIndex { case (uncle, index) =>
+      uncleRewardOutputs(index).lockupScript == uncle._1
+    }
+    if (isUncleMinerValid) {
       val totalReward = uncleRewards.fold(blockReward)(_ addUnsafe _)
       for {
-        _ <- checkCoinbaseAsTx(chainIndex, block, groupView, totalReward.addUnsafe(coinbaseGasFee))
+        _ <- checkCoinbaseAsTx(
+          chainIndex,
+          block,
+          groupView,
+          totalReward.addUnsafe(coinbaseGasFeeSubsidy)
+        )
         _ <- checkLockedReward(block, blockRewardLocked +: uncleRewards)
       } yield ()
     } else {
-      invalidBlock(InvalidCoinbaseReward)
+      invalidBlock(InvalidGhostUncleMiner)
+    }
+  }
+
+  private[validation] def checkTestnetMiner(
+      block: Block,
+      hardFork: HardFork
+  ): BlockValidationResult[Unit] = {
+    if (
+      hardFork.isGhostEnabled() &&
+      networkConfig.networkId == NetworkId.AlephiumTestNet &&
+      !ALPH.testnetWhitelistedMiners.contains(block.minerLockupScript)
+    ) {
+      invalidBlock(InvalidTestnetMiner)
+    } else {
+      validBlock(())
     }
   }
 
@@ -382,22 +453,23 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      outputNum: Int,
-      netReward: U256,
       lockedReward: U256,
-      hardFork: HardFork
+      burntAmount: Option[U256],
+      hardFork: HardFork,
+      isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
     for {
       ghostUncleHashes <- checkCoinbaseData(chainIndex, block)
-      totalOutputNum = outputNum + ghostUncleHashes.length
-      _      <- checkCoinbaseEasy(block, totalOutputNum)
-      uncles <- checkGhostUncles(flow, chainIndex, block, ghostUncleHashes)
+      _                <- checkCoinbaseEasy(block, ghostUncleHashes.length, isPoLW)
+      uncles           <- checkGhostUncles(flow, chainIndex, block, ghostUncleHashes)
+      _ <- if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncles.length) else validBlock(())
       _ <-
         if (hardFork.isGhostEnabled()) {
-          checkRewardGhost(chainIndex, block, groupView, netReward, lockedReward, uncles)
+          checkRewardGhost(chainIndex, block, groupView, lockedReward, burntAmount, uncles)
         } else {
-          checkRewardPreGhost(chainIndex, block, groupView, netReward, lockedReward)
+          checkRewardPreGhost(chainIndex, block, groupView, lockedReward)
         }
+      _ <- checkTestnetMiner(block, hardFork)
     } yield ()
   }
 
@@ -426,24 +498,62 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
 
   private[validation] def checkCoinbaseEasy(
       block: Block,
-      outputsNum: Int
+      uncleRewardLength: Int,
+      isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
-    val coinbase = block.coinbase // Note: validateNonEmptyTransactions first pls!
+    // Note: validateNonEmptyTransactions first pls!
+    if (!isPoLW) {
+      checkCoinbaseEasyNonPoLW(block, uncleRewardLength)
+    } else {
+      checkCoinbaseEasyPoLW(block, uncleRewardLength)
+    }
+  }
+
+  @inline private def checkCoinbaseEasyCommon(block: Block): Boolean = {
+    val coinbase = block.coinbase
+    val unsigned = coinbase.unsigned
+    unsigned.scriptOpt.isEmpty &&
+    unsigned.gasPrice == coinbaseGasPrice &&
+    unsigned.fixedOutputs.forall(_.tokens.isEmpty) &&
+    coinbase.contractInputs.isEmpty &&
+    coinbase.generatedOutputs.isEmpty &&
+    coinbase.scriptSignatures.isEmpty
+  }
+
+  private def checkCoinbaseEasyNonPoLW(
+      block: Block,
+      uncleRewardLength: Int
+  ): BlockValidationResult[Unit] = {
+    val coinbase = block.coinbase
     val unsigned = coinbase.unsigned
     if (
-      unsigned.scriptOpt.isEmpty &&
+      checkCoinbaseEasyCommon(block) &&
       unsigned.gasAmount == minimalGas &&
-      unsigned.gasPrice == coinbaseGasPrice &&
-      unsigned.fixedOutputs.length == outputsNum &&
-      unsigned.fixedOutputs(0).tokens.isEmpty &&
-      coinbase.contractInputs.isEmpty &&
-      coinbase.generatedOutputs.isEmpty &&
-      coinbase.inputSignatures.isEmpty &&
-      coinbase.scriptSignatures.isEmpty
+      unsigned.fixedOutputs.length == uncleRewardLength + 1 &&
+      coinbase.inputSignatures.isEmpty
     ) {
       validBlock(())
     } else {
       invalidBlock(InvalidCoinbaseFormat)
+    }
+  }
+
+  private def checkCoinbaseEasyPoLW(
+      block: Block,
+      uncleRewardLength: Int
+  ): BlockValidationResult[Unit] = {
+    val coinbase = block.coinbase
+    val unsigned = coinbase.unsigned
+    if (
+      checkCoinbaseEasyCommon(block) &&
+      unsigned.gasAmount >= minimalGas &&
+      unsigned.fixedOutputs.length >= uncleRewardLength + 1 &&
+      unsigned.inputs.nonEmpty &&
+      coinbase.inputSignatures.length == 1
+    ) {
+      validBlock(())
+    } else {
+      invalidBlock(InvalidPoLWCoinbaseFormat)
     }
   }
 
