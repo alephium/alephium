@@ -44,8 +44,8 @@ trait FlowDifficultyAdjustment {
       nextTimeStamp: TimeStamp
   ): IOResult[Target] = {
     val hardFork = networkConfig.getHardFork(nextTimeStamp)
-    if (hardFork.isGhostEnabled()) {
-      getNextHashTargetGhost(chainIndex, deps)
+    if (hardFork.isRhoneEnabled()) {
+      getNextHashTargetRhone(chainIndex, deps)
     } else if (hardFork.isLemanEnabled()) {
       getNextHashTargetLeman(chainIndex, deps)
     } else {
@@ -93,11 +93,11 @@ trait FlowDifficultyAdjustment {
   ): IOResult[Target] =
     getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Leman)(consensusConfigs.mainnet)
 
-  def getNextHashTargetGhost(
+  def getNextHashTargetRhone(
       chainIndex: ChainIndex,
       deps: BlockDeps
   ): IOResult[Target] =
-    getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Ghost)(consensusConfigs.ghost)
+    getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Rhone)(consensusConfigs.rhone)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {

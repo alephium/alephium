@@ -25,7 +25,7 @@ class NetworkConfigSpec extends AlephiumSpec {
 
   it should "get Leman hard fork" in new NetworkConfigFixture.Default {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
-    override def ghostHardForkTimestamp: TimeStamp = lemanHardForkTimestamp.plusMinutesUnsafe(1)
+    override def rhoneHardForkTimestamp: TimeStamp = lemanHardForkTimestamp.plusMinutesUnsafe(1)
 
     networkConfig.getHardFork(lemanHardForkTimestamp) is HardFork.Leman
     networkConfig.getHardFork(
@@ -34,13 +34,13 @@ class NetworkConfigSpec extends AlephiumSpec {
     networkConfig.getHardFork(
       lemanHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
     ) is HardFork.Leman
-    networkConfig.getHardFork(ghostHardForkTimestamp) is HardFork.Ghost
+    networkConfig.getHardFork(rhoneHardForkTimestamp) is HardFork.Rhone
     networkConfig.getHardFork(
-      ghostHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+      rhoneHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
     ) is HardFork.Leman
     networkConfig.getHardFork(
-      ghostHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
-    ) is HardFork.Ghost
+      rhoneHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is HardFork.Rhone
   }
 
   it should "get the right hard fork" in {
@@ -48,16 +48,16 @@ class NetworkConfigSpec extends AlephiumSpec {
 
     NetworkConfigFixture.Genesis.getHardFork(now) is HardFork.Mainnet
     NetworkConfigFixture.Leman.getHardFork(now) is HardFork.Leman
-    NetworkConfigFixture.Ghost.getHardFork(now) is HardFork.Ghost
-    Seq(HardFork.Leman, HardFork.Ghost).contains(
+    NetworkConfigFixture.Rhone.getHardFork(now) is HardFork.Rhone
+    Seq(HardFork.Leman, HardFork.Rhone).contains(
       NetworkConfigFixture.SinceLeman.getHardFork(now)
     ) is true
 
     NetworkConfigFixture.sinceLemanForks is ArraySeq(
       NetworkConfigFixture.Leman,
-      NetworkConfigFixture.Ghost
+      NetworkConfigFixture.Rhone
     )
-    NetworkConfigFixture.sinceRhoneForks is ArraySeq(NetworkConfigFixture.Ghost)
+    NetworkConfigFixture.sinceRhoneForks is ArraySeq(NetworkConfigFixture.Rhone)
 
     NetworkConfigFixture.preRhoneForks is ArraySeq(
       NetworkConfigFixture.Genesis,

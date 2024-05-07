@@ -23,16 +23,16 @@ sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
 
   def isLemanEnabled(): Boolean = this >= HardFork.Leman
-  def isGhostEnabled(): Boolean = this >= HardFork.Ghost
+  def isRhoneEnabled(): Boolean = this >= HardFork.Rhone
 }
 object HardFork {
   object Mainnet extends HardFork(0)
   object Leman   extends HardFork(1)
-  object Ghost   extends HardFork(2)
+  object Rhone   extends HardFork(2)
 
-  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman, Ghost)
+  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman, Rhone)
 
   // TestOnly
   def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(2))
-  def PreGhostForTest: HardFork   = All.take(2).apply(Random.nextInt(2))
+  def PreRhoneForTest: HardFork   = All.take(2).apply(Random.nextInt(2))
 }

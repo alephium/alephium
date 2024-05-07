@@ -61,15 +61,15 @@ final case class ConsensusSetting(
   val powAveragingWindow: Int          = 17
   val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
-  private val crossShardHeightGapThresholdPreGhost: Int = powAveragingWindow
+  private val crossShardHeightGapThresholdPreRhone: Int = powAveragingWindow
   private val crossShardHeightGapThreshold: Int         = powAveragingWindow / 2
 
   def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int, hardFork: HardFork): Difficulty = {
     assume(hardFork.isLemanEnabled())
-    val (threshold, factor) = if (hardFork.isGhostEnabled()) {
+    val (threshold, factor) = if (hardFork.isRhoneEnabled()) {
       crossShardHeightGapThreshold -> 3
     } else {
-      crossShardHeightGapThresholdPreGhost -> 5
+      crossShardHeightGapThresholdPreRhone -> 5
     }
     val delta = gap - threshold
     if (delta > 0) {
@@ -93,11 +93,11 @@ final case class ConsensusSetting(
 
 final case class ConsensusSettings(
     mainnet: ConsensusSetting,
-    ghost: ConsensusSetting,
+    rhone: ConsensusSetting,
     blockCacheCapacityPerChain: Int
 ) extends ConsensusConfigs {
   override def getConsensusConfig(hardFork: HardFork): ConsensusSetting = {
-    if (hardFork.isGhostEnabled()) ghost else mainnet
+    if (hardFork.isRhoneEnabled()) rhone else mainnet
   }
   override def getConsensusConfig(
       ts: TimeStamp
@@ -108,9 +108,9 @@ final case class ConsensusSettings(
   val conflictCacheKeepDuration: Duration =
     Math.max(
       mainnet.expectedTimeSpan,
-      ghost.expectedTimeSpan
+      rhone.expectedTimeSpan
     ) timesUnsafe blockCacheCapacityPerChain.toLong
-  val tipsPruneDuration: Duration = Math.max(mainnet.tipsPruneDuration, ghost.tipsPruneDuration)
+  val tipsPruneDuration: Duration = Math.max(mainnet.tipsPruneDuration, rhone.tipsPruneDuration)
 
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
@@ -127,7 +127,7 @@ final case class MiningSetting(
 final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
-    ghostHardForkTimestamp: TimeStamp,
+    rhoneHardForkTimestamp: TimeStamp,
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
@@ -255,17 +255,17 @@ object AlephiumConfig {
 
   final private case class TempConsensusSettings(
       mainnet: TempConsensusSetting,
-      ghost: TempConsensusSetting,
+      rhone: TempConsensusSetting,
       blockCacheCapacityPerChain: Int,
       numZerosAtLeastInHash: Int
   ) {
     def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
-      val ghostEmission =
-        Emission.ghost(groupConfig, mainnet.blockTargetTime, ghost.blockTargetTime)
+      val rhoneEmission =
+        Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
       ConsensusSettings(
         mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
-        ghost.toConsensusSetting(ghostEmission, numZerosAtLeastInHash),
+        rhone.toConsensusSetting(rhoneEmission, numZerosAtLeastInHash),
         blockCacheCapacityPerChain
       )
     }
@@ -287,7 +287,7 @@ object AlephiumConfig {
   final private case class TempNetworkSetting(
       networkId: NetworkId,
       lemanHardForkTimestamp: TimeStamp,
-      ghostHardForkTimestamp: TimeStamp,
+      rhoneHardForkTimestamp: TimeStamp,
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
@@ -323,7 +323,7 @@ object AlephiumConfig {
       NetworkSetting(
         networkId,
         lemanHardForkTimestamp,
-        ghostHardForkTimestamp,
+        rhoneHardForkTimestamp,
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,

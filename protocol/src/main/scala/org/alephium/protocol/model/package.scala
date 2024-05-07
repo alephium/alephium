@@ -58,7 +58,7 @@ package object model {
   val minimalAlphInContract: U256         = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
 
   def minimalContractStorageDeposit(hardFork: HardFork): U256 = {
-    if (hardFork.isGhostEnabled()) minimalAlphInContract else minimalAlphInContractPreRhone
+    if (hardFork.isRhoneEnabled()) minimalAlphInContract else minimalAlphInContractPreRhone
   }
 
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)

@@ -269,7 +269,7 @@ class ContractSpec extends AlephiumSpec {
   trait ContractFixture extends MethodsFixture with ContextGenerators {
     val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
     val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
-    val rhoneContext    = genStatefulContext(None)(NetworkConfigFixture.Ghost)
+    val rhoneContext    = genStatefulContext(None)(NetworkConfigFixture.Rhone)
   }
 
   it should "check method modifier in contracts" in new ContractFixture {

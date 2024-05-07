@@ -217,14 +217,14 @@ object Emission {
   def mainnet(groupConfig: GroupConfig, mainnetBlockTargetTime: Duration): Emission =
     new Emission(mainnetBlockTargetTime, Fraction(1, 1))(groupConfig)
 
-  def ghost(
+  def rhone(
       groupConfig: GroupConfig,
       mainnetBlockTargetTime: Duration,
-      ghostBlockTargetTime: Duration
+      rhoneBlockTargetTime: Duration
   ): Emission = {
-    assume(ghostBlockTargetTime.millis < mainnetBlockTargetTime.millis)
-    val fraction = Fraction(ghostBlockTargetTime.millis, mainnetBlockTargetTime.millis)
-    new Emission(ghostBlockTargetTime, fraction)(groupConfig)
+    assume(rhoneBlockTargetTime.millis < mainnetBlockTargetTime.millis)
+    val fraction = Fraction(rhoneBlockTargetTime.millis, mainnetBlockTargetTime.millis)
+    new Emission(rhoneBlockTargetTime, fraction)(groupConfig)
   }
 
   // scalastyle:off magic.number

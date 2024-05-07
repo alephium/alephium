@@ -63,7 +63,7 @@ object CoinbaseData {
           prefixResult <- _decode[CoinbaseDataPrefix](input)
           hardFork = networkConfig.getHardFork(prefixResult.value.blockTs)
           coinbaseData <-
-            if (hardFork.isGhostEnabled()) {
+            if (hardFork.isRhoneEnabled()) {
               for {
                 ghostUncleHashesResult <- _decode[AVector[BlockHash]](prefixResult.rest)
               } yield Staging[CoinbaseData](
@@ -104,7 +104,7 @@ object CoinbaseData {
   ): CoinbaseData = {
     val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
     val hardFork = networkConfig.getHardFork(blockTs)
-    if (hardFork.isGhostEnabled()) {
+    if (hardFork.isRhoneEnabled()) {
       CoinbaseDataV2(prefix, sortedGhostUncleHashes, minerData)
     } else {
       CoinbaseDataV1(prefix, minerData)

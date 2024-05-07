@@ -166,7 +166,7 @@ object VM {
       hardFork: HardFork
   ): ExeResult[GasBox] = {
     val maximalCodeSize = {
-      if (hardFork.isGhostEnabled()) { maximalCodeSizeRhone }
+      if (hardFork.isRhoneEnabled()) { maximalCodeSizeRhone }
       else if (hardFork.isLemanEnabled()) { maximalCodeSizeLeman }
       else { maximalCodeSizePreLeman }
     }
@@ -325,7 +325,7 @@ final class StatefulVM(
       isApproved: Boolean,
       lockupScript: LockupScript
   ): Boolean = {
-    hardFork.isGhostEnabled() && !isApproved && lockupScript.isInstanceOf[LockupScript.P2C]
+    hardFork.isRhoneEnabled() && !isApproved && lockupScript.isInstanceOf[LockupScript.P2C]
   }
 
   protected def mergeBack(
@@ -404,7 +404,7 @@ final class StatefulVM(
   }
 
   def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
-    if (hardFork.isGhostEnabled() && ctx.gasFeePaid > U256.Zero) {
+    if (hardFork.isRhoneEnabled() && ctx.gasFeePaid > U256.Zero) {
       val totalGasFee = ctx.txEnv.gasFeeUnsafe
       val gasFeePaid  = ctx.gasFeePaid
 

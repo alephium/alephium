@@ -469,7 +469,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check gas bounds for rhone-hardfork" in new Fixture {
-    implicit val validator = checkGasBound(_, isCoinbase = Random.nextBoolean(), HardFork.Ghost)
+    implicit val validator = checkGasBound(_, isCoinbase = Random.nextBoolean(), HardFork.Rhone)
 
     val tx = transactionGen(2, 1).sample.value
     tx.pass()

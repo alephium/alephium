@@ -188,7 +188,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
         .toTxOutput(lockupScript, HardFork.Leman)
 
       lazy val rhoneOutputs = MutBalancesPerLockup(alphAmount, mutable.Map.from(tokens), 1)
-        .toTxOutput(lockupScript, HardFork.Ghost)
+        .toTxOutput(lockupScript, HardFork.Rhone)
 
       def expectGenesis(outputs: (U256, Seq[(TokenId, U256)])*): Assertion = {
         genesisOutputs isE AVector.from(outputs).map { case (amount, tokens) =>

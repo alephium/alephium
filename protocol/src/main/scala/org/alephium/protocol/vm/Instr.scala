@@ -63,15 +63,15 @@ sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait GhostInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+sealed trait RhoneInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _ <- frame.ctx.checkGhostHardFork(this)
-      _ <- runWithGhost(frame)
+      _ <- frame.ctx.checkRhoneHardFork(this)
+      _ <- runWithRhone(frame)
     } yield ()
   }
 
-  def runWithGhost[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+  def runWithRhone[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
@@ -102,16 +102,16 @@ sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext]
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait GhostInstrWithSimpleGas[-Ctx <: StatelessContext]
-    extends GhostInstr[Ctx]
+sealed trait RhoneInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends RhoneInstr[Ctx]
     with GasSimple {
   def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
 
   override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _ <- frame.ctx.checkGhostHardFork(this)
+      _ <- frame.ctx.checkRhoneHardFork(this)
       _ <- frame.ctx.chargeGas(this)
-      _ <- runWithGhost(frame)
+      _ <- runWithRhone(frame)
     } yield ()
   }
 }
@@ -188,7 +188,7 @@ object Instr {
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
     I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
     U256ToString, I256ToString, BoolToString,
-    /* Below are instructions for Ghost hard fork */
+    /* Below are instructions for Rhone hard fork */
     GroupOfAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -204,7 +204,7 @@ object Instr {
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
-    /* Below are instructions for Ghost hard fork */
+    /* Below are instructions for Rhone hard fork */
     PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
   )
   // format: on
@@ -535,7 +535,7 @@ case object StoreMutFieldByIndex
 }
 
 case object PayGasFee
-    extends GhostInstrWithSimpleGas[StatefulContext]
+    extends RhoneInstrWithSimpleGas[StatefulContext]
     with GasBalance
     with StatefulInstrCompanion0 {
 
@@ -552,7 +552,7 @@ case object PayGasFee
     if (gasRemainingToPay < alphAmount) failed(GasOverPaid) else okay
   }
 
-  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       balanceState <- frame.getBalanceState()
       amount       <- frame.popOpStackU256()
@@ -576,19 +576,19 @@ case object PayGasFee
 }
 
 case object MinimalContractDeposit
-    extends GhostInstrWithSimpleGas[StatefulContext]
+    extends RhoneInstrWithSimpleGas[StatefulContext]
     with GasBase
     with StatefulInstrCompanion0 {
-  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(model.minimalAlphInContract))
   }
 }
 
 case object GroupOfAddress
-    extends GhostInstrWithSimpleGas[StatelessContext]
+    extends RhoneInstrWithSimpleGas[StatelessContext]
     with GasLow
     with StatelessInstrCompanion0 {
-  def runWithGhost[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithRhone[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.popOpStackAddress()
       group = address.lockupScript.groupIndex(frame.ctx.groupConfig)
@@ -1687,7 +1687,7 @@ sealed trait ApproveAssetBase {
       amount: U256,
       hardFork: HardFork
   ): ExeResult[Unit] = {
-    if (amount.isZero && hardFork.isGhostEnabled()) {
+    if (amount.isZero && hardFork.isRhoneEnabled()) {
       okay
     } else {
       balanceState
@@ -1712,7 +1712,7 @@ sealed trait ApproveAssetBase {
       amount: U256,
       hardFork: HardFork
   ): ExeResult[Unit] = {
-    if (amount.isZero && hardFork.isGhostEnabled()) {
+    if (amount.isZero && hardFork.isRhoneEnabled()) {
       okay
     } else {
       balanceState
@@ -1782,7 +1782,7 @@ object AlphRemaining extends AssetInstr with StatefulInstrCompanion0 {
       address: Val.Address
   ): ExeResult[U256] = {
     val amountOpt = balanceState.alphRemaining(address.lockupScript)
-    if (hardFork.isGhostEnabled()) {
+    if (hardFork.isRhoneEnabled()) {
       Right(amountOpt.getOrElse(U256.Zero))
     } else {
       amountOpt.toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
@@ -1812,7 +1812,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
     } else {
       balanceState.tokenRemaining(address.lockupScript, tokenId)
     }
-    if (hardFork.isGhostEnabled()) {
+    if (hardFork.isRhoneEnabled()) {
       Right(amountOpt.getOrElse(U256.Zero))
     } else {
       amountOpt.toRight(
@@ -1871,7 +1871,7 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    if (amount.v.isZero && frame.ctx.getHardFork().isGhostEnabled()) {
+    if (amount.v.isZero && frame.ctx.getHardFork().isRhoneEnabled()) {
       okay
     } else {
       for {
@@ -1915,7 +1915,7 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    if (amount.v.isZero && frame.ctx.getHardFork().isGhostEnabled()) {
+    if (amount.v.isZero && frame.ctx.getHardFork().isRhoneEnabled()) {
       okay
     } else {
       for {
@@ -2244,7 +2244,7 @@ object CreateSubContractAndTransferToken
 @ByteCode
 final case class CreateMapEntry(immFieldsNum: Byte, mutFieldsNum: Byte)
     extends ContractFactory
-    with GhostInstrWithSimpleGas[StatefulContext]
+    with RhoneInstrWithSimpleGas[StatefulContext]
     with GasCreate {
   def subContract: Boolean = true
   def copyCreate: Boolean  = false
@@ -2273,7 +2273,7 @@ final case class CreateMapEntry(immFieldsNum: Byte, mutFieldsNum: Byte)
 
   override def returnContractId: Boolean = false
 
-  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, tokenIssuance = NoIssuance)
   }
 }

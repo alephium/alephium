@@ -923,13 +923,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
 
-    serverUtils.getInitialAttoAlphAmount(None, HardFork.Ghost) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(None, HardFork.Rhone) isE minimalAlphInContract
     serverUtils.getInitialAttoAlphAmount(
       Some(minimalAlphInContract),
-      HardFork.Ghost
+      HardFork.Rhone
     ) isE minimalAlphInContract
     serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Ghost)
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Rhone)
       .leftValue
       .detail is "Expect 0.1 ALPH deposit to deploy a new contract"
   }
@@ -2864,9 +2864,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
   }
 
-  it should "should throw exception for payGasFee instr before Ghost hardfork" in new GasFeeFixture {
+  it should "should throw exception for payGasFee instr before Rhone hardfork" in new GasFeeFixture {
     implicit override lazy val networkConfig: NetworkSetting = config.network.copy(
-      ghostHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
+      rhoneHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
     )
 
     val contractAddress = deployContract(fooContract)

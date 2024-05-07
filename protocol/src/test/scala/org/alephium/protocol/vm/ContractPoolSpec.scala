@@ -136,7 +136,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "load unlimited number of contracts from Rhone" in new ContractNumFixture {
-    pool.getHardFork() is HardFork.Ghost
+    pool.getHardFork() is HardFork.Rhone
     val contracts = prepare()
     pool.loadContractObj(contracts.last._1).isRight is true
   }
@@ -167,7 +167,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "load contracts with limited number of fields from Rhone" in new FieldNumFixture {
-    pool.getHardFork() is HardFork.Ghost
+    pool.getHardFork() is HardFork.Rhone
 
     val contractId2 = prepare()
     pool.loadContractObj(contractId2).isRight is true

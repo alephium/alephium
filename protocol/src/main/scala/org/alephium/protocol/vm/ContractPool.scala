@@ -65,7 +65,7 @@ trait ContractPool extends CostStrategy {
   }
 
   def cacheNewContractIfNecessary(contractId: ContractId): ExeResult[Unit] = {
-    if (getHardFork().isGhostEnabled()) {
+    if (getHardFork().isRhoneEnabled()) {
       for {
         obj <- loadFromWorldState(contractId)
         _   <- add(contractId, obj)
@@ -98,7 +98,7 @@ trait ContractPool extends CostStrategy {
   private var contractFieldSize = 0
   private def add(contractId: ContractId, obj: StatefulContractObject): ExeResult[Unit] = {
     contractFieldSize += (obj.immFields.length + obj.initialMutFields.length)
-    if (!getHardFork().isGhostEnabled()) {
+    if (!getHardFork().isRhoneEnabled()) {
       if (contractPool.size >= contractPoolMaxSize) {
         failed(ContractPoolOverflow)
       } else if (contractFieldSize > contractFieldMaxSize) {
@@ -160,7 +160,7 @@ trait ContractPool extends CostStrategy {
       contractId: ContractId,
       methodIndex: Int
   ): ExeResult[MutBalancesPerLockup] = {
-    if (getHardFork().isGhostEnabled()) {
+    if (getHardFork().isRhoneEnabled()) {
       useContractAssetsRhone(contractId, methodIndex)
     } else {
       useContractAssetsPreRhone(contractId)

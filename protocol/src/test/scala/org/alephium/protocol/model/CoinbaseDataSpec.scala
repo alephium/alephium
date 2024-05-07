@@ -40,7 +40,7 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
         deserialize[CoinbaseData](serialize[CoinbaseData](data)).rightValue is data
       }
       {
-        implicit val networkConfig = NetworkConfigFixture.Ghost
+        implicit val networkConfig = NetworkConfigFixture.Rhone
         deserialize[CoinbaseData](serialize[CoinbaseData](data)).isLeft is true
       }
     }
@@ -54,7 +54,7 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
     val prefix = CoinbaseDataPrefix.from(chainIndexGen.sample.get, TimeStamp.now())
     val hashes = AVector.from(Gen.listOfN(2, blockHashGen).sample.get)
 
-    implicit val networkConfig = NetworkConfigFixture.Ghost
+    implicit val networkConfig = NetworkConfigFixture.Rhone
     val data0                  = CoinbaseDataV2(prefix, hashes, ByteString.empty)
     deserialize[CoinbaseData](serialize[CoinbaseData](data0)).rightValue is data0
 

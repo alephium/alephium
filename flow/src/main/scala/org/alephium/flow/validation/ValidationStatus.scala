@@ -81,7 +81,7 @@ case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
 case object InvalidPoLWBeforeRhoneHardFork      extends InvalidPoLWStatus
 
 sealed trait InvalidGhostUncleStatus              extends InvalidBlockStatus
-case object InvalidGhostUnclesBeforeGhostHardFork extends InvalidGhostUncleStatus
+case object InvalidGhostUnclesBeforeRhoneHardFork extends InvalidGhostUncleStatus
 case object InvalidGhostUncleSize                 extends InvalidGhostUncleStatus
 case object UnsortedGhostUncles                   extends InvalidGhostUncleStatus
 case object InvalidGhostUncleDeps                 extends InvalidGhostUncleStatus

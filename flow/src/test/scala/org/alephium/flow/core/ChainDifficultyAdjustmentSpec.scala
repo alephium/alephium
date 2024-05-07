@@ -40,12 +40,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     val consensusConfigs: ConsensusSettings = {
       val configFixture = (new ConsensusConfigsFixture.Default {}).consensusConfigs
       val mainnet       = toConsensusSetting(configFixture.mainnet)
-      val ghost         = toConsensusSetting(configFixture.ghost)
-      ConsensusSettings(mainnet, ghost, 25)
+      val rhone         = toConsensusSetting(configFixture.rhone)
+      ConsensusSettings(mainnet, rhone, 25)
     }
     implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.SinceLeman
     implicit val consensusConfig =
-      if (Random.nextBoolean()) consensusConfigs.ghost else consensusConfigs.mainnet
+      if (Random.nextBoolean()) consensusConfigs.rhone else consensusConfigs.mainnet
 
     val enabledDurationAfterNow = Duration.ofDaysUnsafe(10)
     override val difficultyBombPatchConfig =
@@ -208,7 +208,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       override def noPreMineProof: ByteString = ByteString.empty
       override def lemanHardForkTimestamp: TimeStamp =
         ALPH.DifficultyBombPatchEnabledTimeStamp.plusHoursUnsafe(100)
-      def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
+      def rhoneHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
     }
 
     final def calIceAgeTarget(

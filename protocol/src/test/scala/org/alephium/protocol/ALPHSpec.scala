@@ -69,9 +69,9 @@ class ALPHSpec extends AlephiumSpec {
   }
 
   it should "test isSequentialTxSupported" in new GroupConfigFixture.Default {
-    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.Ghost) is true
-    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.Ghost) is false
-    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.PreGhostForTest) is false
-    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.PreGhostForTest) is false
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.Rhone) is true
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.Rhone) is false
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.PreRhoneForTest) is false
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.PreRhoneForTest) is false
   }
 }

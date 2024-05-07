@@ -99,7 +99,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
           MutBalances.empty,
           MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
         )
-      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Ghost)
+      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Rhone)
     }
 
     val contract0 =
@@ -229,8 +229,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       AVector.empty,
       AVector.empty,
       contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
-    )(NetworkConfigFixture.Ghost)
-    val frame = genStatefulFrame(None)(NetworkConfigFixture.Ghost)
+    )(NetworkConfigFixture.Rhone)
+    val frame = genStatefulFrame(None)(NetworkConfigFixture.Rhone)
 
     frame.getNewFrameBalancesState(contractObj, contract.methods.head, 0).rightValue is Some(
       MutBalanceState(

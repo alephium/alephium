@@ -47,7 +47,7 @@ object Coinbase {
 
   @inline
   def calcGhostUncleReward(mainChainReward: U256, heightDiff: Int): U256 = {
-    val heightDiffMax = ALPH.MaxUncleAge + 1
+    val heightDiffMax = ALPH.MaxGhostUncleAge + 1
     assume(heightDiff > 0 && heightDiff < heightDiffMax)
     val numerator = U256.unsafe(heightDiffMax - heightDiff)
     mainChainReward.mulUnsafe(numerator).divUnsafe(U256.unsafe(heightDiffMax))
@@ -59,7 +59,7 @@ object Coinbase {
     mainChainReward.addUnsafe(inclusionReward)
   }
 
-  def coinbaseOutputsPreGhost(
+  def coinbaseOutputsPreRhone(
       coinbaseData: CoinbaseData,
       miningReward: U256,
       lockupScript: LockupScript.Asset,
@@ -70,7 +70,7 @@ object Coinbase {
     )
   }
 
-  def coinbaseOutputsGhost(
+  def coinbaseOutputsRhone(
       coinbaseData: CoinbaseData,
       miningReward: U256,
       lockupScript: LockupScript.Asset,
@@ -99,12 +99,12 @@ object Coinbase {
   )(implicit networkConfig: NetworkConfig): Transaction = {
     val lockTime = blockTs + networkConfig.coinbaseLockupPeriod
     val hardFork = networkConfig.getHardFork(blockTs)
-    val outputs = if (hardFork.isGhostEnabled()) {
+    val outputs = if (hardFork.isRhoneEnabled()) {
       assume(coinbaseData.isGhostEnabled)
-      coinbaseOutputsGhost(coinbaseData, miningReward, lockupScript, lockTime, uncles)
+      coinbaseOutputsRhone(coinbaseData, miningReward, lockupScript, lockTime, uncles)
     } else {
       assume(!coinbaseData.isGhostEnabled)
-      coinbaseOutputsPreGhost(coinbaseData, miningReward, lockupScript, lockTime)
+      coinbaseOutputsPreRhone(coinbaseData, miningReward, lockupScript, lockTime)
     }
     Transaction(
       UnsignedTransaction.coinbase(AVector.empty, outputs),

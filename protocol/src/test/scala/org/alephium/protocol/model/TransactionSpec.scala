@@ -166,17 +166,17 @@ class TransactionSpec
     }
 
     {
-      info("pre-ghost coinbase transaction")
+      info("pre-rhone coinbase transaction")
 
       implicit val networkConfig = new NetworkConfigFixture.Default {
-        override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+        override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
       }.networkConfig
       val tx = coinbaseTransaction(AVector.empty)
       tx.verify("coinbase")
     }
 
     {
-      info("ghost coinbase transaction")
+      info("rhone coinbase transaction")
       val blockHash = model.BlockHash.unsafe(
         hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7"
       )
@@ -184,7 +184,7 @@ class TransactionSpec
         Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
       )
       val tx = coinbaseTransaction(AVector(SelectedGhostUncle(blockHash, lockupScript, 1)))
-      tx.verify("ghost-coinbase")
+      tx.verify("rhone-coinbase")
     }
 
     {
