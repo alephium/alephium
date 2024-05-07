@@ -334,7 +334,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
             true
           )
         } else {
-          invalidBlock(InvalidPoLWBeforeGhostHardFork)
+          invalidBlock(InvalidPoLWBeforeRhoneHardFork)
         }
     }
 
@@ -376,7 +376,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         for {
           _ <- inputs.tail.foreachE { input =>
             if (input.unlockScript != unlockScript) {
-              invalidBlock(PoLWUnlockScriptNotSame)
+              invalidBlock(PoLWUnlockScriptNotTheSame)
             } else {
               validBlock(())
             }

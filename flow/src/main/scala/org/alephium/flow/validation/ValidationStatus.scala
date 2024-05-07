@@ -71,10 +71,10 @@ final case object InvalidFlowTxs                                    extends Inva
 
 sealed trait InvalidPoLWStatus                  extends InvalidBlockStatus
 case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus
-case object PoLWUnlockScriptNotSame             extends InvalidPoLWStatus
+case object PoLWUnlockScriptNotTheSame          extends InvalidPoLWStatus
 case object InvalidPoLWChangeOutputLockupScript extends InvalidPoLWStatus
 case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
-case object InvalidPoLWBeforeGhostHardFork      extends InvalidPoLWStatus
+case object InvalidPoLWBeforeRhoneHardFork      extends InvalidPoLWStatus
 
 sealed trait InvalidGhostUncleStatus              extends InvalidBlockStatus
 case object InvalidGhostUnclesBeforeGhostHardFork extends InvalidGhostUncleStatus

@@ -79,7 +79,9 @@ object UnlockScript {
   case object SameAsPrevious                                            extends UnlockScript
   final case class PoLW(publicKey: PublicKey)                           extends UnlockScript
   object PoLW {
-    private lazy val prefix: ByteString = ByteString("polw".getBytes(StandardCharsets.US_ASCII))
+    private lazy val prefix: ByteString = ByteString(
+      "alph-polw".getBytes(StandardCharsets.US_ASCII)
+    )
 
     def buildPreImage(from: LockupScript, to: LockupScript): ByteString = {
       Hash.hash(prefix ++ serialize(from) ++ serialize(to)).bytes

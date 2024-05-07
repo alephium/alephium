@@ -1281,24 +1281,21 @@ class BlockValidationSpec extends AlephiumSpec {
     }
 
     def emptyPoLWBlock(uncleSize: Int): Block = {
-      (0 until ALPH.MaxUncleAge).foreach(_ =>
-        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
-      )
       val (utxos, privateKey) = prepareUtxos()
       val blocks = (0 until (uncleSize + 1)).map(_ => emptyBlock(blockFlow, chainIndex))
       blocks.foreach(addAndCheck(blockFlow, _))
-      val block = mineBlockTemplate(blockFlow, chainIndex)
-      block.ghostUncleHashes.rightValue.length is uncleSize
+      val block           = mineBlockTemplate(blockFlow, chainIndex)
       val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
       val polwTarget      = randomPoLWTarget(consensusConfig.blockTargetTime)
       assume(consensusConfig.emission.shouldEnablePoLW(polwTarget))
       val header      = block.header.copy(target = polwTarget)
       val blockHeight = blockFlow.getMaxHeight(chainIndex).rightValue + 1
-      val uncles = block.ghostUncleHashes.rightValue.map { hash =>
+      val uncles = block.ghostUncleHashes.rightValue.take(uncleSize).map { hash =>
         val uncleMiner  = blockFlow.getBlockUnsafe(hash).minerLockupScript
         val uncleHeight = blockFlow.getHeightUnsafe(hash)
         SelectedGhostUncle(hash, uncleMiner, blockHeight - uncleHeight)
       }
+      uncles.length is uncleSize
       val coinbaseTx = buildPoLWCoinbaseTx(header, uncles, utxos, privateKey)
       block.copy(header = header, transactions = AVector(coinbaseTx))
     }
@@ -1326,7 +1323,7 @@ class BlockValidationSpec extends AlephiumSpec {
       .fail(InvalidPoLWInputUnlockScript)
     block.Coinbase
       .input(_.copy(unlockScript = invalidUnlockScript), 1)
-      .fail(PoLWUnlockScriptNotSame)
+      .fail(PoLWUnlockScriptNotTheSame)
 
     info("invalid output lockup script")
     val invalidLockupScript = assetLockupGen(chainIndex.from).sample.get
@@ -1418,6 +1415,6 @@ class BlockValidationSpec extends AlephiumSpec {
     }
 
     val block = emptyPoLWBlock(0)
-    block.fail(InvalidPoLWBeforeGhostHardFork)
+    block.fail(InvalidPoLWBeforeRhoneHardFork)
   }
 }
