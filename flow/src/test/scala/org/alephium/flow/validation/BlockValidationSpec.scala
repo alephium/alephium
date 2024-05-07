@@ -428,7 +428,7 @@ class BlockValidationSpec extends AlephiumSpec {
         .fail(TooMuchGasUsed)(checkBlockUnit(_, blockFlow))
     }
 
-    val preRhoneValidator = checkTotalGas(_, HardFork.PreRhoneForTest)
+    val preRhoneValidator = checkTotalGas(_, HardFork.PreGhostForTest)
     test(maximalTxsInOneBlock)(preRhoneValidator)
     val rhoneValidator = checkTotalGas(_, HardFork.Ghost)
     test(maximalTxsInOneBlock / 4)(rhoneValidator)

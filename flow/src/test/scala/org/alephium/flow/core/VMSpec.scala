@@ -4966,6 +4966,51 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "test constant expressions" in new ContractFixture {
+    val address = Address.p2pkh(PublicKey.generate).toBase58
+
+    def code(expr: String, value: String) =
+      s"""
+         |Contract Foo() {
+         |  const A = 1
+         |  const B = 2
+         |  const C = -1i
+         |  const D = 2i
+         |  const E = #00
+         |  const F = false
+         |  const G = @$address
+         |  const H = $expr
+         |
+         |  pub fn foo() -> () {
+         |    assert!(H == $value, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    // format: off
+    Seq(
+      ("A + B", "3"), ("B - A", "1"), ("A * B", "2"), ("A / B", "0"), ("A % B", "1"),
+      ("C + D", "1i"), ("C - D", "-3i"), ("C * D", "-2i"), ("C / D", "0i"), ("C % D", "-1i"),
+      ("A ** B", "1"), ("C ** B", "1i"), ("A |+| B", "3"), ("A |-| B", "u256Max!()"), ("A |*| B", "2"), ("A |**| B", "1"),
+      ("#01 ++ E", "#0100"), ("A << B", "4"), ("A >> B", "0"), ("A & B", "0"), ("A | B", "3"), ("A ^ B", "3"),
+      ("A == B", "false"), ("A != B", "true"), ("A > B", "false"), ("A >= B", "false"), ("A < B", "true"), ("A <= B", "true"),
+      ("G", s"@$address"), ("!F", "true"), ("(A < B) && (C < D)", "true"), ("(A > B) || (C > D)", "false")
+    ).foreach { case (expr, value) =>
+      val contractCode = code(expr, value)
+      val contractId = createContract(contractCode)._1.toHexString
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  Foo(#$contractId).foo()
+           |}
+           |$contractCode
+           |""".stripMargin
+      )
+    }
+    // format: on
+  }
+
   trait MapFixture extends ContractFixture {
     def mapContract: String
     lazy val mapContractId = createContract(mapContract)._1

@@ -52,7 +52,9 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def typeId[Unknown: P]: P[Ast.TypeId] = id(uppercase, Ast.TypeId)
   def funcId[Unknown: P]: P[Ast.FuncId] =
     P(ident ~ "!".?.!).map { case (id, postfix) =>
-      Ast.FuncId(id.name, postfix.nonEmpty).atSourceIndex(id.sourceIndex)
+      Ast
+        .FuncId(id.name, postfix.nonEmpty)
+        .atSourceIndex(id.sourceIndex.map(_.addToWidth(postfix.length)))
     }
 
   private[ralph] def getSimpleName(obj: Object): String = {
@@ -84,61 +86,82 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def lineComment[Unknown: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
-  def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
-  def integer[Unknown: P]: P[BigInteger] = P(
+  def hexNum[Unknown: P]: P[(BigInteger, Int)] = P("0x" ~ hex.!).map { h =>
+    (new BigInteger(h, 16), h.length + 2) // 2 for "0x"
+  }
+  def integer[Unknown: P]: P[(BigInteger, Int)] = P(
     Index ~ (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
       ("e" ~ "-".? ~ CharsWhileIn("0-9")).?).! ~
-      CharsWhileIn(" ", 0) ~ token(Keyword.alph).?.!
-  ).map { case (index, input, unit) =>
+      CharsWhileIn(" ", 0).! ~ token(Keyword.alph).?.!
+  ).map { case (index, input, spaces, unit) =>
     try {
-      var num = new BigDecimal(input.replaceAll("_", ""))
-      if (unit == "alph") num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
-      num.toBigIntegerExact()
+      var num       = new BigDecimal(input.replaceAll("_", ""))
+      val baseWidth = input.length
+      val width =
+        if (unit == "alph") {
+          num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
+          baseWidth + spaces.length + unit.length
+        } else {
+          baseWidth
+        }
+
+      (num.toBigIntegerExact(), width)
     } catch {
       case NonFatal(_) => throw CompilerError.`Invalid number`(input, index, fileURI)
     }
   }
-  def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | integer))
-  def negatable[Unknown: P](p: => P[BigInteger]): P[BigInteger] =
+  def num[Unknown: P]: P[(BigInteger, Int)] = negatable(P(hexNum | integer))
+  def negatable[Unknown: P](p: => P[(BigInteger, Int)]): P[(BigInteger, Int)] =
     ("-".?.! ~ p).map {
-      case ("-", i) => i.negate()
-      case (_, i)   => i
+      case ("-", (i, width)) => (i.negate(), width + 1)
+      case (_, (i, width))   => (i, width)
     }
-  def typedNum[Unknown: P]: P[Val] =
+  def typedNum[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
     P(Index ~ num ~ ("i" | "u").?.!)(
       sourcecode.Name(CompilerError.`an I256 or U256 value`.message),
       implicitly[P[_]]
     )
-      .map {
-        case (index, n, postfix) if Number.isNegative(n) || postfix == "i" =>
-          I256.from(n) match {
-            case Some(value) => Val.I256(value)
-            case None        => throw CompilerError.`Expected an I256 value`(index, n, fileURI)
+      .map { case (index, (n, width), postfix) =>
+        val sourceIndex = SourceIndex(index, width + postfix.length, fileURI)
+        val const: Ast.Const[Ctx] =
+          if (Number.isNegative(n) || postfix == "i") {
+            I256.from(n) match {
+              case Some(value) => Ast.Const(Val.I256(value))
+              case None        => throw CompilerError.`Expected an I256 value`(index, n, fileURI)
+            }
+
+          } else {
+            U256.from(n) match {
+              case Some(value) => Ast.Const(Val.U256(value))
+              case None        => throw CompilerError.`Expected an U256 value`(index, n, fileURI)
+            }
           }
 
-        case (index, n, _) =>
-          U256.from(n) match {
-            case Some(value) => Val.U256(value)
-            case None        => throw CompilerError.`Expected an U256 value`(index, n, fileURI)
-          }
+        const.atSourceIndex(Some(sourceIndex))
       }
 
-  def bytesInternal[Unknown: P]: P[Val.ByteVec] =
+  def bytesInternal[Unknown: P]: P[(Val.ByteVec, Int)] =
     P(Index ~ CharsWhileIn("0-9a-zA-Z", 0).!).map { case (index, string) =>
       Hex.from(string) match {
-        case Some(bytes) => ByteVec(bytes)
+        case Some(bytes) => (ByteVec(bytes), string.length)
         case None =>
           Address.extractLockupScript(string) match {
-            case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
+            case Some(LockupScript.P2C(contractId)) =>
+              (ByteVec(contractId.bytes), string.length)
             case _ => throw CompilerError.`Invalid byteVec`(string, index, fileURI)
           }
       }
     }
-  def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
+  def bytes[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
+    P(Index ~ "#" ~ bytesInternal).map { case (index, (bytes, bytesWidth)) =>
+      val sourceIndex = SourceIndex(index, bytesWidth + 1, fileURI)
+      Ast.Const(bytes).atSourceIndex(Some(sourceIndex))
+    }
+
   def contractAddress[Unknown: P]: P[Val.ByteVec] =
     addressInternal.map {
-      case (Val.Address(LockupScript.P2C(contractId)), _) => Val.ByteVec(contractId.bytes)
-      case (addr, index) =>
+      case (Val.Address(LockupScript.P2C(contractId)), _, _) => Val.ByteVec(contractId.bytes)
+      case (addr, index, _) =>
         throw CompilerError.`Invalid contract address`(
           s"#@${addr.toBase58}",
           index,
@@ -146,20 +169,26 @@ class Lexer(fileURI: Option[java.net.URI]) {
         )
     }
 
-  def addressInternal[Unknown: P]: P[(Val.Address, Int)] =
+  def addressInternal[Unknown: P]: P[(Val.Address, Int, Int)] =
     P(Index ~ CharsWhileIn("0-9a-zA-Z").!).map { case (index, input) =>
       val lockupScriptOpt = Address.extractLockupScript(input)
       lockupScriptOpt match {
-        case Some(lockupScript) => (Val.Address(lockupScript), index)
+        case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
         case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
       }
     }
-  def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal.map(_._1))
+  def address[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
+    P(Index ~ "@" ~ addressInternal).map { case (index, (address, _, addressWidth)) =>
+      val sourceIndex = SourceIndex(index, addressWidth + 1, fileURI)
+      Ast.Const(address).atSourceIndex(Some(sourceIndex))
+    }
 
-  def bool[Unknown: P]: P[Val.Bool] =
-    P(token(Keyword.`true`) | token(Keyword.`false`)).!.map {
-      case "true" => Val.Bool(true)
-      case _      => Val.Bool(false)
+  def bool[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
+    P(Index ~ (token(Keyword.`true`) | token(Keyword.`false`)).!).map {
+      case (index, "true") =>
+        Ast.Const(Val.Bool(true)).atSourceIndex(Some(SourceIndex(index, 4, fileURI)))
+      case (index, _) =>
+        Ast.Const(Val.Bool(false)).atSourceIndex(Some(SourceIndex(index, 5, fileURI)))
     }
 
   def stringNoChar[Unknown: P]: P[String] =
