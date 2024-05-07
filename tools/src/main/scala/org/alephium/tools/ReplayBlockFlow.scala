@@ -29,19 +29,19 @@ import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.{Files => AFiles, TimeStamp}
 
-object ReplayBlocks extends App with StrictLogging {
-  private val sourcePath = Platform.getRootPath()
-  private val replayPath = Utils.prepareReplayFolder(sourcePath)
+object ReplayBlockFlow extends App with StrictLogging {
+  val sourcePath = Platform.getRootPath()
+  val replayPath = Utils.prepareReplayFolder(sourcePath)
 
-  private val (sourceBlockFlow, sourceStorages) = Node.buildBlockFlowUnsafe(sourcePath)
-  private val (targetBlockFlow, targetStorages) = Node.buildBlockFlowUnsafe(replayPath)
+  val (sourceBlockFlow, sourceStorages) = Node.buildBlockFlowUnsafe(sourcePath)
+  val (targetBlockFlow, targetStorages) = Node.buildBlockFlowUnsafe(replayPath)
   Runtime.getRuntime.addShutdownHook(new Thread(() => {
     sourceStorages.closeUnsafe()
     targetStorages.closeUnsafe()
   }))
 
-  private val chainIndexes = sourceBlockFlow.brokerConfig.chainIndexes
-  private val brokerConfig = sourceBlockFlow.brokerConfig
+  val chainIndexes = sourceBlockFlow.brokerConfig.chainIndexes
+  val brokerConfig = sourceBlockFlow.brokerConfig
 
   implicit class RightValue[L, R](either: Either[L, R]) {
     def value: R = either.toOption.get
