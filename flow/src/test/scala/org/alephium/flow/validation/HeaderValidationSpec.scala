@@ -136,12 +136,12 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   behavior of "normal header validation"
 
   trait HeaderFixture extends Fixture with FlowFixture {
-    def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
+    def rhoneHardForkTimestamp: TimeStamp = TimeStamp.now()
 
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.consensus.num-zeros-at-least-in-hash", 1),
-      ("alephium.network.ghost-hard-fork-timestamp", ghostHardForkTimestamp.millis)
+      ("alephium.network.rhone-hard-fork-timestamp", rhoneHardForkTimestamp.millis)
     )
 
     val chainIndex = ChainIndex.unsafe(1, 2)
@@ -190,11 +190,12 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     passValidation(header)
   }
 
-  it should "check header version for pre-ghost hardfork" in new HeaderFixture {
-    override def ghostHardForkTimestamp = TimeStamp.Max
-
+  it should "check header version" in new HeaderFixture {
     header.version is DefaultBlockVersion
     passValidation(header)
+
+    val modified = updateNonce(header.copy(version = 1))
+    failValidation(modified, InvalidBlockVersion)
   }
 
   it should "check header timestamp increasing" in new HeaderFixture {

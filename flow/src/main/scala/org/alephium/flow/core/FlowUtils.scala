@@ -223,7 +223,7 @@ trait FlowUtils
       deps: BlockDeps,
       parentHeader: BlockHeader
   ): AVector[SelectedGhostUncle] = {
-    if (hardFork.isGhostEnabled()) {
+    if (hardFork.isRhoneEnabled()) {
       getGhostUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
       AVector.empty
@@ -271,7 +271,7 @@ trait FlowUtils
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     createBlockTemplate(chainIndex, miner).flatMap { case (template, uncles) =>
-      assume(uncles.length <= ALPH.MaxUncleSize)
+      assume(uncles.length <= ALPH.MaxGhostUncleSize)
       validateTemplate(chainIndex, template, uncles, miner)
     }
   }

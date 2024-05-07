@@ -36,7 +36,7 @@ final case class BlockEnv(
   @inline def getHardFork(): HardFork = hardFork
 
   def addOutputRef(ref: AssetOutputRef, output: AssetOutput): Unit = {
-    assume(hardFork.isGhostEnabled())
+    assume(hardFork.isRhoneEnabled())
     newOutputRefCache.foreach(_.addOne(ref -> output))
   }
 }
@@ -179,8 +179,8 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
-  def checkGhostHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
-    if (getHardFork().isGhostEnabled()) {
+  def checkRhoneHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    if (getHardFork().isRhoneEnabled()) {
       okay
     } else {
       failed(InactiveInstr(instr))
@@ -343,7 +343,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def outputRemainingContractAssetsForRhone(): ExeResult[Unit] = {
-    if (getHardFork().isGhostEnabled()) {
+    if (getHardFork().isRhoneEnabled()) {
       EitherF.foreachTry(assetStatus) {
         case (contractId, ContractPool.ContractAssetInUsing(balances)) =>
           outputBalances.add(LockupScript.p2c(contractId), balances) match {

@@ -91,10 +91,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     // format: on
   }
 
-  trait GhostForkFixture extends AllInstrsFixture {
-    val ghostStatelessInstrs = AVector[GhostInstr[StatelessContext]](GroupOfAddress)
-    val ghostStatefulInstrs =
-      AVector[GhostInstr[StatefulContext]](
+  trait RhoneForkFixture extends AllInstrsFixture {
+    val rhoneStatelessInstrs = AVector[RhoneInstr[StatelessContext]](GroupOfAddress)
+    val rhoneStatefulInstrs =
+      AVector[RhoneInstr[StatefulContext]](
         PayGasFee,
         MinimalContractDeposit,
         CreateMapEntry(twoBytes)
@@ -110,13 +110,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       .map(_.isInstanceOf[LemanInstr[_]] is false)
   }
 
-  it should "check all GhostInstr" in new GhostForkFixture {
-    ghostStatelessInstrs.foreach(_.isInstanceOf[GhostInstr[_]] is true)
-    ghostStatefulInstrs.foreach(_.isInstanceOf[GhostInstr[_]] is true)
-    (statelessInstrs.toSet -- ghostStatelessInstrs.toSet)
-      .map(_.isInstanceOf[GhostInstr[_]] is false)
-    (statefulInstrs.toSet -- ghostStatefulInstrs.toSet)
-      .map(_.isInstanceOf[GhostInstr[_]] is false)
+  it should "check all RhoneInstr" in new RhoneForkFixture {
+    rhoneStatelessInstrs.foreach(_.isInstanceOf[RhoneInstr[_]] is true)
+    rhoneStatefulInstrs.foreach(_.isInstanceOf[RhoneInstr[_]] is true)
+    (statelessInstrs.toSet -- rhoneStatelessInstrs.toSet)
+      .map(_.isInstanceOf[RhoneInstr[_]] is false)
+    (statefulInstrs.toSet -- rhoneStatefulInstrs.toSet)
+      .map(_.isInstanceOf[RhoneInstr[_]] is false)
   }
 
   it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
@@ -146,19 +146,19 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lemanStatefulInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
   }
 
-  it should "fail if the ghost hardfork is not activated yet for stateful instrs" in new GhostForkFixture
+  it should "fail if the rhone hardfork is not activated yet for stateful instrs" in new RhoneForkFixture
     with StatefulFixture {
-    val frame0 = prepareFrame()(NetworkConfigFixture.Ghost) // Ghost is activated
-    ghostStatefulInstrs.foreach { instr =>
+    val frame0 = prepareFrame()(NetworkConfigFixture.Rhone) // Rhone is activated
+    rhoneStatefulInstrs.foreach { instr =>
       val result = instr.runWith(frame0)
       if (result.isLeft) {
         result.leftValue isnotE InactiveInstr(instr)
       }
     }
     val frame1 = prepareFrame()(NetworkConfigFixture.Leman)
-    ghostStatefulInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+    rhoneStatefulInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
     val frame2 = preparePreLemanFrame()
-    ghostStatefulInstrs.foreach(instr => instr.runWith(frame2).leftValue isE InactiveInstr(instr))
+    rhoneStatefulInstrs.foreach(instr => instr.runWith(frame2).leftValue isE InactiveInstr(instr))
   }
 
   trait GenFixture extends ContextGenerators {
@@ -2284,7 +2284,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val balanceState1      = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
     val remainBalanceState = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
-    val rhoneFrame         = prepareFrame(Some(balanceState1))(NetworkConfigFixture.Ghost)
+    val rhoneFrame         = prepareFrame(Some(balanceState1))(NetworkConfigFixture.Rhone)
     test(rhoneFrame, U256.Zero, remainBalanceState)
     test(rhoneFrame, U256.Zero, remainBalanceState, Some(randomLockupScript))
     fail(rhoneFrame, U256.One, U256.Zero, Some(randomLockupScript))
@@ -2455,7 +2455,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
     val remainBalanceState =
       MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
-    val rhoneFrame = prepareFrame(Some(initBalanceState2))(NetworkConfigFixture.Ghost)
+    val rhoneFrame = prepareFrame(Some(initBalanceState2))(NetworkConfigFixture.Rhone)
     fail(rhoneFrame, tokenId, ALPH.alph(2), ALPH.oneAlph)
     test(rhoneFrame, tokenId, U256.Zero, remainBalanceState, Some(randomLockupScript))
     fail(rhoneFrame, tokenId, U256.One, U256.Zero, Some(randomLockupScript))
@@ -2801,7 +2801,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     fail(lemanFrame, U256.Zero, U256.Zero, Some(randomLockupScript))
 
     val balanceState2 = MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
-    val rhoneFrame    = prepareFrame(Some(balanceState2))(NetworkConfigFixture.Ghost)
+    val rhoneFrame    = prepareFrame(Some(balanceState2))(NetworkConfigFixture.Rhone)
     test(rhoneFrame, U256.Zero, U256.Zero, Some(randomLockupScript))
     test(rhoneFrame, ALPH.oneNanoAlph, ALPH.oneNanoAlph)
     fail(rhoneFrame, ALPH.alph(10), ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
@@ -2928,7 +2928,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val balanceState1 = MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     val rhoneFrame =
       prepareFrame(Some(balanceState1), Some((contractId, contractOutput, contractOutputRef)))(
-        NetworkConfigFixture.Ghost
+        NetworkConfigFixture.Rhone
       )
     test(rhoneFrame, U256.Zero, U256.Zero)
     test(rhoneFrame, U256.Zero, U256.Zero, Some(randomLockupScript))
@@ -3084,7 +3084,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       val balanceState4 = createBalanceState(tokenId, from, ALPH.oneAlph)
       val rhoneFrame0 =
-        prepareFrame(Some(balanceState4), contractOutputOpt)(NetworkConfigFixture.Ghost)
+        prepareFrame(Some(balanceState4), contractOutputOpt)(NetworkConfigFixture.Rhone)
       val outputBalances4 = MutBalances(
         ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
       )
@@ -3094,14 +3094,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       val balanceState5 = MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
       val rhoneFrame1 =
-        prepareFrame(Some(balanceState5), contractOutputOpt)(NetworkConfigFixture.Ghost)
+        prepareFrame(Some(balanceState5), contractOutputOpt)(NetworkConfigFixture.Rhone)
       val outputBalances5 = MutBalances(
         ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
       )
       test(rhoneFrame1, TokenId.alph, ALPH.oneNanoAlph, outputBalances5)
 
       val rhoneFrame2 =
-        prepareFrame(Some(MutBalanceState.empty), contractOutputOpt)(NetworkConfigFixture.Ghost)
+        prepareFrame(Some(MutBalanceState.empty), contractOutputOpt)(NetworkConfigFixture.Rhone)
       test(rhoneFrame2, tokenId, U256.Zero, MutBalances.empty)
       fail(rhoneFrame2, tokenId, U256.One)
       test(rhoneFrame2, TokenId.alph, U256.Zero, MutBalances.empty)
@@ -3572,7 +3572,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
     val rhoneFrame =
       (balanceState: MutBalanceState) =>
-        prepareFrame(Some(balanceState))(NetworkConfigFixture.Ghost)
+        prepareFrame(Some(balanceState))(NetworkConfigFixture.Rhone)
 
     val contract0 =
       StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
@@ -4384,7 +4384,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2,
       I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3, MulModN -> 13, AddModN -> 8,
       U256ToString -> 4, I256ToString -> 4, BoolToString -> 4,
-      /* Below are instructions for Ghost hard fork */
+      /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 5
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
@@ -4518,7 +4518,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
       I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134, MulModN -> 135, AddModN -> 136,
       U256ToString -> 137, I256ToString -> 138, BoolToString -> 139,
-      /* Below are instructions for Ghost hard fork */
+      /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 140,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
@@ -4583,7 +4583,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
       I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
       U256ToString, I256ToString, BoolToString,
-      /* Below are instructions for Ghost hard fork */
+      /* Below are instructions for Rhone hard fork */
       GroupOfAddress
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(

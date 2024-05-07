@@ -463,7 +463,7 @@ trait FlowFixture
     def setGhostUncles(uncles: AVector[SelectedGhostUncle]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
-      implicit val emissionConfig = consensusConfigs.ghost
+      implicit val emissionConfig = consensusConfigs.rhone
       val gasFee                  = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
       val reward = Coinbase.miningReward(gasFee, template.target, template.templateTs)
       val coinbaseData = CoinbaseData.from(

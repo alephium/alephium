@@ -144,7 +144,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   ): BlockValidationResult[AVector[(LockupScript.Asset, Int)]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val hardFork = networkConfig.getHardFork(block.timestamp)
-      if (hardFork.isGhostEnabled() && ghostUncleHashes.nonEmpty) {
+      if (hardFork.isRhoneEnabled() && ghostUncleHashes.nonEmpty) {
         val blockchain = flow.getBlockChain(chainIndex)
         for {
           _ <- checkGhostUncleSize(ghostUncleHashes)
@@ -162,7 +162,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           (uncleBlock.minerLockupScript, parentHeight + 1 - uncleHeight)
         }
       } else if (ghostUncleHashes.nonEmpty) {
-        invalidBlock(InvalidGhostUnclesBeforeGhostHardFork)
+        invalidBlock(InvalidGhostUnclesBeforeRhoneHardFork)
       } else {
         validBlock(AVector.empty)
       }
@@ -200,7 +200,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   @inline private def checkGhostUncleSize(
       uncles: AVector[BlockHash]
   ): BlockValidationResult[Unit] = {
-    if (uncles.length > ALPH.MaxUncleSize) {
+    if (uncles.length > ALPH.MaxGhostUncleSize) {
       invalidBlock(InvalidGhostUncleSize)
     } else {
       validBlock(())
@@ -304,7 +304,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   ): BlockValidationResult[Unit] = {
     val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
     val maximalGas =
-      if (hardFork.isGhostEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
+      if (hardFork.isRhoneEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
     if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
   }
 
@@ -321,7 +321,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
         checkCoinbase(flow, chainIndex, block, groupView, lockedReward, None, hardFork, false)
       case Emission.PoLW(miningReward, burntAmount) =>
-        if (hardFork.isGhostEnabled()) {
+        if (hardFork.isRhoneEnabled()) {
           val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
           checkCoinbase(
             flow,
@@ -344,7 +344,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private[validation] def checkRewardPreGhost(
+  private[validation] def checkRewardPreRhone(
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -394,7 +394,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private[validation] def checkRewardGhost(
+  private[validation] def checkRewardRhone(
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -438,7 +438,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       hardFork: HardFork
   ): BlockValidationResult[Unit] = {
     if (
-      hardFork.isGhostEnabled() &&
+      hardFork.isRhoneEnabled() &&
       networkConfig.networkId == NetworkId.AlephiumTestNet &&
       !ALPH.testnetWhitelistedMiners.contains(block.minerLockupScript)
     ) {
@@ -464,10 +464,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       uncles           <- checkGhostUncles(flow, chainIndex, block, ghostUncleHashes)
       _ <- if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncles.length) else validBlock(())
       _ <-
-        if (hardFork.isGhostEnabled()) {
-          checkRewardGhost(chainIndex, block, groupView, lockedReward, burntAmount, uncles)
+        if (hardFork.isRhoneEnabled()) {
+          checkRewardRhone(chainIndex, block, groupView, lockedReward, burntAmount, uncles)
         } else {
-          checkRewardPreGhost(chainIndex, block, groupView, lockedReward)
+          checkRewardPreRhone(chainIndex, block, groupView, lockedReward)
         }
       _ <- checkTestnetMiner(block, hardFork)
     } yield ()

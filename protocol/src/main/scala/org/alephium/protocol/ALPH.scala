@@ -46,8 +46,8 @@ object ALPH {
   val MaxScriptSigNum: Int   = 32
   val MaxKeysInP2MPK: Int    = 16
 
-  val MaxUncleAge: Int  = 7
-  val MaxUncleSize: Int = 2
+  val MaxGhostUncleAge: Int  = 7
+  val MaxGhostUncleSize: Int = 2
   // scalastyle:on magic.number
 
   def alph(amount: U256): Option[U256] = amount.mul(CoinInOneALPH)
@@ -98,10 +98,11 @@ object ALPH {
   }
 
   @inline def isSequentialTxSupported(chainIndex: ChainIndex, hardFork: HardFork): Boolean = {
-    hardFork.isGhostEnabled() && chainIndex.isIntraGroup
+    hardFork.isRhoneEnabled() && chainIndex.isIntraGroup
   }
 
   lazy val testnetWhitelistedMiners = {
+    @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def miner(address: String) = {
       Address.fromBase58(address).get.lockupScript
     }

@@ -2202,7 +2202,7 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "execute tx in random order" in new TxExecutionOrderFixture {
     override val configValues = Map(
       ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
 
@@ -2283,7 +2283,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "execute tx in sequential order" in new TxExecutionOrderFixture {
     override val configValues =
-      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
     val block      = callScript(contractId, identity)
     networkConfig.getHardFork(block.timestamp) is HardFork.Leman
@@ -3697,7 +3697,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
     override val configValues = Map(
-      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
+      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
     )
     config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
 
@@ -3707,7 +3707,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not load contract assets just after creation from Rhone upgrade" in new CreateContractFixture {
-    config.network.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
@@ -3717,7 +3717,7 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "load contract fields just after creation from Rhone upgrade" in new CreateContractFixture {
     override def useAssets: Boolean = false
 
-    config.network.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
     val block = payableCall(blockFlow, chainIndex, script)
     addAndCheck(blockFlow, block)
@@ -5923,7 +5923,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "call multiple asset functions in the same contract: Rhone" in new ReentrancyFixture {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
     callTxScript(script(s"""
                            |  foo.withdraw0(callerAddress!())
                            |  foo.withdraw2(callerAddress!())
@@ -5949,7 +5949,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
     override val configValues =
-      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     failCallTxScript(
       script(s"""
@@ -6017,7 +6017,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "call the same deposit function multiple times in the same contract: Rhone" in new PayToContractOnlyFixture {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
     getContractAsset(fooId).amount is ALPH.alph(100)
     callTxScript(script)
@@ -6026,7 +6026,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "not call the same deposit function multiple times in the same contract: Leman" in new PayToContractOnlyFixture {
     override val configValues =
-      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     intercept[AssertionError](callTxScript(script)).getMessage is

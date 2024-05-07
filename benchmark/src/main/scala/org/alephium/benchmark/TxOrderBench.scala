@@ -40,7 +40,7 @@ class TxOrderBench {
     val noPreMineProof: ByteString        = ByteString.empty
     val now                               = TimeStamp.now()
     val lemanHardForkTimestamp: TimeStamp = now
-    val ghostHardForkTimestamp: TimeStamp = now
+    val rhoneHardForkTimestamp: TimeStamp = now
   }
   val txNum: Int = 2000
   val header: BlockHeader =

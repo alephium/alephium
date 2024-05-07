@@ -50,7 +50,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
       ("alephium.consensus.mainnet.block-target-time", "11 seconds"),
-      ("alephium.consensus.ghost.block-target-time", "4 seconds")
+      ("alephium.consensus.rhone.block-target-time", "4 seconds")
     )
 
     config.broker.groups is 12
@@ -58,7 +58,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.broker.groupNumPerBroker is 4
     config.network.networkId is NetworkId(2)
     config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
-    config.consensus.ghost.blockTargetTime is Duration.ofSecondsUnsafe(4)
+    config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
     config.network.connectionBufferCapacityInByte is 100000000L
   }
 
@@ -84,23 +84,23 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
   }
 
-  it should "load ghost config" in {
+  it should "load rhone config" in {
     val rootPath = Files.tmpDir
     val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
     config.broker.groups is 4
-    config.consensus.ghost.numZerosAtLeastInHash is 37
-    config.consensus.ghost.blockTargetTime is Duration.ofSecondsUnsafe(16)
-    config.consensus.ghost.uncleDependencyGapTime is Duration.ofSecondsUnsafe(8)
+    config.consensus.rhone.numZerosAtLeastInHash is 37
+    config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(16)
+    config.consensus.rhone.uncleDependencyGapTime is Duration.ofSecondsUnsafe(8)
     val initialHashRate =
       HashRate.from(
-        config.consensus.ghost.maxMiningTarget,
-        config.consensus.ghost.blockTargetTime
+        config.consensus.rhone.maxMiningTarget,
+        config.consensus.rhone.blockTargetTime
       )(
         config.broker
       )
     initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
-    config.network.ghostHardForkTimestamp is TimeStamp.unsafe(1695571200000L)
+    config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1695571200000L)
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
@@ -322,16 +322,16 @@ class AlephiumConfigSpec extends AlephiumSpec {
         Difficulty.unsafe(N * (100 + 5 * (gap - 17)) / 100)
     }
 
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Ghost) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Ghost) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Ghost) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 8, HardFork.Ghost) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 9, HardFork.Ghost) is
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 8, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 9, HardFork.Rhone) is
       Difficulty.unsafe(N * 103 / 100)
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 10, HardFork.Ghost) is
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 10, HardFork.Rhone) is
       Difficulty.unsafe(N * 106 / 100)
     (11 until 18 * 3).foreach { gap =>
-      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Ghost) is
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Rhone) is
         Difficulty.unsafe(N * (100 + 3 * (gap - 8)) / 100)
     }
   }

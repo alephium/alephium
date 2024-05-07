@@ -354,7 +354,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "seder the snapshots properly" in new BlockSnapshotsFixture {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+    override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
 
     implicit val basePath = "src/test/resources/message/payloads"
 

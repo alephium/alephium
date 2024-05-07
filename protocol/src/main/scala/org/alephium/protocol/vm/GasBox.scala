@@ -80,7 +80,7 @@ object GasBox {
   def unsafeTest(gas: Int): GasBox = new GasBox(gas)
 
   @inline def validate(box: GasBox, hardFork: HardFork): Boolean = {
-    val maximalGas = if (hardFork.isGhostEnabled()) maximalGasPerTx else maximalGasPerTxPreRhone
+    val maximalGas = if (hardFork.isRhoneEnabled()) maximalGasPerTx else maximalGasPerTxPreRhone
     box >= minimalGas && box <= maximalGas
   }
 }

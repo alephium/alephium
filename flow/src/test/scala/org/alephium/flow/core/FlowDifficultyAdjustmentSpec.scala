@@ -212,7 +212,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
     override val configValues = Map(
       ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
-      ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis),
+      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis),
       ("alephium.consensus.num-zeros-at-least-in-hash", 3)
     )
     config.network.networkId is NetworkId.AlephiumDevNet
@@ -243,7 +243,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   trait PreLemanDifficultyFixture extends FlowFixture {
     override val configValues = Map(
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis)
+      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
     )
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is false
 
@@ -274,7 +274,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   trait LemanDifficultyFixture extends FlowFixture {
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis)
+      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
     )
 
     implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet

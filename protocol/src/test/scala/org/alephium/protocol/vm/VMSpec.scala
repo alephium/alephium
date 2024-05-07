@@ -556,7 +556,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       .checkCodeSize(
         minimalGas,
         ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024 + 1)),
-        HardFork.Ghost
+        HardFork.Rhone
       )
       .leftValue
       .rightValue
@@ -566,7 +566,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       .checkCodeSize(
         GasBox.unsafe(200 + 32 * 1024),
         ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024)),
-        HardFork.Ghost
+        HardFork.Rhone
       ) isE GasBox.zero
   }
 
@@ -647,15 +647,15 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     VM.checkContractAttoAlphAmounts(Seq(output13), HardFork.Leman).leftValue isE
       a[LowerThanContractMinimalBalance]
 
-    VM.checkContractAttoAlphAmounts(Seq(output00), HardFork.Ghost) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output01), HardFork.Ghost) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output02), HardFork.Ghost) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output03), HardFork.Ghost) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output10), HardFork.Ghost) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output11), HardFork.Ghost) isE ()
-    VM.checkContractAttoAlphAmounts(Seq(output12), HardFork.Ghost).leftValue isE
+    VM.checkContractAttoAlphAmounts(Seq(output00), HardFork.Rhone) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output01), HardFork.Rhone) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output02), HardFork.Rhone) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output03), HardFork.Rhone) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output10), HardFork.Rhone) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output11), HardFork.Rhone) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output12), HardFork.Rhone).leftValue isE
       a[LowerThanContractMinimalBalance]
-    VM.checkContractAttoAlphAmounts(Seq(output13), HardFork.Ghost) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output13), HardFork.Rhone) isE ()
   }
 
   it should "preserve stack safety" in new StatefulFixture {
@@ -759,7 +759,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "switch back frames properly: Rhone" in new SwitchBackFixture
     with NetworkConfigFixture.SinceRhoneT {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
     addAndCheckBalance(0)
     for {

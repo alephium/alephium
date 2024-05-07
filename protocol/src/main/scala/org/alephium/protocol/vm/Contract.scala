@@ -220,7 +220,7 @@ sealed trait Contract[Ctx <: StatelessContext] {
       for {
         method <- getMethod(methodIndex)
         _ <-
-          if (hardFork.isGhostEnabled()) { method.checkModifierSinceRhone() }
+          if (hardFork.isRhoneEnabled()) { method.checkModifierSinceRhone() }
           else { method.checkModifierPreRhone() }
         _ <-
           if (hardFork.isLemanEnabled()) { okay }

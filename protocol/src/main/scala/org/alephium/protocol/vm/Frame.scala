@@ -359,7 +359,7 @@ final case class StatefulFrame(
                 .map(_ => currentBalance)
             }
         } else if (method.usePayToContractOnly) {
-          assume(ctx.getHardFork().isGhostEnabled(), "Must be true")
+          assume(ctx.getHardFork().isRhoneEnabled(), "Must be true")
           ctx.prepareForPayToContractOnly(contractId).map(_ => Some(currentBalance))
         } else {
           // Dead branch

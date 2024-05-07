@@ -131,7 +131,7 @@ trait DependencyHandlerState extends IOBaseActor {
       case header: BlockHeader => header.blockDeps.deps
       case block: Block =>
         val hardFork = networkSetting.getHardFork(block.timestamp)
-        if (hardFork.isGhostEnabled()) {
+        if (hardFork.isRhoneEnabled()) {
           block.ghostUncleHashes(networkSetting) match {
             case Right(hashes) => block.blockDeps.deps ++ hashes
             case Left(error) =>

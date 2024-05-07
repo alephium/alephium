@@ -88,7 +88,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       acc: AVector[BlockHash]
   ): AVector[BlockHash] = {
     val hardFork = networkConfig.getHardFork(header.timestamp)
-    if (hardFork.isGhostEnabled()) {
+    if (hardFork.isRhoneEnabled()) {
       val block = getBlockUnsafe(header.hash)
       val uncles = block.ghostUncleHashes match {
         case Right(hashes) => hashes
@@ -127,7 +127,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     // For a block with a height from `heightFrom` to `uncleHeightTo`, its uncle's height may lower than `heightFrom`
-    val uncleHeightTo = math.min(heightFrom + ALPH.MaxUncleAge - 1, heightTo)
+    val uncleHeightTo = math.min(heightFrom + ALPH.MaxGhostUncleAge - 1, heightTo)
     val hashes = AVector
       .from(heightFrom to uncleHeightTo)
       .fold(AVector.ofCapacity[BlockHash](heightTo - heightFrom + 1)) { case (acc, height) =>
@@ -170,7 +170,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         }
       }
     }
-    iter(parentHeader.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
+    iter(parentHeader.hash, ALPH.MaxGhostUncleAge, AVector.empty, AVector.empty)
   }
 
   def getUsedGhostUnclesAndAncestors(
@@ -193,7 +193,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         unclesAcc: AVector[SelectedGhostUncle]
     ): AVector[SelectedGhostUncle] = {
 
-      if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
+      if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxGhostUncleSize) {
         unclesAcc
       } else {
         val uncleHeight = getHeightUnsafe(fromHeader.hash)
@@ -213,8 +213,8 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       }
     }
 
-    val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, AVector.empty)
-    availableUncles.takeUpto(ALPH.MaxUncleSize)
+    val availableUncles = iter(parentHeader, ALPH.MaxGhostUncleAge, AVector.empty)
+    availableUncles.takeUpto(ALPH.MaxGhostUncleSize)
   }
 
   def selectGhostUncles(

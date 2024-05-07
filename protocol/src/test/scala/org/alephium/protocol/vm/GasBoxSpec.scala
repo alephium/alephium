@@ -26,11 +26,11 @@ class GasBoxSpec extends AlephiumSpec {
     GasBox.validate(maximalGasPerTxPreRhone, HardFork.Leman) is true
     GasBox.validate(GasBox.unsafe(maximalGasPerTxPreRhone.value + 1), HardFork.Leman) is false
 
-    GasBox.validate(minimalGas, HardFork.Ghost) is true
-    GasBox.validate(GasBox.unsafe(minimalGas.value - 1), HardFork.Ghost) is false
-    GasBox.validate(maximalGasPerTxPreRhone, HardFork.Ghost) is true
-    GasBox.validate(GasBox.unsafe(maximalGasPerTxPreRhone.value + 1), HardFork.Ghost) is true
-    GasBox.validate(maximalGasPerTx, HardFork.Ghost) is true
-    GasBox.validate(GasBox.unsafe(maximalGasPerTx.value + 1), HardFork.Ghost) is false
+    GasBox.validate(minimalGas, HardFork.Rhone) is true
+    GasBox.validate(GasBox.unsafe(minimalGas.value - 1), HardFork.Rhone) is false
+    GasBox.validate(maximalGasPerTxPreRhone, HardFork.Rhone) is true
+    GasBox.validate(GasBox.unsafe(maximalGasPerTxPreRhone.value + 1), HardFork.Rhone) is true
+    GasBox.validate(maximalGasPerTx, HardFork.Rhone) is true
+    GasBox.validate(GasBox.unsafe(maximalGasPerTx.value + 1), HardFork.Rhone) is false
   }
 }
