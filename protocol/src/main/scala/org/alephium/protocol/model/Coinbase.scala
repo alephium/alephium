@@ -127,9 +127,8 @@ object Coinbase {
       uncles: AVector[SelectedGhostUncle]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val sortedUncles = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
-    val coinbaseData =
-      CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
-    val reward = miningReward(gasFee, target, blockTs)
+    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, sortedUncles, minerData)
+    val reward       = miningReward(gasFee, target, blockTs)
     build(coinbaseData, reward, lockupScript, blockTs, sortedUncles)
   }
 
@@ -151,8 +150,7 @@ object Coinbase {
     val uncleRewardOutputs = sortedUncles.map(_.toAssetOutput(mainChainReward, lockTime))
     val blockReward = Coinbase.calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount))
     val blockRewardLocked = blockReward.addUnsafe(reward.burntAmount)
-    val coinbaseData =
-      CoinbaseData.from(chainIndex, blockTs, sortedUncles.map(_.blockHash), minerData)
+    val coinbaseData      = CoinbaseData.from(chainIndex, blockTs, sortedUncles, minerData)
     AssetOutput(
       blockRewardLocked,
       minerLockupScript,

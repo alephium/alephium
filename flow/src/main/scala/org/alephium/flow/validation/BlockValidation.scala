@@ -16,7 +16,7 @@
 
 package org.alephium.flow.validation
 
-import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
+import org.alephium.flow.core.{BlockChain, BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.io.{IOError, IOUtils}
 import org.alephium.protocol.{ALPH, Hash}
@@ -140,28 +140,26 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
-      ghostUncleHashes: AVector[BlockHash]
+      ghostUncleData: AVector[GhostUncleData]
   ): BlockValidationResult[AVector[(LockupScript.Asset, Int)]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val hardFork = networkConfig.getHardFork(block.timestamp)
-      if (hardFork.isRhoneEnabled() && ghostUncleHashes.nonEmpty) {
-        val blockchain = flow.getBlockChain(chainIndex)
+      if (hardFork.isRhoneEnabled() && ghostUncleData.nonEmpty) {
+        val blockchain       = flow.getBlockChain(chainIndex)
+        val ghostUncleHashes = ghostUncleData.map(_.blockHash)
         for {
-          _ <- checkGhostUncleSize(ghostUncleHashes)
-          _ <- checkGhostUncleOrder(ghostUncleHashes)
-          uncleBlocks <- ghostUncleHashes.mapE(blockchain.getBlock) match {
-            case Left(IOError.KeyNotFound(_)) => invalidBlock(GhostUncleDoesNotExist)
-            case result                       => from(result)
-          }
-          _            <- validateGhostUncles(flow, chainIndex, block, uncleBlocks)
+          _            <- checkGhostUncleSize(ghostUncleData.length)
+          _            <- checkGhostUncleOrder(ghostUncleHashes)
+          uncleBlocks  <- getGhostUncleBlocks(blockchain, ghostUncleHashes)
+          _            <- checkGhostUncleMiners(ghostUncleData.map(_.lockupScript), uncleBlocks)
+          _            <- checkGhostUncleBlocks(flow, chainIndex, block, uncleBlocks)
           _            <- checkGhostUncleDeps(block, flow, uncleBlocks)
           parentHeight <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)))
           uncleHeights <- from(ghostUncleHashes.mapE(blockchain.getHeight))
-        } yield uncleBlocks.zipWithIndex.map { case (uncleBlock, index) =>
-          val uncleHeight = uncleHeights(index)
-          (uncleBlock.minerLockupScript, parentHeight + 1 - uncleHeight)
+        } yield uncleHeights.mapWithIndex { case (uncleHeight, index) =>
+          (ghostUncleData(index).lockupScript, parentHeight + 1 - uncleHeight)
         }
-      } else if (ghostUncleHashes.nonEmpty) {
+      } else if (ghostUncleData.nonEmpty) {
         invalidBlock(InvalidGhostUnclesBeforeRhoneHardFork)
       } else {
         validBlock(AVector.empty)
@@ -171,7 +169,31 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private def validateGhostUncles(
+  @inline private def getGhostUncleBlocks(
+      blockchain: BlockChain,
+      ghostUncleHashes: AVector[BlockHash]
+  ): BlockValidationResult[AVector[Block]] = {
+    ghostUncleHashes.mapE(blockchain.getBlock) match {
+      case Left(IOError.KeyNotFound(_)) => invalidBlock(GhostUncleDoesNotExist)
+      case result                       => from(result)
+    }
+  }
+
+  @inline private def checkGhostUncleMiners(
+      ghostUncleMiners: AVector[LockupScript.Asset],
+      uncleBlocks: AVector[Block]
+  ): BlockValidationResult[Unit] = {
+    val isValid = ghostUncleMiners.forallWithIndex { case (miner, index) =>
+      miner == uncleBlocks(index).minerLockupScript
+    }
+    if (isValid) {
+      validBlock(())
+    } else {
+      invalidBlock(InvalidGhostUncleMiner)
+    }
+  }
+
+  private def checkGhostUncleBlocks(
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
@@ -198,9 +220,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   @inline private def checkGhostUncleSize(
-      uncles: AVector[BlockHash]
+      ghostUncleSize: Int
   ): BlockValidationResult[Unit] = {
-    if (uncles.length > ALPH.MaxGhostUncleSize) {
+    if (ghostUncleSize > ALPH.MaxGhostUncleSize) {
       invalidBlock(InvalidGhostUncleSize)
     } else {
       validBlock(())
@@ -208,11 +230,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   @inline private[validation] def checkGhostUncleOrder(
-      uncles: AVector[BlockHash]
+      ghostUncleHashes: AVector[BlockHash]
   ): BlockValidationResult[Unit] = {
-    uncles.foreachWithIndexE { case (hash, index) =>
+    ghostUncleHashes.foreachWithIndexE { case (hash, index) =>
       if (index > 0) {
-        if (Bytes.byteStringOrdering.compare(hash.bytes, uncles(index - 1).bytes) <= 0) {
+        if (Bytes.byteStringOrdering.compare(hash.bytes, ghostUncleHashes(index - 1).bytes) <= 0) {
           invalidBlock(UnsortedGhostUncles)
         } else {
           validBlock(())
@@ -459,9 +481,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
     for {
-      ghostUncleHashes <- checkCoinbaseData(chainIndex, block)
-      _                <- checkCoinbaseEasy(block, ghostUncleHashes.length, isPoLW)
-      uncles           <- checkGhostUncles(flow, chainIndex, block, ghostUncleHashes)
+      ghostUncleData <- checkCoinbaseData(chainIndex, block)
+      _              <- checkCoinbaseEasy(block, ghostUncleData.length, isPoLW)
+      uncles         <- checkGhostUncles(flow, chainIndex, block, ghostUncleData)
       _ <- if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncles.length) else validBlock(())
       _ <-
         if (hardFork.isRhoneEnabled()) {
@@ -560,7 +582,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   private[validation] def checkCoinbaseData(
       chainIndex: ChainIndex,
       block: Block
-  ): BlockValidationResult[AVector[BlockHash]] = {
+  ): BlockValidationResult[AVector[GhostUncleData]] = {
     val coinbase = block.coinbase
     if (coinbase.unsigned.fixedOutputs.isEmpty) {
       invalidBlock(InvalidCoinbaseFormat)
@@ -573,9 +595,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           } else {
             invalidBlock(InvalidCoinbaseData)
           }
-        case Right(CoinbaseDataV2(prefix, ghostUncleHashes, _)) =>
+        case Right(CoinbaseDataV2(prefix, ghostUncleData, _)) =>
           if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-            validBlock(ghostUncleHashes)
+            validBlock(ghostUncleData)
           } else {
             invalidBlock(InvalidCoinbaseData)
           }

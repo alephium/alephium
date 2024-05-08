@@ -96,6 +96,14 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
 
+  def emptyBlockWithMiner(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      miner: LockupScript.Asset
+  ): Block = {
+    mineWithTxsAndMiner(blockFlow, chainIndex, miner)((_, _) => AVector.empty[Transaction])
+  }
+
   def simpleScript(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -417,16 +425,22 @@ trait FlowFixture
   def mineWithTxs(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
-    val txs              = prepareTxs(blockFlow, chainIndex)
-    val parentTs         = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
-    val blockTs          = FlowUtils.nextTimeStamp(parentTs)
+    mineWithTxsAndMiner(blockFlow, chainIndex, lockupScript)(prepareTxs)
+  }
+
+  def mineWithTxsAndMiner(blockFlow: BlockFlow, chainIndex: ChainIndex, miner: LockupScript.Asset)(
+      prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
+  ): Block = {
+    val deps     = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val txs      = prepareTxs(blockFlow, chainIndex)
+    val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
+    val blockTs  = FlowUtils.nextTimeStamp(parentTs)
 
     val target = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
     val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs, AVector.empty)
+      Transaction.coinbase(chainIndex, txs, miner, target, blockTs, AVector.empty)
     mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs, target)
   }
 
@@ -469,7 +483,7 @@ trait FlowFixture
       val coinbaseData = CoinbaseData.from(
         template.index,
         template.templateTs,
-        uncles.map(_.blockHash),
+        uncles,
         ByteString.empty
       )
       val coinbaseTx = Coinbase.build(coinbaseData, reward, miner, template.templateTs, uncles)
@@ -481,7 +495,7 @@ trait FlowFixture
       deserialize[CoinbaseData](
         coinbase.unsigned.fixedOutputs.head.additionalData
       ).rightValue match {
-        case v2: CoinbaseDataV2 => v2.ghostUncleHashes
+        case v2: CoinbaseDataV2 => v2.ghostUncleData.map(_.blockHash)
         case _: CoinbaseDataV1  => AVector.empty
       }
 
