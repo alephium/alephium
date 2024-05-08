@@ -1441,7 +1441,10 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check miner for tesnet" in new TestnetFixture {
-    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 1),
+      ("alephium.network.rhone-hard-fork-timestamp", 0)
+    )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
     networkConfig.networkId is NetworkId.AlephiumTestNet
 

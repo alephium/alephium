@@ -66,6 +66,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     val rootPath = Files.tmpDir
     val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
+    config.network.networkId is NetworkId.AlephiumMainNet
     config.broker.groups is 4
     config.consensus.mainnet.numZerosAtLeastInHash is 37
     val initialHashRate =
@@ -82,6 +83,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.lemanHardForkTimestamp is TimeStamp.unsafe(1680170400000L)
     config.genesisBlocks.flatMap(_.map(_.shortHex)).mkString("-") is
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
   }
 
   it should "load rhone config" in {
@@ -100,7 +102,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
         config.broker
       )
     initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
-    config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1695571200000L)
+    config.network.networkId is NetworkId.AlephiumMainNet
+    config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
@@ -111,18 +114,15 @@ class AlephiumConfigSpec extends AlephiumSpec {
     assertThrows[IllegalArgumentException](config.network.networkId is NetworkId.AlephiumMainNet)
   }
 
-  ignore should "throw error when use leman hardfork for mainnet (1)" in new AlephiumConfigFixture {
+  it should "check rhone hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
-      ("alephium.network.leman-hard-fork-timestamp", 0)
+      ("alephium.network.rhone-hard-fork-timestamp", 0)
     )
-    intercept[RuntimeException](buildNewConfig()).getMessage is
-      "The leman hardfork is not available for mainnet yet"
-  }
-
-  ignore should "throw error when use leman hardfork for mainnet (2)" in new AlephiumConfigFixture {
-    Configs.parseNetworkId(ConfigFactory.empty()).leftValue is
-      "The leman hardfork is not available for mainnet yet"
+    intercept[RuntimeException](
+      AlephiumConfig.load(buildNewConfig(), "alephium")
+    ).getMessage is
+      "Invalid timestamp for rhone hard fork"
   }
 
   it should "load bootstrap config" in {

@@ -453,6 +453,13 @@ object AlephiumConfig {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
     }
 
+    if (
+      config.network.networkId == NetworkId.AlephiumMainNet &&
+      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+    ) {
+      throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
+    }
+
     config
   }
 }
