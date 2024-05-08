@@ -348,21 +348,6 @@ final class StatefulVM(
     }
   }
 
-  protected def mergeToOutputExceptContractAssetsForRhone(
-      current: MutBalances,
-      isApproved: Boolean
-  ): Option[Unit] = {
-    val hardFork = ctx.getHardFork()
-
-    OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
-      if (shouldKeepContractBalances(hardFork, isApproved, lockupScript)) {
-        Some(())
-      } else {
-        ctx.outputBalances.add(lockupScript, balancesPerLockup)
-      }
-    }
-  }
-
   protected def completeLastFrame(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
     for {
       _ <- ctx.updateContractStates()
@@ -377,9 +362,8 @@ final class StatefulVM(
     if (lastFrame.method.usesAssetsFromInputs()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
-
-        _ <- mergeToOutputExceptContractAssetsForRhone(balances.approved, isApproved = true)
-        _ <- mergeToOutputExceptContractAssetsForRhone(balances.remaining, isApproved = false)
+        _        <- ctx.outputBalances.merge(balances.approved)
+        _        <- ctx.outputBalances.merge(balances.remaining)
       } yield ()
       for {
         _ <- resultOpt match {
