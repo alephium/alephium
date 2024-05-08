@@ -136,7 +136,7 @@ trait DependencyHandlerState extends IOBaseActor {
             case Right(hashes) => block.blockDeps.deps ++ hashes
             case Left(error) =>
               log.error(s"Failed to deserialize uncles, error: $error")
-              block.blockDeps.deps
+              AVector.empty
           }
         } else {
           block.blockDeps.deps

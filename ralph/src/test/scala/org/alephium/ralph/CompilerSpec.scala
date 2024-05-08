@@ -5104,6 +5104,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "load from array/struct literal" in new Fixture {
+    val code =
+      s"""
+         |struct Baz { x: U256, y: U256 }
+         |struct Foo { baz: Baz }
+         |Contract Bar() {
+         |  pub fn foo() -> () {
+         |    assert!([[0, 1], [2, 3]][1][0] == 2, 0)
+         |    assert!(([[0, 1], [2, 3]][1])[0] == 2, 0)
+         |    assert!(Foo{baz: Baz{x: 0, y: 1}}.baz.y == 1, 0)
+         |    assert!((Foo{baz: Baz{x: 0, y: 1}}.baz).y == 1, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    test(code)
+  }
+
   it should "test struct" in new Fixture {
     {
       info("Struct as contract fields")

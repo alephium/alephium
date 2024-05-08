@@ -144,7 +144,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  def getUsedGhostUnclesAndAncestorsUnsafe(
+  private def getUsedGhostUnclesAndAncestorsUnsafe(
       parentHeader: BlockHeader
   ): (AVector[BlockHash], AVector[BlockHash]) = {
     @tailrec
