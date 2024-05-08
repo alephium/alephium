@@ -16,9 +16,10 @@
 
 package org.alephium.tools
 
-import java.nio.file.Path
+import java.nio.file.{Files, StandardCopyOption}
 
 import scala.collection.mutable.PriorityQueue
+import scala.reflect.io.Directory
 
 import com.typesafe.scalalogging.StrictLogging
 
@@ -29,7 +30,7 @@ import org.alephium.flow.validation.{BlockValidation, BlockValidationResult}
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, Files => AFiles, TimeStamp}
 
 class ReplayBlockFlow(
     sourceBlockFlow: BlockFlow,
@@ -126,16 +127,21 @@ class ReplayBlockFlow(
 }
 
 object ReplayBlockFlow extends App with StrictLogging {
-  if (args.length != 1) {
-    logger.error("Usage: ReplayBlocks <replayDbPath>")
-    sys.exit(1)
+  private val sourcePath = Platform.getRootPath()
+  private val targetPath = {
+    val path = AFiles.homeDir.resolve(".alephium-replay")
+    new Directory(path.toFile).deleteRecursively()
+    path.toFile.mkdir()
+    Files.copy(
+      sourcePath.resolve("user.conf"),
+      path.resolve("user.conf"),
+      StandardCopyOption.REPLACE_EXISTING
+    )
+    path
   }
 
-  private val replayDbPath = Path.of(args(0))
-  private val targetPath   = Platform.getRootPath()
-
-  private val (targetBlockFlow, targetStorages, config) = Node.buildBlockFlowUnsafe(targetPath)
-  private val (sourceBlockFlow, sourceStorages) = Node.buildBlockFlowUnsafe(replayDbPath, config)
+  private val (sourceBlockFlow, sourceStorages) = Node.buildBlockFlowUnsafe(sourcePath)
+  private val (targetBlockFlow, targetStorages) = Node.buildBlockFlowUnsafe(targetPath)
 
   Runtime.getRuntime.addShutdownHook(new Thread(() => {
     sourceStorages.closeUnsafe()

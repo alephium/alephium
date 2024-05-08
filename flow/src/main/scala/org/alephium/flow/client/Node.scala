@@ -135,15 +135,10 @@ object Node {
       )
   }
 
-  def buildBlockFlowUnsafe(rootPath: Path): (BlockFlow, Storages, AlephiumConfig) = {
+  def buildBlockFlowUnsafe(rootPath: Path): (BlockFlow, Storages) = {
     val typesafeConfig =
       Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
-    val config                = AlephiumConfig.load(typesafeConfig, "alephium")
-    val (blockFlow, storages) = buildBlockFlowUnsafe(rootPath, config)
-    (blockFlow, storages, config)
-  }
-
-  def buildBlockFlowUnsafe(rootPath: Path, config: AlephiumConfig): (BlockFlow, Storages) = {
+    val config   = AlephiumConfig.load(typesafeConfig, "alephium")
     val dbPath   = rootPath.resolve(config.network.networkId.nodeFolder)
     val storages = Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker)
     buildBlockFlowUnsafe(storages)(config) -> storages
