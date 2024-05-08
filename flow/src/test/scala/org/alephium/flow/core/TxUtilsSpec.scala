@@ -1743,6 +1743,43 @@ class TxUtilsSpec extends AlephiumSpec {
     ).leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
   }
 
+  it should "check gas amount: pre-rhone" in new FlowFixture {
+    override val configValues = Map(
+      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
+    blockFlow.checkProvidedGasAmount(None) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
+      "Provided gas GasBox(19999) too small, minimal GasBox(20000)"
+    blockFlow.checkProvidedGasAmount(Some(maximalGasPerTxPreRhone)) isE ()
+    blockFlow
+      .checkProvidedGasAmount(Some(maximalGasPerTxPreRhone.addUnsafe(GasBox.unsafe(1))))
+      .leftValue is
+      "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
+
+    blockFlow.checkEstimatedGasAmount(maximalGasPerTxPreRhone) isE ()
+    blockFlow
+      .checkEstimatedGasAmount(maximalGasPerTxPreRhone.addUnsafe(GasBox.unsafe(1)))
+      .isLeft is true
+  }
+
+  it should "check gas amount: rhone" in new FlowFixture {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+
+    blockFlow.checkProvidedGasAmount(None) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
+      "Provided gas GasBox(19999) too small, minimal GasBox(20000)"
+    blockFlow.checkProvidedGasAmount(Some(maximalGasPerTx)) isE ()
+    blockFlow.checkProvidedGasAmount(Some(maximalGasPerTx.addUnsafe(GasBox.unsafe(1)))).leftValue is
+      "Provided gas GasBox(2500001) too large, maximal GasBox(2500000)"
+
+    blockFlow.checkEstimatedGasAmount(maximalGasPerTx) isE ()
+    blockFlow.checkEstimatedGasAmount(maximalGasPerTx.addUnsafe(GasBox.unsafe(1))).isLeft is true
+  }
+
   trait PoLWCoinbaseTxFixture extends FlowFixture with LockupScriptGenerators {
     lazy val chainIndex                 = chainIndexGenForBroker(brokerConfig).sample.get
     lazy val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)

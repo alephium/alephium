@@ -38,6 +38,7 @@ object TxScriptGasEstimator {
     def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       val chainIndexOpt =
         inputs.headOption.map(input => ChainIndex(input.fromGroup, input.fromGroup))
+      val maximalGasPerTx = getMaximalGasPerTx()
 
       def runScript(
           blockEnv: BlockEnv,

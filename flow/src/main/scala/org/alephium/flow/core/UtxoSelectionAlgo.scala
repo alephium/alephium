@@ -21,6 +21,7 @@ import scala.annotation.tailrec
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.gasestimation._
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript, UnlockScript}
 import org.alephium.util._
@@ -95,7 +96,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         txScriptOpt: Option[StatefulScript],
         assetScriptGasEstimator: AssetScriptGasEstimator,
         txScriptGasEstimator: TxScriptGasEstimator
-    ): Either[String, Selected] = {
+    )(implicit networkConfig: NetworkConfig): Either[String, Selected] = {
       val ascendingResult = ascendingOrderSelector.select(
         amounts,
         unlockScript,
@@ -141,7 +142,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         txScriptOpt: Option[StatefulScript],
         assetScriptGasEstimator: AssetScriptGasEstimator,
         txScriptGasEstimator: TxScriptGasEstimator
-    ): Either[String, Selected] = {
+    )(implicit networkConfig: NetworkConfig): Either[String, Selected] = {
       val gasPrice = providedGas.gasPrice
       providedGas.gasOpt match {
         case Some(gas) =>
@@ -216,8 +217,9 @@ object UtxoSelectionAlgo extends StrictLogging {
         amounts: AssetAmounts,
         unlockScript: UnlockScript,
         utxos: AVector[Asset]
-    ): Either[String, AVector[TxInput]] = {
-      val gasPrice = providedGas.gasPrice
+    )(implicit networkConfig: NetworkConfig): Either[String, AVector[TxInput]] = {
+      val gasPrice        = providedGas.gasPrice
+      val maximalGasPerTx = getMaximalGasPerTx()
       SelectionWithoutGasEstimation(assetOrder)
         .select(
           amounts.copy(alph = amounts.alph.addUnsafe(gasPrice * maximalGasPerTx)),

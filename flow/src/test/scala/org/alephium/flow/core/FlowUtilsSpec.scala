@@ -29,6 +29,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript}
 import org.alephium.util._
 
+// scalastyle:off file.size.limit
 class FlowUtilsSpec extends AlephiumSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
     val chainIndex = ChainIndex.unsafe(0, 0)
@@ -164,6 +165,47 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.truncateTxs(txs, 1, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
     FlowUtils.truncateTxs(txs, 2, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
     FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
+  }
+
+  it should "collect txs with respect to gas limit" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val genesisKey = genesisKeys(chainIndex.from.value)._1
+    val txNum      = 10
+    val to         = chainIndex.to.generateKey._2
+    val txs = AVector.from(0 until txNum).map { _ =>
+      val (privateKey, publicKey) = chainIndex.to.generateKey
+      addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10)))
+      transfer(blockFlow, privateKey, to, ALPH.oneAlph).nonCoinbase.head
+    }
+
+    def prepareTxs(gas: Int) = {
+      blockFlow.grandPool.clear()
+      val gasAmount = GasBox.unsafe(gas)
+      val now       = TimeStamp.now()
+      txs.mapWithIndex { case (tx, index) =>
+        val template = tx.copy(unsigned = tx.unsigned.copy(gasAmount = gasAmount)).toTemplate
+        blockFlow.grandPool.add(chainIndex, template, now.plusMillisUnsafe(index.toLong))
+        template
+      }
+    }
+
+    def test(hardFork: HardFork, expected: AVector[TransactionTemplate]) = {
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      val bestDeps  = blockFlow.getBestDeps(chainIndex.from)
+      blockFlow.collectTransactions(chainIndex, groupView, bestDeps, hardFork) isE expected
+    }
+
+    val txs0 = prepareTxs(minimalGas.value)
+    test(HardFork.Leman, txs0)
+    test(HardFork.Rhone, txs0)
+
+    val txs1 = prepareTxs(maximalGasPerBlockPreRhone.value / 5)
+    test(HardFork.Leman, txs1.take(5))
+    test(HardFork.Rhone, txs1.take(1))
+
+    val txs2 = prepareTxs(maximalGasPerBlock.value / 5)
+    test(HardFork.Leman, txs2)
+    test(HardFork.Rhone, txs2.take(5))
   }
 
   trait CoinbaseRewardFixture extends FlowFixture {

@@ -16,9 +16,10 @@
 
 package org.alephium.protocol
 
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.{TimeStamp, U256}
 import org.alephium.util.Bytes.byteStringOrdering
-import org.alephium.util.U256
 
 package object model {
   val DefaultBlockVersion: Byte = 0.toByte
@@ -42,6 +43,18 @@ package object model {
   val maximalGasPerBlock: GasBox         = GasBox.unsafe(maximalGasPerBlockPreRhone.value / 4)
   val maximalGasPerTxPreRhone: GasBox    = GasBox.unsafe(maximalGasPerBlockPreRhone.value / 64)
   val maximalGasPerTx: GasBox            = GasBox.unsafe(maximalGasPerBlock.value / 4)
+
+  @inline def getMaximalGasPerBlock(hardFork: HardFork): GasBox = {
+    if (hardFork.isRhoneEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
+  }
+
+  @inline def getMaximalGasPerTx(hardFork: HardFork): GasBox = {
+    if (hardFork.isRhoneEnabled()) maximalGasPerTx else maximalGasPerTxPreRhone
+  }
+
+  @inline def getMaximalGasPerTx()(implicit networkConfig: NetworkConfig): GasBox = {
+    getMaximalGasPerTx(networkConfig.getHardFork(TimeStamp.now()))
+  }
 
   val maximalCodeSizePreLeman: Int = 12 * 1024 // 12KB
   val maximalCodeSizeLeman: Int    = 4 * 1024  // 4KB

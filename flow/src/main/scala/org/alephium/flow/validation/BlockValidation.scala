@@ -302,9 +302,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       hardFork: HardFork
   ): BlockValidationResult[Unit] = {
-    val totalGas = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
-    val maximalGas =
-      if (hardFork.isRhoneEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
+    val totalGas   = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
+    val maximalGas = getMaximalGasPerBlock(hardFork)
     if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
   }
 
