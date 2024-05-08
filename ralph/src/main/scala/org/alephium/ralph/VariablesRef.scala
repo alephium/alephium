@@ -114,12 +114,12 @@ final case class DataRefOffset[Ctx <: StatelessContext](
       index: Ast.Expr[Ctx],
       isMutable: Boolean
   ): DataRefOffset[Ctx] = {
-    val result       = state.flattenTypeMutability(tpe.baseType, isMutable)
-    val mutFieldSize = result.count(identity)
-    val immFieldSize = result.length - mutFieldSize
+    val result      = state.flattenTypeMutability(tpe.baseType, isMutable)
+    val mutDataSize = result.count(identity)
+    val immDataSize = result.length - mutDataSize
     DataRefOffset(
-      VarOffset.calcArrayElementOffset(state, immDataOffset, index, tpe, immFieldSize),
-      VarOffset.calcArrayElementOffset(state, mutDataOffset, index, tpe, mutFieldSize)
+      VarOffset.calcArrayElementOffset(state, immDataOffset, index, tpe, immDataSize),
+      VarOffset.calcArrayElementOffset(state, mutDataOffset, index, tpe, mutDataSize)
     )
   }
 

@@ -157,9 +157,10 @@ trait FlowUtils
       chainIndex: ChainIndex,
       hardFork: HardFork
   ): AVector[TransactionTemplate] = {
-    val newOutputRefs = mutable.HashSet.empty[AssetOutputRef]
+    val newOutputRefs           = mutable.HashSet.empty[AssetOutputRef]
+    val isSequentialTxSupported = ALPH.isSequentialTxSupported(chainIndex, hardFork)
     txs.filter { tx =>
-      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
+      if (isSequentialTxSupported) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)
       }
       Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
