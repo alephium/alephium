@@ -173,9 +173,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         ),
         AVector.empty[Signature]
       )
-      val coinbase = Transaction.coinbase(
+      val coinbase = Transaction.powCoinbaseForTest(
         ChainIndex.unsafe(0, 0),
-        U256.Zero,
+        AVector.empty,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
         Math.max(networkConfig.lemanHardForkTimestamp, ALPH.LaunchTimestamp),

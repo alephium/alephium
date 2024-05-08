@@ -53,14 +53,14 @@ class TransactionSpec
     val script   = LockupScript.p2pkh(key)
     val coinbaseTxs = (0 to 1000).map(_ =>
       Transaction
-        .coinbase(
+        .powCoinbaseForTest(
           ChainIndex.unsafe(0, 0),
-          0,
+          AVector.empty,
           script,
-          Hash.generate.bytes,
           Target.Max,
           ALPH.LaunchTimestamp,
-          AVector.empty
+          AVector.empty,
+          Hash.generate.bytes
         )
     )
 
@@ -77,25 +77,25 @@ class TransactionSpec
 
   it should "avoid hash collision for coinbase txs" in {
     val script = LockupScript.p2pkh(PublicKey.generate)
-    val coinbase0 = Transaction.coinbase(
+    val coinbase0 = Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0, 0),
-      gasFee = U256.Zero,
+      AVector.empty,
       script,
       target = Target.Max,
       blockTs = ALPH.LaunchTimestamp,
       AVector.empty
     )
-    val coinbase1 = Transaction.coinbase(
+    val coinbase1 = Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0, 1),
-      gasFee = U256.Zero,
+      AVector.empty,
       script,
       target = Target.Max,
       blockTs = ALPH.LaunchTimestamp,
       AVector.empty
     )
-    val coinbase2 = Transaction.coinbase(
+    val coinbase2 = Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0, 0),
-      gasFee = U256.Zero,
+      AVector.empty,
       script,
       target = Target.Max,
       blockTs = TimeStamp.now(),

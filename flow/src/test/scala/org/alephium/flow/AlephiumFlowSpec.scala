@@ -440,7 +440,7 @@ trait FlowFixture
 
     val target = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
     val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, miner, target, blockTs, AVector.empty)
+      Transaction.powCoinbaseForTest(chainIndex, txs, miner, target, blockTs, AVector.empty)
     mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs, target)
   }
 
@@ -456,7 +456,7 @@ trait FlowFixture
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val consensusConfig  = consensusConfigs.getConsensusConfig(blockTs)
     val coinbaseTx =
-      Transaction.coinbase(
+      Transaction.powCoinbaseForTest(
         chainIndex,
         txs,
         lockupScript,
@@ -477,17 +477,16 @@ trait FlowFixture
     def setGhostUncles(uncles: AVector[SelectedGhostUncle]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
-      implicit val emissionConfig = consensusConfigs.rhone
-      val gasFee                  = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-      val reward = Coinbase.miningReward(gasFee, template.target, template.templateTs)
-      val coinbaseData = CoinbaseData.from(
-        template.index,
-        template.templateTs,
-        uncles,
-        ByteString.empty
+      val coinbaseData =
+        CoinbaseData.from(template.index, template.templateTs, uncles, ByteString.empty)
+      val newTemplate = blockFlow.rebuild(template, txs, uncles, miner)
+      val coinbase    = newTemplate.transactions.last
+      val assetOutput =
+        coinbase.unsigned.fixedOutputs.head.copy(additionalData = serialize(coinbaseData))
+      val unsigned = coinbase.unsigned.copy(
+        fixedOutputs = coinbase.unsigned.fixedOutputs.replace(0, assetOutput)
       )
-      val coinbaseTx = Coinbase.build(coinbaseData, reward, miner, template.templateTs, uncles)
-      template.copy(transactions = txs :+ coinbaseTx)
+      template.copy(transactions = txs :+ coinbase.copy(unsigned = unsigned))
     }
 
     lazy val ghostUncleHashes: AVector[BlockHash] = {

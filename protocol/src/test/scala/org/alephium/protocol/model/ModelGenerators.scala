@@ -555,7 +555,7 @@ trait BlockGenerators extends TxGenerators {
       uncles: AVector[SelectedGhostUncle]
   ): Block = {
     val consensusConfig = consensusConfigs.getConsensusConfig(blockTs)
-    val coinbase = Transaction.coinbase(
+    val coinbase = Transaction.powCoinbaseForTest(
       chainIndex,
       txs,
       p2pkhLockupGen(chainIndex.to).sample.get,

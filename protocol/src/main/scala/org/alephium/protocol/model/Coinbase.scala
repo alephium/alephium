@@ -19,23 +19,18 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{EmissionConfig, NetworkConfig}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Bytes, TimeStamp, U256}
 
 object Coinbase {
-  def miningReward(gasFee: U256, target: Target, blockTs: TimeStamp)(implicit
-      emissionConfig: EmissionConfig,
+  def powMiningReward(gasFee: U256, reward: Emission.PoW, blockTs: TimeStamp)(implicit
       networkConfig: NetworkConfig
   ): U256 = {
-    val miningReward = emissionConfig.emission.reward(target, blockTs, ALPH.LaunchTimestamp)
-    val hardFork     = networkConfig.getHardFork(blockTs)
-    miningReward match {
-      case Emission.PoW(miningReward) => Transaction.totalReward(gasFee, miningReward, hardFork)
-      case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
-    }
+    val hardFork = networkConfig.getHardFork(blockTs)
+    Transaction.totalReward(gasFee, reward.miningReward, hardFork)
   }
 
   @inline
@@ -89,8 +84,7 @@ object Coinbase {
     blockRewardOutput +: uncleRewardOutputs
   }
 
-  // scalastyle:off parameter.number
-  def build(
+  def buildPoWCoinbase(
       coinbaseData: CoinbaseData,
       miningReward: U256,
       lockupScript: LockupScript.Asset,
@@ -116,20 +110,17 @@ object Coinbase {
     )
   }
 
-  // scalastyle:off parameter.number
-  def build(
+  def buildPoWCoinbase(
       chainIndex: ChainIndex,
-      gasFee: U256,
+      rewardAmount: U256,
       lockupScript: LockupScript.Asset,
       minerData: ByteString,
-      target: Target,
       blockTs: TimeStamp,
       uncles: AVector[SelectedGhostUncle]
-  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
+  )(implicit networkConfig: NetworkConfig): Transaction = {
     val sortedUncles = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
     val coinbaseData = CoinbaseData.from(chainIndex, blockTs, sortedUncles, minerData)
-    val reward       = miningReward(gasFee, target, blockTs)
-    build(coinbaseData, reward, lockupScript, blockTs, sortedUncles)
+    buildPoWCoinbase(coinbaseData, rewardAmount, lockupScript, blockTs, sortedUncles)
   }
 
   def calcPoLWCoinbaseRewardOutputs(

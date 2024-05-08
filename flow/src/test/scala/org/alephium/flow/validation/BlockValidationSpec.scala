@@ -676,8 +676,8 @@ class BlockValidationSpec extends AlephiumSpec {
       val template0   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
       val parentIndex = brokerConfig.groups - 1 + chainIndex.to.value
       val newDeps     = template0.deps.replace(parentIndex, parentHash)
-      val template1 = template0
-        .rebuild(template0.transactions.init, AVector.empty, miner)
+      val template1 = blockFlow
+        .rebuild(template0, template0.transactions.init, AVector.empty, miner)
         .copy(
           deps = newDeps,
           depStateHash =
