@@ -28,6 +28,7 @@ import org.alephium.flow.setting.Platform
 import org.alephium.flow.validation.{BlockValidation, BlockValidationResult}
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{AVector, TimeStamp}
 
 class ReplayBlockFlow(
@@ -42,12 +43,14 @@ class ReplayBlockFlow(
   private val pendingBlocks =
     PriorityQueue.empty(Ordering.by[(Block, Int), TimeStamp](t => t._1.timestamp).reverse)
 
-  def start(): BlockValidationResult[Unit] = {
+  def start(): BlockValidationResult[Boolean] = {
     for {
       maxHeights <- from(chainIndexes.mapE(chainIndex => sourceBlockFlow.getMaxHeight(chainIndex)))
       _          <- from(chainIndexes.foreachE(loadBlocksAt(_, startLoadingHeight)))
       _          <- replay(maxHeights)
-    } yield ()
+      sourceStateHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
+      targetStateHashes <- fetchBestWorldStateHashes(targetBlockFlow)
+    } yield sourceStateHashes == targetStateHashes
   }
 
   private def replay(maxHeights: AVector[Int]): BlockValidationResult[Unit] = {
@@ -107,6 +110,16 @@ class ReplayBlockFlow(
     }
   }
 
+  private def fetchBestWorldStateHashes(
+      blockFlow: BlockFlow
+  ): BlockValidationResult[AVector[WorldState.Hashes]] = {
+    from(
+      blockFlow.brokerConfig.cliqueGroupIndexes.mapE { groupIndex =>
+        blockFlow.getBestPersistedWorldState(groupIndex).map(_.toHashes)
+      }
+    )
+  }
+
   private def from[T](result: IOResult[T]): BlockValidationResult[T] = {
     result.left.map(Left(_))
   }
@@ -130,7 +143,13 @@ object ReplayBlockFlow extends App with StrictLogging {
   }))
 
   new ReplayBlockFlow(sourceBlockFlow, targetBlockFlow).start() match {
-    case Right(_)    => logger.info("Replay finished")
-    case Left(error) => logger.error(s"Replay failed: $error")
+    case Right(valid) =>
+      if (valid) {
+        logger.info("Replay blocks succeeded")
+      } else {
+        logger.error("All blocks replayed, but state hashes do not match")
+      }
+    case Left(error) =>
+      logger.error(s"Replay blocks failed: $error")
   }
 }
