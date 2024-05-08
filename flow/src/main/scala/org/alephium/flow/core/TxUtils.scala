@@ -995,10 +995,11 @@ trait TxUtils { Self: FlowUtils =>
     } yield ()
   }
 
-  private def checkProvidedGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
+  private[core] def checkProvidedGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
     gasOpt match {
       case None => Right(())
       case Some(gas) =>
+        val maximalGasPerTx = getMaximalGasPerTx()
         if (gas < minimalGas) {
           Left(s"Provided gas $gas too small, minimal $minimalGas")
         } else if (gas > maximalGasPerTx) {
@@ -1009,7 +1010,8 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def checkEstimatedGasAmount(gas: GasBox): Either[String, Unit] = {
+  private[core] def checkEstimatedGasAmount(gas: GasBox): Either[String, Unit] = {
+    val maximalGasPerTx = getMaximalGasPerTx()
     if (gas > maximalGasPerTx) {
       Left(
         s"Estimated gas $gas too large, maximal $maximalGasPerTx. " ++

@@ -157,9 +157,10 @@ trait FlowUtils
       chainIndex: ChainIndex,
       hardFork: HardFork
   ): AVector[TransactionTemplate] = {
-    val newOutputRefs = mutable.HashSet.empty[AssetOutputRef]
+    val newOutputRefs           = mutable.HashSet.empty[AssetOutputRef]
+    val isSequentialTxSupported = ALPH.isSequentialTxSupported(chainIndex, hardFork)
     txs.filter { tx =>
-      if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
+      if (isSequentialTxSupported) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)
       }
       Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
@@ -180,7 +181,7 @@ trait FlowUtils
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
-      FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, maximalGasPerBlock)
+      FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, getMaximalGasPerBlock(hardFork))
     }
   }
 
