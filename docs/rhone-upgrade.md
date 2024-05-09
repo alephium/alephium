@@ -19,3 +19,5 @@
 - **Mutable New Contracts**: Contracts can utilize fields in the same transaction in which they are created.
 - **New Built-In Functions**: Introduced `minimalContractDeposit`, `mapEntryDeposit`, and other built-in functions.
 - **Increased Limits**: Transaction gas limit and contract bytecode size limit have been increased for greater flexibility.
+
+Code: https://github.com/alephium/alephium/pull/1084
