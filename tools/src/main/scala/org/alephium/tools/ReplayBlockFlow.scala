@@ -47,7 +47,7 @@ class ReplayBlockFlow(
   def start(): BlockValidationResult[Boolean] = {
     for {
       maxHeights <- from(chainIndexes.mapE(chainIndex => sourceBlockFlow.getMaxHeight(chainIndex)))
-      _          <- from(chainIndexes.foreachE(loadBlocksAt(_, startLoadingHeight)))
+      _          <- from(loadInitialBlocks(targetBlockFlow))
       _          <- replay(maxHeights)
       sourceStateHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
       targetStateHashes <- fetchBestWorldStateHashes(targetBlockFlow)
@@ -121,22 +121,38 @@ class ReplayBlockFlow(
     )
   }
 
+  private def loadInitialBlocks(targetBlockFlow: BlockFlow): IOResult[Unit] = {
+    chainIndexes.foreachE { chainIndex =>
+      val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
+      for {
+        height0 <- targetBlockFlow.getMaxHeight(chainIndex)
+        height = if (height0 > startLoadingHeight) height0 else startLoadingHeight
+        _ <- loadBlocksAt(chainIndex, height)
+      } yield {
+        loadedHeights(chainIndexOneDim) = height
+      }
+    }
+  }
+
   private def from[T](result: IOResult[T]): BlockValidationResult[T] = {
     result.left.map(Left(_))
   }
 }
 
 object ReplayBlockFlow extends App with StrictLogging {
+  private val restart    = if (args.length == 1 && args(0) == "restart") true else false
   private val sourcePath = Platform.getRootPath()
   private val targetPath = {
     val path = AFiles.homeDir.resolve(".alephium-replay")
-    new Directory(path.toFile).deleteRecursively()
-    path.toFile.mkdir()
-    Files.copy(
-      sourcePath.resolve("user.conf"),
-      path.resolve("user.conf"),
-      StandardCopyOption.REPLACE_EXISTING
-    )
+    if (!restart) {
+      new Directory(path.toFile).deleteRecursively()
+      path.toFile.mkdir()
+      Files.copy(
+        sourcePath.resolve("user.conf"),
+        path.resolve("user.conf"),
+        StandardCopyOption.REPLACE_EXISTING
+      )
+    }
     path
   }
 
