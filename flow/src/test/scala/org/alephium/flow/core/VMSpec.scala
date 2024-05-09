@@ -6326,12 +6326,13 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val tx0 = buildCreateContractTx(foo, ALPH.alph(5))
-    blockFlow.grandPool.add(chainIndex, tx0, TimeStamp.now())
+    val now = TimeStamp.now()
+    blockFlow.grandPool.add(chainIndex, tx0, now)
 
     val tx1 = transferTx(blockFlow, chainIndex, lockupScript, ALPH.oneAlph, None).toTemplate
     tx1.unsigned.inputs.length is 1
     tx1.unsigned.inputs.head.outputRef is tx0.fixedOutputRefs.head
-    blockFlow.grandPool.add(chainIndex, tx1, TimeStamp.now())
+    blockFlow.grandPool.add(chainIndex, tx1, now.plusMillisUnsafe(1))
 
     val block1 = mineFromMemPool(blockFlow, chainIndex)
     block1.nonCoinbase.map(_.toTemplate) is AVector(tx0, tx1)
