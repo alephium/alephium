@@ -1840,7 +1840,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs.map(i => AssetOutputInfo(i._1, i._2, FlowUtils.PersistedOutput)),
         minimalGas
       )
-      .leftValue is "Not enough ALPH balance for PoLW input"
+      .leftValue is "Tokens are not allowed for PoLW input"
   }
 
   "PoLW change output amount" should "larger than dust amount" in new PoLWCoinbaseTxFixture {

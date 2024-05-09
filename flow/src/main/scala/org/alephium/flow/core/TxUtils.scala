@@ -293,7 +293,7 @@ trait TxUtils { Self: FlowUtils =>
     for {
       _ <- utxos.foreachE { utxo =>
         if (utxo.output.tokens.nonEmpty) {
-          Left("Not enough ALPH balance for PoLW input")
+          Left("Tokens are not allowed for PoLW input")
         } else {
           Right(())
         }

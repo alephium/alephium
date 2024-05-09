@@ -917,7 +917,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block = mine(
       blockFlow,
       blockTemplate.setGhostUncles(
-        sortGhostUncleHashes(ghostUncleHashes).map(hash => SelectedGhostUncle(hash, miner, 1))
+        ghostUncleHashes.map(hash => SelectedGhostUncle(hash, miner, 1))
       )
     )
     checkBlock(block, blockFlow).left.value isE InvalidGhostUncleSize
@@ -928,6 +928,19 @@ class BlockValidationSpec extends AlephiumSpec {
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is 2
 
+    def rebuildTemplate(uncles: AVector[SelectedGhostUncle]) = {
+      val newTemplate = blockTemplate.setGhostUncles(uncles)
+      val coinbaseData =
+        CoinbaseData.from(chainIndex, newTemplate.templateTs, uncles, ByteString.empty)
+      val coinbase = newTemplate.transactions.last
+      val assetOutput =
+        coinbase.unsigned.fixedOutputs.head.copy(additionalData = serialize(coinbaseData))
+      val unsigned = coinbase.unsigned.copy(
+        fixedOutputs = coinbase.unsigned.fixedOutputs.replace(0, assetOutput)
+      )
+      newTemplate.copy(transactions = AVector(coinbase.copy(unsigned = unsigned)))
+    }
+
     val block0 = mine(blockFlow, blockTemplate)
     checkBlock(block0, blockFlow).isRight is true
 
@@ -936,7 +949,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block1 =
       mine(
         blockFlow,
-        blockTemplate.setGhostUncles(
+        rebuildTemplate(
           AVector(SelectedGhostUncle(blockTemplate.ghostUncleHashes.head, uncleBlockMiner, 1))
         )
       )
@@ -945,7 +958,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block2 =
       mine(
         blockFlow,
-        blockTemplate.setGhostUncles(
+        rebuildTemplate(
           AVector.fill(2)(SelectedGhostUncle(blockTemplate.ghostUncleHashes.head, miner, 1))
         )
       )
@@ -954,7 +967,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block3 =
       mine(
         blockFlow,
-        blockTemplate.setGhostUncles(
+        rebuildTemplate(
           blockTemplate.ghostUncleHashes.reverse.map(hash => SelectedGhostUncle(hash, miner, 1))
         )
       )
@@ -1047,14 +1060,13 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, blocks1.toSeq: _*)
     val hashes = blockFlow.getHashes(chainIndex, 3).rightValue
     hashes.length is 2
-    val ghostUncleHashes = hashes.tail
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is 1
-    val sortedHashes = sortGhostUncleHashes(blockTemplate.ghostUncleHashes ++ ghostUncleHashes)
+    val ghostUncleHashes = blockTemplate.ghostUncleHashes ++ hashes.tail
     val block = mine(
       blockFlow,
-      blockTemplate.setGhostUncles(sortedHashes.map(hash => SelectedGhostUncle(hash, miner, 1)))
+      blockTemplate.setGhostUncles(ghostUncleHashes.map(hash => SelectedGhostUncle(hash, miner, 1)))
     )
     checkBlock(block, blockFlow).left.value isE GhostUncleHashConflictWithParentHash
   }
@@ -1091,11 +1103,13 @@ class BlockValidationSpec extends AlephiumSpec {
       } else {
         (uncle1, uncle0)
       }
-    val sortedUncles = sortGhostUncleHashes(AVector(validUncle.hash, invalidUncle.hash))
+    val ghostUncleHashes = AVector(validUncle.hash, invalidUncle.hash)
     val block0 =
       mine(
         blockFlow,
-        blockTemplate.setGhostUncles(sortedUncles.map(hash => SelectedGhostUncle(hash, miner, 1)))
+        blockTemplate.setGhostUncles(
+          ghostUncleHashes.map(hash => SelectedGhostUncle(hash, miner, 1))
+        )
       )
     addAndCheck(blockFlow, uncle0, uncle1)
     checkBlock(block0, blockFlow).leftValue is Right(InvalidGhostUncleDeps)
@@ -1120,8 +1134,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is ALPH.MaxGhostUncleSize
     (0 until blockTemplate.ghostUncleHashes.length).foreach { size =>
-      val sortedGhostUncleHashes = sortGhostUncleHashes(blockTemplate.ghostUncleHashes.take(size))
-      val selectedUncles = sortedGhostUncleHashes.map { hash =>
+      val selectedUncles = blockTemplate.ghostUncleHashes.take(size).map { hash =>
         val lockupScript = blockFlow.getBlockUnsafe(hash).minerLockupScript
         SelectedGhostUncle(hash, lockupScript, 1)
       }
