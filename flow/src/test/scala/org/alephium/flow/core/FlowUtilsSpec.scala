@@ -637,13 +637,13 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
     lazy val (fromPrivateKey0, fromPublicKey0) = keys(0)
     lazy val (fromPrivateKey1, fromPublicKey1) = keys(1)
+    private var timestamp                      = TimeStamp.now()
 
     def transferTx(
         from: PrivateKey,
         to: PublicKey,
         amount: U256,
-        gasPrice: GasPrice = nonCoinbaseMinGasPrice,
-        timestamp: TimeStamp = TimeStamp.now()
+        gasPrice: GasPrice = nonCoinbaseMinGasPrice
     ): TransactionTemplate = {
       val output =
         UnsignedTransaction.TxOutputInfo(LockupScript.p2pkh(to), amount, AVector.empty, None)
@@ -658,6 +658,7 @@ class FlowUtilsSpec extends AlephiumSpec {
         .rightValue
         .rightValue
       val tx = Transaction.from(unsignedTx, from).toTemplate
+      timestamp = timestamp.plusMillisUnsafe(1)
       blockFlow.grandPool.add(chainIndex, tx, timestamp)
       tx
     }
@@ -751,11 +752,9 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "collect all sequential txs" in new SequentialTxsFixture {
-    val now = TimeStamp.now()
-    val txs = AVector.from((0 until 15).map { index =>
+    val txs = AVector.from((0 until 15).map { _ =>
       val (_, toPublicKey) = chainIndex.to.generateKey
-      val ts               = now.plusMillisUnsafe(index.toLong)
-      transferTx(fromPrivateKey0, toPublicKey, ALPH.alph(1), nonCoinbaseMinGasPrice, ts)
+      transferTx(fromPrivateKey0, toPublicKey, ALPH.alph(1), nonCoinbaseMinGasPrice)
     })
 
     collectTxs() is txs
