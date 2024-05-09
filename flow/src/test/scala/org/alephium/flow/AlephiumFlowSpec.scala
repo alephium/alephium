@@ -477,16 +477,7 @@ trait FlowFixture
     def setGhostUncles(uncles: AVector[SelectedGhostUncle]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
-      val coinbaseData =
-        CoinbaseData.from(template.index, template.templateTs, uncles, ByteString.empty)
-      val newTemplate = blockFlow.rebuild(template, txs, uncles, miner)
-      val coinbase    = newTemplate.transactions.last
-      val assetOutput =
-        coinbase.unsigned.fixedOutputs.head.copy(additionalData = serialize(coinbaseData))
-      val unsigned = coinbase.unsigned.copy(
-        fixedOutputs = coinbase.unsigned.fixedOutputs.replace(0, assetOutput)
-      )
-      template.copy(transactions = txs :+ coinbase.copy(unsigned = unsigned))
+      blockFlow.rebuild(template, txs, uncles, miner)
     }
 
     lazy val ghostUncleHashes: AVector[BlockHash] = {
