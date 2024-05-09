@@ -1774,7 +1774,7 @@ class TxUtilsSpec extends AlephiumSpec {
       "Provided gas GasBox(19999) too small, minimal GasBox(20000)"
     blockFlow.checkProvidedGasAmount(Some(maximalGasPerTx)) isE ()
     blockFlow.checkProvidedGasAmount(Some(maximalGasPerTx.addUnsafe(GasBox.unsafe(1)))).leftValue is
-      "Provided gas GasBox(2500001) too large, maximal GasBox(2500000)"
+      "Provided gas GasBox(5000001) too large, maximal GasBox(5000000)"
 
     blockFlow.checkEstimatedGasAmount(maximalGasPerTx) isE ()
     blockFlow.checkEstimatedGasAmount(maximalGasPerTx.addUnsafe(GasBox.unsafe(1))).isLeft is true
