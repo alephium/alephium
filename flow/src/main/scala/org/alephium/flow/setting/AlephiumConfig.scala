@@ -394,8 +394,8 @@ object AlephiumConfig {
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
           discovery.copy(bootstrap =
             ArraySeq(
-              new InetSocketAddress("v17-bootstrap0.testnet.alephium.org", 9973),
-              new InetSocketAddress("v17-bootstrap1.testnet.alephium.org", 9973)
+              new InetSocketAddress("bootstrap0.testnet.alephium.org", 9973),
+              new InetSocketAddress("bootstrap1.testnet.alephium.org", 9973)
             )
           )
         } else {
@@ -451,6 +451,13 @@ object AlephiumConfig {
       config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)
     ) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
+    }
+
+    if (
+      config.network.networkId == NetworkId.AlephiumMainNet &&
+      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+    ) {
+      throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
     }
 
     config
