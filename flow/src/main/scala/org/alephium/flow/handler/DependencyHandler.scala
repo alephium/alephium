@@ -126,6 +126,24 @@ trait DependencyHandlerState extends IOBaseActor {
   val readies      = mutable.HashSet.empty[BlockHash]
   val processing   = mutable.HashSet.empty[BlockHash]
 
+  private def getDeps(flowData: FlowData): AVector[BlockHash] = {
+    flowData match {
+      case header: BlockHeader => header.blockDeps.deps
+      case block: Block =>
+        val hardFork = networkSetting.getHardFork(block.timestamp)
+        if (hardFork.isRhoneEnabled()) {
+          block.ghostUncleHashes(networkSetting) match {
+            case Right(hashes) => block.blockDeps.deps ++ hashes
+            case Left(error) =>
+              log.error(s"Failed to deserialize uncles, error: $error")
+              AVector.empty
+          }
+        } else {
+          block.blockDeps.deps
+        }
+    }
+  }
+
   def addPendingData(
       data: FlowData,
       broker: ActorRefT[ChainHandler.Event],
@@ -134,7 +152,7 @@ trait DependencyHandlerState extends IOBaseActor {
     if (!pending.contains(data.hash)) {
       escapeIOError(blockFlow.contains(data.hash)) { existing =>
         if (!existing) {
-          escapeIOError(data.blockDeps.deps.filterNotE(blockFlow.contains)) { missingDeps =>
+          escapeIOError(getDeps(data).filterNotE(blockFlow.contains)) { missingDeps =>
             if (missingDeps.nonEmpty) {
               missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
             }

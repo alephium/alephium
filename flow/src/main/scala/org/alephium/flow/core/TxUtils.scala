@@ -20,6 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 import TxUtils._
+import akka.util.ByteString
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed, MemPooled, TxStatus}
 import org.alephium.flow.core.FlowUtils._
@@ -27,10 +28,12 @@ import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, PublicKey}
+import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.{TxOutputInfo, UnlockScriptWithAssets}
 import org.alephium.protocol.vm.{GasBox, GasPrice, GasSchedule, LockupScript, UnlockScript}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit number.of.types
@@ -224,6 +227,103 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice,
       utxoLimit
     )
+  }
+
+  // scalastyle:off parameter.number
+  def polwCoinbase(
+      chainIndex: ChainIndex,
+      fromPublicKey: PublicKey,
+      minerLockupScript: LockupScript.Asset,
+      uncles: AVector[SelectedGhostUncle],
+      reward: Emission.PoLW,
+      gasFee: U256,
+      blockTs: TimeStamp,
+      minerData: ByteString
+  )(implicit networkConfig: NetworkConfig): IOResult[Either[String, UnsignedTransaction]] = {
+    val rewardOutputs = Coinbase.calcPoLWCoinbaseRewardOutputs(
+      chainIndex,
+      minerLockupScript,
+      uncles,
+      reward,
+      gasFee,
+      blockTs,
+      minerData
+    )
+    val totalAmount      = reward.burntAmount.addUnsafe(dustUtxoAmount)
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.polw(fromPublicKey)
+    getUsableUtxos(None, fromLockupScript, Int.MaxValue)
+      .map { utxos =>
+        UtxoSelectionAlgo
+          .Build(ProvidedGas(None, coinbaseGasPrice))
+          .select(
+            AssetAmounts(totalAmount, AVector.empty),
+            fromUnlockScript,
+            utxos,
+            rewardOutputs.length + 1,
+            txScriptOpt = None,
+            AssetScriptGasEstimator.Default(Self.blockFlow),
+            TxScriptGasEstimator.NotImplemented
+          )
+      }
+      .map(
+        _.flatMap(selected =>
+          polwCoinbase(
+            fromLockupScript,
+            fromUnlockScript,
+            rewardOutputs,
+            reward.burntAmount,
+            selected.assets,
+            selected.gas
+          )
+        )
+      )
+  }
+  // scalastyle:on parameter.number
+
+  private[flow] def polwCoinbase(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript.PoLW,
+      rewardOutputs: AVector[AssetOutput],
+      burntAmount: U256,
+      utxos: AVector[AssetOutputInfo],
+      gas: GasBox
+  ): Either[String, UnsignedTransaction] = {
+    assume(gas >= minimalGas)
+    for {
+      _ <- utxos.foreachE { utxo =>
+        if (utxo.output.tokens.nonEmpty) {
+          Left("Tokens are not allowed for PoLW input")
+        } else {
+          Right(())
+        }
+      }
+      _ <- checkEstimatedGasAmount(gas)
+      inputSum <- EitherF.foldTry(utxos, U256.Zero) { case (acc, asset) =>
+        acc.add(asset.output.amount).toRight("Input amount overflow")
+      }
+      gasUsed = if (gas > minimalGas) gas.subUnsafe(minimalGas) else GasBox.unsafe(0)
+      gasFee  = coinbaseGasPrice * gasUsed
+      changeAmount <- inputSum
+        .sub(burntAmount)
+        .flatMap(_.sub(gasFee))
+        .toRight("Change amount underflow")
+    } yield {
+      val changeOutput = AssetOutput(
+        changeAmount,
+        fromLockupScript,
+        TimeStamp.zero,
+        AVector.empty,
+        ByteString.empty
+      )
+      UnsignedTransaction(
+        None,
+        gas,
+        coinbaseGasPrice,
+        utxos.map(output => TxInput(output.ref, fromUnlockScript)),
+        rewardOutputs :+ changeOutput
+      )
+    }
   }
 
   // scalastyle:off method.length
@@ -895,10 +995,11 @@ trait TxUtils { Self: FlowUtils =>
     } yield ()
   }
 
-  private def checkProvidedGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
+  private[core] def checkProvidedGasAmount(gasOpt: Option[GasBox]): Either[String, Unit] = {
     gasOpt match {
       case None => Right(())
       case Some(gas) =>
+        val maximalGasPerTx = getMaximalGasPerTx()
         if (gas < minimalGas) {
           Left(s"Provided gas $gas too small, minimal $minimalGas")
         } else if (gas > maximalGasPerTx) {
@@ -909,7 +1010,8 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def checkEstimatedGasAmount(gas: GasBox): Either[String, Unit] = {
+  private[core] def checkEstimatedGasAmount(gas: GasBox): Either[String, Unit] = {
+    val maximalGasPerTx = getMaximalGasPerTx()
     if (gas > maximalGasPerTx) {
       Left(
         s"Estimated gas $gas too large, maximal $maximalGasPerTx. " ++

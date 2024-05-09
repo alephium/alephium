@@ -40,7 +40,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
-import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
+import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
@@ -65,11 +65,11 @@ trait EndpointsLogic extends Endpoints {
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
 
-  implicit lazy val groupConfig: GroupConfig         = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting    = node.config.network
-  implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
-  implicit lazy val logConfig: LogConfig             = node.config.node.eventLogConfig
-  implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig            = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting       = node.config.network
+  implicit lazy val consensusConfigs: ConsensusSettings = node.config.consensus
+  implicit lazy val logConfig: LogConfig                = node.config.node.eventLogConfig
+  implicit lazy val askTimeout: Timeout                 = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -639,8 +639,9 @@ trait EndpointsLogic extends Endpoints {
   val targetToHashrateLogic = serverLogic(targetToHashrate) { targetToHashrate =>
     Future.successful(
       try {
+        val consensusConfig = consensusConfigs.getConsensusConfig(TimeStamp.now())
         val hashrate =
-          HashRate.from(Target.unsafe(targetToHashrate.target), consenseConfig.blockTargetTime)
+          HashRate.from(Target.unsafe(targetToHashrate.target), consensusConfig.blockTargetTime)
         Right(TargetToHashrate.Result(hashrate.value))
       } catch {
         case _: Throwable =>
@@ -769,11 +770,12 @@ trait EndpointsLogic extends Endpoints {
   }
 
   def fetchChainParams(): FutureTry[ChainParams] = {
+    val now = TimeStamp.now()
     Future.successful(
       Right(
         ChainParams(
           networkConfig.networkId,
-          consenseConfig.numZerosAtLeastInHash,
+          consensusConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
           brokerConfig.groupNumPerBroker,
           brokerConfig.groups
         )

@@ -23,7 +23,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
 
@@ -31,7 +31,11 @@ object HeaderChainHandler {
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex
-  )(implicit brokerConfig: BrokerConfig, consensusConfig: ConsensusConfig): Props =
+  )(implicit
+      brokerConfig: BrokerConfig,
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig
+  ): Props =
     Props(new HeaderChainHandler(blockFlow, chainIndex))
 
   sealed trait Command
@@ -66,8 +70,11 @@ object HeaderChainHandler {
 class HeaderChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex
-)(implicit brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
-    extends ChainHandler[BlockHeader, InvalidHeaderStatus, Unit, HeaderValidation](
+)(implicit
+    brokerConfig: BrokerConfig,
+    val consensusConfigs: ConsensusConfigs,
+    val networkConfig: NetworkConfig
+) extends ChainHandler[BlockHeader, InvalidHeaderStatus, Unit, HeaderValidation](
       blockFlow,
       chainIndex,
       HeaderValidation.build

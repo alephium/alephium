@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{ChainIndex, NetworkId, Target}
 import org.alephium.protocol.vm.LockupScript
@@ -211,11 +212,13 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
     override val configValues = Map(
       ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
+      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis),
       ("alephium.consensus.num-zeros-at-least-in-hash", 3)
     )
     config.network.networkId is NetworkId.AlephiumDevNet
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
-    config.consensus.numZerosAtLeastInHash is 3
+    implicit val consensusConfig = consensusConfigs.mainnet
+    consensusConfig.numZerosAtLeastInHash is 3
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     (0 until consensusConfig.powAveragingWindow).foreach { _ =>
@@ -239,11 +242,13 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
 
   trait PreLemanDifficultyFixture extends FlowFixture {
     override val configValues = Map(
-      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis)
+      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis),
+      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
     )
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is false
 
-    val chainIndex = ChainIndex.unsafe(0, 1)
+    val chainIndex               = ChainIndex.unsafe(0, 1)
+    implicit val consensusConfig = consensusConfigs.mainnet
 
     def prepareBlocks(scale: Int): Unit = {
       (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
@@ -267,8 +272,12 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   trait LemanDifficultyFixture extends FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
+    )
 
+    implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 
     def checkTemplates(testTarget: Option[Target => Unit] = None) = {

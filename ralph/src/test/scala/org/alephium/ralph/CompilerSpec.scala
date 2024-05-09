@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable
+
 import akka.util.ByteString
 import org.scalatest.Assertion
 
@@ -66,6 +68,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     error.message is message
 
     error
+  }
+
+  def methodSelectorOf(signature: String): MethodSelector = {
+    MethodSelector(Method.Selector(DjbHash.intHash(ByteString.fromString(signature))))
   }
 
   it should "compile asset script" in {
@@ -645,7 +651,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "Invalid condition type: Const(U256(1))"
     )
     Compiler.compileContract(code(update = "true")).isLeft is true
-    testContractError(code(update = "$i = true$"), "Cannot assign List(Bool) to List(U256)")
+    testContractError(code(update = "$i = true$"), "Cannot assign \"Bool\" to \"U256\"")
     Compiler.compileContract(code(body = "")).isLeft is true
     testContractError(
       code(initialize = "", forKey = "$for$"),
@@ -965,7 +971,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"U256\"",
+        "Expected array or map type, got \"U256\"",
       s"""
          |// invalid array expression
          |Contract Foo() {
@@ -976,7 +982,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"U256\"", // TODO: improve this error message
+        "Expected array or map type, got \"U256\"", // TODO: improve this error message
       s"""
          |// invalid array expression
          |Contract Foo() {
@@ -987,7 +993,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"U256\"",
+        "Expected array or map type, got \"U256\"",
       s"""
          |// invalid binary expression(compare array)
          |Contract Foo() {
@@ -1018,7 +1024,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Cannot assign List(U256) to List(I256)",
+        "Cannot assign \"U256\" to \"I256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> U256 {
@@ -1027,7 +1033,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid array index type \"List(ByteVec)\", expected \"U256\"",
+        "Invalid array index type \"ByteVec\", expected \"U256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -1036,7 +1042,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid array index type \"List(I256)\", expected \"U256\"",
+        "Invalid array index type \"I256\", expected \"U256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -1363,6 +1369,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       isPublic = false,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 6,
       returnLength = 0,
@@ -1383,6 +1390,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       isPublic = false,
       usePreapprovedAssets = false,
       useContractAssets = false,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 14,
       returnLength = 0,
@@ -1825,10 +1833,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 5,
         returnLength = 0,
         instrs = AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
           U256Const1,
           U256Const2,
           U256Const3,
@@ -2184,7 +2194,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) implements Bar {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    transferTokenToSelf!(addr, ALPH, 1)
+           |    approveToken!(selfAddress!(), ALPH, 1 alph)
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2201,7 +2211,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) extends Bar() {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    transferTokenToSelf!(addr, ALPH, 1)
+           |    approveToken!(selfAddress!(), ALPH, 1 alph)
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2239,10 +2249,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       }
 
       Seq(interface, abstractContract).foreach(code => {
-        test(Parser.UsingAnnotation.usePreapprovedAssetsKey, true, code)
-        test(Parser.UsingAnnotation.useContractAssetsKey, false, code)
-        test(Parser.UsingAnnotation.useCheckExternalCallerKey, false, code)
-        test(Parser.UsingAnnotation.useUpdateFieldsKey, false, code)
+        test(Parser.FunctionUsingAnnotation.usePreapprovedAssetsKey, true, code)
+        test(Parser.FunctionUsingAnnotation.useContractAssetsKey, false, code)
+        test(Parser.FunctionUsingAnnotation.useCheckExternalCallerKey, false, code)
+        test(Parser.FunctionUsingAnnotation.useUpdateFieldsKey, false, code)
       })
     }
 
@@ -2417,76 +2427,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.Contract]
         contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
       }
-    }
-
-    {
-      info("Check that compilation fails if interfaces are not chained")
-
-      val diamondShapedParentInterfaces: String =
-        s"""
-           |Contract FooBarBazContract() extends FooBarContract() implements FooBaz {
-           |  pub fn baz() -> (U256, U256) {
-           |     return 1, 2
-           |  }
-           |}
-           |
-           |Interface Foo {
-           |  pub fn foo() -> ()
-           |}
-           |
-           |Interface FooBar extends Foo {
-           |  pub fn bar() -> U256
-           |}
-           |
-           |$$Interface FooBaz extends Foo {
-           |  pub fn baz() -> (U256, U256)
-           |}$$
-           |
-           |Abstract Contract FooBarContract() implements FooBar {
-           |   pub fn foo() -> () {
-           |      return
-           |   }
-           |   pub fn bar() -> U256 {
-           |      return 1
-           |   }
-           |}
-           |""".stripMargin
-
-      testContractError(
-        diamondShapedParentInterfaces,
-        "Only single inheritance is allowed. Interface FooBaz does not inherit from FooBar"
-      )
-
-      val unrelatedParentInterfaces: String =
-        s"""
-           |Contract FooBarBazContract() extends FooBarContract() implements Foo {
-           |  pub fn baz() -> (U256, U256) {
-           |     return 1, 2
-           |  }
-           |}
-           |
-           |$$Interface Foo {
-           |  pub fn foo() -> ()
-           |}$$
-           |
-           |Interface Bar {
-           |  pub fn bar() -> U256
-           |}
-           |
-           |Abstract Contract FooBarContract() implements Bar {
-           |   pub fn foo() -> () {
-           |      return
-           |   }
-           |   pub fn bar() -> U256 {
-           |      return 1
-           |   }
-           |}
-           |""".stripMargin
-
-      testContractError(
-        unrelatedParentInterfaces,
-        "Only single inheritance is allowed. Interface Foo does not inherit from Bar"
-      )
     }
 
     {
@@ -2798,22 +2738,44 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(replace(code())).isRight is true
-    Compiler
-      .compileContract(
-        replace(code("true", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
-      )
-      .isRight is true
-    Compiler
-      .compileContract(
-        replace(code("false", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
-      )
-      .isRight is true
+
+    val statements = Seq(
+      "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenFromSelf!(callerAddress!(), selfTokenId!(), 1 alph)",
+      "destroySelf!(callerAddress!())",
+      "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)",
+      "approveToken!(selfAddress!(), ALPH, 1 alph)"
+    )
+    statements.foreach { stmt =>
+      Compiler.compileContract(replace(code("true", stmt))).isRight is true
+    }
     testContractError(
       code("true"),
-      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on." +
+      "Function \"Foo.foo\" does not use contract assets, but the annotation `assetsInContract` is enabled. " +
+        "Please remove the `assetsInContract` annotation or set it to `enforced`"
+    )
+    testContractError(
+      code("true", "payGasFee!(callerAddress!(), 1 alph)"),
+      "Function \"Foo.foo\" does not use contract assets, but the annotation `assetsInContract` is enabled. " +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
     Compiler.compileContract(replace(code("enforced"))).isRight is true
+    statements.take(3).foreach { stmt =>
+      testContractError(
+        code("false", stmt),
+        "Function \"Foo.foo\" uses contract assets, please use annotation `assetsInContract = true`."
+      )
+    }
+    Seq(
+      "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)"
+    ).foreach { stmt =>
+      testContractError(
+        code("false", stmt),
+        "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
+      )
+    }
   }
 
   it should "check types for braces syntax" in {
@@ -2887,7 +2849,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
-        AVector[Instr[StatefulContext]](ConstTrue, IfFalse(1), Return)
+        AVector[Instr[StatefulContext]](
+          ConstTrue,
+          IfFalse(1),
+          Return
+        )
     }
 
     {
@@ -2937,7 +2903,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
-        AVector[Instr[StatefulContext]](ConstTrue, IfFalse(2), Return, Jump(1), Return)
+        AVector[Instr[StatefulContext]](
+          ConstTrue,
+          IfFalse(2),
+          Return,
+          Jump(1),
+          Return
+        )
     }
 
     {
@@ -3579,6 +3551,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->()"),
           U256Const0,
           Pop
         )
@@ -3601,6 +3574,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
+          methodSelectorOf("foo()->(U256)"),
           CallLocal(1),
           Pop,
           StoreLocal(0),
@@ -3660,14 +3634,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val bar =
       s"""
-         |Contract Bar() {
+         |Contract Foo() {
          |  const C0 = 0
          |  const C1 = 1
          |  enum Errors {
          |    Error0 = 0
          |    Error1 = 1
          |  }
-         |  pub fn bar() -> () {}
+         |  pub fn foo() -> () {}
          |}
          |""".stripMargin
 
@@ -3762,6 +3736,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
+           |  @using(assetsInContract = true)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
            |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
@@ -4018,13 +3993,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       6,
       methods = AVector(
         Method[StatefulContext](
-          true,
-          false,
-          false,
+          isPublic = true,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          usePayToContractOnly = false,
           1,
           1,
           0,
           AVector[Instr[StatefulContext]](
+            methodSelectorOf("foo(I256)->()"),
             U256Const0,
             StoreMutField(0.toByte),
             U256Const0,
@@ -4038,13 +4015,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
             AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
         ),
         Method[StatefulContext](
-          true,
-          false,
-          false,
+          isPublic = true,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          usePayToContractOnly = false,
           1,
           1,
           0,
           AVector[Instr[StatefulContext]](
+            methodSelectorOf("bar(ByteVec)->()"),
             LoadImmField(2.toByte),
             U256Const0,
             AssertWithErrorCode
@@ -4083,13 +4062,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       6,
       methods = AVector(
         Method[StatefulContext](
-          true,
-          false,
-          false,
-          2,
-          2,
-          0,
-          AVector[Instr[StatefulContext]](
+          isPublic = true,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          usePayToContractOnly = false,
+          argsLength = 2,
+          localsLength = 2,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
+            methodSelectorOf("foo(I256,U256)->()"),
             U256Const0,
             StoreMutField(0.toByte),
             U256Const0,
@@ -4112,13 +4093,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
             AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
         ),
         Method[StatefulContext](
-          true,
-          false,
-          false,
+          isPublic = true,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          usePayToContractOnly = false,
           2,
           2,
           0,
           AVector[Instr[StatefulContext]](
+            methodSelectorOf("bar(ByteVec,U256)->()"),
             LoadLocal(1.toByte),
             U256Const1,
             U256Add,
@@ -4219,6 +4202,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           isPublic = true,
           usePreapprovedAssets = false,
           useContractAssets = false,
+          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
@@ -4520,13 +4504,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
          |  @using(checkExternalCaller = false)
          |  pub fn foo() -> () {
-         |    let bs0 = Bar.encodeImmFields!(${input0})
-         |    let bs1 = Bar.encodeMutFields!(${input1})
-         |    let (bs2, bs3) = Bar.encodeFields!($input0, $input1)
+         |    let (bs0, bs1) = Bar.encodeFields!($input0, $input1)
          |    assert!(bs0 == #, 0)
          |    assert!(bs1 == #, 0)
-         |    assert!(bs2 == #, 0)
-         |    assert!(bs3 == #, 0)
          |  }
          |}
          |
@@ -4566,12 +4546,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     }
     testContractFullError(
-      code(s"let x = bar.$$encodeImmFields!$$()"),
-      s"""Expected non-static function, got "Bar.encodeImmFields""""
+      code(s"let x = bar.$$encodeFields!$$()"),
+      s"""Expected non-static function, got "Bar.encodeFields""""
     )
     testContractFullError(
-      code(s"bar.$$encodeImmFields!$$()"),
-      s"""Expected non-static function, got "Bar.encodeImmFields""""
+      code(s"bar.$$encodeFields!$$()"),
+      s"""Expected non-static function, got "Bar.encodeFields""""
     )
     testContractFullError(
       code(s"let x = Bar.$$bar$$()"),
@@ -4756,7 +4736,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Cannot assign List(U256) to List(Foo)")
+      testContractError(code, "Cannot assign \"U256\" to \"Foo\"")
     }
 
     {
@@ -4808,11 +4788,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$"),
-        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foo. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$", "mut"),
-        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foo. Assignment only works when all of the (nested) fields are mutable."
       )
     }
 
@@ -4834,7 +4814,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos = [[Foo { x : 2 }; 2]; 2]$$", "", "mut"),
-        "Cannot assign to variable foos. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foos. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foos[0] = [Foo { x : 2 }; 2]$$", "", ""),
@@ -4842,7 +4822,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos[0] = [Foo { x : 2 }; 2]$$", "", "mut"),
-        "Cannot assign to immutable element in array foos. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array foos. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foos[0][0] = Foo { x : 2 }$$", "", ""),
@@ -4850,7 +4830,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos[0][0] = Foo { x : 2 }$$", "", "mut"),
-        "Cannot assign to immutable element in array foos. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array foos. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foos[0][0].x = 2$$", "", ""),
@@ -4885,15 +4865,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foo = Foo{bars: [Bar{x: 1}; 2]}$$"),
-        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to variable foo. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo.bars = [Bar{x: 1}; 2]$$"),
-        "Cannot assign to field bars in struct Foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to field bars in struct Foo. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo.bars[0] = Bar{x: 1}$$"),
-        "Cannot assign to immutable element in array Foo.bars. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to immutable element in array Foo.bars. Assignment only works when all of the (nested) fields are mutable."
       )
       testContractError(
         code(s"$$foo.bars[0].x = 2$$"),
@@ -5122,6 +5102,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code(), "Cannot assign to immutable variable x.")
       Compiler.compileContractFull(code("mut").replace("$", "")).isRight is true
     }
+  }
+
+  it should "load from array/struct literal" in new Fixture {
+    val code =
+      s"""
+         |struct Baz { x: U256, y: U256 }
+         |struct Foo { baz: Baz }
+         |Contract Bar() {
+         |  pub fn foo() -> () {
+         |    assert!([[0, 1], [2, 3]][1][0] == 2, 0)
+         |    assert!(([[0, 1], [2, 3]][1])[0] == 2, 0)
+         |    assert!(Foo{baz: Baz{x: 0, y: 1}}.baz.y == 1, 0)
+         |    assert!((Foo{baz: Baz{x: 0, y: 1}}.baz).y == 1, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    test(code)
   }
 
   it should "test struct" in new Fixture {
@@ -5612,6 +5610,373 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "compile map" in {
+    {
+      info("Invalid map type for Map.insert")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f(address: Address) -> () {
+           |    let map = 0
+           |    $$map$$.insert!(address, 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected map type, got U256")
+    }
+
+    {
+      info("Invalid args for Map.insert")
+      def code(args: String) =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |  pub fn f(address: Address) -> () {
+           |    $$map.insert!($args)$$
+           |  }
+           |  pub fn f1(address: Address) -> (Address, U256, U256) {
+           |    return address, 0, 0
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code("address, 1, #00"),
+        "Invalid args type List(Address, U256, ByteVec), expected List(Address, U256, U256)"
+      )
+      testContractError(
+        code("address, #00, 1"),
+        "Invalid args type List(Address, ByteVec, U256), expected List(Address, U256, U256)"
+      )
+      testContractError(
+        code("1, 1, 1"),
+        "Invalid args type List(U256, U256, U256), expected List(Address, U256, U256)"
+      )
+      testContractError(code("f1(address)"), "Invalid args length, expected 3, got 1")
+      testContractError(code("address, 1, 1, 1"), "Invalid args length, expected 3, got 4")
+    }
+
+    {
+      info("Invalid map type for Map.remove")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f(address: Address) -> () {
+           |    let map = 0
+           |    $$map$$.remove!(address, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected map type, got U256")
+    }
+
+    {
+      info("Invalid args for Map.remove")
+      def code(args: String) =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |  pub fn f(address: Address) -> () {
+           |    $$map.remove!($args)$$
+           |  }
+           |  pub fn f1(address: Address) -> (Address, U256) {
+           |    return address, 0
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code("#00, 1"),
+        "Invalid args type List(ByteVec, U256), expected List(Address, U256)"
+      )
+      testContractError(
+        code("address, #00"),
+        "Invalid args type List(Address, ByteVec), expected List(Address, U256)"
+      )
+      testContractError(code("f1(address)"), "Invalid args length, expected 2, got 1")
+      testContractError(code("address, 1, 1"), "Invalid args length, expected 2, got 3")
+    }
+
+    {
+      info("Invalid map key or value type")
+      def code(stmt: String) =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |  pub fn foo() -> () {
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code(s"let _ = map$$[#00]$$"),
+        "Invalid map key type \"ByteVec\", expected \"U256\""
+      )
+      testContractError(
+        code(s"map$$[#00]$$ = 1"),
+        "Invalid map key type \"ByteVec\", expected \"U256\""
+      )
+      testContractError(code(s"$$map[0] = #00$$"), "Cannot assign \"ByteVec\" to \"U256\"")
+    }
+
+    {
+      info("Invalid map value(struct) assignment")
+      def code(stmt: String, mut0: String = "", mut1: String = "") =
+        s"""
+           |struct Foo { $mut0 a: U256 }
+           |struct Bar {
+           |  $mut1 x: U256,
+           |  mut y: [Foo; 2]
+           |}
+           |Contract Baz() {
+           |  mapping[U256, Bar] map
+           |  pub fn f() -> () {
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code(s"$$map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}$$"),
+        "Cannot assign to value in map \"map\". Assignment only works when all of the (nested) fields are mutable."
+      )
+      testContractError(
+        code(s"$$map[0].x = 1$$"),
+        "Cannot assign to immutable field x in struct Bar."
+      )
+      testContractError(
+        code(s"$$map[0].y = [Foo{a: 0}; 2]$$"),
+        "Cannot assign to field y in struct Bar. Assignment only works when all of the (nested) fields are mutable."
+      )
+      testContractError(
+        code(s"$$map[0].y[0] = Foo{a: 0}$$"),
+        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the (nested) fields are mutable."
+      )
+      testContractError(
+        code(s"$$map[0].y[0].a = 1$$"),
+        "Cannot assign to immutable field a in struct Foo."
+      )
+      Compiler.compileContractFull(code("map[0].x = 1", "", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y[0].a = 1", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      Compiler
+        .compileContractFull(code("map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
+        .isRight is true
+    }
+
+    {
+      info("Invalid map value(array) assignment")
+      def code(stmt: String, mut0: String = "", mut1: String = "") =
+        s"""
+           |struct Foo { $mut0 a: U256 }
+           |struct Bar {
+           |  $mut1 x: U256,
+           |  mut y: [Foo; 2]
+           |}
+           |Contract Baz() {
+           |  mapping[U256, [Bar; 2]] map
+           |  pub fn f() -> () {
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code(s"$$map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]$$"),
+        "Cannot assign to value in map \"map\". Assignment only works when all of the (nested) fields are mutable."
+      )
+      testContractError(
+        code(s"$$map[0][0].x = 1$$"),
+        "Cannot assign to immutable field x in struct Bar."
+      )
+      testContractError(
+        code(s"$$map[0][0].y = [Foo{a: 0}; 2]$$"),
+        "Cannot assign to field y in struct Bar. Assignment only works when all of the (nested) fields are mutable."
+      )
+      testContractError(
+        code(s"$$map[0][0].y[0] = Foo{a: 0}$$"),
+        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the (nested) fields are mutable."
+      )
+      testContractError(
+        code(s"$$map[0][0].y[0].a = 1$$"),
+        "Cannot assign to immutable field a in struct Foo."
+      )
+      Compiler.compileContractFull(code("map[0][0].x = 1", "", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y[0].a = 1", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      Compiler
+        .compileContractFull(code("map[0][0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
+        .isRight is true
+      Compiler
+        .compileContractFull(code("map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut"))
+        .isRight is true
+    }
+
+    {
+      info("Invalid map type for Map.contains")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f() -> () {
+           |    let map = 0
+           |    let _ = $$map$$.contains!(0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected map type, got U256")
+    }
+
+    {
+      info("Invalid key type for Map.contains")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |  pub fn f() -> () {
+           |    let _ = $$map.contains!(#00)$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Invalid args type List(ByteVec), expected List(U256)")
+    }
+
+    {
+      info("Assign to map variable")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map0
+           |  mapping[U256, U256] map1
+           |  pub fn f() -> () {
+           |    $$map0 = map1$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to map variable map0.")
+    }
+
+    {
+      info("Assign to local map variable")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map0
+           |  mapping[U256, ByteVec] map1
+           |  pub fn f() -> () {
+           |    let mut localMap0 = map0
+           |    $$localMap0 = map1$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign \"Map[U256,ByteVec]\" to \"Map[U256,U256]\"")
+    }
+
+    {
+      info("The number of struct fields exceeds the maximum limit")
+      def code(size: Int, mut: String) =
+        s"""
+           |struct Foo { $mut a: [U256; $size] }
+           |Contract Bar() {
+           |  mapping[U256, Foo] map
+           |  pub fn bar(address: Address) -> () {
+           |    map.insert!(address, 1, $$Foo { a: [0; $size] }$$)
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code(256, "mut"), "The number of struct fields exceeds the maximum limit")
+      testContractError(code(256, ""), "The number of struct fields exceeds the maximum limit")
+      // we have an extra immutable field `parentContractId`
+      testContractError(code(255, ""), "The number of struct fields exceeds the maximum limit")
+      Compiler.compileContractFull(code(255, "mut").replace("$", "")).isRight is true
+      Compiler.compileContractFull(code(254, "").replace("$", "")).isRight is true
+    }
+
+    {
+      info("Use a variable to store path if the load/store method is called multiple times")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, [U256; 2]] map
+           |  pub fn read() -> [U256; 2] {
+           |    return map[0]
+           |  }
+           |  pub fn write() -> () {
+           |    map[0] = [0; 2]
+           |  }
+           |}
+           |""".stripMargin
+
+      val methods = Compiler.compileContractFull(code).rightValue.code.methods
+      methods(0).argsLength is 0
+      methods(0).localsLength is 1
+      methods(1).argsLength is 0
+      methods(1).localsLength is 1
+    }
+
+    {
+      info("Generate codes for path if the load/store method is called only once")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, [U256; 2]] map
+           |  pub fn read() -> U256 {
+           |    return map[0][0]
+           |  }
+           |  pub fn write() -> () {
+           |    map[0][0] = 0
+           |  }
+           |}
+           |""".stripMargin
+
+      val methods = Compiler.compileContractFull(code).rightValue.code.methods
+      methods(0).argsLength is 0
+      methods(0).localsLength is 0
+      methods(1).argsLength is 0
+      methods(1).localsLength is 0
+    }
+
+    {
+      info("Duplicated map definitions")
+      val code0 =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |  $$mapping[U256, U256] map$$
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code0, "These maps are defined multiple times: map")
+
+      val code1 =
+        s"""
+           |Contract Foo() extends Bar() {
+           |  $$mapping[U256, U256] map$$
+           |  pub fn foo() -> () {}
+           |}
+           |Abstract Contract Bar() {
+           |  mapping[U256, U256] map
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code1, "These maps are defined multiple times: map")
+    }
+
+    {
+      info("Unused maps")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code).rightValue.warnings is AVector(
+        "Found unused maps in Foo: map"
+      )
+    }
+  }
+
   it should "report friendly error for non-primitive types for consts" in new Fixture {
     {
       info("Array as constant")
@@ -5796,6 +6161,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "compile successfully when statements in contract body are not in strict order" in new Fixture {
     val statements = Seq(
+      "mapping[U256, U256] map",
       "event E(v: U256)",
       "const V = 1",
       "enum FooErrorCodes { Error0 = 0 }",
@@ -5810,6 +6176,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  ${statements(indexes(1))}
            |  ${statements(indexes(2))}
            |  ${statements(indexes(3))}
+           |  ${statements(indexes(4))}
            |}
            |""".stripMargin
 
@@ -5819,13 +6186,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Compiler
           .compileContract(code)
           .leftValue
-          .message is "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`"
+          .message is "Contract statements should be in the order of `maps`, `events`, `consts`, `enums` and `methods`"
       }
     }
 
-    verify(success = true, 0, 1, 2, 3)
+    verify(success = true, 0, 1, 2, 3, 4)
 
-    (Seq(0, 1, 2, 3).permutations.toSet - Seq(0, 1, 2, 3)).foreach { permutation =>
+    (Seq(0, 1, 2, 3, 4).permutations.toSet - Seq(0, 1, 2, 3, 4)).foreach { permutation =>
       verify(success = false, permutation: _*)
     }
   }
@@ -6115,11 +6482,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Ast.FuncDef(
         Seq.empty,
         Ast.FuncId(name, false),
-        false,
-        false,
+        isPublic = false,
+        usePreapprovedAssets = false,
         Ast.NotUseContractAssets,
-        false,
-        false,
+        usePayToContractOnly = false,
+        useCheckExternalCaller = false,
+        useUpdateFields = false,
         methodIndex,
         Seq.empty,
         Seq.empty,
@@ -6170,5 +6538,561 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       funcs3,
       Map("f1" -> 0, "f0" -> 1, "f2" -> 2, "f3" -> 5)
     )
+  }
+
+  it should "generate the right asset modifiers for functions" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = false, assetsInContract = false, payToContractOnly = true)
+         |  pub fn foo0() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+    val method0  = contract.methods(0)
+    method0.usePreapprovedAssets is false
+    method0.useContractAssets is false
+    method0.usePayToContractOnly is true
+    val method1 = contract.methods(1)
+    method1.usePreapprovedAssets is true
+    method1.useContractAssets is true
+    method1.usePayToContractOnly is false
+  }
+
+  it should "check if the function pay to contract" in {
+    def code(payToContractOnly: String = "false", stmt: String = "return"): String =
+      s"""
+         |Contract Foo() {
+         |  $$@using(payToContractOnly = $payToContractOnly, checkExternalCaller = false)
+         |  pub fn foo() -> () {
+         |    $stmt
+         |  }$$
+         |}
+         |""".stripMargin
+    Compiler.compileContractFull(replace(code())).rightValue.warnings.isEmpty is true
+
+    val statements = Seq(
+      "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
+      "transferTokenToSelf!(callerAddress!(), selfTokenId!(), 1 alph)",
+      "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)"
+    )
+    statements.foreach { stmt =>
+      Compiler.compileContractFull(replace(code("true", stmt))).isRight is true
+    }
+    testContractError(
+      code("true"),
+      "Function \"Foo.foo\" does not pay to the contract, but the annotation `payToContractOnly` is enabled."
+    )
+    statements.dropRight(1).foreach { stmt =>
+      testContractError(
+        code("false", stmt),
+        "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
+      )
+    }
+  }
+
+  it should "generate method selector instr" in {
+    def code(useMethodSelector: String = "false") =
+      s"""
+         |@using(methodSelector = $useMethodSelector)
+         |Interface I {
+         |  pub fn foo() -> ()
+         |  pub fn bar() -> ()
+         |}
+         |Contract Foo() implements I {
+         |  pub fn foo() -> () { return }
+         |  pub fn bar() -> () { return }
+         |}
+         |""".stripMargin
+
+    val compiled0 = Compiler.compileContractFull(code(), 1).rightValue.code
+    compiled0.methods.foreach(_.instrs.head isnot a[MethodSelector])
+
+    val compiled1 = Compiler.compileContractFull(code("true"), 1).rightValue
+    val funcs     = compiled1.ast.funcs
+    compiled1.code.methods(0).instrs.head is MethodSelector(funcs(0).methodSelector.get)
+    compiled1.code.methods(1).instrs.head is MethodSelector(funcs(1).methodSelector.get)
+  }
+
+  "contract" should "use method selector by default" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |""".stripMargin
+
+    val result0 = Compiler.compileContractFull(code0).rightValue
+    result0.code.methods.foreach(_.instrs.head is a[MethodSelector])
+
+    val code1 =
+      s"""
+         |Contract Foo() implements Bar {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |@using(methodSelector = false)
+         |Interface Bar {
+         |  pub fn func0() -> ()
+         |}
+         |""".stripMargin
+    val result1 = Compiler.compileContractFull(code1).rightValue
+    result1.code.methods(0).instrs.head isnot a[MethodSelector]
+    result1.code.methods(1).instrs.head is a[MethodSelector]
+
+    val code2 =
+      s"""
+         |Contract Foo() implements Bar {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |@using(methodSelector = true)
+         |Interface Bar {
+         |  pub fn func0() -> ()
+         |}
+         |""".stripMargin
+    val result2 = Compiler.compileContractFull(code2).rightValue
+    result2.code.methods.foreach(_.instrs.head is a[MethodSelector])
+
+    val code3 =
+      s"""
+         |Contract Foo() implements Bar {
+         |  pub fn func0() -> () { return }
+         |  pub fn func1() -> () { return }
+         |}
+         |Interface Bar {
+         |  pub fn func0() -> ()
+         |}
+         |""".stripMargin
+    val result3 = Compiler.compileContractFull(code3).rightValue
+    result3.code.methods(0).instrs.head isnot a[MethodSelector]
+    result3.code.methods(1).instrs.head is a[MethodSelector]
+  }
+
+  it should "not use method selector for private functions" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  pub fn func0() -> () {
+         |    func1()
+         |  }
+         |  fn func1() -> () { return }
+         |}
+         |""".stripMargin
+    val result0 = Compiler.compileContractFull(code0).rightValue
+    result0.code.methods(0).instrs.head is a[MethodSelector]
+    result0.code.methods(1).instrs.head isnot a[MethodSelector]
+
+    val code1 =
+      s"""
+         |Contract Foo() implements IFoo {
+         |  pub fn func0() -> () {
+         |    func1()
+         |  }
+         |  fn func1() -> () { return }
+         |}
+         |@using(methodSelector = true)
+         |Interface IFoo {
+         |  pub fn func0() -> ()
+         |  fn func1() -> ()
+         |}
+         |""".stripMargin
+    val result1 = Compiler.compileContractFull(code1).rightValue
+    result1.code.methods(0).instrs.head is a[MethodSelector]
+    result1.code.methods(1).instrs.head isnot a[MethodSelector]
+  }
+
+  it should "call by method selector" in {
+    val fooCode =
+      s"""
+         |@using(methodSelector = true)
+         |Interface I {
+         |  pub fn f0() -> U256
+         |  pub fn f1() -> U256
+         |}
+         |Contract Foo() implements I {
+         |  pub fn f0() -> U256 { return 0 }
+         |  pub fn f1() -> U256 { return 1 }
+         |}
+         |""".stripMargin
+
+    val compiledFoo     = Compiler.compileContractFull(fooCode, 1).rightValue
+    val funcs           = compiledFoo.ast.funcs
+    val globalState     = Ast.GlobalState(Seq.empty)
+    val methodSelector0 = funcs(0).getMethodSelector(globalState)
+    val methodSelector1 = funcs(1).getMethodSelector(globalState)
+    compiledFoo.code.methods(0).instrs.head is MethodSelector(methodSelector0)
+    compiledFoo.code.methods(1).instrs.head is MethodSelector(methodSelector1)
+    val fooObj = prepareContract(compiledFoo.code, AVector.empty, AVector.empty)._1
+
+    def bar(expr: String) = {
+      val barCode =
+        s"""
+           |Contract Bar(fooId: ByteVec) {
+           |  pub fn bar() -> () {
+           |    let foo = $expr
+           |    assert!(foo.f0() == 0, 0)
+           |    assert!(foo.f1() == 1, 0)
+           |  }
+           |}
+           |$fooCode
+           |""".stripMargin
+
+      Compiler.compileContractFull(barCode).rightValue.code
+    }
+
+    val instrs =
+      Seq(CallExternalBySelector(methodSelector0), CallExternalBySelector(methodSelector1))
+    val bar0 = bar("Foo(fooId)")
+    bar0.methods.head.instrs.exists(instrs.contains) is false
+    val (bar0Obj, context0) =
+      prepareContract(bar0, AVector(Val.ByteVec(fooObj.contractId.bytes)), AVector.empty)
+    StatefulVM.execute(context0, bar0Obj, AVector.empty).isRight is true
+
+    val bar1 = bar("I(fooId)")
+    bar1.methods.head.instrs.exists(instrs.contains) is true
+    val (bar1Obj, context1) =
+      prepareContract(bar1, AVector(Val.ByteVec(fooObj.contractId.bytes)), AVector.empty)
+    StatefulVM.execute(context1, bar1Obj, AVector.empty).isRight is true
+  }
+
+  it should "test sort interfaces" in {
+    def createInterface(name: String, useMethodSelector: Boolean): Ast.ContractInterface = {
+      Ast.ContractInterface(
+        None,
+        useMethodSelector,
+        Ast.TypeId(name),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty
+      )
+    }
+
+    def test(
+        parentsCache: mutable.Map[Ast.TypeId, Seq[Ast.ContractWithState]],
+        interfaces: Seq[Ast.ContractInterface],
+        result: Seq[Ast.ContractInterface]
+    ) = {
+      val newInterfaces = interfaces.map { i =>
+        i.copy(inheritances = parentsCache(i.ident).map(p => Ast.InterfaceInheritance(p.ident)))
+      }
+      Ast.MultiContract
+        .sortInterfaces(
+          parentsCache,
+          newInterfaces
+        )
+        .map(_.ident) is result.map(_.ident)
+    }
+
+    {
+      info("sort interfaces by the method selector annotation")
+      val foo = createInterface("Foo", true)
+      val bar = createInterface("Bar", true)
+      val baz = createInterface("Baz", false)
+      test(
+        mutable.Map(bar.ident -> Seq.empty, baz.ident -> Seq.empty, foo.ident -> Seq(bar, baz)),
+        Seq(foo, bar, baz),
+        Seq(baz, bar, foo)
+      )
+    }
+
+    {
+      info("sort interfaces by the parent length")
+      val foo = createInterface("Foo", true)
+      val bar = createInterface("Bar", true)
+      val baz = createInterface("Baz", true)
+      val qux = createInterface("Qux", true)
+      test(
+        mutable.Map(
+          foo.ident -> Seq(bar, baz, qux),
+          bar.ident -> Seq(baz, qux),
+          baz.ident -> Seq(qux),
+          qux.ident -> Seq.empty
+        ),
+        Seq(foo, bar, baz, qux),
+        Seq(qux, baz, bar, foo)
+      )
+    }
+
+    {
+      info("sort interfaces by name")
+      val foo = createInterface("Foo", true)
+      val bar = createInterface("Bar", true)
+      val baz = createInterface("Baz", true)
+      test(
+        mutable.Map(foo.ident -> Seq.empty, bar.ident -> Seq.empty, baz.ident -> Seq.empty),
+        Seq(foo, bar, baz),
+        Seq(bar, baz, foo)
+      )
+    }
+
+    {
+      info("sort interfaces by order")
+      val foo  = createInterface("Foo", true)
+      val bar  = createInterface("Bar", false)
+      val baz  = createInterface("Baz", false)
+      val qux  = createInterface("Qux", true)
+      val quz  = createInterface("Quz", true)
+      val fred = createInterface("Fred", true)
+      test(
+        mutable.Map(
+          foo.ident  -> Seq(bar, baz, qux, quz, fred),
+          bar.ident  -> Seq(baz),
+          baz.ident  -> Seq.empty,
+          qux.ident  -> Seq(quz),
+          quz.ident  -> Seq.empty,
+          fred.ident -> Seq.empty
+        ),
+        Seq(foo, bar, baz, qux, quz, fred),
+        Seq(baz, bar, fred, quz, qux, foo)
+      )
+    }
+
+    {
+      info("interfaces are chained and not use method selector")
+      val foo = createInterface("Foo", false)
+      val bar = createInterface("Bar", false)
+      val baz = createInterface("Baz", false)
+      val qux = createInterface("Qux", false)
+      test(
+        mutable.Map(
+          foo.ident -> Seq(bar, baz, qux),
+          bar.ident -> Seq(baz, qux),
+          baz.ident -> Seq(qux),
+          qux.ident -> Seq.empty
+        ),
+        Seq(foo, bar, baz, qux),
+        Seq(qux, baz, bar, foo)
+      )
+    }
+
+    {
+      info("throw an error if parents are not chained")
+      val foo = createInterface("Foo", false)
+      val bar = createInterface("Bar", false)
+      val baz = createInterface("Baz", false)
+      val qux = createInterface("Qux", false)
+      intercept[Compiler.Error](
+        test(
+          mutable.Map(
+            foo.ident -> Seq(bar, baz, qux),
+            bar.ident -> Seq(qux),
+            baz.ident -> Seq(qux),
+            qux.ident -> Seq.empty
+          ),
+          Seq(foo, bar, baz, qux),
+          Seq(qux, baz, bar, foo)
+        )
+      ).message is "Interface Baz does not inherit from Bar, please annotate Baz with @using(methodSelector = true) annotation"
+    }
+
+    {
+      info("throw an error if the interface not use method selector but parents does")
+      val code =
+        s"""
+           |Interface $$Foo$$ extends Bar {
+           |  pub fn foo() -> ()
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar {
+           |  pub fn bar() -> ()
+           |}
+           |""".stripMargin
+
+      testMultiContractError(
+        code,
+        "Interface Foo does not use method selector, but its parent Bar use method selector"
+      )
+    }
+
+    {
+      info("interface use method selector inherit from an interface not use method selector")
+      val code =
+        s"""
+           |Contract Baz(id: ByteVec) {
+           |  pub fn func0() -> U256 {
+           |    return Foo(id).func0()
+           |  }
+           |  pub fn func1() -> U256 {
+           |    return Foo(id).func1()
+           |  }
+           |  pub fn func2() -> U256 {
+           |    return Bar(id).func0()
+           |  }
+           |  pub fn func3() -> U256 {
+           |    return Bar(id).func1()
+           |  }
+           |  pub fn func4() -> U256 {
+           |    return Bar(id).func2()
+           |  }
+           |  pub fn func5() -> U256 {
+           |    return Bar(id).func3()
+           |  }
+           |}
+           |@using(methodSelector = false)
+           |Interface Foo {
+           |  pub fn func0() -> U256
+           |  pub fn func1() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar extends Foo {
+           |  pub fn func2() -> U256
+           |  pub fn func3() -> U256
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileContractFull(code).rightValue.code
+      compiled.methods
+        .take(4)
+        .foreach(_.instrs.exists(_.isInstanceOf[CallExternalBySelector]) is false)
+      compiled.methods
+        .drop(4)
+        .foreach(_.instrs.exists(_.isInstanceOf[CallExternalBySelector]) is true)
+    }
+  }
+
+  it should "not generate method selector instr for TxScript" in {
+    val code =
+      s"""
+         |TxScript Main {
+         |  foo()
+         |
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileTxScriptFull(code).rightValue.code
+    compiled.methods.foreach(_.instrs.head isnot a[MethodSelector])
+  }
+
+  "contract" should "support multiple inheritance" in {
+    {
+      info("inherit from both interfaces that use and not use method selector")
+      val code: String =
+        s"""
+           |Contract Impl() implements Foo, Bar {
+           |  pub fn bar() -> U256 { return 0 }
+           |  pub fn foo() -> U256 { return 1 }
+           |}
+           |@using(methodSelector = false)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |""".stripMargin
+      val result = Compiler.compileContractFull(code).rightValue
+      result.ast.funcs.map(_.name) is Seq("foo", "bar")
+      val compiled = result.code
+      compiled.methods(0).instrs.head isnot a[MethodSelector]
+      compiled.methods(1).instrs.head is MethodSelector(result.ast.funcs(1).methodSelector.get)
+    }
+
+    {
+      info("inherit from multiple interfaces")
+      val code: String =
+        s"""
+           |Contract Impl() implements Foo, Bar {
+           |  pub fn baz() -> U256 { return 0 }
+           |  pub fn foo() -> U256 { return 1 }
+           |  pub fn bar() -> U256 { return 2 }
+           |}
+           |@using(methodSelector = true)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileContractFull(code).rightValue
+      compiled.ast.funcs.map(_.name) is Seq("bar", "foo", "baz")
+      compiled.code.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
+      compiled.code.methods.last.instrs isnot a[MethodSelector]
+    }
+
+    {
+      info("diamond shaped parent interfaces")
+      val code: String =
+        s"""
+           |Contract Impl() extends FooBarContract() implements FooBaz {
+           |  pub fn baz() -> U256 {
+           |     return 2
+           |  }
+           |}
+           |@using(methodSelector = true)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface FooBar extends Foo {
+           |  pub fn bar() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface FooBaz extends Foo {
+           |  pub fn baz() -> U256
+           |}
+           |
+           |Abstract Contract FooBarContract() implements FooBar {
+           |   pub fn foo() -> U256 {
+           |      return 0
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileContractFull(code).rightValue
+      compiled.ast.funcs.map(_.name) is Seq("foo", "bar", "baz")
+      compiled.code.methods.foreach(_.instrs.head is a[MethodSelector])
+    }
+
+    {
+      info("unrelated parent interfaces")
+      val code =
+        s"""
+           |Contract Impl() extends FooBarContract() implements Foo {
+           |  pub fn baz() -> (U256, U256) {
+           |     return 1, 2
+           |  }
+           |}
+           |@using(methodSelector = true)
+           |Interface Foo {
+           |  pub fn foo() -> U256
+           |}
+           |@using(methodSelector = true)
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |
+           |Abstract Contract FooBarContract() implements Bar {
+           |   pub fn foo() -> U256 {
+           |      return 0
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileContractFull(code).rightValue
+      compiled.ast.funcs.map(_.name) is Seq("bar", "foo", "baz")
+      compiled.code.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
+      compiled.code.methods.last.instrs isnot a[MethodSelector]
+    }
   }
 }

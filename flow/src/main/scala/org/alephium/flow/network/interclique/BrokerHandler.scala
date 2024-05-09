@@ -247,7 +247,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
 
   def validateBlockHash(hash: BlockHash): Boolean = {
-    if (!PoW.checkWork(hash, blockflow.consensusConfig.maxMiningTarget)) {
+    if (!PoW.checkWork(hash, blockflow.consensusConfigs.maxAllowedMiningTarget)) {
       handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
       false
     } else {

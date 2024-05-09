@@ -269,7 +269,7 @@ trait FlowDataHandler extends BaseHandler {
   def blockflow: BlockFlow
 
   def validateFlowData[T <: FlowData](datas: AVector[T], isBlock: Boolean): Boolean = {
-    if (!Validation.preValidate(datas)(blockflow.consensusConfig)) {
+    if (!Validation.preValidate(datas)(blockflow.consensusConfigs)) {
       log.warning(s"The data received does not contain minimal work")
       handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
       false

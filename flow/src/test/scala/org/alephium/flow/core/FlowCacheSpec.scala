@@ -26,7 +26,7 @@ class FlowCacheSpec extends AlephiumSpec with LockFixture {
       ("alephium.broker.broker-num", 1),
       ("alephium.consensus.block-cache-capacity-per-chain", 1)
     )
-    consensusConfig.blockCacheCapacityPerChain is 1
+    consensusConfigs.blockCacheCapacityPerChain is 1
 
     val chainIndex = ChainIndex.unsafe(0, 1)
     val cache      = blockFlow.getGroupCache(GroupIndex.unsafe(0))

@@ -1056,11 +1056,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     CompileProjectResult.diffPatch("Hello", "Hello").value is ""
 
     val bytecode = Hex.toHexString(serialize(compiledContract.code))
-    bytecode is "0901403d01010707061c05ce00a000a001ce0261b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602"
+    bytecode is "0901404201010707061dd38471018705ce00a000a001ce0261b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602"
     val debugBytecode = Hex.toHexString(serialize(compiledContract.debugCode))
-    debugBytecode is "0901404201010707061d05ce00a000a001ce02617e01027878b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602"
+    debugBytecode is "0901404701010707061ed38471018705ce00a000a001ce02617e01027878b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602"
     val diff = CompileProjectResult.diffPatch(bytecode, debugBytecode)
-    diff.value is "=6-2+42=11-1+d=20+7e01027878=90"
+    diff.value is "=7-1+7=11-1+e=30+7e01027878=90"
     val patchedCode = CompileProjectResult.applyPatchUnsafe(bytecode, diff)
     patchedCode is debugBytecode
   }
@@ -1072,10 +1072,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "version": "${ReleaseVersion.current}",
          |  "name": "Foo",
-         |  "bytecode": "0901403d01010707061c05ce00a000a001ce0261b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602",
-         |  "bytecodeDebugPatch": "=6-2+42=11-1+d=20+7e01027878=90",
-         |  "codeHash": "8232ffadc0c21503d4968607332b425617fd05e62edd0a27bb34df02fd191016",
-         |  "codeHashDebug":"049ce2b22e2eed2d6b92326f2e4677aa899a50f7922f8da3102dbe36ca1ae965",
+         |  "bytecode": "0901404201010707061dd38471018705ce00a000a001ce0261b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602",
+         |  "bytecodeDebugPatch": "=7-1+7=11-1+e=30+7e01027878=90",
+         |  "codeHash": "e9e468d5a564d0ae0b4595da0a6ae8557f3c32d696dab77430c51c540b20c23f",
+         |  "codeHashDebug":"d855a602f75d5def58a531d0231f5debfd4c31292e28dc4b96f3be84498263a1",
          |  "fields": {
          |    "names": ["aa","bb","cc","dd","ee","ff", "gg"],
          |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account"],
@@ -1123,12 +1123,17 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
+         |    "Found unused maps in Foo: map",
          |    "Found unused constants in Foo: A,Color.Blue,Color.Red",
          |    "Found unused fields in Foo: cc, ff"
-         |  ]
+         |  ],
+         |  "maps": { "names": ["map"], "types": ["Map[U256,U256]"] }
          |}
          |""".stripMargin
-    write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
+    val jsonString = write(result0)
+    jsonString.filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
+    jsonString.contains("\"maps\"") is true
+    write(result0.copy(maps = None)).contains("\"maps\"") is false
 
     val result1 = CompileScriptResult.from(compiledScript)
     val jsonRaw1 =
@@ -1310,7 +1315,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "calc output ref correctly" in {
     val tx = api.Transaction.fromProtocol(transaction)
     tx.unsigned.fixedOutputs.zipWithIndex.foreach { case (output, index) =>
-      output.key is transaction.assetOutputRefs(index).key.value
+      output.key is transaction.fixedOutputRefs(index).key.value
     }
     tx.generatedOutputs.length is 2
     tx.generatedOutputs.zipWithIndex.foreach { case (output, index) =>

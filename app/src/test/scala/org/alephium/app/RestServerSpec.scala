@@ -779,9 +779,10 @@ abstract class RestServerSpec(
   it should "call GET /infos/chain-params" in {
     Get(s"/infos/chain-params") check { response =>
       response.code is StatusCode.Ok
+      val now = TimeStamp.now()
       response.as[ChainParams] is ChainParams(
         networkConfig.networkId,
-        consensusConfig.numZerosAtLeastInHash,
+        consensusConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
         brokerConfig.groupNumPerBroker,
         brokerConfig.groups
       )
@@ -1194,6 +1195,7 @@ abstract class RestServerSpec(
       response.code is StatusCode.Ok
 
       val hashrateResponse = response.as[TargetToHashrate.Result]
+      val consensusConfig  = consensusConfigs.getConsensusConfig(TimeStamp.now())
       val expected =
         HashRate.from(Target.unsafe(Hex.unsafe(target)), consensusConfig.blockTargetTime).value
 

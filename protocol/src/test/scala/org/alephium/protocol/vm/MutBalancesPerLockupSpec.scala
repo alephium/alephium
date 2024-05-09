@@ -187,6 +187,9 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
       lazy val lemanOutputs = MutBalancesPerLockup(alphAmount, mutable.Map.from(tokens), 1)
         .toTxOutput(lockupScript, HardFork.Leman)
 
+      lazy val rhoneOutputs = MutBalancesPerLockup(alphAmount, mutable.Map.from(tokens), 1)
+        .toTxOutput(lockupScript, HardFork.Rhone)
+
       def expectGenesis(outputs: (U256, Seq[(TokenId, U256)])*): Assertion = {
         genesisOutputs isE AVector.from(outputs).map { case (amount, tokens) =>
           TxOutput.fromDeprecated(amount, AVector.from(tokens), lockupScript)
@@ -209,6 +212,18 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
           error: ExeFailure = InvalidOutputBalances(lockupScript, tokens.length, alphAmount)
       ): Assertion = {
         lemanOutputs is failed(error)
+      }
+
+      def expectRhone(outputs: (U256, Seq[(TokenId, U256)])*): Assertion = {
+        rhoneOutputs isE AVector.from(outputs).map { case (amount, tokens) =>
+          TxOutput.fromDeprecated(amount, AVector.from(tokens), lockupScript)
+        }
+      }
+
+      def failRhone(
+          error: ExeFailure = InvalidOutputBalances(lockupScript, tokens.length, alphAmount)
+      ): Assertion = {
+        rhoneOutputs is failed(error)
       }
     }
   }
@@ -286,6 +301,28 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
     )
     Test(ALPH.oneAlph, tokens.map(_ -> U256.One).toSeq: _*)
       .failLeman(InvalidTokenNumForContractOutput(address, tokens.length))
+  }
+
+  it should "toTxOutput for rhone fork + contract lockup script" in new ToTxOutputFixture {
+    override val lockupScript = LockupScript.p2c(ContractId.generate)
+    val address               = Address.from(lockupScript)
+    val minimalDeposit        = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
+
+    Test(0).expectRhone()
+    Test(minimalDeposit - 1).failRhone(LowerThanContractMinimalBalance(address, minimalDeposit - 1))
+    Test(minimalDeposit).expectRhone(minimalDeposit -> Seq.empty)
+
+    Test(0, tokenId -> 1).failRhone()
+    Test(minimalDeposit - 1, tokenId -> 1)
+      .failRhone(LowerThanContractMinimalBalance(address, minimalDeposit - 1))
+    Test(minimalDeposit, tokenId -> 1).expectRhone(
+      minimalDeposit -> Seq(tokenId -> 1)
+    )
+    Test(minimalDeposit, tokens.init.map(_ -> U256.One).toSeq: _*).expectRhone(
+      minimalDeposit -> tokens.init.map(_ -> U256.One).toSeq
+    )
+    Test(minimalDeposit, tokens.map(_ -> U256.One).toSeq: _*)
+      .failRhone(InvalidTokenNumForContractOutput(address, tokens.length))
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {

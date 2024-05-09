@@ -67,7 +67,7 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
     tmp.copy(genesis = GenesisSetting(allocations))
   }
   implicit lazy val brokerConfig     = config.broker
-  implicit lazy val consensusConfig  = config.consensus
+  implicit lazy val consensusConfigs = config.consensus
   implicit lazy val networkConfig    = config.network
   implicit lazy val discoverySetting = config.discovery
   implicit lazy val memPoolSetting   = config.mempool

@@ -24,8 +24,15 @@ class TypeSpec extends AlephiumSpec {
       "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2],gg:Account)"
     contractAst.getFieldNames() is
       AVector("aa", "bb", "cc", "dd", "ee", "ff", "gg")
-    contractAst.getFieldTypes() is
-      AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account")
+    contractAst.getFieldTypes() is AVector(
+      "Bool",
+      "U256",
+      "I256",
+      "ByteVec",
+      "Address",
+      "[[Bool;1];2]",
+      "Account"
+    )
     contractAst.getFieldMutability() is
       AVector(false, true, false, true, false, false, false)
     contractAst.funcs.map(_.getArgNames()) is
@@ -73,6 +80,8 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |  id: ByteVec
        |}
        |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2], gg: Account) {
+       |  mapping[U256, U256] map
+       |
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
        |  const A = true

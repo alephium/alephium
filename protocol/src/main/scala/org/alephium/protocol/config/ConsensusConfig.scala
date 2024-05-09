@@ -20,11 +20,7 @@ import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
 trait ConsensusConfig extends EmissionConfig {
+  def maxMiningTarget: Target
   def blockTargetTime: Duration
   def uncleDependencyGapTime: Duration
-  def maxMiningTarget: Target
-
-  // scalastyle:off magic.number
-  val maxHeaderTimeStampDrift: Duration = Duration.ofSecondsUnsafe(15) // same as geth
-  // scalastyle:on magic.number
 }

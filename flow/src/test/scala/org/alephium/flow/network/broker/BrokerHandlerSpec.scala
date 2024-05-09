@@ -126,7 +126,9 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "publish misbehavior when received invalid block" in new Fixture {
-    override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+    override val configValues = Map(
+      ("alephium.consensus.num-zeros-at-least-in-hash", 1)
+    )
 
     receivedHandshakeMessage()
     val chainIndex = ChainIndex.unsafe(0, 0)

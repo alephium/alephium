@@ -90,7 +90,7 @@ object GasEstimation extends StrictLogging {
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
     unlockScript match {
-      case _: UnlockScript.P2PKH =>
+      case _: UnlockScript.P2PKH | _: UnlockScript.PoLW =>
         Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
       case p2mpkh: UnlockScript.P2MPKH =>
         Right(

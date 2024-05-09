@@ -96,6 +96,7 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
         val networkId: NetworkId              = NetworkId.AlephiumMainNet
         val noPreMineProof: ByteString        = ByteString.empty
         val lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
+        val rhoneHardForkTimestamp: TimeStamp = TimeStamp.now()
       }))
       .swap isE
       SerdeError.wrongFormat("Wrong magic bytes")

@@ -24,11 +24,10 @@ import scala.util.Random
 import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.mining.Emission
+import org.alephium.protocol.config._
 import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
@@ -36,12 +35,17 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   import ChainDifficultyAdjustment._
 
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
-    implicit val consensusConfig: ConsensusSetting = {
-      val blockTargetTime = Duration.ofSecondsUnsafe(64)
-      val emission        = Emission(Test.groupConfig, blockTargetTime)
-      ConsensusSetting(blockTargetTime, blockTargetTime, 18, 25, emission)
+    def toConsensusSetting(config: ConsensusConfig): ConsensusSetting =
+      ConsensusSetting(config.blockTargetTime, config.uncleDependencyGapTime, 18, config.emission)
+    val consensusConfigs: ConsensusSettings = {
+      val configFixture = (new ConsensusConfigsFixture.Default {}).consensusConfigs
+      val mainnet       = toConsensusSetting(configFixture.mainnet)
+      val rhone         = toConsensusSetting(configFixture.rhone)
+      ConsensusSettings(mainnet, rhone, 25)
     }
-    implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
+    implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.SinceLeman
+    implicit val consensusConfig =
+      if (Random.nextBoolean()) consensusConfigs.rhone else consensusConfigs.mainnet
 
     val enabledDurationAfterNow = Duration.ofDaysUnsafe(10)
     override val difficultyBombPatchConfig =
@@ -115,7 +119,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "return initial target when few blocks" in {
-    val maxHeight = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val maxHeight                = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
     (1 until maxHeight).foreach { n =>
       val data       = AVector.fill(n)(BlockHash.random -> TimeStamp.zero)
       val fixture    = new MockFixture { setup(data) }
@@ -203,6 +208,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       override def noPreMineProof: ByteString = ByteString.empty
       override def lemanHardForkTimestamp: TimeStamp =
         ALPH.DifficultyBombPatchEnabledTimeStamp.plusHoursUnsafe(100)
+      def rhoneHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
     }
 
     final def calIceAgeTarget(

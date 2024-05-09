@@ -336,5 +336,12 @@ trait FlowTipsUtil {
       Utils.unsafe(chain.isBefore(previous, groupDeps(index2.to.value)))
     }
   }
+
+  private[flow] def isExtendingUnsafe(current: BlockDeps, previous: BlockDeps): Boolean = {
+    current.deps.forallWithIndex { case (currentHash, index) =>
+      val previousHash = previous.deps(index)
+      isExtendingUnsafe(currentHash, previousHash)
+    }
+  }
 }
 // scalastyle:on

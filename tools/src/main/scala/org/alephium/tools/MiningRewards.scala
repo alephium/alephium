@@ -27,7 +27,7 @@ object MiningRewards extends App {
     override def groups: Int = 4
   }
   val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-  val emission: Emission        = Emission(groupConfig, blockTargetTime)
+  val emission: Emission        = Emission.mainnet(groupConfig, blockTargetTime)
 
   private def calInflation(yearlyReward: U256): BigDecimal = {
     val alphReward = yearlyReward.divUnsafe(ALPH.oneAlph).v

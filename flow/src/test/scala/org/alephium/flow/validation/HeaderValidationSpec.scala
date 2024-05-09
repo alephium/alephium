@@ -26,7 +26,7 @@ import org.alephium.crypto.Blake3
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Duration}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   trait Fixture {
@@ -53,9 +53,10 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   behavior of "genesis validation"
 
   trait GenesisFixture extends Fixture {
-    val chainIndex      = ChainIndex.unsafe(1, 2)
-    val genesis         = BlockHeader.genesis(chainIndex, Hash.zero)
-    val headerValidator = HeaderValidation.build
+    val chainIndex               = ChainIndex.unsafe(1, 2)
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = BlockHeader.genesis(chainIndex, Hash.zero)
+    val headerValidator          = HeaderValidation.build
 
     def passValidation(header: BlockHeader): Assertion = {
       passValidation(headerValidator.validateGenesisHeader(header))
@@ -126,7 +127,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis PoW target" in new GenesisFixture {
-    genesis.target is consensusConfig.maxMiningTarget
+    genesis.target is consensusConfigs.mainnet.maxMiningTarget
 
     val modified = genesis.copy(target = Target.unsafe(BigInteger.ZERO))
     failValidation(headerValidator.validateGenesisHeader(modified), InvalidGenesisWorkTarget)
@@ -135,9 +136,12 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   behavior of "normal header validation"
 
   trait HeaderFixture extends Fixture with FlowFixture {
+    def rhoneHardForkTimestamp: TimeStamp = TimeStamp.now()
+
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.consensus.num-zeros-at-least-in-hash", 1)
+      ("alephium.consensus.num-zeros-at-least-in-hash", 1),
+      ("alephium.network.rhone-hard-fork-timestamp", rhoneHardForkTimestamp.millis)
     )
 
     val chainIndex = ChainIndex.unsafe(1, 2)
@@ -187,8 +191,11 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check header version" in new HeaderFixture {
-    val modified0 = updateNonce(header.copy(version = DefaultBlockVersion))
-    passValidation(modified0)
+    header.version is DefaultBlockVersion
+    passValidation(header)
+
+    val modified = updateNonce(header.copy(version = 1))
+    failValidation(modified, InvalidBlockVersion)
   }
 
   it should "check header timestamp increasing" in new HeaderFixture {
@@ -200,7 +207,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check timestamp drift" in new HeaderFixture {
-    val newTs = header.timestamp + consensusConfig.maxHeaderTimeStampDrift +
+    val newTs = header.timestamp + consensusConfigs.maxHeaderTimeStampDrift +
       Duration.ofSecondsUnsafe(2)
     val modified = updateNonce(header.copy(timestamp = newTs))
     failValidation(modified, TooAdvancedTimeStamp)

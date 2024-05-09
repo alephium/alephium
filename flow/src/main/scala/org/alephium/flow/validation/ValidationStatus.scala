@@ -68,6 +68,28 @@ final case object BlockDoubleSpending                               extends Inva
 final case class ExistInvalidTx(t: Transaction, e: InvalidTxStatus) extends InvalidBlockStatus
 final case object InvalidFlowDeps                                   extends InvalidBlockStatus
 final case object InvalidFlowTxs                                    extends InvalidBlockStatus
+final case object InvalidTestnetMiner extends InvalidBlockStatus {
+  override def toString: String =
+    "The testnet is currently limited to whitelisted miners only. To test miners or pools, please set up a local testnet following the documentation."
+}
+
+sealed trait InvalidPoLWStatus                  extends InvalidBlockStatus
+case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus
+case object PoLWUnlockScriptNotTheSame          extends InvalidPoLWStatus
+case object InvalidPoLWChangeOutputLockupScript extends InvalidPoLWStatus
+case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
+case object InvalidPoLWBeforeRhoneHardFork      extends InvalidPoLWStatus
+
+sealed trait InvalidGhostUncleStatus              extends InvalidBlockStatus
+case object InvalidGhostUnclesBeforeRhoneHardFork extends InvalidGhostUncleStatus
+case object InvalidGhostUncleSize                 extends InvalidGhostUncleStatus
+case object UnsortedGhostUncles                   extends InvalidGhostUncleStatus
+case object InvalidGhostUncleDeps                 extends InvalidGhostUncleStatus
+case object NotGhostUnclesForTheBlock             extends InvalidGhostUncleStatus
+case object GhostUncleHashConflictWithParentHash  extends InvalidGhostUncleStatus
+case object GhostUnclesAlreadyUsed                extends InvalidGhostUncleStatus
+case object GhostUncleDoesNotExist                extends InvalidGhostUncleStatus
+case object InvalidGhostUncleMiner                extends InvalidGhostUncleStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

@@ -1,7 +1,14 @@
 alephium {
+
   consensus {
-    block-target-time = 64 seconds
-    uncle-dependency-gap-time = 0 seconds
+    mainnet {
+      block-target-time = 64 seconds
+      uncle-dependency-gap-time = 0 seconds
+    }
+    rhone {
+      block-target-time = 16 seconds
+      uncle-dependency-gap-time = 0 seconds
+    }
     num-zeros-at-least-in-hash = 0
   }
 
@@ -12,6 +19,7 @@ alephium {
     ]
 
     leman-hard-fork-timestamp = 1643500800000 // GMT: 30 January 2022 00:00:00
+    rhone-hard-fork-timestamp = 1695571200000
   }
 
   genesis {

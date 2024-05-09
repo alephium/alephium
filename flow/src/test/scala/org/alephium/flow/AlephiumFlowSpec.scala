@@ -96,6 +96,14 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
 
+  def emptyBlockWithMiner(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      miner: LockupScript.Asset
+  ): Block = {
+    mineWithTxsAndMiner(blockFlow, chainIndex, miner)((_, _) => AVector.empty[Transaction])
+  }
+
   def simpleScript(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -322,9 +330,12 @@ trait FlowFixture
       chainIndex: ChainIndex,
       script: StatefulScript,
       initialGas: Int = 200000,
-      validation: Boolean = true
+      validation: Boolean = true,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
-    mineWithTxs(blockFlow, chainIndex)(payableCallTxs(_, _, script, initialGas, validation))
+    mineWithTxs(blockFlow, chainIndex)(
+      payableCallTxs(_, _, script, initialGas, validation, keyPairOpt)
+    )
   }
 
   def payableCallTxTemplate(
@@ -359,11 +370,17 @@ trait FlowFixture
       chainIndex: ChainIndex,
       script: StatefulScript,
       initialGas: Int,
-      validation: Boolean
+      validation: Boolean,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): AVector[Transaction] = {
-    val mainGroup                  = chainIndex.from
-    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
-    val fromLockupScript           = LockupScript.p2pkh(publicKey)
+    val mainGroup = chainIndex.from
+    val (privateKey, publicKey) = keyPairOpt.getOrElse {
+      val keys = genesisKeys(mainGroup.value)
+      (keys._1, keys._2)
+    }
+    val fromLockupScript = LockupScript.p2pkh(publicKey)
+    keyManager += fromLockupScript -> privateKey
+
     val contractTx =
       payableCallTxTemplate(blockFlow, chainIndex, fromLockupScript, script, initialGas, validation)
 
@@ -396,7 +413,10 @@ trait FlowFixture
   def invalidNonceBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     @tailrec
     def iter(current: Block): Block = {
-      val tmp = Block(current.header.copy(nonce = Nonce.unsecureRandom()), current.transactions)
+      val tmp = Block(
+        current.header.copy(nonce = Nonce.unsecureRandom()),
+        current.transactions
+      )
       if (!PoW.checkWork(tmp) && (tmp.chainIndex equals chainIndex)) tmp else iter(tmp)
     }
     iter(mineFromMemPool(blockFlow, chainIndex))
@@ -405,15 +425,22 @@ trait FlowFixture
   def mineWithTxs(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
-    val txs              = prepareTxs(blockFlow, chainIndex)
-    val parentTs         = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
-    val blockTs          = FlowUtils.nextTimeStamp(parentTs)
+    mineWithTxsAndMiner(blockFlow, chainIndex, lockupScript)(prepareTxs)
+  }
 
-    val target     = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
-    val coinbaseTx = Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs)
+  def mineWithTxsAndMiner(blockFlow: BlockFlow, chainIndex: ChainIndex, miner: LockupScript.Asset)(
+      prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
+  ): Block = {
+    val deps     = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val txs      = prepareTxs(blockFlow, chainIndex)
+    val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
+    val blockTs  = FlowUtils.nextTimeStamp(parentTs)
+
+    val target = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
+    val coinbaseTx =
+      Transaction.powCoinbaseForTest(chainIndex, txs, miner, target, blockTs, AVector.empty)
     mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs, target)
   }
 
@@ -421,15 +448,48 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
-      blockTs: TimeStamp
+      blockTs: TimeStamp,
+      uncles: AVector[SelectedGhostUncle] = AVector.empty
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
+    val consensusConfig  = consensusConfigs.getConsensusConfig(blockTs)
     val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
+      Transaction.powCoinbaseForTest(
+        chainIndex,
+        txs,
+        lockupScript,
+        consensusConfig.maxMiningTarget,
+        blockTs,
+        uncles
+      )
 
     mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs)
+  }
+
+  def mineBlockTemplate(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
+    val miner = getGenesisLockupScript(chainIndex.to)
+    mine(blockFlow, blockFlow.prepareBlockFlowUnsafe(chainIndex, miner))
+  }
+
+  implicit class RichBlockFlowTemplate(template: BlockFlowTemplate) {
+    def setGhostUncles(uncles: AVector[SelectedGhostUncle]): BlockFlowTemplate = {
+      val txs   = template.transactions.init
+      val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
+      blockFlow.rebuild(template, txs, uncles, miner)
+    }
+
+    lazy val ghostUncleHashes: AVector[BlockHash] = {
+      val coinbase = template.transactions.last
+      deserialize[CoinbaseData](
+        coinbase.unsigned.fixedOutputs.head.additionalData
+      ).rightValue match {
+        case v2: CoinbaseDataV2 => v2.ghostUncleData.map(_.blockHash)
+        case _: CoinbaseDataV1  => AVector.empty
+      }
+
+    }
   }
 
   def mine(blockFlow: BlockFlow, template: BlockFlowTemplate): Block = {
@@ -449,13 +509,20 @@ trait FlowFixture
       deps: AVector[BlockHash],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = consensusConfig.maxMiningTarget
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
     mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), txs, blockTs, target)
   }
 
   def reMine(blockFlow: BlockFlow, chainIndex: ChainIndex, block: Block): Block = {
-    mine0(blockFlow, chainIndex, block.blockDeps, block.transactions, block.timestamp, block.target)
+    mine0(
+      blockFlow,
+      chainIndex,
+      block.blockDeps,
+      block.transactions,
+      block.timestamp,
+      block.target
+    )
   }
 
   def mine0(
@@ -464,13 +531,18 @@ trait FlowFixture
       deps: BlockDeps,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = consensusConfig.maxMiningTarget
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): Block = {
-    val loosenDeps = blockFlow.looseUncleDependencies(deps, chainIndex, TimeStamp.now()).rightValue
+    val hardFork = networkConfig.getHardFork(blockTs)
+    val loosenDeps =
+      blockFlow.looseUncleDependencies(deps, chainIndex, TimeStamp.now(), hardFork).rightValue
     val depStateHash =
       blockFlow.getDepStateHash(loosenDeps, chainIndex.from).rightValue
     val txsHash = Block.calTxsHash(txs)
-    Block(mineHeader(chainIndex, loosenDeps.deps, depStateHash, txsHash, blockTs, target), txs)
+    Block(
+      mineHeader(chainIndex, loosenDeps.deps, depStateHash, txsHash, blockTs, target),
+      txs
+    )
   }
 
   def mineHeader(
@@ -479,7 +551,7 @@ trait FlowFixture
       depStateHash: Hash,
       txsHash: Hash,
       blockTs: TimeStamp,
-      target: Target = consensusConfig.maxMiningTarget
+      target: Target = consensusConfigs.maxAllowedMiningTarget
   ): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
 
@@ -536,17 +608,23 @@ trait FlowFixture
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
     addAndCheck0(blockFlow, block)
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
     blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * weightRatio
   }
 
   def addAndCheck(blockFlow: BlockFlow, header: BlockHeader): Assertion = {
-    val headerValidation = HeaderValidation.build(blockFlow.brokerConfig, blockFlow.consensusConfig)
+    val headerValidation = HeaderValidation.build(
+      blockFlow.brokerConfig,
+      blockFlow.consensusConfigs,
+      blockFlow.networkConfig
+    )
     headerValidation.validate(header, blockFlow).isRight is true
     blockFlow.addAndUpdateView(header).isRight is true
   }
 
   def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
     addAndCheck(blockFlow, header)
+    val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)
     blockFlow.getWeight(header) isE consensusConfig.minBlockWeight * weightFactor
   }
 
@@ -651,11 +729,20 @@ trait FlowFixture
     val chainIndex = block.chainIndex
     val worldState =
       blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val hardFork = networkConfig.getHardFork(block.timestamp)
+    val usedRefs =
+      block.nonCoinbase
+        .flatMap(_.unsigned.inputs.map(_.outputRef))
+        .toSet
+        .asInstanceOf[Set[TxOutputRef]]
     if (chainIndex.isIntraGroup) {
       block.nonCoinbase.foreach { tx =>
         tx.allOutputs.foreachWithIndex { case (output, index) =>
           val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
-          worldState.existOutput(outputRef) isE true
+          val exist = worldState.existOutput(outputRef).rightValue || (
+            ALPH.isSequentialTxSupported(chainIndex, hardFork) && usedRefs.contains(outputRef)
+          )
+          exist is true
         }
       }
     }
@@ -665,16 +752,17 @@ trait FlowFixture
     val initialGas  = tx0.unsigned.gasAmount
     val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
     val prevOutputs = worldState.getPreOutputs(tx0).rightValue
+    val now         = TimeStamp.now()
     val blockEnv = BlockEnv(
       chainIndex,
       networkConfig.networkId,
-      TimeStamp.now(),
-      consensusConfig.maxMiningTarget,
+      now,
+      consensusConfigs.getConsensusConfig(now).maxMiningTarget,
       None
     )
     val txValidation = TxValidation.build
-    val gasLeft      = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv).rightValue
-    val gasUsed      = initialGas.use(gasLeft).rightValue
+    val gasLeft = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false).rightValue
+    val gasUsed = initialGas.use(gasLeft).rightValue
     print(s"length: ${tx0.unsigned.inputs.length}\n")
     print(s"gasUsed $gasUsed\n")
     import org.alephium.protocol.vm.GasSchedule._
@@ -753,8 +841,26 @@ trait FlowFixture
       initialAttoAlphAmount: U256 = minimalAlphInContract,
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
   ): (ContractId, ContractOutputRef) = {
+    val contract = Compiler.compileContract(input).rightValue
+    createCompiledContract(
+      contract,
+      initialImmState,
+      initialMutState,
+      tokenIssuanceInfo,
+      initialAttoAlphAmount,
+      chainIndex
+    )
+  }
+
+  def createCompiledContract(
+      contract: StatefulContract,
+      initialImmState: AVector[Val] = AVector.empty,
+      initialMutState: AVector[Val] = AVector.empty,
+      tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
+      initialAttoAlphAmount: U256 = minimalAlphInContract,
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+  ): (ContractId, ContractOutputRef) = {
     val genesisLockup = getGenesisLockupScript(chainIndex)
-    val contract      = Compiler.compileContract(input).rightValue
     val txScript =
       contractCreation(
         contract,
@@ -784,6 +890,13 @@ trait FlowFixture
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
   ): Block = {
     val script = Compiler.compileTxScript(input).rightValue
+    callCompiledTxScript(script, chainIndex)
+  }
+
+  def callCompiledTxScript(
+      script: StatefulScript,
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+  ): Block = {
     script.toTemplateString() is Hex.toHexString(serialize(script))
     val block =
       if (script.entryMethod.usePreapprovedAssets) {

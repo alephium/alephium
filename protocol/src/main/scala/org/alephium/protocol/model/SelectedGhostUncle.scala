@@ -14,28 +14,23 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.protocol.model
 
-import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.Target
-import org.alephium.util.Duration
+import akka.util.ByteString
 
-trait ConsensusConfigFixture {
-  def groupConfig: GroupConfig
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AVector, TimeStamp, U256}
 
-  def consensusConfig: ConsensusConfig
-}
-
-object ConsensusConfigFixture {
-  trait Default extends ConsensusConfigFixture with GroupConfigFixture.Default {
-    implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
-      override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-
-      def uncleDependencyGapTime: Duration = blockTargetTime
-
-      override val maxMiningTarget: Target = Target.Max
-
-      override val emission: Emission = Emission(groupConfig, blockTargetTime)
-    }
+final case class SelectedGhostUncle(
+    blockHash: BlockHash,
+    lockupScript: LockupScript.Asset,
+    heightDiff: Int
+) {
+  def toAssetOutput(
+      mainChainReward: U256,
+      lockTime: TimeStamp
+  ): AssetOutput = {
+    val uncleReward = Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
+    AssetOutput(uncleReward, lockupScript, lockTime, AVector.empty, ByteString.empty)
   }
 }

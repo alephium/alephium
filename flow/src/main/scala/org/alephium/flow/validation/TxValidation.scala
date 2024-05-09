@@ -18,6 +18,8 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
+import akka.util.ByteString
+
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
@@ -205,7 +207,7 @@ trait TxValidation {
         blockEnv.getHardFork(),
         isCoinbase = coinbaseNetReward.nonEmpty
       )
-      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx))
+      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx, blockEnv.newOutputRefCache))
       _ <- checkStateful(
         chainIndex,
         tx,
@@ -290,7 +292,7 @@ trait TxValidation {
       _            <- checkLockTime(preOutputs, blockEnv.timeStamp)
       _            <- checkAlphBalance(tx, preOutputs, coinbaseNetReward)
       _            <- checkTokenBalance(tx, preOutputs)
-      gasRemaining <- checkGasAndWitnesses(tx, preOutputs, blockEnv)
+      gasRemaining <- checkGasAndWitnesses(tx, preOutputs, blockEnv, coinbaseNetReward.isDefined)
     } yield gasRemaining
   }
 
@@ -317,7 +319,7 @@ trait TxValidation {
   protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlphBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv): TxValidationResult[GasBox]
+  def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv, isCoinbase: Boolean): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
       chainIndex: ChainIndex,
       tx: Transaction,
@@ -448,7 +450,7 @@ object TxValidation {
         isCoinbase: Boolean,
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
-      if (!GasBox.validate(tx.unsigned.gasAmount)) {
+      if (!GasBox.validate(tx.unsigned.gasAmount, hardFork)) {
         invalidTx(InvalidStartGas)
       } else if (!GasPrice.validate(tx.unsigned.gasPrice, isCoinbase, hardFork)) {
         invalidTx(InvalidGasPrice)
@@ -709,11 +711,12 @@ object TxValidation {
     def checkGasAndWitnesses(
         tx: Transaction,
         preOutputs: AVector[TxOutput],
-        blockEnv: BlockEnv
+        blockEnv: BlockEnv,
+        isCoinbase: Boolean
     ): TxValidationResult[GasBox] = {
       for {
         gasRemaining0 <- checkBasicGas(tx, tx.unsigned.gasAmount)
-        gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0)
+        gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0, isCoinbase)
       } yield gasRemaining1
     }
 
@@ -744,7 +747,8 @@ object TxValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv,
-        gasRemaining: GasBox
+        gasRemaining: GasBox,
+        isCoinbase: Boolean
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
@@ -769,7 +773,8 @@ object TxValidation {
               txEnv,
               gasRemaining,
               preOutputs(idx).lockupScript,
-              unlockScript
+              unlockScript,
+              isCoinbase
             )
           }
         }
@@ -782,15 +787,21 @@ object TxValidation {
         txEnv: TxEnv,
         gasRemaining: GasBox,
         lockupScript: LockupScript,
-        unlockScript: UnlockScript
+        unlockScript: UnlockScript,
+        isCoinbase: Boolean
     ): TxValidationResult[GasBox] = {
       (lockupScript, unlockScript) match {
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.P2PKH) =>
-          checkP2pkh(txEnv, gasRemaining, lock, unlock)
+          checkP2pkh(txEnv, txEnv.txId.bytes, gasRemaining, lock, unlock.publicKey)
         case (lock: LockupScript.P2MPKH, unlock: UnlockScript.P2MPKH) =>
           checkP2mpkh(txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
           checkP2SH(blockEnv, txEnv, gasRemaining, lock, unlock)
+        case (lock: LockupScript.P2PKH, unlock: UnlockScript.PoLW) if isCoinbase =>
+          assume(blockEnv.getHardFork() == HardFork.Rhone)
+          val addressTo = txEnv.fixedOutputs(0).lockupScript
+          val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
+          checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -798,25 +809,27 @@ object TxValidation {
 
     protected[validation] def checkP2pkh(
         txEnv: TxEnv,
+        preImage: ByteString,
         gasRemaining: GasBox,
         lock: LockupScript.P2PKH,
-        unlock: UnlockScript.P2PKH
+        publicKey: PublicKey
     ): TxValidationResult[GasBox] = {
-      if (Hash.hash(unlock.publicKey.bytes) != lock.pkHash) {
+      if (Hash.hash(publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        checkSignature(txEnv, gasRemaining, unlock.publicKey)
+        checkSignature(txEnv, preImage, gasRemaining, publicKey)
       }
     }
 
     private def checkSignature(
         txEnv: TxEnv,
+        preImage: ByteString,
         gasRemaining: GasBox,
         publicKey: PublicKey
     ): TxValidationResult[GasBox] = {
       txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(txEnv.txId.bytes, signature, publicKey)) {
+          if (!SignatureSchema.verify(preImage, signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
             fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)
@@ -843,7 +856,7 @@ object TxValidation {
                 if (Hash.hash(publicKey.bytes) != pkHash) {
                   invalidTx(InvalidPublicKeyHash)
                 } else {
-                  checkSignature(txEnv, gasBox, publicKey)
+                  checkSignature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
                 }
               case None =>
                 invalidTx(InvalidP2mpkhUnlockScript)

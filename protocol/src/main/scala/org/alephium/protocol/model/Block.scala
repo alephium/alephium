@@ -23,9 +23,10 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.BlockHash
-import org.alephium.serde.Serde
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde.{deserialize, Serde, SerdeResult}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
@@ -34,6 +35,32 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
   def chainIndex: ChainIndex = header.chainIndex
 
   def coinbase: Transaction = transactions.last
+
+  def minerLockupScript: LockupScript.Asset = coinbase.unsigned.fixedOutputs(0).lockupScript
+
+  private[model] var _ghostUncleData: Option[AVector[GhostUncleData]] = None
+  def ghostUncleData(implicit
+      networkConfig: NetworkConfig
+  ): SerdeResult[AVector[GhostUncleData]] = {
+    _ghostUncleData match {
+      case Some(data) => Right(data)
+      case None =>
+        deserialize[CoinbaseData](coinbase.unsigned.fixedOutputs.head.additionalData).map {
+          case v2: CoinbaseDataV2 =>
+            _ghostUncleData = Some(v2.ghostUncleData)
+            v2.ghostUncleData
+          case _: CoinbaseDataV1 =>
+            val data = AVector.empty[GhostUncleData]
+            _ghostUncleData = Some(data)
+            data
+        }
+    }
+  }
+  @inline def ghostUncleHashes(implicit
+      networkConfig: NetworkConfig
+  ): SerdeResult[AVector[BlockHash]] = {
+    ghostUncleData.map(_.map(_.blockHash))
+  }
 
   def coinbaseReward: U256 = coinbase.unsigned.fixedOutputs.head.amount
 

@@ -29,6 +29,7 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     isPublic = true,
     usePreapprovedAssets = false,
     useContractAssets = false,
+    usePayToContractOnly = false,
     argsLength = 0,
     localsLength = 0,
     returnLength = 0,
@@ -54,6 +55,11 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     deserialize[UnlockScript](
       serialize[UnlockScript](UnlockScript.SameAsPrevious)
     ) isE UnlockScript.SameAsPrevious
+
+    forAll(keyGen) { publicKey =>
+      val unlock = UnlockScript.polw(publicKey)
+      deserialize[UnlockScript](serialize[UnlockScript](unlock)) isE unlock
+    }
   }
 
   it should "serialize examples" in {
@@ -71,6 +77,11 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     serialize[UnlockScript](unlock2) is Hex.unsafe(s"020101000000000000")
 
     serialize[UnlockScript](UnlockScript.SameAsPrevious) is Hex.unsafe(s"03")
+
+    val unlock3 = UnlockScript.polw(publicKey0)
+    val encoded = Hex.unsafe(s"04${publicKey0.toHexString}")
+    serialize[UnlockScript](unlock3) is encoded
+    deserialize[UnlockScript](encoded).rightValue is unlock3
   }
 
   it should "validate multisig" in {

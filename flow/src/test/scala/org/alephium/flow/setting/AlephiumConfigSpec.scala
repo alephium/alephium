@@ -33,7 +33,14 @@ import org.alephium.conf._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
-import org.alephium.protocol.model.{Address, ContractId, Difficulty, GroupIndex, NetworkId}
+import org.alephium.protocol.model.{
+  Address,
+  ContractId,
+  Difficulty,
+  GroupIndex,
+  HardFork,
+  NetworkId
+}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
@@ -42,14 +49,16 @@ class AlephiumConfigSpec extends AlephiumSpec {
   it should "load alephium config" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
-      ("alephium.consensus.block-target-time", "11 seconds")
+      ("alephium.consensus.mainnet.block-target-time", "11 seconds"),
+      ("alephium.consensus.rhone.block-target-time", "4 seconds")
     )
 
     config.broker.groups is 12
     config.broker.brokerNum is 3
     config.broker.groupNumPerBroker is 4
     config.network.networkId is NetworkId(2)
-    config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
+    config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
+    config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
     config.network.connectionBufferCapacityInByte is 100000000L
   }
 
@@ -57,10 +66,14 @@ class AlephiumConfigSpec extends AlephiumSpec {
     val rootPath = Files.tmpDir
     val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
+    config.network.networkId is NetworkId.AlephiumMainNet
     config.broker.groups is 4
-    config.consensus.numZerosAtLeastInHash is 37
+    config.consensus.mainnet.numZerosAtLeastInHash is 37
     val initialHashRate =
-      HashRate.from(config.consensus.maxMiningTarget, config.consensus.blockTargetTime)(
+      HashRate.from(
+        config.consensus.mainnet.maxMiningTarget,
+        config.consensus.mainnet.blockTargetTime
+      )(
         config.broker
       )
     initialHashRate is HashRate.unsafe(new BigInteger("549756862464"))
@@ -70,6 +83,27 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.lemanHardForkTimestamp is TimeStamp.unsafe(1680170400000L)
     config.genesisBlocks.flatMap(_.map(_.shortHex)).mkString("-") is
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
+  }
+
+  it should "load rhone config" in {
+    val rootPath = Files.tmpDir
+    val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.rhone.numZerosAtLeastInHash is 37
+    config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(16)
+    config.consensus.rhone.uncleDependencyGapTime is Duration.ofSecondsUnsafe(8)
+    val initialHashRate =
+      HashRate.from(
+        config.consensus.rhone.maxMiningTarget,
+        config.consensus.rhone.blockTargetTime
+      )(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
+    config.network.networkId is NetworkId.AlephiumMainNet
+    config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
@@ -80,18 +114,15 @@ class AlephiumConfigSpec extends AlephiumSpec {
     assertThrows[IllegalArgumentException](config.network.networkId is NetworkId.AlephiumMainNet)
   }
 
-  ignore should "throw error when use leman hardfork for mainnet (1)" in new AlephiumConfigFixture {
+  it should "check rhone hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
-      ("alephium.network.leman-hard-fork-timestamp", 0)
+      ("alephium.network.rhone-hard-fork-timestamp", 0)
     )
-    intercept[RuntimeException](buildNewConfig()).getMessage is
-      "The leman hardfork is not available for mainnet yet"
-  }
-
-  ignore should "throw error when use leman hardfork for mainnet (2)" in new AlephiumConfigFixture {
-    Configs.parseNetworkId(ConfigFactory.empty()).leftValue is
-      "The leman hardfork is not available for mainnet yet"
+    intercept[RuntimeException](
+      AlephiumConfig.load(buildNewConfig(), "alephium")
+    ).getMessage is
+      "Invalid timestamp for rhone hard fork"
   }
 
   it should "load bootstrap config" in {
@@ -270,19 +301,38 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "adjust diff for height gaps across chains" in new AlephiumConfigFixture {
-    val N    = 123456
-    val diff = Difficulty.unsafe(N)
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17) is diff
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18) is
+    val N               = 123456
+    val diff            = Difficulty.unsafe(N)
+    val consensusConfig = consensusConfigs.mainnet
+
+    intercept[AssertionError](
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Mainnet) is diff
+    ).getMessage is "assumption failed"
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17, HardFork.Leman) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18, HardFork.Leman) is
       Difficulty.unsafe(N * 105 / 100)
-    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19) is
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19, HardFork.Leman) is
       Difficulty.unsafe(N * 110 / 100)
     (20 until 18 * 3).foreach { gap =>
-      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap) is
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Leman) is
         Difficulty.unsafe(N * (100 + 5 * (gap - 17)) / 100)
+    }
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 8, HardFork.Rhone) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 9, HardFork.Rhone) is
+      Difficulty.unsafe(N * 103 / 100)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 10, HardFork.Rhone) is
+      Difficulty.unsafe(N * 106 / 100)
+    (11 until 18 * 3).foreach { gap =>
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Rhone) is
+        Difficulty.unsafe(N * (100 + 3 * (gap - 8)) / 100)
     }
   }
 }

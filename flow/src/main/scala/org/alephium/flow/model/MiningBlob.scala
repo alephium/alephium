@@ -29,7 +29,11 @@ final case class MiningBlob(
     headerBlob: ByteString,
     target: BigInteger,
     txsBlob: ByteString
-)
+) {
+  def toBlockBlob(nonce: Nonce): ByteString = {
+    nonce.value ++ headerBlob ++ txsBlob
+  }
+}
 
 object MiningBlob {
   def from(template: BlockFlowTemplate): MiningBlob = {

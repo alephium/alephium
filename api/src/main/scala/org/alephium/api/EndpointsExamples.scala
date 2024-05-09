@@ -657,6 +657,7 @@ trait EndpointsExamples extends ErrorExamples {
         returnTypes = AVector("U256", "I256", "ByteVec", "Address")
       )
     ),
+    maps = Some(CompileResult.MapsSig(AVector("foo"), AVector("Map[U256,U256]"))),
     constants = AVector(CompileResult.Constant("A", Val.True)),
     enums = AVector(
       CompileResult.Enum(

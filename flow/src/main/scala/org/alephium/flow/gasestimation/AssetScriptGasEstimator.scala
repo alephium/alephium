@@ -51,6 +51,8 @@ object AssetScriptGasEstimator {
     def estimate(
         p2sh: UnlockScript.P2SH
     ): Either[String, GasBox] = {
+      val maximalGasPerTx = getMaximalGasPerTx()
+
       def runScript(
           blockEnv: BlockEnv,
           unsignedTx: UnsignedTransaction,

@@ -36,7 +36,7 @@ class MiningBench {
 
   val config: AlephiumConfig            = AlephiumConfig.load(Platform.getRootPath(), "alephium")
   implicit val groupConfig: GroupConfig = config.broker
-  implicit val consensusConfig: ConsensusConfig = config.consensus
+  implicit val consensusConfig: ConsensusConfig = config.consensus.mainnet
 
   @Benchmark
   def mineGenesis(): Boolean = {

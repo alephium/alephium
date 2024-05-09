@@ -7045,6 +7045,14 @@
                   "warnings": [
                     "Found unused fields in Foo: a"
                   ],
+                  "maps": {
+                    "names": [
+                      "foo"
+                    ],
+                    "types": [
+                      "Map[U256,U256]"
+                    ]
+                  },
                   "stdInterfaceId": "0001"
                 }
               }
@@ -7266,6 +7274,14 @@
                       "warnings": [
                         "Found unused fields in Foo: a"
                       ],
+                      "maps": {
+                        "names": [
+                          "foo"
+                        ],
+                        "types": [
+                          "Map[U256,U256]"
+                        ]
+                      },
                       "stdInterfaceId": "0001"
                     }
                   ],
@@ -11257,6 +11273,9 @@
               "type": "string"
             }
           },
+          "maps": {
+            "$ref": "#/components/schemas/MapsSig"
+          },
           "stdInterfaceId": {
             "type": "string"
           }
@@ -11994,6 +12013,27 @@
         "properties": {
           "detail": {
             "type": "string"
+          }
+        }
+      },
+      "MapsSig": {
+        "required": [
+          "names",
+          "types"
+        ],
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

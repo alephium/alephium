@@ -29,7 +29,7 @@ trait EmptyBlockFlow extends BlockFlow {
   implicit def config: AlephiumConfig
 
   implicit lazy val brokerConfig: BrokerConfig = config.broker
-  implicit lazy val consensusConfig            = config.consensus
+  implicit lazy val consensusConfigs           = config.consensus
   implicit lazy val networkConfig              = config.network
   implicit lazy val mempoolSetting             = config.mempool
   implicit lazy val logConfig                  = config.node.eventLogConfig

@@ -18,6 +18,17 @@ package org.alephium.util
 
 object OptionF {
   // scalastyle:off return
+  def foreach[E](elems: IterableOnce[E])(f: E => Option[Unit]): Option[Unit] = {
+    val iterator = elems.iterator
+    while (iterator.hasNext) {
+      f(iterator.next()) match {
+        case None    => return None
+        case Some(_) => ()
+      }
+    }
+    Some(())
+  }
+
   def fold[E, R](elems: IterableOnce[E], zero: R)(
       op: (R, E) => Option[R]
   ): Option[R] = {

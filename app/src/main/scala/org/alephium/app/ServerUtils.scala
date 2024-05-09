@@ -48,7 +48,7 @@ import org.alephium.util._
 // scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig,
+    consensusConfigs: ConsensusConfigs,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     logConfig: LogConfig,
@@ -1058,6 +1058,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
+    val hardfork = blockFlow.networkConfig.getHardFork(TimeStamp.now())
     for {
       amounts <- BuildTxCommon
         .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
@@ -1067,7 +1068,7 @@ class ServerUtils(implicit
         .getTokenIssuanceInfo(query.issueTokenAmount, query.issueTokenTo)
         .left
         .map(badRequest)
-      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1, hardfork)
       code                  <- query.decodeBytecode()
       lockPair              <- query.getLockPair()
       script <- buildDeployContractTxWithParsedState(
@@ -1095,16 +1096,17 @@ class ServerUtils(implicit
     } yield BuildDeployContractTxResult.from(utx)
   }
 
-  def getInitialAttoAlphAmount(amountOption: Option[U256]): Try[U256] = {
+  def getInitialAttoAlphAmount(amountOption: Option[U256], hardfork: HardFork): Try[U256] = {
+    val minimalContractDeposit = minimalContractStorageDeposit(hardfork)
     amountOption match {
       case Some(amount) =>
-        if (amount >= minimalAlphInContract) { Right(amount) }
+        if (amount >= minimalContractDeposit) { Right(amount) }
         else {
           val error =
-            s"Expect ${Amount.toAlphString(minimalAlphInContract)} deposit to deploy a new contract"
+            s"Expect ${Amount.toAlphString(minimalContractDeposit)} deposit to deploy a new contract"
           Left(failed(error))
         }
-      case None => Right(minimalAlphInContract)
+      case None => Right(minimalContractDeposit)
     }
   }
 
@@ -1432,6 +1434,7 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(blockTimeStamp)
     val blockEnv = BlockEnv(
       ChainIndex(groupIndex, groupIndex),
       networkConfig.networkId,
@@ -1498,6 +1501,7 @@ class ServerUtils(implicit
               isPublic = true,
               usePreapprovedAssets = inputAssets.nonEmpty,
               useContractAssets = false,
+              usePayToContractOnly = false,
               argsLength = 0,
               localsLength = 0,
               returnLength = method.returnLength,
@@ -1520,6 +1524,7 @@ class ServerUtils(implicit
               isPublic = true,
               usePreapprovedAssets = inputAssets.nonEmpty,
               useContractAssets = false,
+              usePayToContractOnly = false,
               argsLength = 0,
               localsLength = 0,
               returnLength = method.returnLength,

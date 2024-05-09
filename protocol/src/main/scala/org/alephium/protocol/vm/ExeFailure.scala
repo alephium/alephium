@@ -21,10 +21,10 @@ import java.math.BigInteger
 import akka.util.ByteString
 
 import org.alephium.io.IOError
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.serde.SerdeError
-import org.alephium.util.{Hex, U256}
-import org.alephium.util.TimeStamp
+import org.alephium.util.{Bytes, Hex, TimeStamp, U256}
 
 // scalastyle:off number.of.types
 trait ExeFailure extends Product {
@@ -144,9 +144,18 @@ final case class InvalidType(expected: Val.Type, got: Val) extends ExeFailure {
 
 case object InvalidMethod                    extends ExeFailure
 case object InvalidMethodModifierBeforeLeman extends ExeFailure
+case object InvalidMethodModifierBeforeRhone extends ExeFailure
+case object InvalidMethodModifierSinceRhone  extends ExeFailure
 
 final case class InvalidMethodIndex(index: Int, methodLength: Int) extends ExeFailure {
   override def toString: String = s"Invalid method index $index, method length: $methodLength"
+}
+final case class InvalidMethodSelector(selector: Method.Selector) extends ExeFailure {
+  override def toString: String = {
+    s"Invalid method selector: ${Hex.toHexString(Bytes.from(selector.index))}. " +
+      "This method might have been created before the Rhone upgrade and does not support dynamic calling. " +
+      "You'll need to call it directly using the method index."
+  }
 }
 
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure {
@@ -260,7 +269,8 @@ case object BalanceErrorWhenSwitchingBackFrame extends ExeFailure
 final case class LowerThanContractMinimalBalance(address: Address, amount: U256)
     extends ExeFailure {
   override def toString: String =
-    s"Contract output contains ${amount}, less than contract minimal balance ${minimalAlphInContract}"
+    s"Contract output contains ${ALPH.prettifyAmount(amount)}," +
+      s"less than contract minimal balance ${ALPH.prettifyAmount(minimalAlphInContract)}"
 }
 
 case object UnableToPayGasFee extends ExeFailure {
@@ -284,8 +294,8 @@ final case class InvalidOutputBalances(
         tokenDustAmount.addUnsafe(dustUtxoAmount)
       }
     }
-    s"Invalid ALPH balance for address $address, expected $totalDustAmount, " +
-      s"got $attoAlphAmount, you need to transfer more ALPH to this address"
+    s"Invalid ALPH balance for address $address, expected ${ALPH.prettifyAmount(totalDustAmount)}, " +
+      s"got ${ALPH.prettifyAmount(attoAlphAmount)}, you need to transfer more ALPH to this address"
   }
 }
 
@@ -299,11 +309,24 @@ case object InvalidTokenId                              extends ExeFailure
 case object InvalidContractId                           extends ExeFailure
 case object ExpectAContract                             extends ExeFailure
 case object OutOfGas                                    extends ExeFailure
+case object GasOverflow                                 extends ExeFailure
+case object GasOverPaid                                 extends ExeFailure
 case object ContractPoolOverflow                        extends ExeFailure
 case object ContractFieldOverflow                       extends ExeFailure
 final case class ContractLoadDisallowed(id: ContractId) extends ExeFailure
-case object ContractAssetAlreadyInUsing                 extends ExeFailure
-case object ContractAssetAlreadyFlushed                 extends ExeFailure
+case object ContractAssetAlreadyInUsing extends ExeFailure {
+  override def toString: String = {
+    s"Contract assets can only be loaded once per transaction, to prevent reentrancy attacks! Rhone upgrade will support method-level reentrancy protection."
+  }
+}
+case object ContractAssetAlreadyFlushed extends ExeFailure
+final case class FunctionReentrancy(contractId: ContractId, methodIndex: Int) extends ExeFailure {
+  override def toString: String = {
+    val address = Address.contract(contractId)
+    s"The $methodIndex-th function in the contract (@$address) is called twice and uses contract assets twice, " +
+      s"which is not allowed due to reentrancy protection!"
+  }
+}
 
 final case class ContractAssetUnloaded(address: Address.Contract) extends ExeFailure {
   override def toString: String = {
@@ -313,7 +336,7 @@ final case class ContractAssetUnloaded(address: Address.Contract) extends ExeFai
 
 case object EmptyContractAsset extends ExeFailure {
   override def toString: String =
-    s"The contract's asset(s) have been used up, but a minimum of ${dustUtxoAmount} ALPH is required"
+    s"The contract's asset(s) have been used up, but a minimum of ${ALPH.prettifyAmount(dustUtxoAmount)} ALPH is required"
 }
 
 case object NoCaller extends ExeFailure {
