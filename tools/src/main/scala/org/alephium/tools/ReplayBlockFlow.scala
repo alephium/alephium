@@ -19,7 +19,6 @@ package org.alephium.tools
 import java.nio.file.{Files, StandardCopyOption}
 
 import scala.collection.mutable.PriorityQueue
-import scala.reflect.io.Directory
 
 import com.typesafe.scalalogging.StrictLogging
 
@@ -47,7 +46,7 @@ class ReplayBlockFlow(
   def start(): BlockValidationResult[Boolean] = {
     for {
       maxHeights <- from(chainIndexes.mapE(chainIndex => sourceBlockFlow.getMaxHeight(chainIndex)))
-      _          <- from(chainIndexes.foreachE(loadBlocksAt(_, startLoadingHeight)))
+      _          <- from(loadInitialBlocks(targetBlockFlow))
       _          <- replay(maxHeights)
       sourceStateHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
       targetStateHashes <- fetchBestWorldStateHashes(targetBlockFlow)
@@ -55,7 +54,7 @@ class ReplayBlockFlow(
   }
 
   private def replay(maxHeights: AVector[Int]): BlockValidationResult[Unit] = {
-    var count: Int                          = 0
+    var count: Int                          = loadedHeights.map(_ - 1).sum
     var result: BlockValidationResult[Unit] = Right(())
 
     while (pendingBlocks.nonEmpty && result.isRight) {
@@ -121,6 +120,19 @@ class ReplayBlockFlow(
     )
   }
 
+  private def loadInitialBlocks(targetBlockFlow: BlockFlow): IOResult[Unit] = {
+    chainIndexes.foreachE { chainIndex =>
+      val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
+      for {
+        height0 <- targetBlockFlow.getMaxHeight(chainIndex)
+        height = if (height0 > startLoadingHeight) height0 + 1 else startLoadingHeight
+        _ <- loadBlocksAt(chainIndex, height)
+      } yield {
+        loadedHeights(chainIndexOneDim) = height
+      }
+    }
+  }
+
   private def from[T](result: IOResult[T]): BlockValidationResult[T] = {
     result.left.map(Left(_))
   }
@@ -130,7 +142,6 @@ object ReplayBlockFlow extends App with StrictLogging {
   private val sourcePath = Platform.getRootPath()
   private val targetPath = {
     val path = AFiles.homeDir.resolve(".alephium-replay")
-    new Directory(path.toFile).deleteRecursively()
     path.toFile.mkdir()
     Files.copy(
       sourcePath.resolve("user.conf"),
