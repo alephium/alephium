@@ -125,7 +125,7 @@ class ReplayBlockFlow(
       val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
       for {
         height0 <- targetBlockFlow.getMaxHeight(chainIndex)
-        height = if (height0 > startLoadingHeight) height0 else startLoadingHeight
+        height = if (height0 > startLoadingHeight) height0 + 1 else startLoadingHeight
         _ <- loadBlocksAt(chainIndex, height)
       } yield {
         loadedHeights(chainIndexOneDim) = height
