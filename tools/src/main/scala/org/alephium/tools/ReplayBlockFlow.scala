@@ -19,7 +19,6 @@ package org.alephium.tools
 import java.nio.file.{Files, StandardCopyOption}
 
 import scala.collection.mutable.PriorityQueue
-import scala.reflect.io.Directory
 
 import com.typesafe.scalalogging.StrictLogging
 
@@ -55,7 +54,7 @@ class ReplayBlockFlow(
   }
 
   private def replay(maxHeights: AVector[Int]): BlockValidationResult[Unit] = {
-    var count: Int                          = 0
+    var count: Int                          = loadedHeights.map(_ - 1).sum
     var result: BlockValidationResult[Unit] = Right(())
 
     while (pendingBlocks.nonEmpty && result.isRight) {
@@ -140,19 +139,15 @@ class ReplayBlockFlow(
 }
 
 object ReplayBlockFlow extends App with StrictLogging {
-  private val restart    = if (args.length == 1 && args(0) == "restart") true else false
   private val sourcePath = Platform.getRootPath()
   private val targetPath = {
     val path = AFiles.homeDir.resolve(".alephium-replay")
-    if (!restart) {
-      new Directory(path.toFile).deleteRecursively()
-      path.toFile.mkdir()
-      Files.copy(
-        sourcePath.resolve("user.conf"),
-        path.resolve("user.conf"),
-        StandardCopyOption.REPLACE_EXISTING
-      )
-    }
+    path.toFile.mkdir()
+    Files.copy(
+      sourcePath.resolve("user.conf"),
+      path.resolve("user.conf"),
+      StandardCopyOption.REPLACE_EXISTING
+    )
     path
   }
 
