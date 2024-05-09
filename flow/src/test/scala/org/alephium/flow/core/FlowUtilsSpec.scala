@@ -574,12 +574,12 @@ class FlowUtilsSpec extends AlephiumSpec {
     val invalidTx = block.transactions.head
     blockFlow.grandPool.add(chainIndex, invalidTx.toTemplate, TimeStamp.now())
     val (template0, _) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
-    val template1      = template0.rebuild(AVector(invalidTx), AVector.empty, miner)
+    val template1      = blockFlow.rebuild(template0, AVector(invalidTx), AVector.empty, miner)
     template1.transactions.head is invalidTx
     val template2 =
       blockFlow.validateTemplate(chainIndex, template1, AVector.empty, miner).rightValue
     template2 isnot template1
-    template2 is template1.rebuild(AVector.empty, AVector.empty, miner)
+    template2 is blockFlow.rebuild(template1, AVector.empty, AVector.empty, miner)
   }
 
   it should "rebuild block template if there are invalid uncles" in new PrepareBlockFlowFixture {
@@ -595,10 +595,10 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
 
     val (template1, _) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
-    val template2      = template1.rebuild(template1.transactions.init, uncles, miner)
+    val template2      = blockFlow.rebuild(template1, template1.transactions.init, uncles, miner)
     val template3      = blockFlow.validateTemplate(chainIndex, template2, uncles, miner).rightValue
     template3 isnot template2
-    template3 is template2.rebuild(template2.transactions.init, AVector.empty, miner)
+    template3 is blockFlow.rebuild(template2, template2.transactions.init, AVector.empty, miner)
   }
 
   it should "rebuild block template if there are invalid txs and uncles" in new PrepareBlockFlowFixture {
@@ -616,12 +616,12 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.grandPool.add(chainIndex, invalidTx.toTemplate, TimeStamp.now())
 
     val (template1, _) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
-    val template2      = template1.rebuild(AVector(invalidTx), uncles, miner)
+    val template2      = blockFlow.rebuild(template1, AVector(invalidTx), uncles, miner)
     template2.transactions.head is invalidTx
 
     val template3 = blockFlow.validateTemplate(chainIndex, template2, uncles, miner).rightValue
     template3 isnot template2
-    template3 is template2.rebuild(AVector.empty, AVector.empty, miner)
+    template3 is blockFlow.rebuild(template2, AVector.empty, AVector.empty, miner)
   }
 
   trait SequentialTxsFixture extends FlowFixture with Generators {

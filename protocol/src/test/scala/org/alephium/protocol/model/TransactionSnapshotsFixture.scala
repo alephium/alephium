@@ -69,7 +69,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       transactions: Transaction*
   )(implicit networkConfig: NetworkConfig) = {
     val ts = TimeStamp.unsafe(1640879601000L)
-    Transaction.coinbase(
+    Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0),
       AVector.from(transactions),
       LockupScript.P2PKH(

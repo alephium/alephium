@@ -173,9 +173,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         ),
         AVector.empty[Signature]
       )
-      val coinbase = Transaction.coinbase(
+      val coinbase = Transaction.powCoinbaseForTest(
         ChainIndex.unsafe(0, 0),
-        U256.Zero,
+        AVector.empty,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
         Math.max(networkConfig.lemanHardForkTimestamp, ALPH.LaunchTimestamp),
@@ -395,12 +395,14 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "cache block ghost uncle hashes" in {
     val block = blockGen.sample.get
     block.ghostUncleHashes.rightValue.isEmpty is true
-    block._ghostUncleHashes is Some(AVector.empty[BlockHash])
+    block._ghostUncleData is Some(AVector.empty[GhostUncleData])
 
-    val ghostUncleHashes = AVector.fill(2)(BlockHash.random)
+    val groupIndex = GroupIndex.unsafe(0)
+    val ghostUncleData =
+      AVector.fill(2)(GhostUncleData(BlockHash.random, assetLockupGen(groupIndex).sample.get))
     val coinbaseData: CoinbaseData = CoinbaseDataV2(
       CoinbaseDataPrefix.from(block.chainIndex, block.timestamp),
-      ghostUncleHashes,
+      ghostUncleData,
       ByteString.empty
     )
     val newOutput =
@@ -411,7 +413,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       )
     )
     val newBlock = block.copy(transactions = AVector(newCoinbaseTx))
-    newBlock.ghostUncleHashes.rightValue is ghostUncleHashes
-    newBlock._ghostUncleHashes is Some(ghostUncleHashes)
+    newBlock.ghostUncleData.rightValue is ghostUncleData
+    newBlock._ghostUncleData is Some(ghostUncleData)
   }
 }

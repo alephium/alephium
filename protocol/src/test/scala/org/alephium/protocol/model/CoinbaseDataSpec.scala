@@ -19,7 +19,6 @@ package org.alephium.protocol.model
 import scala.util.Random
 
 import akka.util.ByteString
-import org.scalacheck.Gen
 
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
@@ -50,17 +49,18 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
     test(prefix, ByteString.fromArrayUnsafe(Random.nextBytes(40)))
   }
 
-  it should "serde CoinbaseDataV2" in {
-    val prefix = CoinbaseDataPrefix.from(chainIndexGen.sample.get, TimeStamp.now())
-    val hashes = AVector.from(Gen.listOfN(2, blockHashGen).sample.get)
+  it should "serde CoinbaseDataV2" in new NoIndexModelGenerators with NetworkConfigFixture.RhoneT {
+    val chainIndex = chainIndexGen.sample.get
+    val prefix     = CoinbaseDataPrefix.from(chainIndex, TimeStamp.now())
+    val ghostUncleData =
+      AVector.fill(2)(GhostUncleData(BlockHash.random, assetLockupGen(chainIndex.to).sample.get))
 
-    implicit val networkConfig = NetworkConfigFixture.Rhone
-    val data0                  = CoinbaseDataV2(prefix, hashes, ByteString.empty)
+    val data0 = CoinbaseDataV2(prefix, ghostUncleData, ByteString.empty)
     deserialize[CoinbaseData](serialize[CoinbaseData](data0)).rightValue is data0
 
     val data1 = CoinbaseDataV2(
       prefix,
-      hashes,
+      ghostUncleData,
       ByteString.fromArrayUnsafe(Random.nextBytes(40))
     )
     deserialize[CoinbaseData](serialize[CoinbaseData](data1)).rightValue is data1

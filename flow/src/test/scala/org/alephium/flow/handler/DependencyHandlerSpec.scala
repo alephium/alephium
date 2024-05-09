@@ -317,8 +317,8 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
         ghostUncleHashes.map(hash =>
           SelectedGhostUncle(hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1)
         )
-      val template1 = template0
-        .rebuild(template0.transactions.init, uncles, lockupScript)
+      val template1 = blockFlow
+        .rebuild(template0, template0.transactions.init, uncles, lockupScript)
         .copy(
           deps = newDeps,
           depStateHash =

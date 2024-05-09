@@ -30,11 +30,12 @@ import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex, TimeStamp}
+import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
 trait FlowUtils
@@ -277,6 +278,24 @@ trait FlowUtils
     }
   }
 
+  private def prepareCoinbase(
+      chainIndex: ChainIndex,
+      uncles: AVector[SelectedGhostUncle],
+      fullTxs: AVector[Transaction],
+      target: Target,
+      templateTs: TimeStamp,
+      miner: LockupScript.Asset
+  ): Transaction = {
+    val emission = consensusConfigs.getConsensusConfig(templateTs).emission
+    emission.reward(target, templateTs, ALPH.LaunchTimestamp) match {
+      case reward: Emission.PoW =>
+        val gasFee       = fullTxs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
+        val rewardAmount = Coinbase.powMiningReward(gasFee, reward, templateTs)
+        Transaction.powCoinbase(chainIndex, rewardAmount, miner, templateTs, uncles)
+      case _: Emission.PoLW => ???
+    }
+  }
+
   private def prepareBlockFlow(
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
@@ -292,7 +311,7 @@ trait FlowUtils
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
-      val coinbaseTx = Transaction.coinbase(chainIndex, fullTxs, miner, target, templateTs, uncles)
+      val coinbaseTx = prepareCoinbase(chainIndex, uncles, fullTxs, target, templateTs, miner)
       BlockFlowTemplate(
         chainIndex,
         loosenDeps.deps,
@@ -302,6 +321,23 @@ trait FlowUtils
         fullTxs :+ coinbaseTx
       )
     }
+  }
+
+  private[flow] def rebuild(
+      template: BlockFlowTemplate,
+      txs: AVector[Transaction],
+      uncles: AVector[SelectedGhostUncle],
+      miner: LockupScript.Asset
+  ): BlockFlowTemplate = {
+    val coinbase = prepareCoinbase(
+      template.index,
+      uncles,
+      txs,
+      template.target,
+      template.templateTs,
+      miner
+    )
+    template.copy(transactions = txs :+ coinbase)
   }
 
   lazy val templateValidator =
@@ -319,19 +355,19 @@ trait FlowUtils
         error match {
           case _: InvalidGhostUncleStatus =>
             logger.warn("Assemble block with empty uncles due to invalid uncles")
-            Right(template.rebuild(template.transactions.init, AVector.empty, miner))
+            Right(rebuild(template, template.transactions.init, AVector.empty, miner))
           case ExistInvalidTx(t, _) =>
             logger.warn(
               s"Remove invalid mempool tx: ${t.id.toHexString} - ${Hex.toHexString(serialize(t))}"
             )
             logger.warn("Assemble block with empty txs due to invalid txs")
             this.getMemPool(chainIndex).removeUnusedTxs(AVector(t.toTemplate))
-            val newTemplate = template.rebuild(AVector.empty, uncles, miner)
+            val newTemplate = rebuild(template, AVector.empty, uncles, miner)
             // we need to validate the template again since we don't know if uncles are valid
             validateTemplate(chainIndex, newTemplate, uncles, miner)
           case _ =>
             logger.warn(s"Assemble empty block due to error: ${error}")
-            Right(template.rebuild(AVector.empty, AVector.empty, miner))
+            Right(rebuild(template, AVector.empty, AVector.empty, miner))
         }
       case Right(_) => Right(template)
     }

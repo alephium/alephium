@@ -19,6 +19,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -49,9 +50,19 @@ final case class CoinbaseDataV1(
     minerData: ByteString
 ) extends CoinbaseData
 
+final case class GhostUncleData(blockHash: BlockHash, lockupScript: LockupScript.Asset)
+
+object GhostUncleData {
+  implicit val ghostUncleDataSerde: Serde[GhostUncleData] =
+    Serde.forProduct2(GhostUncleData.apply, d => (d.blockHash, d.lockupScript))
+
+  def from(uncle: SelectedGhostUncle): GhostUncleData =
+    GhostUncleData(uncle.blockHash, uncle.lockupScript)
+}
+
 final case class CoinbaseDataV2(
     prefix: CoinbaseDataPrefix,
-    ghostUncleHashes: AVector[BlockHash],
+    ghostUncleData: AVector[GhostUncleData],
     minerData: ByteString
 ) extends CoinbaseData
 
@@ -65,12 +76,12 @@ object CoinbaseData {
           coinbaseData <-
             if (hardFork.isRhoneEnabled()) {
               for {
-                ghostUncleHashesResult <- _decode[AVector[BlockHash]](prefixResult.rest)
+                ghostUncleDataResult <- _decode[AVector[GhostUncleData]](prefixResult.rest)
               } yield Staging[CoinbaseData](
                 CoinbaseDataV2(
                   prefixResult.value,
-                  ghostUncleHashesResult.value,
-                  ghostUncleHashesResult.rest
+                  ghostUncleDataResult.value,
+                  ghostUncleDataResult.rest
                 ),
                 ByteString.empty
               )
@@ -89,7 +100,7 @@ object CoinbaseData {
         d match {
           case data: CoinbaseDataV1 => encode(data.prefix) ++ data.minerData
           case data: CoinbaseDataV2 =>
-            encode(data.prefix) ++ encode(data.ghostUncleHashes) ++ data.minerData
+            encode(data.prefix) ++ encode(data.ghostUncleData) ++ data.minerData
         }
       }
     }
@@ -97,7 +108,7 @@ object CoinbaseData {
   def from(
       chainIndex: ChainIndex,
       blockTs: TimeStamp,
-      sortedGhostUncleHashes: AVector[BlockHash],
+      sortedGhostUncles: AVector[SelectedGhostUncle],
       minerData: ByteString
   )(implicit
       networkConfig: NetworkConfig
@@ -105,7 +116,7 @@ object CoinbaseData {
     val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
     val hardFork = networkConfig.getHardFork(blockTs)
     if (hardFork.isRhoneEnabled()) {
-      CoinbaseDataV2(prefix, sortedGhostUncleHashes, minerData)
+      CoinbaseDataV2(prefix, sortedGhostUncles.map(GhostUncleData.from), minerData)
     } else {
       CoinbaseDataV1(prefix, minerData)
     }
