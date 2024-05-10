@@ -128,6 +128,7 @@ object TxOutputRef {
   @inline def key(txId: TransactionId, outputIndex: Int): Key = {
     new Key(Hash.hash(txId.bytes ++ Bytes.from(outputIndex)))
   }
+
   @inline def firstContractOutputKey(contractId: ContractId): Key = {
     new Key(contractId.value)
   }

@@ -49,7 +49,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
       assets.foreach { asset =>
-        worldState.addAsset(asset.txInput.outputRef, asset.referredOutput).isRight is true
+        worldState.addAsset(asset.txInput.outputRef, asset.referredOutput, None).isRight is true
       }
       val firstInput = assets.head.referredOutput
       val firstOutput = firstInput.copy(

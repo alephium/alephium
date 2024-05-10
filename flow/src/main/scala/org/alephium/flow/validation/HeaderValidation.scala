@@ -280,7 +280,11 @@ object HeaderValidation {
       ValidationStatus
         .from(blockFlow.getNextHashTarget(header.chainIndex, header.blockDeps, header.timestamp))
         .flatMap { target =>
-          if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
+          if (target == header.target) {
+            validHeader(())
+          } else {
+            invalidHeader(InvalidWorkTarget)
+          }
         }
     }
 

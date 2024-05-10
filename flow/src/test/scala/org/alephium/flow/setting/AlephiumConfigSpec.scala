@@ -34,6 +34,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, ContractId, Difficulty, GroupIndex, NetworkId}
+import org.alephium.protocol.vm.IndexesConfig
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
@@ -266,6 +267,79 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ConfigFactory
         .parseString(configs)
         .as[LogConfig]("event-log")(ValueReader[LogConfig]) is logConfig
+    }
+  }
+
+  it should "load IndexesConfig" in {
+    val configs =
+      s"""
+         |{
+         |  indexes {
+         |    tx-output-ref-index = true
+         |  }
+         |}
+         |""".stripMargin
+
+    ConfigFactory
+      .parseString(configs)
+      .as[IndexesConfig]("indexes")(ValueReader[IndexesConfig]) is IndexesConfig(txOutputRefIndex =
+      true
+    )
+  }
+
+  it should "load NodeSetting" in {
+    {
+      info("Without indexes config")
+      // val logConfig = LogConfig.allEnabled()
+      val configs =
+        s"""
+           |{
+           |  node {
+           |    db-sync-write = false
+           |    event-log {
+           |      enabled = true
+           |      index-by-tx-id = true
+           |      index-by-block-hash = true
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      ConfigFactory
+        .parseString(configs)
+        .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
+        dbSyncWrite = false,
+        LogConfig.allEnabled(),
+        None
+      )
+    }
+
+    {
+      info("With indexes config")
+      val configs =
+        s"""
+           |{
+           |  node {
+           |    db-sync-write = false
+           |    event-log {
+           |      enabled = true
+           |      index-by-tx-id = true
+           |      index-by-block-hash = true
+           |    }
+           |    indexes {
+           |      tx-output-ref-index = true
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      ConfigFactory
+        .parseString(configs)
+        .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
+        dbSyncWrite = false,
+        LogConfig.allEnabled(),
+        Some(IndexesConfig(txOutputRefIndex = true))
+      )
     }
   }
 

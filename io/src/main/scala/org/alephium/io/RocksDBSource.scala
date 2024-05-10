@@ -36,18 +36,30 @@ object RocksDBSource {
 
   object ColumnFamily {
 
-    case object All        extends ColumnFamily("all")
-    case object Block      extends ColumnFamily("block")
-    case object Broker     extends ColumnFamily("broker")
-    case object Header     extends ColumnFamily("header")
-    case object PendingTx  extends ColumnFamily("pendingtx")
-    case object ReadyTx    extends ColumnFamily("readytx")
-    case object Trie       extends ColumnFamily("trie")
-    case object Log        extends ColumnFamily("log")
-    case object LogCounter extends ColumnFamily("logcounter")
+    case object All             extends ColumnFamily("all")
+    case object Block           extends ColumnFamily("block")
+    case object Broker          extends ColumnFamily("broker")
+    case object Header          extends ColumnFamily("header")
+    case object PendingTx       extends ColumnFamily("pendingtx")
+    case object ReadyTx         extends ColumnFamily("readytx")
+    case object Trie            extends ColumnFamily("trie")
+    case object Log             extends ColumnFamily("log")
+    case object LogCounter      extends ColumnFamily("logcounter")
+    case object TxOutputRefTxId extends ColumnFamily("txoutputreftxid")
 
     val values: AVector[ColumnFamily] =
-      AVector(All, Block, Broker, Header, Log, LogCounter, PendingTx, ReadyTx, Trie)
+      AVector(
+        All,
+        Block,
+        Broker,
+        Header,
+        Log,
+        LogCounter,
+        PendingTx,
+        ReadyTx,
+        Trie,
+        TxOutputRefTxId
+      )
   }
 
   final case class Compaction(

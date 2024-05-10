@@ -33,6 +33,7 @@ trait EmptyBlockFlow extends BlockFlow {
   implicit lazy val networkConfig              = config.network
   implicit lazy val mempoolSetting             = config.mempool
   implicit lazy val logConfig                  = config.node.eventLogConfig
+  implicit lazy val indexesConfig              = config.node.indexesConfig
 
   lazy val genesisBlocks: AVector[AVector[Block]] = config.genesisBlocks
 

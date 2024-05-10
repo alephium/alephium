@@ -85,7 +85,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.removeAsset(assetOutputRef).isLeft is true
     worldState.removeAsset(contractOutputRef).isLeft is true
 
-    update(worldState.addAsset(assetOutputRef, assetOutput))
+    update(worldState.addAsset(assetOutputRef, assetOutput, None))
     worldState.getOutput(assetOutputRef) isE assetOutput
 
     update {
@@ -152,7 +152,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val persisted = WorldState.emptyPersisted(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      newLogStorage(storage)
+      newLogStorage(storage),
+      newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefTxId)
     )
     val cached = persisted.cached()
   }
@@ -276,7 +277,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      newLogStorage(storage)
+      newLogStorage(storage),
+      newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefTxId)
     )
     val staging = worldState.staging()
 

@@ -157,6 +157,20 @@ object LogConfig {
   }
 }
 
+final case class IndexesConfig(
+    txOutputRefIndex: Boolean
+)
+
+object IndexesConfig {
+  def allEnabled(): IndexesConfig = {
+    IndexesConfig(txOutputRefIndex = true)
+  }
+
+  def disabled(): IndexesConfig = {
+    IndexesConfig(txOutputRefIndex = false)
+  }
+}
+
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def blockEnv: BlockEnv

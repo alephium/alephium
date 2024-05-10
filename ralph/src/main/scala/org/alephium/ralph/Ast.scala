@@ -18,7 +18,7 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
-import scala.annotation.tailrec
+import scala.annotation.{nowarn, tailrec}
 import scala.collection.mutable
 
 import akka.util.ByteString
@@ -1565,7 +1565,7 @@ object Ast {
       }
     }
 
-    protected def checkConstants(state: Compiler.State[Ctx]): Unit = {}
+    protected def checkConstants(@nowarn state: Compiler.State[Ctx]): Unit = {}
 
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()

@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.alephium.crypto.Byte32
 import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util.AVector
 
@@ -33,6 +33,8 @@ trait VMFactory extends StorageFixture {
     val logRefDb     = newDB[Byte32, AVector[LogStateRef]](storage, RocksDBSource.ColumnFamily.Log)
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
-    WorldState.emptyCached(trieDb, trieImmutableStateStorage, logStorage)
+    val txOutputRefTxIdStorage =
+      newDB[TxOutputRef.Key, TransactionId](storage, RocksDBSource.ColumnFamily.TxOutputRefTxId)
+    WorldState.emptyCached(trieDb, trieImmutableStateStorage, logStorage, txOutputRefTxIdStorage)
   }
 }
