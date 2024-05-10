@@ -7095,4 +7095,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.code.methods.last.instrs isnot a[MethodSelector]
     }
   }
+
+  it should "throw an error if there are conflicting method selectors" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |  pub fn $$bar() -> () {}
+         |}
+         |""".stripMargin
+
+    Compiler.compileContract(replace(code)).isRight is true
+
+    val multiContracts = Compiler.compileMultiContract(replace(code)).rightValue
+    val foo            = multiContracts.contracts.head.asInstanceOf[Ast.Contract]
+    foo.funcs(0).methodSelector = Some(foo.funcs(1).getMethodSelector(multiContracts.globalState))
+
+    val state = Compiler.State.buildFor(multiContracts, 0)(CompilerOptions.Default)
+    val error = intercept[Compiler.Error](foo.genMethods(state))
+    error.message is "Function bar's method selector conflicts with function foo's method selector. Please use a new function name."
+    error.position is code.indexOf("$")
+  }
 }

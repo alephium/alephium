@@ -2141,10 +2141,20 @@ object Ast {
     override def genMethods(
         state: Compiler.State[StatefulContext]
     ): AVector[Method[StatefulContext]] = {
+      val selectors = mutable.Map.empty[Method.Selector, FuncId]
       AVector.from(funcs.view.map { func =>
         val method = func.genMethod(state)
         if (func.isPublic && state.isUseMethodSelector(ident, func.id)) {
-          val methodSelector      = func.getMethodSelector(state.globalState)
+          val methodSelector = func.getMethodSelector(state.globalState)
+          selectors.get(methodSelector) match {
+            case Some(funcId) =>
+              throw Compiler.Error(
+                s"Function ${func.name}'s method selector conflicts with function ${funcId.name}'s method selector. Please use a new function name.",
+                func.id.sourceIndex
+              )
+            case _ => ()
+          }
+          selectors(methodSelector) = func.id
           val methodSelectorInstr = MethodSelector(methodSelector)
           method.copy(instrs = methodSelectorInstr +: method.instrs)
         } else {
