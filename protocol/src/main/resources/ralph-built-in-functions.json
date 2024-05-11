@@ -332,7 +332,7 @@
     "returns": "@returns the id of the sub contract"
   },
   {
-    "name": "<map>.insert",
+    "name": "map.insert",
     "category": "Map",
     "signature": "fn <map>.insert!(depositorAddress: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
     "doc": "Insert a key/value pair into the map. No brace syntax is required, as the minimal storage deposit will be deducted from the approved assets by the VM",
@@ -344,7 +344,7 @@
     "returns": ""
   },
   {
-    "name": "<map>.remove",
+    "name": "map.remove",
     "category": "Map",
     "signature": "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>)",
     "doc": "Remove a key from the map",
@@ -355,7 +355,7 @@
     "returns": ""
   },
   {
-    "name": "<map>.contains!",
+    "name": "map.contains",
     "category": "Map",
     "signature": "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>)",
     "doc": "Check whether the map contains a bindiing for the key",
