@@ -608,7 +608,7 @@
     "name": "mapEntryDeposit",
     "category": "Utils",
     "signature": "fn mapEntryDeposit!() -> (U256)",
-    "doc": "The amount of ALPH required to create a map entry, which is '0.1 ALPH since Rhone upgrade",
+    "doc": "The amount of ALPH required to create a map entry, which is '0.1 ALPH' since Rhone upgrade",
     "params": [
       
     ],
