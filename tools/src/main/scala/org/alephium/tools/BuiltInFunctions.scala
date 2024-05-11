@@ -78,7 +78,7 @@ object BuiltInFunctions extends App {
     )
 
     val mapInsert: FunctionInfo = FunctionInfo(
-      name = "<map>.insert",
+      name = "map.insert",
       category = BuiltIn.Category.Map.toString,
       signature =
         "fn <map>.insert!(depositorAddress: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
@@ -93,7 +93,7 @@ object BuiltInFunctions extends App {
     )
 
     val mapRemove: FunctionInfo = FunctionInfo(
-      name = "<map>.remove",
+      name = "map.remove",
       category = BuiltIn.Category.Map.toString,
       signature =
         "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>)",
@@ -106,7 +106,7 @@ object BuiltInFunctions extends App {
     )
 
     val mapContains: FunctionInfo = FunctionInfo(
-      name = "<map>.contains!",
+      name = "map.contains",
       category = BuiltIn.Category.Map.toString,
       signature = "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>)",
       doc = "Check whether the map contains a bindiing for the key",
