@@ -16,7 +16,6 @@
 
 package org.alephium.tools
 
-import scala.collection.immutable
 import scala.io.Source
 import scala.util.Using
 
@@ -24,20 +23,14 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 import upickle.default._
 
-import org.alephium.ralph.BuiltIn
-import org.alephium.tools.BuiltInFunctions.FunctionInfo
-
 class BuiltInFunctionsSpec extends AnyFlatSpecLike with Matchers {
   it should "check docs for built in functions are generated and formatted correctly" in {
     val builtInFunctionsDocPath = "../protocol/src/main/resources/ralph-built-in-functions.json"
     val builtinFunctionsDoc =
       Using(Source.fromFile(builtInFunctionsDocPath, "UTF-8"))(_.getLines().mkString("\n")).get
 
-    val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map {
-      case (_, f) =>
-        FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
-    }
-    val expectedBuiltinFunctionsDoc: String = write(allFunctions.toSeq.sorted, indent = 2)
+    val expectedBuiltinFunctionsDoc: String =
+      write(BuiltInFunctions.buildAllFunctions(), indent = 2)
 
     assert(
       expectedBuiltinFunctionsDoc == builtinFunctionsDoc,
