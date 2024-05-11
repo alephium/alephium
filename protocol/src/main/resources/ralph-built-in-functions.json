@@ -1,5 +1,15 @@
 [
   {
+    "name": "encodeFields",
+    "category": "Contract",
+    "signature": "fn <ContractName>.encodeFields!(...) -> (ByteVec, ByteVec)",
+    "doc": "Encode the fields for creating a contract",
+    "params": [
+      "@param ... the fields of the to-be-created target contract"
+    ],
+    "returns": "two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
+  },
+  {
     "name": "createContract",
     "category": "Contract",
     "signature": "fn createContract!(bytecode:ByteVec, encodedImmFields:ByteVec, encodedMutFields:ByteVec) -> (ByteVec)",
@@ -322,6 +332,39 @@
     "returns": "@returns the id of the sub contract"
   },
   {
+    "name": "<map>.insert",
+    "category": "Map",
+    "signature": "fn <map>.insert!(depositorAddress: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
+    "doc": "Insert a key/value pair into the map. No brace syntax is required, as the minimal storage deposit will be deducted from the approved assets by the VM",
+    "params": [
+      "@param depositorAddress the address to pay the minimal storage deposit (0.1 ALPH) for the new map entry",
+      "@param key the key to insert",
+      "@param value the value to insert"
+    ],
+    "returns": ""
+  },
+  {
+    "name": "<map>.remove",
+    "category": "Map",
+    "signature": "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>)",
+    "doc": "Remove a key from the map",
+    "params": [
+      "@param depositRecipient the address to receive the redeemed minimal storage deposit",
+      "@param key the key to remove"
+    ],
+    "returns": ""
+  },
+  {
+    "name": "<map>.contains!",
+    "category": "Map",
+    "signature": "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>)",
+    "doc": "Check whether the map contains a bindiing for the key",
+    "params": [
+      "@param key the key to check"
+    ],
+    "returns": "true if there is a binding for key in this map, false otherwise"
+  },
+  {
     "name": "approveToken",
     "category": "Asset",
     "signature": "fn approveToken!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
@@ -565,7 +608,7 @@
     "name": "mapEntryDeposit",
     "category": "Utils",
     "signature": "fn mapEntryDeposit!() -> (U256)",
-    "doc": "The amount of ALPH required to create a map entry",
+    "doc": "The amount of ALPH required to create a map entry, which is '0.1 ALPH since Rhone upgrade",
     "params": [
       
     ],
