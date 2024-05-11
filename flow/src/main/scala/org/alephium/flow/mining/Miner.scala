@@ -174,11 +174,9 @@ trait Miner extends BaseActor with MinerState {
     val totalCount = getMiningCount(fromShift, to)
     val txCount    = block.transactions.length
     log.debug(s"MiningCounts: $countsToString")
-    val minerAddress =
-      Address.Asset(block.coinbase.unsigned.fixedOutputs.head.lockupScript).toBase58
     log.info(
       s"A new block ${block.hash.toHexString} got mined for $chainIndex, tx: $txCount, " +
-        s"miningCount: $totalCount, target: ${block.header.target}, miner: $minerAddress"
+        s"miningCount: $totalCount, target: ${block.header.target}"
     )
   }
 
@@ -212,7 +210,7 @@ trait Miner extends BaseActor with MinerState {
     }(context.dispatcher)
     task.onComplete {
       case Success(_) => ()
-      case Failure(e) => log.debug(s"Mining task failed ${e.getMessage}")
+      case Failure(e) => log.debug(s"Mining task failed: ${e.getMessage}")
     }(context.dispatcher)
   }
 }

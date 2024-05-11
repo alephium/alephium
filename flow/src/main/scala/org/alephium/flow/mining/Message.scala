@@ -117,13 +117,14 @@ object Job {
     )
   }
 
+  private val emptyTxsBlob = ByteString(0)
   def from(template: BlockFlowTemplate): Job = {
     val blobs = MiningBlob.from(template)
     Job(
       template.index.from.value,
       template.index.to.value,
       blobs.headerBlob,
-      blobs.txsBlob,
+      emptyTxsBlob, // Don't send transactions to miners
       blobs.target
     )
   }

@@ -31,9 +31,9 @@ import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Nonce}
 import org.alephium.serde.{deserialize, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Hex}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex}
 
 object MinerApiController {
   def props(allHandlers: AllHandlers)(implicit
@@ -89,6 +89,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   var latestJobs: Option[AVector[Job]]                                   = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
+  val jobCache: Cache[ByteString, BlockFlowTemplate] = Cache.fifo(brokerConfig.chainNum * 10)
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
@@ -150,17 +151,30 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           acc ++ AVector.from(templates.view.map(Job.from))
       }
     latestJobs = Some(jobs)
+    jobs.foreachWithIndex { case (job, index) =>
+      val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
+      jobCache.put(job.headerBlob, template)
+    }
     connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
   }
 
   def handleClientMessage(message: ClientMessage): Unit = message match {
     case SubmitBlock(blockBlob) =>
+      val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
+      val headerKey = header.drop(Nonce.byteLength)
       deserialize[Block](blockBlob) match {
         case Right(block) =>
-          submit(block)
-          log.info(
-            s"A new block ${block.hash.toHexString} got mined for ${block.chainIndex}, tx: ${block.transactions.length}, target: ${block.header.target}"
-          )
+          jobCache.get(headerKey) match {
+            case Some(template) =>
+              submit(block.copy(transactions = template.transactions))
+              log.info(
+                s"A new block ${block.hash.toHexString} got mined for ${block.chainIndex}, tx: ${block.transactions.length}, target: ${block.header.target}"
+              )
+            case None =>
+              log.error(
+                s"The job for the block is expired: ${Hex.toHexString(blockBlob)}"
+              )
+          }
         case Left(error) =>
           log.error(
             s"Deserialization error for submited block: $error : ${Hex.toHexString(blockBlob)}"
