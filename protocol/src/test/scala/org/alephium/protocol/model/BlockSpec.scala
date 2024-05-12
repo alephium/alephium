@@ -33,6 +33,15 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val bytes  = serialize[Block](block)
       val output = deserialize[Block](bytes).rightValue
       output is block
+
+      // check serialization cache
+      block.getSerialized().value is bytes
+      val headerBytes = block.header.getSerialized().value
+      headerBytes is bytes.take(headerBytes.length)
+
+      // check deserialization cache
+      output.getSerialized().value is bytes
+      output.header.getSerialized().value is headerBytes
     }
   }
 
