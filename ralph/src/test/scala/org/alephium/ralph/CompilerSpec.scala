@@ -5975,6 +5975,35 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Found unused maps in Foo: map"
       )
     }
+
+    {
+      info("Check external caller for map update")
+      def code(statement: String, annotation: String = "") =
+        s"""
+           |Contract Foo(@unused address: Address) {
+           |  mapping[U256, U256] map
+           |  $annotation
+           |  pub fn foo() -> () {
+           |    $statement
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+      val updateStatements =
+        Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
+      updateStatements.foreach { statement =>
+        Compiler.compileContractFull(code(statement)).rightValue.warnings is warnings
+        Compiler
+          .compileContractFull(code(statement, "@using(checkExternalCaller = false)"))
+          .rightValue
+          .warnings is AVector.empty[String]
+      }
+      Compiler.compileContractFull(code("let _ = map[0]")).rightValue.warnings is
+        AVector.empty[String]
+      Compiler.compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings is
+        AVector.empty[String]
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {

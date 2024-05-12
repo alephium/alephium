@@ -1150,6 +1150,18 @@ object Ast {
       }
     }
 
+    @inline private def isUpdateMap(state: Compiler.State[Ctx]): Boolean = {
+      body.exists {
+        case _: InsertToMap | _: RemoveFromMap => true
+        case Assign(targets, _) =>
+          targets.exists {
+            case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
+            case _                                  => false
+          }
+        case _ => false
+      }
+    }
+
     def isSimpleViewFunc(state: Compiler.State[Ctx]): Boolean = {
       val hasInterfaceFuncCall = state.hasInterfaceFuncCallSet.contains(id)
       val hasMigrateSimple = body.exists {
@@ -1160,7 +1172,8 @@ object Ast {
         || usePreapprovedAssets
         || useAssetsInContract != Ast.NotUseContractAssets
         || hasInterfaceFuncCall
-        || hasMigrateSimple)
+        || hasMigrateSimple
+        || isUpdateMap(state))
     }
 
     lazy val signature: FuncSignature = FuncSignature(
