@@ -24,7 +24,7 @@ import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.LogConfig
+import org.alephium.protocol.vm.{IndexesConfig, LogConfig}
 import org.alephium.util.{ActorRefT, EventBus}
 
 final case class AllHandlers(
@@ -71,7 +71,8 @@ object AllHandlers {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
   ): AllHandlers = {
     build(system, blockFlow, eventBus, "", storages)
   }
@@ -90,7 +91,8 @@ object AllHandlers {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
   ): AllHandlers = {
     val flowProps = FlowHandler.props(blockFlow)
     val flowHandler =
@@ -113,7 +115,8 @@ object AllHandlers {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
   ): AllHandlers = {
     val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
@@ -140,7 +143,6 @@ object AllHandlers {
       headerHandlers
     )
   }
-  // scalastyle:on parameter.number
 
   private def buildBlockHandlers(
       system: ActorSystem,
@@ -151,7 +153,8 @@ object AllHandlers {
       brokerConfig: BrokerConfig,
       consensusConfig: ConsensusConfig,
       networkSetting: NetworkSetting,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
   ): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
     val handlers = for {
       from <- 0 until brokerConfig.groups
@@ -168,6 +171,7 @@ object AllHandlers {
     }
     handlers.toMap
   }
+  // scalastyle:on parameter.number
 
   private def buildHeaderHandlers(
       system: ActorSystem,

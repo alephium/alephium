@@ -73,6 +73,7 @@ object Node {
     implicit private val miningSetting        = config.mining
     implicit private val memPoolSetting       = config.mempool
     implicit private val logConfig            = config.node.eventLogConfig
+    implicit private val indexesConfig        = config.node.indexesConfig
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 

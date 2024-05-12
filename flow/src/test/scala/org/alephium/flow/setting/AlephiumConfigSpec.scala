@@ -276,21 +276,22 @@ class AlephiumConfigSpec extends AlephiumSpec {
          |{
          |  indexes {
          |    tx-output-ref-index = true
+         |    subcontract-index = true
          |  }
          |}
          |""".stripMargin
 
     ConfigFactory
       .parseString(configs)
-      .as[IndexesConfig]("indexes")(ValueReader[IndexesConfig]) is IndexesConfig(txOutputRefIndex =
-      true
+      .as[IndexesConfig]("indexes")(ValueReader[IndexesConfig]) is IndexesConfig(
+      txOutputRefIndex = true,
+      subcontractIndex = true
     )
   }
 
   it should "load NodeSetting" in {
     {
       info("Without indexes config")
-      // val logConfig = LogConfig.allEnabled()
       val configs =
         s"""
            |{
@@ -328,6 +329,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
            |    }
            |    indexes {
            |      tx-output-ref-index = true
+           |      subcontract-index = false
            |    }
            |  }
            |}
@@ -338,7 +340,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
         .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
         dbSyncWrite = false,
         LogConfig.allEnabled(),
-        Some(IndexesConfig(txOutputRefIndex = true))
+        Some(IndexesConfig(txOutputRefIndex = true, subcontractIndex = false))
       )
     }
   }

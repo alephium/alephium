@@ -29,6 +29,11 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.subcontract.{
+  SubContractIndexState,
+  SubContractIndexStateId,
+  SubContractIndexStorage
+}
 import org.alephium.util.AVector
 
 object Storages {
@@ -59,12 +64,29 @@ object Storages {
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
     val txOutputRefTxIdStorage =
       RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefTxId, writeOptions)
+    val parentContractIndexStorage =
+      RocksDBKeyValueStorage[ContractId, ContractId](db, ParentContract, writeOptions)
+    val subContractIndexStateStorage =
+      RocksDBKeyValueStorage[SubContractIndexStateId, SubContractIndexState](
+        db,
+        SubContract,
+        writeOptions
+      )
+    val subContractIndexCounterStorage =
+      RocksDBKeyValueStorage[ContractId, Int](db, SubContractCounter, writeOptions)
+    val subContractIndexStorage = SubContractIndexStorage(
+      parentContractIndexStorage,
+      subContractIndexStateStorage,
+      subContractIndexCounterStorage
+    )
+
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
         trieImmutableStateStorage,
         logStorage,
         txOutputRefTxIdStorage,
+        subContractIndexStorage,
         db,
         All,
         writeOptions
@@ -74,7 +96,8 @@ object Storages {
         trieStorage,
         trieImmutableStateStorage,
         logStorage,
-        txOutputRefTxIdStorage
+        txOutputRefTxIdStorage,
+        subContractIndexStorage
       )
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)

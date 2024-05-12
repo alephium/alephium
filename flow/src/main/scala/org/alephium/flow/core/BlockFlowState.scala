@@ -22,12 +22,13 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, KeyValueStorage}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.subcontract.SubContractIndexStorage
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -72,6 +73,16 @@ trait BlockFlowState extends FlowTipsUtil {
   val logStorage: LogStorage = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
     intraGroupBlockChains.head.worldStateStorage.logStorage
+  }
+
+  val txOutputRefTxIdStorage: KeyValueStorage[TxOutputRef.Key, TransactionId] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.txOutputRefTxIdStorage
+  }
+
+  val subContractIndexStorage: SubContractIndexStorage = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.subContractIndexStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =

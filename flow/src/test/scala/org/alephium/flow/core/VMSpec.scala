@@ -19,6 +19,8 @@ package org.alephium.flow.core
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -4937,6 +4939,114 @@ class VMSpec extends AlephiumSpec with Generators {
       )
     }
     // format: on
+  }
+
+  trait SubContractIndexesFixture extends ContractFixture {
+    def subcontractIndexEnabled: Boolean
+    override val configValues = Map(
+      "alephium.node.indexes.subcontract-index"   -> s"$subcontractIndexEnabled",
+      "alephium.node.indexes.tx-output-ref-index" -> "false"
+    )
+
+    val subContractRaw: String =
+      s"""
+         |Contract SubContract() {
+         |  pub fn call() -> () {}
+         |}
+         |""".stripMargin
+
+    val subContractTemplateId = createContract(subContractRaw)._1.toHexString
+
+    val parentContractRaw: String =
+      s"""
+         |Contract ParentContract() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn createSingleSubContract(index: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index), #$subContractTemplateId, #00, #00)
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  pub fn createMultipleSubContracts(index1: U256, index2: U256, index3: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index1), #$subContractTemplateId, #00, #00)
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index2), #$subContractTemplateId, #00, #00)
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index3), #$subContractTemplateId, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val parentContractId = createContract(parentContractRaw)._1
+
+    def getSubContractId(index: Int): ContractId = {
+      parentContractId.subContractId(ByteString.fromInts(index), chainIndex.from)
+    }
+
+    def createSingleSubContract(index: Int): ContractId = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  ParentContract(#${parentContractId.toHexString}).createSingleSubContract{@$genesisAddress -> ALPH: 1 alph}($index)
+           |}
+           |$parentContractRaw
+           |""".stripMargin
+      )
+
+      getSubContractId(index)
+    }
+
+    def createMultipleSubContracts(
+        index1: Int,
+        index2: Int,
+        index3: Int
+    ): ArrayBuffer[ContractId] = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  ParentContract(#${parentContractId.toHexString}).createMultipleSubContracts{@$genesisAddress -> ALPH: 3 alph}($index1, $index2, $index3)
+           |}
+           |$parentContractRaw
+           |""".stripMargin
+      )
+
+      ArrayBuffer(getSubContractId(index1), getSubContractId(index2), getSubContractId(index3))
+    }
+  }
+
+  it should "not create subcontract indexes when it is disabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = false
+
+    val subContractId = createSingleSubContract(1)
+    blockFlow.getParentContractId(subContractId) isE None
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE None
+    blockFlow.getSubContractIds(parentContractId, 0, 1) isE (0, AVector.empty)
+  }
+
+  it should "create subcontract indexes when it is enabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = true
+
+    val subContracts = ArrayBuffer.empty[ContractId]
+
+    val subContractId1 = createSingleSubContract(1)
+    subContracts += subContractId1
+    blockFlow.getParentContractId(subContractId1) isE Some(parentContractId)
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(1)
+    blockFlow.getSubContractIds(parentContractId, 0, 1) isE (1, AVector.from(subContracts))
+
+    val subContracts234 = createMultipleSubContracts(2, 3, 4)
+    subContracts ++= subContracts234
+    subContracts234.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(2)
+    blockFlow.getSubContractIds(parentContractId, 0, 2) isE (2, AVector.from(subContracts))
+
+    val subContractId5 = createSingleSubContract(5)
+    subContracts += subContractId5
+    blockFlow.getParentContractId(subContractId5) isE Some(parentContractId)
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(3)
+    blockFlow.getSubContractIds(parentContractId, 0, 3) isE (3, AVector.from(subContracts))
+
+    val subContracts678 = createMultipleSubContracts(6, 7, 8)
+    subContracts ++= subContracts678
+    subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
+    blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
   }
 
   private def getEvents(

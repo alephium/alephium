@@ -437,6 +437,7 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
+  // scalastyle:off parameter.number
   def runTxScript(
       worldState: WorldState.Staging,
       blockEnv: BlockEnv,
@@ -444,10 +445,15 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScript(context, script)
   }
+  // scalastyle:on parameter.number
 
   def runTxScript(
       context: StatefulContext,
@@ -459,6 +465,7 @@ object StatefulVM {
     } yield result
   }
 
+  // scalastyle:off parameter.number
   def runTxScriptMockup(
       worldState: WorldState.Staging,
       blockEnv: BlockEnv,
@@ -466,10 +473,15 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScriptMockup(context, script)
   }
+  // scalastyle:on parameter.number
 
   def runTxScriptMockup(
       context: StatefulContext,

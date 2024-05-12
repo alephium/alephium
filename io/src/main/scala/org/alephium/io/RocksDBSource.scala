@@ -36,16 +36,19 @@ object RocksDBSource {
 
   object ColumnFamily {
 
-    case object All             extends ColumnFamily("all")
-    case object Block           extends ColumnFamily("block")
-    case object Broker          extends ColumnFamily("broker")
-    case object Header          extends ColumnFamily("header")
-    case object PendingTx       extends ColumnFamily("pendingtx")
-    case object ReadyTx         extends ColumnFamily("readytx")
-    case object Trie            extends ColumnFamily("trie")
-    case object Log             extends ColumnFamily("log")
-    case object LogCounter      extends ColumnFamily("logcounter")
-    case object TxOutputRefTxId extends ColumnFamily("txoutputreftxid")
+    case object All                extends ColumnFamily("all")
+    case object Block              extends ColumnFamily("block")
+    case object Broker             extends ColumnFamily("broker")
+    case object Header             extends ColumnFamily("header")
+    case object PendingTx          extends ColumnFamily("pendingtx")
+    case object ReadyTx            extends ColumnFamily("readytx")
+    case object Trie               extends ColumnFamily("trie")
+    case object Log                extends ColumnFamily("log")
+    case object LogCounter         extends ColumnFamily("logcounter")
+    case object TxOutputRefTxId    extends ColumnFamily("txoutputreftxid")
+    case object ParentContract     extends ColumnFamily("parentcontract")
+    case object SubContract        extends ColumnFamily("subcontract")
+    case object SubContractCounter extends ColumnFamily("subcontractcounter")
 
     val values: AVector[ColumnFamily] =
       AVector(
@@ -55,8 +58,11 @@ object RocksDBSource {
         Header,
         Log,
         LogCounter,
+        ParentContract,
         PendingTx,
         ReadyTx,
+        SubContract,
+        SubContractCounter,
         Trie,
         TxOutputRefTxId
       )

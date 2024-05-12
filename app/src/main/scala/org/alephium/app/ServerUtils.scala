@@ -52,6 +52,7 @@ class ServerUtils(implicit
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     logConfig: LogConfig,
+    indexesConfig: IndexesConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
   import ServerUtils._

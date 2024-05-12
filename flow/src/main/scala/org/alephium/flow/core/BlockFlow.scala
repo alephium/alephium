@@ -35,7 +35,6 @@ import org.alephium.util.{AVector, Env, Files, TimeStamp}
 trait BlockFlow
     extends MultiChain
     with BlockFlowState
-    with IndexesUtils
     with FlowUtils
     with ConflictedBlocks
     with BlockFlowValidation {

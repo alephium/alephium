@@ -16,16 +16,61 @@
 
 package org.alephium.flow.core
 
-import org.alephium.io.IOResult
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 
-trait IndexesUtils { Self: BlockFlowState =>
-  def getTransactionId(outputRef: TxOutputRef)(implicit config: GroupConfig): IOResult[Option[TransactionId]] = {
-    val groupIndex = outputRef.hint.groupIndex(config)
-    for {
-      worldState <- getBestPersistedWorldState(groupIndex)
-      result <- worldState.txOutputRefTxId.getOpt(outputRef.key)
-    } yield result
+import org.alephium.io.IOResult
+import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.subcontract.SubContractIndexStateId
+import org.alephium.util.AVector
+
+trait IndexesUtils { Self: FlowUtils =>
+  def getTransactionId(
+      outputRef: TxOutputRef
+  ): IOResult[Option[TransactionId]] = {
+    txOutputRefTxIdStorage.getOpt(outputRef.key)
+  }
+
+  def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {
+    subContractIndexStorage.parentContractIndexState.getOpt(contractId)
+  }
+
+  def getSubContractIds(
+      contractId: ContractId,
+      start: Int,
+      end: Int
+  ): IOResult[(Int, AVector[ContractId])] = {
+    assume(start < end)
+    val allSubContracts: ArrayBuffer[ContractId] = ArrayBuffer.empty
+    var nextCount                                = start
+
+    @tailrec
+    def rec(
+        subContractIndexStateId: SubContractIndexStateId
+    ): IOResult[Unit] = {
+      subContractIndexStorage.subContractIndexStates.getOpt(subContractIndexStateId) match {
+        case Right(Some(subContractIndexState)) =>
+          allSubContracts ++= subContractIndexState.subContracts
+          nextCount = subContractIndexStateId.counter + 1
+          if (nextCount < end) {
+            rec(SubContractIndexStateId(subContractIndexStateId.contractId, nextCount))
+          } else {
+            Right(())
+          }
+        case Right(None) =>
+          Right(())
+        case Left(error) =>
+          Left(error)
+      }
+    }
+
+    rec(SubContractIndexStateId(contractId, nextCount)).map(_ =>
+      (nextCount, AVector.from(allSubContracts))
+    )
+  }
+
+  def getSubContractsCurrentCount(parentContractId: ContractId): IOResult[Option[Int]] = {
+    subContractIndexStorage.subContractIndexCounterState.getOpt(parentContractId)
   }
 }

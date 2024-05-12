@@ -76,7 +76,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       txEnv,
       cachedWorldState.staging(),
       gasLimit
-    )(networkConfig, LogConfig.allEnabled())
+    )(networkConfig, LogConfig.allEnabled(), IndexesConfig.allEnabled())
   }
 
   def prepareStatefulScript(
@@ -125,6 +125,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
       def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
       def logConfig: LogConfig                         = LogConfig.allEnabled()
+      def indexesConfig: IndexesConfig                 = IndexesConfig.allEnabled()
       var gasRemaining: GasBox                         = gasLimit
     }
     obj -> context

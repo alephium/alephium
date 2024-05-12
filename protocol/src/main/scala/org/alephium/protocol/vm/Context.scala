@@ -158,16 +158,17 @@ object LogConfig {
 }
 
 final case class IndexesConfig(
-    txOutputRefIndex: Boolean
+    txOutputRefIndex: Boolean,
+    subcontractIndex: Boolean
 )
 
 object IndexesConfig {
   def allEnabled(): IndexesConfig = {
-    IndexesConfig(txOutputRefIndex = true)
+    IndexesConfig(txOutputRefIndex = true, subcontractIndex = true)
   }
 
   def disabled(): IndexesConfig = {
-    IndexesConfig(txOutputRefIndex = false)
+    IndexesConfig(txOutputRefIndex = false, subcontractIndex = false)
   }
 }
 
@@ -270,6 +271,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def outputBalances: MutBalances
 
   def logConfig: LogConfig
+
+  def indexesConfig: IndexesConfig
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
@@ -489,6 +492,21 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
     result.left.map(e => Left(IOErrorWriteLog(e)))
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def writeSubContractIndexes(
+      parentContract: Option[ContractId],
+      contractId: ContractId
+  ): ExeResult[Unit] = {
+    if (parentContract.nonEmpty && indexesConfig.subcontractIndex) {
+      worldState.subContractIndexState
+        .createSubContractIndexes(parentContract.get, contractId)
+        .left
+        .map(e => Left(IOErrorCreateSubContractIndex(e)))
+    } else {
+      Right(())
+    }
+  }
 }
 
 object StatefulContext {
@@ -497,7 +515,11 @@ object StatefulContext {
       txEnv: TxEnv,
       worldState: WorldState.Staging,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
+  ): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
@@ -507,7 +529,11 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      indexesConfig: IndexesConfig
+  ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
@@ -517,8 +543,11 @@ object StatefulContext {
       val txEnv: TxEnv,
       val worldState: WorldState.Staging,
       var gasRemaining: GasBox
-  )(implicit val networkConfig: NetworkConfig, val logConfig: LogConfig)
-      extends StatefulContext {
+  )(implicit
+      val networkConfig: NetworkConfig,
+      val logConfig: LogConfig,
+      val indexesConfig: IndexesConfig
+  ) extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 
     def nextOutputIndex: Int = txEnv.fixedOutputs.length + generatedOutputs.length

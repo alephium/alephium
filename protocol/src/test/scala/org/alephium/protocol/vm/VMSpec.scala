@@ -266,6 +266,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
         def logConfig: LogConfig           = LogConfig.allEnabled()
+        def indexesConfig: IndexesConfig   = IndexesConfig.allEnabled()
 
         def getInitialBalances(): ExeResult[MutBalances] = {
           Right(

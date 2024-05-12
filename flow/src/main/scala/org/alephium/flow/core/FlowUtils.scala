@@ -42,11 +42,13 @@ trait FlowUtils
     with LogUtils
     with ContractUtils
     with ConflictedBlocks
+    with IndexesUtils
     with LazyLogging { Self: BlockFlow =>
   implicit def mempoolSetting: MemPoolSetting
   implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
   implicit def logConfig: LogConfig
+  implicit def indexesConfig: IndexesConfig
 
   val blockFlow = Self
 
@@ -266,7 +268,7 @@ trait FlowUtils
   }
 
   lazy val templateValidator =
-    BlockValidation.build(brokerConfig, networkConfig, consensusConfig, logConfig)
+    BlockValidation.build(brokerConfig, networkConfig, consensusConfig, logConfig, indexesConfig)
   def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate

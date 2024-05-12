@@ -21,6 +21,7 @@ import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.subcontract._
 import org.alephium.util.AVector
 
 trait VMFactory extends StorageFixture {
@@ -35,6 +36,25 @@ trait VMFactory extends StorageFixture {
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
     val txOutputRefTxIdStorage =
       newDB[TxOutputRef.Key, TransactionId](storage, RocksDBSource.ColumnFamily.TxOutputRefTxId)
-    WorldState.emptyCached(trieDb, trieImmutableStateStorage, logStorage, txOutputRefTxIdStorage)
+    val parentContractIndexStorage =
+      newDB[ContractId, ContractId](storage, RocksDBSource.ColumnFamily.ParentContract)
+    val subContractIndexStateStorage = newDB[SubContractIndexStateId, SubContractIndexState](
+      storage,
+      RocksDBSource.ColumnFamily.SubContract
+    )
+    val subContractIndexCounterStorage =
+      newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.SubContractCounter)
+    val subContractIndexStorage = SubContractIndexStorage(
+      parentContractIndexStorage,
+      subContractIndexStateStorage,
+      subContractIndexCounterStorage
+    )
+    WorldState.emptyCached(
+      trieDb,
+      trieImmutableStateStorage,
+      logStorage,
+      txOutputRefTxIdStorage,
+      subContractIndexStorage
+    )
   }
 }
