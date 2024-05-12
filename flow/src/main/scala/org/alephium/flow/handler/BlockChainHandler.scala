@@ -101,6 +101,9 @@ class BlockChainHandler(
   override def receive: Receive = validate orElse updateNodeSyncStatus
 
   def validate: Receive = { case Validate(block, broker, origin) =>
+    if (origin == DataOrigin.Local) {
+      cacheAndBroadcast(block, origin)
+    }
     handleData(block, broker, origin)
   }
 
@@ -110,15 +113,22 @@ class BlockChainHandler(
   ): ValidationResult[InvalidBlockStatus, Option[WorldState.Cached]] = {
     for {
       _ <- validator.headerValidation.validate(block.header, blockFlow)
-      blockMsgOpt = {
-        blockFlow.cacheHeaderVerifiedBlock(block)
-        interCliqueBroadcast(block, origin)
-      }
+      blockMsgOpt =
+        if (origin != DataOrigin.Local) {
+          cacheAndBroadcast(block, origin)
+        } else {
+          None
+        }
       sideResult <- validator.checkBlockAfterHeader(block, blockFlow)
     } yield {
       intraCliqueBroadCast(block, blockMsgOpt, origin)
       sideResult
     }
+  }
+
+  private def cacheAndBroadcast(block: Block, origin: DataOrigin) = {
+    blockFlow.cacheHeaderVerifiedBlock(block)
+    interCliqueBroadcast(block, origin)
   }
 
   private def interCliqueBroadcast(
