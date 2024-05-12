@@ -1055,6 +1055,10 @@ object Ast {
       }
       vars.zip(types).foreach {
         case (NamedVar(isMutable, ident), tpe) =>
+          if (tpe.isMapType) {
+            throw Compiler
+              .Error(s"Cannot define local map variable ${ident.name}", ident.sourceIndex)
+          }
           state.addLocalVariable(ident, tpe, isMutable, isUnused = false, isGenerated = false)
         case _ =>
       }

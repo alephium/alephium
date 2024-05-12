@@ -5856,19 +5856,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Assign to local map variable")
+      info("Cannot define local map variables")
       val code =
         s"""
            |Contract Foo() {
            |  mapping[U256, U256] map0
            |  mapping[U256, ByteVec] map1
            |  pub fn f() -> () {
-           |    let mut localMap0 = map0
-           |    $$localMap0 = map1$$
+           |    let mut $$localMap0$$ = map0
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Cannot assign \"Map[U256,ByteVec]\" to \"Map[U256,U256]\"")
+      testContractError(code, "Cannot define local map variable localMap0")
     }
 
     {
