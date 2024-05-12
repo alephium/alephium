@@ -94,7 +94,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.removeAsset(assetOutputRef).isLeft is true
     worldState.removeAsset(contractOutputRef).isLeft is true
 
-    update(worldState.addAsset(assetOutputRef, assetOutput, None))
+    update(worldState.addAsset(assetOutputRef, assetOutput, TxOutputRefIndexConfig.Disabled))
     worldState.getOutput(assetOutputRef) isE assetOutput
 
     update {

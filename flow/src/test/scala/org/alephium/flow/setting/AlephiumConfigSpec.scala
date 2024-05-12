@@ -34,8 +34,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, ContractId, Difficulty, GroupIndex, NetworkId}
-import org.alephium.protocol.vm.IndexesConfig
-import org.alephium.protocol.vm.LogConfig
+import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
 class AlephiumConfigSpec extends AlephiumSpec {
@@ -283,7 +282,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
     ConfigFactory
       .parseString(configs)
-      .as[IndexesConfig]("indexes")(ValueReader[IndexesConfig]) is IndexesConfig(
+      .as[NodeIndexesConfig]("indexes")(ValueReader[NodeIndexesConfig]) is NodeIndexesConfig(
       txOutputRefIndex = true,
       subcontractIndex = true
     )
@@ -340,7 +339,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
         .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
         dbSyncWrite = false,
         LogConfig.allEnabled(),
-        Some(IndexesConfig(txOutputRefIndex = true, subcontractIndex = false))
+        Some(NodeIndexesConfig(txOutputRefIndex = true, subcontractIndex = false))
       )
     }
   }

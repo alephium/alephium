@@ -448,7 +448,7 @@ object StatefulVM {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      indexesConfig: IndexesConfig
+      nodeIndexesConfig: NodeIndexesConfig
   ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScript(context, script)
@@ -476,7 +476,7 @@ object StatefulVM {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      indexesConfig: IndexesConfig
+      nodeIndexesConfig: NodeIndexesConfig
   ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScriptMockup(context, script)

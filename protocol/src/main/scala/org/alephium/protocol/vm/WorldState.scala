@@ -136,7 +136,11 @@ trait WorldState[T, R1, R2, R3] {
     } yield state.toObject(key, code)
   }
 
-  def addAsset(outputRef: TxOutputRef, output: TxOutput, txId: Option[TransactionId]): IOResult[T]
+  def addAsset(
+      outputRef: TxOutputRef,
+      output: TxOutput,
+      indexConfig: TxOutputRefIndexConfig
+  ): IOResult[T]
 
   def createContractUnsafe(
       contractId: ContractId,
@@ -343,13 +347,13 @@ object WorldState {
     def addAsset(
         outputRef: TxOutputRef,
         output: TxOutput,
-        txId: Option[TransactionId]
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Persisted] = {
       for {
         updateOutputState <- outputState.put(outputRef, output)
-        _ <- txId match {
-          case Some(id) => txOutputRefTxId.put(outputRef.key, id)
-          case None     => Right(())
+        _ <- indexConfig match {
+          case TxOutputRefIndexConfig.Enabled(id) => txOutputRefTxId.put(outputRef.key, id)
+          case TxOutputRefIndexConfig.Disabled    => Right(())
         }
       } yield {
         Persisted(
@@ -521,13 +525,13 @@ object WorldState {
     def addAsset(
         outputRef: TxOutputRef,
         output: TxOutput,
-        txId: Option[TransactionId]
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Unit] = {
       for {
         _ <- outputState.put(outputRef, output)
-        _ <- txId match {
-          case Some(txId) => txOutputRefTxIdState.put(outputRef.key, txId)
-          case None       => Right(())
+        _ <- indexConfig match {
+          case TxOutputRefIndexConfig.Enabled(txId) => txOutputRefTxIdState.put(outputRef.key, txId)
+          case TxOutputRefIndexConfig.Disabled      => Right(())
         }
       } yield ()
     }

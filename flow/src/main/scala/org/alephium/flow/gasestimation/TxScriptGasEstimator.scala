@@ -37,7 +37,7 @@ object TxScriptGasEstimator {
       networkConfig: NetworkConfig,
       config: GroupConfig,
       logConfig: LogConfig,
-      indexesConfig: IndexesConfig
+      nodeIndexesConfig: NodeIndexesConfig
   ) extends TxScriptGasEstimator {
     def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       val chainIndexOpt =

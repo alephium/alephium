@@ -35,7 +35,7 @@ import org.alephium.flow.validation._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{IndexesConfig, LockupScript, LogConfig}
+import org.alephium.protocol.vm.{LockupScript, LogConfig, NodeIndexesConfig}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -45,7 +45,7 @@ object TxHandler {
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig,
-      indexesConfig: IndexesConfig
+      nodeIndexesConfig: NodeIndexesConfig
   ): Props = Props(new TxHandler(blockFlow, txStorage))
 
   sealed trait Command
@@ -162,7 +162,7 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
     memPoolSetting: MemPoolSetting,
     val networkSetting: NetworkSetting,
     logConfig: LogConfig,
-    indexesConfig: IndexesConfig
+    nodeIndexesConfig: NodeIndexesConfig
 ) extends TxCoreHandler
     with TxHandlerPersistence
     with BroadcastTxsHandler

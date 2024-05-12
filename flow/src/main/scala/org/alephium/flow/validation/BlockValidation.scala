@@ -22,7 +22,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{BlockEnv, GasPrice, IndexesConfig, LogConfig, WorldState}
+import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, NodeIndexesConfig, WorldState}
 import org.alephium.serde._
 import org.alephium.util.{EitherF, U256}
 
@@ -403,7 +403,7 @@ object BlockValidation {
       blockFlow.networkConfig,
       blockFlow.consensusConfig,
       blockFlow.logConfig,
-      blockFlow.indexesConfig
+      blockFlow.nodeIndexesConfig
     )
 
   def build(implicit
@@ -411,7 +411,7 @@ object BlockValidation {
       networkConfig: NetworkConfig,
       consensusConfig: ConsensusConfig,
       logConfig: LogConfig,
-      indexesConfig: IndexesConfig
+      nodeIndexesConfig: NodeIndexesConfig
   ): BlockValidation = new Impl()
 
   class Impl(implicit
@@ -419,7 +419,7 @@ object BlockValidation {
       val networkConfig: NetworkConfig,
       val consensusConfig: ConsensusConfig,
       val logConfig: LogConfig,
-      val indexesConfig: IndexesConfig
+      val nodeIndexesConfig: NodeIndexesConfig
   ) extends BlockValidation {
     override def headerValidation: HeaderValidation  = HeaderValidation.build
     override def nonCoinbaseValidation: TxValidation = TxValidation.build
