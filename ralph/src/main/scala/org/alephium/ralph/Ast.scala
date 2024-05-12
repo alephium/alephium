@@ -2136,6 +2136,14 @@ object Ast {
 
     private def checkMaps(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(maps, "maps")
+      maps.find(mapDef => fields.exists(_.ident == mapDef.ident)) match {
+        case Some(mapDef) =>
+          throw Compiler.Error(
+            s"The map ${mapDef.ident.name} cannot have the same name as the contract field",
+            mapDef.ident.sourceIndex
+          )
+        case _ => ()
+      }
       maps.view.zipWithIndex.foreach { case (m, index) =>
         val mapType = Type.Map(m.tpe.key, state.resolveType(m.tpe.value))
         state.addMapVar(m.ident, mapType, index)

@@ -6004,6 +6004,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings is
         AVector.empty[String]
     }
+
+    {
+      info("Map cannot have the same name as the contract field")
+      val code =
+        s"""
+           |Contract Foo(@unused counters: [U256; 2]) {
+           |  mapping[U256, U256] $$counters$$
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(code, "The map counters cannot have the same name as the contract field")
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
