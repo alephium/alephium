@@ -5785,6 +5785,53 @@ class VMSpec extends AlephiumSpec with Generators {
     subContractNotExist(mapKey)
   }
 
+  it should "test create contract with map entry" in new ContractFixture {
+    val baz =
+      s"""
+         |struct Foo { mut x: U256, y: U256 }
+         |Contract Baz(mut foo: Foo) {
+         |  pub fn getFoo() -> Foo { return foo }
+         |}
+         |""".stripMargin
+    val bazContractCode = serialize(Compiler.compileContractFull(baz).rightValue.code)
+
+    val bar =
+      s"""
+         |Contract Bar() {
+         |  mapping[U256, Foo] map
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn createBaz() -> () {
+         |    map.insert!(@$genesisAddress, 0, Foo { x: 0, y: 1 })
+         |    let (encodedImmFields, encodedMutFields) = Baz.encodeFields!(map[0])
+         |    let bazId = createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(
+         |      #${Hex.toHexString(bazContractCode)},
+         |      encodedImmFields,
+         |      encodedMutFields
+         |    )
+         |    let baz = Baz(bazId)
+         |    let Foo { x, y } = baz.getFoo()
+         |    assert!(x == 0, 0)
+         |    assert!(y == 1, 0)
+         |  }
+         |}
+         |$baz
+         |""".stripMargin
+
+    val barId = createContract(bar)._1.toHexString
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let bar = Bar(#$barId)
+         |  bar.createBaz{@$genesisAddress -> ALPH: ${minimalAlphInContract * 2}}()
+         |}
+         |$bar
+         |""".stripMargin
+
+    callTxScript(script)
+  }
+
   it should "test maximum field length for map value" in new ContractFixture {
     val maxFieldSize = 0xff
     def code(mutable: Boolean) = {

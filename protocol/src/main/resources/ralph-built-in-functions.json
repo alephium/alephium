@@ -346,7 +346,7 @@
   {
     "name": "map.remove",
     "category": "Map",
-    "signature": "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>)",
+    "signature": "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
     "doc": "Remove a key from the map",
     "params": [
       "@param depositRecipient the address to receive the redeemed minimal storage deposit",
@@ -357,7 +357,7 @@
   {
     "name": "map.contains",
     "category": "Map",
-    "signature": "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>)",
+    "signature": "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>) -> Bool",
     "doc": "Check whether the map contains a bindiing for the key",
     "params": [
       "@param key the key to check"

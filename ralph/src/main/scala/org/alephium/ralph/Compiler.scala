@@ -594,25 +594,34 @@ object Compiler {
     def getOrCreateVariablesRef(expr: Ast.Expr[Ctx]): (VariablesRef[Ctx], Seq[Instr[Ctx]]) = {
       expr match {
         case Ast.LoadDataBySelectors(base, selectors) =>
-          val (ref, codes) = getOrCreateVariablesRef(base)
-          (ref.subRef(this, selectors), codes)
+          if (base.getType(this)(0).isMapType) {
+            createVariablesRef(expr)
+          } else {
+            val (ref, codes) = getOrCreateVariablesRef(base)
+            (ref.subRef(this, selectors), codes)
+          }
         case Ast.Variable(ident)  => (getVariablesRef(ident), Seq.empty)
         case Ast.ParenExpr(inner) => getOrCreateVariablesRef(inner)
-        case _ =>
-          val ref = VariablesRef.init(
-            this,
-            expr.getType(this)(0),
-            freshName(),
-            isMutable = false,
-            isUnused = false,
-            isLocal = true,
-            isGenerated = true,
-            isTemplate = false,
-            VarInfo.Local
-          )
-          val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
-          (ref, codes)
+        case _                    => createVariablesRef(expr)
       }
+    }
+
+    private def createVariablesRef(
+        expr: Ast.Expr[Ctx]
+    ): (VariablesRef[Ctx], Seq[Instr[Ctx]]) = {
+      val ref = VariablesRef.init(
+        this,
+        expr.getType(this)(0),
+        freshName(),
+        isMutable = false,
+        isUnused = false,
+        isLocal = true,
+        isGenerated = true,
+        isTemplate = false,
+        VarInfo.Local
+      )
+      val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
+      (ref, codes)
     }
 
     def getLocalArrayVarIndex(): Ast.Ident = {
@@ -675,6 +684,10 @@ object Compiler {
     private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)
       addVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
+    }
+
+    @inline private[ralph] def hasMapVar(ident: Ast.Ident): Boolean = {
+      varTable.get(ident.name).exists(_.tpe.isMapType)
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
