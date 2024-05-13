@@ -90,7 +90,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
   val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] =
-    Cache.fifo(brokerConfig.chainNum * 10)
+    Cache.fifo(brokerConfig.chainNum * miningSetting.jobCacheSizePerChain)
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
