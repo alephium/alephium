@@ -89,7 +89,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   var latestJobs: Option[AVector[Job]]                                   = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
-  val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] = Cache.fifo(brokerConfig.chainNum * 10)
+  val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] =
+    Cache.fifo(brokerConfig.chainNum * 10)
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
@@ -155,7 +156,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     latestJobs = Some(jobs)
     jobs.foreachWithIndex { case (job, index) =>
       val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
-      val txsBlob = serialize(template.transactions)
+      val txsBlob  = serialize(template.transactions)
       jobCache.put(job.headerBlob, template -> txsBlob)
     }
   }

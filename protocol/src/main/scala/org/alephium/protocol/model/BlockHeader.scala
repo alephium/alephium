@@ -33,7 +33,8 @@ final case class BlockHeader(
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target
-) extends FlowData with SerializationCache {
+) extends FlowData
+    with SerializationCache {
   lazy val hash: BlockHash = PoW.hash(this)
 
   lazy val chainIndex: ChainIndex = {

@@ -44,13 +44,12 @@ object Miner extends LazyLogging {
       groupConfig: GroupConfig,
       miningConfig: MiningSetting
   ): Option[(Block, U256)] = {
-    mine(index, job.headerBlob, Target.unsafe(job.target)).map {
-      case (nonce, miningCount) =>
-        val blockBlob = job.toBlockBlob(nonce)
-        deserialize[Block](blockBlob) match {
-          case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
-          case Right(block) => block -> miningCount
-        }
+    mine(index, job.headerBlob, Target.unsafe(job.target)).map { case (nonce, miningCount) =>
+      val blockBlob = job.toBlockBlob(nonce)
+      deserialize[Block](blockBlob) match {
+        case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
+        case Right(block) => block -> miningCount
+      }
     }
   }
 

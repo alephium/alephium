@@ -120,7 +120,8 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   }
 
   it should "submit block when the job is cached" in new SubmissionFixture {
-    minerApiController.underlyingActor.jobCache.put(headerBlob, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+    minerApiController.underlyingActor.jobCache
+      .put(headerBlob, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
 
     val blockBlob = serialize(block.copy(transactions = AVector.empty))
     connection0 ! Tcp.Write(ClientMessage.serialize(SubmitBlock(blockBlob)))
