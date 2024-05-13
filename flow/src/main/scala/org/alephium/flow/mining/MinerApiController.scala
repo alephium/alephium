@@ -27,12 +27,12 @@ import akka.util.ByteString
 
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Nonce}
-import org.alephium.serde.{deserialize, SerdeResult, Staging}
+import org.alephium.protocol.mining.PoW
+import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce}
+import org.alephium.serde.{SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex}
 
 object MinerApiController {
@@ -89,7 +89,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   var latestJobs: Option[AVector[Job]]                                   = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
-  val jobCache: Cache[ByteString, BlockFlowTemplate] = Cache.fifo(brokerConfig.chainNum * 10)
+  val jobCache: Cache[ByteString, (BlockFlowTemplate, Job)] = Cache.fifo(brokerConfig.chainNum * 10)
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
@@ -150,46 +150,43 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
         case (acc, templates) =>
           acc ++ AVector.from(templates.view.map(Job.from))
       }
+    connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
+
     latestJobs = Some(jobs)
     jobs.foreachWithIndex { case (job, index) =>
       val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
-      jobCache.put(job.headerBlob, template)
+      jobCache.put(job.headerBlob, template -> job)
     }
-    connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
   }
 
   def handleClientMessage(message: ClientMessage): Unit = message match {
     case SubmitBlock(blockBlob) =>
       val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
+      val blockHash = PoW.hash(header)
       val headerKey = header.drop(Nonce.byteLength)
-      deserialize[Block](blockBlob) match {
-        case Right(block) =>
-          jobCache.get(headerKey) match {
-            case Some(template) =>
-              submit(block.copy(transactions = template.transactions))
-              log.info(
-                s"A new block ${block.hash.toHexString} got mined for ${block.chainIndex}, tx: ${block.transactions.length}, target: ${block.header.target}"
-              )
-            case None =>
-              log.error(
-                s"The job for the block is expired: ${Hex.toHexString(blockBlob)}"
-              )
-          }
-        case Left(error) =>
+      jobCache.get(headerKey) match {
+        case Some((template, job)) =>
+          val blockBytes = header ++ job.txsBlob
+          submit(blockHash, blockBytes, template.index)
+          log.info(
+            s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
+          )
+        case None =>
           log.error(
-            s"Deserialization error for submited block: $error : ${Hex.toHexString(blockBlob)}"
+            s"The job for the block is expired: ${Hex.toHexString(blockBlob)}"
           )
       }
   }
 
-  def submit(block: Block): Unit = {
-    allHandlers.getBlockHandler(block.chainIndex) match {
+  def submit(blockHash: BlockHash, blockBytes: ByteString, chainIndex: ChainIndex): Unit = {
+    allHandlers.getBlockHandler(chainIndex) match {
       case Some(blockHandler) =>
-        val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
+        val handlerMessage =
+          BlockChainHandler.ValidateMinedBlock(blockHash, blockBytes, ActorRefT(self))
         blockHandler ! handlerMessage
-        submittingBlocks.addOne(block.hash -> ActorRefT(sender()))
+        submittingBlocks.addOne(blockHash -> ActorRefT(sender()))
       case None =>
-        log.error(s"Block with index ${block.chainIndex} does not belong to ${brokerConfig}")
+        log.error(s"Block with index ${chainIndex} does not belong to ${brokerConfig}")
     }
   }
 
