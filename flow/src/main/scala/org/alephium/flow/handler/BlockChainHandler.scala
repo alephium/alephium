@@ -115,7 +115,6 @@ class BlockChainHandler(
     case ValidateMinedBlock(blockHash, blockBytes, broker) =>
       // Broadcast immediately to reduce propagation latency
       interCliqueBroadcast(blockHash, blockBytes, DataOrigin.Local)
-      assume(ChainIndex.from(blockHash) == chainIndex)
       deserialize[Block](blockBytes) match {
         case Right(block) =>
           handleData(block, broker, DataOrigin.Local)

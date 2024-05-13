@@ -40,3 +40,16 @@ final case class BlockFlowTemplate(
       Nonce.zero
     )
 }
+
+object BlockFlowTemplate {
+  def from(block: Block): BlockFlowTemplate = {
+    BlockFlowTemplate(
+      block.chainIndex,
+      block.blockDeps.deps,
+      block.header.depStateHash,
+      block.header.target,
+      block.timestamp,
+      block.transactions
+    )
+  }
+}

@@ -195,7 +195,7 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
 
   def updateAndStartTasks(jobs: AVector[Job]): Unit = {
     jobs.foreach { job =>
-      pendingTasks(job.fromGroup)(job.toGroup) = job.toMiningBlob
+      pendingTasks(job.fromGroup)(job.toGroup) = job
     }
     startNewTasks()
   }

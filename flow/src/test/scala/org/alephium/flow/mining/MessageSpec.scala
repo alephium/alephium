@@ -118,6 +118,6 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
       block.timestamp,
       block.transactions
     )
-    Job.from(blockFlowTemplate).txsBlob is serialize(AVector.empty[Transaction])
+    Job.fromWithoutTxs(blockFlowTemplate).txsBlob is serialize(AVector.empty[Transaction])
   }
 }

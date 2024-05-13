@@ -32,7 +32,7 @@ import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce}
-import org.alephium.serde.{SerdeResult, Staging}
+import org.alephium.serde.{serialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex}
 
 object MinerApiController {
@@ -89,7 +89,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   var latestJobs: Option[AVector[Job]]                                   = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
-  val jobCache: Cache[ByteString, (BlockFlowTemplate, Job)] = Cache.fifo(brokerConfig.chainNum * 10)
+  val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] = Cache.fifo(brokerConfig.chainNum * 10)
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
@@ -148,14 +148,15 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     val jobs =
       templatess.foldLeft(AVector.ofCapacity[Job](templatess.length * brokerConfig.groups)) {
         case (acc, templates) =>
-          acc ++ AVector.from(templates.view.map(Job.from))
+          acc ++ AVector.from(templates.view.map(Job.fromWithoutTxs))
       }
     connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
 
     latestJobs = Some(jobs)
     jobs.foreachWithIndex { case (job, index) =>
       val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
-      jobCache.put(job.headerBlob, template -> job)
+      val txsBlob = serialize(template.transactions)
+      jobCache.put(job.headerBlob, template -> txsBlob)
     }
   }
 
@@ -165,8 +166,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       val blockHash = PoW.hash(header)
       val headerKey = header.drop(Nonce.byteLength)
       jobCache.get(headerKey) match {
-        case Some((template, job)) =>
-          val blockBytes = header ++ job.txsBlob
+        case Some((template, txBlob)) =>
+          val blockBytes = header ++ txBlob
           submit(blockHash, blockBytes, template.index)
           log.info(
             s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"

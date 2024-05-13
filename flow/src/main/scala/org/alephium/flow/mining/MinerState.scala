@@ -16,7 +16,6 @@
 
 package org.alephium.flow.mining
 
-import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
@@ -30,7 +29,7 @@ trait MinerState {
     Array.fill[U256](brokerConfig.groupNumPerBroker, brokerConfig.groups)(U256.Zero)
   protected val running = Array.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(false)
   protected val pendingTasks =
-    Array.fill(brokerConfig.groupNumPerBroker)(Array.ofDim[MiningBlob](brokerConfig.groups))
+    Array.fill(brokerConfig.groupNumPerBroker)(Array.ofDim[Job](brokerConfig.groups))
 
   def getMiningCount(fromShift: Int, to: Int): U256 = miningCounts(fromShift)(to)
 
@@ -55,7 +54,7 @@ trait MinerState {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  protected def pickTasks(): IndexedSeq[(Int, Int, MiningBlob)] = {
+  protected def pickTasks(): IndexedSeq[(Int, Int, Job)] = {
     val minCount   = miningCounts.map(_.min).min
     val countBound = minCount.addUnsafe(miningConfig.nonceStep)
     for {
@@ -73,8 +72,8 @@ trait MinerState {
       tasksReady = pendingTasks.forall(_.forall(_ != null))
     }
     if (tasksReady) {
-      pickTasks().foreach { case (fromShift, to, template) =>
-        startTask(fromShift, to, template)
+      pickTasks().foreach { case (fromShift, to, job) =>
+        startTask(fromShift, to, job)
         setRunning(fromShift, to)
       }
     }
@@ -90,6 +89,6 @@ trait MinerState {
   def startTask(
       fromShift: Int,
       to: Int,
-      template: MiningBlob
+      job: Job
   ): Unit
 }
