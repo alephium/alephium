@@ -74,7 +74,7 @@ object BuiltInFunctions extends App {
       doc = "Encode the fields for creating a contract",
       params = Seq("@param ... the fields of the to-be-created target contract"),
       returns =
-        "two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
+        "@returns two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
     )
 
     val mapInsert: FunctionInfo = FunctionInfo(
@@ -89,7 +89,7 @@ object BuiltInFunctions extends App {
         "@param key the key to insert",
         "@param value the value to insert"
       ),
-      returns = ""
+      returns = "@returns "
     )
 
     val mapRemove: FunctionInfo = FunctionInfo(
@@ -102,7 +102,7 @@ object BuiltInFunctions extends App {
         "@param depositRecipient the address to receive the redeemed minimal storage deposit",
         "@param key the key to remove"
       ),
-      returns = ""
+      returns = "@returns "
     )
 
     val mapContains: FunctionInfo = FunctionInfo(
@@ -111,7 +111,7 @@ object BuiltInFunctions extends App {
       signature = "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>) -> Bool",
       doc = "Check whether the map contains a bindiing for the key",
       params = Seq("@param key the key to check"),
-      returns = "true if there is a binding for key in this map, false otherwise"
+      returns = "@returns true if there is a binding for key in this map, false otherwise"
     )
 
     val mapFunctions: Seq[FunctionInfo] = Seq(mapInsert, mapRemove, mapContains)

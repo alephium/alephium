@@ -7,7 +7,7 @@
     "params": [
       "@param ... the fields of the to-be-created target contract"
     ],
-    "returns": "two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
+    "returns": "@returns two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
   },
   {
     "name": "createContract",
@@ -341,7 +341,7 @@
       "@param key the key to insert",
       "@param value the value to insert"
     ],
-    "returns": ""
+    "returns": "@returns "
   },
   {
     "name": "map.remove",
@@ -352,7 +352,7 @@
       "@param depositRecipient the address to receive the redeemed minimal storage deposit",
       "@param key the key to remove"
     ],
-    "returns": ""
+    "returns": "@returns "
   },
   {
     "name": "map.contains",
@@ -362,7 +362,7 @@
     "params": [
       "@param key the key to check"
     ],
-    "returns": "true if there is a binding for key in this map, false otherwise"
+    "returns": "@returns true if there is a binding for key in this map, false otherwise"
   },
   {
     "name": "approveToken",
