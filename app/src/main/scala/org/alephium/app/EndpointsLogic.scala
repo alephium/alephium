@@ -683,6 +683,16 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.multipleCallContract(blockFlow, params))
   }
 
+  val parentContractLogic = serverLogic(parentContract) { contractAddress =>
+    val groupIndex = contractAddress.groupIndex
+    requestFromGroupIndex(
+      groupIndex,
+      Future.successful(serverUtils.getParentContract(blockFlow, contractAddress)),
+      parentContract,
+      contractAddress
+    )
+  }
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     // Run the export in background
     Future.successful(

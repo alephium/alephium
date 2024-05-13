@@ -510,6 +510,13 @@ trait Endpoints
       .out(jsonBody[MultipleCallContractResult])
       .summary("Multiple call contract")
 
+  lazy val parentContract: BaseEndpoint[Address.Contract, ContractParent] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("parent")
+      .out(jsonBody[ContractParent])
+      .summary("Get parent contract address")
+
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")

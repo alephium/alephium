@@ -835,6 +835,23 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /contracts/<address>/parent with parent" in {
+    val contractId      = ContractId.from(TransactionId.random, 0, GroupIndex.unsafe(0))
+    val contractAddress = Address.contract(contractId)
+    Get(s"/contracts/${contractAddress.toBase58}/parent") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractParent] is ContractParent(Some(ServerFixture.dummyParentContractAddress))
+    }
+  }
+
+  it should "call GET /contracts/<address>/parent without parent" in {
+    val contractAddress = Address.contract(ContractId.zero)
+    Get(s"/contracts/${contractAddress.toBase58}/parent") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractParent] is ContractParent(None)
+    }
+  }
+
   it should "call GET /docs" in {
     Get(s"/docs") check { response =>
       response.code is StatusCode.Ok

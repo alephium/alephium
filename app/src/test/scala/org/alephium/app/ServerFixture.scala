@@ -159,6 +159,9 @@ object ServerFixture {
     )
   }
 
+  val dummyParentContractId      = ContractId.hash("parent")
+  val dummyParentContractAddress = Address.contract(dummyParentContractId)
+
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = { case DiscoveryServer.GetNeighborPeers =>
       sender() ! DiscoveryServer.NeighborPeers(neighborPeers.peers)
@@ -492,5 +495,13 @@ object ServerFixture {
     override def getBestPersistedWorldState(
         groupIndex: GroupIndex
     ): IOResult[WorldState.Persisted] = getBestCachedWorldState(groupIndex).flatMap(_.persist())
+
+    override def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {
+      if (contractId == ContractId.zero) {
+        Right(None)
+      } else {
+        Right(Some(dummyParentContractId))
+      }
+    }
   }
 }
