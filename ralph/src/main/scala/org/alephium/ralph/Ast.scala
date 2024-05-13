@@ -1055,6 +1055,10 @@ object Ast {
       }
       vars.zip(types).foreach {
         case (NamedVar(isMutable, ident), tpe) =>
+          if (tpe.isMapType) {
+            throw Compiler
+              .Error(s"Cannot define local map variable ${ident.name}", ident.sourceIndex)
+          }
           state.addLocalVariable(ident, tpe, isMutable, isUnused = false, isGenerated = false)
         case _ =>
       }
@@ -1150,6 +1154,18 @@ object Ast {
       }
     }
 
+    @inline private def isUpdateMap(state: Compiler.State[Ctx]): Boolean = {
+      body.exists {
+        case _: InsertToMap | _: RemoveFromMap => true
+        case Assign(targets, _) =>
+          targets.exists {
+            case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
+            case _                                  => false
+          }
+        case _ => false
+      }
+    }
+
     def isSimpleViewFunc(state: Compiler.State[Ctx]): Boolean = {
       val hasInterfaceFuncCall = state.hasInterfaceFuncCallSet.contains(id)
       val hasMigrateSimple = body.exists {
@@ -1160,7 +1176,8 @@ object Ast {
         || usePreapprovedAssets
         || useAssetsInContract != Ast.NotUseContractAssets
         || hasInterfaceFuncCall
-        || hasMigrateSimple)
+        || hasMigrateSimple
+        || isUpdateMap(state))
     }
 
     lazy val signature: FuncSignature = FuncSignature(
@@ -2123,6 +2140,14 @@ object Ast {
 
     private def checkMaps(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(maps, "maps")
+      maps.find(mapDef => fields.exists(_.ident == mapDef.ident)) match {
+        case Some(mapDef) =>
+          throw Compiler.Error(
+            s"The map ${mapDef.ident.name} cannot have the same name as the contract field",
+            mapDef.ident.sourceIndex
+          )
+        case _ => ()
+      }
       maps.view.zipWithIndex.foreach { case (m, index) =>
         val mapType = Type.Map(m.tpe.key, state.resolveType(m.tpe.value))
         state.addMapVar(m.ident, mapType, index)

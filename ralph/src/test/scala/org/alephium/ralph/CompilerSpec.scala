@@ -5856,19 +5856,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Assign to local map variable")
+      info("Cannot define local map variables")
       val code =
         s"""
            |Contract Foo() {
            |  mapping[U256, U256] map0
            |  mapping[U256, ByteVec] map1
            |  pub fn f() -> () {
-           |    let mut localMap0 = map0
-           |    $$localMap0 = map1$$
+           |    let mut $$localMap0$$ = map0
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Cannot assign \"Map[U256,ByteVec]\" to \"Map[U256,U256]\"")
+      testContractError(code, "Cannot define local map variable localMap0")
     }
 
     {
@@ -5974,6 +5973,63 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContractFull(code).rightValue.warnings is AVector(
         "Found unused maps in Foo: map"
       )
+    }
+
+    {
+      info("Check external caller for map update")
+      def code(statement: String, annotation: String = "") =
+        s"""
+           |Contract Foo(@unused address: Address) {
+           |  mapping[U256, U256] map
+           |  $annotation
+           |  pub fn foo() -> () {
+           |    $statement
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+      val updateStatements =
+        Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
+      updateStatements.foreach { statement =>
+        Compiler.compileContractFull(code(statement)).rightValue.warnings is warnings
+        Compiler
+          .compileContractFull(code(statement, "@using(checkExternalCaller = false)"))
+          .rightValue
+          .warnings is AVector.empty[String]
+      }
+      Compiler.compileContractFull(code("let _ = map[0]")).rightValue.warnings is
+        AVector.empty[String]
+      Compiler.compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings is
+        AVector.empty[String]
+    }
+
+    {
+      info("Map cannot have the same name as the contract field")
+      val code =
+        s"""
+           |Contract Foo(@unused counters: [U256; 2]) {
+           |  mapping[U256, U256] $$counters$$
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(code, "The map counters cannot have the same name as the contract field")
+    }
+
+    {
+      info("Local variable has the same name as map variable")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] counters
+           |  pub fn foo() -> [U256; 2] {
+           |    let $$counters$$ = [0; 2]
+           |    return counters
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Global variable has the same name as local variable: counters")
     }
   }
 

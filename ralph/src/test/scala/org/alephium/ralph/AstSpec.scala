@@ -649,6 +649,38 @@ class AstSpec extends AlephiumSpec {
       .isEmpty is true
   }
 
+  it should "warning if private function uses assets" in {
+    val code0 =
+      s"""
+         |Contract Foo(to: Address) {
+         |  pub fn foo() -> () {
+         |    bar{callerAddress!() -> ALPH: 1 alph}(callerAddress!())
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  fn bar(from: Address) -> () {
+         |    transferToken!(from, to, ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContractFull(code0).rightValue.warnings is
+      AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+
+    val code1 =
+      s"""
+         |Contract Foo(to: Address) {
+         |  pub fn foo() -> () {
+         |    bar()
+         |  }
+         |  @using(assetsInContract = true)
+         |  fn bar() -> () {
+         |    transferTokenFromSelf!(to, ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContractFull(code1).rightValue.warnings is
+      AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+  }
+
   behavior of "Private function usage"
 
   it should "check if private functions are used" in {

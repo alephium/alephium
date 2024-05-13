@@ -686,6 +686,10 @@ object Compiler {
       addVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
     }
 
+    @inline private[ralph] def hasMapVar(ident: Ast.Ident): Boolean = {
+      varTable.get(ident.name).exists(_.tpe.isMapType)
+    }
+
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
       addVariable(
         ident,
