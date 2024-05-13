@@ -1192,6 +1192,17 @@ class ServerUtils(implicit
     } yield state
   }
 
+  def getParentContract(
+      blockFlow: BlockFlow,
+      contractAddress: Address.Contract
+  ): Try[ContractParent] = {
+    wrapResult(
+      blockFlow.getParentContractId(contractAddress.contractId).map { contractIdOpt =>
+        ContractParent(contractIdOpt.map(Address.contract))
+      }
+    )
+  }
+
   def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
     val result = for {
       groupIndex <- params.validate()
