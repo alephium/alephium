@@ -6016,6 +6016,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(code, "The map counters cannot have the same name as the contract field")
     }
+
+    {
+      info("Local variable has the same name as map variable")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] counters
+           |  pub fn foo() -> [U256; 2] {
+           |    let $$counters$$ = [0; 2]
+           |    return counters
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Global variable has the same name as local variable: counters")
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
