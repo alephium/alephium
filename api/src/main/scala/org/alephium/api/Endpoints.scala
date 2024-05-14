@@ -525,6 +525,14 @@ trait Endpoints
       .out(jsonBody[SubContracts])
       .summary("Get sub-contract addresses")
 
+  val subContractsCurrentCount: BaseEndpoint[Address.Contract, Int] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("sub-contracts")
+      .in("current-count")
+      .out(jsonBody[Int])
+      .summary("Get current value of the sub-contracts counter for a contract")
+
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")

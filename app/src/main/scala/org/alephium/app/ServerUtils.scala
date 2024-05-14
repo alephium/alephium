@@ -1219,6 +1219,19 @@ class ServerUtils(implicit
     )
   }
 
+  def getSubContractsCurrentCount(
+      blockFlow: BlockFlow,
+      contractAddress: Address.Contract
+  ): Try[Int] = {
+    val contractId = contractAddress.contractId
+    for {
+      countOpt <- wrapResult(blockFlow.getSubContractsCurrentCount(contractId))
+      count <- countOpt.toRight(
+        notFound(s"Current sub-contracts count for contract $contractAddress")
+      )
+    } yield count
+  }
+
   def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
     val result = for {
       groupIndex <- params.validate()

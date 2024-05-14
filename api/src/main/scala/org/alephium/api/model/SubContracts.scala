@@ -20,6 +20,6 @@ import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
 final case class SubContracts(
-  subContracts: AVector[Address],
-  nextStart: Int
+    subContracts: AVector[Address],
+    nextStart: Int
 )

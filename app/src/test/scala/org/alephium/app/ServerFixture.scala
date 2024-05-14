@@ -516,5 +516,13 @@ object ServerFixture {
     ): IOResult[(Int, AVector[ContractId])] = {
       Right((2, AVector(dummySubContractId1, dummySubContractId2)))
     }
+
+    override def getSubContractsCurrentCount(contractId: ContractId): IOResult[Option[Int]] = {
+      if (contractId == ContractId.zero) {
+        Right(None)
+      } else {
+        Right(Some(10))
+      }
+    }
   }
 }

@@ -845,7 +845,9 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /contracts/<address>/sub-contracts" in {
-    Get(s"/contracts/${dummyContractAddress.toBase58}/sub-contracts?start=0&limit=2") check {
+    val contractWithoutParent = Address.contract(ContractId.zero)
+    val contractWithParent    = dummyContractAddress
+    Get(s"/contracts/${contractWithParent.toBase58}/sub-contracts?start=0&limit=2") check {
       response =>
         response.code is StatusCode.Ok
         response.as[SubContracts] is SubContracts(
@@ -856,13 +858,23 @@ abstract class RestServerSpec(
           2
         )
     }
-  }
 
-  it should "call GET /contracts/<address>/parent without parent" in {
-    val contractAddress = Address.contract(ContractId.zero)
-    Get(s"/contracts/${contractAddress.toBase58}/parent") check { response =>
+    Get(s"/contracts/${contractWithoutParent.toBase58}/parent") check { response =>
       response.code is StatusCode.Ok
       response.as[ContractParent] is ContractParent(None)
+    }
+  }
+
+  it should "call GET /contracts/<address>/sub-contracts/current-count" in {
+    val contractWithCount    = Address.contract(ContractId.random)
+    val contractWithoutCount = Address.contract(ContractId.zero)
+    Get(s"/contracts/${contractWithCount.toBase58}/sub-contracts/current-count") check { response =>
+      response.code is StatusCode.Ok
+      response.as[Int] is 10
+    }
+
+    Get(s"/contracts/${contractWithoutCount.toBase58}/sub-contracts/current-count") check {
+      _.code is StatusCode.NotFound
     }
   }
 
