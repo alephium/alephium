@@ -147,12 +147,11 @@ class BlockChainHandler(
       blockHash: BlockHash,
       blockBytes: ByteString,
       origin: DataOrigin
-  ): Option[ByteString] = {
-    Option.when(brokerConfig.contains(chainIndex.from) && isNodeSynced) {
+  ): Unit = {
+    if (brokerConfig.contains(chainIndex.from) && isNodeSynced) {
       val blockMsg = Message.serialize(NewBlock(blockBytes))
       val event    = InterCliqueManager.BroadCastBlock(chainIndex, blockHash, blockMsg, origin)
       publishEvent(event)
-      blockBytes
     }
   }
 
