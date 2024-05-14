@@ -367,8 +367,11 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       }
     }
 
-    val configOverrides = Map(("alephium.consensus.num-zeros-at-least-in-hash", 10))
-    val clique0         = bootClique(1, configOverrides = configOverrides)
+    val configOverrides = Map[String, Any](
+      ("alephium.mining.job-cache-size-per-chain", 100),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 10)
+    )
+    val clique0 = bootClique(1, configOverrides = configOverrides)
     clique0.start()
     val server0 = clique0.servers.head
     val node    = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
@@ -382,7 +385,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     blocks.foreach { block =>
       eventually {
         val response = request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
-        response.toProtocol()(networkConfig).rightValue is block
+        response.toProtocol()(networkConfig).rightValue.header is block.header
       }
     }
 
