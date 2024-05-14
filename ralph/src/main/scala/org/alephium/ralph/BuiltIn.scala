@@ -45,6 +45,7 @@ object BuiltIn {
   object Category {
     case object Contract     extends Category
     case object SubContract  extends Category
+    case object Map          extends Category
     case object Asset        extends Category
     case object Utils        extends Category
     case object Chain        extends Category
@@ -1607,7 +1608,8 @@ object BuiltIn {
       MinimalContractDeposit,
       argsName = Seq.empty,
       retComment = "the amount of ALPH required to create a map entry",
-      doc = "The amount of ALPH required to create a map entry"
+      doc =
+        "The amount of ALPH required to create a map entry, which is '0.1 ALPH' since Rhone upgrade"
     )
 
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {

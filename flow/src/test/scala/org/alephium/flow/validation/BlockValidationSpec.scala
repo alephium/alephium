@@ -1220,6 +1220,31 @@ class BlockValidationSpec extends AlephiumSpec {
     block.pass()(checkBlockUnit(_, blockFlow))
   }
 
+  it should "invalidate sequential txs if the input does not exist" in new SequentialTxsFixture {
+    override lazy val chainIndex =
+      chainIndexGenForBroker(brokerConfig).retryUntil(_.isIntraGroup).sample.get
+    val (_, toPublicKey0) = chainIndex.to.generateKey
+    val now               = TimeStamp.now()
+    val tx0 = transfer(blockFlow, privateKey, toPublicKey0, ALPH.oneAlph).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex, tx0.toTemplate, now)
+    val tx1 = transfer(blockFlow, privateKey, toPublicKey0, ALPH.oneAlph).nonCoinbase.head
+    tx1.unsigned.inputs.forall(input =>
+      tx0.unsigned.fixedOutputRefs.contains(input.outputRef)
+    ) is true
+    blockFlow.grandPool.add(chainIndex, tx1.toTemplate, now.plusMillisUnsafe(1))
+    val tx2 = transfer(blockFlow, privateKey, toPublicKey0, ALPH.oneAlph).nonCoinbase.head
+    tx2.unsigned.inputs.forall(input =>
+      tx1.unsigned.fixedOutputRefs.contains(input.outputRef)
+    ) is true
+    blockFlow.grandPool.add(chainIndex, tx2.toTemplate, now.plusMillisUnsafe(2))
+
+    val block0 = mineWithTxs(blockFlow, chainIndex, AVector(tx0, tx2))
+    checkBlock(block0, blockFlow).leftValue isE ExistInvalidTx(tx2, NonExistInput)
+
+    val block1 = mineWithTxs(blockFlow, chainIndex, AVector(tx0, tx1, tx2))
+    block1.pass()(checkBlockUnit(_, blockFlow))
+  }
+
   it should "check double spending for sequential txs" in new SequentialTxsFixture {
     override lazy val chainIndex =
       chainIndexGenForBroker(brokerConfig).retryUntil(_.isIntraGroup).sample.get
