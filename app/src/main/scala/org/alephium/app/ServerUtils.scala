@@ -1203,6 +1203,20 @@ class ServerUtils(implicit
     )
   }
 
+  def getSubContracts(
+      blockFlow: BlockFlow,
+      start: Int,
+      limit: Int,
+      contractAddress: Address.Contract
+  ): Try[SubContracts] = {
+    wrapResult(
+      blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
+        case (nextStart, contractIds) =>
+          SubContracts(contractIds.map(Address.contract), nextStart)
+      }
+    )
+  }
+
   def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
     val result = for {
       groupIndex <- params.validate()

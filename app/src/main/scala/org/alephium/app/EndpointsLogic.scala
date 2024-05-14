@@ -692,6 +692,17 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
+  val subContractsLogic = serverLogic(subContracts) { case (contractAddress, counterRange) =>
+    Future.successful {
+      serverUtils.getSubContracts(
+        blockFlow,
+        counterRange.start,
+        counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
+        contractAddress
+      )
+    }
+  }
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     // Run the export in background
     Future.successful(

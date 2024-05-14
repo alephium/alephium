@@ -517,6 +517,14 @@ trait Endpoints
       .out(jsonBody[ContractParent])
       .summary("Get parent contract address")
 
+  lazy val subContracts: BaseEndpoint[(Address.Contract, CounterRange), SubContracts] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("sub-contracts")
+      .in(counterQuery)
+      .out(jsonBody[SubContracts])
+      .summary("Get sub-contract addresses")
+
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")
