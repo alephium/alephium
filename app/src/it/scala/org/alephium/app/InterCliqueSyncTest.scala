@@ -318,13 +318,13 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
     case object StopMiningUncles
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {
-      private val allBlocks = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
+      private val allBlocks        = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
       private var stopMiningUncles = false
 
       override def receive: Receive = super.receive orElse handleStopMiningUncles
 
-      private def handleStopMiningUncles: Receive = {
-        case StopMiningUncles => stopMiningUncles = true
+      private def handleStopMiningUncles: Receive = { case StopMiningUncles =>
+        stopMiningUncles = true
       }
 
       private def publishBlocks(blocks: mutable.ArrayBuffer[Block]): Unit = {
