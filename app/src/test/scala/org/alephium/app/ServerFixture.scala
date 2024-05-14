@@ -16,6 +16,7 @@
 
 package org.alephium.app
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
@@ -161,6 +162,10 @@ object ServerFixture {
 
   val dummyParentContractId      = ContractId.hash("parent")
   val dummyParentContractAddress = Address.contract(dummyParentContractId)
+  val dummySubContractId1        = ContractId.hash("sub-contract-1")
+  val dummySubContractAddress1   = Address.contract(dummySubContractId1)
+  val dummySubContractId2        = ContractId.hash("sub-contract-2")
+  val dummySubContractAddress2   = Address.contract(dummySubContractId2)
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = { case DiscoveryServer.GetNeighborPeers =>
@@ -502,6 +507,14 @@ object ServerFixture {
       } else {
         Right(Some(dummyParentContractId))
       }
+    }
+
+    override def getSubContractIds(
+        @nowarn contractId: ContractId,
+        start: Int,
+        end: Int
+    ): IOResult[(Int, AVector[ContractId])] = {
+      Right((2, AVector(dummySubContractId1, dummySubContractId2)))
     }
   }
 }

@@ -872,5 +872,9 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val contractParentExamples: List[Example[ContractParent]] = {
     simpleExample(ContractParent(Option(contractAddress)))
   }
+
+  implicit val subContractsExamples: List[Example[SubContracts]] = {
+    simpleExample(SubContracts(subContracts = AVector(contractAddress), nextStart = 10))
+  }
 }
 // scalastyle:on magic.number

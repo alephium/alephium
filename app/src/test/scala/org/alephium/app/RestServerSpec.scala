@@ -844,6 +844,20 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /contracts/<address>/sub-contracts" in {
+    Get(s"/contracts/${dummyContractAddress.toBase58}/sub-contracts?start=0&limit=2") check {
+      response =>
+        response.code is StatusCode.Ok
+        response.as[SubContracts] is SubContracts(
+          AVector(
+            ServerFixture.dummySubContractAddress1,
+            ServerFixture.dummySubContractAddress2
+          ),
+          2
+        )
+    }
+  }
+
   it should "call GET /contracts/<address>/parent without parent" in {
     val contractAddress = Address.contract(ContractId.zero)
     Get(s"/contracts/${contractAddress.toBase58}/parent") check { response =>
