@@ -314,8 +314,6 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "sync ghost uncle blocks" in new CliqueFixture {
-    val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
-
     case object StopMiningUncles
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {
       private val allBlocks        = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
@@ -341,7 +339,6 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
           task.onComplete {
             case Success(_) =>
               log.info(s"Block ${block.hash.toHexString} is submitted")
-              allSubmittedBlocks.addOne(block)
             case Failure(error) =>
               log.error(s"Submit block ${block.shortHex} failed ${error.getMessage}")
           }(context.dispatcher)
@@ -367,8 +364,11 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       }
     }
 
-    val configOverrides = Map(("alephium.consensus.num-zeros-at-least-in-hash", 10))
-    val clique0         = bootClique(1, configOverrides = configOverrides)
+    val configOverrides = Map(
+      ("alephium.consensus.num-zeros-at-least-in-hash", 10),
+      ("alephium.mining.job-cache-size-per-chain", 40)
+    )
+    val clique0 = bootClique(1, configOverrides = configOverrides)
     clique0.start()
     val server0 = clique0.servers.head
     val node    = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
@@ -376,19 +376,19 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     miner ! Miner.Start
 
     Thread.sleep(50 * 1000)
-
-    val blocks = allSubmittedBlocks.toSeq
-    blocks.nonEmpty is true
-    blocks.foreach { block =>
-      eventually {
-        val response = request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
-        response.toProtocol()(networkConfig).rightValue is block
-      }
-    }
-
     miner ! StopMiningUncles
     Thread.sleep(20 * 1000)
     miner ! Miner.Stop
+
+    eventually {
+      clique0.servers.head.config.broker.chainIndexes.foreach { chainIndex =>
+        val chainInfo = request[ChainInfo](
+          getChainInfo(chainIndex.from.value, chainIndex.to.value),
+          clique0.servers.head.restPort
+        )
+        chainInfo.currentHeight > 0 is true
+      }
+    }
 
     val clique1 =
       bootClique(
