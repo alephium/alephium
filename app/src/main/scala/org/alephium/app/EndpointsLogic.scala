@@ -710,6 +710,15 @@ trait EndpointsLogic extends Endpoints {
     }
   }
 
+  val getTxIdFromOutputRefLogic = serverLogic(getTxIdFromOutputRef) { outputRef =>
+    Future.successful {
+      for {
+        assetOutputRef <- outputRef.toToAssetOutputRef()
+        result         <- serverUtils.getTxIdFromOutputRef(blockFlow, assetOutputRef)
+      } yield result
+    }
+  }
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     // Run the export in background
     Future.successful(

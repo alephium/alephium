@@ -878,6 +878,37 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /tx-id-from-outputref" in {
+    val assetOutputRefWithTxId    = ServerFixture.dummyAssetOutputRef
+    val assetOutputRefWithoutTxId = assetOutputRefGen(GroupIndex.unsafe(0)).sample.value
+    val contractOutputRef         = contractOutputRefGen(GroupIndex.unsafe(0)).sample.value
+    def toJson(outputRef: TxOutputRef) = {
+      s"""
+         |{
+         |  "hint": ${outputRef.hint.value},
+         |  "key": "${outputRef.key.value.toHexString}"
+         |}
+        """.stripMargin
+    }
+
+    Get("/tx-id-from-outputref", maybeBody = Some(toJson(assetOutputRefWithTxId))) check {
+      response =>
+        response.code is StatusCode.Ok
+        response.as[TransactionId] is ServerFixture.dummyTransactionId
+    }
+
+    Get("/tx-id-from-outputref", maybeBody = Some(toJson(assetOutputRefWithoutTxId))) check {
+      _.code is StatusCode.NotFound
+    }
+
+    Get("/tx-id-from-outputref", maybeBody = Some(toJson(contractOutputRef))) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        "Expect asset output ref, got contract output ref instead"
+      )
+    }
+  }
+
   it should "call GET /docs" in {
     Get(s"/docs") check { response =>
       response.code is StatusCode.Ok

@@ -403,6 +403,13 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status, only from the local broker")
 
+  lazy val getTxIdFromOutputRef: BaseEndpoint[OutputRef, TransactionId] =
+    baseEndpoint.get
+      .in("tx-id-from-outputref")
+      .in(jsonBody[OutputRef])
+      .out(jsonBody[TransactionId])
+      .summary("Get transaction id from transaction output ref")
+
   val decodeUnsignedTransaction: BaseEndpoint[DecodeUnsignedTx, DecodeUnsignedTxResult] =
     transactionsEndpoint.post
       .in("decode-unsigned-tx")
