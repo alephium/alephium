@@ -166,6 +166,13 @@ object ServerFixture {
   val dummySubContractAddress1   = Address.contract(dummySubContractId1)
   val dummySubContractId2        = ContractId.hash("sub-contract-2")
   val dummySubContractAddress2   = Address.contract(dummySubContractId2)
+  val dummyAssetOutputRef = AssetOutputRef.from(
+    ScriptHint.fromHash(1144047305),
+    TxOutputRef.unsafeKey(
+      Blake2b.unsafe(hex"87f94b3a493059643dcf5cb75147c17090362ae18f25260fab4f9ca9c6e20bbc")
+    )
+  )
+  val dummyTransactionId = TransactionId.random
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = { case DiscoveryServer.GetNeighborPeers =>
@@ -522,6 +529,16 @@ object ServerFixture {
         Right(None)
       } else {
         Right(Some(10))
+      }
+    }
+
+    override def getTxIdFromOutputRef(
+        outputRef: AssetOutputRef
+    ): IOResult[Option[TransactionId]] = {
+      if (outputRef == dummyAssetOutputRef) {
+        Right(Some(dummyTransactionId))
+      } else {
+        Right(None)
       }
     }
   }

@@ -16,6 +16,7 @@
 
 package org.alephium.api.model
 
+import org.alephium.api.{badRequest, Try}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{AssetOutputRef, ContractOutputRef, Hint, TxOutputRef}
 
@@ -25,6 +26,14 @@ final case class OutputRef(hint: Int, key: Hash) {
   }
   def unsafeToContractOutputRef(): ContractOutputRef = {
     ContractOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
+  }
+
+  def toToAssetOutputRef(): Try[AssetOutputRef] = {
+    if (Hint.unsafe(hint).isAssetType) {
+      Right(unsafeToAssetOutputRef())
+    } else {
+      Left(badRequest("Expect asset output ref, got contract output ref instead"))
+    }
   }
 }
 

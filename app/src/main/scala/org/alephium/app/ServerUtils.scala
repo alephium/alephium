@@ -1230,6 +1230,18 @@ class ServerUtils(implicit
     } yield count
   }
 
+  def getTxIdFromOutputRef(
+      blockFlow: BlockFlow,
+      outputRef: AssetOutputRef
+  ): Try[TransactionId] = {
+    for {
+      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      txId <- txIdOpt.toRight(
+        notFound(s"No transaction id found for output ref $outputRef")
+      )
+    } yield txId
+  }
+
   def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
     val result = for {
       groupIndex <- params.validate()

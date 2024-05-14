@@ -932,7 +932,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val txOutputRef = utxos.head.ref
     val txIdResult  = if (enableTxOutputRefIndex) Some(block.nonCoinbase.head.id) else None
-    blockFlow.getTransactionId(txOutputRef) isE txIdResult
+    blockFlow.getTxIdFromOutputRef(txOutputRef.asInstanceOf[AssetOutputRef]) isE txIdResult
   }
 
   it should "not store txOutputRef index when it is disabled" in new TxOutputRefIndexesFixture {

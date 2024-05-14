@@ -20,14 +20,14 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{AssetOutputRef, TransactionId}
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.subcontract.SubContractIndexStateId
 import org.alephium.util.AVector
 
 trait IndexesUtils { Self: FlowUtils =>
-  def getTransactionId(
-      outputRef: TxOutputRef
+  def getTxIdFromOutputRef(
+      outputRef: AssetOutputRef
   ): IOResult[Option[TransactionId]] = {
     txOutputRefTxIdStorage.getOpt(outputRef.key)
   }

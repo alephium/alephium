@@ -121,6 +121,7 @@ class RestServer(
       parentContractLogic,
       subContractsLogic,
       subContractsCurrentCountLogic,
+      getTxIdFromOutputRefLogic,
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,
