@@ -24,7 +24,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
-import org.alephium.flow.model.MiningBlob
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -101,7 +101,7 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
   it should "mine from both template and data blob" in {
     val chainIndex = ChainIndex.unsafe(0, 1)
     val block      = emptyBlock(blockFlow, chainIndex)
-    val template   = MiningBlob.from(block)
+    val template   = Job.from(BlockFlowTemplate.from(block))
     val headerBlob = serialize(block.header).drop(Nonce.byteLength)
 
     @tailrec

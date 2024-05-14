@@ -35,7 +35,6 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -46,7 +45,6 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
-import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -883,31 +881,5 @@ object EndpointsLogic {
       syncStatus.isSynced,
       syncStatus.clientInfo
     )
-  }
-
-  // Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
-  def blockTempateToCandidate(
-      chainIndex: ChainIndex,
-      template: MiningBlob
-  ): BlockCandidate = {
-    BlockCandidate(
-      fromGroup = chainIndex.from.value,
-      toGroup = chainIndex.to.value,
-      headerBlob = template.headerBlob,
-      target = template.target,
-      txsBlob = template.txsBlob
-    )
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def blockSolutionToBlock(
-      solution: BlockSolution
-  ): Either[ApiError[_ <: StatusCode], (Block, U256)] = {
-    deserialize[Block](solution.blockBlob) match {
-      case Right(block) =>
-        Right(block -> solution.miningCount)
-      case Left(error) =>
-        Left(ApiError.InternalServerError(s"Block deserialization error: ${error.getMessage}"))
-    }
   }
 }

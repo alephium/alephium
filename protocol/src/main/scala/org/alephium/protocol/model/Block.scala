@@ -29,7 +29,10 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{deserialize, Serde, SerdeResult}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
+final case class Block(header: BlockHeader, transactions: AVector[Transaction])
+    extends FlowData
+    with SerializationCache {
+
   def hash: BlockHash = header.hash
 
   def chainIndex: ChainIndex = header.chainIndex
@@ -104,7 +107,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 }
 
 object Block {
-  implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
+  private val _serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
+  implicit val serde: Serde[Block] = SerializationCache.cachedSerde(_serde)
 
   def calTxsHash(transactions: AVector[Transaction]): Hash =
     MerkleHashable.rootHash(Hash, transactions)

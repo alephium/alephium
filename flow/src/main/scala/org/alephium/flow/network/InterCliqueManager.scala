@@ -72,7 +72,8 @@ object InterCliqueManager {
   final case object IsSynced               extends Command
   final case object UpdateNodeSyncedStatus extends Command
   final case class BroadCastBlock(
-      block: Block,
+      chainIndex: ChainIndex,
+      blockHash: BlockHash,
       blockMsg: ByteString,
       origin: DataOrigin
   ) extends Command
@@ -80,6 +81,16 @@ object InterCliqueManager {
   final case class BroadCastTx(hashes: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
       with EventStream.Event
+
+  object BroadCastBlock {
+    def apply(
+        block: Block,
+        blockMsg: ByteString,
+        origin: DataOrigin
+    ): BroadCastBlock = {
+      BroadCastBlock(block.chainIndex, block.hash, blockMsg, origin)
+    }
+  }
 
   sealed trait Event
   final case class SyncedResult(isSynced: Boolean) extends Event with EventStream.Event
@@ -202,9 +213,15 @@ class InterCliqueManager(
     case _: Tcp.ConnectionClosed => () // response for Tcp.Close above
   }
 
+  // scalastyle:off method.length
   def handleMessage: Receive = {
     case message: InterCliqueManager.BroadCastBlock =>
-      handleBroadCastBlock(message)
+      handleBroadCastBlock(
+        message.chainIndex,
+        message.blockHash,
+        message.blockMsg,
+        message.origin
+      )
 
     case InterCliqueManager.BroadCastTx(hashes) =>
       log.debug(s"Broadcasting txs ${FlowUtils.showChainIndexedDigest(hashes)}")
@@ -258,22 +275,26 @@ class InterCliqueManager(
     }
   }
 
-  def handleBroadCastBlock(message: InterCliqueManager.BroadCastBlock): Unit = {
+  def handleBroadCastBlock(
+      chainIndex: ChainIndex,
+      blockHash: BlockHash,
+      blockMsg: ByteString,
+      origin: DataOrigin
+  ): Unit = {
     if (lastNodeSyncedStatus.getOrElse(false)) {
-      val block = message.block
-      log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
-      if (message.origin.isLocal) {
+      log.debug(s"Broadcasting block ${blockHash.shortHex} for ${chainIndex}")
+      if (origin.isLocal) {
         randomIterBrokers { (peerId, brokerState) =>
-          if (brokerState.readyFor(block.chainIndex)) {
+          if (brokerState.readyFor(chainIndex)) {
             log.debug(s"Send block to broker $peerId")
-            brokerState.actor ! BrokerHandler.Send(message.blockMsg)
+            brokerState.actor ! BrokerHandler.Send(blockMsg)
           }
         }
       } else {
         randomIterBrokers { (peerId, brokerState) =>
-          if (!message.origin.isFrom(brokerState.info) && brokerState.readyFor(block.chainIndex)) {
+          if (!origin.isFrom(brokerState.info) && brokerState.readyFor(chainIndex)) {
             log.debug(s"Send announcement to broker $peerId")
-            brokerState.actor ! BrokerHandler.RelayBlock(block.hash)
+            brokerState.actor ! BrokerHandler.RelayBlock(blockHash)
           }
         }
       }

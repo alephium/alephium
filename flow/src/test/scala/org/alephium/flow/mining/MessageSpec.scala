@@ -20,8 +20,11 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
+import org.alephium.flow.FlowFixture
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.protocol.config.GroupConfigFixture
-import org.alephium.serde.Staging
+import org.alephium.protocol.model.{ChainIndex, Transaction}
+import org.alephium.serde.{serialize, Staging}
 import org.alephium.util.{AlephiumSpec, AVector}
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -102,5 +105,19 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
         // bool type (1 byte) indicating if the block submission succeeded
         hex"01"
     }
+  }
+
+  "Job" should "use empty transaction list for efficiency" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    val blockFlowTemplate = BlockFlowTemplate(
+      chainIndex,
+      block.blockDeps.deps,
+      block.header.depStateHash,
+      block.target,
+      block.timestamp,
+      block.transactions
+    )
+    Job.fromWithoutTxs(blockFlowTemplate).txsBlob is serialize(AVector.empty[Transaction])
   }
 }

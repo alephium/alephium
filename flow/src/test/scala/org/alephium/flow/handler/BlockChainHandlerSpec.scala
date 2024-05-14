@@ -16,6 +16,8 @@
 
 package org.alephium.flow.handler
 
+import java.net.InetSocketAddress
+
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
 
@@ -26,13 +28,15 @@ import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{InvalidBlockVersion, InvalidTxsMerkleRoot}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.serde.serialize
 import org.alephium.util.ActorRefT
 
 class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   trait Fixture extends FlowFixture {
+    val brokerInfo = BrokerInfo.unsafe(CliqueId.zero, 0, 1, new InetSocketAddress("127.0.0.1", 0))
     val brokerHandler       = TestProbe()
-    val dataOrigin          = DataOrigin.Local
+    val dataOrigin          = DataOrigin.InterClique(brokerInfo): DataOrigin
     val interCliqueListener = TestProbe()
     val intraCliqueListener = TestProbe()
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
@@ -136,14 +140,14 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     val interCliqueMessage = InterCliqueManager.BroadCastBlock(
       block,
       blockMsg(block),
-      DataOrigin.Local
+      dataOrigin
     )
     interCliqueListener.expectMsg(interCliqueMessage)
     val intraCliqueMessage = IntraCliqueManager.BroadCastBlock(
       block,
       blockMsg(block),
       headerMsg(block.header),
-      DataOrigin.Local
+      dataOrigin
     )
     intraCliqueListener.expectMsg(intraCliqueMessage)
     brokerHandler.expectMsg(BlockChainHandler.BlockAdded(block.hash))
@@ -159,7 +163,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     val interCliqueMessage = InterCliqueManager.BroadCastBlock(
       invalidBlock,
       blockMsg(invalidBlock),
-      DataOrigin.Local
+      dataOrigin
     )
     blockFlow.getHeaderVerifiedBlock(invalidBlock.hash) isE invalidBlock
     blockFlow.getBlock(invalidBlock.hash).isLeft is true
@@ -168,16 +172,44 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidTxsMerkleRoot))
   }
 
-  it should "not broadcast block if the block header is invalid" in new Fixture {
-    // block header is invalid
+  trait InvalidBlockFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     val block         = emptyBlock(blockFlow, chainIndex)
     val invalidHeader = block.header.copy(version = 4.toByte)
     val invalidBlock  = block.copy(header = invalidHeader)
+  }
+
+  it should "not broadcast block if the block header is invalid and the block is not mined locally" in new InvalidBlockFixture {
+    override val dataOrigin = DataOrigin.InterClique(brokerInfo)
 
     blockChainHandler ! InterCliqueManager.SyncedResult(true)
     validateBlock(invalidBlock)
+
+    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidBlockVersion))
     interCliqueListener.expectNoMessage()
     intraCliqueListener.expectNoMessage()
+  }
+
+  it should "broadcast block if the block header is invalid and the block is mined locally" in new InvalidBlockFixture {
+    override val dataOrigin = DataOrigin.Local
+
+    blockChainHandler ! InterCliqueManager.SyncedResult(true)
+    blockChainHandler ! BlockChainHandler.ValidateMinedBlock(
+      invalidBlock.hash,
+      serialize(invalidBlock),
+      ActorRefT(brokerHandler.ref)
+    )
+
     brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidBlockVersion))
+    interCliqueListener.expectMsg(
+      InterCliqueManager.BroadCastBlock(
+        chainIndex,
+        invalidBlock.hash,
+        blockMsg(invalidBlock),
+        dataOrigin
+      )
+    )
+    intraCliqueListener.expectNoMessage()
   }
 }

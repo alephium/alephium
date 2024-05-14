@@ -275,6 +275,7 @@ final case class BlocksResponse(id: RequestId, blocks: AVector[Block]) extends P
 }
 
 object BlocksResponse extends Payload.Serding[BlocksResponse] with Payload.Code {
+  implicit val blockSerde: Serde[Block]     = Block.serde
   implicit val serde: Serde[BlocksResponse] = Serde.forProduct2(apply, p => (p.id, p.blocks))
 }
 
@@ -335,12 +336,29 @@ object InvResponse extends Payload.Serding[InvResponse] with Payload.Code {
   implicit val serde: Serde[InvResponse] = Serde.forProduct2(apply, p => (p.id, p.hashes))
 }
 
-final case class NewBlock(block: Block) extends Payload.UnSolicited {
+final case class NewBlock(block: Either[Block, ByteString]) extends Payload.UnSolicited {
   override def measure(): Unit = NewBlock.payloadLabeled.inc()
 }
 
 object NewBlock extends Payload.Serding[NewBlock] with Payload.Code {
-  implicit val serde: Serde[NewBlock] = Serde.forProduct1(apply, _.block)
+  implicit val blockSerde: Serde[Block] = Block.serde
+  implicit val serde: Serde[NewBlock] = new Serde[NewBlock] {
+    override def _deserialize(input: ByteString) = {
+      blockSerde._deserialize(input).map { staging =>
+        Staging(NewBlock(Left(staging.value)), staging.rest)
+      }
+    }
+
+    override def serialize(input: NewBlock) = {
+      input.block match {
+        case Left(block)       => blockSerde.serialize(block)
+        case Right(blockBytes) => blockBytes
+      }
+    }
+  }
+
+  def apply(block: Block): NewBlock           = NewBlock(Left(block))
+  def apply(blockBytes: ByteString): NewBlock = NewBlock(Right(blockBytes))
 }
 
 final case class NewHeader(header: BlockHeader) extends Payload.UnSolicited {

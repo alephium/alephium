@@ -65,7 +65,8 @@ final case class Transaction(
     inputSignatures: AVector[Signature],
     scriptSignatures: AVector[Signature]
 ) extends TransactionAbstract
-    with MerkleHashable[Hash] {
+    with MerkleHashable[Hash]
+    with SerializationCache {
   def toMerkleTx: MerkelTx =
     MerkelTx(
       id,
@@ -127,7 +128,7 @@ final case class Transaction(
 }
 
 object Transaction {
-  implicit val serde: Serde[Transaction] =
+  private val _serde: Serde[Transaction] =
     Serde.forProduct6(
       Transaction.apply,
       t =>
@@ -140,6 +141,7 @@ object Transaction {
           t.scriptSignatures
         )
     )
+  implicit val serde: Serde[Transaction] = SerializationCache.cachedSerde(_serde)
 
   def from(
       inputs: AVector[TxInput],
@@ -348,7 +350,8 @@ final case class TransactionTemplate(
     unsigned: UnsignedTransaction,
     inputSignatures: AVector[Signature],
     scriptSignatures: AVector[Signature]
-) extends TransactionAbstract {
+) extends TransactionAbstract
+    with SerializationCache {
   override def outputsLength: Int = unsigned.fixedOutputs.length
 
   override def getOutput(index: Int): TxOutput = unsigned.fixedOutputs(index)
@@ -356,10 +359,11 @@ final case class TransactionTemplate(
 }
 
 object TransactionTemplate {
-  implicit val serde: Serde[TransactionTemplate] = Serde.forProduct3(
+  private val _serde: Serde[TransactionTemplate] = Serde.forProduct3(
     TransactionTemplate.apply,
     t => (t.unsigned, t.inputSignatures, t.scriptSignatures)
   )
+  implicit val serde: Serde[TransactionTemplate] = SerializationCache.cachedSerde(_serde)
 
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
     val signature = SignatureSchema.sign(unsigned.id, privateKey)

@@ -23,7 +23,6 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{AllHandlers, TestUtils, ViewHandler}
-import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.ChainIndex
@@ -47,8 +46,8 @@ class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
         fromShift <- 0 until brokerConfig.groupNumPerBroker
         to        <- 0 until brokerConfig.groups
       } {
-        val miningBlob = MiningBlob.from(templates(fromShift)(to))
-        pendingTasks(fromShift)(to) = miningBlob
+        val job = Job.from(templates(fromShift)(to))
+        pendingTasks(fromShift)(to) = job
       }
       startNewTasks()
     }
@@ -56,9 +55,9 @@ class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
     override def startTask(
         fromShift: Int,
         to: Int,
-        template: MiningBlob
+        job: Job
     ): Unit = {
-      probes(fromShift)(to).ref ! template
+      probes(fromShift)(to).ref ! job
     }
   }
 
@@ -74,7 +73,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
   it should "start new tasks correctly" in new Fixture {
     updateAndStartTasks()
     startNewTasks()
-    probes.foreach(_.foreach(_.expectMsgType[MiningBlob]))
+    probes.foreach(_.foreach(_.expectMsgType[Job]))
     running.foreach(_.foreach(_ is true))
   }
 
@@ -107,7 +106,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
       if (i != to) {
         probes(fromShift)(i).expectNoMessage()
       } else {
-        probes(fromShift)(i).expectMsgType[MiningBlob]
+        probes(fromShift)(i).expectMsgType[Job]
       }
     }
   }

@@ -139,11 +139,16 @@ trait BrokerHandler extends FlowDataHandler {
         s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
       send(BlocksRequest(hashes))
-    case Received(NewBlock(block)) =>
-      log.debug(
-        s"Received new block ${block.hash.shortHex} from $remoteAddress"
-      )
-      handleNewBlock(block)
+    case Received(NewBlock(blockEither)) =>
+      blockEither match {
+        case Left(block) =>
+          log.debug(
+            s"Received new block ${block.hash.shortHex} from $remoteAddress"
+          )
+          handleNewBlock(block)
+        case Right(_) => // Dead branch since deserialized NewBlock should always contain block
+          log.error("Unexpected NewBlock data")
+      }
     case Received(BlocksResponse(requestId, blocks)) =>
       log.debug(
         s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress with $requestId"

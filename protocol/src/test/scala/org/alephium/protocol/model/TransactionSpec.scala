@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{TokenId}
+import org.alephium.protocol.model.TokenId
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
@@ -37,6 +37,10 @@ class TransactionSpec
       val bytes  = serialize[Transaction](transaction)
       val output = deserialize[Transaction](bytes).toOption.value
       output is transaction
+
+      // check cache
+      transaction.getSerialized().value is bytes
+      output.getSerialized().value is bytes
     }
 
     info("merkle transation")
