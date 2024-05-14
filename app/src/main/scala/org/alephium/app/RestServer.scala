@@ -120,6 +120,7 @@ class RestServer(
       multipleCallContractLogic,
       parentContractLogic,
       subContractsLogic,
+      subContractsCurrentCountLogic,
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,
