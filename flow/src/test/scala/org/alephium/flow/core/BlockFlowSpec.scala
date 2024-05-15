@@ -987,7 +987,8 @@ class BlockFlowSpec extends AlephiumSpec {
     def enableTxOutputRefIndex: Boolean
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex")
+      ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex"),
+      ("alephium.node.indexes.subcontract-index", "false")
     )
 
     val (fromPriKey, _, _) = genesisKeys(0)

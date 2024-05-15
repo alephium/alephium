@@ -28,6 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -78,6 +79,11 @@ trait BlockFlowState extends FlowTipsUtil {
   val txOutputRefIndexStorage: KeyValueStorage[TxOutputRef.Key, TransactionId] = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
     intraGroupBlockChains.head.worldStateStorage.txOutputRefIndexStorage
+  }
+
+  val subContractIndexStorage: SubContractIndexStorage = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.subContractIndexStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =

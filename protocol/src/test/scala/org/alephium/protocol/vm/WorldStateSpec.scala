@@ -23,6 +23,7 @@ import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
@@ -39,6 +40,14 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(dbSource, RocksDBSource.ColumnFamily.Log),
       newDB(dbSource, RocksDBSource.ColumnFamily.Log),
       newDB(dbSource, RocksDBSource.ColumnFamily.LogCounter)
+    )
+  }
+
+  def newSubContractIndexStorage(dbSource: RocksDBSource): SubContractIndexStorage = {
+    SubContractIndexStorage(
+      newDB(dbSource, RocksDBSource.ColumnFamily.ParentContract),
+      newDB(dbSource, RocksDBSource.ColumnFamily.SubContract),
+      newDB(dbSource, RocksDBSource.ColumnFamily.SubContractCounter)
     )
   }
 
@@ -153,7 +162,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage),
-      newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)
+      newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex),
+      newSubContractIndexStorage(storage)
     )
     val cached = persisted.cached()
   }
@@ -278,7 +288,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage),
-      newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)
+      newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex),
+      newSubContractIndexStorage(storage)
     )
     val staging = worldState.staging()
 

@@ -173,15 +173,16 @@ object TxOutputRefIndexConfig {
 
 object NodeIndexesConfig {
   def enabled(): NodeIndexesConfig = {
-    NodeIndexesConfig(txOutputRefIndex = true)
+    NodeIndexesConfig(txOutputRefIndex = true, subcontractIndex = true)
   }
 
   def disabled(): NodeIndexesConfig = {
-    NodeIndexesConfig(txOutputRefIndex = false)
+    NodeIndexesConfig(txOutputRefIndex = false, subcontractIndex = false)
   }
 }
 final case class NodeIndexesConfig(
-    txOutputRefIndex: Boolean
+    txOutputRefIndex: Boolean,
+    subcontractIndex: Boolean
 )
 
 trait StatelessContext extends CostStrategy {
@@ -527,6 +528,21 @@ trait StatefulContext extends StatelessContext with ContractPool {
     }
 
     result.left.map(e => Left(IOErrorWriteLog(e)))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def writeSubContractIndexes(
+      parentContract: Option[ContractId],
+      contractId: ContractId
+  ): ExeResult[Unit] = {
+    if (parentContract.nonEmpty && nodeIndexesConfig.subcontractIndex) {
+      worldState.subContractIndexState
+        .createSubContractIndexes(parentContract.get, contractId)
+        .left
+        .map(e => Left(IOErrorCreateSubContractIndex(e)))
+    } else {
+      Right(())
+    }
   }
 }
 
