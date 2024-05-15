@@ -744,6 +744,25 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
   }
 
+  it should "not collect sequential txs if the input of the parent tx does not exist" in new SequentialTxsFixture {
+    val gasPrice          = GasPrice(nonCoinbaseMinGasPrice.value.addOneUnsafe())
+    val (_, toPublicKey0) = chainIndex.to.generateKey
+    val tx0               = transferTx(fromPrivateKey0, toPublicKey0, ALPH.alph(5))
+    val (_, toPublicKey1) = chainIndex.to.generateKey
+    val tx1               = transferTx(fromPrivateKey0, toPublicKey1, ALPH.alph(5), gasPrice)
+    val tx2               = transferTx(fromPrivateKey0, toPublicKey1, ALPH.oneAlph)
+
+    (tx1.unsigned.gasPrice.value > tx0.unsigned.gasPrice.value) is true
+    tx1.unsigned.inputs.forall(input => tx0.fixedOutputRefs.contains(input.outputRef)) is true
+    tx2.unsigned.inputs.forall(input => tx1.fixedOutputRefs.contains(input.outputRef)) is true
+    collectTxs() is AVector(tx0)
+    val block = mineFromMemPool(blockFlow, chainIndex)
+    block.nonCoinbase.map(_.toTemplate) is AVector(tx0)
+    addAndCheck(blockFlow, block)
+
+    blockFlow.getMemPool(chainIndex.from).contains(tx1.id) is true
+  }
+
   it should "not collect sequential txs for inter group blocks" in new SequentialTxsFixture {
     override lazy val chainIndex: ChainIndex =
       chainIndexGenForBroker(brokerConfig).retryUntil(!_.isIntraGroup).sample.get
@@ -809,5 +828,46 @@ class FlowUtilsSpec extends AlephiumSpec {
     val block = mineFromMemPool(blockFlow, chainIndex)
     addAndCheck(blockFlow, block)
     block.nonCoinbase.map(_.toTemplate).toSet is txs.toSet
+  }
+
+  it should "not collect sequential txs if the input of the source tx from other chains" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val chainIndex0               = ChainIndex.unsafe(0, 0)
+    val (privateKey0, publicKey0) = chainIndex0.from.generateKey
+    val block0 = transfer(blockFlow, genesisKeys(0)._1, publicKey0, ALPH.alph(10))
+    addAndCheck(blockFlow, block0)
+
+    val chainIndex1     = ChainIndex.unsafe(0, 1)
+    val (_, publicKey1) = GroupIndex.unsafe(1).generateKey
+    val tx0 = transfer(blockFlow, privateKey0, publicKey1, ALPH.oneAlph).nonCoinbase.head.toTemplate
+    val now = TimeStamp.now()
+    blockFlow.grandPool.add(chainIndex1, tx0, now)
+
+    val (_, publicKey2) = chainIndex0.from.generateKey
+    var sourceTx        = tx0
+    val sequentialTxs = AVector.from(0 until 5).map { index =>
+      val tx =
+        transfer(blockFlow, privateKey0, publicKey2, ALPH.oneAlph).nonCoinbase.head.toTemplate
+      tx.unsigned.inputs.forall(input => sourceTx.fixedOutputRefs.contains(input.outputRef)) is true
+      blockFlow.grandPool.add(chainIndex0, tx, now.plusMillisUnsafe(index.toLong))
+      sourceTx = tx
+      tx
+    }
+
+    val mempool      = blockFlow.grandPool.getMemPool(chainIndex0.from)
+    val collectedTxs = mempool.collectAllTxs(chainIndex0, Int.MaxValue)
+    collectedTxs is sequentialTxs
+
+    val template0 =
+      blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue
+    template0.transactions.length is 1 // coinbase tx
+
+    addAndCheck(blockFlow, mineFromMemPool(blockFlow, chainIndex1))
+
+    val template1 =
+      blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue
+    template1.transactions.init.map(_.toTemplate) is sequentialTxs
+    addAndCheck(blockFlow, mine(blockFlow, template1))
   }
 }

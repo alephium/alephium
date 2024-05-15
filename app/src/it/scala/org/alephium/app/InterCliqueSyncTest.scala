@@ -316,8 +316,16 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   it should "sync ghost uncle blocks" in new CliqueFixture {
     val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
 
+    case object StopMiningUncles
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {
-      private val allBlocks = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
+      private val allBlocks        = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
+      private var stopMiningUncles = false
+
+      override def receive: Receive = super.receive orElse handleStopMiningUncles
+
+      private def handleStopMiningUncles: Receive = { case StopMiningUncles =>
+        stopMiningUncles = true
+      }
 
       private def publishBlocks(blocks: mutable.ArrayBuffer[Block]): Unit = {
         // avoid overflowing the DependencyHandler pending cache
@@ -341,39 +349,48 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       }
 
       override def publishNewBlock(block: Block): Unit = {
-        setIdle(block.chainIndex)
-        allBlocks.get(block.parentHash) match {
-          case None =>
-            allBlocks += block.parentHash -> mutable.ArrayBuffer(block)
-          case Some(blocks) =>
-            blocks.addOne(block)
-            if (blocks.length >= 2) {
-              allBlocks.remove(block.parentHash)
-              publishBlocks(Random.shuffle(blocks))
-            }
+        if (stopMiningUncles) {
+          super.publishNewBlock(block)
+        } else {
+          setIdle(block.chainIndex)
+          allBlocks.get(block.parentHash) match {
+            case None =>
+              allBlocks += block.parentHash -> mutable.ArrayBuffer(block)
+            case Some(blocks) =>
+              blocks.addOne(block)
+              if (blocks.length >= 2) {
+                allBlocks.remove(block.parentHash)
+                publishBlocks(Random.shuffle(blocks))
+              }
+          }
         }
       }
     }
 
-    val configOverrides = Map(("alephium.consensus.num-zeros-at-least-in-hash", 10))
-    val clique0         = bootClique(1, configOverrides = configOverrides)
+    val configOverrides = Map[String, Any](
+      ("alephium.mining.job-cache-size-per-chain", 100),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 10)
+    )
+    val clique0 = bootClique(1, configOverrides = configOverrides)
     clique0.start()
     val server0 = clique0.servers.head
     val node    = new InetSocketAddress("127.0.0.1", server0.config.network.minerApiPort)
     val miner   = server0.flowSystem.actorOf(Props(new TestMiner(node)))
     miner ! Miner.Start
 
-    Thread.sleep(60 * 1000)
+    Thread.sleep(50 * 1000)
 
     val blocks = allSubmittedBlocks.toSeq
     blocks.nonEmpty is true
     blocks.foreach { block =>
       eventually {
         val response = request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
-        response.toProtocol()(networkConfig).rightValue is block
+        response.toProtocol()(networkConfig).rightValue.header is block.header
       }
     }
 
+    miner ! StopMiningUncles
+    Thread.sleep(20 * 1000)
     miner ! Miner.Stop
 
     val clique1 =

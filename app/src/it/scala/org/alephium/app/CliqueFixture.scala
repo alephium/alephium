@@ -39,8 +39,7 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
 import org.alephium.flow.io.{Storages, StoragesFixture}
-import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.MiningBlob
+import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfig
@@ -173,11 +172,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val blockFlow = server.node.blockFlow
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(index, LockupScript.p2pkh(genesisKeys(index.to.value)._2))
-    val miningBlob = MiningBlob.from(blockTemplate)
+    val job = Job.from(blockTemplate)
 
     @tailrec
     def mine(): Block = {
-      Miner.mine(index, miningBlob)(server.config.broker, server.config.mining) match {
+      Miner.mine(index, job)(server.config.broker, server.config.mining) match {
         case Some((block, _)) => block
         case None             => mine()
       }
@@ -283,7 +282,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.network.miner-api-port", minerPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
-        ("alephium.consensus.block-target-time", "1 seconds"),
+        ("alephium.consensus.mainnet.block-target-time", "2 seconds"),
+        ("alephium.consensus.rhone.block-target-time", "1 seconds"),
+        ("alephium.consensus.rhone.uncle-dependency-gap-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),

@@ -33,7 +33,8 @@ final case class BlockHeader(
     txsHash: Hash,
     timestamp: TimeStamp,
     target: Target
-) extends FlowData {
+) extends FlowData
+    with SerializationCache {
   lazy val hash: BlockHash = PoW.hash(this)
 
   lazy val chainIndex: ChainIndex = {
@@ -104,12 +105,13 @@ final case class BlockHeader(
 }
 
 object BlockHeader {
-  implicit val serde: Serde[BlockHeader] =
+  private val _serde: Serde[BlockHeader] =
     Serde.forProduct7(
       apply,
       bh =>
         (bh.nonce, bh.version, bh.blockDeps, bh.depStateHash, bh.txsHash, bh.timestamp, bh.target)
     )
+  implicit val serde: Serde[BlockHeader] = SerializationCache.cachedSerde(_serde)
 
   def genesis(txsHash: Hash, target: Target, nonce: Nonce)(implicit
       config: GroupConfig

@@ -163,10 +163,11 @@ trait FlowUtils
     val newOutputRefs           = mutable.HashSet.empty[AssetOutputRef]
     val isSequentialTxSupported = ALPH.isSequentialTxSupported(chainIndex, hardFork)
     txs.filter { tx =>
-      if (isSequentialTxSupported) {
+      val isExists = Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
+      if (isExists && isSequentialTxSupported) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)
       }
-      Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
+      isExists
     }
   }
 
