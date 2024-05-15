@@ -35,9 +35,13 @@ final case class BlockEnv(
 ) {
   @inline def getHardFork(): HardFork = hardFork
 
-  def addOutputRef(ref: AssetOutputRef, output: AssetOutput): Unit = {
-    assume(hardFork.isRhoneEnabled())
-    newOutputRefCache.foreach(_.addOne(ref -> output))
+  def addOutputRefFromTx(unsignedTx: UnsignedTransaction): Unit = {
+    assume(hardFork.isRhoneEnabled() && newOutputRefCache.isDefined)
+    newOutputRefCache.foreach { cache =>
+      unsignedTx.fixedOutputRefs.foreachWithIndex { case (outputRef, outputIndex) =>
+        cache.addOne(outputRef -> unsignedTx.fixedOutputs(outputIndex))
+      }
+    }
   }
 }
 object BlockEnv {

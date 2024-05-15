@@ -202,6 +202,9 @@ trait FlowUtils
       val fullTxs =
         Array.ofDim[Transaction](txTemplates.length + 1) // reserve 1 slot for coinbase tx
       txTemplates.foreachWithIndex { case (tx, index) =>
+        if (blockEnv.getHardFork().isRhoneEnabled()) {
+          blockEnv.addOutputRefFromTx(tx.unsigned)
+        }
         if (tx.unsigned.scriptOpt.isEmpty) {
           fullTxs(index) = FlowUtils.convertNonScriptTx(tx)
         }
@@ -257,6 +260,7 @@ trait FlowUtils
       uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps, hardFork)
       template <- prepareBlockFlow(
+        hardFork,
         chainIndex,
         loosenDeps,
         groupView,
@@ -297,7 +301,9 @@ trait FlowUtils
     }
   }
 
+  // scalastyle:off parameter.number
   private def prepareBlockFlow(
+      hardFork: HardFork,
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -307,7 +313,12 @@ trait FlowUtils
       templateTs: TimeStamp,
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
-    val blockEnv = BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None)
+    val blockEnv = if (hardFork.isRhoneEnabled()) {
+      val refCache = Some(mutable.HashMap.empty[AssetOutputRef, AssetOutput])
+      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, refCache)
+    } else {
+      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None)
+    }
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
@@ -323,6 +334,7 @@ trait FlowUtils
       )
     }
   }
+  // scalastyle:on parameter.number
 
   private[flow] def rebuild(
       template: BlockFlowTemplate,
@@ -424,7 +436,7 @@ trait FlowUtils
     val validator = TxValidation.build
     for {
       preOutputs <- groupView
-        .getPreOutputs(tx.unsigned.inputs)
+        .getPreOutputs(tx.unsigned.inputs, blockEnv.newOutputRefCache)
         .flatMap {
           case None =>
             // Runtime exception as we have validated the inputs in collectTransactions
