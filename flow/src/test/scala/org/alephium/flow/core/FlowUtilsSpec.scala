@@ -26,7 +26,8 @@ import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, Generators, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript}
+import org.alephium.protocol.vm._
+import org.alephium.ralph.Compiler
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -861,5 +862,59 @@ class FlowUtilsSpec extends AlephiumSpec {
       blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue
     template1.transactions.init.map(_.toTemplate) is sequentialTxs
     addAndCheck(blockFlow, mine(blockFlow, template1))
+  }
+
+  it should "support sequential script txs in rhone" in new FlowFixture {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    val chainIndex              = ChainIndex.unsafe(0, 0)
+    val (privateKey, publicKey) = chainIndex.from.generateKey
+    val lockupScript            = LockupScript.p2pkh(publicKey)
+    val unlockScript            = UnlockScript.p2pkh(publicKey)
+    val genesisKey              = genesisKeys(chainIndex.from.value)._1
+    addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey, ALPH.alph(5)))
+    val utxos = blockFlow.getUsableUtxos(lockupScript, Int.MaxValue).rightValue
+    utxos.length is 1
+
+    val script = Compiler.compileTxScript("TxScript Main { let _ = 0 }").rightValue
+    val unsignedTx0 = UnsignedTransaction
+      .buildScriptTx(
+        script,
+        lockupScript,
+        unlockScript,
+        utxos.map(info => (info.ref, info.output)),
+        ALPH.cent(1),
+        AVector.empty,
+        minimalGas,
+        nonCoinbaseMinGasPrice
+      )
+      .rightValue
+    unsignedTx0.fixedOutputs.length is 1
+
+    val unsignedTx1 = UnsignedTransaction
+      .buildScriptTx(
+        script,
+        lockupScript,
+        unlockScript,
+        unsignedTx0.fixedOutputRefs.mapWithIndex { case (ref, index) =>
+          (ref, unsignedTx0.fixedOutputs(index))
+        },
+        ALPH.cent(1),
+        AVector.empty,
+        minimalGas,
+        nonCoinbaseMinGasPrice
+      )
+      .rightValue
+
+    val tx0 = Transaction.from(unsignedTx0, privateKey).toTemplate
+    val tx1 = Transaction.from(unsignedTx1, privateKey).toTemplate
+    val now = TimeStamp.now()
+    blockFlow.grandPool.add(chainIndex, tx0, now)
+    blockFlow.grandPool.add(chainIndex, tx1, now.plusMillisUnsafe(1))
+    val txs = AVector(tx0, tx1)
+
+    val block = mineBlockTemplate(blockFlow, chainIndex)
+    block.transactions.foreach(_.scriptExecutionOk is true)
+    block.nonCoinbase.map(_.toTemplate) is txs
+    addAndCheck(blockFlow, block)
   }
 }
