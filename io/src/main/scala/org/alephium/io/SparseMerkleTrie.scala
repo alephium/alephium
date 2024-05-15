@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
-import org.alephium.util.{AVector, Bytes, Cache => NodeCache}
+import org.alephium.util.{AVector, Bytes, SizedLruCache}
 
 object SparseMerkleTrie {
   /* branch [encodedPath, v0, ..., v15]
@@ -33,6 +33,8 @@ object SparseMerkleTrie {
   sealed trait Node {
     private[io] var _serialized: Option[ByteString] = None
     private[io] var _hash: Option[Hash]             = None
+    private[io] var _byteSize: Option[Int]          = None
+
     def serialized: ByteString = _serialized match {
       case Some(s) => s
       case None =>
@@ -47,7 +49,17 @@ object SparseMerkleTrie {
         _hash = Some(h)
         h
     }
+    @inline private def updateByteSize(): Int = {
+      val size = 40 + serialized.length
+      _byteSize = Some(size)
+      size
+    }
+    def byteSize: Int = _byteSize match {
+      case Some(size) => size
+      case None       => updateByteSize()
+    }
     def optimize(hash: Hash): Node = {
+      updateByteSize()
       _serialized = None
       _hash = Some(hash)
       this
@@ -157,11 +169,15 @@ object SparseMerkleTrie {
           val path             = decodeNibbles(left, length)
           if (isLeaf) {
             bytestringSerde._deserialize(right).map { case Staging(data, rest1) =>
-              Staging(LeafNode(path, data), rest1)
+              val node = LeafNode(path, data)
+              node._serialized = Some(input.dropRight(rest1.length))
+              Staging(node, rest1)
             }
           } else {
             childrenSerde._deserialize(right).map { case Staging(children, rest1) =>
-              Staging(BranchNode(path, children), rest1)
+              val node = BranchNode(path, children)
+              node._serialized = Some(input.dropRight(rest1.length))
+              Staging(node, rest1)
             }
           }
         }
@@ -222,7 +238,7 @@ object SparseMerkleTrie {
       storage: KeyValueStorage[Hash, Node],
       genesisKey: K,
       genesisValue: V,
-      nodeCache: NodeCache[Hash, SparseMerkleTrie.Node]
+      nodeCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
   ): SparseMerkleTrie[K, V] = {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
@@ -234,7 +250,7 @@ object SparseMerkleTrie {
   def apply[K: Serde, V: Serde](
       rootHash: Hash,
       storage: KeyValueStorage[Hash, Node],
-      nodeCache: NodeCache[Hash, SparseMerkleTrie.Node]
+      nodeCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
   ): SparseMerkleTrie[K, V] =
     new SparseMerkleTrie[K, V](rootHash, storage, nodeCache)
 
@@ -242,7 +258,7 @@ object SparseMerkleTrie {
       storage: KeyValueStorage[Hash, Node],
       genesisKey: K,
       genesisValue: V,
-      nodeCache: NodeCache[Hash, SparseMerkleTrie.Node]
+      nodeCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
   ): InMemorySparseMerkleTrie[K, V] = {
     val genesisPath = bytes2Nibbles(serialize(genesisKey))
     val genesisData = serialize(genesisValue)
@@ -254,9 +270,13 @@ object SparseMerkleTrie {
   def inMemory[K: Serde, V: Serde](
       rootHash: Hash,
       storage: KeyValueStorage[Hash, Node],
-      nodeCache: NodeCache[Hash, SparseMerkleTrie.Node]
+      nodeCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
   ): InMemorySparseMerkleTrie[K, V] =
     new InMemorySparseMerkleTrie[K, V](rootHash, storage, mutable.Map.empty, nodeCache)
+
+  def nodeCache(maxByteSize: Int): SizedLruCache[Hash, Node] = {
+    SizedLruCache.threadSafe(maxByteSize, (_, node) => 40 + node.byteSize)
+  }
 }
 
 abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, V, T] {
@@ -264,9 +284,10 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
 
   def rootHash: Hash
   def storage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
-  def nodeCache: NodeCache[Hash, Node]
+  def nodeCache: SizedLruCache[Hash, Node]
 
   def cacheNode(hash: Hash, node: Node): Unit = {
+    assume(node._serialized.nonEmpty)
     nodeCache.put(hash, node.optimize(hash))
   }
 
@@ -596,7 +617,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
 final class SparseMerkleTrie[K: Serde, V: Serde](
     val rootHash: Hash,
     val storage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-    val nodeCache: NodeCache[Hash, SparseMerkleTrie.Node]
+    val nodeCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
 ) extends SparseMerkleTrieBase[K, V, SparseMerkleTrie[K, V]] {
   import SparseMerkleTrie._
 
@@ -653,7 +674,7 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
     var rootHash: Hash,
     val storage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
     writeBuffer: mutable.Map[Hash, SparseMerkleTrie.Node],
-    val nodeCache: NodeCache[Hash, SparseMerkleTrie.Node]
+    val nodeCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
 ) extends SparseMerkleTrieBase[K, V, Unit] {
   import SparseMerkleTrie._
 

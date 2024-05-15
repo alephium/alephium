@@ -22,7 +22,7 @@ import scala.util.Random
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b => Hash}
-import org.alephium.util.{AlephiumSpec, Cache}
+import org.alephium.util.AlephiumSpec
 import org.alephium.util.Bytes.byteStringOrdering
 
 class CachedTrieSpec extends AlephiumSpec {
@@ -241,7 +241,12 @@ object CachedTrieSpec {
     val storage      = newDBStorage()
     val db           = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
     val unCached =
-      SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue, Cache.lruSafe(1000))
+      SparseMerkleTrie.unsafe[Hash, Hash](
+        db,
+        genesisKey,
+        genesisValue,
+        SparseMerkleTrie.nodeCache(1000_000)
+      )
 
     var cached: MutableKV[Hash, Hash, Unit] = CachedSMT.from(unCached)
 

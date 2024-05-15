@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, StagingLog}
 import org.alephium.serde.{Serde, SerdeError}
-import org.alephium.util.{AVector, Cache}
+import org.alephium.util.{AVector, SizedLruCache}
 
 // scalastyle:off number.of.methods
 trait WorldState[T, R1, R2, R3] {
@@ -637,7 +637,7 @@ object WorldState {
 
   def emptyPersisted(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      trieCache: Cache[Hash, SparseMerkleTrie.Node],
+      trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Persisted = {
@@ -666,7 +666,7 @@ object WorldState {
 
   def emptyCached(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      trieCache: Cache[Hash, SparseMerkleTrie.Node],
+      trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Cached = {
@@ -676,7 +676,7 @@ object WorldState {
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash, codeStateHash: Hash) {
     def toPersistedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-        trieCache: Cache[Hash, SparseMerkleTrie.Node],
+        trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Persisted = {
@@ -694,7 +694,7 @@ object WorldState {
 
     def toCachedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-        trieCache: Cache[Hash, SparseMerkleTrie.Node],
+        trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Cached = {

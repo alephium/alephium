@@ -25,11 +25,11 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{ContractStorageImmutableState, WorldState}
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.util.Cache
+import org.alephium.util.SizedLruCache
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
-  val trieCache: Cache[Hash, SparseMerkleTrie.Node]
+  val trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node]
   val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState]
   val logStorage: LogStorage
 
@@ -56,7 +56,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
 object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      trieCache: Cache[Hash, SparseMerkleTrie.Node],
+      trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage,
       storage: RocksDBSource,
@@ -78,7 +78,7 @@ object WorldStateRockDBStorage {
 
 class WorldStateRockDBStorage(
     val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-    val trieCache: Cache[Hash, SparseMerkleTrie.Node],
+    val trieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
     val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
     val logStorage: LogStorage,
     storage: RocksDBSource,

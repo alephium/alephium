@@ -52,11 +52,24 @@ class SizedLruCacheSpec extends AlephiumSpec {
       cache.size is 2
       cache.currentByteSize is 3
       cache.get('a') is Some(1)
+
       cache.put('c', 3)
       cache.keys().toSeq is Seq('a', 'c')
       cache.values().toSeq is Seq(1, 3)
       cache.size is 2
       cache.currentByteSize is 4
+
+      cache.put('d', 4)
+      cache.keys().toSeq is Seq('d')
+      cache.values().toSeq is Seq(4)
+      cache.size is 1
+      cache.currentByteSize is 4
+
+      cache.put('3', 5)
+      cache.keys().toSeq.isEmpty is true
+      cache.values().toSeq.isEmpty is true
+      cache.size is 0
+      cache.currentByteSize is 0
     }
   }
 

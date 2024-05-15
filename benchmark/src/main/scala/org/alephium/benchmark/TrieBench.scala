@@ -26,7 +26,7 @@ import org.openjdk.jmh.annotations._
 import org.alephium.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource, SparseMerkleTrie}
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
-import org.alephium.util.{Cache, Files}
+import org.alephium.util.Files
 
 @BenchmarkMode(Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -48,7 +48,7 @@ class TrieBench {
       RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
     }
     val db: KeyValueStorage[Hash, Node] = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
-    SparseMerkleTrie.unsafe(db, Hash.zero, Hash.zero, Cache.lruSafe(1000))
+    SparseMerkleTrie.unsafe(db, Hash.zero, Hash.zero, SparseMerkleTrie.nodeCache(1000_000))
   }
 
   val data: Array[(ByteString, ByteString)] = Array.tabulate(1 << 20) { _ =>
