@@ -29,7 +29,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Cache}
 
 object Storages {
   val isInitializedPostfix: Byte = 0
@@ -43,6 +43,8 @@ object Storages {
   def createUnsafe(rootPath: Path, storageDbFolder: String, writeOptions: WriteOptions)(implicit
       config: GroupConfig
   ): Storages = {
+    val trieCache = Cache.lruSafe[Hash, Node](1000_000)
+
     val db                = createRocksDBUnsafe(rootPath, storageDbFolder)
     val blockStorage      = BlockRockDBStorage(db, Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, Header, writeOptions)
@@ -59,6 +61,7 @@ object Storages {
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
+        trieCache,
         trieImmutableStateStorage,
         logStorage,
         db,
@@ -66,7 +69,7 @@ object Storages {
         writeOptions
       )
     val emptyWorldState =
-      WorldState.emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage)
+      WorldState.emptyPersisted(trieStorage, trieCache, trieImmutableStateStorage, logStorage)
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)

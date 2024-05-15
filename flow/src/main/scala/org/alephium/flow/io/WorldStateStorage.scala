@@ -25,9 +25,11 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{ContractStorageImmutableState, WorldState}
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.util.Cache
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
+  val trieCache: Cache[Hash, SparseMerkleTrie.Node]
   val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState]
   val logStorage: LogStorage
 
@@ -35,7 +37,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
     key.bytes ++ ByteString(Storages.trieHashPostfix)
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
-    get(hash).map(_.toPersistedWorldState(trieStorage, trieImmutableStateStorage, logStorage))
+    get(hash).map(_.toPersistedWorldState(trieStorage, trieCache, trieImmutableStateStorage, logStorage))
   }
 
   def getWorldStateHash(hash: BlockHash): IOResult[Hash] = {
@@ -43,7 +45,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   }
 
   def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
-    get(hash).map(_.toCachedWorldState(trieStorage, trieImmutableStateStorage, logStorage))
+    get(hash).map(_.toCachedWorldState(trieStorage, trieCache, trieImmutableStateStorage, logStorage))
   }
 
   def putTrie(hash: BlockHash, worldState: WorldState.Persisted): IOResult[Unit] = {
@@ -54,6 +56,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
 object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      trieCache: Cache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage,
       storage: RocksDBSource,
@@ -62,6 +65,7 @@ object WorldStateRockDBStorage {
   ): WorldStateRockDBStorage = {
     new WorldStateRockDBStorage(
       trieStorage,
+      trieCache,
       trieImmutableStateStorage,
       logStorage,
       storage,
@@ -74,6 +78,7 @@ object WorldStateRockDBStorage {
 
 class WorldStateRockDBStorage(
     val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+    val trieCache: Cache[Hash, SparseMerkleTrie.Node],
     val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
     val logStorage: LogStorage,
     storage: RocksDBSource,

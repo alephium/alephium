@@ -137,7 +137,7 @@ class PruneStorageService(
 
       currentHashes.foreach(hash => bloomFilter.add(hash.bytes))
 
-      val allNodes = smt.getNodesUnsafe(currentHashes)
+      val allNodes = smt.getNodesForPruningService(currentHashes)
       val newHashes: Seq[Hash] = allNodes.flatMap { node =>
         node match {
           case SparseMerkleTrie.BranchNode(_, children) =>

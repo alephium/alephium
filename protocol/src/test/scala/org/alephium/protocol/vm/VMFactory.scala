@@ -21,7 +21,7 @@ import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Cache}
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {
@@ -33,6 +33,6 @@ trait VMFactory extends StorageFixture {
     val logRefDb     = newDB[Byte32, AVector[LogStateRef]](storage, RocksDBSource.ColumnFamily.Log)
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
-    WorldState.emptyCached(trieDb, trieImmutableStateStorage, logStorage)
+    WorldState.emptyCached(trieDb, Cache.lruSafe(10), trieImmutableStateStorage, logStorage)
   }
 }

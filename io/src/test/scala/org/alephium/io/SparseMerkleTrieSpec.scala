@@ -24,7 +24,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, Cache}
 
 class SparseMerkleTrieSpec extends AlephiumSpec {
   import SparseMerkleTrie._
@@ -117,11 +117,18 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   trait TrieFixture extends StorageFixture {
     val storage0 = newDBStorage()
     val db0      = newDB[Hash, SparseMerkleTrie.Node](storage0, RocksDBSource.ColumnFamily.All)
-    var trie     = SparseMerkleTrie.unsafe[Hash, Hash](db0, genesisKey, genesisValue)
+    var trie =
+      SparseMerkleTrie.unsafe[Hash, Hash](db0, genesisKey, genesisValue, Cache.lruSafe(1000))
 
-    val storage1  = newDBStorage()
-    val db1       = newDB[Hash, SparseMerkleTrie.Node](storage1, RocksDBSource.ColumnFamily.All)
-    var inMemTrie = SparseMerkleTrie.inMemoryUnsafe[Hash, Hash](db1, genesisKey, genesisValue)
+    val storage1 = newDBStorage()
+    val db1      = newDB[Hash, SparseMerkleTrie.Node](storage1, RocksDBSource.ColumnFamily.All)
+    var inMemTrie =
+      SparseMerkleTrie.inMemoryUnsafe[Hash, Hash](
+        db1,
+        genesisKey,
+        genesisValue,
+        Cache.lruSafe(1000)
+      )
   }
 
   def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
@@ -253,7 +260,8 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   it should "work for explicit examples" in new StorageFixture {
     val storage = newDBStorage()
     val db      = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
-    val trie0   = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
+    val trie0 =
+      SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue, Cache.lruSafe(1000))
 
     val key0   = Hash.generate
     val key1   = Hash.generate

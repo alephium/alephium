@@ -23,7 +23,7 @@ import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, Cache}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
   def generateAsset: Gen[(TxOutputRef, TxOutput)] = {
@@ -151,6 +151,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage = newDBStorage()
     val persisted = WorldState.emptyPersisted(
       newDB(storage, RocksDBSource.ColumnFamily.All),
+      Cache.lruSafe(1000),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )
@@ -275,6 +276,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage              = newDBStorage()
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
+      Cache.lruSafe(1000),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )

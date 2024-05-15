@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, StagingLog}
 import org.alephium.serde.{Serde, SerdeError}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Cache}
 
 // scalastyle:off number.of.methods
 trait WorldState[T, R1, R2, R3] {
@@ -637,18 +637,24 @@ object WorldState {
 
   def emptyPersisted(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      trieCache: Cache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Persisted = {
     val genesisRef  = ContractOutputRef.forSMT
     val emptyOutput = TxOutput.forSMT
-    val emptyOutputTrie =
-      SparseMerkleTrie.unsafe[TxOutputRef, TxOutput](trieStorage, genesisRef, emptyOutput)
+    val emptyOutputTrie = SparseMerkleTrie.unsafe[TxOutputRef, TxOutput](
+      trieStorage,
+      genesisRef,
+      emptyOutput,
+      trieCache
+    )
     val emptyState: ContractStorageState =
       ContractLegacyState.unsafe(StatefulContract.forSMT, AVector.empty, genesisRef)
-    val emptyCode         = CodeRecord(StatefulContract.forSMT, 0)
-    val emptyContractTrie = SparseMerkleTrie.unsafe(trieStorage, ContractId.zero, emptyState)
-    val emptyCodeTrie     = SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyCode)
+    val emptyCode = CodeRecord(StatefulContract.forSMT, 0)
+    val emptyContractTrie =
+      SparseMerkleTrie.unsafe(trieStorage, ContractId.zero, emptyState, trieCache)
+    val emptyCodeTrie = SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyCode, trieCache)
     Persisted(
       emptyOutputTrie,
       emptyContractTrie,
@@ -660,31 +666,39 @@ object WorldState {
 
   def emptyCached(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+      trieCache: Cache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Cached = {
-    emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage).cached()
+    emptyPersisted(trieStorage, trieCache, trieImmutableStateStorage, logStorage).cached()
   }
 
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash, codeStateHash: Hash) {
     def toPersistedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+        trieCache: Cache[Hash, SparseMerkleTrie.Node],
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Persisted = {
-      val outputState = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage)
+      val outputState =
+        SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage, trieCache)
       val contractState =
-        SparseMerkleTrie[ContractId, ContractStorageState](contractStateHash, trieStorage)
-      val codeState = SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage)
+        SparseMerkleTrie[ContractId, ContractStorageState](
+          contractStateHash,
+          trieStorage,
+          trieCache
+        )
+      val codeState = SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage, trieCache)
       Persisted(outputState, contractState, trieImmutableStateStorage, codeState, logStorage)
     }
 
     def toCachedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
+        trieCache: Cache[Hash, SparseMerkleTrie.Node],
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Cached = {
-      toPersistedWorldState(trieStorage, trieImmutableStateStorage, logStorage).cached()
+      toPersistedWorldState(trieStorage, trieCache, trieImmutableStateStorage, logStorage).cached()
     }
 
     def stateHash: Hash = Hash.hash(outputStateHash.bytes ++ contractStateHash.bytes)
