@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSettings
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, KeyValueStorage}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -36,6 +36,8 @@ trait BlockFlowState extends FlowTipsUtil {
 
   implicit def brokerConfig: BrokerConfig
   implicit def networkConfig: NetworkConfig
+  implicit def nodeIndexesConfig: NodeIndexesConfig
+
   def consensusConfigs: ConsensusSettings
   def groups: Int = brokerConfig.groups
   def genesisBlocks: AVector[AVector[Block]]
@@ -71,6 +73,11 @@ trait BlockFlowState extends FlowTipsUtil {
   val logStorage: LogStorage = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
     intraGroupBlockChains.head.worldStateStorage.logStorage
+  }
+
+  val txOutputRefIndexStorage: KeyValueStorage[TxOutputRef.Key, TransactionId] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.txOutputRefIndexStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =
@@ -480,7 +487,8 @@ object BlockFlowState {
   }
 
   def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
-      brokerConfig: GroupConfig
+      brokerConfig: GroupConfig,
+      nodeIndexesConfig: NodeIndexesConfig
   ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
@@ -508,7 +516,7 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
       _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
@@ -520,7 +528,7 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
       _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
@@ -532,7 +540,7 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
     updateStateForOutputs(worldState, tx, targetGroup, blockTs)
   }
 
@@ -546,13 +554,20 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
-        worldState.addAsset(outputRef, outputUpdated)
+
+        val indexConfig = if (nodeIndexesConfig.txOutputRefIndex) {
+          TxOutputRefIndexConfig.Enabled(tx.id)
+        } else {
+          TxOutputRefIndexConfig.Disabled
+        }
+
+        worldState.addAsset(outputRef, outputUpdated, indexConfig)
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

@@ -29,7 +29,7 @@ import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{LogConfig, WorldState}
+import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig, WorldState}
 import org.alephium.util.{AVector, Env, Files, TimeStamp}
 
 trait BlockFlow
@@ -131,7 +131,8 @@ object BlockFlow extends StrictLogging {
       config.network,
       config.consensus,
       config.mempool,
-      config.node.eventLogConfig
+      config.node.eventLogConfig,
+      config.node.indexesConfig
     )
   }
 
@@ -141,7 +142,8 @@ object BlockFlow extends StrictLogging {
       config.network,
       config.consensus,
       config.mempool,
-      config.node.eventLogConfig
+      config.node.eventLogConfig,
+      config.node.indexesConfig
     )
   }
 
@@ -150,7 +152,8 @@ object BlockFlow extends StrictLogging {
       networkConfig: NetworkConfig,
       consensusSettings: ConsensusSettings,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      nodeIndexesConfig: NodeIndexesConfig
   ): BlockFlow = {
     val blockFlow = new BlockFlowImpl(
       genesisBlocks,
@@ -168,7 +171,8 @@ object BlockFlow extends StrictLogging {
       config.network,
       config.consensus,
       config.mempool,
-      config.node.eventLogConfig
+      config.node.eventLogConfig,
+      config.node.indexesConfig
     )
   }
 
@@ -216,7 +220,8 @@ object BlockFlow extends StrictLogging {
       networkConfig: NetworkConfig,
       consensusSettings: ConsensusSettings,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      nodeIndexesConfig: NodeIndexesConfig
   ): BlockFlow = {
     val blockflow = new BlockFlowImpl(
       genesisBlocks,
@@ -241,7 +246,8 @@ object BlockFlow extends StrictLogging {
       val networkConfig: NetworkConfig,
       val consensusConfigs: ConsensusSettings,
       val mempoolSetting: MemPoolSetting,
-      val logConfig: LogConfig
+      val logConfig: LogConfig,
+      val nodeIndexesConfig: NodeIndexesConfig
   ) extends BlockFlow {
 
     // for intra-group block, worldStateOpt should not be empty

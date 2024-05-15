@@ -45,7 +45,7 @@ import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
-import org.alephium.protocol.vm.{LockupScript, LogConfig}
+import org.alephium.protocol.vm.{LockupScript, LogConfig, NodeIndexesConfig}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -65,11 +65,12 @@ trait EndpointsLogic extends Endpoints {
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
 
-  implicit lazy val groupConfig: GroupConfig            = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting       = node.config.network
-  implicit lazy val consensusConfigs: ConsensusSettings = node.config.consensus
-  implicit lazy val logConfig: LogConfig                = node.config.node.eventLogConfig
-  implicit lazy val askTimeout: Timeout                 = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig             = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting        = node.config.network
+  implicit lazy val consensusConfigs: ConsensusSettings  = node.config.consensus
+  implicit lazy val logConfig: LogConfig                 = node.config.node.eventLogConfig
+  implicit lazy val nodeIndexesConfig: NodeIndexesConfig = node.config.node.indexesConfig
+  implicit lazy val askTimeout: Timeout                  = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 

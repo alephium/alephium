@@ -719,21 +719,24 @@ object BlockValidation {
       blockFlow.brokerConfig,
       blockFlow.networkConfig,
       blockFlow.consensusConfigs,
-      blockFlow.logConfig
+      blockFlow.logConfig,
+      blockFlow.nodeIndexesConfig
     )
 
   def build(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
       consensusConfigs: ConsensusConfigs,
-      logConfig: LogConfig
+      logConfig: LogConfig,
+      nodeIndexesConfig: NodeIndexesConfig
   ): BlockValidation = new Impl()
 
   class Impl(implicit
       val brokerConfig: BrokerConfig,
       val networkConfig: NetworkConfig,
       val consensusConfigs: ConsensusConfigs,
-      val logConfig: LogConfig
+      val logConfig: LogConfig,
+      val nodeIndexesConfig: NodeIndexesConfig
   ) extends BlockValidation {
     override def headerValidation: HeaderValidation  = HeaderValidation.build
     override def nonCoinbaseValidation: TxValidation = TxValidation.build

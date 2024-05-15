@@ -37,7 +37,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.{Address, Block, Difficulty, HardFork, NetworkId, Target, Weight}
-import org.alephium.protocol.vm.LogConfig
+import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
 import org.alephium.util._
 
 final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) extends BrokerConfig {
@@ -211,9 +211,11 @@ object WalletSetting {
 
 final case class NodeSetting(
     dbSyncWrite: Boolean,
-    eventLog: LogConfig
+    eventLog: LogConfig,
+    indexes: Option[NodeIndexesConfig]
 ) {
-  def eventLogConfig: LogConfig = eventLog
+  def eventLogConfig: LogConfig        = eventLog
+  def indexesConfig: NodeIndexesConfig = indexes.getOrElse(NodeIndexesConfig.disabled())
 }
 
 final case class Allocation(

@@ -983,6 +983,34 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
+  trait TxOutputRefIndexFixture extends FlowFixture {
+    def enableTxOutputRefIndex: Boolean
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex")
+    )
+
+    val (fromPriKey, _, _) = genesisKeys(0)
+    val (_, toPubKey)      = GroupIndex.unsafe(0).generateKey
+    val block              = transfer(blockFlow, fromPriKey, toPubKey, ALPH.alph(10))
+    addAndCheck(blockFlow, block)
+
+    val utxos = blockFlow.getUTXOs(LockupScript.p2pkh(toPubKey), Int.MaxValue, true).rightValue
+    utxos.length is 1
+
+    val txOutputRef = utxos.head.ref
+    val txIdResult  = if (enableTxOutputRefIndex) Some(block.nonCoinbase.head.id) else None
+    blockFlow.getTxIdFromOutputRef(txOutputRef.asInstanceOf[AssetOutputRef]) isE txIdResult
+  }
+
+  it should "not store txOutputRef index when it is disabled" in new TxOutputRefIndexFixture {
+    override def enableTxOutputRefIndex = false
+  }
+
+  it should "store txOutputRef index when it is enabled" in new TxOutputRefIndexFixture {
+    override def enableTxOutputRefIndex = true
+  }
+
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
     blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
   }

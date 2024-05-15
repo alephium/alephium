@@ -26,7 +26,7 @@ import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util.AVector
@@ -40,6 +40,7 @@ object Storages {
   val dbVersionPostfix: Byte     = 5
   val bootstrapInfoPostFix: Byte = 6
 
+  // scalastyle:off method.length
   def createUnsafe(rootPath: Path, storageDbFolder: String, writeOptions: WriteOptions)(implicit
       config: GroupConfig
   ): Storages = {
@@ -56,17 +57,25 @@ object Storages {
     val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
     val trieImmutableStateStorage =
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
+    val txOutputRefIndexStorage =
+      RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
         trieImmutableStateStorage,
         logStorage,
+        txOutputRefIndexStorage,
         db,
         All,
         writeOptions
       )
     val emptyWorldState =
-      WorldState.emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage)
+      WorldState.emptyPersisted(
+        trieStorage,
+        trieImmutableStateStorage,
+        logStorage,
+        txOutputRefIndexStorage
+      )
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)
@@ -83,9 +92,11 @@ object Storages {
       pendingTxStorage,
       readyTxStorage,
       brokerStorage,
-      logStorage
+      logStorage,
+      txOutputRefIndexStorage
     )
   }
+  // scalastyle:on method.length
 
   def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
     val dbPath = rootPath.resolve(dbFolder)
@@ -105,7 +116,8 @@ final case class Storages(
     pendingTxStorage: PendingTxStorage,
     readyTxStorage: ReadyTxStorage,
     brokerStorage: BrokerStorage,
-    logStorage: LogStorage
+    logStorage: LogStorage,
+    txOutputRefTxIdStorage: KeyValueStorage[TxOutputRef.Key, TransactionId]
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 

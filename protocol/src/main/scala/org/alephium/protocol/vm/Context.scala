@@ -165,6 +165,25 @@ object LogConfig {
   }
 }
 
+sealed trait TxOutputRefIndexConfig extends Product with Serializable
+object TxOutputRefIndexConfig {
+  final case class Enabled(txId: TransactionId) extends TxOutputRefIndexConfig
+  case object Disabled                          extends TxOutputRefIndexConfig
+}
+
+object NodeIndexesConfig {
+  def enabled(): NodeIndexesConfig = {
+    NodeIndexesConfig(txOutputRefIndex = true)
+  }
+
+  def disabled(): NodeIndexesConfig = {
+    NodeIndexesConfig(txOutputRefIndex = false)
+  }
+}
+final case class NodeIndexesConfig(
+    txOutputRefIndex: Boolean
+)
+
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def groupConfig: GroupConfig
@@ -273,6 +292,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def outputBalances: MutBalances
 
   def logConfig: LogConfig
+
+  def nodeIndexesConfig: NodeIndexesConfig
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
@@ -518,11 +539,13 @@ object StatefulContext {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      groupConfig: GroupConfig
+      groupConfig: GroupConfig,
+      nodeIndexesConfig: NodeIndexesConfig
   ): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
+  // scalastyle:off parameter.number
   def apply(
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
@@ -532,11 +555,13 @@ object StatefulContext {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      groupConfig: GroupConfig
+      groupConfig: GroupConfig,
+      nodeIndexesConfig: NodeIndexesConfig
   ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
+  // scalastyle:on parameter.number
 
   final class Impl(
       val blockEnv: BlockEnv,
@@ -546,7 +571,8 @@ object StatefulContext {
   )(implicit
       val networkConfig: NetworkConfig,
       val logConfig: LogConfig,
-      val groupConfig: GroupConfig
+      val groupConfig: GroupConfig,
+      val nodeIndexesConfig: NodeIndexesConfig
   ) extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 

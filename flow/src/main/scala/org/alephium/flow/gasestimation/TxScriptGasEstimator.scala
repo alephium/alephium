@@ -33,8 +33,12 @@ object TxScriptGasEstimator {
   // Is it because of not all inputs are picked for gas estimation?
   final case class Default(
       flow: BlockFlow
-  )(implicit networkConfig: NetworkConfig, config: GroupConfig, logConfig: LogConfig)
-      extends TxScriptGasEstimator {
+  )(implicit
+      networkConfig: NetworkConfig,
+      config: GroupConfig,
+      logConfig: LogConfig,
+      nodeIndexesConfig: NodeIndexesConfig
+  ) extends TxScriptGasEstimator {
     def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       val chainIndexOpt =
         inputs.headOption.map(input => ChainIndex(input.fromGroup, input.fromGroup))

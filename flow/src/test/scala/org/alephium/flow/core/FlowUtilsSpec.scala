@@ -26,7 +26,13 @@ import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, Generators, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript}
+import org.alephium.protocol.vm.{
+  GasBox,
+  GasPrice,
+  LockupScript,
+  StatefulScript,
+  TxOutputRefIndexConfig
+}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -50,7 +56,9 @@ class FlowUtilsSpec extends AlephiumSpec {
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
       assets.foreach { asset =>
-        worldState.addAsset(asset.txInput.outputRef, asset.referredOutput).isRight is true
+        worldState
+          .addAsset(asset.txInput.outputRef, asset.referredOutput, TxOutputRefIndexConfig.Disabled)
+          .isRight is true
       }
       val firstInput = assets.head.referredOutput
       val firstOutput = firstInput.copy(
