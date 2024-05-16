@@ -73,6 +73,25 @@ class SizedLruCacheSpec extends AlephiumSpec {
     }
   }
 
+  it should "change the max size" in {
+    val cache = SizedLruCache.threadSafe[Char, Int](4, (_, v) => v)
+    cache.put('a', 1)
+    cache.put('b', 2)
+    cache.put('c', 3)
+    cache.size is 1
+    cache.currentByteSize is 3
+    cache.maxByteSize is 4
+    cache.keys().toSeq is Seq('c')
+
+    cache.setMaxByteSize(10)
+    cache.put('a', 1)
+    cache.put('b', 2)
+    cache.size is 3
+    cache.currentByteSize is 6
+    cache.maxByteSize is 10
+    cache.keys().toSeq is Seq('c', 'a', 'b')
+  }
+
   it should "clear all elements" in {
     val cache = SizedLruCache.threadSafe[Int, Unit](10, (k, _) => k)
     (1 until 4).foreach(v => cache.put(v, ()))

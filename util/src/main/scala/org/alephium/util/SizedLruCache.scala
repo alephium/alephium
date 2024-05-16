@@ -40,7 +40,7 @@ object SizedLruCache {
   }
 }
 
-abstract class SizedLruCache[K, V](maxByteSize: Int, getEntrySize: (K, V) => Int)
+abstract class SizedLruCache[K, V](var maxByteSize: Int, getEntrySize: (K, V) => Int)
     extends SimpleMap[K, V]
     with Lock {
   private var _currentByteSize: Int      = 0
@@ -71,6 +71,8 @@ abstract class SizedLruCache[K, V](maxByteSize: Int, getEntrySize: (K, V) => Int
   protected def underlying: util.Map[K, V] = m
 
   def currentByteSize: Int = _currentByteSize
+
+  def setMaxByteSize(newMaxByteSize: Int): Unit = maxByteSize = newMaxByteSize
 
   def contains(key: K): Boolean = readOnly {
     m.containsKey(key)
