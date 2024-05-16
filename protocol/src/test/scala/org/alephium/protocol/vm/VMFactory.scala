@@ -35,8 +35,6 @@ trait VMFactory extends StorageFixture {
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
     WorldState.emptyCached(
       trieDb,
-      SparseMerkleTrie.nodeCache(10_000),
-      SparseMerkleTrie.nodeCache(10_000),
       trieImmutableStateStorage,
       logStorage
     )

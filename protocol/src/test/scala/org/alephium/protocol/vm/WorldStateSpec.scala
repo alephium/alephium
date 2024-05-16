@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 import org.scalacheck.Gen
 
-import org.alephium.io.{IOResult, RocksDBSource, SparseMerkleTrie, StorageFixture}
+import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
@@ -151,8 +151,6 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage = newDBStorage()
     val persisted = WorldState.emptyPersisted(
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      SparseMerkleTrie.nodeCache(1000_000),
-      SparseMerkleTrie.nodeCache(100_000),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )
@@ -277,8 +275,6 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage              = newDBStorage()
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      SparseMerkleTrie.nodeCache(1000_000),
-      SparseMerkleTrie.nodeCache(100_000),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )

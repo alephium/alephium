@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, StagingLog}
 import org.alephium.serde.{Serde, SerdeError}
-import org.alephium.util.{AVector, SizedLruCache}
+import org.alephium.util.{AVector}
 
 // scalastyle:off number.of.methods
 trait WorldState[T, R1, R2, R3] {
@@ -279,6 +279,9 @@ sealed abstract class ImmutableWorldState
 // scalastyle:on
 
 object WorldState {
+  val assetTrieCache    = SparseMerkleTrie.nodeCache(200_000_000)
+  val contractTrieCache = SparseMerkleTrie.nodeCache(20_000_000)
+
   val expectedAssetError: IOError    = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
   val expectedContractError: IOError = IOError.Serde(SerdeError.validation("Expect ContractOutput"))
 
@@ -637,8 +640,6 @@ object WorldState {
 
   def emptyPersisted(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      assetTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
-      contractTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Persisted = {
@@ -668,15 +669,11 @@ object WorldState {
 
   def emptyCached(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      assetTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
-      contractTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Cached = {
     emptyPersisted(
       trieStorage,
-      assetTrieCache,
-      contractTrieCache,
       trieImmutableStateStorage,
       logStorage
     ).cached()
@@ -685,8 +682,6 @@ object WorldState {
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash, codeStateHash: Hash) {
     def toPersistedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-        assetTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
-        contractTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Persisted = {
@@ -705,15 +700,11 @@ object WorldState {
 
     def toCachedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-        assetTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
-        contractTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node],
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Cached = {
       toPersistedWorldState(
         trieStorage,
-        assetTrieCache,
-        contractTrieCache,
         trieImmutableStateStorage,
         logStorage
       ).cached()

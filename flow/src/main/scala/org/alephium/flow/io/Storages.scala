@@ -44,8 +44,6 @@ object Storages {
   def createUnsafe(rootPath: Path, storageDbFolder: String, writeOptions: WriteOptions)(implicit
       config: GroupConfig
   ): Storages = {
-    val assetTrieCache    = SparseMerkleTrie.nodeCache(200_000_000)
-    val contractTrieCache = SparseMerkleTrie.nodeCache(20_000_000)
 
     val db                = createRocksDBUnsafe(rootPath, storageDbFolder)
     val blockStorage      = BlockRockDBStorage(db, Block, writeOptions)
@@ -63,8 +61,6 @@ object Storages {
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
-        assetTrieCache,
-        contractTrieCache,
         trieImmutableStateStorage,
         logStorage,
         db,
@@ -74,8 +70,6 @@ object Storages {
     val emptyWorldState =
       WorldState.emptyPersisted(
         trieStorage,
-        assetTrieCache,
-        contractTrieCache,
         trieImmutableStateStorage,
         logStorage
       )
