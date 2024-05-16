@@ -121,6 +121,10 @@ alephium {
     # a boolean flag to indicate whether a write with rocksdb should be synchronized
     # Note that if it is just the process that crashes (i.e., the machine does not reboot), no writes will be lost even if sync==false
     db-sync-write = false
+
+    asset-trie-cache-max-byte-size = 200000000
+    contract-trie-cache-max-byte-size = 20000000
+
     event-log {
       enabled = false
       index-by-tx-id = false

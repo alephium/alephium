@@ -279,8 +279,8 @@ sealed abstract class ImmutableWorldState
 // scalastyle:on
 
 object WorldState {
-  val assetTrieCache    = SparseMerkleTrie.nodeCache(200_000_000)
-  val contractTrieCache = SparseMerkleTrie.nodeCache(20_000_000)
+  val assetTrieCache    = SparseMerkleTrie.nodeCache(20_000_000)
+  val contractTrieCache = SparseMerkleTrie.nodeCache(10_000_000)
 
   val expectedAssetError: IOError    = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
   val expectedContractError: IOError = IOError.Serde(SerdeError.validation("Expect ContractOutput"))

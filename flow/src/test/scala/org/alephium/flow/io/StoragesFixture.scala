@@ -18,6 +18,7 @@ package org.alephium.flow.io
 
 import java.nio.file.{Files, Path}
 
+import org.alephium.flow.setting.NodeSetting
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
@@ -31,7 +32,9 @@ trait StoragesFixture {
 }
 
 object StoragesFixture {
-  def buildStorages(rootPath: Path)(implicit groupConfig: GroupConfig): Storages = {
+  def buildStorages(
+      rootPath: Path
+  )(implicit groupConfig: GroupConfig, nodeSetting: NodeSetting): Storages = {
     if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
 
     val postFix   = Hash.random.toHexString
@@ -44,6 +47,7 @@ object StoragesFixture {
   trait Default extends StoragesFixture {
     def rootPath: Path
     implicit def groupConfig: GroupConfig
+    implicit def nodeSetting: NodeSetting
 
     lazy val storages = StoragesFixture.buildStorages(rootPath)
   }
