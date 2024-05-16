@@ -245,7 +245,7 @@ object CachedTrieSpec {
         db,
         genesisKey,
         genesisValue,
-        SparseMerkleTrie.nodeCache(1000_000)
+        SparseMerkleTrie.nodeCache(0)
       )
 
     var cached: MutableKV[Hash, Hash, Unit] = CachedSMT.from(unCached)

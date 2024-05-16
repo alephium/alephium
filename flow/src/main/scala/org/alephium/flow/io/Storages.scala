@@ -72,11 +72,7 @@ object Storages {
         writeOptions
       )
     val emptyWorldState =
-      WorldState.emptyPersisted(
-        trieStorage,
-        trieImmutableStateStorage,
-        logStorage
-      )
+      WorldState.emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage)
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)

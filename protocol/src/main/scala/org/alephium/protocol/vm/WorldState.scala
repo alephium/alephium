@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, StagingLog}
 import org.alephium.serde.{Serde, SerdeError}
-import org.alephium.util.{AVector}
+import org.alephium.util.{AVector, SizedLruCache}
 
 // scalastyle:off number.of.methods
 trait WorldState[T, R1, R2, R3] {
@@ -279,8 +279,10 @@ sealed abstract class ImmutableWorldState
 // scalastyle:on
 
 object WorldState {
-  val assetTrieCache    = SparseMerkleTrie.nodeCache(20_000_000)
-  val contractTrieCache = SparseMerkleTrie.nodeCache(10_000_000)
+  val assetTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node] =
+    SparseMerkleTrie.nodeCache(20_000_000)
+  val contractTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node] =
+    SparseMerkleTrie.nodeCache(10_000_000)
 
   val expectedAssetError: IOError    = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
   val expectedContractError: IOError = IOError.Serde(SerdeError.validation("Expect ContractOutput"))
@@ -672,11 +674,7 @@ object WorldState {
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage
   ): Cached = {
-    emptyPersisted(
-      trieStorage,
-      trieImmutableStateStorage,
-      logStorage
-    ).cached()
+    emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage).cached()
   }
 
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash, codeStateHash: Hash) {
@@ -703,11 +701,7 @@ object WorldState {
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Cached = {
-      toPersistedWorldState(
-        trieStorage,
-        trieImmutableStateStorage,
-        logStorage
-      ).cached()
+      toPersistedWorldState(trieStorage, trieImmutableStateStorage, logStorage).cached()
     }
 
     def stateHash: Hash = Hash.hash(outputStateHash.bytes ++ contractStateHash.bytes)

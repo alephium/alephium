@@ -96,7 +96,24 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
   }
 
   it should "serde correctly" in new NodeFixture {
-    forAll(nodeGen) { node => deserialize[Node](serialize[Node](node)) isE node }
+    forAll(nodeGen) { node =>
+      val serialized  = serialize[Node](node)
+      val deserialied = deserialize[Node](serialized).rightValue
+      deserialied is node
+      deserialied._serialized.value is serialized
+
+      val hash = deserialied.hash
+      deserialied._hash.value is hash
+
+      val byteSize = deserialied.byteSize
+      byteSize is (40 + serialized.length)
+      deserialied._byteSize.value is (40 + serialized.length)
+
+      deserialied.optimize(hash)
+      deserialied._serialized.isEmpty is true
+      deserialied._hash.value is hash
+      deserialied._byteSize.value is (40 + serialized.length)
+    }
   }
 
   behavior of "Merkle Patricia Trie"
@@ -251,6 +268,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
 
     trie.rootHash is genesisNode.hash
+    trie.nodeCache.values().foreach { node =>
+      node._serialized.isEmpty is true
+      node._byteSize.nonEmpty is true
+      node._hash.nonEmpty is true
+    }
   }
 
   it should "work for random insertions" in withTrieFixture { fixture =>
@@ -265,11 +287,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     val storage = newDBStorage()
     val db      = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
     val trie0 = SparseMerkleTrie.unsafe[Hash, Hash](
-        db,
-        genesisKey,
-        genesisValue,
-        SparseMerkleTrie.nodeCache(1000_000)
-      )
+      db,
+      genesisKey,
+      genesisValue,
+      SparseMerkleTrie.nodeCache(1000_000)
+    )
 
     val key0   = Hash.generate
     val key1   = Hash.generate

@@ -287,19 +287,16 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
   def nodeCache: SizedLruCache[Hash, Node]
 
   def cacheNode(hash: Hash, node: Node): Unit = {
-    assume(node._serialized.nonEmpty)
     nodeCache.put(hash, node.optimize(hash))
   }
 
   def getNode(hash: Hash): IOResult[Node] = {
     nodeCache.get(hash) match {
       case Some(node) =>
-        assume(node.isCacheEmpty())
         Right(node)
       case None =>
         storage.get(hash).map { node =>
           cacheNode(hash, node)
-          assume(node.isCacheEmpty())
           node
         }
     }

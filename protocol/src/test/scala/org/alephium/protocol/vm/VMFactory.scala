@@ -33,10 +33,6 @@ trait VMFactory extends StorageFixture {
     val logRefDb     = newDB[Byte32, AVector[LogStateRef]](storage, RocksDBSource.ColumnFamily.Log)
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
-    WorldState.emptyCached(
-      trieDb,
-      trieImmutableStateStorage,
-      logStorage
-    )
+    WorldState.emptyCached(trieDb, trieImmutableStateStorage, logStorage)
   }
 }

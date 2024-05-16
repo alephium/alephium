@@ -35,13 +35,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
     key.bytes ++ ByteString(Storages.trieHashPostfix)
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
-    get(hash).map(
-      _.toPersistedWorldState(
-        trieStorage,
-        trieImmutableStateStorage,
-        logStorage
-      )
-    )
+    get(hash).map(_.toPersistedWorldState(trieStorage, trieImmutableStateStorage, logStorage))
   }
 
   def getWorldStateHash(hash: BlockHash): IOResult[Hash] = {
@@ -49,13 +43,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   }
 
   def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
-    get(hash).map(
-      _.toCachedWorldState(
-        trieStorage,
-        trieImmutableStateStorage,
-        logStorage
-      )
-    )
+    get(hash).map(_.toCachedWorldState(trieStorage, trieImmutableStateStorage, logStorage))
   }
 
   def putTrie(hash: BlockHash, worldState: WorldState.Persisted): IOResult[Unit] = {
