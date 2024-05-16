@@ -45,7 +45,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
     }
   }
 
-  private def getPreOutputs(
+  private[core] def getPreOutputs(
       inputs: AVector[TxInput],
       additionalCacheOpt: Option[scala.collection.Map[AssetOutputRef, AssetOutput]]
   ): IOResult[Option[AVector[AssetOutput]]] = {

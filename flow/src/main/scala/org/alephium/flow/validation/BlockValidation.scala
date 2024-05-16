@@ -668,9 +668,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         None
       )
       if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
-        tx.unsigned.fixedOutputRefs.foreachWithIndex { case (outputRef, outputIndex) =>
-          blockEnv.addOutputRef(outputRef, tx.unsigned.fixedOutputs(outputIndex))
-        }
+        blockEnv.addOutputRefFromTx(tx.unsigned)
       }
       txValidationResult match {
         case Right(_) => Right(())
