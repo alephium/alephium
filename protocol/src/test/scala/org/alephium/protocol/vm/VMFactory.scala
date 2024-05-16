@@ -36,6 +36,7 @@ trait VMFactory extends StorageFixture {
     WorldState.emptyCached(
       trieDb,
       SparseMerkleTrie.nodeCache(10_000),
+      SparseMerkleTrie.nodeCache(10_000),
       trieImmutableStateStorage,
       logStorage
     )

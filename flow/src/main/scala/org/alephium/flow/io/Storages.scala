@@ -40,10 +40,12 @@ object Storages {
   val dbVersionPostfix: Byte     = 5
   val bootstrapInfoPostFix: Byte = 6
 
+  // scalastyle:off method.length
   def createUnsafe(rootPath: Path, storageDbFolder: String, writeOptions: WriteOptions)(implicit
       config: GroupConfig
   ): Storages = {
-    val trieCache = SparseMerkleTrie.nodeCache(200_000_000)
+    val assetTrieCache    = SparseMerkleTrie.nodeCache(200_000_000)
+    val contractTrieCache = SparseMerkleTrie.nodeCache(20_000_000)
 
     val db                = createRocksDBUnsafe(rootPath, storageDbFolder)
     val blockStorage      = BlockRockDBStorage(db, Block, writeOptions)
@@ -61,7 +63,8 @@ object Storages {
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
-        trieCache,
+        assetTrieCache,
+        contractTrieCache,
         trieImmutableStateStorage,
         logStorage,
         db,
@@ -69,7 +72,13 @@ object Storages {
         writeOptions
       )
     val emptyWorldState =
-      WorldState.emptyPersisted(trieStorage, trieCache, trieImmutableStateStorage, logStorage)
+      WorldState.emptyPersisted(
+        trieStorage,
+        assetTrieCache,
+        contractTrieCache,
+        trieImmutableStateStorage,
+        logStorage
+      )
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)

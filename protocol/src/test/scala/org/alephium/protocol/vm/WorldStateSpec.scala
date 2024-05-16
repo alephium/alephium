@@ -152,6 +152,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val persisted = WorldState.emptyPersisted(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       SparseMerkleTrie.nodeCache(1000_000),
+      SparseMerkleTrie.nodeCache(100_000),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )
@@ -277,6 +278,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       SparseMerkleTrie.nodeCache(1000_000),
+      SparseMerkleTrie.nodeCache(100_000),
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )
