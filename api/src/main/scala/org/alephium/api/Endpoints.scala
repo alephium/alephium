@@ -30,7 +30,7 @@ import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.{avectorReadWriter, inetAddressRW}
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
-import org.alephium.protocol.ALPH
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.util.{AVector, TimeStamp}
@@ -68,6 +68,13 @@ trait Endpoints
       .and(query[GroupIndex]("toGroup"))
       .map { case (from, to) => ChainIndex(from, to) }(chainIndex =>
         (chainIndex.from, chainIndex.to)
+      )
+
+  private val outputRefQuery: EndpointInput[OutputRef] =
+    query[Int]("hint")
+      .and(query[Hash]("key"))
+      .map { case (hint, key) => OutputRef(hint, key) }(outputRef =>
+        (outputRef.hint, outputRef.key)
       )
 
   private val infosEndpoint: BaseEndpoint[Unit, Unit] =
@@ -406,7 +413,7 @@ trait Endpoints
   lazy val getTxIdFromOutputRef: BaseEndpoint[OutputRef, TransactionId] =
     baseEndpoint.get
       .in("tx-id-from-outputref")
-      .in(jsonBody[OutputRef])
+      .in(outputRefQuery)
       .out(jsonBody[TransactionId])
       .summary("Get transaction id from transaction output ref")
 

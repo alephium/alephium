@@ -882,26 +882,23 @@ abstract class RestServerSpec(
     val assetOutputRefWithTxId    = ServerFixture.dummyAssetOutputRef
     val assetOutputRefWithoutTxId = assetOutputRefGen(GroupIndex.unsafe(0)).sample.value
     val contractOutputRef         = contractOutputRefGen(GroupIndex.unsafe(0)).sample.value
-    def toJson(outputRef: TxOutputRef) = {
-      s"""
-         |{
-         |  "hint": ${outputRef.hint.value},
-         |  "key": "${outputRef.key.value.toHexString}"
-         |}
-        """.stripMargin
+    def toQuery(outputRef: TxOutputRef) = {
+      s"?hint=${outputRef.hint.value}&key=${outputRef.key.value.toHexString}"
     }
 
-    Get("/tx-id-from-outputref", maybeBody = Some(toJson(assetOutputRefWithTxId))) check {
-      response =>
-        response.code is StatusCode.Ok
-        response.as[TransactionId] is ServerFixture.dummyTransactionId
+    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithTxId)}") check { response =>
+      response.code is StatusCode.Ok
+      response.as[TransactionId] is ServerFixture.dummyTransactionId
     }
 
-    Get("/tx-id-from-outputref", maybeBody = Some(toJson(assetOutputRefWithoutTxId))) check {
-      _.code is StatusCode.NotFound
+    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithoutTxId)}") check { response =>
+      response.code is StatusCode.NotFound
+      response
+        .as[ApiError.NotFound]
+        .resource is s"No transaction id found for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
     }
 
-    Get("/tx-id-from-outputref", maybeBody = Some(toJson(contractOutputRef))) check { response =>
+    Get(s"/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
         "Expect asset output ref, got contract output ref instead"

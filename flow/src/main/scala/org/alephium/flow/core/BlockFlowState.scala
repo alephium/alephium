@@ -76,9 +76,10 @@ trait BlockFlowState extends FlowTipsUtil {
     intraGroupBlockChains.head.worldStateStorage.logStorage
   }
 
-  val txOutputRefIndexStorage: KeyValueStorage[TxOutputRef.Key, TransactionId] = {
-    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
-    intraGroupBlockChains.head.worldStateStorage.txOutputRefIndexStorage
+  def txOutputRefIndexStorage(
+      groupIndex: GroupIndex
+  ): KeyValueStorage[TxOutputRef.Key, TransactionId] = {
+    getBlockChainWithState(groupIndex).worldStateStorage.txOutputRefIndexStorage
   }
 
   val subContractIndexStorage: SubContractIndexStorage = {

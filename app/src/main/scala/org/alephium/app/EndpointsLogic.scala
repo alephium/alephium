@@ -711,7 +711,7 @@ trait EndpointsLogic extends Endpoints {
   val getTxIdFromOutputRefLogic = serverLogic(getTxIdFromOutputRef) { outputRef =>
     Future.successful {
       for {
-        assetOutputRef <- outputRef.toToAssetOutputRef()
+        assetOutputRef <- outputRef.toAssetOutputRef()
         result         <- serverUtils.getTxIdFromOutputRef(blockFlow, assetOutputRef)
       } yield result
     }
