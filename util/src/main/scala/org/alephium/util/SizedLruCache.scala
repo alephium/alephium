@@ -20,7 +20,7 @@ import java.util
 
 object SizedLruCache {
   def threadSafe[K, V](maxByteSize: Int, getEntrySize: (K, V) => Int): SizedLruCache[K, V] = {
-    new SizedLruCache[K, V](maxByteSize, getEntrySize) with RWLock {}
+    new SizedLruCache[K, V](maxByteSize, getEntrySize) with MutexLock {}
   }
 
   def threadUnsafe[K, V](maxByteSize: Int, getEntrySize: (K, V) => Int): SizedLruCache[K, V] = {
@@ -72,7 +72,9 @@ abstract class SizedLruCache[K, V](var maxByteSize: Int, getEntrySize: (K, V) =>
 
   def currentByteSize: Int = _currentByteSize
 
-  def setMaxByteSize(newMaxByteSize: Int): Unit = maxByteSize = newMaxByteSize
+  def setMaxByteSize(newMaxByteSize: Int): Unit = writeOnly {
+    maxByteSize = newMaxByteSize
+  }
 
   def contains(key: K): Boolean = readOnly {
     m.containsKey(key)
