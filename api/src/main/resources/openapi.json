@@ -3619,7 +3619,13 @@
                         "version": 1,
                         "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                         "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                        "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "ghostUncles": [
+                          {
+                            "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                            "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                          }
+                        ]
                       }
                     ]
                   ]
@@ -3841,7 +3847,13 @@
                           "version": 1,
                           "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                           "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "ghostUncles": [
+                            {
+                              "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                              "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                            }
+                          ]
                         },
                         "events": [
                           {
@@ -4066,7 +4078,13 @@
                   "version": 1,
                   "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                  "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "ghostUncles": [
+                    {
+                      "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                    }
+                  ]
                 }
               }
             }
@@ -4271,7 +4289,13 @@
                     "version": 1,
                     "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                     "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                    "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                    "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "ghostUncles": [
+                      {
+                        "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                        "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                      }
+                    ]
                   },
                   "events": [
                     {
@@ -10375,7 +10399,8 @@
           "version",
           "depStateHash",
           "txsHash",
-          "target"
+          "target",
+          "ghostUncles"
         ],
         "type": "object",
         "properties": {
@@ -10430,6 +10455,12 @@
           "target": {
             "type": "string",
             "format": "hex-string"
+          },
+          "ghostUncles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GhostUncleBlockEntry"
+            }
           }
         }
       },
@@ -11927,6 +11958,23 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "GhostUncleBlockEntry": {
+        "required": [
+          "hash",
+          "miner"
+        ],
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "miner": {
+            "type": "string",
+            "format": "address"
           }
         }
       },

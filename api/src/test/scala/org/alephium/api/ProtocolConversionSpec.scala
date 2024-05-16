@@ -26,6 +26,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{model => protocol}
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.vm
 import org.alephium.serde.deserialize
 import org.alephium.util._
@@ -113,7 +114,9 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
 
       checkData[BlockEntry, protocol.Block](
         block,
-        BlockEntry.from(_, 0), // height not needed for protocol
+        BlockEntry
+          .from(_, 0)(NetworkConfigFixture.PreRhone) // height not needed for protocol
+          .rightValue,
         _.toProtocol().rightValue
       )
     }

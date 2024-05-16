@@ -213,6 +213,8 @@ trait ApiModelCodec {
 
   implicit val exportFileRW: RW[ExportFile] = macroRW
 
+  implicit val ghostUncleBlockEntryRW: RW[GhostUncleBlockEntry] = macroRW
+
   implicit val blockEntryRW: RW[BlockEntry] = macroRW
 
   implicit val blockAndEventsRW: RW[BlockAndEvents] = macroRW

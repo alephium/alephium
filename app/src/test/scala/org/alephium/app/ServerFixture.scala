@@ -55,18 +55,19 @@ trait ServerFixture
     with ModelGenerators
     with TxGenerators
     with StoragesFixture.Default
-    with NoIndexModelGeneratorsLike {
+    with NoIndexModelGeneratorsLike
+    with AlephiumFixture {
 
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
-  lazy val dummyBlock = blockGen.sample.get.copy(header = dummyBlockHeader)
+  lazy val dummyBlock      = blockGen.sample.get.copy(header = dummyBlockHeader)
+  lazy val dummyBlockEntry = BlockEntry.from(dummyBlock, 1).rightValue
   lazy val dummyFetchResponse = BlocksPerTimeStampRange(
-    AVector(AVector(BlockEntry.from(dummyBlock, 1)))
+    AVector(AVector(dummyBlockEntry))
   )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique =
     EndpointsLogic.selfCliqueFrom(dummyIntraCliqueInfo, true, true)
-  lazy val dummyBlockEntry    = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
   lazy val dummyBalance =
     Balance.from(

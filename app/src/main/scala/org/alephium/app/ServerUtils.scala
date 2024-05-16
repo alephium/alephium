@@ -67,10 +67,12 @@ class ServerUtils(implicit
   }
 
   def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
-    getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      BlocksPerTimeStampRange(heightedBlocks.map(_._2.map { case (block, height) =>
-        BlockEntry.from(block, height)
-      }))
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          BlockEntry.from(block, height).left.map(failed)
+        })
+        .map(BlocksPerTimeStampRange)
     }
   }
 
@@ -81,10 +83,13 @@ class ServerUtils(implicit
     getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
-          val blockEntry = BlockEntry.from(block, height)
-          getEventsByBlockHash(blockFlow, blockEntry.hash).map(events =>
+          for {
+            blockEntry <- BlockEntry.from(block, height).left.map(failed)
+            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+          } yield {
             BlockAndEvents(blockEntry, events.events)
-          )
+          }
+
         })
         .map(BlocksAndEventsPerTimeStampRange)
     }
@@ -445,7 +450,8 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-    } yield BlockEntry.from(block, height)
+      blockEntry <- BlockEntry.from(block, height).left.map(failed)
+    } yield blockEntry
 
   def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
     for {

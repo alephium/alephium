@@ -3415,6 +3415,24 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  it should "get ghost uncles" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0, block1)
+    val block2 = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block2)
+    blockFlow.getMaxHeight(chainIndex).rightValue is 2
+
+    val ghostUncleHash  = blockFlow.getHashes(chainIndex, 1).rightValue.last
+    val ghostUncleBlock = blockFlow.getBlock(ghostUncleHash).rightValue
+    val serverUtils     = new ServerUtils()
+    serverUtils.getBlock(blockFlow, block2.hash).rightValue.ghostUncles is
+      AVector(
+        GhostUncleBlockEntry(ghostUncleHash, Address.Asset(ghostUncleBlock.minerLockupScript))
+      )
+  }
+
   private def generateDestination(
       chainIndex: ChainIndex,
       message: ByteString = ByteString.empty
