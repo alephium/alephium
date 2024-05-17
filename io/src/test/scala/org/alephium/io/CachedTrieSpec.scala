@@ -240,7 +240,13 @@ object CachedTrieSpec {
     val genesisValue = Hash.zero
     val storage      = newDBStorage()
     val db           = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
-    val unCached     = SparseMerkleTrie.unsafe[Hash, Hash](db, genesisKey, genesisValue)
+    val unCached =
+      SparseMerkleTrie.unsafe[Hash, Hash](
+        db,
+        genesisKey,
+        genesisValue,
+        SparseMerkleTrie.nodeCache(0)
+      )
 
     var cached: MutableKV[Hash, Hash, Unit] = CachedSMT.from(unCached)
 

@@ -21,6 +21,7 @@ import java.nio.file.Path
 import org.rocksdb.WriteOptions
 
 import org.alephium.crypto.Byte32
+import org.alephium.flow.setting.NodeSetting
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
@@ -47,8 +48,12 @@ object Storages {
 
   // scalastyle:off method.length
   def createUnsafe(rootPath: Path, storageDbFolder: String, writeOptions: WriteOptions)(implicit
-      config: GroupConfig
+      config: GroupConfig,
+      nodeSetting: NodeSetting
   ): Storages = {
+    WorldState.assetTrieCache.setMaxByteSize(nodeSetting.assetTrieCacheMaxByteSize)
+    WorldState.contractTrieCache.setMaxByteSize(nodeSetting.contractTrieCacheMaxByteSize)
+
     val db                = createRocksDBUnsafe(rootPath, storageDbFolder)
     val blockStorage      = BlockRockDBStorage(db, Block, writeOptions)
     val headerStorage     = BlockHeaderRockDBStorage(db, Header, writeOptions)
