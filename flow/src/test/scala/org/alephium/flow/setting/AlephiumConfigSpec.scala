@@ -323,59 +323,35 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "load NodeSetting" in {
-    {
-      info("Without indexes config")
-      val configs =
-        s"""
-           |{
-           |  node {
-           |    db-sync-write = false
-           |    event-log {
-           |      enabled = true
-           |      index-by-tx-id = true
-           |      index-by-block-hash = true
-           |    }
-           |  }
-           |}
-           |""".stripMargin
+    val configs =
+      s"""
+         |{
+         |  node {
+         |    db-sync-write = false
+         |    asset-trie-cache-max-byte-size = 200000000
+         |    contract-trie-cache-max-byte-size = 20000000
+         |    event-log {
+         |      enabled = true
+         |      index-by-tx-id = true
+         |      index-by-block-hash = true
+         |    }
+         |    indexes {
+         |      tx-output-ref-index = true
+         |      subcontract-index = false
+         |    }
+         |  }
+         |}
+         |""".stripMargin
 
-      ConfigFactory
-        .parseString(configs)
-        .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
-        dbSyncWrite = false,
-        LogConfig.allEnabled(),
-        None
-      )
-    }
-
-    {
-      info("With indexes config")
-      val configs =
-        s"""
-           |{
-           |  node {
-           |    db-sync-write = false
-           |    event-log {
-           |      enabled = true
-           |      index-by-tx-id = true
-           |      index-by-block-hash = true
-           |    }
-           |    indexes {
-           |      tx-output-ref-index = true
-           |      subcontract-index = false
-           |    }
-           |  }
-           |}
-           |""".stripMargin
-
-      ConfigFactory
-        .parseString(configs)
-        .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
-        dbSyncWrite = false,
-        LogConfig.allEnabled(),
-        Some(NodeIndexesConfig(txOutputRefIndex = true, subcontractIndex = false))
-      )
-    }
+    ConfigFactory
+      .parseString(configs)
+      .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
+      dbSyncWrite = false,
+      assetTrieCacheMaxByteSize = 200000000,
+      contractTrieCacheMaxByteSize = 20000000,
+      LogConfig.allEnabled(),
+      NodeIndexesConfig(txOutputRefIndex = true, subcontractIndex = false)
+    )
   }
 
   it should "adjust diff for height gaps across chains" in new AlephiumConfigFixture {

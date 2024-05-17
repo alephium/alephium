@@ -211,10 +211,10 @@ final case class NodeSetting(
     assetTrieCacheMaxByteSize: Int,
     contractTrieCacheMaxByteSize: Int,
     eventLog: LogConfig,
-    indexes: Option[NodeIndexesConfig]
+    indexes: NodeIndexesConfig
 ) {
   def eventLogConfig: LogConfig        = eventLog
-  def indexesConfig: NodeIndexesConfig = indexes.getOrElse(NodeIndexesConfig.disabled())
+  def indexesConfig: NodeIndexesConfig = indexes
 }
 
 final case class Allocation(
