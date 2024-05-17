@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.model.{Address, BlockHash, GhostUncleData}
 
-final case class GhostUncleBlockEntry(hash: BlockHash, miner: Address.Asset)
+final case class GhostUncleBlockEntry(blockHash: BlockHash, miner: Address.Asset)
 
 object GhostUncleBlockEntry {
   def from(data: GhostUncleData): GhostUncleBlockEntry = {

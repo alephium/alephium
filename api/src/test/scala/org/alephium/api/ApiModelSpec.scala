@@ -130,7 +130,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode GhostUncleBlockEntry" in {
     val entry = GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))
     val jsonRaw =
-      """{"hash":"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5","miner":"1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"}"""
+      """{"blockHash":"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5","miner":"1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"}"""
     checkData(entry, jsonRaw)
   }
 

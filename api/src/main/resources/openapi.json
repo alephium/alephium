@@ -3622,7 +3622,7 @@
                         "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                         "ghostUncles": [
                           {
-                            "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                            "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                             "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                           }
                         ]
@@ -3850,7 +3850,7 @@
                           "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                           "ghostUncles": [
                             {
-                              "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                              "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                               "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                             }
                           ]
@@ -4081,7 +4081,7 @@
                   "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "ghostUncles": [
                     {
-                      "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                     }
                   ]
@@ -4291,7 +4291,7 @@
                   "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "ghostUncles": [
                     {
-                      "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                     }
                   ]
@@ -4502,7 +4502,7 @@
                     "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                     "ghostUncles": [
                       {
-                        "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                        "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                       }
                     ]
@@ -12173,12 +12173,12 @@
       },
       "GhostUncleBlockEntry": {
         "required": [
-          "hash",
+          "blockHash",
           "miner"
         ],
         "type": "object",
         "properties": {
-          "hash": {
+          "blockHash": {
             "type": "string",
             "format": "block-hash"
           },
