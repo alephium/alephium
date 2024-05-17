@@ -45,7 +45,7 @@ class TrieBench {
         files.foreach(_.delete)
       }
 
-      RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.SSD)
+      RocksDBSource.openUnsafe(dbPath)
     }
     val db: KeyValueStorage[Hash, Node] = RocksDBKeyValueStorage(dbStorage, ColumnFamily.Trie)
     SparseMerkleTrie.unsafe(db, Hash.zero, Hash.zero, SparseMerkleTrie.nodeCache(1000_000))
