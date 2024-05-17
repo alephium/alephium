@@ -145,7 +145,8 @@ object WebSocketServer {
               val params       = writeJs(blockEntry)
               val notification = write(Notification("block_notify", params))
               subscribers.foreach(subscriber => vertxEventBus.send(subscriber, notification))
-            case _ => ()
+            case _ => // this should never happen
+              log.error(s"Received invalid block $block")
           }
       }
     }
