@@ -27,13 +27,14 @@ import io.vertx.core.http.HttpClientOptions
 import org.scalatest.{Assertion, EitherValues}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
-import org.alephium.api.model.BlockEntry
+import org.alephium.api.model.{BlockEntry, GhostUncleBlockEntry}
 import org.alephium.crypto.Blake3
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
@@ -46,26 +47,31 @@ class WebSocketServerSpec
 
   behavior of "http"
 
-  it should "encode BlockNotify" in new Fixture {
+  it should "encode BlockEntry" in new Fixture {
     val dep  = BlockHash.unsafe(Blake3.hash("foo"))
     val deps = AVector.fill(groupConfig.depsNum)(dep)
-    val header =
-      BlockHeader.unsafeWithRawDeps(
-        deps,
-        Hash.zero,
-        Hash.hash("bar"),
-        TimeStamp.zero,
-        Target.Max,
-        Nonce.zero
+    val blockEntry = BlockEntry(
+      BlockHash.random,
+      TimeStamp.zero,
+      0,
+      0,
+      1,
+      deps,
+      AVector.empty,
+      Nonce.zero.value,
+      0,
+      Hash.zero,
+      Hash.hash("bar"),
+      Target.Max.bits,
+      AVector(
+        GhostUncleBlockEntry(
+          BlockHash.random,
+          Address.Asset(LockupScript.p2pkh(PublicKey.generate))
+        )
       )
-
-    val block       = Block(header, AVector.empty)
-    val blockNotify = BlockNotify(block, 1)
-    val result      = WebSocketServer.blockNotifyEncode(blockNotify)
-
-    show(
-      result
-    ) is write(BlockEntry.from(block, 1))
+    )
+    val result = writeJs(blockEntry)
+    show(result) is write(blockEntry)
   }
 
   behavior of "ws"

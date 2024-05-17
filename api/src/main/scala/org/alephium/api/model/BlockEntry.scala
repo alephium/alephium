@@ -35,7 +35,8 @@ final case class BlockEntry(
     version: Byte,
     depStateHash: Hash,
     txsHash: Hash,
-    target: ByteString
+    target: ByteString,
+    ghostUncles: AVector[GhostUncleBlockEntry]
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
     for {
@@ -67,19 +68,28 @@ final case class BlockEntry(
 }
 
 object BlockEntry {
-  def from(block: Block, height: Int): BlockEntry =
-    BlockEntry(
-      hash = block.header.hash,
-      timestamp = block.header.timestamp,
-      chainFrom = block.header.chainIndex.from.value,
-      chainTo = block.header.chainIndex.to.value,
-      height = height,
-      deps = block.header.blockDeps.deps,
-      transactions = block.transactions.map(Transaction.fromProtocol(_)),
-      nonce = block.header.nonce.value,
-      version = block.header.version,
-      depStateHash = block.header.depStateHash,
-      txsHash = block.header.txsHash,
-      target = block.header.target.bits
-    )
+  def from(block: Block, height: Int)(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, BlockEntry] =
+    block.ghostUncleData match {
+      case Right(ghostUncleData) =>
+        Right(
+          BlockEntry(
+            hash = block.header.hash,
+            timestamp = block.header.timestamp,
+            chainFrom = block.header.chainIndex.from.value,
+            chainTo = block.header.chainIndex.to.value,
+            height = height,
+            deps = block.header.blockDeps.deps,
+            transactions = block.transactions.map(Transaction.fromProtocol(_)),
+            nonce = block.header.nonce.value,
+            version = block.header.version,
+            depStateHash = block.header.depStateHash,
+            txsHash = block.header.txsHash,
+            target = block.header.target.bits,
+            ghostUncles = ghostUncleData.map(GhostUncleBlockEntry.from)
+          )
+        )
+      case _ => Left(s"Invalid block ${block.hash.toHexString}")
+    }
 }

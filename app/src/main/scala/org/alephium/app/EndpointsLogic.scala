@@ -172,6 +172,11 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBlock(blockFlow, hash))
   }
 
+  val getMainChainBlockByGhostUncleLogic = serverLogic(getMainChainBlockByGhostUncle) {
+    ghostUncleHash =>
+      Future.successful(serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash))
+  }
+
   val getBlockAndEventsLogic = serverLogic(getBlockAndEvents) { hash =>
     Future.successful(serverUtils.getBlockAndEvents(blockFlow, hash))
   }
