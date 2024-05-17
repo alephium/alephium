@@ -206,12 +206,10 @@ final case class MemPoolSetting(
 
 final case class WalletSetting(enabled: Boolean, secretDir: Path, lockingTimeout: Duration)
 
-object WalletSetting {
-  final case class BlockFlow(host: String, port: Int, groups: Int)
-}
-
 final case class NodeSetting(
     dbSyncWrite: Boolean,
+    assetTrieCacheMaxByteSize: Int,
+    contractTrieCacheMaxByteSize: Int,
     eventLog: LogConfig
 ) {
   def eventLogConfig: LogConfig = eventLog

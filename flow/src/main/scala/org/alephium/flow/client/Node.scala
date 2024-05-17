@@ -138,9 +138,10 @@ object Node {
   def buildBlockFlowUnsafe(rootPath: Path): (BlockFlow, Storages) = {
     val typesafeConfig =
       Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
-    val config   = AlephiumConfig.load(typesafeConfig, "alephium")
-    val dbPath   = rootPath.resolve(config.network.networkId.nodeFolder)
-    val storages = Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker)
+    val config = AlephiumConfig.load(typesafeConfig, "alephium")
+    val dbPath = rootPath.resolve(config.network.networkId.nodeFolder)
+    val storages =
+      Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker, config.node)
     buildBlockFlowUnsafe(storages)(config) -> storages
   }
 

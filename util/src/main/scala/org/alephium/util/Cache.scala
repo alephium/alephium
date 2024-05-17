@@ -108,7 +108,7 @@ object Cache {
       removal: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit,
       accessOrder: Boolean
   ): Cache[K, V] = {
-    new Cache[K, V] with RWLock {
+    new Cache[K, V] with MutexLock {
       val m = new Inner(removal, 32, 0.75f, accessOrder)
     }
   }

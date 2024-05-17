@@ -33,7 +33,8 @@ object ValidateDifficultyBombPatch extends App {
   private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
   implicit private val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   private val dbPath                          = rootPath.resolve("mainnet")
-  private val storages  = Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker)
+  private val storages =
+    Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker, config.node)
   private val blockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   config.broker.chainIndexes.foreach { chainIndex =>

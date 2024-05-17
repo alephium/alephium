@@ -99,6 +99,10 @@ alephium {
 
   node {
     db-sync-write = true
+
+    asset-trie-cache-max-byte-size = 20000000
+    contract-trie-cache-max-byte-size = 10000000
+
     event-log {
       enabled = true
       index-by-tx-id = true
