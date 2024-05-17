@@ -30,9 +30,8 @@ object SizedLruCache {
   final class Inner[K, V](
       initialCapacity: Int,
       loadFactor: Float,
-      accessOrder: Boolean,
       resize: (util.LinkedHashMap[K, V], util.Map.Entry[K, V]) => Unit
-  ) extends util.LinkedHashMap[K, V](initialCapacity, loadFactor, accessOrder) {
+  ) extends util.LinkedHashMap[K, V](initialCapacity, loadFactor, true) {
     override protected def removeEldestEntry(eldest: util.Map.Entry[K, V]): Boolean = {
       resize(this, eldest)
       false
@@ -51,20 +50,19 @@ abstract class SizedLruCache[K, V](var maxByteSize: Int, getEntrySize: (K, V) =>
     new SizedLruCache.Inner[K, V](
       1024,
       0.75f,
-      true,
       (map, eldest) => {
         if (overSized) {
           val key = eldest.getKey
           map.remove(key)
           _currentByteSize -= getEntrySize(key, eldest.getValue)
-        }
-        if (overSized) {
-          val iterator = map.entrySet().iterator()
-          do {
-            val entry = iterator.next()
-            iterator.remove()
-            _currentByteSize -= getEntrySize(entry.getKey, entry.getValue)
-          } while (overSized)
+          if (overSized) {
+            val iterator = map.entrySet().iterator()
+            do {
+              val entry = iterator.next()
+              iterator.remove()
+              _currentByteSize -= getEntrySize(entry.getKey, entry.getValue)
+            } while (overSized)
+          }
         }
       }
     )
