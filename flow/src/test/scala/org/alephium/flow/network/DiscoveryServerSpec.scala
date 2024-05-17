@@ -27,7 +27,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.network.DiscoveryServer.NeighborPeers
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.flow.setting.Platform
+import org.alephium.flow.setting.{NodeSetting, Platform}
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
@@ -35,6 +35,9 @@ import org.alephium.util._
 
 class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
   import DiscoveryServerSpec._
+
+  implicit val nodeSetting: NodeSetting =
+    NodeSetting(true, 1000, 1000, vm.LogConfig(false, false, false, None))
 
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {
     ActorRefT.build(
@@ -263,14 +266,14 @@ class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
     self =>
     val groups = 4
 
-    val groupConfig = new GroupConfig {
+    implicit val groupConfig = new GroupConfig {
       def groups: Int = self.groups
     }
     val cliqueNum = 16
     val cliques   = AVector.fill(cliqueNum)(generateClique())
     val servers = cliques.flatMapWithIndex { case ((clique, infos), index) =>
       infos.map { case (brokerInfo, config) =>
-        val storages           = StoragesFixture.buildStorages(Platform.getRootPath())(groupConfig)
+        val storages           = StoragesFixture.buildStorages(Platform.getRootPath())
         val misbehaviorManager = buildMisbehaviorManager(system)
         val server = {
           if (index equals 0) {

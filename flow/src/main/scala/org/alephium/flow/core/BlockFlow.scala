@@ -124,7 +124,8 @@ object BlockFlow extends StrictLogging {
   def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
     val storages =
       Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, Settings.writeOptions)(
-        config.broker
+        config.broker,
+        config.node
       )
     fromGenesisUnsafe(storages, config.genesisBlocks)(
       config.broker,

@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, StagingLog}
 import org.alephium.serde.{Serde, SerdeError}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, SizedLruCache}
 
 // scalastyle:off number.of.methods
 trait WorldState[T, R1, R2, R3] {
@@ -279,6 +279,11 @@ sealed abstract class ImmutableWorldState
 // scalastyle:on
 
 object WorldState {
+  val assetTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node] =
+    SparseMerkleTrie.nodeCache(20_000_000)
+  val contractTrieCache: SizedLruCache[Hash, SparseMerkleTrie.Node] =
+    SparseMerkleTrie.nodeCache(10_000_000)
+
   val expectedAssetError: IOError    = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
   val expectedContractError: IOError = IOError.Serde(SerdeError.validation("Expect ContractOutput"))
 
@@ -642,13 +647,19 @@ object WorldState {
   ): Persisted = {
     val genesisRef  = ContractOutputRef.forSMT
     val emptyOutput = TxOutput.forSMT
-    val emptyOutputTrie =
-      SparseMerkleTrie.unsafe[TxOutputRef, TxOutput](trieStorage, genesisRef, emptyOutput)
+    val emptyOutputTrie = SparseMerkleTrie.unsafe[TxOutputRef, TxOutput](
+      trieStorage,
+      genesisRef,
+      emptyOutput,
+      assetTrieCache
+    )
     val emptyState: ContractStorageState =
       ContractLegacyState.unsafe(StatefulContract.forSMT, AVector.empty, genesisRef)
-    val emptyCode         = CodeRecord(StatefulContract.forSMT, 0)
-    val emptyContractTrie = SparseMerkleTrie.unsafe(trieStorage, ContractId.zero, emptyState)
-    val emptyCodeTrie     = SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyCode)
+    val emptyCode = CodeRecord(StatefulContract.forSMT, 0)
+    val emptyContractTrie =
+      SparseMerkleTrie.unsafe(trieStorage, ContractId.zero, emptyState, contractTrieCache)
+    val emptyCodeTrie =
+      SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyCode, contractTrieCache)
     Persisted(
       emptyOutputTrie,
       emptyContractTrie,
@@ -672,10 +683,16 @@ object WorldState {
         trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
         logStorage: LogStorage
     ): Persisted = {
-      val outputState = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage)
+      val outputState =
+        SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage, assetTrieCache)
       val contractState =
-        SparseMerkleTrie[ContractId, ContractStorageState](contractStateHash, trieStorage)
-      val codeState = SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage)
+        SparseMerkleTrie[ContractId, ContractStorageState](
+          contractStateHash,
+          trieStorage,
+          contractTrieCache
+        )
+      val codeState =
+        SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage, contractTrieCache)
       Persisted(outputState, contractState, trieImmutableStateStorage, codeState, logStorage)
     }
 
