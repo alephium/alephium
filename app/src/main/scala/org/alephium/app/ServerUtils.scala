@@ -453,6 +453,23 @@ class ServerUtils(implicit
       blockEntry <- BlockEntry.from(block, height).left.map(failed)
     } yield blockEntry
 
+  def getMainChainBlockByGhostUncle(
+      blockFlow: BlockFlow,
+      ghostUncleHash: BlockHash
+  ): Try[BlockEntry] =
+    for {
+      chainIndex <- checkHashChainIndex(ghostUncleHash)
+      result <- blockFlow
+        .getMainChainBlockByGhostUncle(chainIndex, ghostUncleHash)
+        .left
+        .map(_ =>
+          failed(s"Fail fetching mainchain block by ghost uncle hash ${ghostUncleHash.toHexString}")
+        )
+      blockEntry <- result
+        .toRight(notFound(s"Mainchain block by ghost uncle hash ${ghostUncleHash.toHexString}"))
+        .flatMap { case (block, height) => BlockEntry.from(block, height).left.map(failed) }
+    } yield blockEntry
+
   def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
     for {
       block  <- getBlock(blockFlow, hash)

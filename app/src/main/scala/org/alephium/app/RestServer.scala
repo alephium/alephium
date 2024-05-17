@@ -80,6 +80,7 @@ class RestServer(
       getBlocksLogic,
       getBlocksAndEventsLogic,
       getBlockLogic,
+      getMainChainBlockByGhostUncleLogic,
       getBlockAndEventsLogic,
       isBlockInMainChainLogic,
       getBalanceLogic,

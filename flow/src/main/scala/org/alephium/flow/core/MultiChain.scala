@@ -19,7 +19,8 @@ package org.alephium.flow.core
 import scala.reflect.ClassTag
 
 import org.alephium.flow.model.BlockState
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, WorldState}
@@ -177,6 +178,37 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
 
   def getBlock(hash: BlockHash): IOResult[Block] = {
     getBlockChain(hash).getBlock(hash)
+  }
+
+  private def getMainChainBlockByGhostUncleUnsafe(
+      chainIndex: ChainIndex,
+      ghostUncleHash: BlockHash
+  ): Option[(Block, Int)] = {
+    val chain            = getBlockChain(chainIndex)
+    val maxHeight        = chain.maxHeightUnsafe
+    val ghostUncleHeight = getHeightUnsafe(ghostUncleHash)
+    val fromHeight       = Math.min(ghostUncleHeight + 1, maxHeight)
+    val toHeight         = Math.min(ghostUncleHeight + ALPH.MaxGhostUncleAge, maxHeight)
+    var mainChainBlock: Option[(Block, Int)] = None
+    (fromHeight to toHeight).find { height =>
+      val blockHash = chain.getHashesUnsafe(height).head
+      val block     = chain.getBlockUnsafe(blockHash)
+      block.ghostUncleHashes match {
+        case Right(hashes) =>
+          val result = hashes.contains(ghostUncleHash)
+          if (result) mainChainBlock = Some((block, height))
+          result
+        case Left(error) => throw error
+      }
+    }
+    mainChainBlock
+  }
+
+  def getMainChainBlockByGhostUncle(
+      chainIndex: ChainIndex,
+      ghostUncleHash: BlockHash
+  ): IOResult[Option[(Block, Int)]] = {
+    IOUtils.tryExecute(getMainChainBlockByGhostUncleUnsafe(chainIndex, ghostUncleHash))
   }
 
   val bodyVerifyingBlocks = MultiChain.bodyVerifyingBlocks(brokerConfig.chainNum * 2)

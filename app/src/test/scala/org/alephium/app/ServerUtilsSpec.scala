@@ -3433,6 +3433,32 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
   }
 
+  it should "get mainchain block by ghost uncle hash" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0, block1)
+    blockFlow.getMaxHeight(chainIndex).rightValue is 1
+
+    val serverUtils    = new ServerUtils()
+    val ghostUncleHash = blockFlow.getHashes(chainIndex, 1).rightValue.last
+    val blockNum       = Random.between(0, ALPH.MaxGhostUncleAge)
+    (0 until blockNum).foreach { _ =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      block.ghostUncleHashes.rightValue.isEmpty is true
+      addAndCheck(blockFlow, block)
+    }
+    serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).leftValue.detail is
+      s"Mainchain block by ghost uncle hash ${ghostUncleHash.toHexString} not found"
+
+    val block = mineBlockTemplate(blockFlow, chainIndex)
+    block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
+    addAndCheck(blockFlow, block)
+    val blockHeight = blockNum + 2
+    serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
+      BlockEntry.from(block, blockHeight).rightValue
+  }
+
   private def generateDestination(
       chainIndex: ChainIndex,
       message: ByteString = ByteString.empty
