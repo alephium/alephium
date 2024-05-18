@@ -54,7 +54,9 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   private val vertx         = Vertx.vertx()
   private val vertxEventBus = vertx.eventBus()
   private val server = {
-    val options = new HttpServerOptions().setMaxWebSocketFrameSize(1024 * 1024)
+    val options = new HttpServerOptions()
+      .setMaxWebSocketFrameSize(1024 * 1024)
+      .setRegisterWebSocketWriteHandlers(true)
     vertx.createHttpServer(options)
   }
 

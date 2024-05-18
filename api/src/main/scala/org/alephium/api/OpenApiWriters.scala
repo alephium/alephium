@@ -138,50 +138,80 @@ object OpenAPIWriters extends EndpointsExamples {
   implicit val encoderExampleValue: Writer[ExampleValue] = encodeExampleValue(false)
 
   implicit val writerAnySchema: Writer[AnySchema] = writer[ujson.Value].comap(_ => ujson.Bool(true))
-  implicit val writerSchemaType: Writer[SchemaType] = writer[ujson.Value].comap {
-    case t: BasicSchemaType => t.value
-    case t: ArraySchemaType => ujson.Arr(t.value.map(_.value))
-  }
+  implicit val writerSchemaType: Writer[SchemaType] = writer[ujson.Value].comap(_.value)
   implicit val writerSchema: Writer[Schema] = expandExtensions(writer[ujson.Value].comap { schema =>
-    val minKey = if (schema.exclusiveMinimum.getOrElse(false)) "exclusiveMinimum" else "minimum"
-    val maxKey = if (schema.exclusiveMaximum.getOrElse(false)) "exclusiveMaximum" else "maximum"
+    // keep the same order as the definition:
+    // https://github.com/softwaremill/sttp-apispec/blob/master/apispec-model/src/main/scala/sttp/apispec/Schema.scala#L28
     ujson.Obj(
       (s"$$schema", writeJs(schema.$schema)),
-      ("allOf", writeJs(schema.allOf)),
+      (s"$$vocabulary", writeJs(schema.$vocabulary)),
+      (s"$$id", writeJs(schema.$id)),
+      (s"$$anchor", writeJs(schema.$anchor)),
+      (s"$$dynamicAnchor", writeJs(schema.$dynamicAnchor)),
+      (s"$$ref", writeJs(schema.$ref)),
+      (s"$$dynamicRef", writeJs(schema.$dynamicRef)),
+      (s"$$comment", writeJs(schema.$comment)),
+      (s"$$defs", writeJs(schema.$defs)),
       ("title", writeJs(schema.title)),
-      ("required", writeJs(schema.required)),
-      ("type", writeJs(schema.`type`)),
+      ("description", writeJs(schema.description)),
+      ("default", writeJs(schema.default.map(writeJs(_)(encodeExampleValue(false))))),
+      ("deprecated", writeJs(schema.deprecated)),
+      ("readOnly", writeJs(schema.readOnly)),
+      ("writeOnly", writeJs(schema.writeOnly)),
+      (
+        "examples",
+        schema.examples.map(writeJs(_)(writerList(encodeExampleValue(true)))).getOrElse(ujson.Null)
+      ),
+      (
+        "type",
+        schema.`type` match {
+          case Some(List(tpe)) => writeJs(tpe)
+          case Some(list)      => writeJs(list)
+          case None            => ujson.Null
+        }
+      ),
+      ("enum", writeJs(schema.`enum`)),
+      ("const", writeJs(schema.const.map(writeJs(_)(encodeExampleValue(false))))),
+      ("format", writeJs(schema.format)),
+      ("allOf", writeJs(schema.allOf)),
+      ("anyOf", writeJs(schema.anyOf)),
+      ("oneOf", writeJs(schema.oneOf)),
+      ("not", writeJs(schema.not)),
+      ("if", writeJs(schema.`if`)),
+      ("then", writeJs(schema.`then`)),
+      ("else", writeJs(schema.`else`)),
+      ("dependentSchemas", writeJs(schema.dependentSchemas)),
+      ("multipleOf", writeJs(schema.multipleOf)),
+      ("minimum", writeJs(schema.minimum)),
+      ("exclusiveMinimum", writeJs(schema.exclusiveMinimum)),
+      ("maximum", writeJs(schema.maximum)),
+      ("exclusiveMaximum", writeJs(schema.exclusiveMaximum)),
+      ("maxLength", writeJs(schema.maxLength)),
+      ("minLength", writeJs(schema.minLength)),
+      ("pattern", writeJs(schema.pattern)),
+      ("maxItems", writeJs(schema.maxItems)),
+      ("minItems", writeJs(schema.minItems)),
+      ("uniqueItems", writeJs(schema.uniqueItems)),
+      ("maxContains", writeJs(schema.maxContains)),
+      ("minContains", writeJs(schema.minContains)),
       ("prefixItems", writeJs(schema.prefixItems)),
       ("items", writeJs(schema.items)),
       ("contains", writeJs(schema.contains)),
+      ("unevaluatedItems", writeJs(schema.unevaluatedItems)),
+      ("maxProperties", writeJs(schema.maxProperties)),
+      ("minProperties", writeJs(schema.minProperties)),
+      ("required", writeJs(schema.required)),
+      ("dependentRequired", writeJs(schema.dependentRequired)),
+      ("discriminator", writeJs(schema.discriminator)),
       ("properties", writeJs(schema.properties)),
       (
         "patternProperties",
         if (schema.patternProperties.nonEmpty) writeJs(schema.patternProperties) else ujson.Null
       ),
-      ("description", writeJs(schema.description)),
-      ("format", writeJs(schema.format)),
-      ("default", writeJs(schema.default.map(writeJs(_)(encodeExampleValue(false))))),
-      ("readOnly", writeJs(schema.readOnly)),
-      ("writeOnly", writeJs(schema.writeOnly)),
-      ("example", schema.example.map(writeJs(_)(encodeExampleValue(true))).getOrElse(ujson.Null)),
-      ("deprecated", writeJs(schema.deprecated)),
-      ("oneOf", writeJs(schema.oneOf)),
-      ("discriminator", writeJs(schema.discriminator)),
       ("additionalProperties", writeJs(schema.additionalProperties)),
-      ("pattern", writeJs(schema.pattern)),
-      ("minLength", writeJs(schema.minLength)),
-      ("maxLength", writeJs(schema.maxLength)),
-      (minKey, writeJs(schema.minimum)),
-      (maxKey, writeJs(schema.maximum)),
-      ("minItems", writeJs(schema.minItems)),
-      ("maxItems", writeJs(schema.maxItems)),
-      ("enum", writeJs(schema.`enum`)),
-      ("not", writeJs(schema.not)),
-      ("if", writeJs(schema.`if`)),
-      ("then", writeJs(schema.`then`)),
-      ("else", writeJs(schema.`else`)),
-      ("$defs", writeJs(schema.$defs)),
+      ("propertyNames", writeJs(schema.propertyNames)),
+      ("unevaluatedProperties", writeJs(schema.unevaluatedProperties)),
+      ("externalDocs", writeJs(schema.externalDocs)),
       ("extensions", writeJs(schema.extensions))
     )
   })

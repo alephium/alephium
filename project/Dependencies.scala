@@ -18,9 +18,9 @@ import sbt._
 
 object Version {
   lazy val akka       = "2.6.20"
-  lazy val tapir      = "1.2.8"
-  lazy val sttp       = "3.5.2"
-  lazy val apispec    = "0.3.2"
+  lazy val tapir      = "1.10.7"
+  lazy val sttp       = "3.9.6"
+  lazy val apispec    = "0.10.0"
   lazy val prometheus = "0.16.0"
 }
 
@@ -29,7 +29,7 @@ object Dependencies {
   lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
   lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.3.8"
+  lazy val vertx = "io.vertx" % "vertx-core" % "4.5.7"
 
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "2.0.0"
 
@@ -55,6 +55,7 @@ object Dependencies {
   lazy val `tapir-swagger-ui` =
     "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui" % Version.tapir
   lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
+  lazy val `tapir-files`  = "com.softwaremill.sttp.tapir" %% "tapir-files"       % Version.tapir
   lazy val `sttp-backend` =
     "com.softwaremill.sttp.client3" %% "async-http-client-backend-future" % Version.sttp
 
