@@ -14,24 +14,16 @@
       false
     ]
   },
-  "eventsSig": [
-    
-  ],
+  "eventsSig": [],
   "functions": [
     {
       "name": "greet",
       "usePreapprovedAssets": false,
       "useAssetsInContract": false,
       "isPublic": true,
-      "paramNames": [
-        
-      ],
-      "paramTypes": [
-        
-      ],
-      "paramIsMutable": [
-        
-      ],
+      "paramNames": [],
+      "paramTypes": [],
+      "paramIsMutable": [],
       "returnTypes": [
         "U256"
       ]

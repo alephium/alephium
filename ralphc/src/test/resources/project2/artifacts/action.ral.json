@@ -14,27 +14,17 @@
       true
     ]
   },
-  "eventsSig": [
-    
-  ],
+  "eventsSig": [],
   "functions": [
     {
       "name": "action",
       "usePreapprovedAssets": false,
       "useAssetsInContract": false,
       "isPublic": true,
-      "paramNames": [
-        
-      ],
-      "paramTypes": [
-        
-      ],
-      "paramIsMutable": [
-        
-      ],
-      "returnTypes": [
-        
-      ]
+      "paramNames": [],
+      "paramTypes": [],
+      "paramIsMutable": [],
+      "returnTypes": []
     }
   ]
 }
