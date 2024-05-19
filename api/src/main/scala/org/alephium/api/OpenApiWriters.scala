@@ -90,7 +90,7 @@ object OpenAPIWriters extends EndpointsExamples {
         .getOrElse(LinkedHashMap.empty)
       val value: LinkedHashMap[String, ujson.Value] =
         LinkedHashMap((s"$$ref", ujson.Str(ref))) ++ summary ++ description
-      ujson.Obj(value)
+      ujson.Obj.from(value)
     case Right(t) => writeJs(t)
   }
 
@@ -248,14 +248,14 @@ object OpenAPIWriters extends EndpointsExamples {
   implicit val writerResponses: Writer[Responses] = writer[ujson.Value].comap { resp =>
     val extensions = writeJs(resp.extensions).objOpt.getOrElse(LinkedHashMap.empty)
     val respJson   = writeJs(resp.responses)
-    respJson.objOpt.map(p => ujson.Obj(p ++ extensions)).getOrElse(respJson)
+    respJson.objOpt.map(p => ujson.Obj.from(p ++ extensions)).getOrElse(respJson)
   }
   implicit val writerOperation: Writer[Operation] = expandExtensions(macroW[Operation])
   implicit val writerPathItem: Writer[PathItem]   = macroW[PathItem]
   implicit val writerPaths: Writer[Paths] = writer[ujson.Value].comap { paths =>
     val extensions = writeJs(paths.extensions).objOpt.getOrElse(LinkedHashMap.empty)
     val pathItems  = writeJs(paths.pathItems)
-    pathItems.objOpt.map(p => ujson.Obj(p ++ extensions)).getOrElse(pathItems)
+    pathItems.objOpt.map(p => ujson.Obj.from(p ++ extensions)).getOrElse(pathItems)
   }
   implicit val writerComponents: Writer[Components] = expandExtensions(macroW[Components])
   implicit val writerServerVariable: Writer[ServerVariable] = expandExtensions(
@@ -300,7 +300,7 @@ object OpenAPIWriters extends EndpointsExamples {
   private def expandObjExtensions(jsonObject: ujson.Obj): ujson.Obj = {
     val extensions = ujson.Obj.from(jsonObject.value.find { case (key, _) => key == "extensions" })
     val jsonWithoutExt = jsonObject.value.filter { case (key, _) => key != "extensions" }
-    ujson.Obj(extensions.objOpt.map(ext => ext ++ jsonWithoutExt).getOrElse(jsonWithoutExt))
+    ujson.Obj.from(extensions.objOpt.map(ext => ext ++ jsonWithoutExt).getOrElse(jsonWithoutExt))
   }
 
   implicit private val openapiWriter: Writer[OpenAPI] = writerMyOpenAPI.comap[OpenAPI] { openapi =>
