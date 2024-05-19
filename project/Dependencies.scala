@@ -34,13 +34,13 @@ object Dependencies {
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "3.3.0"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
-  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.71.1"
+  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.78.1"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.0"
-  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.4.5"
+  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.6"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "6.29.5"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.5"
-  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.17.0"  % Test
-  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.14"  % Test
+  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.18.0"  % Test
+  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.18"  % Test
   lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
   lazy val weupnp          = "org.bitlet"                  % "weupnp"          % "0.1.4"
 
