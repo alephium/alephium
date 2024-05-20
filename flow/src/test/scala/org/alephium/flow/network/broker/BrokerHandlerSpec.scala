@@ -28,7 +28,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.InvalidHeaderFlow
-import org.alephium.protocol.{Generators, SignatureSchema}
+import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId}
@@ -50,6 +50,25 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     watch(brokerHandler)
     brokerHandler ! BrokerHandler.Received(Pong(RequestId.unsafe(100)))
     expectTerminated(brokerHandler)
+  }
+
+  it should "stop when handshake message contains invalid client id" in new Fixture {
+    override val configValues = Map(("alephium.network.network-id", 1))
+
+    networkConfig.networkId.id is 1.toByte
+    networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled() is true
+
+    watch(brokerHandler)
+    brokerHandler ! BrokerHandler.Received(
+      Hello.unsafe(
+        "scala-alephium/v2.13.1/Linux",
+        TimeStamp.now(),
+        brokerInfo.interBrokerInfo,
+        Signature.zero
+      )
+    )
+    expectTerminated(brokerHandler)
+    listener.expectMsg(MisbehaviorManager.InvalidClientVersion(remoteAddress))
   }
 
   it should "publish misbehavior if receive invalid ping" in new Fixture {
