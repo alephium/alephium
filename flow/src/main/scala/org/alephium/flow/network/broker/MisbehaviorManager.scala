@@ -77,6 +77,7 @@ object MisbehaviorManager {
   final case class InvalidFlowData(remoteAddress: InetSocketAddress)         extends Critical
   final case class InvalidPoW(remoteAddress: InetSocketAddress)              extends Critical
   final case class InvalidPingPongCritical(remoteAddress: InetSocketAddress) extends Critical
+  final case class InvalidClientVersion(remoteAddress: InetSocketAddress)    extends Critical
 
   final case class Spamming(remoteAddress: InetSocketAddress)              extends Warning
   final case class InvalidFlowChainIndex(remoteAddress: InetSocketAddress) extends Warning
