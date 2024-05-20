@@ -4,8 +4,9 @@ assembly:
 package:
 	sbt app/universal:packageBin
 
-docker:
-	sbt app/docker sbt tools/docker
+docker: FORCE
+	sbt app/docker tools/docker
+FORCE: ;
 
 clean:
 	sbt clean
