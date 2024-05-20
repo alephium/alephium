@@ -26,24 +26,16 @@
       false
     ]
   },
-  "eventsSig": [
-    
-  ],
+  "eventsSig": [],
   "functions": [
     {
       "name": "foo",
       "usePreapprovedAssets": false,
       "useAssetsInContract": false,
       "isPublic": true,
-      "paramNames": [
-        
-      ],
-      "paramTypes": [
-        
-      ],
-      "paramIsMutable": [
-        
-      ],
+      "paramNames": [],
+      "paramTypes": [],
+      "paramIsMutable": [],
       "returnTypes": [
         "Bool",
         "I256",

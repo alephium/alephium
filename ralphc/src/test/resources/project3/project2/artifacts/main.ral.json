@@ -22,18 +22,10 @@
       "usePreapprovedAssets": true,
       "useAssetsInContract": false,
       "isPublic": true,
-      "paramNames": [
-        
-      ],
-      "paramTypes": [
-        
-      ],
-      "paramIsMutable": [
-        
-      ],
-      "returnTypes": [
-        
-      ]
+      "paramNames": [],
+      "paramTypes": [],
+      "paramIsMutable": [],
+      "returnTypes": []
     }
   ]
 }
