@@ -68,8 +68,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with HttpFixture { Fixture =>
   implicit val system: ActorSystem = spec.system
 
-  private val vertx      = Vertx.vertx()
-  private val httpClient = vertx.createHttpClient()
+  private val vertx           = Vertx.vertx()
+  private val webSocketClient = vertx.createWebSocketClient()
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -391,8 +391,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def startWS(port: Int): Future[WebSocketBase] = {
-    httpClient
-      .webSocket(port, "127.0.0.1", "/events")
+    webSocketClient
+      .connect(port, "127.0.0.1", "/events")
       .asScala
       .map { ws =>
         ws.textMessageHandler { blockNotify =>
