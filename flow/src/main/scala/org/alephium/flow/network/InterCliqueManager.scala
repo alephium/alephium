@@ -284,16 +284,16 @@ class InterCliqueManager(
     if (lastNodeSyncedStatus.getOrElse(false)) {
       log.debug(s"Broadcasting block ${blockHash.shortHex} for ${chainIndex}")
       if (origin.isLocal) {
-        randomIterBrokers { (peerId, brokerState) =>
+        randomIterBrokers { (_, brokerState) =>
           if (brokerState.readyFor(chainIndex)) {
-            log.debug(s"Send block to broker $peerId")
+            log.debug(s"Send block to broker ${brokerState.info.address}")
             brokerState.actor ! BrokerHandler.Send(blockMsg)
           }
         }
       } else {
-        randomIterBrokers { (peerId, brokerState) =>
+        randomIterBrokers { (_, brokerState) =>
           if (!origin.isFrom(brokerState.info) && brokerState.readyFor(chainIndex)) {
-            log.debug(s"Send announcement to broker $peerId")
+            log.debug(s"Send announcement to broker ${brokerState.info.address}")
             brokerState.actor ! BrokerHandler.RelayBlock(blockHash)
           }
         }
