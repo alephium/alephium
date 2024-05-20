@@ -37,6 +37,7 @@ import org.alephium.protocol.model.{
   BrokerInfo,
   ChainIndex,
   FlowData,
+  ReleaseVersion,
   TransactionId
 }
 import org.alephium.util._
@@ -105,10 +106,16 @@ trait BrokerHandler extends FlowDataHandler {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
         cancelHandshakeTick()
-        handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
 
-        pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
-        context become (exchanging orElse pingPong)
+        if (!ReleaseVersion.checkClientId(hello.clientId)) {
+          log.warning(s"Unknown client id from ${remoteAddress}: ${hello.clientId}")
+          stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
+        } else {
+          handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
+
+          pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
+          context become (exchanging orElse pingPong)
+        }
       case HandShakeTimeout =>
         log.warning(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
         stop(MisbehaviorManager.RequestTimeout(remoteAddress))
