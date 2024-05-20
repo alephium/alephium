@@ -12,7 +12,7 @@ jobs:
       matrix:
         # os: [ macos-latest, windows-latest, ubuntu-latest ]
         os: [ windows-latest, ubuntu-latest ]
-        java: [ '11' ]
+        java: [ '17' ]
     steps:
       - uses: actions/checkout@v2
       - name: Setup JDK

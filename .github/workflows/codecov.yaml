@@ -16,7 +16,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
           cache: sbt
       - run: sbt clean coverage test coverageReport && sbt coverageAggregate
       - name: Upload coverage to Codecov
