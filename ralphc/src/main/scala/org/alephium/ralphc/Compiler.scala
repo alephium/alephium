@@ -128,7 +128,7 @@ final case class Compiler(config: Config) {
                 metaInfos
                   .map(item => (item._2.name, item._2.codeInfo))
                   .toSeq
-                  .sortWith(_._1 < _._1)*
+                  .sortWith(_._1 < _._1) *
               )
             ),
             config.artifactPath.resolve(".project.json")
