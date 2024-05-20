@@ -23,7 +23,7 @@ import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.HttpClientOptions
+import io.vertx.core.http.WebSocketClientOptions
 import org.scalatest.{Assertion, EitherValues}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
@@ -112,9 +112,9 @@ class WebSocketServerSpec
   trait RouteWS extends WebSocketServerFixture {
 
     private val vertx = Vertx.vertx()
-    private val httpClient = {
-      val options = new HttpClientOptions().setMaxWebSocketFrameSize(1024 * 1024)
-      vertx.createHttpClient(options)
+    private val webSocketClient = {
+      val options = new WebSocketClientOptions().setMaxFrameSize(1024 * 1024)
+      vertx.createWebSocketClient(options)
     }
     val port             = node.config.network.wsPort
     val blockNotifyProbe = TestProbe()
@@ -142,8 +142,8 @@ class WebSocketServerSpec
           .contains(server.eventHandler) is true
       }
 
-      val ws = httpClient
-        .webSocket(port, "127.0.0.1", "/events")
+      val ws = webSocketClient
+        .connect(port, "127.0.0.1", "/events")
         .asScala
         .map { ws =>
           ws.textMessageHandler { blockNotify =>

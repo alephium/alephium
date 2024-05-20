@@ -22,6 +22,7 @@ import scala.concurrent.Future
 
 import sttp.model.{HeaderNames, StatusCode}
 import sttp.tapir._
+import sttp.tapir.files.staticResourcesGetServerEndpoint
 import sttp.tapir.server.ServerEndpoint
 
 import org.alephium.util.AVector
@@ -83,7 +84,7 @@ object SwaggerUI {
         .out(textJavascriptUtf8)
         .serverLogicPure[Future](_ => Right(swaggerInitializerJsWithExtended))
 
-    val resourcesEndpoint = resourcesGetServerEndpoint[Future](contextPath)(
+    val resourcesEndpoint = staticResourcesGetServerEndpoint[Future](contextPath)(
       SwaggerUI.getClass.getClassLoader,
       s"META-INF/resources/webjars/swagger-ui/$swaggerVersion/"
     )

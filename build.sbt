@@ -261,6 +261,7 @@ lazy val http = project("http")
     libraryDependencies ++= Seq(
       `tapir-vertx`,
       `tapir-client`,
+      `tapir-files`,
       `sttp-backend`
     )
   )

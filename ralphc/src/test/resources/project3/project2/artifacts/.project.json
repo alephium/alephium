@@ -13,36 +13,28 @@
       "sourceCodeHash": "90e91b024b215506f579b59cb06e4d820327a87e28663ddb17c1d193118dc4f4",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "6b18a8b0fe1aaa38b0c187c798cbcd2d2a40e6ee718f7668eedd40d927daa0f0",
-      "warnings": [
-        
-      ]
+      "warnings": []
     },
     "Foo": {
       "sourceFile": "foo.ral",
       "sourceCodeHash": "31c215eef9b9bb6faeeb0b6de689cabe4097716a15470ed0766b1bf5e4174b24",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "5e770de7380fd93ffc4f3a02462d4fd3ac4e624252421e25041c113381a1e175",
-      "warnings": [
-        
-      ]
+      "warnings": []
     },
     "Main": {
       "sourceFile": "main.ral",
       "sourceCodeHash": "82cadbfc4cf9576d2ce5814fe7041a56430741a2b8e0f149558617911f0c1494",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "",
-      "warnings": [
-        
-      ]
+      "warnings": []
     },
     "Math": {
       "sourceFile": "math.ral",
       "sourceCodeHash": "bf6305b5f82a1267b36f72b25c4f01d5fe27b3be0edff7b16200951bc0ab3c20",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "f5773744dafc81efaf82b27f1fe6bad1292d88a7f33ee053835c68ad77c787f3",
-      "warnings": [
-        
-      ]
+      "warnings": []
     }
   }
 }
