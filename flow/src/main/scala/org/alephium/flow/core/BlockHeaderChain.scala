@@ -213,7 +213,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
   }
 
   def checkHashIndexingUnsafe(): Unit = {
-    val maxHeight   = maxHeightUnsafe
+    val maxHeight   = maxHeightByWeightUnsafe
     var startHeight = maxHeight - maxForkDepth
 
     if (startHeight > ALPH.GenesisHeight) {

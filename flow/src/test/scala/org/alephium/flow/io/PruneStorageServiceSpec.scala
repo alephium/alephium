@@ -114,7 +114,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
 
     val allKeysFinal: Set[Hash] = getAllKeysInTrie().toSet
 
-    blockFlow.getMaxHeight(chainIndex).rightValue is 100
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 100
 
     val keysAfterApplyingRestOfBlocks = (block5 +: restOfBlocks)
       .foldLeft(allKeysAtBlock4) { (acc, block) =>
@@ -131,7 +131,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
       val ci = ChainIndex(groupIndex, groupIndex)
       (0 until 200).map { _ => addOneBlock(ci, blockFlow) }
 
-      blockFlow.getMaxHeight(ci).rightValue is 200
+      blockFlow.getMaxHeightByWeight(ci).rightValue is 200
     }
 
     val (contractId, _) = createContract(
@@ -156,7 +156,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     groupConfig.cliqueGroupIndexes.foreach { groupIndex =>
       val ci = ChainIndex(groupIndex, groupIndex)
       (0 until 126).map { _ => addOneBlock(ci, blockFlow) }
-      blockFlow.getMaxHeight(ci).rightValue is 126
+      blockFlow.getMaxHeightByWeight(ci).rightValue is 126
     }
 
     assertThrows[AssertionError](pruneStorageService.prune())
@@ -164,7 +164,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     groupConfig.cliqueGroupIndexes.take(groupConfig.groups - 1).foreach { groupIndex =>
       val ci = ChainIndex(groupIndex, groupIndex)
       (0 until 10).map { _ => addOneBlock(ci, blockFlow) }
-      blockFlow.getMaxHeight(ci).rightValue is 136
+      blockFlow.getMaxHeightByWeight(ci).rightValue is 136
     }
 
     assertThrows[AssertionError](pruneStorageService.prune())
@@ -172,7 +172,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     groupConfig.cliqueGroupIndexes.drop(groupConfig.groups - 1).foreach { groupIndex =>
       val ci = ChainIndex(groupIndex, groupIndex)
       (0 until 10).map { _ => addOneBlock(ci, blockFlow) }
-      blockFlow.getMaxHeight(ci).rightValue is 136
+      blockFlow.getMaxHeightByWeight(ci).rightValue is 136
     }
 
     pruneAndVerify()

@@ -68,7 +68,7 @@ class BlocksExporter(blockflow: BlockFlow, rootPath: Path)(implicit groupConfig:
 
   private def fetchChain(chainIndex: ChainIndex): IOResult[AVector[Block]] = {
     for {
-      maxHeight <- blockflow.getMaxHeight(chainIndex)
+      maxHeight <- blockflow.getMaxHeightByWeight(chainIndex)
       blocks <- EitherF.foldTry(0 to maxHeight, AVector.empty[Block]) { case (blocks, height) =>
         fetchBlocksAt(chainIndex, height).map(newBlocks => blocks ++ newBlocks)
       }

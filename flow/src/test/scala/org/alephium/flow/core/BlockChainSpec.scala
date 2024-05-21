@@ -89,10 +89,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val mainChainPart2     = chainGenOf(4, mainChainPart1.last).sample.get
 
     addBlocks(chain, mainChainPart1)
-    chain.maxHeightUnsafe is 4
+    chain.maxHeightByWeightUnsafe is 4
     chain.validateBlockHeight(deepForkedBlock, maxForkDepth) isE true
     addBlocks(chain, mainChainPart2)
-    chain.maxHeightUnsafe is 8
+    chain.maxHeightByWeightUnsafe is 8
     chain.validateBlockHeight(deepForkedBlock, maxForkDepth) isE false
     chain.validateBlockHeight(validBlock, maxForkDepth) isE true
     chain.contains(validBlock) isE false
@@ -290,7 +290,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.isTip(headBlock) is false
     chain.isTip(lastBlock) is true
     chain.getBestTipUnsafe() is lastBlock.hash
-    chain.maxHeight isE blocks.length
+    chain.maxHeightByWeight isE blocks.length
     chain.getAllTips is AVector(lastBlock.hash)
 
     val diff = chain.calHashDiff(blocks.last.hash, genesis.hash).rightValue
@@ -312,7 +312,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.isTip(shortChain.last) is true
 
     addBlocks(chain, longChain.init)
-    chain.maxHeight isE longChain.length - 1
+    chain.maxHeightByWeight isE longChain.length - 1
     chain.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
 
     addBlock(chain, longChain.last)
@@ -323,7 +323,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.isTip(longChain.head) is false
     chain.isTip(longChain.last) is true
     chain.getBestTipUnsafe() is longChain.last.hash
-    chain.maxHeight isE longChain.length
+    chain.maxHeightByWeight isE longChain.length
     chain.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
   }
 
@@ -449,11 +449,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val blocks          = chainGenOf(5).sample.get
     val chain           = createBlockChain(blocks.init)
     blocks.init.foreach(block => chain.contains(block) isE true)
-    chain.maxHeight isE 3
+    chain.maxHeightByWeight isE 3
     chain.maxWeight isE consensusConfig.minBlockWeight * 3
     addBlock(chain, blocks.last)
     chain.contains(blocks.last) isE true
-    chain.maxHeight isE 4
+    chain.maxHeightByWeight isE 4
     chain.maxWeight isE consensusConfig.minBlockWeight * 4
   }
 
@@ -466,7 +466,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     blocks1.foreach(block => chain.contains(block) isE true)
     blocks2.foreach(block => chain.contains(block) isE true)
-    chain.maxHeight isE 4
+    chain.maxHeightByWeight isE 4
     chain.maxWeight isE consensusConfig.minBlockWeight * 4
     chain.getHashesAfter(blocks1.head.hash) isE {
       val branch1 = blocks1.tail
@@ -837,7 +837,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   it should "select uncles and calc the block diff" in new RhoneFixture {
     val length = ALPH.MaxGhostUncleAge + 1
     val chain  = createBlockChain(length)
-    chain.maxHeightUnsafe is length
+    chain.maxHeightByWeightUnsafe is length
     val parentHeight = Random.between(1, length - 2)
     val parentHash   = chain.getHashesUnsafe(parentHeight).head
     val uncle        = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
@@ -920,7 +920,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       block.hash
     }
     val result2 =
-      blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
+      blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeightByWeight.rightValue)
     result2 is (result1 ++ AVector.from(hashes))
   }
 
@@ -961,7 +961,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       block.hash
     }
     val result4 =
-      blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
+      blockChain.getRecentDataUnsafe(
+        ALPH.GenesisHeight + 1,
+        blockChain.maxHeightByWeight.rightValue
+      )
     result4 is (result1 ++ AVector(block0.hash, block2.hash, block3.hash) ++ AVector.from(hashes))
   }
 
@@ -982,7 +985,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       addBlock(blockChain, block)
       block
     }
-    blockChain.maxHeightUnsafe is 3
+    blockChain.maxHeightByWeightUnsafe is 3
     val Seq(block0, block1, block2) = blocks
     val uncle1                      = blockGen(chainIndex, TimeStamp.now(), block0.hash).sample.get
     addBlock(blockChain, uncle1)
@@ -990,7 +993,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val selectedUncle1 = AVector(SelectedGhostUncle(uncle1.hash, lockupScript, 1))
     val block3 = blockGen(chainIndex, TimeStamp.now(), block2.hash, selectedUncle1).sample.get
     addBlock(blockChain, block3)
-    blockChain.maxHeightUnsafe is 4
+    blockChain.maxHeightByWeightUnsafe is 4
 
     val uncle2 = blockGen(chainIndex, TimeStamp.now(), block1.hash, selectedUncle1).sample.get
     addBlock(blockChain, uncle2)
@@ -998,9 +1001,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val selectedUncle2 = AVector(SelectedGhostUncle(uncle2.hash, lockupScript, 1))
     val block4 = blockGen(chainIndex, TimeStamp.now(), block3.hash, selectedUncle2).sample.get
     addBlock(blockChain, block4)
-    blockChain.maxHeightUnsafe is 5
+    blockChain.maxHeightByWeightUnsafe is 5
 
-    val hashes = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeightUnsafe)
+    val hashes =
+      blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeightByWeightUnsafe)
     hashes is AVector(
       block4.hash,
       uncle2.hash,
@@ -1021,13 +1025,13 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       addBlock(blockChain, block)
       block
     }
-    blockChain.maxHeightUnsafe is 4
+    blockChain.maxHeightByWeightUnsafe is 4
     blockChain.getBestTipUnsafe() is blocks.last.hash
     val tipWeight = blockChain.getStateUnsafe(blocks.last.hash).weight
 
     val block = blockGen(chainIndex, TimeStamp.now(), genesis.hash).sample.get
     blockChain.add(block, tipWeight + Weight(BigInteger.ONE)).isRight is true
-    blockChain.maxHeightUnsafe is 1
+    blockChain.maxHeightByWeightUnsafe is 1
     blockChain.getBestTipUnsafe() is block.hash
 
     blockChain.getSyncDataUnsafe(AVector(blocks.last.hash)).isEmpty is true

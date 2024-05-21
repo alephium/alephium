@@ -89,7 +89,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     chain.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)
     chain.getBestTipUnsafe() is shortChain.last.hash
     chain.maxWeight isE Weight(3)
-    chain.maxHeight isE 2
-    chain.maxHeightUnsafe is 2
+    chain.maxHeightByWeight isE 2
+    chain.maxHeightByWeightUnsafe is 2
   }
 }

@@ -357,7 +357,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     }
 
     addAndCheck(blockFlow0, (0 until 2).map(_ => emptyBlock(blockFlow0, chainIndex)): _*)
-    blockFlow0.getMaxHeight(chainIndex).rightValue is 1
+    blockFlow0.getMaxHeightByWeight(chainIndex).rightValue is 1
     val hashes = blockFlow0.getHashes(chainIndex, 1).rightValue
     hashes.length is 2
     val (main0, fork0) =
@@ -441,10 +441,10 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
 
     addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
     addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
-    blockChain.maxHeightUnsafe is 2
+    blockChain.maxHeightByWeightUnsafe is 2
     val validForkedBlock = emptyBlock(blockFlow, chainIndex)
     (0 until maxForkDepth).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
-    blockChain.maxHeightUnsafe is (2 + maxForkDepth)
+    blockChain.maxHeightByWeightUnsafe is (2 + maxForkDepth)
 
     val brokerInfo = BrokerInfo.unsafe(CliqueId.zero, 0, 1, new InetSocketAddress("127.0.0.1", 0))
     val dataOrigin = DataOrigin.InterClique(brokerInfo)

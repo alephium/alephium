@@ -68,7 +68,7 @@ trait BlockFlow
   private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[BlockHash] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain     = getHeaderChain(chainIndex)
-      val maxHeight = chain.maxHeightUnsafe
+      val maxHeight = chain.maxHeightByWeightUnsafe
       if (maxHeight == ALPH.GenesisHeight) {
         AVector.empty
       } else {
@@ -188,7 +188,7 @@ object BlockFlow extends StrictLogging {
   private def cacheBlockChain(blockflow: BlockFlow, chain: BlockChain)(implicit
       consensusSettings: ConsensusSettings
   ): Unit = {
-    val maxHeight = chain.maxHeightUnsafe
+    val maxHeight = chain.maxHeightByWeightUnsafe
     val startHeight =
       Math.max(ALPH.GenesisHeight, maxHeight - consensusSettings.blockCacheCapacityPerChain)
     (startHeight to maxHeight).foreach { height =>
@@ -201,7 +201,7 @@ object BlockFlow extends StrictLogging {
   private def cacheHeaderChain(chain: BlockHeaderChain)(implicit
       consensusSettings: ConsensusSettings
   ): Unit = {
-    val maxHeight = chain.maxHeightUnsafe
+    val maxHeight = chain.maxHeightByWeightUnsafe
     val startHeight =
       Math.max(ALPH.GenesisHeight, maxHeight - consensusSettings.blockCacheCapacityPerChain * 2)
     (startHeight to maxHeight).foreach { height =>

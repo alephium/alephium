@@ -857,7 +857,7 @@ trait TxUtils { Self: FlowUtils =>
     iter(fromTipHeight + 1) match {
       case None => 0
       case Some(firstConfirmationHeight) =>
-        fromChain.maxHeightUnsafe - firstConfirmationHeight + 1
+        fromChain.maxHeightByWeightUnsafe - firstConfirmationHeight + 1
     }
   }
 
@@ -885,12 +885,12 @@ trait TxUtils { Self: FlowUtils =>
     }
 
     if (header.isGenesis) {
-      toChain.maxHeightUnsafe - ALPH.GenesisHeight + 1
+      toChain.maxHeightByWeightUnsafe - ALPH.GenesisHeight + 1
     } else {
       iter(toTipHeight + 1) match {
         case None => 0
         case Some(firstConfirmationHeight) =>
-          toChain.maxHeightUnsafe - firstConfirmationHeight + 1
+          toChain.maxHeightByWeightUnsafe - firstConfirmationHeight + 1
       }
     }
   }

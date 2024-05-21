@@ -38,7 +38,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def validateBlockHeight(block: Block, maxForkDepth: Int): IOResult[Boolean] = {
     for {
-      tipHeight    <- maxHeight
+      tipHeight    <- maxHeightByWeight
       parentHeight <- getHeight(block.parentHash)
     } yield {
       val blockHeight = parentHeight + 1
@@ -74,7 +74,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
-    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
+    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightByWeightUnsafe)
     if (Utils.unsafe(isRecentHeight(heightFrom))) {
       getRecentDataUnsafe(heightFrom, heightTo)
     } else {
@@ -239,7 +239,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       toTs: TimeStamp
   ): IOResult[(ChainIndex, AVector[(Block, Int)])] =
     for {
-      height <- maxHeight
+      height <- maxHeightByWeight
       result <- searchByTimestampHeight(height, fromTs, toTs)
     } yield (chainIndex, result)
 
@@ -434,7 +434,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getTxStatusUnsafe(txId: TransactionId): Option[TxStatus] = {
     getCanonicalTxIndex(txId).flatMap { selectedIndex =>
       val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
-      val maxHeight          = maxHeightUnsafe
+      val maxHeight          = maxHeightByWeightUnsafe
       val chainConfirmations = maxHeight - selectedHeight + 1
       Some(TxStatus(selectedIndex, chainConfirmations))
     }
@@ -446,7 +446,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getLatestHashesUnsafe(): AVector[BlockHash] = {
-    val toHeight   = maxHeightUnsafe
+    val toHeight   = maxHeightByWeightUnsafe
     val fromHeight = math.max(ALPH.GenesisHeight + 1, toHeight - 20)
     (fromHeight to toHeight).foldLeft(AVector.empty[BlockHash]) { case (acc, height) =>
       acc ++ Utils.unsafe(getHashes(height))

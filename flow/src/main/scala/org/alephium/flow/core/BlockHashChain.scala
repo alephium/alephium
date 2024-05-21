@@ -107,11 +107,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
 
   // the max height is the height of the tip of max weight
-  def maxHeight: IOResult[Int] = {
-    IOUtils.tryExecute(maxHeightUnsafe)
+  def maxHeightByWeight: IOResult[Int] = {
+    IOUtils.tryExecute(maxHeightByWeightUnsafe)
   }
 
-  def maxHeightUnsafe: Int = {
+  def maxHeightByWeightUnsafe: Int = {
     val (maxHeight, _) =
       tips.keys().foldLeft((ALPH.GenesisHeight, ALPH.GenesisWeight)) {
         case ((height, weight), tip) =>
@@ -362,7 +362,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def isRecentHeight(height: Int): IOResult[Boolean] = {
-    maxHeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
+    maxHeightByWeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
   }
 }
 // scalastyle:on number.of.methods
