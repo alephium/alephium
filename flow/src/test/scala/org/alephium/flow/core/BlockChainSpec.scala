@@ -65,6 +65,22 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.add(block, parentWeight + block.weight).isRight is true
       }
     }
+
+    def addChain(chain: BlockChain, blockNum: Int) = {
+      val blocks = chainGenOf(chain.chainIndex, blockNum, genesis.hash, TimeStamp.now()).sample.get
+      addBlocks(chain, blocks)
+      chain.maxHeightUnsafe is blockNum
+      chain.maxHeightByWeightUnsafe is blockNum
+      blocks
+    }
+
+    def addMaxWeightBlock(chain: BlockChain) = {
+      val maxWeight = chain.maxWeight.rightValue + Weight(BigInteger.ONE)
+      val block     = blockGen(chain.chainIndex, TimeStamp.now(), genesis.hash).sample.get
+      chain.add(block, maxWeight).isRight is true
+      chain.maxHeightUnsafe isnot chain.maxHeightByWeightUnsafe
+      chain.maxHeightByWeightUnsafe is 1
+    }
   }
 
   it should "initialize genesis correctly" in new Fixture {
@@ -89,10 +105,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val mainChainPart2     = chainGenOf(4, mainChainPart1.last).sample.get
 
     addBlocks(chain, mainChainPart1)
-    chain.maxHeightByWeightUnsafe is 4
+    chain.maxHeightUnsafe is 4
     chain.validateBlockHeight(deepForkedBlock, maxForkDepth) isE true
     addBlocks(chain, mainChainPart2)
-    chain.maxHeightByWeightUnsafe is 8
+    chain.maxHeightUnsafe is 8
     chain.validateBlockHeight(deepForkedBlock, maxForkDepth) isE false
     chain.validateBlockHeight(validBlock, maxForkDepth) isE true
     chain.contains(validBlock) isE false
@@ -1016,24 +1032,34 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     ).reverse
   }
 
-  it should "get empty blocks if the height of the best tip is less than the height of the locator" in new Fixture {
-    val chainIndex = genesis.chainIndex
-    val blockChain = buildBlockChain()
-    val blocks = AVector.from(0 until 4).map { _ =>
-      val parentHash = blockChain.getBestTipUnsafe()
-      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
-      addBlock(blockChain, block)
-      block
+  it should "get sync data based on max height" in new Fixture {
+    val chain  = buildBlockChain()
+    val blocks = addChain(chain, 4)
+    addMaxWeightBlock(chain)
+
+    blocks.foreachWithIndex { case (block, index) =>
+      chain.getSyncDataUnsafe(AVector(block.hash)) is blocks.drop(index + 1).map(_.hash)
     }
-    blockChain.maxHeightByWeightUnsafe is 4
-    blockChain.getBestTipUnsafe() is blocks.last.hash
-    val tipWeight = blockChain.getStateUnsafe(blocks.last.hash).weight
+  }
 
-    val block = blockGen(chainIndex, TimeStamp.now(), genesis.hash).sample.get
-    blockChain.add(block, tipWeight + Weight(BigInteger.ONE)).isRight is true
-    blockChain.maxHeightByWeightUnsafe is 1
-    blockChain.getBestTipUnsafe() is block.hash
+  it should "check recent height" in new Fixture {
+    val blockNum = consensusConfigs.recentBlockHeightDiff + 5
+    val chain    = buildBlockChain()
+    addChain(chain, blockNum)
+    addMaxWeightBlock(chain)
 
-    blockChain.getSyncDataUnsafe(AVector(blocks.last.hash)).isEmpty is true
+    (0 until 5).foreach { height =>
+      chain.isRecentHeight(height) isE false
+    }
+    (5 until blockNum).foreach { height =>
+      chain.isRecentHeight(height) isE true
+    }
+  }
+
+  it should "get latest hashes based on max height" in new Fixture {
+    val chain  = buildBlockChain()
+    val blocks = addChain(chain, 25)
+    addMaxWeightBlock(chain)
+    chain.getLatestHashesUnsafe() is blocks.drop(4).map(_.hash)
   }
 }

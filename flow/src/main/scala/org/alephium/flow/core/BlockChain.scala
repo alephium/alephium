@@ -38,7 +38,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def validateBlockHeight(block: Block, maxForkDepth: Int): IOResult[Boolean] = {
     for {
-      tipHeight    <- maxHeightByWeight
+      tipHeight    <- maxHeight
       parentHeight <- getHeight(block.parentHash)
     } yield {
       val blockHeight = parentHeight + 1
@@ -74,12 +74,16 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
-    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightByWeightUnsafe)
+    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
     if (Utils.unsafe(isRecentHeight(heightFrom))) {
       getRecentDataUnsafe(heightFrom, heightTo)
     } else {
       getSyncDataUnsafe(heightFrom, heightTo)
     }
+  }
+
+  def isRecentHeight(height: Int): IOResult[Boolean] = {
+    maxHeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -446,7 +450,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getLatestHashesUnsafe(): AVector[BlockHash] = {
-    val toHeight   = maxHeightByWeightUnsafe
+    val toHeight   = maxHeightUnsafe
     val fromHeight = math.max(ALPH.GenesisHeight + 1, toHeight - 20)
     (fromHeight to toHeight).foldLeft(AVector.empty[BlockHash]) { case (acc, height) =>
       acc ++ Utils.unsafe(getHashes(height))

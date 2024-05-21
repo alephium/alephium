@@ -68,7 +68,7 @@ trait BlockFlow
   private def getSyncLocatorsUnsafe(chainIndex: ChainIndex): AVector[BlockHash] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain     = getHeaderChain(chainIndex)
-      val maxHeight = chain.maxHeightByWeightUnsafe
+      val maxHeight = chain.maxHeightUnsafe
       if (maxHeight == ALPH.GenesisHeight) {
         AVector.empty
       } else {
