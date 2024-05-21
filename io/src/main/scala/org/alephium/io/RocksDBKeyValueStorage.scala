@@ -22,20 +22,20 @@ import org.rocksdb._
 import org.alephium.serde._
 
 object RocksDBKeyValueStorage {
-  import RocksDBSource.Settings
+  import RocksDBSource.ProdSettings
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
       cf: RocksDBSource.ColumnFamily
   ): KeyValueStorage[K, V] =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+    apply(storage, cf, ProdSettings.writeOptions, ProdSettings.readOptions)
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
       cf: RocksDBSource.ColumnFamily,
       writeOptions: WriteOptions
   ): KeyValueStorage[K, V] =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+    apply(storage, cf, writeOptions, ProdSettings.readOptions)
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,

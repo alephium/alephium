@@ -36,7 +36,7 @@ class BlockFlowBench {
   implicit val config: AlephiumConfig = AlephiumConfig.load(rootPath, "alephium")
   private val storages: Storages = {
     val dbFolder = "db"
-    Storages.createUnsafe(rootPath, dbFolder, RocksDBSource.Settings.writeOptions)(
+    Storages.createUnsafe(rootPath, dbFolder, RocksDBSource.ProdSettings.writeOptions)(
       config.broker,
       config.node
     )

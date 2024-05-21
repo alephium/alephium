@@ -40,7 +40,7 @@ object StoragesFixture {
     val postFix   = Hash.random.toHexString
     val dbFolders = s"db-$postFix"
     val storages: Storages =
-      Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.Settings.syncWrite)
+      Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.ProdSettings.syncWrite)
     storages
   }
 

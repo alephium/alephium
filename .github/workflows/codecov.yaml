@@ -13,10 +13,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
           cache: sbt
       - run: sbt clean coverage test coverageReport && sbt coverageAggregate
       - name: Upload coverage to Codecov

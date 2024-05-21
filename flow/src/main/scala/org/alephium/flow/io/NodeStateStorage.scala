@@ -22,7 +22,7 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 import org.alephium.flow.core.BlockHashChain
 import org.alephium.flow.model.BootstrapInfo
 import org.alephium.io._
-import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
+import org.alephium.io.RocksDBSource.{ColumnFamily, ProdSettings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
@@ -128,12 +128,12 @@ object NodeStateRockDBStorage {
   def apply(storage: RocksDBSource, cf: ColumnFamily)(implicit
       config: GroupConfig
   ): NodeStateRockDBStorage =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+    apply(storage, cf, ProdSettings.writeOptions, ProdSettings.readOptions)
 
   def apply(storage: RocksDBSource, cf: ColumnFamily, writeOptions: WriteOptions)(implicit
       config: GroupConfig
   ): NodeStateRockDBStorage =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+    apply(storage, cf, writeOptions, ProdSettings.readOptions)
 
   def apply(
       storage: RocksDBSource,

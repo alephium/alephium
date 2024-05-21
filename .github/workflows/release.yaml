@@ -13,10 +13,10 @@ jobs:
           fetch-depth: 0
           submodules: true
       - name: Setup JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
           cache: sbt
       - name: Get the version
         id: get_version
