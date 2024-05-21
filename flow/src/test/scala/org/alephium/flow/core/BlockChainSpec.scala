@@ -80,6 +80,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.add(block, maxWeight).isRight is true
       chain.maxHeightUnsafe isnot chain.maxHeightByWeightUnsafe
       chain.maxHeightByWeightUnsafe is 1
+      block
     }
   }
 
@@ -1057,9 +1058,21 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "get latest hashes based on max height" in new Fixture {
-    val chain  = buildBlockChain()
-    val blocks = addChain(chain, 25)
-    addMaxWeightBlock(chain)
-    chain.getLatestHashesUnsafe() is blocks.drop(4).map(_.hash)
+    val chain          = buildBlockChain()
+    val blocks0        = addChain(chain, 25)
+    val maxWeightBlock = addMaxWeightBlock(chain)
+    val result0        = blocks0.drop(4).map(_.hash)
+    chain.getLatestHashesUnsafe() is result0
+
+    val forkChainLength = 5
+    val parentHash      = blocks0(3).hash
+    val blocks1 =
+      chainGenOf(chain.chainIndex, forkChainLength, parentHash, TimeStamp.now()).sample.get
+    addBlocks(chain, blocks1)
+    chain.getAllTips.toSet is Set(blocks0.last.hash, maxWeightBlock.hash, blocks1.last.hash)
+    val result1 = AVector.from(0 until forkChainLength).flatMap { index =>
+      AVector(result0(index), blocks1(index).hash)
+    } ++ result0.drop(forkChainLength)
+    chain.getLatestHashesUnsafe() is result1
   }
 }
