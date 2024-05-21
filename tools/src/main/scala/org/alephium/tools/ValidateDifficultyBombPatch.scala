@@ -21,7 +21,7 @@ import java.nio.file.Path
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{BlockDeps, Target}
@@ -34,7 +34,7 @@ object ValidateDifficultyBombPatch extends App {
   implicit private val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   private val dbPath                          = rootPath.resolve("mainnet")
   private val storages =
-    Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker, config.node)
+    Storages.createUnsafe(dbPath, "db", ProdSettings.writeOptions)(config.broker, config.node)
   private val blockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   config.broker.chainIndexes.foreach { chainIndex =>
