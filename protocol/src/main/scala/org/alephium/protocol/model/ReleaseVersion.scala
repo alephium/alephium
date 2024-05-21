@@ -42,7 +42,7 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
       if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
         this >= ReleaseVersion(3, 0, 0)
       } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
-        this >= ReleaseVersion(2, 14, 0)
+        this >= ReleaseVersion(2, 14, 5)
       } else {
         true
       }
