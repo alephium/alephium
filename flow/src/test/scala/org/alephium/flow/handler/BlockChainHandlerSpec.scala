@@ -25,6 +25,7 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{InvalidBlockVersion, InvalidTxsMerkleRoot}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
@@ -39,10 +40,11 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     val dataOrigin          = DataOrigin.InterClique(brokerInfo): DataOrigin
     val interCliqueListener = TestProbe()
     val intraCliqueListener = TestProbe()
+    val maxForkDepth        = 5
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
     lazy val blockChainHandler =
       TestActorRef[BlockChainHandler](
-        BlockChainHandler.props(blockFlow, chainIndex, ActorRefT(TestProbe().ref))
+        BlockChainHandler.props(blockFlow, chainIndex, ActorRefT(TestProbe().ref), maxForkDepth)
       )
 
     system.eventStream.subscribe(
@@ -211,5 +213,41 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
       )
     )
     intraCliqueListener.expectNoMessage()
+  }
+
+  it should "publish misbehavior when receiving deep forked blocks from remote" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val invalidForkedBlock = emptyBlock(blockFlow, chainIndex)
+    val listener           = TestProbe()
+    val blockChain         = blockFlow.getBlockChain(chainIndex)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    blockChain.maxHeightByWeightUnsafe is 2
+    val validForkedBlock = emptyBlock(blockFlow, chainIndex)
+    (0 until maxForkDepth).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+    blockChain.maxHeightByWeightUnsafe is (2 + maxForkDepth)
+
+    val brokerProbe = TestProbe()
+    val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)
+    blockChainHandler ! BlockChainHandler.Validate(validForkedBlock, broker, dataOrigin)
+    eventually {
+      blockChain.contains(validForkedBlock) isE true
+      brokerProbe.expectMsg(BlockChainHandler.BlockAdded(validForkedBlock.hash))
+    }
+
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    blockChainHandler ! BlockChainHandler.Validate(invalidForkedBlock, broker, dataOrigin)
+    eventually {
+      brokerProbe.expectNoMessage()
+      listener.expectMsg(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
+    }
+
+    blockChainHandler ! BlockChainHandler.Validate(invalidForkedBlock, broker, DataOrigin.Local)
+    eventually {
+      brokerProbe.expectNoMessage()
+      listener.expectNoMessage()
+    }
   }
 }

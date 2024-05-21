@@ -18,7 +18,7 @@ package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
@@ -161,7 +161,7 @@ object AllHandlers {
     } yield {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
-        BlockChainHandler.props(blockFlow, chainIndex, eventBus),
+        BlockChainHandler.props(blockFlow, chainIndex, eventBus, maxForkDepth),
         s"BlockChainHandler-$from-$to$namePostfix"
       )
       chainIndex -> handler
