@@ -262,7 +262,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       val block0 = emptyBlock(blockFlow, chainIndex)
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0, block1)
-      blockFlow.getMaxHeight(chainIndex).rightValue is 3
+      blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 3
       val block2          = mineBlockTemplate(blockFlow, chainIndex)
       val hashesAtHeight3 = blockFlow.getHashes(chainIndex, 3).rightValue
       block2.ghostUncleHashes.rightValue is hashesAtHeight3.tail
@@ -281,7 +281,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       val block3 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block2, block3)
       val block4 = mineBlockTemplate(blockFlow, chainIndex)
-      blockFlow.getMaxHeight(chainIndex).rightValue is 6
+      blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 6
       val hashesAtHeight5  = blockFlow.getHashes(chainIndex, 5).rightValue
       val hashesAtHeight6  = blockFlow.getHashes(chainIndex, 6).rightValue
       val ghostUncleHashes = block4.ghostUncleHashes.rightValue
@@ -498,7 +498,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0, block1)
 
-      blockFlow.getMaxHeight(chainIndex).rightValue is 1
+      blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
       val blockHashes = blockFlow.getHashes(chainIndex, 1).rightValue
       blockHashes.length is 2
       blockHashes.toSet is Set(block0.hash, block1.hash)

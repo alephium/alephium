@@ -434,12 +434,12 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "auto mine new blocks if auto-mine is enabled" in new Fixture {
     override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
-    val old = blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
+    val old = blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Right(())
-    (old + 1) is blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
+    (old + 1) is blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     txHandler ! TxHandler.MineOneBlock(chainIndex)
     eventually(
-      (old + 2) is blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
+      (old + 2) is blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     )
   }
 
@@ -453,14 +453,14 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "check force mine block for dev if auto-mine is disabled" in new Fixture {
     override val configValues = Map(("alephium.mempool.auto-mine-for-dev", false))
     config.mempool.autoMineForDev is false
-    val old = blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
+    val old = blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Left(
       "CPU mining for dev is not enabled, please turn it on in config:\n alephium.mempool.auto-mine-for-dev = true"
     )
-    old is blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
+    old is blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     txHandler ! TxHandler.MineOneBlock(chainIndex)
     eventually(
-      old is blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
+      old is blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     )
   }
 

@@ -82,6 +82,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
+  def isRecentHeight(height: Int): IOResult[Boolean] = {
+    maxHeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def getHashWithUncleDepsUnsafe(
       header: BlockHeader,
@@ -239,7 +243,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       toTs: TimeStamp
   ): IOResult[(ChainIndex, AVector[(Block, Int)])] =
     for {
-      height <- maxHeight
+      height <- maxHeightByWeight
       result <- searchByTimestampHeight(height, fromTs, toTs)
     } yield (chainIndex, result)
 
@@ -434,7 +438,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getTxStatusUnsafe(txId: TransactionId): Option[TxStatus] = {
     getCanonicalTxIndex(txId).flatMap { selectedIndex =>
       val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
-      val maxHeight          = maxHeightUnsafe
+      val maxHeight          = maxHeightByWeightUnsafe
       val chainConfirmations = maxHeight - selectedHeight + 1
       Some(TxStatus(selectedIndex, chainConfirmations))
     }

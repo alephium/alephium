@@ -152,8 +152,8 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
   def getHashes(chainIndex: ChainIndex, height: Int): IOResult[AVector[BlockHash]] =
     getHeaderChain(chainIndex).getHashes(height)
 
-  def getMaxHeight(chainIndex: ChainIndex): IOResult[Int] =
-    getHeaderChain(chainIndex).maxHeight
+  def getMaxHeightByWeight(chainIndex: ChainIndex): IOResult[Int] =
+    getHeaderChain(chainIndex).maxHeightByWeight
 
   def getDryrunBlockEnv(chainIndex: ChainIndex): IOResult[BlockEnv] = {
     getHeaderChain(chainIndex).getDryrunBlockEnv()
@@ -185,7 +185,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
       ghostUncleHash: BlockHash
   ): Option[(Block, Int)] = {
     val chain            = getBlockChain(chainIndex)
-    val maxHeight        = chain.maxHeightUnsafe
+    val maxHeight        = chain.maxHeightByWeightUnsafe
     val ghostUncleHeight = getHeightUnsafe(ghostUncleHash)
     val fromHeight       = Math.min(ghostUncleHeight + 1, maxHeight)
     val toHeight         = Math.min(ghostUncleHeight + ALPH.MaxGhostUncleAge, maxHeight)

@@ -3422,7 +3422,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, block1)
     val block2 = mineBlockTemplate(blockFlow, chainIndex)
     addAndCheck(blockFlow, block2)
-    blockFlow.getMaxHeight(chainIndex).rightValue is 2
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 2
 
     val ghostUncleHash  = blockFlow.getHashes(chainIndex, 1).rightValue.last
     val ghostUncleBlock = blockFlow.getBlock(ghostUncleHash).rightValue
@@ -3438,7 +3438,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val block0     = emptyBlock(blockFlow, chainIndex)
     val block1     = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block0, block1)
-    blockFlow.getMaxHeight(chainIndex).rightValue is 1
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
 
     val serverUtils    = new ServerUtils()
     val ghostUncleHash = blockFlow.getHashes(chainIndex, 1).rightValue.last

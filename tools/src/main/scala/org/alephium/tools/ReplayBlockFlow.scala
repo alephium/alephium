@@ -45,9 +45,11 @@ class ReplayBlockFlow(
 
   def start(): BlockValidationResult[Boolean] = {
     for {
-      maxHeights <- from(chainIndexes.mapE(chainIndex => sourceBlockFlow.getMaxHeight(chainIndex)))
-      _          <- from(loadInitialBlocks(targetBlockFlow))
-      _          <- replay(maxHeights)
+      maxHeights <- from(
+        chainIndexes.mapE(chainIndex => sourceBlockFlow.getMaxHeightByWeight(chainIndex))
+      )
+      _                 <- from(loadInitialBlocks(targetBlockFlow))
+      _                 <- replay(maxHeights)
       sourceStateHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
       targetStateHashes <- fetchBestWorldStateHashes(targetBlockFlow)
     } yield sourceStateHashes == targetStateHashes
@@ -124,7 +126,7 @@ class ReplayBlockFlow(
     chainIndexes.foreachE { chainIndex =>
       val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
       for {
-        height0 <- targetBlockFlow.getMaxHeight(chainIndex)
+        height0 <- targetBlockFlow.getMaxHeightByWeight(chainIndex)
         height = if (height0 > startLoadingHeight) height0 + 1 else startLoadingHeight
         _ <- loadBlocksAt(chainIndex, height)
       } yield {

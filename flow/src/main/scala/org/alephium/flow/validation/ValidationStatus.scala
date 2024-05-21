@@ -72,6 +72,7 @@ final case object InvalidTestnetMiner extends InvalidBlockStatus {
   override def toString: String =
     "The testnet is currently limited to whitelisted miners only. To test miners or pools, please set up a local testnet following the documentation."
 }
+case object InvalidBlockHeight extends InvalidBlockStatus
 
 sealed trait InvalidPoLWStatus                  extends InvalidBlockStatus
 case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus

@@ -24,6 +24,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
@@ -38,14 +39,15 @@ object BlockChainHandler {
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      eventBus: ActorRefT[EventBus.Message]
+      eventBus: ActorRefT[EventBus.Message],
+      maxForkDepth: Int
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
   ): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, eventBus))
+    Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
 
   sealed trait Command
   final case class Validate(
@@ -92,7 +94,8 @@ object BlockChainHandler {
 class BlockChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex,
-    eventBus: ActorRefT[EventBus.Message]
+    eventBus: ActorRefT[EventBus.Message],
+    maxForkDepth: Int
 )(implicit
     brokerConfig: BrokerConfig,
     val consensusConfigs: ConsensusConfigs,
@@ -109,9 +112,34 @@ class BlockChainHandler(
 
   override def receive: Receive = validate orElse updateNodeSyncStatus
 
+  @inline private def validateBlock(
+      block: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
+    val blockChain = blockFlow.getBlockChain(block.chainIndex)
+    blockChain.validateBlockHeight(block, maxForkDepth) match {
+      case Right(true) => handleData(block, broker, origin)
+      case Right(false) =>
+        origin match {
+          case DataOrigin.InterClique(brokerInfo) =>
+            log.warning(
+              s"Received invalid block from ${brokerInfo.address}, block hash: ${block.hash.toHexString}"
+            )
+            publishEvent(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
+          case _ =>
+            log.error(s"Received invalid block from $origin, block hash: ${block.hash.toHexString}")
+        }
+        handleInvalidData(block, broker, origin, InvalidBlockHeight)
+      case Left(error) => // this should never happen
+        log.error(s"IO error in validating block height: $error")
+        handleInvalidData(block, broker, origin, InvalidBlockHeight)
+    }
+  }
+
   def validate: Receive = {
     case Validate(block, broker, origin) =>
-      handleData(block, broker, origin)
+      validateBlock(block, broker, origin)
     case ValidateMinedBlock(blockHash, blockBytes, broker) =>
       // Broadcast immediately to reduce propagation latency
       interCliqueBroadcast(blockHash, blockBytes, DataOrigin.Local)

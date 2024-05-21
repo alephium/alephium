@@ -203,7 +203,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         .deltaUnsafe(startTs)
         .timesUnsafe(brokerConfig.chainNum.toLong)) is true
       earliestDepTs is getEarliestDepTs(
-        blockFlow.getMaxHeight(ChainIndex(groupIndex, groupIndex)).rightValue
+        blockFlow.getMaxHeightByWeight(ChainIndex(groupIndex, groupIndex)).rightValue
       )
     }
   }

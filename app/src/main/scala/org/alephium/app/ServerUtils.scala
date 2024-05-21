@@ -516,7 +516,7 @@ class ServerUtils(implicit
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
     for {
       maxHeight <- blockFlow
-        .getMaxHeight(chainIndex)
+        .getMaxHeightByWeight(chainIndex)
         .left
         .map(failedInIO)
     } yield ChainInfo(maxHeight)

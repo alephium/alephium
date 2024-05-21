@@ -328,7 +328,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     }
 
     addAndCheck(blockFlow0, (0 until 2).map(_ => emptyBlock(blockFlow0, chainIndex)): _*)
-    blockFlow0.getMaxHeight(chainIndex).rightValue is 1
+    blockFlow0.getMaxHeightByWeight(chainIndex).rightValue is 1
     val hashes = blockFlow0.getHashes(chainIndex, 1).rightValue
     hashes.length is 2
     val (main0, fork0) =
