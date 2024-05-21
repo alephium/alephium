@@ -393,12 +393,16 @@ object AlephiumConfig {
         val consensusExtracted = consensus.toConsensusSettings(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
-          discovery.copy(bootstrap =
-            ArraySeq(
-              new InetSocketAddress("bootstrap0.testnet.alephium.org", 9973),
-              new InetSocketAddress("bootstrap1.testnet.alephium.org", 9973)
+          if (discovery.bootstrap.isEmpty) {
+            discovery.copy(bootstrap =
+              ArraySeq(
+                new InetSocketAddress("bootstrap0.testnet.alephium.org", 9973),
+                new InetSocketAddress("bootstrap1.testnet.alephium.org", 9973)
+              )
             )
-          )
+          } else {
+            discovery
+          }
         } else {
           discovery
         }
