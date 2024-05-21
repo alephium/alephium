@@ -98,10 +98,13 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         case Right(hashes) => hashes
         case Left(error)   => throw error
       }
-      val newAcc = if (acc.contains(header.hash)) acc else acc :+ header.hash
-      uncles.fold(newAcc) { case (acc, uncleHash) =>
-        val uncleHeader = getBlockHeaderUnsafe(uncleHash)
-        getHashWithUncleDepsUnsafe(uncleHeader, acc)
+      if (acc.contains(header.hash)) {
+        acc
+      } else {
+        uncles.fold(acc :+ header.hash) { case (acc, uncleHash) =>
+          val uncleHeader = getBlockHeaderUnsafe(uncleHash)
+          getHashWithUncleDepsUnsafe(uncleHeader, acc)
+        }
       }
     } else {
       acc :+ header.hash
