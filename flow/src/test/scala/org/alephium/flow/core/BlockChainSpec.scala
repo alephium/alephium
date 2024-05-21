@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
@@ -1008,5 +1010,26 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       block1.hash,
       block0.hash
     ).reverse
+  }
+
+  it should "get empty blocks if the height of the best tip is less than the height of the locator" in new Fixture {
+    val chainIndex = genesis.chainIndex
+    val blockChain = buildBlockChain()
+    val blocks = AVector.from(0 until 4).map { _ =>
+      val parentHash = blockChain.getBestTipUnsafe()
+      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
+      addBlock(blockChain, block)
+      block
+    }
+    blockChain.maxHeightUnsafe is 4
+    blockChain.getBestTipUnsafe() is blocks.last.hash
+    val tipWeight = blockChain.getStateUnsafe(blocks.last.hash).weight
+
+    val block = blockGen(chainIndex, TimeStamp.now(), genesis.hash).sample.get
+    blockChain.add(block, tipWeight + Weight(BigInteger.ONE)).isRight is true
+    blockChain.maxHeightUnsafe is 1
+    blockChain.getBestTipUnsafe() is block.hash
+
+    blockChain.getSyncDataUnsafe(AVector(blocks.last.hash)).isEmpty is true
   }
 }

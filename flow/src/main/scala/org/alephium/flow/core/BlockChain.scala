@@ -130,12 +130,13 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     val uncleHeightTo = math.min(heightFrom + ALPH.MaxGhostUncleAge - 1, heightTo)
     val hashes = AVector
       .from(heightFrom to uncleHeightTo)
-      .fold(AVector.ofCapacity[BlockHash](heightTo - heightFrom + 1)) { case (acc, height) =>
-        val hashes = getHashesUnsafe(height)
-        hashes.fold(acc) { case (acc, hash) =>
-          val header = getBlockHeaderUnsafe(hash)
-          getHashWithUncleDepsUnsafe(header, acc)
-        }
+      .fold(AVector.ofCapacity[BlockHash](Math.max(heightTo - heightFrom + 1, 0))) {
+        case (acc, height) =>
+          val hashes = getHashesUnsafe(height)
+          hashes.fold(acc) { case (acc, hash) =>
+            val header = getBlockHeaderUnsafe(hash)
+            getHashWithUncleDepsUnsafe(header, acc)
+          }
       }
     if (uncleHeightTo < heightTo) {
       hashes ++ AVector.from((uncleHeightTo + 1) to heightTo).flatMap(getHashesUnsafe)
