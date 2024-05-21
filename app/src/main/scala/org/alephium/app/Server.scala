@@ -117,7 +117,8 @@ object Server {
 
     val dbPath                = rootPath.resolve(config.network.networkId.nodeFolder)
     val storageFolder: String = "db"
-    val writeOptions = if (config.node.dbSyncWrite) ProdSettings.syncWrite else ProdSettings.writeOptions
+    val writeOptions =
+      if (config.node.dbSyncWrite) ProdSettings.syncWrite else ProdSettings.writeOptions
 
     val storages: Storages =
       Storages.createUnsafe(dbPath, storageFolder, writeOptions)(config.broker, config.node)

@@ -23,7 +23,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.rocksdb._
 import org.rocksdb.util.{SizeUnit, StdErrLogger}
 
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Env => AEnv}
 
 object RocksDBSource {
   import IOUtils.tryExecute
@@ -51,6 +51,44 @@ object RocksDBSource {
   }
 
   // scalastyle:off magic.number
+  object TestSettings {
+    RocksDB.loadLibrary()
+
+    val readOptions: ReadOptions   = (new ReadOptions).setVerifyChecksums(false)
+    val writeOptions: WriteOptions = new WriteOptions
+    val syncWrite: WriteOptions    = (new WriteOptions).setSync(true)
+
+    def databaseOptions(): DBOptions = {
+      new DBOptions()
+        .setUseFsync(false)
+        .setCreateIfMissing(true)
+        .setCreateMissingColumnFamilies(true)
+        .setMaxOpenFiles(512)
+        .setKeepLogFileNum(1)
+        .setBytesPerSync(1 * SizeUnit.MB)
+        .setDbWriteBufferSize(8 * SizeUnit.MB)
+        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime.availableProcessors() / 2))
+        .setRateLimiter(new RateLimiter(16 * SizeUnit.MB))
+    }
+
+    def columnOptions(): ColumnFamilyOptions = {
+      import scala.jdk.CollectionConverters._
+
+      (new ColumnFamilyOptions)
+        .setLevelCompactionDynamicLevelBytes(true)
+        .setTableFormatConfig(
+          new BlockBasedTableConfig()
+            .setBlockSize(64 * SizeUnit.KB)
+            .setBlockCache(new LRUCache(5 * SizeUnit.MB))
+            .setCacheIndexAndFilterBlocks(true)
+            .setPinL0FilterAndIndexBlocksInCache(true)
+        )
+        .optimizeLevelStyleCompaction(8 * SizeUnit.MB)
+        .setTargetFileSizeBase(256 * SizeUnit.MB)
+        .setCompressionPerLevel(Nil.asJava)
+    }
+  }
+
   object ProdSettings {
     RocksDB.loadLibrary()
 
@@ -106,15 +144,17 @@ object RocksDBSource {
       openUnsafe(path)
     }
 
-  def openUnsafe(path: Path): RocksDBSource =
-    openUnsafeWithOptions(
-      path,
-      ProdSettings.databaseOptions(),
-      ProdSettings.columnOptions
-    )
+  def openUnsafe(path: Path): RocksDBSource = {
+    val (databaseOptions, columnOptions) = AEnv.resolve() match {
+      case AEnv.Test =>
+        (TestSettings.databaseOptions(), (_: Boolean) => TestSettings.columnOptions())
+      case _ => (ProdSettings.databaseOptions(), ProdSettings.columnOptions)
+    }
+    openUnsafeWithOptions(path, databaseOptions, columnOptions)
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def openUnsafeWithOptions(
+  private def openUnsafeWithOptions(
       path: Path,
       databaseOptions: DBOptions,
       columnOptions: (Boolean) => ColumnFamilyOptions
