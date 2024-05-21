@@ -123,6 +123,9 @@ class BlockChainHandler(
       case Right(false) =>
         origin match {
           case DataOrigin.InterClique(brokerInfo) =>
+            log.warning(
+              s"Received invalid block from ${brokerInfo.address}, block hash: ${block.hash.toHexString}"
+            )
             publishEvent(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
           case _ =>
             log.error(s"Received invalid block from $origin, block hash: ${block.hash.toHexString}")

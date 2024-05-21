@@ -27,7 +27,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.{InvalidBlockVersion, InvalidTxsMerkleRoot}
+import org.alephium.flow.validation.{InvalidBlockHeight, InvalidBlockVersion, InvalidTxsMerkleRoot}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, CliqueId}
 import org.alephium.serde.serialize
@@ -240,13 +240,17 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     blockChainHandler ! BlockChainHandler.Validate(invalidForkedBlock, broker, dataOrigin)
     eventually {
-      brokerProbe.expectNoMessage()
+      brokerProbe.expectMsg(
+        BlockChainHandler.InvalidBlock(invalidForkedBlock.hash, InvalidBlockHeight)
+      )
       listener.expectMsg(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
     }
 
     blockChainHandler ! BlockChainHandler.Validate(invalidForkedBlock, broker, DataOrigin.Local)
     eventually {
-      brokerProbe.expectNoMessage()
+      brokerProbe.expectMsg(
+        BlockChainHandler.InvalidBlock(invalidForkedBlock.hash, InvalidBlockHeight)
+      )
       listener.expectNoMessage()
     }
   }
