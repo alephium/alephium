@@ -51,7 +51,7 @@ object RocksDBSource {
   }
 
   // scalastyle:off magic.number
-  object Settings {
+  object ProdSettings {
     RocksDB.loadLibrary()
 
     val readOptions: ReadOptions = (new ReadOptions).setVerifyChecksums(false)
@@ -109,8 +109,8 @@ object RocksDBSource {
   def openUnsafe(path: Path): RocksDBSource =
     openUnsafeWithOptions(
       path,
-      Settings.databaseOptions(),
-      Settings.columnOptions
+      ProdSettings.databaseOptions(),
+      ProdSettings.columnOptions
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

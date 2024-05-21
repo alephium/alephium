@@ -22,17 +22,17 @@ import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch, WriteOptions}
 
 object RocksDBColumn {
-  import RocksDBSource.Settings
+  import RocksDBSource.ProdSettings
 
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): RocksDBColumn =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+    apply(storage, cf, ProdSettings.writeOptions, ProdSettings.readOptions)
 
   def apply(
       storage: RocksDBSource,
       cf: RocksDBSource.ColumnFamily,
       writeOptions: WriteOptions
   ): RocksDBColumn =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+    apply(storage, cf, writeOptions, ProdSettings.readOptions)
 
   def apply(
       storage: RocksDBSource,
