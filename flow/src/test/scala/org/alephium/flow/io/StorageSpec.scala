@@ -30,7 +30,7 @@ trait StorageSpec[S] extends AlephiumSpec with BeforeAndAfterEach {
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    source = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    source = RocksDBSource.openUnsafe(dbPath)
     storage = builder(source)
   }
 

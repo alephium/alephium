@@ -20,7 +20,7 @@ import akka.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
-import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
+import org.alephium.io.RocksDBSource.{ColumnFamily, ProdSettings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{ContractStorageImmutableState, WorldState}
@@ -67,7 +67,7 @@ object WorldStateRockDBStorage {
       storage,
       cf,
       writeOptions,
-      Settings.readOptions
+      ProdSettings.readOptions
     )
   }
 }

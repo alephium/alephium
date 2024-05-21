@@ -25,7 +25,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSettings, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -123,7 +123,7 @@ object BlockFlow extends StrictLogging {
 
   def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
     val storages =
-      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, Settings.writeOptions)(
+      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, ProdSettings.writeOptions)(
         config.broker,
         config.node
       )
