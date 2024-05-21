@@ -85,8 +85,8 @@ class ReleaseVersionSpec extends AlephiumSpec {
       implicit val config = buildNetworkConfig(NetworkId.AlephiumTestNet, now.plusHoursUnsafe(1))
       config.getHardFork(now) is HardFork.Leman
       ReleaseVersion.checkClientId("xxx") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.8.1/Linux") is true
       ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
       ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
     }
 
@@ -95,8 +95,8 @@ class ReleaseVersionSpec extends AlephiumSpec {
       implicit val config = buildNetworkConfig(NetworkId.AlephiumTestNet, now.plusHoursUnsafe(-1))
       config.getHardFork(now) is HardFork.Rhone
       ReleaseVersion.checkClientId("xxx") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.8.1/Linux") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
       ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
     }
   }
