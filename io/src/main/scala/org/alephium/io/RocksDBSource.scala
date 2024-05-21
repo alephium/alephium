@@ -17,7 +17,7 @@
 package org.alephium.io
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 
 import com.typesafe.scalalogging.LazyLogging
 import org.rocksdb._
@@ -128,6 +128,8 @@ object RocksDBSource {
         columnOptions(name == ColumnFamily.Trie.name)
       )
     }
+
+    if (!Files.exists(path)) path.toFile.mkdir()
 
     val db = RocksDB.open(
       databaseOptions,
