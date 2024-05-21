@@ -23,12 +23,13 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.actor.Props
 
-import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
+import org.alephium.flow.core.{maxForkDepth => systemMaxForkDepth, maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
-import org.alephium.util.EventStream.Subscriber
+import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object DependencyHandler {
   def props(
@@ -56,8 +57,8 @@ object DependencyHandler {
 
 class DependencyHandler(
     val blockFlow: BlockFlow,
-    blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+    val blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
+    val headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
 )(implicit val networkSetting: NetworkSetting)
     extends DependencyHandlerState
     with Subscriber {
@@ -78,24 +79,16 @@ class DependencyHandler(
     case GetPendings =>
       sender() ! Pendings(AVector.from(pending.keys()))
   }
-
-  def processReadies(): Unit = {
-    val readies = extractReadies()
-    readies.foreach {
-      case PendingStatus(block: Block, broker, origin, _) =>
-        blockHandlers(block.chainIndex) ! BlockChainHandler.Validate(block, broker, origin)
-      case PendingStatus(header: BlockHeader, broker, origin, _) =>
-        headerHandlers(header.chainIndex) ! HeaderChainHandler.Validate(header, broker, origin)
-      case _ => () // dead branch
-    }
-  }
 }
 
-trait DependencyHandlerState extends IOBaseActor {
+trait DependencyHandlerState extends IOBaseActor with Publisher {
   import DependencyHandler.PendingStatus
 
   def blockFlow: BlockFlow
+  def blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]]
+  def headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
   def networkSetting: NetworkSetting
+  val maxForkDepth: Int = systemMaxForkDepth
 
   val cacheSize =
     maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 2
@@ -178,6 +171,40 @@ trait DependencyHandlerState extends IOBaseActor {
     processing.addAll(readies)
     readies.clear()
     result
+  }
+
+  @inline private def processReadyBlock(
+      block: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
+    val blockChain = blockFlow.getBlockChain(block.chainIndex)
+    blockChain.validateBlockHeight(block, maxForkDepth) match {
+      case Right(true) =>
+        blockHandlers(block.chainIndex) ! BlockChainHandler.Validate(block, broker, origin)
+      case Right(false) =>
+        origin match {
+          case DataOrigin.InterClique(brokerInfo) =>
+            publishEvent(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
+          case _ =>
+            log.error(s"Received invalid block from $origin, block hash: ${block.hash.toHexString}")
+        }
+        removePending(block.hash)
+      case Left(error) => // this should never happen
+        log.error(s"IO error in validating block height: $error")
+        removePending(block.hash)
+    }
+  }
+
+  def processReadies(): Unit = {
+    val readies = extractReadies()
+    readies.foreach {
+      case PendingStatus(block: Block, broker, origin, _) =>
+        processReadyBlock(block, broker, origin)
+      case PendingStatus(header: BlockHeader, broker, origin, _) =>
+        headerHandlers(header.chainIndex) ! HeaderChainHandler.Validate(header, broker, origin)
+      case _ => () // dead branch
+    }
   }
 
   def uponDataProcessed(data: FlowData): Unit = {

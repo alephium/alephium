@@ -16,6 +16,8 @@
 
 package org.alephium.flow.handler
 
+import java.net.InetSocketAddress
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -25,6 +27,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
@@ -34,13 +37,39 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     lazy val brokerProbe = TestProbe()
     lazy val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)
     lazy val origin      = DataOrigin.Local
+    lazy val blockHandlerProbes = {
+      val handlers = for {
+        from <- 0 until brokerConfig.groups
+        to   <- 0 until brokerConfig.groups
+        chainIndex = ChainIndex.unsafe(from, to)
+        if chainIndex.relateTo(brokerConfig)
+      } yield chainIndex -> TestProbe()
+      handlers.toMap
+    }
+    lazy val headerHandlerProbes = {
+      val handlers = for {
+        from <- 0 until brokerConfig.groups
+        to   <- 0 until brokerConfig.groups
+        chainIndex = ChainIndex.unsafe(from, to)
+        if !chainIndex.relateTo(brokerConfig)
+      } yield chainIndex -> TestProbe()
+      handlers.toMap
+    }
 
+    val maxForkDepth = 5
     lazy val stateActor = TestActorRef[DependencyHandlerState](
       Props(
         new DependencyHandlerState {
           override def blockFlow: BlockFlow           = Self.blockFlow
           override def networkSetting: NetworkSetting = Self.networkConfig
           override def receive: Receive               = _ => ()
+          override val maxForkDepth                   = Self.maxForkDepth
+          override def blockHandlers =
+            Self.blockHandlerProbes.map(v => (v._1, ActorRefT[BlockChainHandler.Command](v._2.ref)))
+          override def headerHandlers =
+            Self.headerHandlerProbes.map(v =>
+              (v._1, ActorRefT[HeaderChainHandler.Command](v._2.ref))
+            )
         }
       )
     )
@@ -400,5 +429,51 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.missingIndex.isEmpty is true
     state.extractReadies()
     state.readies.isEmpty is true
+  }
+
+  it should "publish misbehavior when receiving deep forked blocks from remote" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val chainIndex         = ChainIndex.unsafe(0, 0)
+    val invalidForkedBlock = emptyBlock(blockFlow, chainIndex)
+    val listener           = TestProbe()
+    val blockChain         = blockFlow.getBlockChain(chainIndex)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    blockChain.maxHeightUnsafe is 2
+    val validForkedBlock = emptyBlock(blockFlow, chainIndex)
+    (0 until maxForkDepth).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+    blockChain.maxHeightUnsafe is (2 + maxForkDepth)
+
+    val brokerInfo = BrokerInfo.unsafe(CliqueId.zero, 0, 1, new InetSocketAddress("127.0.0.1", 0))
+    val dataOrigin = DataOrigin.InterClique(brokerInfo)
+    val handler    = blockHandlerProbes(chainIndex)
+    state.addPendingData(validForkedBlock, broker, dataOrigin)
+    state.processReadies()
+    eventually {
+      handler.expectMsg(BlockChainHandler.Validate(validForkedBlock, broker, dataOrigin))
+      state.pending.contains(validForkedBlock.hash) is true
+      state.processing.contains(validForkedBlock.hash) is true
+    }
+
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    state.addPendingData(invalidForkedBlock, broker, dataOrigin)
+    state.processReadies()
+    eventually {
+      listener.expectMsg(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
+      handler.expectNoMessage()
+      state.pending.contains(invalidForkedBlock.hash) is false
+      state.processing.contains(invalidForkedBlock.hash) is false
+    }
+
+    state.addPendingData(invalidForkedBlock, broker, DataOrigin.Local)
+    state.processReadies()
+    eventually {
+      listener.expectNoMessage()
+      handler.expectNoMessage()
+      state.pending.contains(invalidForkedBlock.hash) is false
+      state.processing.contains(invalidForkedBlock.hash) is false
+    }
   }
 }
