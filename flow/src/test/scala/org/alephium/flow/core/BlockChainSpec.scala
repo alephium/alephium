@@ -1043,20 +1043,6 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     }
   }
 
-  it should "check recent height" in new Fixture {
-    val blockNum = consensusConfigs.recentBlockHeightDiff + 5
-    val chain    = buildBlockChain()
-    addChain(chain, blockNum)
-    addMaxWeightBlock(chain)
-
-    (0 until 5).foreach { height =>
-      chain.isRecentHeight(height) isE false
-    }
-    (5 until blockNum).foreach { height =>
-      chain.isRecentHeight(height) isE true
-    }
-  }
-
   it should "get latest hashes based on max height" in new Fixture {
     val chain          = buildBlockChain()
     val blocks0        = addChain(chain, 25)
@@ -1074,5 +1060,59 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       AVector(result0(index), blocks1(index).hash)
     } ++ result0.drop(forkChainLength)
     chain.getLatestHashesUnsafe() is result1
+  }
+
+  it should "test getSyncDataFromHeightUnsafe" in new Fixture {
+    val chain      = buildBlockChain()
+    val chainIndex = chain.chainIndex
+    val blocks0    = chainGenOf(chainIndex, 10, genesis.hash, TimeStamp.now()).sample.get
+    val blocks1    = chainGenOf(chainIndex, 5, genesis.hash, TimeStamp.now()).sample.get
+    addBlocks(chain, blocks0)
+    addBlocks(chain, blocks1)
+    chain.maxHeightUnsafe is 10
+
+    (1 to 5).foreach { height =>
+      val hashes0 = AVector.from(height to 5).flatMap { height =>
+        AVector(blocks0(height - 1).hash, blocks1(height - 1).hash)
+      }
+      chain.getSyncDataFromHeightUnsafe(height) is hashes0 ++ blocks0.drop(5).map(_.hash)
+    }
+    (6 to 10).foreach { height =>
+      chain.getSyncDataFromHeightUnsafe(height) is blocks0.drop(height - 1).map(_.hash)
+    }
+
+    val recentHeightDiff = consensusConfigs.recentBlockHeightDiff
+    val blocks2          = chainGenOf(chainIndex, recentHeightDiff, blocks0.last).sample.get
+    val blocks3          = chainGenOf(chainIndex, recentHeightDiff, blocks1.last).sample.get
+    addBlocks(chain, blocks2)
+    addBlocks(chain, blocks3)
+    chain.maxHeightUnsafe is recentHeightDiff + 10
+
+    var fork0 = blocks0 ++ blocks2
+    val fork1 = blocks1 ++ blocks3
+    val hashes0 = AVector.from(10 to chain.maxHeightUnsafe - 5).flatMap { height =>
+      AVector(fork0(height - 1).hash, fork1(height - 1).hash)
+    }
+    (1 to 9).foreach { height =>
+      chain.getSyncDataFromHeightUnsafe(height) is
+        fork0.slice(height - 1, 9).map(_.hash) ++ hashes0 ++ fork0.takeRight(5).map(_.hash)
+    }
+    (10 to chain.maxHeightUnsafe - 5).foreach { height =>
+      chain.getSyncDataFromHeightUnsafe(height) is
+        hashes0.drop((height - 10) * 2) ++ fork0.takeRight(5).map(_.hash)
+    }
+    (chain.maxHeightUnsafe - 4 to chain.maxHeightUnsafe).foreach { height =>
+      chain.getSyncDataFromHeightUnsafe(height) is
+        fork0.takeRight(chain.maxHeightUnsafe - height + 1).map(_.hash)
+    }
+
+    val blocks4 = chainGenOf(chainIndex, maxSyncBlocksPerChain, blocks2.last).sample.get
+    fork0 = fork0 ++ blocks4
+    addBlocks(chain, blocks4)
+    chain.maxHeightUnsafe is 10 + recentHeightDiff + maxSyncBlocksPerChain
+    (1 to 9).foreach { from =>
+      val to = from + maxSyncBlocksPerChain
+      chain.getSyncDataFromHeightUnsafe(from) is fork0.slice(from - 1, to).map(_.hash)
+    }
   }
 }

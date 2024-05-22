@@ -74,16 +74,19 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
-    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
-    if (Utils.unsafe(isRecentHeight(heightFrom))) {
+    val maxHeight    = maxHeightUnsafe
+    val heightTo     = math.min(heightFrom + maxSyncBlocksPerChain, maxHeight)
+    val recentHeight = maxHeight - consensusConfigs.recentBlockHeightDiff
+    if (heightFrom >= recentHeight) {
       getRecentDataUnsafe(heightFrom, heightTo)
     } else {
-      getSyncDataUnsafe(heightFrom, heightTo)
+      if (recentHeight > heightTo) {
+        getSyncDataUnsafe(heightFrom, heightTo)
+      } else {
+        getSyncDataUnsafe(heightFrom, recentHeight - 1) ++
+          getRecentDataUnsafe(recentHeight, heightTo)
+      }
     }
-  }
-
-  def isRecentHeight(height: Int): IOResult[Boolean] = {
-    maxHeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
