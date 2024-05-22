@@ -46,7 +46,14 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
 
     val prefix = CoinbaseDataPrefix.from(chainIndexGen.sample.get, TimeStamp.now())
     test(prefix, ByteString.empty)
-    test(prefix, ByteString.fromArrayUnsafe(Random.nextBytes(40)))
+
+    @scala.annotation.tailrec
+    def randomMinerData(maxSize: Int): Array[Byte] = {
+      val bytes = Random.nextBytes(Random.nextInt(maxSize))
+      // if the first byte is 0, then it will decode an empty AVector
+      if (bytes.nonEmpty && bytes(0) == 0) randomMinerData(maxSize) else bytes
+    }
+    test(prefix, ByteString.fromArrayUnsafe(randomMinerData(40)))
   }
 
   it should "serde CoinbaseDataV2" in new NoIndexModelGenerators with NetworkConfigFixture.RhoneT {
