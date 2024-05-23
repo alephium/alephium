@@ -132,6 +132,17 @@ trait FlowFixture
   def transfer(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
+      blockTs: TimeStamp
+  ): Block = {
+    val (_, toPublicKey) = chainIndex.to.generateKey
+    val miner            = LockupScript.p2pkh(toPublicKey)
+    val txs =
+      transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None)
+    mine(blockFlow, chainIndex, txs, miner, Some(blockTs))
+  }
+  def transfer(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
       amount: U256 = ALPH.alph(1),
       numReceivers: Int = 1,
       gasFeeInTheAmount: Boolean = true,
@@ -433,11 +444,22 @@ trait FlowFixture
   def mineWithTxsAndMiner(blockFlow: BlockFlow, chainIndex: ChainIndex, miner: LockupScript.Asset)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
   ): Block = {
-    val deps     = blockFlow.calBestDepsUnsafe(chainIndex.from)
-    val txs      = prepareTxs(blockFlow, chainIndex)
-    val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
-    val blockTs  = FlowUtils.nextTimeStamp(parentTs)
+    val txs = prepareTxs(blockFlow, chainIndex)
+    mine(blockFlow, chainIndex, txs, miner, None)
+  }
 
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      txs: AVector[Transaction],
+      miner: LockupScript.Asset,
+      timestamp: Option[TimeStamp]
+  ): Block = {
+    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val blockTs = timestamp.getOrElse {
+      val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
+      FlowUtils.nextTimeStamp(parentTs)
+    }
     val target = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
     val coinbaseTx =
       Transaction.powCoinbaseForTest(chainIndex, txs, miner, target, blockTs, AVector.empty)

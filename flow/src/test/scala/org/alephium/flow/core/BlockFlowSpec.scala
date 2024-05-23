@@ -975,10 +975,16 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "support sequential transactions" in new FlowFixture with Generators {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
+    var now = TimeStamp.now()
+    def nextBlockTs: TimeStamp = {
+      now = now.plusMillisUnsafe(1)
+      now
+    }
+
     forAll(groupIndexGen, groupIndexGen, groupIndexGen) { case (fromGroup, toGroup0, toGroup1) =>
-      val block0 = transfer(blockFlow, ChainIndex(fromGroup, toGroup0))
+      val block0 = transfer(blockFlow, ChainIndex(fromGroup, toGroup0), nextBlockTs)
       addAndCheck(blockFlow, block0)
-      val block1 = transfer(blockFlow, ChainIndex(fromGroup, toGroup1))
+      val block1 = transfer(blockFlow, ChainIndex(fromGroup, toGroup1), nextBlockTs)
       addAndCheck(blockFlow, block1)
     }
   }
