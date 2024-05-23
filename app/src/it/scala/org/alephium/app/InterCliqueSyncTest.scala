@@ -17,6 +17,7 @@
 package org.alephium.app
 
 import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -24,7 +25,7 @@ import scala.util.{Failure, Random, Success}
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp
-import akka.util.ByteString
+import akka.util.{ByteString, Timeout}
 
 import org.alephium.api.model._
 import org.alephium.flow.mining.{ClientMessage, SubmitBlock}
@@ -314,10 +315,15 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "sync ghost uncle blocks" in new CliqueFixture {
-    val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
-
+    case object GetSubmittedBlocks
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {
-      private val allBlocks = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
+      private val allBlocks          = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
+      private val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
+
+      override def receive: Receive = super.receive orElse handleGetSubmittedBlocks
+      private def handleGetSubmittedBlocks: Receive = { case GetSubmittedBlocks =>
+        sender() ! allSubmittedBlocks.toSeq
+      }
 
       private def publishBlocks(blocks: mutable.ArrayBuffer[Block]): Unit = {
         // avoid overflowing the DependencyHandler pending cache
@@ -368,14 +374,21 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
     Thread.sleep(50 * 1000)
 
-    val blocks = allSubmittedBlocks.toSeq
-    blocks.nonEmpty is true
-    blocks.foreach { block =>
-      eventually {
-        val response = request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
-        response.toProtocol()(networkConfig).rightValue.header is block.header
-      }
-    }
+    miner
+      .ask(GetSubmittedBlocks)(Timeout.apply(5, TimeUnit.SECONDS))
+      .mapTo[Seq[Block]]
+      .onComplete {
+        case Success(blocks) =>
+          blocks.nonEmpty is true
+          blocks.foreach { block =>
+            eventually {
+              val response =
+                request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
+              response.toProtocol()(networkConfig).rightValue.header is block.header
+            }
+          }
+        case Failure(error) => throw error
+      }(server0.flowSystem.dispatcher)
 
     miner ! Miner.Stop
 
