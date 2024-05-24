@@ -439,13 +439,24 @@ class ServerUtils(implicit
     } yield count
   }
 
+  private def handleBlockError(blockHash: BlockHash, error: IOError) = {
+    error match {
+      case _: IOError.KeyNotFound =>
+        failed(
+          s"The block ${blockHash.toHexString} does not exist, please check if your full node synced"
+        )
+      case other =>
+        failed(s"Fail fetching block with hash ${blockHash.toHexString}, error: $other")
+    }
+  }
+
   def getBlock(blockFlow: BlockFlow, hash: BlockHash): Try[BlockEntry] =
     for {
       _ <- checkHashChainIndex(hash)
       block <- blockFlow
         .getBlock(hash)
         .left
-        .map(_ => failed(s"Fail fetching block with header ${hash.toHexString}"))
+        .map(handleBlockError(hash, _))
       height <- blockFlow
         .getHeight(block.header)
         .left
@@ -462,12 +473,22 @@ class ServerUtils(implicit
       result <- blockFlow
         .getMainChainBlockByGhostUncle(chainIndex, ghostUncleHash)
         .left
-        .map(_ =>
-          failed(s"Fail fetching mainchain block by ghost uncle hash ${ghostUncleHash.toHexString}")
-        )
-      blockEntry <- result
-        .toRight(notFound(s"Mainchain block by ghost uncle hash ${ghostUncleHash.toHexString}"))
-        .flatMap { case (block, height) => BlockEntry.from(block, height).left.map(failed) }
+        .map(handleBlockError(ghostUncleHash, _))
+      blockEntry <- result match {
+        case None =>
+          isBlockInMainChain(blockFlow, ghostUncleHash).flatMap { isMainChainBlock =>
+            if (isMainChainBlock) {
+              val message =
+                s"The block ${ghostUncleHash.toHexString} is not a ghost uncle block, you should use a ghost uncle block hash to call this endpoint"
+              Left(failed(message))
+            } else {
+              val resource =
+                s"The mainchain block that references the ghost uncle block ${ghostUncleHash.toHexString}"
+              Left(notFound(resource))
+            }
+          }
+        case Some((block, height)) => BlockEntry.from(block, height).left.map(failed)
+      }
     } yield blockEntry
 
   def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
@@ -481,7 +502,7 @@ class ServerUtils(implicit
       height <- blockFlow
         .getHeight(blockHash)
         .left
-        .map(_ => failed(s"Fail fetching block height with hash ${blockHash.toHexString}"))
+        .map(handleBlockError(blockHash, _))
       hashes <- blockFlow
         .getHashes(ChainIndex.from(blockHash), height)
         .left
@@ -494,7 +515,7 @@ class ServerUtils(implicit
       blockHeader <- blockFlow
         .getBlockHeader(hash)
         .left
-        .map(_ => failed(s"Fail fetching block header with hash ${hash}"))
+        .map(handleBlockError(hash, _))
       height <- blockFlow
         .getHeight(hash)
         .left
