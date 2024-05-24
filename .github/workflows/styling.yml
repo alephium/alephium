@@ -14,7 +14,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 11
           cache: sbt
       - run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck it:scalafmtCheck scalastyle test:scalastyle it:scalastyle doc
       - run: make assembly
