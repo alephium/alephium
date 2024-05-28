@@ -12794,7 +12794,8 @@
         ],
         "properties": {
           "data": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           }
         }
       },
