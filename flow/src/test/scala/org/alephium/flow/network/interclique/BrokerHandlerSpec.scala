@@ -37,13 +37,8 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{
-  BlockHash,
-  ChainIndex,
-  CliqueInfo,
-  NoIndexModelGeneratorsLike,
-  TransactionId
-}
+import org.alephium.protocol.model._
+import org.alephium.serde.serialize
 import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {
@@ -101,7 +96,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "not mark block seen when receive BlocksResponse/HeadersResponse/InvResponse" in new Fixture {
     val block = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(BlocksResponse(RequestId.random(), AVector(block)))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksResponse.fromBlockBytes(RequestId.random(), AVector(serialize(block)))
+    )
     eventually(brokerHandlerActor.seenBlocks.contains(block.hash)) is false
 
     val blockHeader = emptyBlock(blockFlow, chainIndex).header
@@ -128,7 +125,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.cacheHeaderVerifiedBlock(block)
     requestBlocks()
     connectionHandler.expectMsg {
-      val payload = BlocksResponse(requestId, AVector(block))
+      val payload = BlocksResponse.fromBlockBytes(requestId, AVector(serialize(block)))
       ConnectionHandler.Send(Message.serialize(payload))
     }
   }

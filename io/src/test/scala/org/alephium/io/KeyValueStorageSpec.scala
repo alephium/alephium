@@ -17,6 +17,7 @@
 package org.alephium.io
 
 import org.alephium.crypto.{Blake2b => Hash}
+import org.alephium.serde.serialize
 import org.alephium.util.AlephiumSpec
 
 class KeyValueStorageSpec extends AlephiumSpec {
@@ -34,6 +35,7 @@ class KeyValueStorageSpec extends AlephiumSpec {
     }
     pairs.foreach { case (key, value) =>
       db.get(key) isE value
+      db.getRawUnsafe(key) is serialize(value)
     }
 
     db.multiGetUnsafe(keys) is values

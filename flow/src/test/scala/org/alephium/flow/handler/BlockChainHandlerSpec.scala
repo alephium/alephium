@@ -167,7 +167,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
       blockMsg(invalidBlock),
       dataOrigin
     )
-    blockFlow.getHeaderVerifiedBlock(invalidBlock.hash) isE invalidBlock
+    blockFlow.getHeaderVerifiedBlockBytes(invalidBlock.hash) isE serialize(invalidBlock)
     blockFlow.getBlock(invalidBlock.hash).isLeft is true
     interCliqueListener.expectMsg(interCliqueMessage)
     intraCliqueListener.expectNoMessage()

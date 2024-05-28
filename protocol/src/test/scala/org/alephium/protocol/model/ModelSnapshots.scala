@@ -34,7 +34,7 @@ trait ModelSnapshots extends AlephiumFixture with OptionValues {
   implicit class SnapshotVerifier[T: Serde](model: T)(implicit
       baseDir: String
   ) {
-    def verify(name: String): ByteString = {
+    def verify(name: String, f: T => T = identity): ByteString = {
       val filePath = Paths.get(s"$baseDir/$name.serialized.txt")
       if (!Files.exists(filePath)) {
         serializeAndWrite(filePath)
@@ -43,7 +43,7 @@ trait ModelSnapshots extends AlephiumFixture with OptionValues {
       val serialized = Hex.from(readFile(filePath)).value
 
       serialize(model) is serialized
-      deserialize[T](serialized) isE model
+      deserialize[T](serialized) isE f(model)
 
       serialized
     }
