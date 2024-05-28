@@ -68,6 +68,8 @@ trait KeyValueStorage[K, V]
     }
   }
 
+  def getRawUnsafe(key: K): ByteString = getRawUnsafe(storageKey(key))
+
   def getOpt(key: K): IOResult[Option[V]] = IOUtils.tryExecute(getOptUnsafe(key))
 
   def getOptUnsafe(key: K): Option[V] = {

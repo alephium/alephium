@@ -18,6 +18,8 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import akka.util.ByteString
+
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
@@ -27,7 +29,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.serde.Serde
+import org.alephium.serde.{serialize, Serde}
 import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -59,6 +61,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getBlockUnsafe(hash: BlockHash): Block = {
     blockCache.getUnsafe(hash)(blockStorage.getUnsafe(hash))
+  }
+
+  def getBlockBytes(hash: BlockHash): IOResult[ByteString] = {
+    IOUtils.tryExecute(getBlockBytesUnsafe(hash))
+  }
+
+  def getBlockBytesUnsafe(hash: BlockHash): ByteString = {
+    blockCache.get(hash).map(serialize(_)).getOrElse(blockStorage.getRawUnsafe(hash))
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {

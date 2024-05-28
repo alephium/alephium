@@ -145,17 +145,24 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         block2.hash.bytes
     }
 
-    val blocksResponse = BlocksResponse(requestId, AVector(block1))
-    verifySerde(blocksResponse) {
+    val blocksResponse0 = BlocksResponse.fromBlocks(requestId, AVector(block1, block2))
+    val blob =
       // code id
       hex"04" ++
         // request id
         hex"01" ++
         // number of blocks
-        hex"01" ++
+        hex"02" ++
         // block 1
-        serialize(block1)
-    }
+        serialize(block1) ++
+        // block 2
+        serialize(block2)
+    verifySerde(blocksResponse0)(blob)
+
+    val blocksResponse1 =
+      BlocksResponse.fromBlockBytes(requestId, AVector(block1, block2).map(serialize(_)))
+    Payload.serialize(blocksResponse1) is blob
+    Payload.deserialize(blob) isE blocksResponse0
   }
 
   it should "serialize/deserialize the HeadersRequest/HeadersResponse payload" in {
@@ -434,8 +441,11 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val blockRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
     blockRequest.asInstanceOf[Payload].verify("block-request")
 
-    val blockResponse = BlocksResponse(requestId, AVector(block1, block2))
-    blockResponse.asInstanceOf[Payload].verify("block-response")
+    val blockResponse0 = BlocksResponse.fromBlocks(requestId, AVector(block1, block2))
+    blockResponse0.asInstanceOf[Payload].verify("block-response")
+    val blockResponse1 =
+      BlocksResponse.fromBlockBytes(requestId, AVector(block1, block2).map(serialize(_)))
+    blockResponse1.asInstanceOf[Payload].verify("block-response", _ => blockResponse0)
 
     info("headers request / headers response")
 

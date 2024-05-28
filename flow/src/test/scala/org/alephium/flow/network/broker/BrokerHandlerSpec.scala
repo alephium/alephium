@@ -23,7 +23,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, HeaderChainHandler}
+import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
@@ -167,6 +167,20 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     connectionHandler.expectMsg(ConnectionHandler.Send(Message.serialize(response)))
   }
 
+  it should "handle blocks response" in new Fixture {
+    receivedHandshakeMessage()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    val response = BlocksResponse.fromBlocks(RequestId.random(), AVector(block))
+    brokerHandler ! BrokerHandler.Received(response)
+    eventually {
+      allHandlerProbes.dependencyHandler.expectMsg(
+        DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
+      )
+    }
+  }
+
   trait Fixture extends FlowFixture with Generators {
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
@@ -175,6 +189,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     val (priKey, pubKey)      = SignatureSchema.secureGeneratePriPub()
     val pingFrequency         = Duration.ofSecondsUnsafe(10)
 
+    lazy val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     lazy val brokerHandler = {
       val handler = TestActorRef[TestBrokerHandler](
         TestBrokerHandler.props(
@@ -182,7 +197,8 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
           remoteAddress,
           connectionHandler.ref,
           blockFlowSynchronizer.ref,
-          blockFlow
+          blockFlow,
+          allHandlers
         )
       )
       val message = Message.serialize(handler.underlyingActor.handShakeMessage)
@@ -208,7 +224,8 @@ object TestBrokerHandler {
       remoteAddress: InetSocketAddress,
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
       blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-      blockflow: BlockFlow
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
     Props(
       new TestBrokerHandler(
@@ -216,7 +233,8 @@ object TestBrokerHandler {
         remoteAddress,
         brokerConnectionHandler,
         blockFlowSynchronizer,
-        blockflow
+        blockflow,
+        allHandlers
       )
     )
   }
@@ -227,7 +245,8 @@ class TestBrokerHandler(
     val remoteAddress: InetSocketAddress,
     val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
-    val blockflow: BlockFlow
+    val blockflow: BlockFlow,
+    val allHandlers: AllHandlers
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BrokerHandler {
   val connectionType: ConnectionType = OutboundConnection
@@ -235,8 +254,6 @@ class TestBrokerHandler(
   val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
 
   override def handShakeDuration: Duration = Duration.ofSecondsUnsafe(2)
-
-  override def allHandlers: AllHandlers = ???
 
   val brokerInfo = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
 
