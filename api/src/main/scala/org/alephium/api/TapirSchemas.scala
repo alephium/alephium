@@ -20,13 +20,13 @@ import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.util.ByteString
-import sttp.tapir.{FieldName, Schema}
+import sttp.tapir.{FieldName, Schema, Validator}
 import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString}
 
-import org.alephium.api.model.{Amount, BuildTxCommon, Script}
+import org.alephium.api.model.{Amount, ApiKey, BuildTxCommon, MinerAction, Script}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature}
-import org.alephium.protocol.model.{Address, BlockHash, CliqueId, GroupIndex, ReleaseVersion}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -83,6 +83,12 @@ trait TapirSchemasLike {
 
   implicit val publicKeyTypeSchema: Schema[BuildTxCommon.PublicKeyType] =
     Schema(SString()).format("hex-string")
+
+  implicit val apiKeySchema: Schema[ApiKey] =
+    Schema(SString()).validate(Validator.minLength(32)).as[ApiKey]
+
+  implicit val transactionIdSchema: Schema[TransactionId] = Schema(SString()).format("32-byte-hash")
+  implicit val minerActionSchema: Schema[MinerAction]     = Schema(SString())
 }
 
 object TapirSchemas extends TapirSchemasLike

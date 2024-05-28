@@ -18,12 +18,14 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
 
 trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus, Unit] {
+  implicit def networkConfig: NetworkConfig
+
   def validate(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit] = {
     checkHeader(header, flow)
   }
@@ -128,11 +130,15 @@ object HeaderValidation {
 
   def build(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig
   ): HeaderValidation = new Impl()
 
-  final class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
-      extends HeaderValidation {
+  final class Impl(implicit
+      val brokerConfig: BrokerConfig,
+      val consensusConfigs: ConsensusConfigs,
+      val networkConfig: NetworkConfig
+  ) extends HeaderValidation {
     protected[validation] def checkGenesisVersion(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
@@ -178,6 +184,7 @@ object HeaderValidation {
     protected[validation] def checkGenesisWorkTarget(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
+      val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)
       if (header.target != consensusConfig.maxMiningTarget) {
         invalidHeader(InvalidGenesisWorkTarget)
       } else {
@@ -208,7 +215,7 @@ object HeaderValidation {
     protected[validation] def checkTimeStampDrift(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
-      if (TimeStamp.now() + consensusConfig.maxHeaderTimeStampDrift <= header.timestamp) {
+      if (TimeStamp.now() + consensusConfigs.maxHeaderTimeStampDrift <= header.timestamp) {
         invalidHeader(TooAdvancedTimeStamp)
       } else {
         validHeader(())
@@ -287,8 +294,9 @@ object HeaderValidation {
     protected[validation] def checkUncleDepsTimeStamp(header: BlockHeader, flow: BlockFlow)(implicit
         brokerConfig: BrokerConfig
     ): HeaderValidationResult[Unit] = {
-      val thresholdTs = header.timestamp.minusUnsafe(consensusConfig.uncleDependencyGapTime)
-      val headerIndex = header.chainIndex
+      val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)
+      val thresholdTs     = header.timestamp.minusUnsafe(consensusConfig.uncleDependencyGapTime)
+      val headerIndex     = header.chainIndex
       val resultEither = header.blockDeps.deps.forallE { dep =>
         val depIndex = ChainIndex.from(dep)
         if (depIndex != headerIndex) {

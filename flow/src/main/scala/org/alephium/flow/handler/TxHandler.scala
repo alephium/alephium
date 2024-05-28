@@ -26,7 +26,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.PendingTxStorage
 import org.alephium.flow.mempool.{GrandPool, MemPool, TxHandlerBuffer}
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId}
+import org.alephium.flow.model.{DataOrigin, PersistedTxId}
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
@@ -82,9 +82,7 @@ object TxHandler {
       blockFlow: BlockFlow,
       txTemplate: TransactionTemplate,
       publishBlock: Block => Unit
-  )(implicit
-      groupConfig: GroupConfig
-  ): Either[String, Unit] = {
+  )(implicit groupConfig: GroupConfig): Either[String, Unit] = {
     val chainIndex = txTemplate.chainIndex
     val grandPool  = blockFlow.getGrandPool()
     grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
@@ -111,8 +109,7 @@ object TxHandler {
     val miner            = LockupScript.p2pkh(minerPubKey)
     val result = for {
       flowTemplate <- blockFlow.prepareBlockFlow(chainIndex, miner).left.map(_.getMessage)
-      miningBlob = MiningBlob.from(flowTemplate)
-      block      = Miner.mineForDev(chainIndex, miningBlob)
+      block = Miner.mineForDev(chainIndex, flowTemplate)
       _ <- validateAndAddBlock(blockFlow, block)
     } yield {
       publishBlock(block)

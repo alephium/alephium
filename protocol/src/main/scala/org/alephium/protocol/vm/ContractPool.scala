@@ -20,7 +20,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOError
-import org.alephium.protocol.model.{ContractId, ContractOutput, ContractOutputRef, HardFork}
+import org.alephium.protocol.model.{
+  Address,
+  ContractId,
+  ContractOutput,
+  ContractOutputRef,
+  HardFork
+}
 import org.alephium.util.{AVector, EitherF}
 
 trait ContractPool extends CostStrategy {
@@ -31,8 +37,10 @@ trait ContractPool extends CostStrategy {
   def worldState: WorldState.Staging
 
   lazy val contractPool      = mutable.Map.empty[ContractId, StatefulContractObject]
-  lazy val assetStatus       = mutable.Map.empty[ContractId, ContractAssetStatus]
   lazy val contractBlockList = mutable.Set.empty[ContractId]
+
+  lazy val assetStatus         = mutable.Map.empty[ContractId, ContractAssetStatus]
+  lazy val assetUsedSinceRhone = mutable.Set.empty[(ContractId, Int)]
 
   lazy val contractInputs: ArrayBuffer[(ContractOutputRef, ContractOutput)] = ArrayBuffer.empty
 
@@ -56,6 +64,21 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  def cacheNewContractIfNecessary(contractId: ContractId): ExeResult[Unit] = {
+    if (getHardFork().isRhoneEnabled()) {
+      for {
+        obj <- loadFromWorldState(contractId)
+        _   <- add(contractId, obj)
+      } yield {
+        assetStatus(contractId) = ContractAssetFlushed
+        blockContractLoad(contractId)
+      }
+    } else {
+      // No cache for new contracts before Rhone upgrade
+      Right(blockContractLoad(contractId))
+    }
+  }
+
   def checkIfBlocked(contractId: ContractId): ExeResult[Unit] = {
     if (getHardFork().isLemanEnabled() && contractBlockList.contains(contractId)) {
       failed(ContractLoadDisallowed(contractId))
@@ -67,7 +90,7 @@ trait ContractPool extends CostStrategy {
   private def loadFromWorldState(contractId: ContractId): ExeResult[StatefulContractObject] = {
     worldState.getContractObj(contractId) match {
       case Right(obj)                   => Right(obj)
-      case Left(_: IOError.KeyNotFound) => failed(NonExistContract(contractId))
+      case Left(_: IOError.KeyNotFound) => failed(NonExistContract(Address.contract(contractId)))
       case Left(e)                      => ioFailed(IOErrorLoadContract(e))
     }
   }
@@ -75,10 +98,15 @@ trait ContractPool extends CostStrategy {
   private var contractFieldSize = 0
   private def add(contractId: ContractId, obj: StatefulContractObject): ExeResult[Unit] = {
     contractFieldSize += (obj.immFields.length + obj.initialMutFields.length)
-    if (contractPool.size >= contractPoolMaxSize) {
-      failed(ContractPoolOverflow)
-    } else if (contractFieldSize > contractFieldMaxSize) {
-      failed(ContractFieldOverflow)
+    if (!getHardFork().isRhoneEnabled()) {
+      if (contractPool.size >= contractPoolMaxSize) {
+        failed(ContractPoolOverflow)
+      } else if (contractFieldSize > contractFieldMaxSize) {
+        failed(ContractFieldOverflow)
+      } else {
+        contractPool.addOne(contractId -> obj)
+        okay
+      }
     } else {
       contractPool.addOne(contractId -> obj)
       okay
@@ -128,7 +156,38 @@ trait ContractPool extends CostStrategy {
       .map(e => Left(IOErrorUpdateState(e)))
   }
 
-  def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
+  def useContractAssets(
+      contractId: ContractId,
+      methodIndex: Int
+  ): ExeResult[MutBalancesPerLockup] = {
+    if (getHardFork().isRhoneEnabled()) {
+      useContractAssetsRhone(contractId, methodIndex)
+    } else {
+      useContractAssetsPreRhone(contractId)
+    }
+  }
+
+  def useContractAssetsRhone(
+      contractId: ContractId,
+      methodIndex: Int
+  ): ExeResult[MutBalancesPerLockup] = {
+    if (assetUsedSinceRhone.contains(contractId -> methodIndex)) {
+      failed(FunctionReentrancy(contractId, methodIndex))
+    } else {
+      assetUsedSinceRhone.add(contractId -> methodIndex)
+      assetStatus.get(contractId) match {
+        case Some(ContractAssetInUsing(balances)) => Right(balances)
+        case Some(ContractAssetFlushed)           => failed(ContractAssetAlreadyFlushed)
+        case None                                 => loadContractAssets(contractId)
+      }
+    }
+  }
+
+  def useContractAssetsPreRhone(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
+    loadContractAssets(contractId)
+  }
+
+  private def loadContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
     for {
       _ <- chargeContractInput()
       balances <- worldState
@@ -139,30 +198,41 @@ trait ContractPool extends CostStrategy {
         }
         .left
         .map(e => Left(IOErrorLoadContract(e)))
-      _ <- markAssetInUsing(contractId)
+      _ <- markAssetInUsing(contractId, balances)
     } yield balances
   }
 
-  def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {
-    if (assetStatus.contains(contractId)) {
-      failed(ContractAssetAlreadyInUsing)
-    } else {
-      assetStatus.put(contractId, ContractAssetInUsing)
-      Right(())
+  def markAssetInUsing(contractId: ContractId, balances: MutBalancesPerLockup): ExeResult[Unit] = {
+    assetStatus.get(contractId) match {
+      case None =>
+        assetStatus.put(contractId, ContractAssetInUsing(balances))
+        Right(())
+      case Some(ContractAssetInUsing(_)) => failed(ContractAssetAlreadyInUsing)
+      case Some(ContractAssetFlushed)    => failed(ContractAssetAlreadyFlushed)
+    }
+  }
+
+  // Load contract assets so that the corresponding inputs are tracked
+  def prepareForPayToContractOnly(contractId: ContractId): ExeResult[Unit] = {
+    assetStatus.get(contractId) match {
+      case None                          => loadContractAssets(contractId).map(_ => ())
+      case Some(ContractAssetInUsing(_)) => okay
+      case Some(ContractAssetFlushed)    => failed(ContractAssetAlreadyFlushed)
     }
   }
 
   def markAssetFlushed(contractId: ContractId): ExeResult[Unit] = {
     assetStatus.get(contractId) match {
-      case Some(ContractAssetInUsing) => Right(assetStatus.update(contractId, ContractAssetFlushed))
+      case Some(ContractAssetInUsing(_)) =>
+        Right(assetStatus.update(contractId, ContractAssetFlushed))
       case Some(ContractAssetFlushed) => failed(ContractAssetAlreadyFlushed)
-      case None                       => failed(ContractAssetUnloaded)
+      case None                       => failed(ContractAssetUnloaded(Address.contract(contractId)))
     }
   }
 
   def checkAllAssetsFlushed(): ExeResult[Unit] = {
     if (assetStatus.forall(_._2 == ContractAssetFlushed)) {
-      Right(())
+      okay
     } else {
       failed(EmptyContractAsset)
     }
@@ -171,6 +241,6 @@ trait ContractPool extends CostStrategy {
 
 object ContractPool {
   sealed trait ContractAssetStatus
-  case object ContractAssetInUsing extends ContractAssetStatus
-  case object ContractAssetFlushed extends ContractAssetStatus
+  final case class ContractAssetInUsing(balances: MutBalancesPerLockup) extends ContractAssetStatus
+  case object ContractAssetFlushed                                      extends ContractAssetStatus
 }

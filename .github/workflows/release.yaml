@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 0
           submodules: true
       - name: Setup JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 11
@@ -34,6 +34,8 @@ jobs:
              sha256sum "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum"
              cd ../../../ralphc/target/scala-2.13/
              sha256sum "alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum"
+             cd ../../../tools/target/scala-2.13/
+             sha256sum "alephium-tools-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-tools-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum"
              cd ../../../
       
       - name: Release
@@ -47,3 +49,5 @@ jobs:
             wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum
             ralphc/target/scala-2.13/alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar
             ralphc/target/scala-2.13/alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum
+            tools/target/scala-2.13/alephium-tools-${{ steps.get_version.outputs.VERSION }}.jar
+            tools/target/scala-2.13/alephium-tools-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum

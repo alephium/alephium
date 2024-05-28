@@ -10,6 +10,9 @@ alephium {
 
     # the polling interval for block templates, when there is no new blocks generated
     polling-interval = 2 seconds
+
+    # the size of the cache that stores the latest mining jobs
+    job-cache-size-per-chain = 100
   }
 
   network {
@@ -105,6 +108,8 @@ alephium {
   }
 
   wallet {
+    enabled = true
+    enabled = ${?ALEPHIUM_WALLET_ENABLE}
     home-dir = ${user.home}
     home-dir = ${?ALEPHIUM_WALLET_HOME}
 
@@ -116,6 +121,10 @@ alephium {
     # a boolean flag to indicate whether a write with rocksdb should be synchronized
     # Note that if it is just the process that crashes (i.e., the machine does not reboot), no writes will be lost even if sync==false
     db-sync-write = false
+
+    asset-trie-cache-max-byte-size = 200000000
+    contract-trie-cache-max-byte-size = 20000000
+
     event-log {
       enabled = false
       index-by-tx-id = false

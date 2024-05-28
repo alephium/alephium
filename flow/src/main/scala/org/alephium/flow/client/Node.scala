@@ -16,6 +16,8 @@
 
 package org.alephium.flow.client
 
+import java.nio.file.Path
+
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -29,8 +31,9 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.flow.setting.AlephiumConfig
-import org.alephium.util.{ActorRefT, EventBus, Service}
+import org.alephium.flow.setting.{AlephiumConfig, Configs}
+import org.alephium.io.RocksDBSource.ProdSettings
+import org.alephium.util.{ActorRefT, Env, EventBus, Service}
 
 trait Node extends Service {
   implicit def config: AlephiumConfig
@@ -130,6 +133,16 @@ object Node {
         Bootstrapper.props(tcpController, cliqueManager, storages.nodeStateStorage),
         "Bootstrapper"
       )
+  }
+
+  def buildBlockFlowUnsafe(rootPath: Path): (BlockFlow, Storages) = {
+    val typesafeConfig =
+      Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
+    val config = AlephiumConfig.load(typesafeConfig, "alephium")
+    val dbPath = rootPath.resolve(config.network.networkId.nodeFolder)
+    val storages =
+      Storages.createUnsafe(dbPath, "db", ProdSettings.writeOptions)(config.broker, config.node)
+    buildBlockFlowUnsafe(storages)(config) -> storages
   }
 
   def buildBlockFlowUnsafe(storages: Storages)(implicit config: AlephiumConfig): BlockFlow = {

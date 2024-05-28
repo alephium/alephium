@@ -28,9 +28,14 @@ import org.alephium.util._
 object GasEstimation extends StrictLogging {
   def sweepAddress: (Int, Int) => GasBox = estimateWithP2PKHInputs _
 
-  def estimateWithP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
+  def gasForP2PKHInputs(numInputs: Int): GasBox = {
     val inputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
-    estimate(inputGas.mulUnsafe(numInputs), numOutputs)
+    inputGas.mulUnsafe(numInputs)
+  }
+
+  def estimateWithP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
+    val inputGas = gasForP2PKHInputs(numInputs)
+    estimate(inputGas, numOutputs)
   }
 
   def estimateWithInputScript(
@@ -60,11 +65,15 @@ object GasEstimation extends StrictLogging {
   }
 
   def estimate(inputGas: GasBox, numOutputs: Int): GasBox = {
-    val gas = GasSchedule.txBaseGas
-      .addUnsafe(GasSchedule.txOutputBaseGas.mulUnsafe(numOutputs))
-      .addUnsafe(inputGas)
+    val gas = rawEstimate(inputGas, numOutputs)
 
     Math.max(gas, minimalGas)
+  }
+
+  def rawEstimate(inputGas: GasBox, numOutputs: Int): GasBox = {
+    GasSchedule.txBaseGas
+      .addUnsafe(GasSchedule.txOutputBaseGas.mulUnsafe(numOutputs))
+      .addUnsafe(inputGas)
   }
 
   def estimate(
@@ -81,7 +90,7 @@ object GasEstimation extends StrictLogging {
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
     unlockScript match {
-      case _: UnlockScript.P2PKH =>
+      case _: UnlockScript.P2PKH | _: UnlockScript.PoLW =>
         Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
       case p2mpkh: UnlockScript.P2MPKH =>
         Right(

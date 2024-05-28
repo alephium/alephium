@@ -26,8 +26,8 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.model.{ChainIndex, FlowData, Nonce}
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration}
+import org.alephium.protocol.model._
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
 class DependencyHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture { Self =>
@@ -302,5 +302,103 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.missingIndex.contains(blocks(2).hash) is false
     state.readies.toSet is Set(blocks(0).hash)
     state.processing.isEmpty is true
+  }
+
+  it should "wait for ghost uncles" in new Fixture {
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val blockFlow0   = isolatedBlockFlow()
+    val lockupScript = getGenesisLockupScript(chainIndex.to)
+
+    def mineBlock(parentHash: BlockHash, ghostUncleHashes: AVector[BlockHash]): Block = {
+      val template0   = blockFlow0.prepareBlockFlowUnsafe(chainIndex, lockupScript)
+      val parentIndex = brokerConfig.groups - 1 + chainIndex.to.value
+      val newDeps     = template0.deps.replace(parentIndex, parentHash)
+      val uncles =
+        ghostUncleHashes.map(hash =>
+          SelectedGhostUncle(hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1)
+        )
+      val template1 = blockFlow
+        .rebuild(template0, template0.transactions.init, uncles, lockupScript)
+        .copy(
+          deps = newDeps,
+          depStateHash =
+            blockFlow0.getDepStateHash(BlockDeps.unsafe(newDeps), chainIndex.from).rightValue
+        )
+      mine(blockFlow0, template1)
+    }
+
+    addAndCheck(blockFlow0, (0 until 2).map(_ => emptyBlock(blockFlow0, chainIndex)): _*)
+    blockFlow0.getMaxHeightByWeight(chainIndex).rightValue is 1
+    val hashes = blockFlow0.getHashes(chainIndex, 1).rightValue
+    hashes.length is 2
+    val (main0, fork0) =
+      (blockFlow0.getBlockUnsafe(hashes(0)), blockFlow0.getBlockUnsafe(hashes(1)))
+    val main1 = mineBlockTemplate(blockFlow0, chainIndex)
+    addAndCheck(blockFlow0, main1)
+    main1.parentHash is main0.hash
+    main1.ghostUncleHashes.rightValue is AVector(fork0.hash)
+
+    state.addPendingData(main1, broker, origin)
+    state.pending.unsafe(main1.hash).extract() is (main1, broker, origin)
+    state.missing.get(main1.hash) is Some(ArrayBuffer(main0.hash, fork0.hash))
+    state.missingIndex.get(main0.hash) is Some(ArrayBuffer(main1.hash))
+    state.missingIndex.get(fork0.hash) is Some(ArrayBuffer(main1.hash))
+    state.readies.isEmpty is true
+    state.processing.isEmpty is true
+
+    // add block deps
+    state.addPendingData(main0, broker, origin)
+    state.pending.unsafe(main0.hash).extract() is (main0, broker, origin)
+    state.readies is mutable.HashSet(main0.hash)
+    state.processing.isEmpty is true
+    state.uponDataProcessed(main0)
+    state.pending.contains(main0.hash) is false
+    state.missingIndex.contains(main0.hash) is false
+    state.missingIndex.get(fork0.hash) is Some(ArrayBuffer(main1.hash))
+    state.missing.get(main1.hash) is Some(ArrayBuffer(fork0.hash))
+
+    // add ghost uncles
+    state.addPendingData(fork0, broker, origin)
+    state.pending.unsafe(fork0.hash).extract() is (fork0, broker, origin)
+    state.readies is mutable.HashSet(fork0.hash, main0.hash)
+    state.processing.isEmpty is true
+    state.uponDataProcessed(fork0)
+    state.pending.contains(fork0.hash) is false
+    state.missingIndex.isEmpty is true
+    state.missing.isEmpty is true
+    state.readies is mutable.HashSet(main1.hash, fork0.hash, main0.hash)
+    state.extractReadies()
+    state.readies.isEmpty is true
+
+    addAndCheck(blockFlow, main0, fork0, main1)
+    val genesisHash = blockFlow0.getHashes(chainIndex, 0).rightValue.head
+    val fork1       = mineBlock(genesisHash, AVector.empty)
+    addAndCheck(blockFlow0, fork1)
+    val fork2 = mineBlock(main0.hash, AVector(fork1.hash))
+    addAndCheck(blockFlow0, fork2)
+    val main2 = mineBlock(main1.hash, AVector(fork2.hash))
+    addAndCheck(blockFlow0, main2)
+
+    state.addPendingData(main2, broker, origin)
+    state.pending.unsafe(main2.hash).extract() is (main2, broker, origin)
+    state.missing.get(main2.hash) is Some(ArrayBuffer(fork2.hash))
+    state.missingIndex.get(fork2.hash) is Some(ArrayBuffer(main2.hash))
+    state.addPendingData(fork2, broker, origin)
+    state.pending.unsafe(fork2.hash).extract() is (fork2, broker, origin)
+    state.missing.get(fork2.hash) is Some(ArrayBuffer(fork1.hash))
+    state.missingIndex.get(fork1.hash) is Some(ArrayBuffer(fork2.hash))
+    state.addPendingData(fork1, broker, origin)
+    state.pending.unsafe(fork1.hash).extract() is (fork1, broker, origin)
+    state.readies is mutable.HashSet(fork1.hash)
+    state.uponDataProcessed(fork1)
+    state.readies is mutable.HashSet(fork1.hash, fork2.hash)
+    state.missing.contains(fork2.hash) is false
+    state.missingIndex.contains(fork1.hash) is false
+    state.uponDataProcessed(fork2)
+    state.readies is mutable.HashSet(fork1.hash, fork2.hash, main2.hash)
+    state.missing.isEmpty is true
+    state.missingIndex.isEmpty is true
+    state.extractReadies()
+    state.readies.isEmpty is true
   }
 }

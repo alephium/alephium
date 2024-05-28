@@ -16,20 +16,26 @@
 
 package org.alephium.flow.core
 
+import scala.collection.mutable
+
+import akka.util.ByteString
+
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.{AlephiumSpec, TimeStamp}
+import org.alephium.protocol.ALPH
+import org.alephium.protocol.model.{AssetOutput, ChainIndex, GroupIndex}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class BlockFlowGroupViewSpec extends AlephiumSpec {
   it should "fetch preOutputs" in new FlowFixture {
     val blockFlow1 = isolatedBlockFlow()
-    val block0     = transfer(blockFlow1, ChainIndex.unsafe(0, 1))
+    val now        = TimeStamp.now()
+    val block0     = transfer(blockFlow1, ChainIndex.unsafe(0, 1), now)
     addAndCheck(blockFlow1, block0)
-    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2))
+    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2), now.plusMillisUnsafe(1))
     addAndCheck(blockFlow1, block1)
-    val block2 = transfer(blockFlow1, ChainIndex.unsafe(0, 1))
+    val block2 = transfer(blockFlow1, ChainIndex.unsafe(0, 1), now.plusMillisUnsafe(2))
     addAndCheck(blockFlow1, block2)
-    val block3 = transfer(blockFlow1, ChainIndex.unsafe(0, 0))
+    val block3 = transfer(blockFlow1, ChainIndex.unsafe(0, 0), now.plusMillisUnsafe(3))
     addAndCheck(blockFlow1, block3)
 
     addAndCheck(blockFlow, block0)
@@ -46,7 +52,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView1.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
-    grandPool.add(block1.chainIndex, tx1, TimeStamp.now())
+    grandPool.add(block1.chainIndex, tx1, now)
     mempool.contains(tx1) is true
 
     val tx2        = block2.nonCoinbase.head.toTemplate
@@ -56,7 +62,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView2.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
-    grandPool.add(block2.chainIndex, tx2, TimeStamp.now())
+    grandPool.add(block2.chainIndex, tx2, now.plusMillisUnsafe(1))
     mempool.contains(tx2) is true
 
     val tx3        = block3.nonCoinbase.head.toTemplate
@@ -67,5 +73,25 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block2.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView3.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block2.nonCoinbase.head.unsigned.fixedOutputs.tail
+
+    val outputInfos = tx1.unsigned.inputs.map { input =>
+      input.outputRef -> AssetOutput(
+        ALPH.oneAlph,
+        lockupScript,
+        TimeStamp.zero,
+        AVector.empty,
+        ByteString.empty
+      )
+    }
+    val additionalCache = mutable.Map.from(outputInfos)
+    groupView3.getPreOutputs(block1.nonCoinbase.head, None).rightValue.isDefined is false
+    groupView3
+      .getPreOutputs(block1.nonCoinbase.head, Some(additionalCache))
+      .rightValue
+      .isDefined is true
+    groupView2.exists(block1.nonCoinbase.head.unsigned.inputs, Set.empty).rightValue is false
+    groupView2
+      .exists(block1.nonCoinbase.head.unsigned.inputs, additionalCache.keySet)
+      .rightValue is true
   }
 }

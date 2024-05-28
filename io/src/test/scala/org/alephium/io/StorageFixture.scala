@@ -30,7 +30,7 @@ trait StorageFixture extends AlephiumFixture {
     val tmpdir  = Files.tmpDir
     val dbname  = s"test-db-${Keccak256.generate.toHexString}"
     val dbPath  = tmpdir.resolve(dbname)
-    val storage = RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    val storage = RocksDBSource.openUnsafe(dbPath)
     storages.append(storage)
     storage
   }

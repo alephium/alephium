@@ -22,9 +22,10 @@ import scala.reflect.ClassTag
 
 import akka.util.ByteString
 
-import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.bootstrap.SimpleSerde
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.Nonce
 import org.alephium.serde.{intSerde => _, _}
 import org.alephium.util.{AVector, Bytes}
 
@@ -92,7 +93,9 @@ final case class Job(
     txsBlob: ByteString,
     target: BigInteger
 ) {
-  def toMiningBlob: MiningBlob = MiningBlob(headerBlob, target, txsBlob)
+  def toBlockBlob(nonce: Nonce): ByteString = {
+    nonce.value ++ headerBlob ++ txsBlob
+  }
 }
 object Job {
   implicit val serde: Serde[Job] = {
@@ -117,14 +120,24 @@ object Job {
     )
   }
 
+  private val emptyTxsBlob = ByteString(0)
+  def fromWithoutTxs(template: BlockFlowTemplate): Job = {
+    from(template, emptyTxsBlob)
+  }
+
   def from(template: BlockFlowTemplate): Job = {
-    val blobs = MiningBlob.from(template)
+    from(template, serialize(template.transactions))
+  }
+
+  private def from(template: BlockFlowTemplate, txsBlob: ByteString): Job = {
+    val dummyHeader = template.dummyHeader()
+    val headerBlob  = serialize(dummyHeader)
     Job(
       template.index.from.value,
       template.index.to.value,
-      blobs.headerBlob,
-      blobs.txsBlob,
-      blobs.target
+      headerBlob.drop(Nonce.byteLength),
+      txsBlob,
+      template.target.value
     )
   }
 }

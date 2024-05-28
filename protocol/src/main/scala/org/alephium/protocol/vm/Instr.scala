@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
 import scala.annotation.switch
@@ -27,14 +28,14 @@ import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput, ContractId, GroupIndex, TokenId}
+import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex, HardFork, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
   NoIssuance
 }
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
-import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
+import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
 import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
@@ -60,6 +61,17 @@ sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait RhoneInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkRhoneHardFork(this)
+      _ <- runWithRhone(frame)
+    } yield ()
+  }
+
+  def runWithRhone[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
@@ -88,6 +100,20 @@ sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext]
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait RhoneInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends RhoneInstr[Ctx]
+    with GasSimple {
+  def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
+
+  override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkRhoneHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithRhone(frame)
+    } yield ()
+  }
 }
 
 object Instr {
@@ -161,7 +187,9 @@ object Instr {
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
     I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
-    U256ToString, I256ToString, BoolToString
+    U256ToString, I256ToString, BoolToString,
+    /* Below are instructions for Rhone hard fork */
+    GroupOfAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -175,7 +203,9 @@ object Instr {
     LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-    LoadImmField, LoadImmFieldByIndex
+    LoadImmField, LoadImmFieldByIndex,
+    /* Below are instructions for Rhone hard fork */
+    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
   )
   // format: on
 
@@ -387,12 +417,17 @@ object StoreLocal extends StatelessInstrCompanion1[Byte]
 sealed trait VarIndexInstr[Ctx <: StatelessContext]
     extends LemanInstrWithSimpleGas[Ctx]
     with GasLow {
-  def popIndex[C <: Ctx](frame: Frame[C], error: ExeFailure): ExeResult[Int] = {
+  def popIndex[C <: Ctx](
+      frame: Frame[C],
+      error: (BigInteger, Int) => ExeFailure
+  ): ExeResult[Int] = {
+    val maxIndex = 0xff
+
     for {
       u256 <- frame.popOpStackU256()
       index <- u256.v.toInt
-        .flatMap(v => if (v > 0xff) None else Some(v))
-        .toRight(Right(error))
+        .flatMap(v => if (v > maxIndex) None else Some(v))
+        .toRight(Right(error(u256.v.v, maxIndex)))
     } yield index
   }
 }
@@ -495,6 +530,69 @@ case object StoreMutFieldByIndex
       index <- popIndex(frame, InvalidMutFieldIndex)
       v     <- frame.popOpStack()
       _     <- frame.setMutField(index, v)
+    } yield ()
+  }
+}
+
+case object PayGasFee
+    extends RhoneInstrWithSimpleGas[StatefulContext]
+    with GasBalance
+    with StatefulInstrCompanion0 {
+
+  def checkGasAmount[C <: StatefulContext](
+      frame: Frame[C],
+      alphAmount: U256
+  ): ExeResult[Unit] = {
+    val gasFee     = frame.ctx.txEnv.gasFeeUnsafe
+    val gasFeePaid = frame.ctx.gasFeePaid
+
+    assume(gasFee >= gasFeePaid) // This should always be true, so we check with assume
+
+    val gasRemainingToPay = gasFee.subUnsafe(gasFeePaid)
+    if (gasRemainingToPay < alphAmount) failed(GasOverPaid) else okay
+  }
+
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      balanceState <- frame.getBalanceState()
+      amount       <- frame.popOpStackU256()
+      payer        <- frame.popOpStackAddress().map(_.lockupScript)
+      _            <- checkGasAmount(frame, amount.v)
+      _ <- balanceState
+        .useAlph(payer, amount.v)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              payer,
+              TokenId.alph,
+              amount.v,
+              balanceState.remaining.getAttoAlphAmount(payer).getOrElse(U256.Zero)
+            )
+          )
+        )
+      _ <- frame.ctx.payGasFee(amount.v)
+    } yield ()
+  }
+}
+
+case object MinimalContractDeposit
+    extends RhoneInstrWithSimpleGas[StatefulContext]
+    with GasBase
+    with StatefulInstrCompanion0 {
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.U256(model.minimalAlphInContract))
+  }
+}
+
+case object GroupOfAddress
+    extends RhoneInstrWithSimpleGas[StatelessContext]
+    with GasLow
+    with StatelessInstrCompanion0 {
+  def runWithRhone[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.popOpStackAddress()
+      group = address.lockupScript.groupIndex(frame.ctx.groupConfig)
+      _ <- frame.pushOpStack(Val.U256(util.U256.unsafe(group.value)))
     } yield ()
   }
 }
@@ -1059,10 +1157,12 @@ case object ByteVecToAddress
     with GasToByte {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      bytes   <- frame.popOpStackByteVec().map(_.bytes)
-      address <- decode[Val.Address](bytes).left.map(e => Right(SerdeErrorByteVecToAddress(e)))
-      _       <- frame.ctx.chargeGasWithSize(this, bytes.length)
-      _       <- frame.pushOpStack(address)
+      bytes <- frame.popOpStackByteVec().map(_.bytes)
+      address <- decode[Val.Address](bytes).left.map(e =>
+        Right(SerdeErrorByteVecToAddress(bytes, e))
+      )
+      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
+      _ <- frame.pushOpStack(address)
     } yield ()
   }
 }
@@ -1221,6 +1321,45 @@ final case class CallExternal(index: Byte) extends CallInstr with StatefulInstr 
 }
 object CallExternal extends StatefulInstrCompanion1[Byte]
 
+@ByteCode
+final case class MethodSelector(selector: Method.Selector)
+    extends CallInstr
+    with StatefulInstr
+    with GasHigh {
+  def serialize(): ByteString = ByteString(code) ++ encode(selector)
+
+  // The execution is skipped. It's only used to provide method selector
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = okay
+}
+object MethodSelector extends InstrCompanion[StatefulContext] {
+
+  def deserialize[C <: StatefulContext](
+      input: ByteString
+  ): SerdeResult[Staging[MethodSelector]] = {
+    implicitly[Serde[Method.Selector]]._deserialize(input).map(_.mapValue(MethodSelector(_)))
+  }
+}
+
+@ByteCode
+final case class CallExternalBySelector(selector: Method.Selector)
+    extends CallInstr
+    with StatefulInstr
+    with GasCall {
+  def serialize(): ByteString = ByteString(code) ++ encode(selector)
+
+  // Implemented in frame instead
+  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
+}
+object CallExternalBySelector extends InstrCompanion[StatefulContext] {
+  def deserialize[C <: StatefulContext](
+      input: ByteString
+  ): SerdeResult[Staging[Instr[StatefulContext]]] = {
+    implicitly[Serde[Method.Selector]]
+      ._deserialize(input)
+      .map(_.mapValue(CallExternalBySelector(_)))
+  }
+}
+
 case object Return extends StatelessInstrSimpleGas with StatelessInstrCompanion0 with GasZero {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -1309,13 +1448,15 @@ case object VerifyTxSignature
     val signatures = frame.ctx.signatures
     for {
       rawPublicKey <- frame.popOpStackByteVec()
-      publicKey    <- PublicKey.from(rawPublicKey.bytes).toRight(Right(InvalidPublicKey))
-      signature    <- signatures.pop()
+      publicKey <- PublicKey
+        .from(rawPublicKey.bytes)
+        .toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
+      signature <- signatures.pop()
       _ <- {
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
           okay
         } else {
-          failed(InvalidSignature)
+          failed(InvalidSignature(rawPublicKey.bytes, rawData, signature.bytes))
         }
       }
     } yield ()
@@ -1353,12 +1494,24 @@ sealed trait GenericVerifySignature[PubKey, Sig]
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       rawSignature <- frame.popOpStackByteVec()
-      signature    <- buildSignature(rawSignature).toRight(Right(InvalidSignatureFormat))
+      signature <- buildSignature(rawSignature).toRight(
+        Right(InvalidSignatureFormat(rawSignature.bytes))
+      )
       rawPublicKey <- frame.popOpStackByteVec()
-      publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey))
+      publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
       rawData      <- frame.popOpStackByteVec()
-      _            <- if (rawData.bytes.length == 32) okay else failed(SignedDataIsNot32Bytes)
-      _ <- if (verify(rawData.bytes, signature, publicKey)) okay else failed(InvalidSignature)
+      _ <-
+        if (rawData.bytes.length == 32) {
+          okay
+        } else {
+          failed(SignedDataIsNot32Bytes(rawData.bytes.length))
+        }
+      _ <-
+        if (verify(rawData.bytes, signature, publicKey)) {
+          okay
+        } else {
+          failed(InvalidSignature(rawPublicKey.bytes, rawData.bytes, rawSignature.bytes))
+        }
     } yield ()
   }
 
@@ -1485,7 +1638,16 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
         } else {
           balanceState
             .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
-            .toRight(Right(NotEnoughBalance))
+            .toRight(
+              Right(
+                NotEnoughApprovedBalance(
+                  fromAddress.lockupScript,
+                  tokenId,
+                  tokenAmount.v,
+                  balanceState.tokenRemainingUnsafe(fromAddress.lockupScript, tokenId)
+                )
+              )
+            )
         }
     } yield ()
   }
@@ -1496,7 +1658,9 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
     for {
       timestampU256 <- frame.popOpStackU256()
       timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
-      _ <- if (timestamp > frame.ctx.blockEnv.timeStamp) okay else failed(InvalidLockTime)
+      blockTime = frame.ctx.blockEnv.timeStamp
+      _ <-
+        if (timestamp > blockTime) okay else failed(InvalidLockTime(timestamp, blockTime))
     } yield timestamp
   }
 }
@@ -1507,14 +1671,67 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
       lockTime     <- popTimestamp(frame)
       lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
-      approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
-      outputs      <- approved.toLockedTxOutput(lockupScript, lockTime)
-      _            <- outputs.foreachE(frame.ctx.generateOutput)
+      approved <- balanceState
+        .useAllApproved(lockupScript)
+        .toRight(Right(NoAssetsApproved(Address.Asset(lockupScript))))
+      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, frame.ctx.getHardFork())
+      _       <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
 }
 
-object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
+sealed trait ApproveAssetBase {
+  @inline protected def approveALPH(
+      balanceState: MutBalanceState,
+      from: LockupScript,
+      amount: U256,
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    if (amount.isZero && hardFork.isRhoneEnabled()) {
+      okay
+    } else {
+      balanceState
+        .approveALPH(from, amount)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              TokenId.alph,
+              amount,
+              balanceState.alphRemainingUnsafe(from)
+            )
+          )
+        )
+    }
+  }
+
+  @inline protected def approveToken(
+      balanceState: MutBalanceState,
+      from: LockupScript,
+      tokenId: TokenId,
+      amount: U256,
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    if (amount.isZero && hardFork.isRhoneEnabled()) {
+      okay
+    } else {
+      balanceState
+        .approveToken(from, tokenId, amount)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              tokenId,
+              amount,
+              balanceState.tokenRemainingUnsafe(from, tokenId)
+            )
+          )
+        )
+    }
+  }
+}
+
+object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 with ApproveAssetBase {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -1527,14 +1744,12 @@ object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
       amount       <- frame.popOpStackU256()
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .approveALPH(address.lockupScript, amount.v)
-        .toRight(Right(NotEnoughBalance))
+      _ <- approveALPH(balanceState, address.lockupScript, amount.v, frame.ctx.getHardFork())
     } yield ()
   }
 }
 
-object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
+object ApproveToken extends AssetInstr with StatefulInstrCompanion0 with ApproveAssetBase {
   @SuppressWarnings(
     Array(
       "org.wartremover.warts.JavaSerializable",
@@ -1549,49 +1764,75 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
+      hardFork = frame.ctx.getHardFork()
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState.approveALPH(address.lockupScript, amount.v).toRight(Right(NotEnoughBalance))
+        if (hardFork.isLemanEnabled() && tokenId == TokenId.alph) {
+          approveALPH(balanceState, address.lockupScript, amount.v, hardFork)
         } else {
-          balanceState
-            .approveToken(address.lockupScript, tokenId, amount.v)
-            .toRight(Right(NotEnoughBalance))
+          approveToken(balanceState, address.lockupScript, tokenId, amount.v, hardFork)
         }
     } yield ()
   }
 }
 
 object AlphRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def getAmount(
+      hardFork: HardFork,
+      balanceState: MutBalanceState,
+      address: Val.Address
+  ): ExeResult[U256] = {
+    val amountOpt = balanceState.alphRemaining(address.lockupScript)
+    if (hardFork.isRhoneEnabled()) {
+      Right(amountOpt.getOrElse(U256.Zero))
+    } else {
+      amountOpt.toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
+    }
+  }
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      amount <- balanceState
-        .alphRemaining(address.lockupScript)
-        .toRight(Right(NoAlphBalanceForTheAddress))
-      _ <- frame.pushOpStack(Val.U256(amount))
+      amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address)
+      _            <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
 }
 
 object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
+  def getAmount(
+      hardFork: HardFork,
+      balanceState: MutBalanceState,
+      address: Val.Address,
+      tokenId: TokenId
+  ): ExeResult[U256] = {
+    val isALPH = tokenId == TokenId.alph
+    val amountOpt = if (hardFork.isLemanEnabled() && isALPH) {
+      balanceState.alphRemaining(address.lockupScript)
+    } else {
+      balanceState.tokenRemaining(address.lockupScript, tokenId)
+    }
+    if (hardFork.isRhoneEnabled()) {
+      Right(amountOpt.getOrElse(U256.Zero))
+    } else {
+      amountOpt.toRight(
+        if (isALPH) {
+          Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript)))
+        } else {
+          Right(NoTokenBalanceForTheAddress(tokenId, Address.from(address.lockupScript)))
+        }
+      )
+    }
+  }
+
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       tokenIdRaw   <- frame.popOpStackByteVec()
       address      <- frame.popOpStackAddress()
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
-      amount <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState
-            .alphRemaining(address.lockupScript)
-            .toRight(Right(NoAlphBalanceForTheAddress))
-        } else {
-          balanceState
-            .tokenRemaining(address.lockupScript, tokenId)
-            .toRight(Right(NoTokenBalanceForTheAddress))
-        }
-      _ <- frame.pushOpStack(Val.U256(amount))
+      amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address, tokenId)
+      _            <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
 }
@@ -1630,13 +1871,28 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    for {
-      balanceState <- frame.getBalanceState()
-      _            <- balanceState.useAlph(from, amount.v).toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances
-        .addAlph(to, amount.v)
-        .toRight(Right(BalanceOverflow))
-    } yield ()
+    if (amount.v.isZero && frame.ctx.getHardFork().isRhoneEnabled()) {
+      okay
+    } else {
+      for {
+        balanceState <- frame.getBalanceState()
+        _ <- balanceState
+          .useAlph(from, amount.v)
+          .toRight(
+            Right(
+              NotEnoughApprovedBalance(
+                from,
+                TokenId.alph,
+                amount.v,
+                balanceState.alphRemainingUnsafe(from)
+              )
+            )
+          )
+        _ <- frame.ctx.outputBalances
+          .addAlph(to, amount.v)
+          .toRight(Right(BalanceOverflow))
+      } yield ()
+    }
   }
 
   @inline def transferAlph[C <: StatefulContext](
@@ -1659,15 +1915,28 @@ sealed trait Transfer extends AssetInstr {
       to: LockupScript,
       amount: Val.U256
   ): ExeResult[Unit] = {
-    for {
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(from, tokenId, amount.v)
-        .toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances
-        .addToken(to, tokenId, amount.v)
-        .toRight(Right(BalanceOverflow))
-    } yield ()
+    if (amount.v.isZero && frame.ctx.getHardFork().isRhoneEnabled()) {
+      okay
+    } else {
+      for {
+        balanceState <- frame.getBalanceState()
+        _ <- balanceState
+          .useToken(from, tokenId, amount.v)
+          .toRight(
+            Right(
+              NotEnoughApprovedBalance(
+                from,
+                tokenId,
+                amount.v,
+                balanceState.tokenRemainingUnsafe(from, tokenId)
+              )
+            )
+          )
+        _ <- frame.ctx.outputBalances
+          .addToken(to, tokenId, amount.v)
+          .toRight(Right(BalanceOverflow))
+      } yield ()
+    }
   }
 
   @inline def transferToken[C <: StatefulContext](
@@ -1769,7 +2038,7 @@ object TokenIssuance {
   }
 }
 
-sealed trait CreateContractAbstract extends ContractInstr {
+sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
   def subContract: Boolean
   def copyCreate: Boolean
 
@@ -1811,21 +2080,30 @@ sealed trait CreateContractAbstract extends ContractInstr {
     }
   }
 
+  protected def prepareMutFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    frame.popFields()
+  }
+
+  protected def prepareImmFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    if (frame.ctx.getHardFork().isLemanEnabled()) {
+      frame.popFields()
+    } else {
+      Right(CreateContractAbstract.emptyImmFields)
+    }
+  }
+
+  def returnContractId: Boolean = true
+
   def __runWith[C <: StatefulContext](
       frame: Frame[C],
       tokenIssuance: TokenIssuance
   ): ExeResult[Unit] = {
     for {
       tokenIssuanceInfo <- getTokenIssuanceInfo(frame, tokenIssuance)
-      mutFields         <- frame.popFields()
-      immFields <-
-        if (frame.ctx.getHardFork().isLemanEnabled()) {
-          frame.popFields()
-        } else {
-          Right(CreateContractAbstract.emptyImmFields)
-        }
-      _            <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
-      contractCode <- prepareContractCode(frame)
+      mutFields         <- prepareMutFields(frame)
+      immFields         <- prepareImmFields(frame)
+      _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
+      contractCode      <- prepareContractCode(frame)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
@@ -1833,13 +2111,14 @@ sealed trait CreateContractAbstract extends ContractInstr {
       )
       _ <- frame.createContract(
         newContractId,
+        if (subContract) frame.obj.contractIdOpt else None,
         contractCode,
         immFields,
         mutFields,
         tokenIssuanceInfo
       )
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled()) {
+        if (frame.ctx.getHardFork().isLemanEnabled() && returnContractId) {
           frame.pushOpStack(Val.ByteVec(newContractId.bytes))
         } else {
           okay
@@ -1847,6 +2126,8 @@ sealed trait CreateContractAbstract extends ContractInstr {
     } yield ()
   }
 }
+
+sealed trait CreateContractAbstract extends ContractFactory with StatefulInstrCompanion0
 
 object CreateContractAbstract {
   val emptyImmFields: AVector[Val] = AVector.empty
@@ -1957,6 +2238,145 @@ object CreateSubContractAndTransferToken
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, tokenIssuance = IssueTokenAndTransfer)
+  }
+}
+
+@ByteCode
+final case class CreateMapEntry(immFieldsNum: Byte, mutFieldsNum: Byte)
+    extends ContractFactory
+    with RhoneInstrWithSimpleGas[StatefulContext]
+    with GasCreate {
+  def subContract: Boolean = true
+  def copyCreate: Boolean  = false
+
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[Byte, Byte].serialize((immFieldsNum, mutFieldsNum))
+
+  override def prepareMutFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    frame.opStack.pop(Bytes.toPosInt(mutFieldsNum))
+  }
+
+  override def prepareImmFields[C <: StatefulContext](frame: Frame[C]): ExeResult[AVector[Val]] = {
+    frame.opStack.pop(Bytes.toPosInt(immFieldsNum))
+  }
+
+  override def prepareContractCode[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[StatefulContract.HalfDecoded] = {
+    val contract =
+      CreateMapEntry.genContract(Bytes.toPosInt(immFieldsNum), Bytes.toPosInt(mutFieldsNum))
+    val bytecode = encode(contract)
+    frame.ctx
+      .chargeContractCodeSize(bytecode, frame.ctx.getHardFork())
+      .map(_ => contract.toHalfDecoded())
+  }
+
+  override def returnContractId: Boolean = false
+
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, tokenIssuance = NoIssuance)
+  }
+}
+object CreateMapEntry extends StatefulInstrCompanion1[(Byte, Byte)]()(serdeImpl[Byte, Byte]) {
+  def apply(value: (Byte, Byte)): CreateMapEntry = CreateMapEntry(value._1, value._2)
+
+  val LoadImmFieldMethodIndex: Byte  = 0
+  val LoadMutFieldMethodIndex: Byte  = 1
+  val StoreMutFieldMethodIndex: Byte = 2
+  val DestroyMethodIndex: Byte       = 3
+
+  private def genLoadImmFieldByIndex(parentContractIdIndex: Byte) =
+    Method[StatefulContext](
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      usePayToContractOnly = false,
+      argsLength = 1,
+      localsLength = 1,
+      returnLength = 1,
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0),
+        LoadImmFieldByIndex
+      )
+    )
+
+  private def genLoadMutFieldByIndex(parentContractIdIndex: Byte) = {
+    Method[StatefulContext](
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      usePayToContractOnly = false,
+      argsLength = 1,
+      localsLength = 1,
+      returnLength = 1,
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0),
+        LoadMutFieldByIndex
+      )
+    )
+  }
+
+  private def genStoreMutFieldByIndex(parentContractIdIndex: Byte): Method[StatefulContext] = {
+    Method(
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      usePayToContractOnly = false,
+      argsLength = 2,
+      localsLength = 2,
+      returnLength = 0,
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0), // value
+        LoadLocal(1), // index
+        StoreMutFieldByIndex
+      )
+    )
+  }
+
+  private def genDestroy(parentContractIdIndex: Byte): Method[StatefulContext] = {
+    Method(
+      isPublic = true,
+      usePreapprovedAssets = false,
+      useContractAssets = true,
+      usePayToContractOnly = false,
+      argsLength = 1,
+      localsLength = 1,
+      returnLength = 0,
+      instrs = AVector(
+        CallerContractId,
+        LoadImmField(parentContractIdIndex),
+        ByteVecEq,
+        Assert,
+        LoadLocal(0),
+        DestroySelf
+      )
+    )
+  }
+
+  def genContract(immFields: Int, mutFields: Int): StatefulContract = {
+    assume(immFields >= 1) // parent contract id
+    val parentContractIdIndex = (immFields - 1).toByte
+    StatefulContract(
+      immFields + mutFields,
+      AVector(
+        genLoadImmFieldByIndex(parentContractIdIndex),
+        genLoadMutFieldByIndex(parentContractIdIndex),
+        genStoreMutFieldByIndex(parentContractIdIndex),
+        genDestroy(parentContractIdIndex)
+      )
+    )
   }
 }
 
@@ -2226,7 +2646,7 @@ object BlockTarget extends BlockInstr {
     for {
       target <- {
         val value = frame.ctx.blockEnv.target.value
-        util.U256.from(value).toRight(Right(InvalidTarget(value)))
+        util.U256.from(value).toRight(Right(InvalidBlockTarget(value)))
       }
       _ <- frame.pushOpStack(Val.U256(target))
     } yield ()
@@ -2315,7 +2735,7 @@ object VerifyAbsoluteLocktime extends LockTimeInstr with GasLow {
       lockUntil <- popTimeStamp(frame)
       _ <-
         if (lockUntil > frame.ctx.blockEnv.timeStamp) {
-          failed(AbsoluteLockTimeVerificationFailed)
+          failed(AbsoluteLockTimeVerificationFailed(lockUntil, frame.ctx.blockEnv.timeStamp))
         } else {
           okay
         }
@@ -2342,7 +2762,7 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
       lockUntil       <- getLockUntil(preOutput, lockDuration)
       _ <-
         if (lockUntil > frame.ctx.blockEnv.timeStamp) {
-          failed(RelativeLockTimeVerificationFailed)
+          failed(RelativeLockTimeVerificationFailed(lockUntil, frame.ctx.blockEnv.timeStamp))
         } else {
           okay
         }

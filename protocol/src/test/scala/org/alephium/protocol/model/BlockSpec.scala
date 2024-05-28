@@ -18,6 +18,7 @@ package org.alephium.protocol.model
 
 import scala.util.Random
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
@@ -32,6 +33,15 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val bytes  = serialize[Block](block)
       val output = deserialize[Block](bytes).rightValue
       output is block
+
+      // check serialization cache
+      block.getSerialized().value is bytes
+      val headerBytes = block.header.getSerialized().value
+      headerBytes is bytes.take(headerBytes.length)
+
+      // check deserialization cache
+      output.getSerialized().value is bytes
+      output.header.getSerialized().value is headerBytes
     }
   }
 
@@ -172,12 +182,13 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         ),
         AVector.empty[Signature]
       )
-      val coinbase = Transaction.coinbase(
+      val coinbase = Transaction.powCoinbaseForTest(
         ChainIndex.unsafe(0, 0),
-        U256.Zero,
+        AVector.empty,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
-        Math.max(networkConfig.lemanHardForkTimestamp, ALPH.LaunchTimestamp)
+        Math.max(networkConfig.lemanHardForkTimestamp, ALPH.LaunchTimestamp),
+        AVector.empty
       )
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
@@ -189,8 +200,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "seder the snapshots properly" in new BlockSnapshotsFixture {
-    implicit val basePath = "src/test/resources/models/block"
+  it should "serde the snapshots properly" in new BlockSnapshotsFixture {
+    implicit val basePath                          = "src/test/resources/models/block"
+    override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
 
     import Hex._
 
@@ -288,8 +300,8 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       // Compiled from the script above
       val script = StatefulScript.unsafe(
         AVector(
-          vm.Method(true, true, false, 0, 0, 0, AVector(vm.Return)),
-          vm.Method(true, false, false, 0, 0, 0, AVector())
+          vm.Method(true, true, false, false, 0, 0, 0, AVector(vm.Return)),
+          vm.Method(true, false, false, false, 0, 0, 0, AVector())
         )
       )
 
@@ -332,6 +344,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
             isPublic = true,
             usePreapprovedAssets = true,
             useContractAssets = true,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -386,5 +399,30 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val blk = block(transaction)
       blk.verify("txs-with-contract-inputs-outputs")
     }
+  }
+
+  it should "cache block ghost uncle hashes" in {
+    val block = blockGen.sample.get
+    block.ghostUncleHashes.rightValue.isEmpty is true
+    block._ghostUncleData is Some(AVector.empty[GhostUncleData])
+
+    val groupIndex = GroupIndex.unsafe(0)
+    val ghostUncleData =
+      AVector.fill(2)(GhostUncleData(BlockHash.random, assetLockupGen(groupIndex).sample.get))
+    val coinbaseData: CoinbaseData = CoinbaseDataV2(
+      CoinbaseDataPrefix.from(block.chainIndex, block.timestamp),
+      ghostUncleData,
+      ByteString.empty
+    )
+    val newOutput =
+      block.coinbase.unsigned.fixedOutputs.head.copy(additionalData = serialize(coinbaseData))
+    val newCoinbaseTx = block.coinbase.copy(
+      unsigned = block.coinbase.unsigned.copy(
+        fixedOutputs = block.coinbase.unsigned.fixedOutputs.replace(0, newOutput)
+      )
+    )
+    val newBlock = block.copy(transactions = AVector(newCoinbaseTx))
+    newBlock.ghostUncleData.rightValue is ghostUncleData
+    newBlock._ghostUncleData is Some(ghostUncleData)
   }
 }

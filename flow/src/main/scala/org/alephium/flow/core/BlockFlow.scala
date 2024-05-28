@@ -23,9 +23,9 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.crypto.Blake3
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
-import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
+import org.alephium.flow.setting.{AlephiumConfig, ConsensusSettings, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -112,7 +112,7 @@ trait BlockFlow
 
   // data should be valid, and parent should be in blockflow already
   def isRecent(data: FlowData): Boolean = {
-    data.timestamp > TimeStamp.now().minusUnsafe(consensusConfig.recentBlockTimestampDiff)
+    data.timestamp > TimeStamp.now().minusUnsafe(consensusConfigs.recentBlockTimestampDiff)
   }
 
   def getBestIntraGroupTip(): BlockHash
@@ -123,8 +123,9 @@ object BlockFlow extends StrictLogging {
 
   def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
     val storages =
-      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, Settings.writeOptions)(
-        config.broker
+      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, ProdSettings.writeOptions)(
+        config.broker,
+        config.node
       )
     fromGenesisUnsafe(storages, config.genesisBlocks)(
       config.broker,
@@ -148,7 +149,7 @@ object BlockFlow extends StrictLogging {
   def fromGenesisUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusSetting: ConsensusSetting,
+      consensusSettings: ConsensusSettings,
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): BlockFlow = {
@@ -174,7 +175,7 @@ object BlockFlow extends StrictLogging {
 
   private def cacheBlockFlow(
       blockflow: BlockFlow
-  )(implicit consensusSetting: ConsensusSetting): Unit = {
+  )(implicit consensusSettings: ConsensusSettings): Unit = {
     blockflow.inBlockChains.foreach(_.foreach { chain =>
       cacheBlockChain(blockflow, chain)
     })
@@ -185,34 +186,36 @@ object BlockFlow extends StrictLogging {
   }
 
   private def cacheBlockChain(blockflow: BlockFlow, chain: BlockChain)(implicit
-      consensusSetting: ConsensusSetting
+      consensusSettings: ConsensusSettings
   ): Unit = {
-    val maxHeight = chain.maxHeightUnsafe
+    val maxHeight = chain.maxHeightByWeightUnsafe
     val startHeight =
-      Math.max(ALPH.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain)
+      Math.max(ALPH.GenesisHeight, maxHeight - consensusSettings.blockCacheCapacityPerChain)
     (startHeight to maxHeight).foreach { height =>
       val block = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head)
       blockflow.cacheBlock(block)
+      chain.cacheBlock(block)
     }
   }
 
   private def cacheHeaderChain(chain: BlockHeaderChain)(implicit
-      consensusSetting: ConsensusSetting
+      consensusSettings: ConsensusSettings
   ): Unit = {
-    val maxHeight = chain.maxHeightUnsafe
+    val maxHeight = chain.maxHeightByWeightUnsafe
     val startHeight =
-      Math.max(ALPH.GenesisHeight, maxHeight - consensusSetting.blockCacheCapacityPerChain * 2)
+      Math.max(ALPH.GenesisHeight, maxHeight - consensusSettings.blockCacheCapacityPerChain * 2)
     (startHeight to maxHeight).foreach { height =>
       val header = chain.getBlockHeaderUnsafe(chain.getHashesUnsafe(height).head)
       chain.cacheHeader(header)
       chain.cacheState(header.hash, chain.getStateUnsafe(header.hash))
+      chain.cacheHashes(height, chain.getHashesUnsafe(height))
     }
   }
 
   def fromStorageUnsafe(storages: Storages, genesisBlocks: AVector[AVector[Block]])(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusSetting: ConsensusSetting,
+      consensusSettings: ConsensusSettings,
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): BlockFlow = {
@@ -237,7 +240,7 @@ object BlockFlow extends StrictLogging {
   )(implicit
       val brokerConfig: BrokerConfig,
       val networkConfig: NetworkConfig,
-      val consensusConfig: ConsensusSetting,
+      val consensusConfigs: ConsensusSettings,
       val mempoolSetting: MemPoolSetting,
       val logConfig: LogConfig
   ) extends BlockFlow {

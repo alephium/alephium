@@ -18,11 +18,11 @@ package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
 
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, EventBus}
@@ -67,7 +67,7 @@ object AllHandlers {
       storages: Storages
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
@@ -86,7 +86,7 @@ object AllHandlers {
       storages: Storages
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
@@ -109,7 +109,7 @@ object AllHandlers {
       storages: Storages
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
@@ -149,7 +149,7 @@ object AllHandlers {
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
   ): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
@@ -161,7 +161,7 @@ object AllHandlers {
     } yield {
       val handler = ActorRefT.build[BlockChainHandler.Command](
         system,
-        BlockChainHandler.props(blockFlow, chainIndex, eventBus),
+        BlockChainHandler.props(blockFlow, chainIndex, eventBus, maxForkDepth),
         s"BlockChainHandler-$from-$to$namePostfix"
       )
       chainIndex -> handler
@@ -175,7 +175,8 @@ object AllHandlers {
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfigs: ConsensusConfigs,
+      networkSetting: NetworkSetting
   ): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
     val headerHandlers = for {
       from <- 0 until brokerConfig.groups

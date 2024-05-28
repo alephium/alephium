@@ -21,9 +21,16 @@ import org.alephium.util.AlephiumSpec
 
 class GasBoxSpec extends AlephiumSpec {
   it should "validate gas bound" in {
-    GasBox.validate(minimalGas) is true
-    GasBox.validate(GasBox.unsafe(minimalGas.value - 1)) is false
-    GasBox.validate(maximalGasPerTx) is true
-    GasBox.validate(GasBox.unsafe(maximalGasPerTx.value + 1)) is false
+    GasBox.validate(minimalGas, HardFork.Leman) is true
+    GasBox.validate(GasBox.unsafe(minimalGas.value - 1), HardFork.Leman) is false
+    GasBox.validate(maximalGasPerTxPreRhone, HardFork.Leman) is true
+    GasBox.validate(GasBox.unsafe(maximalGasPerTxPreRhone.value + 1), HardFork.Leman) is false
+
+    GasBox.validate(minimalGas, HardFork.Rhone) is true
+    GasBox.validate(GasBox.unsafe(minimalGas.value - 1), HardFork.Rhone) is false
+    GasBox.validate(maximalGasPerTxPreRhone, HardFork.Rhone) is true
+    GasBox.validate(GasBox.unsafe(maximalGasPerTxPreRhone.value + 1), HardFork.Rhone) is true
+    GasBox.validate(maximalGasPerTx, HardFork.Rhone) is true
+    GasBox.validate(GasBox.unsafe(maximalGasPerTx.value + 1), HardFork.Rhone) is false
   }
 }

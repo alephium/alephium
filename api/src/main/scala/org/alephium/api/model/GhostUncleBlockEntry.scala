@@ -14,18 +14,14 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.model
+package org.alephium.api.model
 
-import org.alephium.serde.Serde
-import org.alephium.util.TimeStamp
+import org.alephium.protocol.model.{Address, BlockHash, GhostUncleData}
 
-final case class CoinbaseFixedData private (fromGroup: Byte, toGroup: Byte, blockTs: TimeStamp)
+final case class GhostUncleBlockEntry(blockHash: BlockHash, miner: Address.Asset)
 
-object CoinbaseFixedData {
-  implicit val serde: Serde[CoinbaseFixedData] =
-    Serde.forProduct3(CoinbaseFixedData.apply, t => (t.fromGroup, t.toGroup, t.blockTs))
-
-  def from(chainIndex: ChainIndex, blockTs: TimeStamp): CoinbaseFixedData = {
-    CoinbaseFixedData(chainIndex.from.value.toByte, chainIndex.to.value.toByte, blockTs)
+object GhostUncleBlockEntry {
+  def from(data: GhostUncleData): GhostUncleBlockEntry = {
+    GhostUncleBlockEntry(data.blockHash, Address.Asset(data.lockupScript))
   }
 }

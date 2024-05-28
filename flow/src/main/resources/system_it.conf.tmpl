@@ -14,6 +14,7 @@ alephium {
     nonce-step = 400
     batch-delay = 0 milli
     polling-interval = 2 seconds
+    job-cache-size-per-chain = 100
   }
 
   network {
@@ -89,12 +90,17 @@ alephium {
   }
 
   wallet {
+    enabled = true
     secret-dir = ""
     locking-timeout = 10 minutes
   }
 
   node {
     db-sync-write = false
+
+    asset-trie-cache-max-byte-size = 20000000
+    contract-trie-cache-max-byte-size = 10000000
+
     event-log {
       enabled = true
       index-by-tx-id = true

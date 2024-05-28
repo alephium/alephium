@@ -17,7 +17,6 @@
 package org.alephium.flow.network.interclique
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.{maxForkDepth => systemMaxForkDepth}
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -42,7 +41,6 @@ trait BrokerHandler extends BaseBrokerHandler {
   val seenTxExpiryDuration: Duration     = BrokerHandler.seenTxExpiryDuration
   val seenTxs: Cache[TransactionId, TimeStamp] =
     Cache.fifo[TransactionId, TimeStamp](maxTxsCapacity, identity[TimeStamp], seenTxExpiryDuration)
-  val maxForkDepth: Int = systemMaxForkDepth
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
@@ -62,18 +60,9 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def handleNewBlock(block: Block): Unit = {
     val blocks = AVector(block)
     if (validateFlowData(blocks, isBlock = true)) {
-      val blockChain = blockflow.getBlockChain(block.chainIndex)
-      blockChain.validateBlockHeight(block, maxForkDepth) match {
-        case Right(true) =>
-          seenBlocks.put(block.hash, ())
-          val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
-          allHandlers.dependencyHandler ! message
-        case Right(false) =>
-          log.debug(s"Receive new block ${block.shortHex} which have invalid height")
-          handleMisbehavior(MisbehaviorManager.DeepForkBlock(remoteAddress))
-        case Left(error) =>
-          log.debug(s"IO error in validating block height: $error")
-      }
+      seenBlocks.put(block.hash, ())
+      val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
+      allHandlers.dependencyHandler ! message
     }
   }
 
@@ -247,7 +236,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
 
   def validateBlockHash(hash: BlockHash): Boolean = {
-    if (!PoW.checkWork(hash, blockflow.consensusConfig.maxMiningTarget)) {
+    if (!PoW.checkWork(hash, blockflow.consensusConfigs.maxAllowedMiningTarget)) {
       handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
       false
     } else {

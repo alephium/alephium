@@ -24,7 +24,7 @@ import scala.util.control.Exception.allCatch
 import com.typesafe.config.{Config, ConfigException, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{Block, ChainIndex, NetworkId, Transaction}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.deserialize
@@ -186,7 +186,7 @@ object Configs extends StrictLogging {
 
   def loadBlockFlow(balances: AVector[Allocation])(implicit
       groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkConfig: NetworkConfig
   ): AVector[AVector[Block]] = {
     AVector.tabulate(groupConfig.groups, groupConfig.groups) { case (from, to) =>
@@ -201,7 +201,8 @@ object Configs extends StrictLogging {
       } else {
         AVector.empty[Transaction]
       }
-      Block.genesis(ChainIndex.from(from, to).get, transactions)
+      Block
+        .genesis(ChainIndex.from(from, to).get, transactions)(groupConfig, consensusConfigs.mainnet)
     }
   }
 }

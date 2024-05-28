@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import org.alephium.protocol.model.Weight
+import org.alephium.protocol.model.{Address, ChainIndex, HardFork, Weight}
 import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALPH {
@@ -45,6 +45,9 @@ object ALPH {
   val MaxOutputDataSize: Int = 256
   val MaxScriptSigNum: Int   = 32
   val MaxKeysInP2MPK: Int    = 16
+
+  val MaxGhostUncleAge: Int  = 7
+  val MaxGhostUncleSize: Int = 2
   // scalastyle:on magic.number
 
   def alph(amount: U256): Option[U256] = amount.mul(CoinInOneALPH)
@@ -83,5 +86,31 @@ object ALPH {
       // scalastyle:on magic.number
       case _ => None
     }
+  }
+
+  def prettifyAmount(amount: U256): String = {
+    if (amount == U256.Zero) {
+      "0 alph"
+    } else {
+      val converted = (BigDecimal(amount.v) / BigDecimal(oneAlph.v)).toDouble
+      s"$converted alph"
+    }
+  }
+
+  @inline def isSequentialTxSupported(chainIndex: ChainIndex, hardFork: HardFork): Boolean = {
+    hardFork.isRhoneEnabled() && chainIndex.isIntraGroup
+  }
+
+  lazy val testnetWhitelistedMiners = {
+    @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+    def miner(address: String) = {
+      Address.fromBase58(address).get.lockupScript
+    }
+    Set(
+      miner("1AuWeE5Cwt2ES3473qnpKFV96z57CYL6mbTY7hva9Xz3h"),
+      miner("12sxfxraVoU8FcSVd7P2SVr2cd2vi8d17KtrprrL7cBbV"),
+      miner("1E3vV7rFCgq5jo4NszxH5PqzyxvNXH5pvk2aQfMwmSxPB"),
+      miner("147nW43BH137TYjqEnvA9YfH1oFXKQxcvLZFwZauo7Ahy")
+    )
   }
 }

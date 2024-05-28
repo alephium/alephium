@@ -44,8 +44,16 @@ final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) 
     remaining.getBalances(lockupScript).map(_.attoAlphAmount)
   }
 
+  def alphRemainingUnsafe(lockupScript: LockupScript): U256 = {
+    alphRemaining(lockupScript).getOrElse(U256.Zero)
+  }
+
   def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {
     remaining.getTokenAmount(lockupScript, tokenId)
+  }
+
+  def tokenRemainingUnsafe(lockupScript: LockupScript, tokenId: TokenId): U256 = {
+    tokenRemaining(lockupScript, tokenId).getOrElse(U256.Zero)
   }
 
   def isPaying(lockupScript: LockupScript): Boolean = {
@@ -75,5 +83,6 @@ final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) 
 }
 
 object MutBalanceState {
+  def empty: MutBalanceState = MutBalanceState(MutBalances.empty, MutBalances.empty)
   def from(balances: MutBalances): MutBalanceState = MutBalanceState(balances, MutBalances.empty)
 }

@@ -18,23 +18,23 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.config.{ConsensusConfigsFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class BlockHeaderSpec
     extends AlephiumSpec
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture.Default {
+    with ConsensusConfigsFixture.Default {
 
   it should "have correct data" in {
     for {
       i <- 0 until groups
       j <- 0 until groups
     } {
-      val chainIndex = ChainIndex.unsafe(i, j)
-      val genesis    = BlockHeader.genesis(chainIndex, Hash.zero)
+      implicit val consensusConfig = consensusConfigs.mainnet
+      val chainIndex               = ChainIndex.unsafe(i, j)
+      val genesis                  = BlockHeader.genesis(chainIndex, Hash.zero)
 
       genesis.isGenesis is true
       genesis.copy(timestamp = TimeStamp.unsafe(1)).isGenesis is false
@@ -50,8 +50,9 @@ class BlockHeaderSpec
       AVector.tabulate(groupConfig.depsNum)(i => BlockHash.unsafe(Blake3.hash(Seq(i.toByte))))
     val blockDeps = BlockDeps.build(deps)
 
-    val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
-    val header  = genesis.copy(blockDeps = blockDeps, timestamp = TimeStamp.unsafe(1))
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
+    val header = genesis.copy(blockDeps = blockDeps, timestamp = TimeStamp.unsafe(1))
 
     val chainIndex = header.chainIndex
     header.parentHash is blockDeps.deps(2 + chainIndex.to.value)
@@ -68,7 +69,8 @@ class BlockHeaderSpec
   }
 
   it should "not extract dependencies for genesis headers" in {
-    val genesis = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty).header
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty).header
     assertThrows[AssertionError](genesis.parentHash)
     assertThrows[AssertionError](genesis.intraDep)
     assertThrows[AssertionError](genesis.inDeps)
@@ -94,7 +96,8 @@ class BlockHeaderSpec
   it should "handle version properly" in {
     DefaultBlockVersion is 0.toByte
 
-    val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
     genesis.version is 0.toByte
 
     val header = genesis.copy(version = DefaultBlockVersion)
@@ -118,7 +121,7 @@ class BlockHeaderSpec
         Hash.unsafe(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9"),
       txsHash = Hash.unsafe(hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59"),
       timestamp = TimeStamp.unsafe(1),
-      target = consensusConfig.maxMiningTarget,
+      target = consensusConfigs.mainnet.maxMiningTarget,
       nonce = nonce1
     )
 
@@ -146,7 +149,7 @@ class BlockHeaderSpec
         Hash.unsafe(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"),
       txsHash = Hash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
       timestamp = TimeStamp.unsafe(102348),
-      target = consensusConfig.maxMiningTarget,
+      target = consensusConfigs.mainnet.maxMiningTarget,
       nonce = nonce2
     )
 

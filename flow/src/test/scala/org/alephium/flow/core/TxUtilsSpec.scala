@@ -27,10 +27,11 @@ import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, Signature}
+import org.alephium.protocol._
+import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, TokenIssuance, UnlockScript}
+import org.alephium.protocol.vm._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -162,7 +163,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
       groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
-      tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+      tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
           if (chainIndex.isIntraGroup) {
@@ -191,7 +192,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
-        tx.assetOutputRefs.foreach { outputRef =>
+        tx.fixedOutputRefs.foreach { outputRef =>
           groupView.getPreOutput(outputRef) isE None
         }
       }
@@ -199,7 +200,7 @@ class TxUtilsSpec extends AlephiumSpec {
       {
         val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
         groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
-        tx.assetOutputRefs.foreachWithIndex { case (outputRef, index) =>
+        tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
           val output = tx.unsigned.fixedOutputs(index)
           if (output.toGroup equals chainIndex.from) {
             groupView.getPreOutput(outputRef) isE Some(output)
@@ -218,6 +219,153 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val fromLockupScript = LockupScript.p2pkh(fromPubKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPubKey)
+  }
+
+  trait MultiInputTransactionFixture extends UnsignedTransactionFixture {
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+    val (_, pub1)                         = chainIndex.from.generateKey
+    val (_, pub2)                         = chainIndex.from.generateKey
+    val (_, pub3)                         = chainIndex.from.generateKey
+    val (_, pub4)                         = chainIndex.from.generateKey
+
+    val amount = 10L
+
+    val inputData = TxUtils.InputData(
+      fromLockupScript,
+      fromUnlockScript,
+      ALPH.alph(1),
+      None,
+      None,
+      None
+    )
+
+    def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
+      AVector.fill(nb)(input("input1", ALPH.alph(amount), fromLockupScript))
+
+    def buildInputData(
+        pubKey: PublicKey,
+        alph: Long,
+        gas: Option[GasBox] = None,
+        utxos: Option[AVector[AssetOutputRef]] = None,
+        tokens: Option[AVector[(TokenId, U256)]] = None
+    ) =
+      TxUtils.InputData(
+        LockupScript.p2pkh(pubKey),
+        UnlockScript.p2pkh(pubKey),
+        ALPH.alph(alph),
+        tokens,
+        gas,
+        utxos
+      )
+
+    def genKeys(nb: Int): (AVector[PublicKey], AVector[PrivateKey]) = {
+      val keys        = AVector.fill(nb)(chainIndex.from.generateKey)
+      val publicKeys  = keys.map(_._2)
+      val privateKeys = keys.map(_._1)
+      (publicKeys, privateKeys)
+    }
+
+    def computeAmountPerOutput(totalAmount: Long, nbOfOutputs: Int): (Long, Long) = {
+      val amountPerOutput = totalAmount / nbOfOutputs
+      val rest            = totalAmount % nbOfOutputs
+      (amountPerOutput, rest)
+    }
+
+    def buildBlock(
+        pubKey: PublicKey,
+        transferAmount: Long,
+        tokensOpt: Option[AVector[(TokenId, U256)]] = None
+    ) = {
+      tokensOpt match {
+        case None =>
+          transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(transferAmount))
+        case Some(tokens) =>
+          val lockupScript = Address.p2pkh(pubKey).lockupScript
+          transfer(
+            blockFlow,
+            genesisPriKey,
+            lockupScript,
+            tokens = tokens,
+            amount = ALPH.alph(transferAmount)
+          )
+      }
+    }
+
+    def validateSubmit(utx: UnsignedTransaction, privateKeys: AVector[PrivateKey]) = {
+
+      val signatures = privateKeys.map { privateKey =>
+        SignatureSchema.sign(utx.id.bytes, privateKey)
+      }
+
+      val template = TransactionTemplate(
+        utx,
+        signatures,
+        scriptSignatures = AVector.empty
+      )
+
+      val txValidation = TxValidation.build
+
+      txValidation.validateMempoolTxTemplate(template, blockFlow) is Right(())
+    }
+
+    def buildOutputs(nbOfOutputs: Int, totalAmount: Long) = {
+      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutputs)
+      AVector.fill(nbOfOutputs)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
+        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
+      }
+    }
+
+    // scalastyle:off method.length
+    def checkMultiInputTx(nbOfInputs: Int, nbOfOutputs: Int) = {
+
+      val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+
+      publicKeys.foreach { pubKey =>
+        val block = buildBlock(pubKey, 100)
+        addAndCheck(blockFlow, block)
+      }
+
+      val inputs = publicKeys.map { pubKey =>
+        buildInputData(pubKey, amount)
+      }
+
+      val totalAmount             = amount * nbOfInputs
+      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutputs)
+
+      val outputs = buildOutputs(nbOfOutputs, totalAmount)
+
+      val utx = blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .rightValue
+
+      utx.inputs.length is nbOfInputs
+      utx.fixedOutputs.length is (nbOfInputs + nbOfOutputs)
+
+      val fixedOutputs = utx.fixedOutputs.take(nbOfOutputs)
+      fixedOutputs.head.amount is ALPH.alph(amountPerOutput + rest)
+      fixedOutputs.tail.foreach(_.amount is ALPH.alph(amountPerOutput))
+
+      val gasEstimation =
+        GasEstimation.estimateWithP2PKHInputs(nbOfInputs, nbOfOutputs + nbOfInputs)
+
+      utx.gasAmount <= gasEstimation is true
+
+      val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
+
+      // As they all had 1 utxo, they all had to pay same gas, so same change output
+      // Maybe first input will pay the rest of base fee, so it could be 2
+      changeOutputs.toSeq.distinct.length <= 2 is true
+
+      validateSubmit(utx, privateKeys)
+    }
   }
 
   "UnsignedTransaction.buildTransferTx" should "build transaction successfully" in new UnsignedTransactionFixture {
@@ -484,7 +632,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
-        .leftValue is "Not enough ALPH for change output"
+        .leftValue is "Not enough ALPH for token change output, expected 2000000000000000, got 999999999999999"
     }
 
     {
@@ -512,7 +660,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
-        .leftValue is "Not enough ALPH for change output"
+        .leftValue is "Not enough ALPH for ALPH change output, expected 1000000000000000, got 999999999999999"
     }
   }
 
@@ -805,7 +953,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer with large amount of UTXOs with estimated gas" in new LargeUtxos {
-    val maxP2PKHInputsAllowedByGas = 151
+    val maxP2PKHInputsAllowedByGas = 256
 
     info("With provided Utxos")
 
@@ -814,7 +962,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
-    val outputInfo = AVector(
+    val outputInfos = AVector.fill(255)(
       TxOutputInfo(
         output.lockupScript,
         ALPH.alph(1),
@@ -823,59 +971,35 @@ class TxUtilsSpec extends AlephiumSpec {
       )
     )
 
-    blockFlow
+    val tx0 = blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
         availableInputs.take(maxP2PKHInputsAllowedByGas),
-        outputInfo,
+        outputInfos,
         None,
         nonCoinbaseMinGasPrice
       )
       .rightValue
       .rightValue
-      .inputs
-      .length is maxP2PKHInputsAllowedByGas
-
-    blockFlow
-      .transfer(
-        keyManager(output.lockupScript).publicKey,
-        availableInputs.take(maxP2PKHInputsAllowedByGas + 1),
-        outputInfo,
-        None,
-        nonCoinbaseMinGasPrice
-      )
-      .rightValue
-      .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints"
+    tx0.gasAmount is GasBox.unsafe(2192360)
+    tx0.inputs.length is maxP2PKHInputsAllowedByGas
+    tx0.fixedOutputs.length is 256
 
     info("Without provided Utxos")
 
-    blockFlow
+    val tx1 = blockFlow
       .transfer(
         keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        ALPH.alph(maxP2PKHInputsAllowedByGas.toLong - 1),
+        outputInfos,
         None,
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
       .rightValue
-      .inputs
-      .length is maxP2PKHInputsAllowedByGas
-
-    blockFlow
-      .transfer(
-        keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        ALPH.alph(maxP2PKHInputsAllowedByGas.toLong),
-        None,
-        nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
-      )
-      .rightValue
-      .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints"
+    tx1.gasAmount is GasBox.unsafe(2192360)
+    tx1.inputs.length is maxP2PKHInputsAllowedByGas
+    tx1.fixedOutputs.length is 256
   }
 
   it should "sweep as much as we can" in new LargeUtxos {
@@ -1014,7 +1138,7 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "get balance for contract address" in new ContractFixture {
     val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
       blockFlow.getBalance(address, Int.MaxValue, true).rightValue
-    attoAlphBalance is ALPH.oneAlph
+    attoAlphBalance is minimalAlphInContract
     attoAlphLockedBalance is U256.Zero
     tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
     tokenLockedBalances.length is 0
@@ -1027,7 +1151,7 @@ class TxUtilsSpec extends AlephiumSpec {
     utxos.length is 1
     utxo.ref is ref
     utxo.output.lockupScript is address
-    utxo.output.amount is ALPH.oneAlph
+    utxo.output.amount is minimalAlphInContract
     utxo.output.tokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
   }
 
@@ -1081,6 +1205,424 @@ class TxUtilsSpec extends AlephiumSpec {
     blockFlow
       .getGrandPool()
       .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
+  }
+
+  "TxUtils.transferMultiInputs" should "transfer multi inputs" in new MultiInputTransactionFixture {
+    checkMultiInputTx(1, 1)
+    checkMultiInputTx(2, 1)
+    checkMultiInputTx(3, 1)
+    checkMultiInputTx(5, 1)
+    checkMultiInputTx(5, 4)
+    checkMultiInputTx(5, 30)
+    checkMultiInputTx(30, 1)
+    checkMultiInputTx(10, 10)
+    checkMultiInputTx(20, 30)
+  }
+
+  it should "transfer multi inputs with different nb of utxos per input" in new MultiInputTransactionFixture {
+    val nbOfInputs                = 4
+    val nbOfOutputs               = 4
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+
+    publicKeys.zipWithIndex.foreach { case (pubKey, i) =>
+      def block = buildBlock(pubKey, amount + 1)
+      // each address will get different number of utxos
+      (0 to i).foreach { _ =>
+        addAndCheck(blockFlow, block)
+      }
+    }
+
+    // each input will use different number of utxos
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      val amnt = (i + 1) * amount
+      buildInputData(pubKey, amnt)
+    }
+
+    val totalAmount = (1 to nbOfInputs).map { i =>
+      i * amount
+    }.sum
+
+    val outputs = buildOutputs(nbOfOutputs, totalAmount)
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
+      nbOfInputs,
+      nbOfOutputs + nbOfInputs
+    )) is true
+    (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
+      (1 to nbOfInputs).sum - 1,
+      nbOfOutputs + nbOfInputs
+    )) is true
+
+    (utx.gasAmount <= GasEstimation.estimateWithP2PKHInputs(
+      (1 to nbOfInputs).sum,
+      nbOfOutputs + nbOfInputs
+    )) is true
+
+    val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
+
+    // Each input will pay different fee, so each change output is different
+    changeOutputs.toSeq.distinct.length is changeOutputs.length
+
+    validateSubmit(utx, privateKeys)
+  }
+
+  it should "transfer multi inputs with gas defined" in new MultiInputTransactionFixture {
+    val nbOfInputs                = 4
+    val nbOfOutputs               = 1
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+    val amountPerBlock            = 100L
+
+    publicKeys.foreach { pubKey =>
+      val block = buildBlock(pubKey, amountPerBlock)
+      addAndCheck(blockFlow, block)
+    }
+
+    // We show that we can even define less than the minimal gas, as the overall gas will be enough
+    val gas = GasBox.unsafe(minimalGas.value - (minimalGas.value / 4))
+
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      buildInputData(pubKey, amount, Some(gas.mulUnsafe(i)))
+    }
+
+    val totalAmount = amount * nbOfInputs
+
+    val outputs = buildOutputs(nbOfOutputs, totalAmount)
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
+
+    changeOutputs.zipWithIndex.foreach { case (change, i) =>
+      val expected =
+        ALPH.alph(amountPerBlock - amount) - nonCoinbaseMinGasPrice * gas.mulUnsafe(i)
+      change is expected
+    }
+
+    validateSubmit(utx, privateKeys)
+  }
+
+  it should "transfer multi inputs with explicit utxos" in new MultiInputTransactionFixture {
+    val nbOfInputs                = 4
+    val nbOfOutputs               = 1
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+    val amountPerBlock            = 100L
+
+    publicKeys.foreach { pubKey =>
+      def block = buildBlock(pubKey, amountPerBlock)
+      // Force 2 utxos
+      addAndCheck(blockFlow, block)
+      addAndCheck(blockFlow, block)
+    }
+
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      if (i == 0) {
+        // First input pass all it's utxos, it should be merged
+        val availableUtxos = blockFlow
+          .getUTXOs(Address.p2pkh(pubKey).lockupScript, Int.MaxValue, true)
+          .rightValue
+          .asUnsafe[AssetOutputInfo]
+
+        // First pubKey will use both utxos
+        buildInputData(pubKey, amountPerBlock + amount, utxos = Some(availableUtxos.map(_.ref)))
+      } else {
+        buildInputData(pubKey, amount)
+      }
+    }
+
+    val totalAmount = amountPerBlock + (amount * nbOfInputs)
+
+    val outputs = buildOutputs(nbOfOutputs, totalAmount)
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    val gasEstimation =
+      GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+    utx.gasAmount <= gasEstimation is true
+
+    utx.inputs.length is nbOfInputs + 1 // for the extra utxos of first pub key
+
+    validateSubmit(utx, privateKeys)
+  }
+
+  it should "transfer multi inputs with tokens" in new MultiInputTransactionFixture
+    with ContractFixture {
+
+    def test(nbOfInputs: Int, nbOfOutputs: Int, nbOfTokens: Int, nbOfTokenHolders: Int) = {
+      val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+      val amountPerBlock            = 100L
+      val tokenAmount               = 2 * nbOfInputs
+
+      val tokens = AVector.fill(nbOfTokens) {
+        val (cId, _) = createContract(
+          code,
+          AVector.empty,
+          AVector.empty,
+          tokenIssuanceInfo = Some(
+            TokenIssuance.Info(
+              Val.U256(U256.unsafe(tokenAmount)),
+              Some(Address.p2pkh(genesisPubKey).lockupScript)
+            )
+          )
+        )
+
+        (TokenId.from(cId), U256.Two)
+      }
+
+      publicKeys.foreach { pubKey =>
+        val block = buildBlock(pubKey, amountPerBlock, Some(tokens))
+        addAndCheck(blockFlow, block)
+      }
+
+      val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+        // Holders will send only half of each of their tokens
+        if (i < nbOfTokenHolders) {
+          buildInputData(
+            pubKey,
+            amount,
+            tokens = Some(tokens.map { case (tokenId, _) => (tokenId, U256.One) })
+          )
+        } else {
+          buildInputData(pubKey, amount, tokens = Some(tokens))
+        }
+      }
+
+      val totalAmount = amount * nbOfInputs
+
+      val outputTokens =
+        tokens.map { case (tokenId, _) =>
+          (tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders))
+        }
+
+      val outputsWithoutTokens = buildOutputs(nbOfOutputs, totalAmount)
+      // We send the tokens to the first output
+      val outputs =
+        outputsWithoutTokens.replace(0, outputsWithoutTokens.head.copy(tokens = outputTokens))
+
+      val utx = blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .rightValue
+
+      utx.inputs.length is nbOfInputs + (nbOfInputs * nbOfTokens)
+
+      utx.fixedOutputs.length is tokens.length + nbOfOutputs + (nbOfTokenHolders * tokens.length) + nbOfInputs
+
+      utx.fixedOutputs.take(nbOfTokens).map(_.tokens) is
+        tokens.map { case (tokenId, _) =>
+          AVector((tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders)))
+        }
+
+      utx.fixedOutputs
+        .drop(nbOfTokens)
+        .take(nbOfOutputs)
+        .foreach(_.tokens is AVector.empty[(TokenId, U256)])
+
+      val gasEstimation =
+        GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+
+      utx.gasAmount <= gasEstimation is true
+
+      val changeOutputs = utx.fixedOutputs.drop(nbOfTokens + nbOfOutputs)
+
+      val tokensChange =
+        tokens.map { case (tokenId, _) =>
+          AVector((tokenId, U256.One))
+        } :+ AVector.empty[(TokenId, U256)]
+
+      (0 to nbOfTokenHolders - 1).foreach { i =>
+        changeOutputs
+          .drop(i * tokensChange.length)
+          .take(tokensChange.length)
+          .map(_.tokens) is tokensChange
+      }
+
+      changeOutputs
+        .drop(nbOfTokenHolders * tokensChange.length)
+        .foreach(_.tokens is AVector.empty[(TokenId, U256)])
+
+      validateSubmit(utx, privateKeys)
+    }
+
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 1, nbOfTokenHolders = 0)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 1, nbOfTokenHolders = 1)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 2, nbOfTokenHolders = 0)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 2, nbOfTokenHolders = 1)
+    test(nbOfInputs = 2, nbOfOutputs = 1, nbOfTokens = 3, nbOfTokenHolders = 0)
+    test(nbOfInputs = 2, nbOfOutputs = 1, nbOfTokens = 3, nbOfTokenHolders = 2)
+    test(nbOfInputs = 10, nbOfOutputs = 5, nbOfTokens = 5, nbOfTokenHolders = 3)
+  }
+
+  it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
+    val block0 = transfer(blockFlow, genesisPriKey, pub1, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, genesisPriKey, pub2, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block1)
+
+    val input1 = buildInputData(pub1, amount)
+
+    val outputInfos =
+      AVector(TxOutputInfo(LockupScript.p2pkh(pub1), ALPH.alph(2 * amount), AVector.empty, None))
+
+    {
+      info("same inputs")
+
+      val inputs = AVector(input1, input1)
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Inputs not unique"
+    }
+
+    {
+      info("Inputs not equal outputs")
+
+      val inputs = AVector(input1)
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Total input amount doesn't match total output amount"
+    }
+    {
+      info("Utxos not in same group as lockup script")
+      val utxos = Some(
+        AVector(AssetOutputRef.from(new ScriptHint(1), TxOutputRef.unsafeKey(Hash.hash("input1"))))
+      )
+
+      val inputs = AVector(input1.copy(utxos = utxos))
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Selected UTXOs different from lockup script group"
+    }
+
+    {
+      info("Not all gasAmount are defined")
+      val i1     = buildInputData(pub1, amount, gas = Some(GasBox.zero))
+      val i2     = buildInputData(pub1, amount, gas = None)
+      val inputs = AVector(i1, i2)
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Missing `gasAmount` in some inputs"
+    }
+  }
+
+  "TxUtils.updateSelectedGas" should "Update selected gas" in new MultiInputTransactionFixture {
+    {
+      info("empty list")
+      blockFlow.updateSelectedGas(AVector.empty, 0) is AVector
+        .empty[(TxUtils.InputData, TxUtils.AssetOutputInfoWithGas)]
+    }
+
+    {
+      info("one address with one input")
+      val gas = minimalGas
+
+      val inputs          = buildInputs(1)
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      val entries = AVector((inputData, selectedWithGas))
+      val updated = blockFlow.updateSelectedGas(entries, 2)
+
+      updated.length is entries.length
+
+      // Nothing to update
+      updated.head._2.gas is gas
+    }
+
+    {
+      info("one address with many inputs")
+      val gas = minimalGas.mulUnsafe(10)
+
+      val inputs          = buildInputs(10)
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      val entries = AVector((inputData, selectedWithGas))
+      val updated = blockFlow.updateSelectedGas(entries, 2)
+
+      updated.length is entries.length
+
+      updated.head._2.gas < gas is true
+    }
+
+    {
+      info("multiple addresses with one input")
+      val gas = minimalGas.mulUnsafe(100)
+
+      val inputs          = buildInputs(1)
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      val entries = AVector(
+        (inputData, selectedWithGas),
+        (inputData, selectedWithGas),
+        (inputData, selectedWithGas)
+      )
+
+      val updated = blockFlow.updateSelectedGas(entries, 2)
+
+      updated.length is entries.length
+      // TODO do we want to test how much was reduced?
+      updated.head._2.gas < gas is true
+    }
   }
 
   trait BuildScriptTxFixture extends UnsignedTransactionFixture {
@@ -1152,7 +1694,7 @@ class TxUtilsSpec extends AlephiumSpec {
       buildScriptTx(
         inputs,
         approvedAlph.subOneUnsafe()
-      ).leftValue is "Not enough ALPH for change output"
+      ).leftValue is "Not enough ALPH for ALPH change output, expected 1000000000000000, got 1"
     }
 
     {
@@ -1173,7 +1715,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         availableAlph.subOneUnsafe(),
         (tokenId, ALPH.oneAlph.subOneUnsafe())
-      ).leftValue is "Not enough ALPH for change output"
+      ).leftValue is "Not enough ALPH for ALPH and token change output, expected 2000000000000000, got 1000000000000001"
     }
   }
 
@@ -1199,6 +1741,130 @@ class TxUtilsSpec extends AlephiumSpec {
       inputs1,
       ALPH.oneAlph
     ).leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
+  }
+
+  it should "check gas amount: pre-rhone" in new FlowFixture {
+    override val configValues = Map(
+      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
+    blockFlow.checkProvidedGasAmount(None) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
+      "Provided gas GasBox(19999) too small, minimal GasBox(20000)"
+    blockFlow.checkProvidedGasAmount(Some(maximalGasPerTxPreRhone)) isE ()
+    blockFlow
+      .checkProvidedGasAmount(Some(maximalGasPerTxPreRhone.addUnsafe(GasBox.unsafe(1))))
+      .leftValue is
+      "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
+
+    blockFlow.checkEstimatedGasAmount(maximalGasPerTxPreRhone) isE ()
+    blockFlow
+      .checkEstimatedGasAmount(maximalGasPerTxPreRhone.addUnsafe(GasBox.unsafe(1)))
+      .isLeft is true
+  }
+
+  it should "check gas amount: rhone" in new FlowFixture {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+
+    blockFlow.checkProvidedGasAmount(None) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
+    blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
+      "Provided gas GasBox(19999) too small, minimal GasBox(20000)"
+    blockFlow.checkProvidedGasAmount(Some(maximalGasPerTx)) isE ()
+    blockFlow.checkProvidedGasAmount(Some(maximalGasPerTx.addUnsafe(GasBox.unsafe(1)))).leftValue is
+      "Provided gas GasBox(5000001) too large, maximal GasBox(5000000)"
+
+    blockFlow.checkEstimatedGasAmount(maximalGasPerTx) isE ()
+    blockFlow.checkEstimatedGasAmount(maximalGasPerTx.addUnsafe(GasBox.unsafe(1))).isLeft is true
+  }
+
+  trait PoLWCoinbaseTxFixture extends FlowFixture with LockupScriptGenerators {
+    lazy val chainIndex                 = chainIndexGenForBroker(brokerConfig).sample.get
+    lazy val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+
+    val polwReward: Emission.PoLW = Emission.PoLW(ALPH.alph(1), ALPH.cent(10))
+
+    def buildPoLWCoinbaseTx(uncleSize: Int, fromPublicKey: PublicKey = publicKey) = {
+      val uncles = (0 until uncleSize).map { _ =>
+        SelectedGhostUncle(model.BlockHash.random, assetLockupGen(chainIndex.to).sample.get, 1)
+      }
+      blockFlow
+        .polwCoinbase(
+          chainIndex,
+          fromPublicKey,
+          LockupScript.p2pkh(fromPublicKey),
+          AVector.from(uncles),
+          Emission.PoLW(ALPH.alph(1), ALPH.cent(10)),
+          U256.Zero,
+          TimeStamp.now(),
+          ByteString.empty
+        )
+        .rightValue
+        .rightValue
+    }
+  }
+
+  it should "use minimal gas fee for PoLW coinbase tx" in new PoLWCoinbaseTxFixture {
+    (0 until 2).foreach { uncleSize =>
+      val tx = buildPoLWCoinbaseTx(uncleSize)
+      tx.gasPrice is coinbaseGasPrice
+      tx.gasAmount is minimalGas
+    }
+  }
+
+  it should "not use minimal gas fee for PoLW coinbase tx" in new PoLWCoinbaseTxFixture {
+    val fromPublicKey = chainIndex.from.generateKey._2
+    (0 until 4).foreach { _ =>
+      val block = transfer(blockFlow, privateKey, fromPublicKey, ALPH.cent(3))
+      addAndCheck(blockFlow, block)
+    }
+    val tx = buildPoLWCoinbaseTx(2, fromPublicKey)
+    tx.gasPrice is coinbaseGasPrice
+    (tx.gasAmount > minimalGas) is true
+  }
+
+  it should "return error if there are tokens in PoLW coinbase input" in new PoLWCoinbaseTxFixture {
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    val inputs = AVector(
+      input("input-0", ALPH.cent(10), lockupScript),
+      input("input-1", dustUtxoAmount, lockupScript, (TokenId.random, U256.One))
+    )
+    blockFlow
+      .polwCoinbase(
+        lockupScript,
+        UnlockScript.polw(publicKey),
+        AVector.empty,
+        ALPH.cent(10),
+        inputs.map(i => AssetOutputInfo(i._1, i._2, FlowUtils.PersistedOutput)),
+        minimalGas
+      )
+      .leftValue is "Tokens are not allowed for PoLW input"
+  }
+
+  "PoLW change output amount" should "larger than dust amount" in new PoLWCoinbaseTxFixture {
+    val fromPublicKey = chainIndex.from.generateKey._2
+    val lockupScript  = LockupScript.p2pkh(fromPublicKey)
+    val amount        = polwReward.burntAmount.addUnsafe(coinbaseGasFeeSubsidy)
+    addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, amount))
+    addAndCheck(blockFlow, transfer(blockFlow, privateKey, fromPublicKey, dustUtxoAmount))
+    val utxos = blockFlow.getUsableUtxos(None, lockupScript, Int.MaxValue).rightValue
+    utxos.length is 2
+    utxos.map(_.output.amount).toSet is Set(amount, dustUtxoAmount)
+
+    val tx = buildPoLWCoinbaseTx(0, fromPublicKey)
+    tx.inputs.length is 2
+    tx.inputs.toSet is utxos
+      .map(output => TxInput(output.ref, UnlockScript.polw(fromPublicKey)))
+      .toSet
+
+    tx.fixedOutputs.length is 2
+    tx.gasAmount is minimalGas
+    tx.fixedOutputs(0).amount is Coinbase
+      .calcMainChainReward(polwReward.netRewardUnsafe())
+      .addUnsafe(polwReward.burntAmount)
+    tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy)
   }
 
   private def input(

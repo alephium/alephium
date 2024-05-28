@@ -21,7 +21,7 @@ import java.nio.file.Path
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{BlockDeps, Target}
@@ -33,7 +33,8 @@ object ValidateDifficultyBombPatch extends App {
   private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
   implicit private val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   private val dbPath                          = rootPath.resolve("mainnet")
-  private val storages  = Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker)
+  private val storages =
+    Storages.createUnsafe(dbPath, "db", ProdSettings.writeOptions)(config.broker, config.node)
   private val blockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   config.broker.chainIndexes.foreach { chainIndex =>
@@ -50,10 +51,9 @@ object ValidateDifficultyBombPatch extends App {
     val expectecTarget =
       Target.clipByTwoTimes(depTargets.fold(weightedTarget)(Math.max), weightedTarget)
 
-    val hashrate =
-      HashRate.from(template.target, config.consensus.blockTargetTime)(config.broker).MHs
-    val expectedHashRate =
-      HashRate.from(expectecTarget, config.consensus.blockTargetTime)(config.broker).MHs
+    val blockTargetTime  = config.consensus.mainnet.blockTargetTime
+    val hashrate         = HashRate.from(template.target, blockTargetTime)(config.broker).MHs
+    val expectedHashRate = HashRate.from(expectecTarget, blockTargetTime)(config.broker).MHs
     if (expectecTarget != template.target) {
       throw new RuntimeException(
         s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $expectedHashRate, have: $hashrate"

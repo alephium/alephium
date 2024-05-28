@@ -27,7 +27,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
@@ -42,23 +42,24 @@ trait Server extends Service {
   def storages: Storages
 
   lazy val node: Node = Node.build(storages, flowSystem)
-  lazy val walletApp: Option[WalletApp] = Option.when(config.network.isCoordinator) {
-    val walletConfig: WalletConfig = WalletConfig(
-      port = None,
-      config.wallet.secretDir,
-      config.wallet.lockingTimeout,
-      apiConfig.apiKey,
-      WalletConfig.BlockFlow(
-        apiConfig.networkInterface.getHostAddress,
-        config.network.restPort,
-        config.broker.groups,
-        apiConfig.blockflowFetchMaxAge,
-        apiConfig.apiKey
+  lazy val walletApp: Option[WalletApp] =
+    Option.when(config.wallet.enabled && config.network.isCoordinator) {
+      val walletConfig: WalletConfig = WalletConfig(
+        port = None,
+        config.wallet.secretDir,
+        config.wallet.lockingTimeout,
+        apiConfig.apiKey,
+        WalletConfig.BlockFlow(
+          apiConfig.networkInterface.getHostAddress,
+          config.network.restPort,
+          config.broker.groups,
+          apiConfig.blockflowFetchMaxAge,
+          apiConfig.apiKey
+        )
       )
-    )
 
-    new WalletApp(walletConfig)(executionContext)
-  }
+      new WalletApp(walletConfig)(executionContext)
+    }
 
   def blocksExporter: BlocksExporter
 
@@ -116,10 +117,11 @@ object Server {
 
     val dbPath                = rootPath.resolve(config.network.networkId.nodeFolder)
     val storageFolder: String = "db"
-    val writeOptions = if (config.node.dbSyncWrite) Settings.syncWrite else Settings.writeOptions
+    val writeOptions =
+      if (config.node.dbSyncWrite) ProdSettings.syncWrite else ProdSettings.writeOptions
 
     val storages: Storages =
-      Storages.createUnsafe(dbPath, storageFolder, writeOptions)(config.broker)
+      Storages.createUnsafe(dbPath, storageFolder, writeOptions)(config.broker, config.node)
 
     val blocksExporter: BlocksExporter = new BlocksExporter(node.blockFlow, rootPath)(config.broker)
   }

@@ -518,7 +518,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManager ! message
     broker0.expectNoMessage()
     broker1.expectNoMessage()
-    broker2.expectMsg(BrokerHandler.RelayBlock(message.block.hash))
+    broker2.expectMsg(BrokerHandler.RelayBlock(message.blockHash))
     broker3.expectNoMessage()
   }
 

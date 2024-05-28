@@ -26,9 +26,9 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Weight}
-import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
+import org.alephium.util.{AVector, Cache, EitherF, Math, TimeStamp}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
   implicit def brokerConfig: BrokerConfig
 
@@ -88,15 +88,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       height: Int,
       isCanonical: Boolean
   ): IOResult[Unit] = {
-    heightIndexStorage.getOpt(height).flatMap {
-      case Some(hashes) =>
-        if (isCanonical) {
-          heightIndexStorage.put(height, hash +: hashes)
-        } else {
-          heightIndexStorage.put(height, hashes :+ hash)
-        }
-      case None => heightIndexStorage.put(height, AVector(hash))
-    }
+    heightIndexStorage
+      .getOpt(height)
+      .map {
+        case Some(hashes) => if (isCanonical) hash +: hashes else hashes :+ hash
+        case None         => AVector(hash)
+      }
+      .flatMap { blockHashes =>
+        heightIndexStorage.put(height, blockHashes).map(_ => cacheHashes(height, blockHashes))
+      }
   }
 
   def getParentHash(hash: BlockHash): IOResult[BlockHash]
@@ -107,11 +107,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
 
   // the max height is the height of the tip of max weight
-  def maxHeight: IOResult[Int] = {
-    IOUtils.tryExecute(maxHeightUnsafe)
+  def maxHeightByWeight: IOResult[Int] = {
+    IOUtils.tryExecute(maxHeightByWeightUnsafe)
   }
 
-  def maxHeightUnsafe: Int = {
+  def maxHeightByWeightUnsafe: Int = {
     val (maxHeight, _) =
       tips.keys().foldLeft((ALPH.GenesisHeight, ALPH.GenesisWeight)) {
         case ((height, weight), tip) =>
@@ -122,6 +122,24 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       }
 
     maxHeight
+  }
+
+  def maxHeight: IOResult[Int] = {
+    IOUtils.tryExecute(maxHeightUnsafe)
+  }
+
+  def maxHeightUnsafe: Int = {
+    tips
+      .keys()
+      .foldLeft((ALPH.GenesisHeight, genesisHash)) { case ((height, hash), tip) =>
+        val tipHeight = getHeightUnsafe(tip)
+        if (BlockHashPool.compareHeight(tip, tipHeight, hash, height) > 0) {
+          (tipHeight, tip)
+        } else {
+          (height, hash)
+        }
+      }
+      ._1
   }
 
   def isCanonical(hash: BlockHash): IOResult[Boolean] = {
@@ -136,7 +154,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   protected[core] lazy val stateCache =
-    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 4)
+    FlowCache.states(consensusConfigs.blockCacheCapacityPerChain * 4)
 
   def cacheState(hash: BlockHash, state: BlockState): Unit = stateCache.put(hash, state)
   def contains(hash: BlockHash): IOResult[Boolean] =
@@ -154,12 +172,29 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 
+  private[core] lazy val hashesCache =
+    Cache.lruSafe[Int, AVector[BlockHash]](consensusConfigs.blockCacheCapacityPerChain * 4)
+
+  def updateHashesCache(height: Int, hashes: AVector[BlockHash]): Unit = {
+    if (hashesCache.contains(height)) {
+      hashesCache.put(height, hashes)
+    }
+  }
+
+  def cacheHashes(height: Int, hashes: AVector[BlockHash]): Unit = hashesCache.put(height, hashes)
+
   def getHashesUnsafe(height: Int): AVector[BlockHash] = {
-    heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
+    hashesCache.get(height) match {
+      case Some(hashes) => hashes
+      case None         => heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
+    }
   }
 
   def getHashes(height: Int): IOResult[AVector[BlockHash]] = {
-    heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
+    hashesCache.get(height) match {
+      case Some(hashes) => Right(hashes)
+      case None         => heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
+    }
   }
 
   def getBestTipUnsafe(): BlockHash = {
@@ -342,10 +377,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
         diff      <- calHashDiffFromSameHeight(newParent, oldParent)
       } yield ChainDiff(diff.toRemove :+ oldHash, diff.toAdd :+ newHash)
     }
-  }
-
-  def isRecentHeight(height: Int): IOResult[Boolean] = {
-    maxHeight.map(height >= _ - consensusConfig.recentBlockHeightDiff)
   }
 }
 // scalastyle:on number.of.methods

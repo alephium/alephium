@@ -35,17 +35,16 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.MiningBlob
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
-import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
+import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
-import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -64,11 +63,11 @@ trait EndpointsLogic extends Endpoints {
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
 
-  implicit lazy val groupConfig: GroupConfig         = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting    = node.config.network
-  implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
-  implicit lazy val logConfig: LogConfig             = node.config.node.eventLogConfig
-  implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig            = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting       = node.config.network
+  implicit lazy val consensusConfigs: ConsensusSettings = node.config.consensus
+  implicit lazy val logConfig: LogConfig                = node.config.node.eventLogConfig
+  implicit lazy val askTimeout: Timeout                 = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -171,6 +170,11 @@ trait EndpointsLogic extends Endpoints {
 
   val getBlockLogic = serverLogic(getBlock) { hash =>
     Future.successful(serverUtils.getBlock(blockFlow, hash))
+  }
+
+  val getMainChainBlockByGhostUncleLogic = serverLogic(getMainChainBlockByGhostUncle) {
+    ghostUncleHash =>
+      Future.successful(serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash))
   }
 
   val getBlockAndEventsLogic = serverLogic(getBlockAndEvents) { hash =>
@@ -391,6 +395,37 @@ trait EndpointsLogic extends Endpoints {
     bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
   )
 
+  val buildSweepMultisigLogic = serverLogicRedirect(buildSweepMultisig)(
+    buildSweepMultisig =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils
+            .buildSweepMultisig(
+              blockFlow,
+              buildSweepMultisig
+            )
+        )
+      },
+    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+  )
+
+  val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(
+    buildMultiInputsTransaction =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils
+            .buildMultiInputsTransaction(
+              blockFlow,
+              buildMultiInputsTransaction
+            )
+        )
+      },
+    bt =>
+      bt.from.headOption
+        .map(t => t.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply))
+        .getOrElse(Left(ApiError.BadRequest("Empty list of input")))
+  )
+
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
     buildSweepAddressTransactions =>
       withSyncedClique {
@@ -604,12 +639,31 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(Right(()))
   }
 
-  val contractStateLogic = serverLogic(contractState) { case (contractAddress, groupIndex) =>
+  val targetToHashrateLogic = serverLogic(targetToHashrate) { targetToHashrate =>
+    Future.successful(
+      try {
+        val consensusConfig = consensusConfigs.getConsensusConfig(TimeStamp.now())
+        val hashrate =
+          HashRate.from(Target.unsafe(targetToHashrate.target), consensusConfig.blockTargetTime)
+        Right(TargetToHashrate.Result(hashrate.value))
+      } catch {
+        case _: Throwable =>
+          Left(
+            ApiError.BadRequest(
+              s"Invalid target string: ${Hex.toHexString(targetToHashrate.target)}"
+            )
+          )
+      }
+    )
+  }
+
+  val contractStateLogic = serverLogic(contractState) { contractAddress =>
+    val groupIndex = contractAddress.groupIndex
     requestFromGroupIndex(
       groupIndex,
-      Future.successful(serverUtils.getContractState(blockFlow, contractAddress, groupIndex)),
+      Future.successful(serverUtils.getContractState(blockFlow, contractAddress)),
       contractState,
-      (contractAddress, groupIndex)
+      contractAddress
     )
   }
 
@@ -719,11 +773,12 @@ trait EndpointsLogic extends Endpoints {
   }
 
   def fetchChainParams(): FutureTry[ChainParams] = {
+    val now = TimeStamp.now()
     Future.successful(
       Right(
         ChainParams(
           networkConfig.networkId,
-          consenseConfig.numZerosAtLeastInHash,
+          consensusConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
           brokerConfig.groupNumPerBroker,
           brokerConfig.groups
         )
@@ -831,31 +886,5 @@ object EndpointsLogic {
       syncStatus.isSynced,
       syncStatus.clientInfo
     )
-  }
-
-  // Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
-  def blockTempateToCandidate(
-      chainIndex: ChainIndex,
-      template: MiningBlob
-  ): BlockCandidate = {
-    BlockCandidate(
-      fromGroup = chainIndex.from.value,
-      toGroup = chainIndex.to.value,
-      headerBlob = template.headerBlob,
-      target = template.target,
-      txsBlob = template.txsBlob
-    )
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def blockSolutionToBlock(
-      solution: BlockSolution
-  ): Either[ApiError[_ <: StatusCode], (Block, U256)] = {
-    deserialize[Block](solution.blockBlob) match {
-      case Right(block) =>
-        Right(block -> solution.miningCount)
-      case Left(error) =>
-        Left(ApiError.InternalServerError(s"Block deserialization error: ${error.getMessage}"))
-    }
   }
 }

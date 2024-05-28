@@ -38,7 +38,9 @@ class TxOrderBench {
   implicit val networkConfig: NetworkConfig = new NetworkConfig {
     val networkId: NetworkId              = NetworkId(0)
     val noPreMineProof: ByteString        = ByteString.empty
-    val lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
+    val now                               = TimeStamp.now()
+    val lemanHardForkTimestamp: TimeStamp = now
+    val rhoneHardForkTimestamp: TimeStamp = now
   }
   val txNum: Int = 2000
   val header: BlockHeader =

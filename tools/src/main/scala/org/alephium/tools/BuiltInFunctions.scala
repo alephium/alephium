@@ -24,15 +24,20 @@ import upickle.default.{macroRW, ReadWriter => RW}
 import org.alephium.ralph.BuiltIn
 
 object BuiltInFunctions extends App {
-  val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map { case (_, f) =>
-    FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
-  }
-  val json: String = write(allFunctions.toSeq.sorted, indent = 2)
+  val json: String = write(buildAllFunctions(), indent = 2)
 
   import java.io.PrintWriter
   new PrintWriter("../protocol/src/main/resources/ralph-built-in-functions.json") {
     write(json)
     close()
+  }
+
+  def buildAllFunctions(): Seq[FunctionInfo] = {
+    val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map {
+      case (_, f) =>
+        FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
+    }
+    ((FunctionInfo.encodeFields +: allFunctions.toSeq) ++ FunctionInfo.mapFunctions).sorted
   }
 
   final case class FunctionInfo(
@@ -51,6 +56,7 @@ object BuiltInFunctions extends App {
       val orders = Seq[BuiltIn.Category](
         Contract,
         SubContract,
+        Map,
         Asset,
         Utils,
         Chain,
@@ -60,5 +66,54 @@ object BuiltInFunctions extends App {
       ).map(_.toString)
       Ordering.by(f => orders.indexOf(f.category))
     }
+
+    val encodeFields: FunctionInfo = FunctionInfo(
+      name = "encodeFields",
+      category = BuiltIn.Category.Contract.toString,
+      signature = "fn <ContractName>.encodeFields!(...) -> (ByteVec, ByteVec)",
+      doc = "Encode the fields for creating a contract",
+      params = Seq("@param ... the fields of the to-be-created target contract"),
+      returns =
+        "@returns two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
+    )
+
+    val mapInsert: FunctionInfo = FunctionInfo(
+      name = "map.insert",
+      category = BuiltIn.Category.Map.toString,
+      signature =
+        "fn <map>.insert!(depositorAddress: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
+      doc =
+        "Insert a key/value pair into the map. No brace syntax is required, as the minimal storage deposit will be deducted from the approved assets by the VM",
+      params = Seq(
+        "@param depositorAddress the address to pay the minimal storage deposit (0.1 ALPH) for the new map entry",
+        "@param key the key to insert",
+        "@param value the value to insert"
+      ),
+      returns = "@returns "
+    )
+
+    val mapRemove: FunctionInfo = FunctionInfo(
+      name = "map.remove",
+      category = BuiltIn.Category.Map.toString,
+      signature =
+        "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+      doc = "Remove a key from the map",
+      params = Seq(
+        "@param depositRecipient the address to receive the redeemed minimal storage deposit",
+        "@param key the key to remove"
+      ),
+      returns = "@returns "
+    )
+
+    val mapContains: FunctionInfo = FunctionInfo(
+      name = "map.contains",
+      category = BuiltIn.Category.Map.toString,
+      signature = "fn <map>.contains!(key: <Bool | U256 | I256 | Address | ByteVec>) -> Bool",
+      doc = "Check whether the map contains a bindiing for the key",
+      params = Seq("@param key the key to check"),
+      returns = "@returns true if there is a binding for key in this map, false otherwise"
+    )
+
+    val mapFunctions: Seq[FunctionInfo] = Seq(mapInsert, mapRemove, mapContains)
   }
 }

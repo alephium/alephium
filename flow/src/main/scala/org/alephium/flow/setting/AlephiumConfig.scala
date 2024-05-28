@@ -36,7 +36,7 @@ import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Address, Block, Difficulty, NetworkId, Target, Weight}
+import org.alephium.protocol.model.{Address, Block, Difficulty, HardFork, NetworkId, Target, Weight}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util._
 
@@ -50,7 +50,6 @@ final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
     numZerosAtLeastInHash: Int,
-    blockCacheCapacityPerChain: Int,
     emission: Emission
 ) extends ConsensusConfig {
   val maxMiningTarget: Target =
@@ -58,15 +57,23 @@ final case class ConsensusSetting(
   val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
   val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
 
-  val expectedTimeSpan: Duration        = blockTargetTime
-  val powAveragingWindow: Int           = 17
-  val expectedWindowTimeSpan: Duration  = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
-  val crossShardHeightGapThreshold: Int = powAveragingWindow
+  val expectedTimeSpan: Duration       = blockTargetTime
+  val powAveragingWindow: Int          = 17
+  val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
-  def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int): Difficulty = {
-    val delta = gap - crossShardHeightGapThreshold
+  private val crossShardHeightGapThresholdPreRhone: Int = powAveragingWindow
+  private val crossShardHeightGapThreshold: Int         = powAveragingWindow / 2
+
+  def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int, hardFork: HardFork): Difficulty = {
+    assume(hardFork.isLemanEnabled())
+    val (threshold, factor) = if (hardFork.isRhoneEnabled()) {
+      crossShardHeightGapThreshold -> 3
+    } else {
+      crossShardHeightGapThresholdPreRhone -> 5
+    }
+    val delta = gap - threshold
     if (delta > 0) {
-      diff.times(100 + 5 * delta).divide(100)
+      diff.times(100 + factor * delta).divide(100)
     } else {
       diff
     }
@@ -79,26 +86,49 @@ final case class ConsensusSetting(
   val windowTimeSpanMax: Duration =
     (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
-  val recentBlockHeightDiff: Int         = 30
-  val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
-
-  val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(maxForkDepth.toLong)
-  val conflictCacheKeepDuration: Duration =
-    expectedTimeSpan timesUnsafe blockCacheCapacityPerChain.toLong
+  private[setting] val tipsPruneDuration: Duration =
+    blockTargetTime.timesUnsafe(maxForkDepth.toLong)
 }
 //scalastyle:on
+
+final case class ConsensusSettings(
+    mainnet: ConsensusSetting,
+    rhone: ConsensusSetting,
+    blockCacheCapacityPerChain: Int
+) extends ConsensusConfigs {
+  override def getConsensusConfig(hardFork: HardFork): ConsensusSetting = {
+    if (hardFork.isRhoneEnabled()) rhone else mainnet
+  }
+  override def getConsensusConfig(
+      ts: TimeStamp
+  )(implicit networkConfig: NetworkConfig): ConsensusSetting = {
+    getConsensusConfig(networkConfig.getHardFork(ts))
+  }
+
+  val conflictCacheKeepDuration: Duration =
+    Math.max(
+      mainnet.expectedTimeSpan,
+      rhone.expectedTimeSpan
+    ) timesUnsafe blockCacheCapacityPerChain.toLong
+  val tipsPruneDuration: Duration = Math.max(mainnet.tipsPruneDuration, rhone.tipsPruneDuration)
+
+  val recentBlockHeightDiff: Int         = 30
+  val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
+}
 
 final case class MiningSetting(
     minerAddresses: Option[AVector[Address.Asset]],
     nonceStep: U256,
     batchDelay: Duration,
     apiInterface: InetAddress,
-    pollingInterval: Duration
+    pollingInterval: Duration,
+    jobCacheSizePerChain: Int
 )
 
 final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
+    rhoneHardForkTimestamp: TimeStamp,
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
@@ -174,14 +204,12 @@ final case class MemPoolSetting(
     autoMineForDev: Boolean // for dev only
 )
 
-final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
-
-object WalletSetting {
-  final case class BlockFlow(host: String, port: Int, groups: Int)
-}
+final case class WalletSetting(enabled: Boolean, secretDir: Path, lockingTimeout: Duration)
 
 final case class NodeSetting(
     dbSyncWrite: Boolean,
+    assetTrieCacheMaxByteSize: Int,
+    contractTrieCacheMaxByteSize: Int,
     eventLog: LogConfig
 ) {
   def eventLogConfig: LogConfig = eventLog
@@ -204,7 +232,7 @@ final case class GenesisSetting(allocations: AVector[Allocation])
 
 final case class AlephiumConfig(
     broker: BrokerSetting,
-    consensus: ConsensusSetting,
+    consensus: ConsensusSettings,
     mining: MiningSetting,
     network: NetworkSetting,
     discovery: DiscoverySetting,
@@ -224,19 +252,32 @@ final case class AlephiumConfig(
 object AlephiumConfig {
   import ConfigUtils._
 
+  final private case class TempConsensusSettings(
+      mainnet: TempConsensusSetting,
+      rhone: TempConsensusSetting,
+      blockCacheCapacityPerChain: Int,
+      numZerosAtLeastInHash: Int
+  ) {
+    def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
+      val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
+      val rhoneEmission =
+        Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
+      ConsensusSettings(
+        mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
+        rhone.toConsensusSetting(rhoneEmission, numZerosAtLeastInHash),
+        blockCacheCapacityPerChain
+      )
+    }
+  }
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
-      uncleDependencyGapTime: Option[Duration],
-      numZerosAtLeastInHash: Int,
-      blockCacheCapacityPerChain: Int
+      uncleDependencyGapTime: Duration
   ) {
-    def toConsensusSetting(groupConfig: GroupConfig): ConsensusSetting = {
-      val emission = Emission(groupConfig, blockTargetTime)
+    def toConsensusSetting(emission: Emission, numZerosAtLeastInHash: Int): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
-        uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
+        uncleDependencyGapTime,
         numZerosAtLeastInHash,
-        blockCacheCapacityPerChain,
         emission
       )
     }
@@ -245,6 +286,7 @@ object AlephiumConfig {
   final private case class TempNetworkSetting(
       networkId: NetworkId,
       lemanHardForkTimestamp: TimeStamp,
+      rhoneHardForkTimestamp: TimeStamp,
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
@@ -280,6 +322,7 @@ object AlephiumConfig {
       NetworkSetting(
         networkId,
         lemanHardForkTimestamp,
+        rhoneHardForkTimestamp,
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
@@ -319,7 +362,8 @@ object AlephiumConfig {
       nonceStep: U256,
       batchDelay: Duration,
       apiInterface: InetAddress,
-      pollingInterval: Duration
+      pollingInterval: Duration,
+      jobCacheSizePerChain: Int
   ) {
     def toMiningSetting(addresses: Option[AVector[Address.Asset]]): MiningSetting = {
       MiningSetting(
@@ -327,14 +371,15 @@ object AlephiumConfig {
         nonceStep,
         batchDelay,
         apiInterface,
-        pollingInterval
+        pollingInterval,
+        jobCacheSizePerChain
       )
     }
   }
 
   final private case class TempAlephiumConfig(
       broker: BrokerSetting,
-      consensus: TempConsensusSetting,
+      consensus: TempConsensusSettings,
       mining: TempMiningSetting,
       network: TempNetworkSetting,
       discovery: DiscoverySetting,
@@ -345,15 +390,19 @@ object AlephiumConfig {
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
-        val consensusExtracted = consensus.toConsensusSetting(broker)
+        val consensusExtracted = consensus.toConsensusSettings(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
-          discovery.copy(bootstrap =
-            ArraySeq(
-              new InetSocketAddress("v17-bootstrap0.testnet.alephium.org", 9973),
-              new InetSocketAddress("v17-bootstrap1.testnet.alephium.org", 9973)
+          if (discovery.bootstrap.isEmpty) {
+            discovery.copy(bootstrap =
+              ArraySeq(
+                new InetSocketAddress("bootstrap0.testnet.alephium.org", 9973),
+                new InetSocketAddress("bootstrap1.testnet.alephium.org", 9973)
+              )
             )
-          )
+          } else {
+            discovery
+          }
         } else {
           discovery
         }
@@ -379,7 +428,7 @@ object AlephiumConfig {
     valueReader { implicit cfg =>
       TempAlephiumConfig(
         as[BrokerSetting]("broker"),
-        as[TempConsensusSetting]("consensus"),
+        as[TempConsensusSettings]("consensus"),
         as[TempMiningSetting]("mining"),
         as[TempNetworkSetting]("network"),
         as[DiscoverySetting]("discovery"),
@@ -407,6 +456,13 @@ object AlephiumConfig {
       config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)
     ) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
+    }
+
+    if (
+      config.network.networkId == NetworkId.AlephiumMainNet &&
+      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+    ) {
+      throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
     }
 
     config

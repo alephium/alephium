@@ -16,8 +16,11 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Generators
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.config.NetworkConfig
+import org.alephium.util.{AlephiumSpec, TimeStamp}
 
 class ReleaseVersionSpec extends AlephiumSpec {
   it should "get version from release string" in {
@@ -42,6 +45,59 @@ class ReleaseVersionSpec extends AlephiumSpec {
 
         (version1 > version2) is compareResult
       }
+    }
+  }
+
+  it should "check client id" in {
+    def buildNetworkConfig(_networkId: NetworkId, rhoneActivationTS: TimeStamp): NetworkConfig = {
+      new NetworkConfig {
+        override def networkId              = _networkId
+        override def noPreMineProof         = ByteString.empty
+        override def lemanHardForkTimestamp = TimeStamp.zero
+        override def rhoneHardForkTimestamp = rhoneActivationTS
+      }
+    }
+
+    val now = TimeStamp.now()
+
+    {
+      info("Test mainnet pre-Rhone")
+      implicit val config = buildNetworkConfig(NetworkId.AlephiumMainNet, now.plusHoursUnsafe(1))
+      config.getHardFork(now) is HardFork.Leman
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.8.1/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v3.1.1/Linux") is true
+    }
+
+    {
+      info("Test mainnet Rhone")
+      implicit val config = buildNetworkConfig(NetworkId.AlephiumMainNet, now.plusHoursUnsafe(-1))
+      config.getHardFork(now) is HardFork.Rhone
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.8.1/Linux") is false
+      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v3.1.1/Linux") is true
+    }
+
+    {
+      info("Test testnet pre-Rhone")
+      implicit val config = buildNetworkConfig(NetworkId.AlephiumTestNet, now.plusHoursUnsafe(1))
+      config.getHardFork(now) is HardFork.Leman
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
+    }
+
+    {
+      info("Test testnet Rhone")
+      implicit val config = buildNetworkConfig(NetworkId.AlephiumTestNet, now.plusHoursUnsafe(-1))
+      config.getHardFork(now) is HardFork.Rhone
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
     }
   }
 }

@@ -22,20 +22,20 @@ import org.rocksdb._
 import org.alephium.serde._
 
 object RocksDBKeyValueStorage {
-  import RocksDBSource.Settings
+  import RocksDBSource.ProdSettings
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
       cf: RocksDBSource.ColumnFamily
   ): KeyValueStorage[K, V] =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+    apply(storage, cf, ProdSettings.writeOptions, ProdSettings.readOptions)
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
       cf: RocksDBSource.ColumnFamily,
       writeOptions: WriteOptions
   ): KeyValueStorage[K, V] =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+    apply(storage, cf, writeOptions, ProdSettings.readOptions)
 
   def apply[K: Serde, V: Serde](
       storage: RocksDBSource,
@@ -58,17 +58,23 @@ class RocksDBKeyValueStorage[K, V](
   protected val handle: ColumnFamilyHandle = storage.handle(cf)
 
   def iterateE(f: (K, V) => IOResult[Unit]): IOResult[Unit] = {
+    iterateRawE { (keyBytes, valBytes) =>
+      for {
+        key   <- keySerde.deserialize(keyBytes).left.map(IOError.Serde(_))
+        value <- valueSerde.deserialize(valBytes).left.map(IOError.Serde(_))
+        _     <- f(key, value)
+      } yield ()
+    }
+  }
+
+  def iterateRawE(f: (ByteString, ByteString) => IOResult[Unit]): IOResult[Unit] = {
     IOUtils.tryExecute {
       val iterator = db.newIterator(handle)
       iterator.seekToFirst()
       while (iterator.isValid()) {
         val keyBytes = ByteString.fromArrayUnsafe(iterator.key())
         val valBytes = ByteString.fromArrayUnsafe(iterator.value())
-        (for {
-          key   <- keySerde.deserialize(keyBytes)
-          value <- valueSerde.deserialize(valBytes)
-          _     <- f(key, value)
-        } yield ()) match {
+        f(keyBytes, valBytes) match {
           case Left(err) =>
             iterator.close()
             throw err
@@ -81,5 +87,9 @@ class RocksDBKeyValueStorage[K, V](
 
   def iterate(f: (K, V) => Unit): IOResult[Unit] = {
     iterateE((k, v) => Right(f(k, v)))
+  }
+
+  def iterateRaw(f: (ByteString, ByteString) => Unit): IOResult[Unit] = {
+    iterateRawE((k, v) => Right(f(k, v)))
   }
 }

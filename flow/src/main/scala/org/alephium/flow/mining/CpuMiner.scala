@@ -20,7 +20,7 @@ import akka.actor.Props
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
-import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.BrokerConfig
@@ -84,8 +84,8 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
       fromShift <- 0 until brokerConfig.groupNumPerBroker
       to        <- 0 until brokerConfig.groups
     } {
-      val miningBlob = MiningBlob.from(templates(fromShift)(to))
-      pendingTasks(fromShift)(to) = miningBlob
+      val job = Job.from(templates(fromShift)(to))
+      pendingTasks(fromShift)(to) = job
     }
     startNewTasks()
   }

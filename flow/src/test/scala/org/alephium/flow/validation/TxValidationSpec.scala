@@ -88,7 +88,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     ): TxValidationResult[GasBox] = {
       val blockEnv =
         BlockEnv(tx.chainIndex, networkConfig.networkId, timestamp, Target.Max, None)
-      checkGasAndWitnesses(tx, preOutputs, blockEnv)
+      checkGasAndWitnesses(tx, preOutputs, blockEnv, false)
     }
 
     def prepareOutputs(lockup: LockupScript.Asset, unlock: UnlockScript, outputsNum: Int) = {
@@ -437,8 +437,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
     tx.gasAmount(minimalGas).pass()
     tx.gasAmount(minimalGas.use(1).rightValue).fail(InvalidStartGas)
-    tx.gasAmount(maximalGasPerTx).pass()
-    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTxPreRhone).pass()
+    tx.gasAmount(maximalGasPerTxPreRhone.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
     tx.gasPrice(coinbaseGasPrice).pass()
@@ -457,8 +457,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
     tx.gasAmount(minimalGas).pass()
     tx.gasAmount(minimalGas.use(1).rightValue).fail(InvalidStartGas)
-    tx.gasAmount(maximalGasPerTx).pass()
-    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTxPreRhone).pass()
+    tx.gasAmount(maximalGasPerTxPreRhone.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
     tx.gasPrice(coinbaseGasPrice).fail(InvalidGasPrice)
@@ -466,6 +466,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasPrice(GasPrice(nonCoinbaseMinGasPrice.value - 1)).fail(InvalidGasPrice)
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
+  }
+
+  it should "check gas bounds for rhone-hardfork" in new Fixture {
+    implicit val validator = checkGasBound(_, isCoinbase = Random.nextBoolean(), HardFork.Rhone)
+
+    val tx = transactionGen(2, 1).sample.value
+    tx.pass()
+
+    tx.gasAmount(GasBox.unsafeTest(-1)).fail(InvalidStartGas)
+    tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
+    tx.gasAmount(minimalGas).pass()
+    tx.gasAmount(minimalGas.subUnsafe(1)).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTxPreRhone).pass()
+    tx.gasAmount(maximalGasPerTxPreRhone.addUnsafe(1)).pass()
+    tx.gasAmount(maximalGasPerTx).pass()
+    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
   }
 
   it should "check ALPH balance stats" in new Fixture {
@@ -743,6 +759,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       isPublic = true,
       usePreapprovedAssets = useAssets,
       useContractAssets = useAssets,
+      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -878,6 +895,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
             isPublic = true,
             usePreapprovedAssets = useAssets,
             useContractAssets = useAssets,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -903,7 +921,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val prevOutputs = worldState.getPreOutputs(tx).rightValue
 
     val initialGas = tx.unsigned.gasAmount
-    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv).rightValue
+    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false).rightValue
     val gasUsed    = initialGas.use(gasLeft).rightValue
 
     tx.unsigned.inputs.length is 1
@@ -1141,18 +1159,76 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx2.fail(InvalidScriptHash)
   }
 
+  it should "validate polw" in new Fixture {
+    implicit val validator = (tx: Transaction) => {
+      val chainIndex = getChainIndex(tx).rightValue
+      val bestDeps   = blockFlow.getBestDeps(chainIndex.from)
+      val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
+      val hardFork   = networkConfig.getHardFork(TimeStamp.now())
+      val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue.copy(hardFork = hardFork)
+      validateTx(tx, chainIndex, groupView, blockEnv, Some(U256.Zero), true)
+    }
+
+    val (priKey, pubKey) = keypairGen.sample.value
+    val lockup           = LockupScript.p2pkh(pubKey)
+    val unlock           = UnlockScript.p2pkh(pubKey)
+    val unsignedTx       = prepareOutput(lockup, unlock)
+    val inputs0   = unsignedTx.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(pubKey)))
+    val unsigned0 = unsignedTx.copy(inputs = inputs0)
+    val preImage  = UnlockScript.PoLW.buildPreImage(lockup, lockup)
+    val signature = SignatureSchema.sign(preImage, priKey)
+    val tx0       = Transaction.from(unsigned0, AVector(signature))
+    tx0.pass()
+
+    val tx1 = Transaction.from(unsigned0, AVector(Signature.generate))
+    tx1.fail(InvalidSignature)
+
+    val invalidPubKey = keypairGen.sample.value._2
+    val inputs1 =
+      unsignedTx.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(invalidPubKey)))
+    val unsigned1 = unsignedTx.copy(inputs = inputs1)
+    val tx2       = Transaction.from(unsigned1, AVector(signature))
+    tx2.fail(InvalidPublicKeyHash)
+
+    val invalidMiner = LockupScript.p2pkh(invalidPubKey)
+    val assetOutput  = unsignedTx.fixedOutputs.head.copy(lockupScript = invalidMiner)
+    val unsigned2 = unsignedTx.copy(fixedOutputs = unsignedTx.fixedOutputs.replace(0, assetOutput))
+    val tx3       = Transaction.from(unsigned2, AVector(signature))
+    tx3.fail(InvalidSignature)
+  }
+
+  it should "invalidate polw" in new Fixture {
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
+
+    val (priKey, pubKey) = keypairGen.sample.value
+    val lockup           = LockupScript.p2pkh(pubKey)
+    val unlock           = UnlockScript.p2pkh(pubKey)
+    val unsigned0        = prepareOutput(lockup, unlock)
+    val tx0              = Transaction.from(unsigned0, priKey)
+    tx0.pass()
+
+    val inputs    = unsigned0.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(pubKey)))
+    val unsigned1 = unsigned0.copy(inputs = inputs)
+    val preImage  = UnlockScript.PoLW.buildPreImage(lockup, lockup)
+    val signature = SignatureSchema.sign(preImage, priKey)
+    val tx1       = Transaction.from(unsigned1, AVector(signature))
+    tx1.fail(InvalidUnlockScriptType)
+  }
+
   trait GasFixture extends Fixture {
     def groupIndex: GroupIndex
     def tx: Transaction
     lazy val initialGas = minimalGas
-    lazy val blockEnv =
+    lazy val blockEnv = {
+      val now = TimeStamp.now()
       BlockEnv(
         tx.chainIndex,
         NetworkId.AlephiumMainNet,
-        TimeStamp.now(),
-        consensusConfig.maxMiningTarget,
+        now,
+        consensusConfigs.getConsensusConfig(now).maxMiningTarget,
         None
       )
+    }
     lazy val prevOutputs = blockFlow
       .getBestPersistedWorldState(groupIndex)
       .rightValue

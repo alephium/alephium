@@ -45,8 +45,37 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
     }
   }
 
-  def getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(tx.unsigned.inputs).flatMap {
+  private[core] def getPreOutputs(
+      inputs: AVector[TxInput],
+      additionalCacheOpt: Option[scala.collection.Map[AssetOutputRef, AssetOutput]]
+  ): IOResult[Option[AVector[AssetOutput]]] = {
+    inputs.foldE(Option(AVector.ofCapacity[AssetOutput](inputs.length))) {
+      case (Some(outputs), input) =>
+        getAsset(input.outputRef).map {
+          case Some(output) => Some(outputs :+ output)
+          case None         => additionalCacheOpt.flatMap(_.get(input.outputRef).map(outputs :+ _))
+        }
+      case (None, _) => Right(None)
+    }
+  }
+
+  def exists(
+      inputs: AVector[TxInput],
+      additionalCache: scala.collection.Set[AssetOutputRef]
+  ): IOResult[Boolean] = {
+    inputs.forallE { input =>
+      getAsset(input.outputRef).map {
+        case Some(_) => true
+        case None    => additionalCache.contains(input.outputRef)
+      }
+    }
+  }
+
+  def getPreOutputs(
+      tx: Transaction,
+      additionalCacheOpt: Option[scala.collection.mutable.Map[AssetOutputRef, AssetOutput]]
+  ): IOResult[Option[AVector[TxOutput]]] = {
+    getPreOutputs(tx.unsigned.inputs, additionalCacheOpt).flatMap {
       case Some(outputs) =>
         tx.contractInputs.foldE(Option(outputs.as[TxOutput])) {
           case (Some(outputs), input) => getPreOutput(input).map(_.map(outputs :+ _))

@@ -28,15 +28,14 @@ class VarVectorSpec extends AlephiumSpec {
     vector.set(1, 1).rightValue is ()
     vector.get(0) isE 0
     vector.get(1) isE 1
-    vector.set(-1, -1).leftValue isE InvalidVarIndex
-    vector.get(-1).leftValue isE InvalidVarIndex
-    vector.set(2, 2).leftValue isE InvalidVarIndex
-    vector.get(2).leftValue isE InvalidVarIndex
+    vector.set(-1, -1).leftValue isE InvalidVarIndex(-1, 1)
+    vector.get(-1).leftValue isE InvalidVarIndex(-1, 1)
+    vector.set(2, 2).leftValue isE InvalidVarIndex(2, 1)
+    vector.get(2).leftValue isE InvalidVarIndex(2, 1)
     vector.sameElements(AVector(0)) is false
     vector.sameElements(AVector(0, 1)) is true
-    vector.setIf(1, 2, _ => failed(InvalidVarType)).leftValue isE InvalidVarType
     vector.setIf(1, 2, _ => okay).rightValue is ()
-    vector.setIf(-1, -1, _ => okay).leftValue isE InvalidVarIndex
+    vector.setIf(-1, -1, _ => okay).leftValue isE InvalidVarIndex(-1, 1)
     vector.sameElements(AVector(0)) is false
     vector.sameElements(AVector(0, 1)) is false
     vector.sameElements(AVector(0, 2)) is true

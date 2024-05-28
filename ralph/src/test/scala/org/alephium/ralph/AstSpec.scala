@@ -18,9 +18,12 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import org.alephium.protocol.vm.Val
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import akka.util.ByteString
 
+import org.alephium.protocol.vm.Val
+import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}
+
+//scalastyle:off file.size.limit
 class AstSpec extends AlephiumSpec {
 
   behavior of "Check external caller"
@@ -118,9 +121,10 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "build check external caller table" in new InternalCallFixture {
-    val contracts = fastparse.parse(internalCalls, StatefulParser.multiContract(_)).get.value
-    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
-    val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
+    val contracts =
+      fastparse.parse(internalCalls, new StatefulParser(None).multiContract(_)).get.value
+    val state    = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
+    val contract = contracts.contracts(0).asInstanceOf[Ast.Contract]
     contract.check(state)
     contract.genCode(state)
     val interallCalls = state.internalCalls
@@ -609,6 +613,74 @@ class AstSpec extends AlephiumSpec {
       s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
   }
 
+  it should "warning if private function has checkExternalCaller annotation" in {
+    def code(annotation: String): String = {
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    bar()
+         |  }
+         |
+         |  $annotation
+         |  fn bar() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    Compiler.compileContractFull(code(""), 0).rightValue.warnings.isEmpty is true
+    Compiler
+      .compileContractFull(code("@using(checkExternalCaller = true)"), 0)
+      .rightValue
+      .warnings is AVector(
+      """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
+    )
+    Compiler
+      .compileContractFull(code("@using(checkExternalCaller = false)"), 0)
+      .rightValue
+      .warnings is AVector(
+      """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
+    )
+    Compiler
+      .compileContractFull(code("@using(preapprovedAssets = false)"), 0)
+      .rightValue
+      .warnings
+      .isEmpty is true
+  }
+
+  it should "warning if private function uses assets" in {
+    val code0 =
+      s"""
+         |Contract Foo(to: Address) {
+         |  pub fn foo() -> () {
+         |    bar{callerAddress!() -> ALPH: 1 alph}(callerAddress!())
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  fn bar(from: Address) -> () {
+         |    transferToken!(from, to, ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContractFull(code0).rightValue.warnings is
+      AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+
+    val code1 =
+      s"""
+         |Contract Foo(to: Address) {
+         |  pub fn foo() -> () {
+         |    bar()
+         |  }
+         |  @using(assetsInContract = true)
+         |  fn bar() -> () {
+         |    transferTokenFromSelf!(to, ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContractFull(code1).rightValue.warnings is
+      AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+  }
+
   behavior of "Private function usage"
 
   it should "check if private functions are used" in {
@@ -646,7 +718,7 @@ class AstSpec extends AlephiumSpec {
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin
-    val (contracts, _) = Compiler.compileProject(code1).rightValue
+    val (contracts, _, _) = Compiler.compileProject(code1).rightValue
     contracts.length is 2
     contracts.foreach(_.warnings.isEmpty is true)
   }
@@ -678,13 +750,16 @@ class AstSpec extends AlephiumSpec {
                   |TxScript Main {
                   |  return
                   |}
+                  |struct Foo {
+                  |  amount: U256
+                  |}
                   |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
-    error.message is "These TxScript/Contract/Interface are defined multiple times: Bar, Foo, Main"
+    error.message is "These TxScript/Contract/Interface/Struct are defined multiple times: Bar, Foo, Main"
   }
 
   it should "check interface std id" in {
-    val foo = Ast.ContractInterface(None, Ast.TypeId("Foo"), Seq.empty, Seq.empty, Seq.empty)
+    val foo = Ast.ContractInterface(None, false, Ast.TypeId("Foo"), Seq.empty, Seq.empty, Seq.empty)
     val bar = foo.copy(ident = Ast.TypeId("Bar"))
     val baz = foo.copy(ident = Ast.TypeId("Baz"))
 
@@ -750,6 +825,7 @@ class AstSpec extends AlephiumSpec {
       Seq.empty,
       Seq.empty,
       Seq.empty,
+      Seq.empty,
       Seq.empty
     )
 
@@ -779,5 +855,58 @@ class AstSpec extends AlephiumSpec {
         foo.ident
       )
     ).message is "There are different std id enabled options on the inheritance chain of contract Foo"
+  }
+
+  it should "calc method selector" in {
+    val code =
+      s"""
+         |struct Numbers { x: U256, y: Address }
+         |Contract Bar() {
+         |  pub fn bar() -> () {}
+         |}
+         |Contract Foo() {
+         |  pub fn func0(a: U256) -> U256 {
+         |    return a
+         |  }
+         |  pub fn func1(@unused a: ByteVec, @unused b: U256) -> () {
+         |  }
+         |  pub fn func2() -> (U256, Address) {
+         |    return 0, zeroAddress!()
+         |  }
+         |  pub fn func3(bar: Bar) -> () {
+         |    bar.bar()
+         |  }
+         |  pub fn func4(nums: Numbers) -> Numbers {
+         |    return nums
+         |  }
+         |  pub fn func5(array: [U256; 2]) -> [U256; 2] {
+         |    return array
+         |  }
+         |  pub fn func6(arg0: Numbers, arg1: [U256; 2]) -> (Numbers, [U256; 2]) {
+         |    return arg0, arg1
+         |  }
+         |}
+         |""".stripMargin
+
+    val multiContract = Compiler.compileMultiContract(code).rightValue
+    val funcs         = multiContract.contracts(1).funcs
+
+    def test(signature: String, funcIndex: Int) = {
+      val func           = funcs(funcIndex)
+      val methodSelector = func.getMethodSelector(multiContract.globalState)
+      DjbHash.intHash(ByteString.fromString(signature)) is methodSelector.index
+      func.methodSelector is Some(methodSelector)
+    }
+
+    test("func0(U256)->(U256)", 0)
+    test("func1(ByteVec,U256)->()", 1)
+    test("func2()->(U256,Address)", 2)
+    test("func3(ByteVec)->()", 3)
+    test("func4(U256,Address)->(U256,Address)", 4)
+    test("func5(U256,U256)->(U256,U256)", 5)
+    test("func6(U256,Address,U256,U256)->(U256,Address,U256,U256)", 6)
+
+    val allSelectors = funcs.map(_.methodSelector.get.index)
+    allSelectors.toSet.size is allSelectors.size
   }
 }

@@ -44,6 +44,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
@@ -568,6 +569,34 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call POST /multisig/sweep" in {
+    lazy val (_, dummyKey2, _) = addressStringGen(
+      GroupIndex.unsafe(1)
+    ).sample.get
+
+    lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+    val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+
+    Post(
+      s"/multisig/sweep",
+      body = s"""
+                |{
+                |  "fromAddress": "${address.toBase58}",
+                |  "fromPublicKeys": ["$dummyKeyHex"],
+                |  "toAddress": "$dummyToAddress"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None),
+        Address.asset(dummyKeyAddress).value.groupIndex,
+        Address.asset(dummyToAddress).value.groupIndex
+      )
+    }
+  }
+
   it should "call POST /miners" in {
     val address      = Address.asset(dummyKeyAddress).get
     val lockupScript = address.lockupScript
@@ -750,9 +779,10 @@ abstract class RestServerSpec(
   it should "call GET /infos/chain-params" in {
     Get(s"/infos/chain-params") check { response =>
       response.code is StatusCode.Ok
+      val now = TimeStamp.now()
       response.as[ChainParams] is ChainParams(
         networkConfig.networkId,
-        consensusConfig.numZerosAtLeastInHash,
+        consensusConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
         brokerConfig.groupNumPerBroker,
         brokerConfig.groups
       )
@@ -799,15 +829,9 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /contracts/<address>/state" in {
-    0.until(brokerConfig.groups).filter(_ != dummyContractGroup.group).foreach { group =>
-      Get(s"/contracts/${dummyContractAddress}/state?group=${group}") check { response =>
-        response.code is StatusCode.InternalServerError
-      }
-    }
-    Get(s"/contracts/${dummyContractAddress}/state?group=${dummyContractGroup.group}") check {
-      response =>
-        response.code is StatusCode.Ok
-        response.as[ContractState].address.toBase58 is dummyContractAddress
+    Get(s"/contracts/${dummyContractAddress.toBase58}/state") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractState].address is dummyContractAddress
     }
   }
 
@@ -965,8 +989,18 @@ abstract class RestServerSpec(
     }
   }
 
+  trait RedirectFixture {
+    allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+      msg match {
+        case InterCliqueManager.IsSynced =>
+          sender ! InterCliqueManager.SyncedResult(true)
+          TestActor.KeepRunning
+      }
+    )
+  }
+
   // scalastyle:off no.equal
-  it should "get events for contract id with wrong group" in {
+  it should "get events for contract id with wrong group" in new RedirectFixture {
     val blockHash       = dummyBlock.hash
     val contractId      = ContractId.random
     val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
@@ -1044,7 +1078,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for tx id with wrong group" in {
+  it should "get events for tx id with wrong group" in new RedirectFixture {
     val blockHash  = dummyBlock.hash
     val txId       = Hash.random
     val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
@@ -1121,7 +1155,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for block hash with wrong group" in {
+  it should "get events for block hash with wrong group" in new RedirectFixture {
     val blockHash  = dummyBlock.hash
     val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
     val wrongGroup = (chainIndex.from.value + 1) % groupConfig.groups
@@ -1154,6 +1188,43 @@ abstract class RestServerSpec(
         chainIndex,
         server.port
       )(verifyNonEmptyEvents)
+    }
+  }
+
+  it should "convert target to hashrate" in {
+    val target = "1b032b55"
+
+    Post(
+      s"/utils/target-to-hashrate",
+      body = s"""
+                |{
+                |  "target": "$target"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+
+      val hashrateResponse = response.as[TargetToHashrate.Result]
+      val consensusConfig  = consensusConfigs.getConsensusConfig(TimeStamp.now())
+      val expected =
+        HashRate.from(Target.unsafe(Hex.unsafe(target)), consensusConfig.blockTargetTime).value
+
+      hashrateResponse.hashrate is expected
+    }
+
+    Post(
+      s"/utils/target-to-hashrate",
+      body = s"""
+                |{
+                |  "target": "1234"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+
+      val badRequest = response.as[ApiError.BadRequest]
+
+      badRequest.detail is "Invalid target string: 1234"
     }
   }
 

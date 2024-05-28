@@ -177,7 +177,7 @@ lazy val app = mainProject("app")
       val alephiumHome = "/alephium-home"
 
       new Dockerfile {
-        from("openjdk:17-jdk")
+        from("eclipse-temurin:17-jre")
 
         // Uncomment the next line and comment the previous one if you want to use GraalVM instead of OpenJDK
         // from("ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2")
@@ -206,16 +206,25 @@ lazy val app = mainProject("app")
 
         user("nobody")
 
-        entryPoint("java", "-jar", artifactTargetPath)
+        env("JAVA_NET_OPTS", "-Djava.net.preferIPv4Stack=true")
+        env(
+          "JAVA_MEM_OPTS",
+          "-Xms512M -XX:+UseStringDeduplication -XX:+OptimizeStringConcat -XX:+UseNUMA"
+        )
+        env(
+          "JAVA_GC_OPTS",
+          "-XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=static -XX:+UnlockExperimentalVMOptions -XX:ShenandoahGuaranteedGCInterval=16000 -XX:ShenandoahUncommitDelay=60000 -XX:MaxGCPauseMillis=1 -XX:+ParallelRefProcEnabled -XX:-UseGCOverheadLimit -XX:+DisableExplicitGC"
+        )
+
+        entryPointRaw(
+          s"java $${JAVA_NET_OPTS} $${JAVA_MEM_OPTS} $${JAVA_GC_OPTS} -jar ${artifactTargetPath}"
+        )
       }
     },
     docker / imageNames := {
-      val baseImageName = "alephium/dev-alephium"
-      val versionTag    = version.value.replace('+', '_')
-      Seq(
-        ImageName(baseImageName + ":latest"),
-        ImageName(baseImageName + ":" + versionTag),
-        ImageName(baseImageName + ":" + versionTag + "-jdk17")
+      dockerImageNames(
+        baseImageName = "alephium/dev-alephium",
+        versionTag = version.value.replace('+', '_')
       )
     },
     buildInfoKeys := Seq[BuildInfoKey](
@@ -252,11 +261,62 @@ lazy val http = project("http")
     libraryDependencies ++= Seq(
       `tapir-vertx`,
       `tapir-client`,
+      `tapir-files`,
       `sttp-backend`
     )
   )
 
 lazy val tools = mainProject("tools")
+  .enablePlugins(sbtdocker.DockerPlugin)
+  .settings(
+    assembly / assemblyJarName := s"alephium-tools-${version.value}.jar",
+    assembly / test            := {},
+    assemblyMergeStrategy := {
+      case "logback.xml" => MergeStrategy.first
+      case PathList("META-INF", "io.netty.versions.properties", xs @ _*) =>
+        MergeStrategy.first
+      case PathList("module-info.class") =>
+        MergeStrategy.discard
+      case x if x.endsWith("module-info.class") =>
+        MergeStrategy.discard
+      case other =>
+        assemblyMergeStrategy.value(other)
+    },
+    docker / dockerfile := {
+      val artifact: File     = assembly.value
+      val artifactTargetPath = "/alephium-tools.jar"
+
+      val alephiumHome = "/alephium-home"
+
+      new Dockerfile {
+        from("openjdk:17-jdk")
+
+        runRaw(
+          Seq(
+            s"mkdir -p $alephiumHome && usermod -d $alephiumHome nobody && chown nobody $alephiumHome",
+            s"mkdir -p $alephiumHome/.alephium && chown nobody $alephiumHome/.alephium",
+            s"mkdir -p $alephiumHome/.alephium/mainnet && chown nobody $alephiumHome/.alephium/mainnet"
+          ).mkString(" && ")
+        )
+
+        workDir(alephiumHome)
+
+        copy(artifact, artifactTargetPath)
+
+        volume(s"$alephiumHome/.alephium")
+
+        user("nobody")
+
+        entryPoint("java", "-cp", artifactTargetPath)
+      }
+    },
+    docker / imageNames := {
+      dockerImageNames(
+        baseImageName = "alephium/dev-alephium-tools",
+        versionTag = version.value.replace('+', '_')
+      )
+    }
+  )
   .dependsOn(app)
 
 lazy val benchmark = project("benchmark")
@@ -367,7 +427,7 @@ lazy val ralphc = project("ralphc")
       upickle,
       scopt
     ),
-    publish / skip             := true,
+    publish / skip             := false,
     assembly / mainClass       := Some("org.alephium.ralphc.Main"),
     assembly / assemblyJarName := s"alephium-ralphc-${version.value}.jar",
     assembly / test            := {},
@@ -478,6 +538,14 @@ val wartsTestExcludes = wartsCompileExcludes ++ Seq(
   Wart.IterableOps,
   Wart.OptionPartial
 )
+
+def dockerImageNames(baseImageName: String, versionTag: String): Seq[ImageName] = {
+  Seq(
+    ImageName(baseImageName + ":latest"),
+    ImageName(baseImageName + ":" + versionTag),
+    ImageName(baseImageName + ":" + versionTag + "-jdk17")
+  )
+}
 
 addCommandAlias(
   "format",

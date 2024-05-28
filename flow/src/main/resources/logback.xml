@@ -25,7 +25,7 @@
         <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium.log</file>
         <append>true</append>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${ALEPHIUM_FILE_LOG_LEVEL:-OFF}</level>
+            <level>${ALEPHIUM_FILE_LOG_LEVEL:-INFO}</level>
         </filter>
         <encoder>
             <pattern>${defaultPattern}</pattern>

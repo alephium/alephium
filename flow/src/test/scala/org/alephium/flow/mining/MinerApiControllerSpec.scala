@@ -24,6 +24,7 @@ import akka.testkit.{EventFilter, TestActor, TestProbe}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.serde.serialize
@@ -92,17 +93,41 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     }
   }
 
-  it should "handle submission" in new SyncedFixture {
+  trait SubmissionFixture extends SyncedFixture {
     val probe0      = TestProbe()
     val connection0 = connectToServer(probe0)
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = emptyBlock(blockFlow, chainIndex)
-    val blockBlob  = serialize(block)
+
+    val blockFlowTemplate = BlockFlowTemplate(
+      chainIndex,
+      block.blockDeps.deps,
+      block.header.depStateHash,
+      block.target,
+      block.timestamp,
+      block.transactions
+    )
+    val headerBlob = Job.from(blockFlowTemplate).headerBlob
+  }
+
+  it should "error when the job is not in the cache" in new SubmissionFixture {
+    val blockBlob = serialize(block.copy(transactions = AVector.empty))
+
+    EventFilter.error(start = "The job for the block is expired:").intercept {
+      connection0 ! Tcp.Write(ClientMessage.serialize(SubmitBlock(blockBlob)))
+    }
+  }
+
+  it should "submit block when the job is cached" in new SubmissionFixture {
+    minerApiController.underlyingActor.jobCache
+      .put(headerBlob, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+
+    val blockBlob = serialize(block.copy(transactions = AVector.empty))
     connection0 ! Tcp.Write(ClientMessage.serialize(SubmitBlock(blockBlob)))
 
     eventually(minerApiController.underlyingActor.submittingBlocks.contains(block.hash))
-    allHandlerProbes.blockHandlers(chainIndex).expectMsgType[BlockChainHandler.Validate]
+    allHandlerProbes.blockHandlers(chainIndex).expectMsgType[BlockChainHandler.ValidateMinedBlock]
 
     val succeeded = Random.nextBoolean()
     val feedback = if (succeeded) {

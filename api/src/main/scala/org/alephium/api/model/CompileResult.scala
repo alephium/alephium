@@ -20,6 +20,7 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ReleaseVersion
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm.StatefulContext
 import org.alephium.ralph.{Ast, CompiledContract, CompiledScript}
 import org.alephium.serde.serialize
@@ -71,6 +72,7 @@ final case class CompileContractResult(
     enums: AVector[CompileResult.Enum],
     events: AVector[CompileResult.EventSig],
     warnings: AVector[String],
+    maps: Option[CompileResult.MapsSig] = None,
     stdInterfaceId: Option[String] = None
 ) extends CompileResult.Versioned
 
@@ -94,8 +96,10 @@ object CompileContractResult {
       compiled.debugCode.hash,
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      maps = CompileResult.MapsSig.from(contractAst.maps),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
-      constants = AVector.from(contractAst.constantVars.map(CompileResult.Constant.from)),
+      constants =
+        AVector.from(contractAst.getCalculatedConstants().map(CompileResult.Constant.from.tupled)),
       enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
       warnings = compiled.warnings,
       stdInterfaceId = if (contractAst.hasStdIdField) {
@@ -109,19 +113,26 @@ object CompileContractResult {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CompileProjectResult(
     contracts: AVector[CompileContractResult],
-    scripts: AVector[CompileScriptResult]
+    scripts: AVector[CompileScriptResult],
+    structs: Option[AVector[CompileResult.StructSig]] = None
 )
 
 object CompileProjectResult {
   def from(
       contracts: AVector[CompiledContract],
-      scripts: AVector[CompiledScript]
+      scripts: AVector[CompiledScript],
+      structs: AVector[Ast.Struct]
   ): CompileProjectResult = {
     val compiledContracts = contracts.map(c => CompileContractResult.from(c))
     val compiledScripts   = scripts.map(s => CompileScriptResult.from(s))
-    CompileProjectResult(compiledContracts, compiledScripts)
+    CompileProjectResult(
+      compiledContracts,
+      compiledScripts,
+      Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from))
+    )
   }
 
   final case class Patch(value: String) extends AnyVal
@@ -189,7 +200,7 @@ object CompileResult {
       FunctionSig(
         func.id.name,
         func.usePreapprovedAssets,
-        func.useAssetsInContract,
+        func.useAssetsInContract != Ast.NotUseContractAssets,
         func.isPublic,
         func.getArgNames(),
         func.getArgTypeSignatures(),
@@ -201,22 +212,34 @@ object CompileResult {
 
   final case class Constant(name: String, value: Val)
   object Constant {
-    def from(constantDef: Ast.ConstantVarDef): Constant = {
-      Constant(constantDef.name, Val.from(constantDef.value))
+    def from(ident: Ast.Ident, value: vm.Val): Constant = {
+      Constant(ident.name, Val.from(value))
     }
   }
 
   final case class EnumField(name: String, value: Val)
   object EnumField {
-    def from(enumFieldDef: Ast.EnumField): EnumField = {
-      EnumField(enumFieldDef.name, Val.from(enumFieldDef.value))
+    def from(enumFieldDef: Ast.EnumField[StatefulContext]): EnumField = {
+      EnumField(enumFieldDef.name, Val.from(enumFieldDef.value.v))
     }
   }
 
   final case class Enum(name: String, fields: AVector[EnumField])
   object Enum {
-    def from(enumDef: Ast.EnumDef): Enum = {
+    def from(enumDef: Ast.EnumDef[StatefulContext]): Enum = {
       Enum(enumDef.name, AVector.from(enumDef.fields.map(EnumField.from)))
+    }
+  }
+
+  final case class MapsSig(names: AVector[String], types: AVector[String])
+  object MapsSig {
+    def from(mapDefs: Seq[Ast.MapDef]): Option[MapsSig] = {
+      Option.when(mapDefs.nonEmpty)(
+        MapsSig(
+          AVector.from(mapDefs.view.map(_.name)),
+          AVector.from(mapDefs.view.map(_.tpe.signature))
+        )
+      )
     }
   }
 
@@ -231,6 +254,23 @@ object CompileResult {
         event.name,
         event.getFieldNames(),
         event.getFieldTypeSignatures()
+      )
+    }
+  }
+
+  final case class StructSig(
+      name: String,
+      fieldNames: AVector[String],
+      fieldTypes: AVector[String],
+      isMutable: AVector[Boolean]
+  )
+  object StructSig {
+    def from(struct: Ast.Struct): StructSig = {
+      StructSig(
+        struct.id.name,
+        struct.getFieldNames(),
+        struct.getFieldTypeSignatures(),
+        struct.getFieldsMutability()
       )
     }
   }

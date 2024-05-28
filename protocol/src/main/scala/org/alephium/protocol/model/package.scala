@@ -16,9 +16,10 @@
 
 package org.alephium.protocol
 
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.{TimeStamp, U256}
 import org.alephium.util.Bytes.byteStringOrdering
-import org.alephium.util.U256
 
 package object model {
   val DefaultBlockVersion: Byte = 0.toByte
@@ -27,9 +28,9 @@ package object model {
   val cliqueIdLength: Int = PublicKey.length
 
   // scalastyle:off magic.number
-  val minimalGas: GasBox         = GasBox.unsafe(20000)
-  val coinbaseGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(1))
-  val coinbaseGasFee: U256       = coinbaseGasPrice * minimalGas
+  val minimalGas: GasBox          = GasBox.unsafe(20000)
+  val coinbaseGasPrice: GasPrice  = GasPrice(ALPH.nanoAlph(1))
+  val coinbaseGasFeeSubsidy: U256 = coinbaseGasPrice * minimalGas
 
   val defaultGasPerInput: GasBox  = GasBox.unsafe(2500)
   val defaultGasPerOutput: GasBox = GasBox.unsafe(6000)
@@ -37,12 +38,27 @@ package object model {
   val nonCoinbaseMinGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(100))
   val nonCoinbaseMinGasFee: U256       = nonCoinbaseMinGasPrice * minimalGas
 
-  val maximalTxsInOneBlock: Int  = 2000
-  val maximalGasPerBlock: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
-  val maximalGasPerTx: GasBox    = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock / 64)
+  val maximalTxsInOneBlock: Int          = 2000
+  val maximalGasPerBlockPreRhone: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
+  val maximalGasPerBlock: GasBox         = GasBox.unsafe(maximalGasPerBlockPreRhone.value / 4)
+  val maximalGasPerTxPreRhone: GasBox    = GasBox.unsafe(maximalGasPerBlockPreRhone.value / 64)
+  val maximalGasPerTx: GasBox            = GasBox.unsafe(maximalGasPerBlock.value / 2)
+
+  @inline def getMaximalGasPerBlock(hardFork: HardFork): GasBox = {
+    if (hardFork.isRhoneEnabled()) maximalGasPerBlock else maximalGasPerBlockPreRhone
+  }
+
+  @inline def getMaximalGasPerTx(hardFork: HardFork): GasBox = {
+    if (hardFork.isRhoneEnabled()) maximalGasPerTx else maximalGasPerTxPreRhone
+  }
+
+  @inline def getMaximalGasPerTx()(implicit networkConfig: NetworkConfig): GasBox = {
+    getMaximalGasPerTx(networkConfig.getHardFork(TimeStamp.now()))
+  }
 
   val maximalCodeSizePreLeman: Int = 12 * 1024 // 12KB
   val maximalCodeSizeLeman: Int    = 4 * 1024  // 4KB
+  val maximalCodeSizeRhone: Int    = 32 * 1024 // 32KB
   val maximalFieldSize: Int        = 3 * 1024  // 3KB
 
   val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)
@@ -51,7 +67,12 @@ package object model {
   val maxTokenPerAssetUtxo: Int      = 1
   val deprecatedMaxTokenPerUtxo: Int = 64
 
-  val minimalAlphInContract: U256 = ALPH.oneAlph
+  val minimalAlphInContractPreRhone: U256 = ALPH.oneAlph
+  val minimalAlphInContract: U256         = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
+
+  def minimalContractStorageDeposit(hardFork: HardFork): U256 = {
+    if (hardFork.isRhoneEnabled()) minimalAlphInContract else minimalAlphInContractPreRhone
+  }
 
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
   // scalastyle:on magic.number

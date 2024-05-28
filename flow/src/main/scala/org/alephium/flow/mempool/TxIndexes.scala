@@ -35,7 +35,7 @@ final case class TxIndexes(
       transaction: TransactionTemplate,
       sideEffect: TransactionTemplate => T
   ): (Option[mutable.ArrayBuffer[T]], Option[mutable.ArrayBuffer[T]]) = {
-    val outputRefs = transaction.assetOutputRefs
+    val outputRefs = transaction.fixedOutputRefs
     val parents    = getParentTxs(transaction, sideEffect)
     val children   = getChildTxs(outputRefs, sideEffect)
 
@@ -49,7 +49,7 @@ final case class TxIndexes(
       transaction: TransactionTemplate,
       sideEffect: TransactionTemplate => T
   ): Option[mutable.ArrayBuffer[T]] = {
-    val outputRefs = transaction.assetOutputRefs
+    val outputRefs = transaction.fixedOutputRefs
     val children   = getChildTxs(outputRefs, sideEffect)
     addRelevantOutputs(transaction, outputRefs)
     children

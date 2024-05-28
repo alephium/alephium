@@ -22,14 +22,14 @@ import org.scalatest.Assertion
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
+import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, TimeStamp}
 
 class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
-  trait Fixture extends VMFactory {
+  trait Fixture extends VMFactory with NetworkConfigFixture.Default {
     val initialGas = GasBox.unsafe(1000000)
 
-    val pool = new ContractPool {
-      def getHardFork(): HardFork = HardFork.Leman
+    lazy val pool = new ContractPool {
+      def getHardFork(): HardFork = networkConfig.getHardFork(TimeStamp.now())
 
       val worldState: WorldState.Staging = cachedWorldState.staging()
       var gasRemaining: GasBox           = initialGas
@@ -46,6 +46,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
+        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -113,30 +114,63 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.contractPool.size is 1
   }
 
-  it should "load limited number of contracts" in new Fixture {
-    val contracts = (0 until contractPoolMaxSize + 1).map { k =>
-      createContract(k.toLong)
+  trait ContractNumFixture extends Fixture {
+    def prepare() = {
+      val contracts = (0 until contractPoolMaxSize + 1).map { k =>
+        createContract(k.toLong)
+      }
+      contracts.init.zipWithIndex.foreach { case ((contractId, contract), index) =>
+        pool.loadContractObj(contractId) isE toObject(contract, contractId)
+        pool.contractPool.size is index + 1
+      }
+      contracts
     }
-    contracts.init.zipWithIndex.foreach { case ((contractId, contract), index) =>
-      pool.loadContractObj(contractId) isE toObject(contract, contractId)
-      pool.contractPool.size is index + 1
-    }
+  }
+
+  it should "load limited number of contracts before Rhone" in new ContractNumFixture
+    with NetworkConfigFixture.LemanT {
+    pool.getHardFork() is HardFork.Leman
+
+    val contracts = prepare()
     pool.loadContractObj(contracts.last._1) is failed(ContractPoolOverflow)
   }
 
-  it should "load contracts with limited number of fields" in new Fixture {
-    val (contractId0, contract0) = createContract(0, immFieldLength = contractFieldMaxSize / 2)
-    val (contractId1, contract1) = createContract(1, mutFieldLength = contractFieldMaxSize / 2)
-    val (contractId2, _)         = createContract(2, 1)
-    pool.loadContractObj(contractId0) isE
-      contract0
-        .toHalfDecoded()
-        .toObjectUnsafeTestOnly(contractId0, fields(contract0.fieldLength), AVector.empty)
-    pool.loadContractObj(contractId1) isE
-      contract1
-        .toHalfDecoded()
-        .toObjectUnsafeTestOnly(contractId1, AVector.empty, fields(contract1.fieldLength))
+  it should "load unlimited number of contracts from Rhone" in new ContractNumFixture {
+    pool.getHardFork() is HardFork.Rhone
+    val contracts = prepare()
+    pool.loadContractObj(contracts.last._1).isRight is true
+  }
+
+  trait FieldNumFixture extends Fixture {
+    def prepare() = {
+      val (contractId0, contract0) = createContract(0, immFieldLength = contractFieldMaxSize / 2)
+      val (contractId1, contract1) = createContract(1, mutFieldLength = contractFieldMaxSize / 2)
+      val (contractId2, _)         = createContract(2, 1)
+      pool.loadContractObj(contractId0) isE
+        contract0
+          .toHalfDecoded()
+          .toObjectUnsafeTestOnly(contractId0, fields(contract0.fieldLength), AVector.empty)
+      pool.loadContractObj(contractId1) isE
+        contract1
+          .toHalfDecoded()
+          .toObjectUnsafeTestOnly(contractId1, AVector.empty, fields(contract1.fieldLength))
+      contractId2
+    }
+  }
+
+  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture
+    with NetworkConfigFixture.LemanT {
+    pool.getHardFork() is HardFork.Leman
+
+    val contractId2 = prepare()
     pool.loadContractObj(contractId2) is failed(ContractFieldOverflow)
+  }
+
+  it should "load contracts with limited number of fields from Rhone" in new FieldNumFixture {
+    pool.getHardFork() is HardFork.Rhone
+
+    val contractId2 = prepare()
+    pool.loadContractObj(contractId2).isRight is true
   }
 
   it should "charge IO fee once when loading a contract multiple times" in new Fixture {
@@ -170,24 +204,29 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   it should "market assets properly" in new Fixture {
     val contractId0 = ContractId.generate
     val contractId1 = ContractId.generate
-    pool.markAssetInUsing(contractId0) isE ()
-    pool.markAssetInUsing(contractId0) is failed(ContractAssetAlreadyInUsing)
+    pool.markAssetInUsing(contractId0, MutBalancesPerLockup.empty) isE ()
+    pool.markAssetInUsing(contractId0, MutBalancesPerLockup.empty) is failed(
+      ContractAssetAlreadyInUsing
+    )
 
     pool.markAssetFlushed(contractId0) isE ()
     pool.markAssetFlushed(contractId0) is failed(ContractAssetAlreadyFlushed)
-    pool.markAssetFlushed(contractId1) is failed(ContractAssetUnloaded)
+    pool.markAssetFlushed(contractId1) is failed(
+      ContractAssetUnloaded(Address.contract(contractId1))
+    )
 
     pool.checkAllAssetsFlushed() isE ()
-    pool.markAssetInUsing(contractId1) isE ()
+    pool.markAssetInUsing(contractId1, MutBalancesPerLockup.empty) isE ()
     pool.checkAllAssetsFlushed() is failed(EmptyContractAsset)
     pool.markAssetFlushed(contractId1) isE ()
     pool.checkAllAssetsFlushed() isE ()
   }
 
-  it should "use contract assets" in new Fixture
-    with TxGenerators
-    with GroupConfigFixture.Default
-    with NetworkConfigFixture.Default {
+  trait UseContractAssetsFixture
+      extends Fixture
+      with TxGenerators
+      with GroupConfigFixture.Default
+      with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = ContractId.random
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
@@ -202,9 +241,26 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.gasRemaining is initialGas
     pool.worldState.getOutputOpt(outputRef).rightValue.nonEmpty is true
     pool.assetStatus.contains(contractId) is false
-    pool.useContractAssets(contractId).isRight is true
+
+    val balances = pool.useContractAssets(contractId, 0).rightValue
     initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
     pool.worldState.getOutputOpt(outputRef) isE a[Some[_]]
-    pool.assetStatus(contractId) is ContractPool.ContractAssetInUsing
+    pool.assetStatus(contractId) is a[ContractPool.ContractAssetInUsing]
+  }
+
+  it should "use contract assets wth method-level reentrancy protection since Rhone" in new UseContractAssetsFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    pool.assetUsedSinceRhone.toSet is Set(contractId -> 0)
+    pool.useContractAssets(contractId, 0).leftValue isE FunctionReentrancy(contractId, 0)
+    pool.useContractAssets(contractId, 1).rightValue is balances
+    pool.assetUsedSinceRhone.toSet is Set(contractId -> 0, contractId -> 1)
+  }
+
+  it should "use contract assets wth contract-level reentrancy protection before Rhone" in new UseContractAssetsFixture
+    with NetworkConfigFixture.PreRhoneT {
+    pool.assetUsedSinceRhone.isEmpty is true
+    pool.useContractAssets(contractId, 0).leftValue isE ContractAssetAlreadyInUsing
+    pool.useContractAssets(contractId, 1).leftValue isE ContractAssetAlreadyInUsing
+    pool.assetUsedSinceRhone.isEmpty is true
   }
 }

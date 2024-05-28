@@ -16,6 +16,8 @@
 
 package org.alephium.protocol
 
+import org.alephium.protocol.config.GroupConfigFixture
+import org.alephium.protocol.model.{ChainIndex, HardFork}
 import org.alephium.util.{AlephiumSpec, NumericHelpers, U256}
 
 class ALPHSpec extends AlephiumSpec {
@@ -64,5 +66,12 @@ class ALPHSpec extends AlephiumSpec {
     def fail(str: String) = {
       ALPH.alphFromString(str) is None
     }
+  }
+
+  it should "test isSequentialTxSupported" in new GroupConfigFixture.Default {
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.Rhone) is true
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.Rhone) is false
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.PreRhoneForTest) is false
+    ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.PreRhoneForTest) is false
   }
 }

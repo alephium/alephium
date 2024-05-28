@@ -21,10 +21,18 @@ import org.alephium.util.AlephiumSpec
 class HardForkSpec extends AlephiumSpec {
   it should "compare hard fork version" in {
     (HardFork.Leman > HardFork.Mainnet) is true
+    (HardFork.Rhone > HardFork.Leman) is true
+    (HardFork.Rhone > HardFork.Mainnet) is true
     HardFork.Mainnet.version is 0
     HardFork.Leman.version is 1
+    HardFork.Rhone.version is 2
 
     HardFork.Leman.isLemanEnabled() is true
+    HardFork.Leman.isRhoneEnabled() is false
     HardFork.Mainnet.isLemanEnabled() is false
+    HardFork.Mainnet.isRhoneEnabled() is false
+    HardFork.Rhone.isRhoneEnabled() is true
+
+    Seq(HardFork.Leman, HardFork.Rhone).contains(HardFork.SinceLemanForTest) is true
   }
 }

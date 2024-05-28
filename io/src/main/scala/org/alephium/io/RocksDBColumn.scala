@@ -16,21 +16,23 @@
 
 package org.alephium.io
 
+import scala.jdk.CollectionConverters._
+
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch, WriteOptions}
 
 object RocksDBColumn {
-  import RocksDBSource.Settings
+  import RocksDBSource.ProdSettings
 
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): RocksDBColumn =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+    apply(storage, cf, ProdSettings.writeOptions, ProdSettings.readOptions)
 
   def apply(
       storage: RocksDBSource,
       cf: RocksDBSource.ColumnFamily,
       writeOptions: WriteOptions
   ): RocksDBColumn =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+    apply(storage, cf, writeOptions, ProdSettings.readOptions)
 
   def apply(
       storage: RocksDBSource,
@@ -74,6 +76,24 @@ trait RocksDBColumn extends RawKeyValueStorage {
     db.put(handle, writeOptions, key.toArray, value.toArray)
   }
 
+  override def multiGetRawUnsafe(keys: Seq[ByteString]): Seq[ByteString] = {
+    val convertedKeys = keys.map(_.toArray).asJava
+    val handles       = keys.map(_ => handle).asJava
+    db.multiGetAsList(handles, convertedKeys)
+      .asScala
+      .view
+      .zipWithIndex
+      .map { case (value, index) =>
+        Option(value) match {
+          case Some(v) =>
+            ByteString.fromArrayUnsafe(v)
+          case None =>
+            throw IOError.keyNotFound(keys(index), "RocksDBColumn.multiGetRawUnsafe")
+        }
+      }
+      .toSeq
+  }
+
   override def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit = {
     val writeBatch = new WriteBatch()
     f((x, y) => writeBatch.put(handle, x.toArray, y.toArray))
@@ -88,5 +108,12 @@ trait RocksDBColumn extends RawKeyValueStorage {
 
   override def deleteRawUnsafe(key: ByteString): Unit = {
     db.delete(handle, key.toArray)
+  }
+
+  override def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit = {
+    val writeBatch = new WriteBatch()
+    keys.foreach(key => writeBatch.delete(handle, key.toArray))
+    db.write(writeOptions, writeBatch)
+    writeBatch.close()
   }
 }

@@ -17,6 +17,8 @@
 package org.alephium.ralph
 
 import akka.util.ByteString
+import fastparse._
+import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
@@ -28,65 +30,193 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit
-class ParserSpec extends AlephiumSpec {
+class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   import Ast._
 
+  val StatelessParser = new StatelessParser(fileURI)
+  val StatefulParser  = new StatefulParser(fileURI)
+  /*
+   * parse and check if source index is set on successful parse
+   * check if fileURI is set on successful parse
+   *
+   * @return: the initial parsed result
+   */
+  def parse[A <: Positioned](
+      code: String,
+      p: fastparse.P[_] => fastparse.P[A]
+  ): fastparse.Parsed[A] = {
+    val result = fastparse.parse(code, p)
+    if (result.isSuccess) {
+      result.get.value.sourceIndex.get.fileURI is fileURI
+    }
+    result
+  }
+
   it should "parse exprs" in {
-    fastparse.parse("x + y", StatelessParser.expr(_)).get.value is
+    parse("x + y", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("x >= y", StatelessParser.expr(_)).get.value is
+    parse("x >= y", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](Ge, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("(x + y)", StatelessParser.expr(_)).get.value is
+    parse("(x + y)", StatelessParser.expr(_)).get.value is
       ParenExpr[StatelessContext](Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
-    fastparse.parse("(x + y) + (x + y)", StatelessParser.expr(_)).get.value is
+    parse("(x + y) + (x + y)", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
         ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
       )
-    fastparse.parse("x * y ** z + u", StatelessParser.expr(_)).get.value is
+    parse("x * y ** z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         Binop(Mul, Variable(Ident("x")), Binop(Exp, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u"))
       )
-    fastparse.parse("x / y |**| z + u", StatelessParser.expr(_)).get.value is
+    parse("x / y |**| z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         Binop(Div, Variable(Ident("x")), Binop(ModExp, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u"))
       )
-    fastparse.parse("x + y * z + u", StatelessParser.expr(_)).get.value is
+    parse("x + y * z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         Binop(Add, Variable(Ident("x")), Binop(Mul, Variable(Ident("y")), Variable(Ident("z")))),
         Variable(Ident("u"))
       )
-    fastparse.parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
+    parse("x < y <= y < z", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](Lt, Variable(Ident("x")), Variable(Ident("y")))
-    fastparse.parse("x && y || z", StatelessParser.expr(_)).get.value is
+    parse("x && y || z", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Or,
         Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
         Variable(Ident("z"))
       )
-    fastparse.parse("foo(ErrorCodes.Error)", StatefulParser.expr(_)).get.value is
+    parse("foo(ErrorCodes.Error)", StatefulParser.expr(_)).get.value is
       CallExpr[StatefulContext](
         FuncId("foo", false),
         Seq.empty,
         Seq(EnumFieldSelector(TypeId("ErrorCodes"), Ident("Error")))
       )
+    parse("Foo { x: 1, y: false }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Some(Const(Val.U256(U256.unsafe(1))))),
+          (Ident("y"), Some(Const(Val.False)))
+        )
+      )
+    parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        ParenExpr(
+          StructCtor(
+            TypeId("Foo"),
+            Seq(
+              (Ident("x"), Some(Const(Val.U256(U256.unsafe(1))))),
+              (Ident("y"), Some(Const(Val.False)))
+            )
+          )
+        ),
+        Seq(IdentSelector(Ident("x")))
+      )
+    parse("Foo { x: true, bar: Bar { y: false } }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Some(Const(Val.True))),
+          (Ident("bar"), Some(StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False)))))))
+        )
+      )
+    parse("Foo { x: true, bar: [Bar { y: false }; 2] }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Some(Const(Val.True))),
+          (
+            Ident("bar"),
+            Some(
+              CreateArrayExpr(
+                Seq(
+                  StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False))))),
+                  StructCtor(TypeId("Bar"), Seq((Ident("y"), Some(Const(Val.False)))))
+                )
+              )
+            )
+          )
+        )
+      )
+    parse("Foo { x, y }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq((Ident("x"), None), (Ident("y"), None))
+      )
+    parse("Foo { x: true, y }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq((Ident("x"), Some(Const(Val.True))), (Ident("y"), None))
+      )
+    parse("a.b.c", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(Ast.IdentSelector(Ident("b")), Ast.IdentSelector(Ident("c")))
+      )
+    parse("a[0].b.c", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(
+          Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+          Ast.IdentSelector(Ident("b")),
+          Ast.IdentSelector(Ident("c"))
+        )
+      )
+    parse("a.b[0].c", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(
+          Ast.IdentSelector(Ident("b")),
+          Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+          Ast.IdentSelector(Ident("c"))
+        )
+      )
+    parse("a.b[0][1].c", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        Variable(Ident("a")),
+        Seq(
+          Ast.IdentSelector(Ident("b")),
+          Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+          Ast.IndexSelector(Const(Val.U256(U256.One))),
+          Ast.IdentSelector(Ident("c"))
+        )
+      )
+  }
+
+  it should "parse string literals" in {
+    def test(testString: String) = {
+      parse(s"b`$testString`", StatelessParser.expr(_)).get.value is
+        Const[StatelessContext](
+          Val.ByteVec(ByteString.fromString(testString))
+        )
+    }
+
+    test("Foo")
+    test(" Foo")
+    test("Foo ")
+    test(" Foo ")
+    test("Foo Bar")
+    test("")
+    test(s"$$$${a}")
+    test(s"Hello, $$$${a}$$$${b} $$$${c} $$$$$$$$ $$$$ !")
+    test(s"Sharding is hard $$")
   }
 
   it should "parse function" in {
     info("Function")
-    fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
+    parse("foo(x)", StatelessParser.expr(_)).get.value is
       CallExpr[StatelessContext](FuncId("foo", false), Seq.empty, List(Variable(Ident("x"))))
-    fastparse.parse("Foo(x)", StatelessParser.expr(_)).get.value is
+    parse("Foo(x)", StatelessParser.expr(_)).get.value is
       ContractConv[StatelessContext](Ast.TypeId("Foo"), Variable(Ident("x")))
-    fastparse.parse("foo!(x)", StatelessParser.expr(_)).get.value is
+    parse("foo!(x)", StatelessParser.expr(_)).get.value is
       CallExpr[StatelessContext](FuncId("foo", true), Seq.empty, List(Variable(Ident("x"))))
-    fastparse.parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
+    parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         CallExpr(
@@ -122,6 +252,23 @@ class ParserSpec extends AlephiumSpec {
         List(Variable(Ident("z")))
       )
 
+    parse("foo(1)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](FuncId("foo", false), Seq.empty, List(Const(Val.U256(U256.One))))
+
+    parse("foo(#00)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](
+        FuncId("foo", false),
+        Seq.empty,
+        List(Const(Val.ByteVec(ByteString(Hex.unsafe("00")))))
+      )
+
+    parse("foo(b`Hello`)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](
+        FuncId("foo", false),
+        Seq.empty,
+        List(Const(Val.ByteVec(ByteString.fromString("Hello"))))
+      )
+
     info("Braces syntax")
     fastparse.parse("{ x -> ALPH: 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
     fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
@@ -130,7 +277,7 @@ class ParserSpec extends AlephiumSpec {
       .isSuccess is true
 
     info("Contract call")
-    fastparse.parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
+    parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
         Variable(Ident("x")),
         FuncId("bar", false),
@@ -155,8 +302,8 @@ class ParserSpec extends AlephiumSpec {
 
     val emptyAssetsCode = "Foo(x).bar{ z -> }(x)"
     intercept[CompilerError.`Expected non-empty asset(s) for address`](
-      fastparse.parse(emptyAssetsCode, StatefulParser.contractCallExpr(_))
-    ).toError(emptyAssetsCode).message is
+      parse(emptyAssetsCode, StatefulParser.contractCallExpr(_))
+    ).format(emptyAssetsCode) is
       """-- error (1:17): Syntax error
         |1 |Foo(x).bar{ z -> }(x)
         |  |                ^
@@ -165,18 +312,18 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "call expression" in {
-    fastparse.parse("foo(a)", StatefulParser.callExpr(_)).get.value is
+    parse("foo(a)", StatefulParser.callExpr(_)).get.value is
       CallExpr(FuncId("foo", false), Seq.empty, Seq(Variable[StatefulContext](Ident("a"))))
-    fastparse.parse("Foo.foo(a)", StatefulParser.callExpr(_)).get.value is
+    parse("Foo.foo(a)", StatefulParser.callExpr(_)).get.value is
       ContractStaticCallExpr(
         TypeId("Foo"),
         FuncId("foo", false),
         Seq.empty,
         Seq(Variable[StatefulContext](Ident("a")))
       )
-    fastparse.parse("foo!(a)", StatefulParser.callExpr(_)).get.value is
+    parse("foo!(a)", StatefulParser.callExpr(_)).get.value is
       CallExpr(FuncId("foo", true), Seq.empty, Seq(Variable[StatefulContext](Ident("a"))))
-    fastparse.parse("Foo.foo!(a)", StatefulParser.callExpr(_)).get.value is
+    parse("Foo.foo!(a)", StatefulParser.callExpr(_)).get.value is
       ContractStaticCallExpr(
         TypeId("Foo"),
         FuncId("foo", true),
@@ -185,38 +332,92 @@ class ParserSpec extends AlephiumSpec {
       )
   }
 
+  it should "parse contract call" in {
+    parse("a.b().c().d()", StatefulParser.contractCallExpr(_)).get.value is
+      ContractCallExpr(
+        ContractCallExpr(
+          ContractCallExpr(Variable(Ident("a")), FuncId("b", false), List(), List()),
+          FuncId("c", false),
+          List(),
+          List()
+        ),
+        FuncId("d", false),
+        List(),
+        List()
+      )
+
+    parse("a().b().c()", StatefulParser.contractCallExpr(_)).get.value is
+      ContractCallExpr(
+        ContractCallExpr(
+          CallExpr(FuncId("a", false), List(), List()),
+          FuncId("b", false),
+          List(),
+          List()
+        ),
+        FuncId("c", false),
+        List(),
+        List()
+      )
+
+    parse("a.b().c().d()", StatefulParser.contractCall(_)).get.value is
+      ContractCall(
+        ContractCallExpr(
+          ContractCallExpr(Variable(Ident("a")), FuncId("b", false), List(), List()),
+          FuncId("c", false),
+          List(),
+          List()
+        ),
+        FuncId("d", false),
+        List(),
+        List()
+      )
+
+    parse("a().b().c()", StatefulParser.contractCall(_)).get.value is
+      ContractCall(
+        ContractCallExpr(
+          CallExpr(FuncId("a", false), List(), List()),
+          FuncId("b", false),
+          List(),
+          List()
+        ),
+        FuncId("c", false),
+        List(),
+        List()
+      )
+  }
+
   it should "parse ByteVec" in {
-    fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
+    parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
         Concat,
         Const(Val.ByteVec(ByteString.empty)),
         Const(Val.ByteVec(Hex.unsafe("00")))
       )
-    fastparse.parse("let bytes = #", StatefulParser.statement(_)).get.value is
+    parse("let bytes = #", StatefulParser.statement(_)).get.value is
       VarDef[StatefulContext](
         Seq(Ast.NamedVar(false, Ident("bytes"))),
         Const(Val.ByteVec(ByteString.empty))
       )
-    fastparse.parse("ALPH", StatefulParser.expr(_)).get.value is ALPHTokenId[StatefulContext]()
+    parse("ALPH", StatefulParser.expr(_)).get.value is ALPHTokenId[StatefulContext]()
   }
 
   it should "parse return" in {
-    fastparse.parse("return x, y", StatelessParser.ret(_)).isSuccess is true
-    fastparse.parse("return x + y", StatelessParser.ret(_)).isSuccess is true
-    fastparse.parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
-    intercept[Compiler.Error](fastparse.parse("return return", StatelessParser.ret(_))).message is
+    parse("return x, y", StatelessParser.ret(_)).isSuccess is true
+    parse("return x + y", StatelessParser.ret(_)).isSuccess is true
+    parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
+    intercept[Compiler.Error](parse("return return", StatelessParser.ret(_))).message is
       "Consecutive return statements are not allowed"
   }
 
   it should "parse statements" in {
-    fastparse.parse("let x = 1", StatelessParser.statement(_)).isSuccess is true
-    fastparse.parse("x = 1", StatelessParser.statement(_)).isSuccess is true
-    fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
-    fastparse.parse("ConstantVar = 0", StatefulParser.statement(_)).isSuccess is false
-    fastparse.parse("ErrorCodes.Error = 0", StatefulParser.statement(_)).isSuccess is false
-    fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
-    fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
-    fastparse.parse("Foo(x).add(x, y)", StatefulParser.statement(_)).isSuccess is true
+    parse("let x = 1", StatelessParser.statement(_)).isSuccess is true
+    parse("x = 1", StatelessParser.statement(_)).isSuccess is true
+    parse("x = true", StatelessParser.statement(_)).isSuccess is true
+    parse("ConstantVar = 0", StatefulParser.statement(_)).isSuccess is false
+    parse("ErrorCodes.Error = 0", StatefulParser.statement(_)).isSuccess is false
+    parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
+    parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
+    parse("Foo(x).add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse
       .parse("if (x >= 1) { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
@@ -232,14 +433,14 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse debug statements" in {
-    fastparse.parse(s"$${a}", StatelessParser.stringInterpolator(_)).get.value is
+    parse(s"$${a}", StatelessParser.stringInterpolator(_)).get.value is
       Variable[StatelessContext](Ident("a"))
-    fastparse.parse(s"$${ x + y }", StatelessParser.stringInterpolator(_)).get.value is
+    parse(s"$${ x + y }", StatelessParser.stringInterpolator(_)).get.value is
       Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
 
-    fastparse.parse(s"emit Debug(``)", StatelessParser.debug(_)).get.value is
+    parse(s"emit Debug(``)", StatelessParser.debug(_)).get.value is
       Ast.Debug[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
-    fastparse.parse(s"emit Debug(`$${a}`)", StatelessParser.debug(_)).get.value is
+    parse(s"emit Debug(`$${a}`)", StatelessParser.debug(_)).get.value is
       Ast.Debug[StatelessContext](
         AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
         Seq(Variable(Ident("a")))
@@ -314,9 +515,9 @@ class ParserSpec extends AlephiumSpec {
 
     val missingElseCode = "if (cond0) 0"
     val error = intercept[CompilerError.`Expected else statement`](
-      fastparse.parse(missingElseCode, StatelessParser.expr(_))
+      parse(missingElseCode, StatelessParser.expr(_))
     )
-    error.toError(missingElseCode).message is
+    error.format(missingElseCode) is
       """-- error (1:13): Syntax error
         |1 |if (cond0) 0
         |  |            ^
@@ -327,37 +528,34 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse annotations" in {
-    fastparse.parse("@using(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
+    parse("@using(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
   }
 
   it should "parse functions" in {
-    val parsed0 = fastparse
-      .parse(
-        "fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
-        StatelessParser.func(_)
-      )
-      .get
-      .value
+    def parseFunc(code: String) = {
+      fastparse.parse(code, StatelessParser.func(_))
+    }
+
+    val parsed0 =
+      parseFunc("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }").get.value
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
     parsed0.usePreapprovedAssets is false
-    parsed0.useAssetsInContract is false
+    parsed0.useAssetsInContract is Ast.NotUseContractAssets
+    parsed0.usePayToContractOnly is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
-    val parsed1 = fastparse
-      .parse(
-        """@using(preapprovedAssets = true, updateFields = false)
-          |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
-          |""".stripMargin,
-        StatelessParser.func(_)
-      )
-      .get
-      .value
+    val parsed1 = parseFunc(
+      """@using(preapprovedAssets = true, updateFields = false)
+        |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
+        |""".stripMargin
+    ).get.value
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
-    parsed1.useAssetsInContract is false
+    parsed1.useAssetsInContract is Ast.NotUseContractAssets
+    parsed1.usePayToContractOnly is false
     parsed1.useCheckExternalCaller is true
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
@@ -366,24 +564,21 @@ class ParserSpec extends AlephiumSpec {
       FuncId("add", false),
       true,
       true,
-      false,
       Seq((Type.U256, false), (Type.U256, true)),
       Seq(Type.U256, Type.U256)
     )
 
     info("Simple return type")
-    val parsed2 = fastparse
-      .parse(
+    val parsed2 =
+      parseFunc(
         """@using(preapprovedAssets = true, assetsInContract = true)
-          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
-        StatelessParser.func(_)
-      )
-      .get
-      .value
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      ).get.value
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
-    parsed2.useAssetsInContract is true
+    parsed2.useAssetsInContract is Ast.UseContractAssets
+    parsed2.usePayToContractOnly is false
     parsed2.useCheckExternalCaller is true
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
@@ -392,32 +587,83 @@ class ParserSpec extends AlephiumSpec {
       FuncId("add", false),
       true,
       true,
-      true,
       Seq((Type.U256, false), (Type.U256, false)),
       Seq(Type.U256)
     )
 
     info("More use annotation")
-    val parsed3 = fastparse
-      .parse(
+    val parsed3 =
+      parseFunc(
         """@using(assetsInContract = true, updateFields = true)
-          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
-        StatelessParser.func(_)
-      )
-      .get
-      .value
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      ).get.value
     parsed3.usePreapprovedAssets is false
-    parsed3.useAssetsInContract is true
+    parsed3.useAssetsInContract is Ast.UseContractAssets
+    parsed3.usePayToContractOnly is false
     parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
     parsed3.signature is FuncSignature(
       FuncId("add", false),
       true,
       false,
-      true,
       Seq((Type.U256, false), (Type.U256, false)),
       Seq(Type.U256)
     )
+
+    info("Enforce using contract assets")
+    val code = """@using(assetsInContract = enforced)
+                 |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val parsed4 = parseFunc(code).get.value
+    parsed4.usePreapprovedAssets is false
+    parsed4.useAssetsInContract is Ast.EnforcedUseContractAssets
+    parsed4.usePayToContractOnly is false
+    parsed4.useCheckExternalCaller is true
+    parsed4.useUpdateFields is false
+    parsed4.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      false,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
+
+    info("Use PayToContractOnly annotation")
+    val parsed5 =
+      parseFunc(
+        """@using(payToContractOnly = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      ).get.value
+    parsed5.usePreapprovedAssets is false
+    parsed5.useAssetsInContract is Ast.NotUseContractAssets
+    parsed5.usePayToContractOnly is true
+    parsed5.useCheckExternalCaller is true
+    parsed5.useUpdateFields is false
+    parsed5.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      false,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
+
+    val invalidCode = """@using(assetsInContract = enforced, assetsInContract = false)
+                        |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    intercept[Compiler.Error](parseFunc(invalidCode)).message is
+      "These keys are defined multiple times: assetsInContract"
+
+    val invalidAssetsInContract =
+      s"""@using($$assetsInContract = 1)
+         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val error = intercept[Compiler.Error](parseFunc(invalidAssetsInContract.replace("$", "")))
+    error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
+    error.position is invalidAssetsInContract.indexOf("$")
+
+    val conflictedAnnotations =
+      s"""@using($$assetsInContract = true, payToContractOnly = true)
+         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val error1 = intercept[Compiler.Error](parseFunc(conflictedAnnotations.replace("$", "")))
+    error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)"
+    error1.position is invalidAssetsInContract.indexOf("$")
   }
 
   it should "parser contract initial states" in {
@@ -448,13 +694,10 @@ class ParserSpec extends AlephiumSpec {
   it should "parse bytes and address" in {
     val hash    = Hash.random
     val address = Address.p2pkh(PublicKey.generate)
-    fastparse
-      .parse(
-        s"foo.foo(#${hash.toHexString}, #${hash.toHexString}, @${address.toBase58})",
-        StatefulParser.contractCall(_)
-      )
-      .get
-      .value is a[ContractCall]
+    parse(
+      s"foo.foo(#${hash.toHexString}, #${hash.toHexString}, @${address.toBase58})",
+      StatefulParser.contractCall(_)
+    ).get.value is a[ContractCall]
   }
 
   it should "parse array types" in {
@@ -479,7 +722,7 @@ class ParserSpec extends AlephiumSpec {
           ),
           Argument(
             Ident("c"),
-            Type.FixedSizeArray(Type.Contract.local(TypeId("Foo"), Ident("c")), 4),
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 4),
             isMutable = false,
             isUnused = false
           ),
@@ -496,11 +739,11 @@ class ParserSpec extends AlephiumSpec {
     Ast.Const[Ctx](Val.U256(U256.unsafe(value)))
 
   def checkParseExpr(str: String, expr: Ast.Expr[StatelessContext]) = {
-    fastparse.parse(str, StatelessParser.expr(_)).get.value is expr
+    parse(str, StatelessParser.expr(_)).get.value is expr
   }
 
   def checkParseStat(str: String, stat: Ast.Statement[StatelessContext]) = {
-    fastparse.parse(str, StatelessParser.statement(_)).get.value is stat
+    parse(str, StatelessParser.statement(_)).get.value is stat
   }
 
   it should "parse variable definitions" in {
@@ -546,20 +789,39 @@ class ParserSpec extends AlephiumSpec {
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0u][1u]" -> Ast
-        .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
-      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
-      "a[foo()]" -> Ast
-        .ArrayElement(
+        .LoadDataBySelectors(
           Variable(Ast.Ident("a")),
-          Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+          Seq(
+            IndexSelector(constantIndex(0)),
+            IndexSelector(constantIndex(1))
+          )
         ),
-      "a[i + 1]" -> Ast.ArrayElement(
+      "a[i]" -> LoadDataBySelectors(
+        Variable(Ident("a")),
+        Seq(IndexSelector(Variable(Ident("i"))))
+      ),
+      "a[foo()]" -> Ast
+        .LoadDataBySelectors(
+          Variable(Ast.Ident("a")),
+          Seq(IndexSelector(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)))
+        ),
+      "a[i + 1]" -> Ast.LoadDataBySelectors(
         Variable(Ast.Ident("a")),
-        Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+        Seq(
+          IndexSelector(
+            Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
+          )
+        )
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1)))
+        Ast.LoadDataBySelectors(
+          Variable(Ast.Ident("a")),
+          Seq(
+            IndexSelector(constantIndex(0)),
+            IndexSelector(constantIndex(1))
+          )
+        )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -579,38 +841,106 @@ class ParserSpec extends AlephiumSpec {
   it should "parse assign statement" in {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
       "a[0] = b" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0)))),
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IndexSelector(constantIndex(0)))
+          )
+        ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[0][1] = b[0]" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(
+              IndexSelector(constantIndex(0)),
+              IndexSelector(constantIndex(1))
+            )
+          )
+        ),
+        Ast.LoadDataBySelectors(Ast.Variable(Ast.Ident("b")), Seq(IndexSelector(constantIndex(0))))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
         CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "a[i] = b" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IndexSelector(Variable(Ident("i"))))
+          )
+        ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[foo()] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+            Seq(IndexSelector(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)))
           )
         ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[i + 1] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(
+          AssignmentSelectedTarget(
             Ident("a"),
-            Seq(Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+            Seq(
+              IndexSelector(
+                Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1))))
+              )
+            )
           )
         ),
         Ast.Variable(Ast.Ident("b"))
+      ),
+      "a.b = c" -> Assign(
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IdentSelector(Ident("b")))
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a[0].b = c" -> Assign(
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(
+              IndexSelector(constantIndex(0)),
+              IdentSelector(Ident("b"))
+            )
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a.b[0] = c" -> Assign(
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(
+              Ast.IdentSelector(Ident("b")),
+              Ast.IndexSelector(Const(Val.U256(U256.Zero)))
+            )
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a.b[0].c = d" -> Assign(
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(
+              Ast.IdentSelector(Ident("b")),
+              Ast.IndexSelector(Const(Val.U256(U256.Zero))),
+              Ast.IdentSelector(Ident("c"))
+            )
+          )
+        ),
+        Ast.Variable(Ast.Ident("d"))
       )
     )
 
@@ -624,7 +954,7 @@ class ParserSpec extends AlephiumSpec {
       info("0 field")
 
       val eventRaw = "event Event()"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
+      parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Event"),
         Seq()
       )
@@ -634,7 +964,8 @@ class ParserSpec extends AlephiumSpec {
       info("fields of primitive types")
 
       val eventRaw = "event Transfer(from: Address, to: Address, amount: U256)"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
+      val res      = parse(eventRaw, StatefulParser.eventDef(_)).get.value
+      res is EventDef(
         TypeId("Transfer"),
         Seq(
           EventField(Ident("from"), Type.Address),
@@ -648,7 +979,7 @@ class ParserSpec extends AlephiumSpec {
       info("fields of array type")
 
       val eventRaw = "event Participants(addresses: [Address; 3])"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
+      parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Participants"),
         Seq(
           EventField(Ident("addresses"), Type.FixedSizeArray(Type.Address, 3))
@@ -665,17 +996,19 @@ class ParserSpec extends AlephiumSpec {
     failure.trace().longMsg.contains("constant variables must start with an uppercase letter")
 
     val address = Address.p2pkh(PublicKey.generate)
-    val definitions = Seq[(String, Val)](
-      ("const C = true", Val.True),
-      ("const C = 1", Val.U256(U256.One)),
-      ("const C = 1i", Val.I256(I256.One)),
-      ("const C = #11", Val.ByteVec(Hex.unsafe("11"))),
-      (s"const C = @${address.toBase58}", Val.Address(address.lockupScript))
+    val definitions = Seq[(String, Expr[StatefulContext])](
+      ("const C = true", Const(Val.True)),
+      ("const C = 1", Const(Val.U256(U256.One))),
+      ("const C = 1i", Const(Val.I256(I256.One))),
+      ("const C = #11", Const(Val.ByteVec(Hex.unsafe("11")))),
+      ("const C = b`hello`", Const(Val.ByteVec(ByteString.fromString("hello")))),
+      (s"const C = @${address.toBase58}", Const(Val.Address(address.lockupScript))),
+      ("const C = A + B", Binop(ArithOperator.Add, Variable(Ident("A")), Variable(Ident("B"))))
     )
     definitions.foreach { definition =>
-      val constantVar = fastparse.parse(definition._1, StatefulParser.constantVarDef(_)).get.value
+      val constantVar = parse(definition._1, StatefulParser.constantVarDef(_)).get.value
       constantVar.ident.name is "C"
-      constantVar.value is definition._2
+      constantVar.expr is definition._2
     }
   }
 
@@ -688,7 +1021,7 @@ class ParserSpec extends AlephiumSpec {
            |  Error = 0
            |}
            |""".stripMargin
-      fastparse.parse(definition, StatefulParser.enumDef(_)).isSuccess is false
+      parse(definition, StatefulParser.enumDef(_)).isSuccess is false
     }
 
     {
@@ -714,7 +1047,7 @@ class ParserSpec extends AlephiumSpec {
            |  Error1 = #00
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
       error.message is "Fields have different types in Enum ErrorCodes"
     }
 
@@ -727,7 +1060,7 @@ class ParserSpec extends AlephiumSpec {
            |  Error1 = 0
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
       error.message is "Fields have the same value in Enum ErrorCodes"
     }
 
@@ -740,12 +1073,12 @@ class ParserSpec extends AlephiumSpec {
            |  Error = 1
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
       error.message is "These enum fields are defined multiple times: Error"
     }
 
     {
-      info("Enum definition")
+      info("Enum definition with U256 fields")
       val definition =
         s"""
            |enum ErrorCodes {
@@ -753,11 +1086,55 @@ class ParserSpec extends AlephiumSpec {
            |  Error1 = 1
            |}
            |""".stripMargin
-      fastparse.parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+      parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
         TypeId("ErrorCodes"),
         Seq(
-          EnumField(Ident("Error0"), Val.U256(U256.Zero)),
-          EnumField(Ident("Error1"), Val.U256(U256.One))
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.U256(U256.Zero))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.U256(U256.One)))
+        )
+      )
+    }
+
+    {
+      info("Enum definition with ByteVec fields")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error1 = #01
+           |}
+           |""".stripMargin
+      parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.ByteVec(Hex.unsafe("00")))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.ByteVec(Hex.unsafe("01"))))
+        )
+      )
+    }
+
+    {
+      info("Enum definition with String Literals fields")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error1 = b`hello`
+           |  Error2 = b`world`
+           |}
+           |""".stripMargin
+      parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.ByteVec(Hex.unsafe("00")))),
+          EnumField(
+            Ident("Error1"),
+            Const[StatefulContext](Val.ByteVec(ByteString.fromString("hello")))
+          ),
+          EnumField(
+            Ident("Error2"),
+            Const[StatefulContext](Val.ByteVec(ByteString.fromString("world")))
+          )
         )
       )
     }
@@ -790,14 +1167,17 @@ class ParserSpec extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
+            usePayToContractOnly = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -810,7 +1190,7 @@ class ParserSpec extends AlephiumSpec {
         .parse(code(Keyword.`extends`.name), StatefulParser.contract(_))
         .get
         .value is contract
-      fastparse.parse(code(Keyword.`embeds`.name), StatefulParser.contract(_)).get.value is contract
+      parse(code(Keyword.`embeds`.name), StatefulParser.contract(_)).get.value is contract
     }
 
     {
@@ -835,7 +1215,7 @@ class ParserSpec extends AlephiumSpec {
            |$foo
            |""".stripMargin
       val extended =
-        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+        parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val barContract = extended.contracts(0)
       val fooContract = extended.contracts(1)
       fooContract.events.length is 2
@@ -862,7 +1242,7 @@ class ParserSpec extends AlephiumSpec {
            |$foo
            |""".stripMargin
       val extended =
-        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+        parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val barContract = extended.contracts(0)
       val fooContract = extended.contracts(1)
       barContract.constantVars.length is 3
@@ -892,11 +1272,39 @@ class ParserSpec extends AlephiumSpec {
            |$foo
            |""".stripMargin
       val extended =
-        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+        parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val barContract = extended.contracts(0)
       val fooContract = extended.contracts(1)
       barContract.enums.length is 2
       fooContract.enums.length is 1
+    }
+
+    {
+      info("Contract map inheritance")
+      val foo: String =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map0
+           |
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      val bar: String =
+        s"""
+           |Contract Bar() extends Foo() {
+           |  mapping[U256, U256] map1
+           |
+           |  pub fn bar() -> () {}
+           |}
+           |$foo
+           |""".stripMargin
+      val extended =
+        parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val barContract = extended.contracts(0)
+      val fooContract = extended.contracts(1)
+      barContract.maps.length is 2
+      fooContract.maps.length is 1
     }
 
     {
@@ -915,7 +1323,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val extended =
-        fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+        parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val tokenInterface = extended.contracts(0).asInstanceOf[ContractInterface]
       val tokenImpl      = extended.contracts(1).asInstanceOf[Contract]
       tokenInterface.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
@@ -942,7 +1350,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val extended0 =
-        fastparse.parse(code(""), StatefulParser.multiContract(_)).get.value.extendedContracts()
+        parse(code(""), StatefulParser.multiContract(_)).get.value.extendedContracts()
       val fooInterface0 = extended0.contracts(0).asInstanceOf[ContractInterface]
       val barInterface0 = extended0.contracts(1).asInstanceOf[ContractInterface]
       val implContract0 = extended0.contracts(2).asInstanceOf[Contract]
@@ -973,8 +1381,9 @@ class ParserSpec extends AlephiumSpec {
            |  fn foo() -> ()
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
+      parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
         None,
+        useMethodSelector = false,
         TypeId("Child"),
         Seq(
           FuncDef(
@@ -982,9 +1391,11 @@ class ParserSpec extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
+            usePayToContractOnly = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             None
@@ -1016,41 +1427,88 @@ class ParserSpec extends AlephiumSpec {
         .value
         .stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
       intercept[Compiler.Error](
-        fastparse.parse(interface("@using(updateFields = true)"), StatefulParser.interface(_))
-      ).message is "Invalid annotation, expect @std annotation"
+        parse(interface("@unknown(updateFields = true)"), StatefulParser.interface(_))
+      ).message is "Invalid annotation unknown, interface only supports these annotations: std,using"
       intercept[Compiler.Error](
-        fastparse.parse(
-          interface("@std(id = #0001)", "@using(updateFields = true)"),
+        parse(
+          interface("@std(id = #0001)", "@unknown(updateFields = true)"),
           StatefulParser.interface(_)
         )
-      ).message is "Invalid annotation, expect @std annotation"
+      ).message is "Invalid annotation unknown, interface only supports these annotations: std,using"
       intercept[Compiler.Error](
-        fastparse.parse(
+        parse(
           interface("@std(id = #0001, updateFields = true)"),
           StatefulParser.interface(_)
         )
       ).message is "Invalid keys for @std annotation: updateFields"
       intercept[Compiler.Error](
-        fastparse.parse(interface("@std(id = #)"), StatefulParser.interface(_))
+        parse(interface("@std(id = #)"), StatefulParser.interface(_))
       ).message is "The field id of the @std annotation must be a non-empty ByteVec"
       intercept[Compiler.Error](
-        fastparse.parse(interface("@std(id = 0)"), StatefulParser.interface(_))
+        parse(interface("@std(id = 0)"), StatefulParser.interface(_))
       ).message is "Expect ByteVec for id in annotation @std"
       intercept[Compiler.Error](
-        fastparse.parse(interface("@std(updateFields = 0)"), StatefulParser.interface(_))
+        parse(interface("@std(updateFields = 0)"), StatefulParser.interface(_))
       ).message is "Invalid keys for @std annotation: updateFields"
     }
 
     {
-      info("Interface supports single inheritance")
+      info("Parse method selector annotation")
+      def interface(annotations: String*): String =
+        s"""
+           |${annotations.mkString("\n")}
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+
+      fastparse.parse(interface(""), StatefulParser.interface(_)).isSuccess is true
+      val result0 = fastparse.parse(interface(), StatefulParser.interface(_)).get.value
+      result0.stdId is None
+      result0.useMethodSelector is false
+
+      val result1 = fastparse
+        .parse(interface("@using(methodSelector = false)"), StatefulParser.interface(_))
+        .get
+        .value
+      result1.stdId is None
+      result1.useMethodSelector is false
+
+      val result2 = fastparse
+        .parse(
+          interface("@std(id = #0001)", "@using(methodSelector = true)"),
+          StatefulParser.interface(_)
+        )
+        .get
+        .value
+      result2.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      result2.useMethodSelector is true
+
+      intercept[Compiler.Error](
+        parse(
+          interface("@using(updateFields = true)"),
+          StatefulParser.interface(_)
+        )
+      ).message is "Invalid keys for @using annotation: updateFields"
+
+      intercept[Compiler.Error](
+        parse(interface("@using(methodSelector = 0)"), StatefulParser.interface(_))
+      ).message is "Expect Bool for methodSelector in annotation @using"
+    }
+
+    {
+      info("Interface supports multiple inheritance")
       val code =
         s"""
            |Interface Child extends Parent0, Parent1 {
            |  fn foo() -> ()
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.interface(_)))
-      error.message is "Interface only supports single inheritance: Parent0, Parent1"
+      parse(code, StatefulParser.interface(_)).get.value.inheritances is
+        Seq(
+          InterfaceInheritance(TypeId("Parent0")),
+          InterfaceInheritance(TypeId("Parent1"))
+        )
     }
 
     {
@@ -1061,7 +1519,7 @@ class ParserSpec extends AlephiumSpec {
            |  fn bar() -> () {}
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+      parse(code, StatefulParser.contract(_)).get.value is Contract(
         None,
         None,
         false,
@@ -1074,14 +1532,17 @@ class ParserSpec extends AlephiumSpec {
             FuncId("bar", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
+            usePayToContractOnly = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -1099,7 +1560,7 @@ class ParserSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+      parse(code, StatefulParser.contract(_)).get.value is Contract(
         None,
         None,
         false,
@@ -1112,14 +1573,17 @@ class ParserSpec extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = Ast.NotUseContractAssets,
+            usePayToContractOnly = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -1132,7 +1596,7 @@ class ParserSpec extends AlephiumSpec {
     }
 
     {
-      info("Contract can only implement single interface")
+      info("Contract supports multiple inheritance")
       val code =
         s"""
            |Contract Child() extends Parent0(), Parent1() implements Parent3, Parent4 {
@@ -1141,8 +1605,13 @@ class ParserSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_)))
-      error.message is "Contract only supports implementing single interface: Parent3, Parent4"
+      parse(code, StatefulParser.contract(_)).get.value.inheritances is
+        Seq(
+          ContractInheritance(TypeId("Parent0"), Seq.empty),
+          ContractInheritance(TypeId("Parent1"), Seq.empty),
+          InterfaceInheritance(TypeId("Parent3")),
+          InterfaceInheritance(TypeId("Parent4"))
+        )
     }
   }
 
@@ -1153,9 +1622,11 @@ class ParserSpec extends AlephiumSpec {
         FuncId("foo", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = false,
+        useAssetsInContract = Ast.NotUseContractAssets,
+        usePayToContractOnly = false,
         checkExternalCaller,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1167,9 +1638,11 @@ class ParserSpec extends AlephiumSpec {
         FuncId("bar", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = false,
+        useAssetsInContract = Ast.NotUseContractAssets,
+        usePayToContractOnly = false,
         checkExternalCaller,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1202,19 +1675,19 @@ class ParserSpec extends AlephiumSpec {
         .value
         .stdIdEnabled is Some(false)
       intercept[Compiler.Error](
-        fastparse.parse(contract("@using(updateFields = true)"), StatefulParser.contract(_))
-      ).message is "Invalid annotation, expect @std annotation"
+        parse(contract("@unknown(updateFields = true)"), StatefulParser.contract(_))
+      ).message is "Invalid annotation unknown, contract only supports these annotations: std"
       intercept[Compiler.Error](
-        fastparse.parse(
+        parse(
           contract("@std(enabled = true, updateFields = true)"),
           StatefulParser.contract(_)
         )
       ).message is "Invalid keys for @std annotation: updateFields"
       intercept[Compiler.Error](
-        fastparse.parse(contract("@std(enabled = 0)"), StatefulParser.contract(_))
+        parse(contract("@std(enabled = 0)"), StatefulParser.contract(_))
       ).message is "Expect Bool for enabled in annotation @std"
       intercept[Compiler.Error](
-        fastparse.parse(contract("@std(updateFields = 0)"), StatefulParser.contract(_))
+        parse(contract("@std(updateFields = 0)"), StatefulParser.contract(_))
       ).message is "Invalid keys for @std annotation: updateFields"
     }
 
@@ -1273,7 +1746,7 @@ class ParserSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+      parse(code, StatefulParser.contract(_)).get.value is Contract(
         None,
         None,
         true,
@@ -1281,6 +1754,7 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq(fooFuncDef(true), barFuncDef(false)),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -1309,12 +1783,17 @@ class ParserSpec extends AlephiumSpec {
            |$bar
            |""".stripMargin
       val extended =
-        fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+        parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val fooContract = extended.contracts(0)
       val annotations = Seq(
         Annotation(
-          Ident(Parser.UsingAnnotation.id),
-          Seq(AnnotationField(Ident(Parser.UsingAnnotation.useCheckExternalCallerKey), Val.False))
+          Ident(Parser.FunctionUsingAnnotation.id),
+          Seq(
+            AnnotationField(
+              Ident(Parser.FunctionUsingAnnotation.useCheckExternalCallerKey),
+              Const[StatefulContext](Val.False)
+            )
+          )
         )
       )
       fooContract is Contract(
@@ -1328,6 +1807,7 @@ class ParserSpec extends AlephiumSpec {
           barFuncDef(true, false).copy(annotations = annotations),
           fooFuncDef(false, false).copy(annotations = annotations)
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -1348,9 +1828,11 @@ class ParserSpec extends AlephiumSpec {
         FuncId("main", false),
         isPublic = true,
         usePreapprovedAssets,
-        useAssetsInContract = false,
+        useAssetsInContract = Ast.NotUseContractAssets,
+        usePayToContractOnly = false,
         useCheckExternalCaller = true,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))
@@ -1358,18 +1840,38 @@ class ParserSpec extends AlephiumSpec {
     )
   }
 
-  it should "parse AssetScript" in new ScriptFixture {
-    val usePreapprovedAssets = false
+  it should "parse AssetScript" in {
     val script = s"""
+                    |struct Foo { x: U256 }
                     |AssetScript Main(x: U256) {
-                    |  pub fn main() -> () {
-                    |    return
+                    |  pub fn main(foo: Foo) -> Foo {
+                    |    return foo
                     |  }
                     |}
                     |""".stripMargin
 
-    fastparse.parse(script, StatelessParser.assetScript(_)).get.value is
-      AssetScript(ident, templateVars, funcs)
+    parse(script, StatelessParser.assetScript(_)).get.value is
+      AssetScript(
+        TypeId("Main"),
+        Seq(Argument(Ident("x"), Type.U256, false, false)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("main", false),
+            isPublic = true,
+            usePreapprovedAssets = false,
+            Ast.NotUseContractAssets,
+            usePayToContractOnly = false,
+            useCheckExternalCaller = true,
+            useUpdateFields = false,
+            useMethodIndex = None,
+            Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
+            Seq(Type.NamedType(TypeId("Foo"))),
+            Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
+          )
+        ),
+        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256))))
+      )
   }
 
   // scalastyle:off no.equal
@@ -1386,7 +1888,7 @@ class ParserSpec extends AlephiumSpec {
                     |}
                     |""".stripMargin
 
-    fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
+    parse(script, StatefulParser.txScript(_)).get.value is TxScript(
       ident,
       templateVars,
       funcs
@@ -1405,9 +1907,9 @@ class ParserSpec extends AlephiumSpec {
          |  return
          |}
          |""".stripMargin
-    fastparse.parse(script(""), StatefulParser.txScript(_)).isSuccess is true
-    fastparse.parse(script("()"), StatefulParser.txScript(_)).isSuccess is true
-    fastparse.parse(script("(x: U256)"), StatefulParser.txScript(_)).isSuccess is true
+    parse(script(""), StatefulParser.txScript(_)).isSuccess is true
+    parse(script("()"), StatefulParser.txScript(_)).isSuccess is true
+    parse(script("(x: U256)"), StatefulParser.txScript(_)).isSuccess is true
   }
 
   it should "fail to define Debug event" in {
@@ -1420,7 +1922,252 @@ class ParserSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_))).message is
+    intercept[Compiler.Error](parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
   }
+
+  it should "parse method index annotation" in {
+    def interface(index: String) =
+      s"""
+         |Interface Foo {
+         |  @using(methodIndex = $index, preapprovedAssets = true)
+         |  pub fn f1() -> ()
+         |
+         |  @using(methodIndex = 2)
+         |  pub fn f2() -> ()
+         |}
+         |""".stripMargin
+
+    val funcs = fastparse.parse(interface("1"), StatefulParser.interface(_)).get.value.funcs
+    funcs(0).useMethodIndex is Some(1)
+    funcs(0).usePreapprovedAssets is true
+    funcs(1).useMethodIndex is Some(2)
+
+    intercept[Compiler.Error](
+      fastparse.parse(interface("false"), StatefulParser.interface(_))
+    ).message is
+      "Expect U256 for methodIndex in annotation @using"
+    intercept[Compiler.Error](
+      fastparse.parse(interface("-1"), StatefulParser.interface(_))
+    ).message is
+      "Expect U256 for methodIndex in annotation @using"
+    fastparse.parse(interface("255"), StatefulParser.interface(_)).isSuccess is true
+    intercept[Compiler.Error](
+      fastparse.parse(interface("256"), StatefulParser.interface(_))
+    ).message is
+      "Invalid method index 256, expecting a value in the range [0, 0xff]"
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(methodIndex = 1, preapprovedAssets = true)
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    intercept[Compiler.Error](fastparse.parse(contract, StatefulParser.contract(_))).message is
+      "The `methodIndex` annotation can only be used for interface functions"
+  }
+
+  it should "parse struct" in {
+    {
+      info("Simple struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  amount: U256,
+           |  mut address: Address
+           |}
+           |""".stripMargin
+      parse(code, StatelessParser.struct(_)).get.value is Ast.Struct(
+        TypeId("Foo"),
+        List(
+          StructField(Ident("amount"), false, Type.U256),
+          StructField(Ident("address"), true, Type.Address)
+        )
+      )
+    }
+
+    {
+      info("Nested struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  amount: U256,
+           |  address: Address
+           |}
+           |Contract Bar(foo: Foo, baz: Baz) {
+           |  pub fn f() -> () {}
+           |}
+           |struct Baz {
+           |  id: ByteVec,
+           |  account: Foo,
+           |  mut accounts: [Foo; 2]
+           |}
+           |""".stripMargin
+
+      val result = parse(code, StatefulParser.multiContract(_)).get.value
+      result.contracts.length is 1
+      result.contracts.head.fields.map(_.tpe) is Seq(
+        Type.NamedType(TypeId("Foo")),
+        Type.NamedType(TypeId("Baz"))
+      )
+      result.structs.length is 2
+      result.structs(0) is Ast.Struct(
+        TypeId("Foo"),
+        List(
+          StructField(Ident("amount"), false, Type.U256),
+          StructField(Ident("address"), false, Type.Address)
+        )
+      )
+      result.structs(1) is Ast.Struct(
+        TypeId("Baz"),
+        List(
+          StructField(Ident("id"), false, Type.ByteVec),
+          StructField(
+            Ident("account"),
+            false,
+            Type.NamedType(TypeId("Foo"))
+          ),
+          StructField(
+            Ident("accounts"),
+            true,
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 2)
+          )
+        )
+      )
+    }
+
+    {
+      info("Duplicate field definition")
+      val code =
+        s"""
+           |struct Foo {
+           |  a: U256,
+           |  $$a: ByteVec
+           |}
+           |""".stripMargin
+      val error =
+        intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), StatefulParser.struct(_)))
+      error.message is "These struct fields are defined multiple times: a"
+      error.position is code.indexOf("$")
+    }
+  }
+
+  it should "parse map" in {
+    def fail[T](code: String, parser: P[_] => P[T], errMsg: String) = {
+      val error = intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), parser))
+      error.message is errMsg
+      error.position is code.indexOf("$")
+    }
+
+    fastparse.parse("mapping[U256, U256] map", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
+      Ident("map"),
+      Type.Map(Type.U256, Type.U256)
+    )
+    fastparse.parse("mapping[U256, Foo] map", StatefulParser.mapDef(_)).get.value is Ast.MapDef(
+      Ident("map"),
+      Type.Map(Type.U256, Type.NamedType(TypeId("Foo")))
+    )
+    fastparse.parse("mapping[U256, [U256; 2]] map", StatefulParser.mapDef(_)).get.value is
+      Ast.MapDef(Ident("map"), Type.Map(Type.U256, Type.FixedSizeArray(Type.U256, 2)))
+    fail(
+      s"mapping[$$Foo, Foo] map",
+      StatefulParser.mapDef(_),
+      "The key type of map can only be primitive type"
+    )
+    fail(
+      s"mapping[$$[U256; 2], U256] map",
+      StatefulParser.mapDef(_),
+      "The key type of map can only be primitive type"
+    )
+
+    parse(
+      "map.insert!(address, 1, 0)",
+      StatefulParser.statement(_)
+    ).get.value is Ast.InsertToMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](
+        Variable(Ident("address")),
+        Const(Val.U256(U256.One)),
+        Const(Val.U256(U256.Zero))
+      )
+    )
+    parse("map.remove!(address, 1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](Variable(Ident("address")), Const(Val.U256(U256.One)))
+    )
+
+    parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
+      Ident("map"),
+      constantIndex(0)
+    )
+  }
+
+  it should "parse struct destruction" in {
+    checkParseStat(
+      "let Foo { x, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = false, Ident("x"), None),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { mut x, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = true, Ident("x"), None),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { x: x1, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = false, Ident("x"), Some(Ident("x1"))),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+    checkParseStat(
+      "let Foo { mut x: x1, y } = foo",
+      StructDestruction(
+        TypeId("Foo"),
+        Seq(
+          StructFieldAlias(isMutable = true, Ident("x"), Some(Ident("x1"))),
+          StructFieldAlias(isMutable = false, Ident("y"), None)
+        ),
+        Variable(Ident("foo"))
+      )
+    )
+
+    val invalidStmt = s"$$let Foo { } = foo"
+    val error = intercept[Compiler.Error](
+      fastparse.parse(invalidStmt.replace("$", ""), StatefulParser.structDestruction(_))
+    )
+    error.message is "No variable declaration"
+    error.position is invalidStmt.indexOf("$")
+  }
+
+  it should "handle correct const width lexer" in {
+    info("typedNum")
+    forAll(Gen.posNum, Gen.choose(0, 10)) { case (num, numSpaces) =>
+      val spaces = s"${" " * numSpaces}"
+      val str    = s"${num.toString}$spaces"
+      val result = fastparse.parse(str, StatelessParser.const(_)).get.value
+      result.sourceIndex.get.width is num.toString.length
+    }
+  }
 }
+
+class ParseNoFileSpec extends ParserSpec(None)
+class ParseFileSpec   extends ParserSpec(Some(new java.net.URI("file:///tmp")))

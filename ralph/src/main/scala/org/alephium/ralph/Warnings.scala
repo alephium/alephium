@@ -39,6 +39,12 @@ trait Warnings {
     }
   }
 
+  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[String]): Unit = {
+    if (!compilerOptions.ignoreUnusedVariablesWarnings) {
+      warnings += s"Found unused maps in ${typeId.name}: ${unusedMaps.sorted.mkString(", ")}"
+    }
+  }
+
   def warnUnusedConstants(
       typeId: Ast.TypeId,
       unusedConstants: mutable.ArrayBuffer[String]
@@ -86,6 +92,27 @@ trait Warnings {
     if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
       warnings += Warnings.noCheckExternalCallerMsg(typeId.name, funcId.name)
     }
+  }
+
+  def warnPrivateFuncHasCheckExternalCaller(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
+      warnings += s"No need to add the checkExternalCaller annotation to the private function ${Ast
+          .funcName(typeId, funcId)}"
+    }
+  }
+
+  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
+      s" If this is intentional, consider using anonymous variables to suppress this warning."
+  }
+
+  def warningMutableStructField(
+      typeId: Ast.TypeId,
+      fieldId: Ast.Ident,
+      structId: Ast.TypeId
+  ): Unit = {
+    warnings +=
+      s"The struct ${structId.name} is immutable, you can remove the `mut` from ${typeId.name}.${fieldId.name}"
   }
 }
 

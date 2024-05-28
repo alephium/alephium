@@ -24,31 +24,42 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
 import org.alephium.protocol.vm.{LogConfig, WorldState}
-import org.alephium.util.{ActorRefT, EventBus, EventStream}
+import org.alephium.serde.{deserialize, serialize}
+import org.alephium.util.{ActorRefT, EventBus, EventStream, Hex}
 
 object BlockChainHandler {
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      eventBus: ActorRefT[EventBus.Message]
+      eventBus: ActorRefT[EventBus.Message],
+      maxForkDepth: Int
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
   ): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, eventBus))
+    Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
 
   sealed trait Command
-  final case class Validate(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
-      extends Command
+  final case class Validate(
+      block: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ) extends Command
+  final case class ValidateMinedBlock(
+      blockHash: BlockHash,
+      blockBytes: ByteString,
+      broker: ActorRefT[ChainHandler.Event]
+  ) extends Command
 
   sealed trait Event                           extends ChainHandler.Event
   final case class BlockAdded(hash: BlockHash) extends Event
@@ -83,11 +94,12 @@ object BlockChainHandler {
 class BlockChainHandler(
     blockFlow: BlockFlow,
     chainIndex: ChainIndex,
-    eventBus: ActorRefT[EventBus.Message]
+    eventBus: ActorRefT[EventBus.Message],
+    maxForkDepth: Int
 )(implicit
     brokerConfig: BrokerConfig,
-    val consensusConfig: ConsensusConfig,
-    networkSetting: NetworkSetting,
+    val consensusConfigs: ConsensusConfigs,
+    val networkConfig: NetworkSetting,
     logConfig: LogConfig
 ) extends ChainHandler[Block, InvalidBlockStatus, Option[WorldState.Cached], BlockValidation](
       blockFlow,
@@ -100,8 +112,45 @@ class BlockChainHandler(
 
   override def receive: Receive = validate orElse updateNodeSyncStatus
 
-  def validate: Receive = { case Validate(block, broker, origin) =>
-    handleData(block, broker, origin)
+  @inline private def validateBlock(
+      block: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): Unit = {
+    val blockChain = blockFlow.getBlockChain(block.chainIndex)
+    blockChain.validateBlockHeight(block, maxForkDepth) match {
+      case Right(true) => handleData(block, broker, origin)
+      case Right(false) =>
+        origin match {
+          case DataOrigin.InterClique(brokerInfo) =>
+            log.warning(
+              s"Received invalid block from ${brokerInfo.address}, block hash: ${block.hash.toHexString}"
+            )
+            publishEvent(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
+          case _ =>
+            log.error(s"Received invalid block from $origin, block hash: ${block.hash.toHexString}")
+        }
+        handleInvalidData(block, broker, origin, InvalidBlockHeight)
+      case Left(error) => // this should never happen
+        log.error(s"IO error in validating block height: $error")
+        handleInvalidData(block, broker, origin, InvalidBlockHeight)
+    }
+  }
+
+  def validate: Receive = {
+    case Validate(block, broker, origin) =>
+      validateBlock(block, broker, origin)
+    case ValidateMinedBlock(blockHash, blockBytes, broker) =>
+      // Broadcast immediately to reduce propagation latency
+      interCliqueBroadcast(blockHash, blockBytes, DataOrigin.Local)
+      deserialize[Block](blockBytes) match {
+        case Right(block) =>
+          handleData(block, broker, DataOrigin.Local)
+        case Left(error) =>
+          log.error(
+            s"Deserialization error for submited block: $error : ${Hex.toHexString(blockBytes)}"
+          )
+      }
   }
 
   def validateWithSideEffect(
@@ -109,38 +158,38 @@ class BlockChainHandler(
       origin: DataOrigin
   ): ValidationResult[InvalidBlockStatus, Option[WorldState.Cached]] = {
     for {
-      _ <- validator.headerValidation.validate(block.header, blockFlow)
-      blockMsgOpt = {
+      _ <- validator.headerValidation.validate(block.header, blockFlow).map { _ =>
         blockFlow.cacheHeaderVerifiedBlock(block)
-        interCliqueBroadcast(block, origin)
+        if (origin != DataOrigin.Local) {
+          interCliqueBroadcast(block.hash, serialize(block), origin)
+        }
       }
       sideResult <- validator.checkBlockAfterHeader(block, blockFlow)
     } yield {
-      intraCliqueBroadCast(block, blockMsgOpt, origin)
+      intraCliqueBroadCast(block, origin)
       sideResult
     }
   }
 
   private def interCliqueBroadcast(
-      block: Block,
+      blockHash: BlockHash,
+      blockBytes: ByteString,
       origin: DataOrigin
-  ): Option[ByteString] = {
-    Option.when(brokerConfig.contains(block.chainIndex.from) && isNodeSynced) {
-      val blockMessage = Message.serialize(NewBlock(block))
-      val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, origin)
+  ): Unit = {
+    if (brokerConfig.contains(chainIndex.from) && isNodeSynced) {
+      val blockMsg = Message.serialize(NewBlock(blockBytes))
+      val event    = InterCliqueManager.BroadCastBlock(chainIndex, blockHash, blockMsg, origin)
       publishEvent(event)
-      blockMessage
     }
   }
 
   private def intraCliqueBroadCast(
       block: Block,
-      blockMsgOpt: Option[ByteString],
       origin: DataOrigin
   ): Unit = {
     val broadcastIntraClique = brokerConfig.brokerNum != 1
     if (brokerConfig.contains(block.chainIndex.from) && broadcastIntraClique) {
-      val blockMsg  = blockMsgOpt.getOrElse(Message.serialize(NewBlock(block)))
+      val blockMsg  = Message.serialize(NewBlock(block))
       val headerMsg = Message.serialize(NewHeader(block.header))
       val event     = IntraCliqueManager.BroadCastBlock(block, blockMsg, headerMsg, origin)
       publishEvent(event)

@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{TokenId}
+import org.alephium.protocol.model.TokenId
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
@@ -37,6 +37,10 @@ class TransactionSpec
       val bytes  = serialize[Transaction](transaction)
       val output = deserialize[Transaction](bytes).toOption.value
       output is transaction
+
+      // check cache
+      transaction.getSerialized().value is bytes
+      output.getSerialized().value is bytes
     }
 
     info("merkle transation")
@@ -53,13 +57,14 @@ class TransactionSpec
     val script   = LockupScript.p2pkh(key)
     val coinbaseTxs = (0 to 1000).map(_ =>
       Transaction
-        .coinbase(
+        .powCoinbaseForTest(
           ChainIndex.unsafe(0, 0),
-          0,
+          AVector.empty,
           script,
-          Hash.generate.bytes,
           Target.Max,
-          ALPH.LaunchTimestamp
+          ALPH.LaunchTimestamp,
+          AVector.empty,
+          Hash.generate.bytes
         )
     )
 
@@ -76,26 +81,29 @@ class TransactionSpec
 
   it should "avoid hash collision for coinbase txs" in {
     val script = LockupScript.p2pkh(PublicKey.generate)
-    val coinbase0 = Transaction.coinbase(
+    val coinbase0 = Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0, 0),
-      gasFee = U256.Zero,
+      AVector.empty,
       script,
       target = Target.Max,
-      blockTs = ALPH.LaunchTimestamp
+      blockTs = ALPH.LaunchTimestamp,
+      AVector.empty
     )
-    val coinbase1 = Transaction.coinbase(
+    val coinbase1 = Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0, 1),
-      gasFee = U256.Zero,
+      AVector.empty,
       script,
       target = Target.Max,
-      blockTs = ALPH.LaunchTimestamp
+      blockTs = ALPH.LaunchTimestamp,
+      AVector.empty
     )
-    val coinbase2 = Transaction.coinbase(
+    val coinbase2 = Transaction.powCoinbaseForTest(
       ChainIndex.unsafe(0, 0),
-      gasFee = U256.Zero,
+      AVector.empty,
       script,
       target = Target.Max,
-      blockTs = TimeStamp.now()
+      blockTs = TimeStamp.now(),
+      AVector.empty
     )
     (coinbase0.id equals coinbase1.id) is false
     (coinbase0.id equals coinbase2.id) is false
@@ -162,10 +170,25 @@ class TransactionSpec
     }
 
     {
-      info("coinbase transaction")
+      info("pre-rhone coinbase transaction")
 
-      val tx = coinbaseTransaction()
+      implicit val networkConfig = new NetworkConfigFixture.Default {
+        override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
+      }.networkConfig
+      val tx = coinbaseTransaction(AVector.empty)
       tx.verify("coinbase")
+    }
+
+    {
+      info("rhone coinbase transaction")
+      val blockHash = model.BlockHash.unsafe(
+        hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7"
+      )
+      val lockupScript = LockupScript.P2PKH(
+        Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
+      )
+      val tx = coinbaseTransaction(AVector(SelectedGhostUncle(blockHash, lockupScript, 1)))
+      tx.verify("rhone-coinbase")
     }
 
     {
@@ -256,6 +279,7 @@ class TransactionSpec
             isPublic = true,
             usePreapprovedAssets = true,
             useContractAssets = true,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -406,6 +430,7 @@ class TransactionSpec
             isPublic = true,
             usePreapprovedAssets = false,
             useContractAssets = false,
+            usePayToContractOnly = false,
             argsLength = 2,
             localsLength = 2,
             returnLength = 0,
@@ -487,6 +512,7 @@ class TransactionSpec
             isPublic = true,
             usePreapprovedAssets = true,
             useContractAssets = true,
+            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,

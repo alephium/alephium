@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.util.concurrent.locks.{ReentrantLock, ReentrantReadWriteLock}
 
 trait Lock {
   def readOnly[T](f: => T): T
@@ -47,6 +47,27 @@ trait RWLock extends Lock {
     } finally {
       writeLock.unlock()
     }
+  }
+}
+
+trait MutexLock extends Lock {
+  private val lock = new ReentrantLock()
+
+  @inline private def run[T](f: => T): T = {
+    lock.lock()
+    try {
+      f
+    } finally {
+      lock.unlock()
+    }
+  }
+
+  def readOnly[T](f: => T): T = {
+    run(f)
+  }
+
+  def writeOnly[T](f: => T): T = {
+    run(f)
   }
 }
 

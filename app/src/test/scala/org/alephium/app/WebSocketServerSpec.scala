@@ -23,17 +23,18 @@ import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.HttpClientOptions
+import io.vertx.core.http.WebSocketClientOptions
 import org.scalatest.{Assertion, EitherValues}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
-import org.alephium.api.model.BlockEntry
+import org.alephium.api.model.{BlockEntry, GhostUncleBlockEntry}
 import org.alephium.crypto.Blake3
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
@@ -46,26 +47,31 @@ class WebSocketServerSpec
 
   behavior of "http"
 
-  it should "encode BlockNotify" in new Fixture {
+  it should "encode BlockEntry" in new Fixture {
     val dep  = BlockHash.unsafe(Blake3.hash("foo"))
     val deps = AVector.fill(groupConfig.depsNum)(dep)
-    val header =
-      BlockHeader.unsafeWithRawDeps(
-        deps,
-        Hash.zero,
-        Hash.hash("bar"),
-        TimeStamp.zero,
-        Target.Max,
-        Nonce.zero
+    val blockEntry = BlockEntry(
+      BlockHash.random,
+      TimeStamp.zero,
+      0,
+      0,
+      1,
+      deps,
+      AVector.empty,
+      Nonce.zero.value,
+      0,
+      Hash.zero,
+      Hash.hash("bar"),
+      Target.Max.bits,
+      AVector(
+        GhostUncleBlockEntry(
+          BlockHash.random,
+          Address.Asset(LockupScript.p2pkh(PublicKey.generate))
+        )
       )
-
-    val block       = Block(header, AVector.empty)
-    val blockNotify = BlockNotify(block, 1)
-    val result      = WebSocketServer.blockNotifyEncode(blockNotify)
-
-    show(
-      result
-    ) is write(BlockEntry.from(block, 1))
+    )
+    val result = writeJs(blockEntry)
+    show(result) is write(blockEntry)
   }
 
   behavior of "ws"
@@ -106,9 +112,9 @@ class WebSocketServerSpec
   trait RouteWS extends WebSocketServerFixture {
 
     private val vertx = Vertx.vertx()
-    private val httpClient = {
-      val options = new HttpClientOptions().setMaxWebSocketFrameSize(1024 * 1024)
-      vertx.createHttpClient(options)
+    private val webSocketClient = {
+      val options = new WebSocketClientOptions().setMaxFrameSize(1024 * 1024)
+      vertx.createWebSocketClient(options)
     }
     val port             = node.config.network.wsPort
     val blockNotifyProbe = TestProbe()
@@ -136,8 +142,8 @@ class WebSocketServerSpec
           .contains(server.eventHandler) is true
       }
 
-      val ws = httpClient
-        .webSocket(port, "127.0.0.1", "/events")
+      val ws = webSocketClient
+        .connect(port, "127.0.0.1", "/events")
         .asScala
         .map { ws =>
           ws.textMessageHandler { blockNotify =>
