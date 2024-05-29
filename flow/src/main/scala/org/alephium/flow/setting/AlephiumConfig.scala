@@ -460,7 +460,7 @@ object AlephiumConfig {
 
     if (
       config.network.networkId == NetworkId.AlephiumMainNet &&
-      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(1718186400000L)
     ) {
       throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
     }

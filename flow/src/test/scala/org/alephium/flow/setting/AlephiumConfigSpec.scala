@@ -106,7 +106,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       )
     initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
     config.network.networkId is NetworkId.AlephiumMainNet
-    config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
+    config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1718186400000L)
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
