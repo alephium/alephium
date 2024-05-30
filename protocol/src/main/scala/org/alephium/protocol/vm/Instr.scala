@@ -35,7 +35,7 @@ import org.alephium.protocol.vm.TokenIssuance.{
   NoIssuance
 }
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
-import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
+import org.alephium.util.{AVector, Bytes, Duration, EitherF, TimeStamp, U256}
 import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
@@ -2104,6 +2104,7 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       immFields         <- prepareImmFields(frame)
       _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
       contractCode      <- prepareContractCode(frame)
+      _                 <- checkInactiveInstructions(frame, contractCode)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
@@ -2124,6 +2125,24 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
           okay
         }
     } yield ()
+  }
+
+  def checkInactiveInstructions[C <: StatefulContext](
+      frame: Frame[C],
+      contractCode: StatefulContract.HalfDecoded
+  ): ExeResult[Unit] = {
+    if (!frame.ctx.getHardFork().isRhoneEnabled()) {
+      EitherF.foreachTry(0 until contractCode.methodsLength)(methodIndex => {
+        contractCode.getMethod(methodIndex).flatMap { method =>
+          method.instrs.find(_.isInstanceOf[RhoneInstr[_]]) match {
+            case Some(inactiveInstr) => failed(InactiveInstr(inactiveInstr))
+            case None                => okay
+          }
+        }
+      })
+    } else {
+      okay
+    }
   }
 }
 
