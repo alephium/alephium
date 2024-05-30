@@ -1325,11 +1325,12 @@ object CallExternal extends StatefulInstrCompanion1[Byte]
 final case class MethodSelector(selector: Method.Selector)
     extends CallInstr
     with StatefulInstr
+    with RhoneInstr[StatefulContext]
     with GasHigh {
   def serialize(): ByteString = ByteString(code) ++ encode(selector)
 
   // The execution is skipped. It's only used to provide method selector
-  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = okay
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = okay
 }
 object MethodSelector extends InstrCompanion[StatefulContext] {
 
@@ -1344,11 +1345,12 @@ object MethodSelector extends InstrCompanion[StatefulContext] {
 final case class CallExternalBySelector(selector: Method.Selector)
     extends CallInstr
     with StatefulInstr
+    with RhoneInstr[StatefulContext]
     with GasCall {
   def serialize(): ByteString = ByteString(code) ++ encode(selector)
 
   // Implemented in frame instead
-  def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
+  def runWithRhone[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = ???
 }
 object CallExternalBySelector extends InstrCompanion[StatefulContext] {
   def deserialize[C <: StatefulContext](

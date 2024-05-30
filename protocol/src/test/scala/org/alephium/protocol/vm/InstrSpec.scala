@@ -97,7 +97,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector[RhoneInstr[StatefulContext]](
         PayGasFee,
         MinimalContractDeposit,
-        CreateMapEntry(twoBytes)
+        CreateMapEntry(twoBytes),
+        MethodSelector(Method.Selector(0)),
+        CallExternalBySelector(Method.Selector(0))
       )
   }
 
@@ -149,7 +151,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "fail if the rhone hardfork is not activated yet for stateful instrs" in new RhoneForkFixture
     with StatefulFixture {
     val frame0 = prepareFrame()(NetworkConfigFixture.Rhone) // Rhone is activated
-    rhoneStatefulInstrs.foreach { instr =>
+    rhoneStatefulInstrs.init.foreach { instr =>
       val result = instr.runWith(frame0)
       if (result.isLeft) {
         result.leftValue isnotE InactiveInstr(instr)
@@ -3306,7 +3308,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       GroupOfAddress,
       PayGasFee,
       MinimalContractDeposit,
-      CreateMapEntry(0, 0)
+      CreateMapEntry(0, 0),
+      MethodSelector(Method.Selector(0)),
+      CallExternalBySelector(Method.Selector(0))
     )
     val invalidMethod        = baseMethod.copy(instrs = AVector(rhoneInstrs.shuffle().head))
     val invalidContract      = contract.copy(methods = AVector(invalidMethod))
@@ -4583,7 +4587,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(byte, byte) -> 210,
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(0, 0) -> 210,
       MethodSelector(Method.Selector(0)) -> 211, CallExternalBySelector(Method.Selector(0)) -> 212
     )
     // format: on
@@ -4591,6 +4595,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     def test(instr: Instr[_], code: Int) = instr.code is code.toByte
     allInstrs.length is toCode.size
     allInstrs.foreach(p => test(p._1, p._2))
+    val rhoneInstrs = allInstrs.map(_._1).filter(_.isInstanceOf[RhoneInstr[_]])
+    rhoneInstrs is AVector[Instr[_]](
+      GroupOfAddress,
+      PayGasFee,
+      MinimalContractDeposit,
+      CreateMapEntry(0, 0),
+      MethodSelector(Method.Selector(0)),
+      CallExternalBySelector(Method.Selector(0))
+    )
   }
 
   trait AllInstrsFixture {
