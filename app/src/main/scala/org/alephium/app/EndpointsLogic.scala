@@ -668,12 +668,15 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val testContractLogic = serverLogic(testContract) { testContract: TestContract =>
-    val blockFlow = BlockFlow.emptyUnsafe(node.config)
+    val (blockFlow, storages) = BlockFlow.emptyAndStoragesUnsafe(node.config)
     Future.successful {
-      for {
+      val result = for {
         completeTestContract <- testContract.toComplete()
         result               <- serverUtils.runTestContract(blockFlow, completeTestContract)
       } yield result
+      // We need to clean up the storages, no matter if the test passes or fails
+      storages.dESTROYUnsafe()
+      result
     }
   }
 
