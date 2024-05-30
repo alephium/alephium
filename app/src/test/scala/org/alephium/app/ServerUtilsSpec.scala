@@ -2869,19 +2869,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       rhoneHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
     )
 
-    val contractAddress = deployContract(fooContract)
-
-    def script =
-      s"""
-         |TxScript Main {
-         |  Foo(#${contractAddress.toBase58}).foo()
-         |}
-         |
-         |$fooContract
-         |""".stripMargin
-
-    val exception = intercept[AssertionError](executeScript(script))
-    exception.getMessage() is "Right(TxScriptExeFailed(InactiveInstr(PayGasFee)))"
+    intercept[AssertionError](deployContract(fooContract)).getMessage is
+      "BadRequest(Execution error when estimating gas for tx script or contract: InactiveInstr(PayGasFee))"
   }
 
   it should "not charge caller gas fee when contract is paying gas" in new GasFeeFixture {
