@@ -2870,7 +2870,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     intercept[AssertionError](deployContract(fooContract)).getMessage is
-      "BadRequest(Execution error when estimating gas for tx script or contract: InactiveInstr(PayGasFee))"
+      "BadRequest(Execution error when estimating gas for tx script or contract: InactiveInstr(MethodSelector(Selector(-1928645066))))"
   }
 
   it should "not charge caller gas fee when contract is paying gas" in new GasFeeFixture {

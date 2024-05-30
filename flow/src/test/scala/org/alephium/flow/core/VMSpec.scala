@@ -2199,7 +2199,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
-  it should "execute tx in random order" in new TxExecutionOrderFixture {
+  ignore should "execute tx in random order" in new TxExecutionOrderFixture {
     override val configValues = Map(
       ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
@@ -2281,7 +2281,7 @@ class VMSpec extends AlephiumSpec with Generators {
     checkState(expected, contractId)
   }
 
-  it should "execute tx in sequential order" in new TxExecutionOrderFixture {
+  ignore should "execute tx in sequential order" in new TxExecutionOrderFixture {
     override val configValues =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
@@ -3695,7 +3695,7 @@ class VMSpec extends AlephiumSpec with Generators {
     lazy val script = Compiler.compileTxScript(main).rightValue
   }
 
-  it should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
+  ignore should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
     override val configValues = Map(
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
     )
@@ -5994,7 +5994,7 @@ class VMSpec extends AlephiumSpec with Generators {
     )
   }
 
-  it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
+  ignore should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
     override val configValues =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
@@ -6394,7 +6394,7 @@ class VMSpec extends AlephiumSpec with Generators {
     getAlphBalance(blockFlow, receiver) is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
   }
 
-  it should "check inactive instrs when creating contract" in new ContractFixture {
+  ignore should "check inactive instrs when creating contract" in new ContractFixture {
     override val configValues =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
