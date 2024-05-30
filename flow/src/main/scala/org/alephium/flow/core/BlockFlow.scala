@@ -122,18 +122,23 @@ object BlockFlow extends StrictLogging {
   type WorldStateUpdater = (WorldState.Cached, Block) => IOResult[Unit]
 
   def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
+    emptyAndStoragesUnsafe(config)._1
+  }
+
+  def emptyAndStoragesUnsafe(config: AlephiumConfig): (BlockFlow, Storages) = {
     val storages =
       Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, ProdSettings.writeOptions)(
         config.broker,
         config.node
       )
-    fromGenesisUnsafe(storages, config.genesisBlocks)(
+    val blockFlow = fromGenesisUnsafe(storages, config.genesisBlocks)(
       config.broker,
       config.network,
       config.consensus,
       config.mempool,
       config.node.eventLogConfig
     )
+    (blockFlow, storages)
   }
 
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {

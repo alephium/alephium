@@ -3301,17 +3301,43 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       expectedContractId.foreach { _ is contractId }
       checkContractState(instr, contractId, attoAlphAmount, tokens, tokenAmount)
     }
+
+    val rhoneInstrs: AVector[Instr[StatefulContext]] = AVector(
+      GroupOfAddress,
+      PayGasFee,
+      MinimalContractDeposit,
+      CreateMapEntry(0, 0)
+    )
+    val invalidMethod        = baseMethod.copy(instrs = AVector(rhoneInstrs.shuffle().head))
+    val invalidContract      = contract.copy(methods = AVector(invalidMethod))
+    val invalidContractBytes = serialize(invalidContract)
+
+    def testInactiveInstrs(instr: ContractFactory, values: AVector[Val]) = {
+      val preRhoneFrame = prepareFrame(
+        Some(balanceState),
+        txEnvOpt = Some(
+          TxEnv(
+            tx,
+            prevOutputs.map(_.referredOutput),
+            Stack.ofCapacity[Signature](0)
+          )
+        ),
+        callerFrameOpt = Some(callerFrame)
+      )(NetworkConfigFixture.Leman)
+      values.foreach(preRhoneFrame.opStack.push)
+      instr.runWith(preRhoneFrame).leftValue isE a[InactiveInstr[_]]
+    }
   }
 
   it should "CreateContract" in new CreateContractAbstractFixture {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
-    stack.push(Val.ByteVec(contractBytes))
-    stack.push(immState)
-    stack.push(mutState)
-
+    val values: AVector[Val] = AVector(Val.ByteVec(contractBytes), immState, mutState)
+    values.foreach(stack.push)
     test(CreateContract, ALPH.oneAlph, AVector.empty, None)
+
+    testInactiveInstrs(CreateContract, values.replace(0, Val.ByteVec(invalidContractBytes)))
   }
 
   it should "CreateContractWithToken" in new CreateContractAbstractFixture {
@@ -3321,16 +3347,19 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
-    stack.push(Val.ByteVec(contractBytes))
-    stack.push(immState)
-    stack.push(mutState)
-    stack.push(Val.U256(ALPH.oneNanoAlph))
-
+    val values: AVector[Val] =
+      AVector(Val.ByteVec(contractBytes), immState, mutState, Val.U256(ALPH.oneNanoAlph))
+    values.foreach(stack.push)
     test(
       CreateContractWithToken,
       U256.Zero,
       AVector((tokenId, ALPH.oneAlph)),
       Some(ALPH.oneNanoAlph)
+    )
+
+    testInactiveInstrs(
+      CreateContractWithToken,
+      values.replace(0, Val.ByteVec(invalidContractBytes))
     )
   }
 
@@ -3344,17 +3373,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("create contract and transfer token")
 
-      stack.push(Val.ByteVec(contractBytes))
-      stack.push(immState)
-      stack.push(mutState)
-      stack.push(Val.U256(ALPH.oneNanoAlph))
-      stack.push(Val.Address(assetLockupScriptGen.sample.get))
-
+      val values: AVector[Val] = AVector(
+        Val.ByteVec(contractBytes),
+        immState,
+        mutState,
+        Val.U256(ALPH.oneNanoAlph),
+        Val.Address(assetLockupScriptGen.sample.get)
+      )
+      values.foreach(stack.push)
       test(
         CreateContractAndTransferToken,
         U256.Zero,
         AVector((tokenId, ALPH.oneAlph)),
         tokenAmount = None
+      )
+
+      testInactiveInstrs(
+        CreateContractAndTransferToken,
+        values.replace(0, Val.ByteVec(invalidContractBytes))
       )
     }
 
@@ -3375,13 +3411,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
-    stack.push(Val.ByteVec(serialize("nft-01")))
-    stack.push(Val.ByteVec(contractBytes))
-    stack.push(immState)
-    stack.push(mutState)
-
+    val values: AVector[Val] =
+      AVector(Val.ByteVec(serialize("nft-01")), Val.ByteVec(contractBytes), immState, mutState)
+    values.foreach(stack.push)
     val subContractId = getSubContractId("nft-01")
     test(CreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
+
+    testInactiveInstrs(CreateSubContract, values.replace(1, Val.ByteVec(invalidContractBytes)))
   }
 
   it should "CreateSubContractWithToken" in new CreateContractAbstractFixture {
@@ -3391,12 +3427,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
-    stack.push(Val.ByteVec(serialize("nft-01")))
-    stack.push(Val.ByteVec(contractBytes))
-    stack.push(immState)
-    stack.push(mutState)
-    stack.push(Val.U256(ALPH.oneNanoAlph))
-
+    val values: AVector[Val] = AVector(
+      Val.ByteVec(serialize("nft-01")),
+      Val.ByteVec(contractBytes),
+      immState,
+      mutState,
+      Val.U256(ALPH.oneNanoAlph)
+    )
+    values.foreach(stack.push)
     val subContractId = getSubContractId("nft-01")
     test(
       CreateSubContractWithToken,
@@ -3404,6 +3442,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector((tokenId, ALPH.oneAlph)),
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
+    )
+
+    testInactiveInstrs(
+      CreateSubContractWithToken,
+      values.replace(1, Val.ByteVec(invalidContractBytes))
     )
   }
 
@@ -3417,13 +3460,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("create sub contract and transfer token")
 
-      stack.push(Val.ByteVec(serialize("nft-01")))
-      stack.push(Val.ByteVec(contractBytes))
-      stack.push(immState)
-      stack.push(mutState)
-      stack.push(Val.U256(ALPH.oneNanoAlph))
-      stack.push(Val.Address(assetLockupScriptGen.sample.get))
-
+      val values: AVector[Val] = AVector(
+        Val.ByteVec(serialize("nft-01")),
+        Val.ByteVec(contractBytes),
+        immState,
+        mutState,
+        Val.U256(ALPH.oneNanoAlph),
+        Val.Address(assetLockupScriptGen.sample.get)
+      )
+      values.foreach(stack.push)
       val subContractId = getSubContractId("nft-01")
       test(
         CreateSubContractAndTransferToken,
@@ -3431,6 +3476,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         AVector((tokenId, ALPH.oneAlph)),
         tokenAmount = None,
         Some(subContractId)
+      )
+
+      testInactiveInstrs(
+        CreateSubContractAndTransferToken,
+        values.replace(1, Val.ByteVec(invalidContractBytes))
       )
     }
 
