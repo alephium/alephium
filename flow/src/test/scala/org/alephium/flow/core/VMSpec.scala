@@ -6394,6 +6394,24 @@ class VMSpec extends AlephiumSpec with Generators {
     getAlphBalance(blockFlow, receiver) is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
   }
 
+  it should "check inactive instrs when creating contract" in new ContractFixture {
+    override val configValues =
+      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let _ = groupOfAddress!(@$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    intercept[AssertionError](createContract(code)).getMessage is
+      "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
