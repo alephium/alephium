@@ -28,7 +28,7 @@ import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
 
-import org.alephium.api.{notFound, ApiError, Endpoints, Try}
+import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
@@ -40,7 +40,9 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
+import org.alephium.flow.validation.InvalidTestnetMiner
 import org.alephium.http.EndpointSender
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
@@ -602,11 +604,19 @@ trait EndpointsLogic extends Endpoints {
 
   val minerUpdateAddressesLogic = serverLogic(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
-      Miner
-        .validateAddresses(minerAddresses.addresses)
-        .map(_ => viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses))
-        .left
-        .map(ApiError.BadRequest(_))
+      Miner.validateAddresses(minerAddresses.addresses) match {
+        case Right(_) =>
+          if (
+            networkConfig.networkId == NetworkId.AlephiumTestNet &&
+            !ALPH.isTestnetMinersWhitelisted(minerAddresses.addresses)
+          ) {
+            Left(badRequest(InvalidTestnetMiner.errorMessage))
+          } else {
+            viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses)
+            Right(())
+          }
+        case Left(error) => Left(badRequest(error))
+      }
     }
   }
 

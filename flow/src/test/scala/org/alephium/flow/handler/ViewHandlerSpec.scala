@@ -24,9 +24,9 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util._
+import org.alephium.util.*
 
 class ViewHandlerSpec extends AlephiumActorSpec {
   it should "update when necessary" in {
@@ -184,15 +184,6 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     EventFilter.error(start = "Updating invalid miner addresses").intercept {
       viewHandler ! ViewHandler.UpdateMinerAddresses(AVector.empty)
     }
-  }
-
-  it should "terminate if the testnet miner addresses are invalid" in new Fixture {
-    override val configValues = Map(("alephium.network.network-id", 1))
-    networkConfig.networkId is NetworkId.AlephiumTestNet
-
-    watch(viewHandler)
-    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
-    expectTerminated(viewHandler)
   }
 
   behavior of "unsynced node"
