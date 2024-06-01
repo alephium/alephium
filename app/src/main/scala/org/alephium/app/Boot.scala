@@ -140,7 +140,7 @@ class BootUp extends StrictLogging {
     if (config.network.networkId == NetworkId.AlephiumTestNet) {
       config.mining.minerAddresses match {
         case Some(miners) =>
-          if (miners.exists(miner => !ALPH.testnetWhitelistedMiners.contains(miner.lockupScript))) {
+          if (!ALPH.isTestnetMinersWhitelisted(miners)) {
             val errorMsg =
               "The miner addresses for the testnet are invalid. If you want to test mining, please set up your own testnet: " +
                 "https://github.com/alephium/alephium-stack/tree/master/mining-pool-local-testnet"

@@ -26,8 +26,9 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex}
+import org.alephium.protocol.ALPH
+import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
+import org.alephium.protocol.model.{Address, ChainIndex, NetworkId}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 import org.alephium.util.EventStream.{Publisher, Subscriber}
@@ -37,7 +38,8 @@ object ViewHandler {
       blockFlow: BlockFlow
   )(implicit
       brokerConfig: BrokerConfig,
-      miningSetting: MiningSetting
+      miningSetting: MiningSetting,
+      networkConfig: NetworkConfig
   ): Props = Props(
     new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
   )
@@ -79,7 +81,8 @@ class ViewHandler(
     var minerAddressesOpt: Option[AVector[LockupScript.Asset]]
 )(implicit
     val brokerConfig: BrokerConfig,
-    val miningSetting: MiningSetting
+    val miningSetting: MiningSetting,
+    val networkConfig: NetworkConfig
 ) extends ViewHandlerState
     with Subscriber
     with Publisher
@@ -105,7 +108,18 @@ class ViewHandler(
     case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
-        case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
+        case Right(_) =>
+          if (
+            networkConfig.networkId == NetworkId.AlephiumTestNet &&
+            !ALPH.isTestnetMinersWhitelisted(addresses)
+          ) {
+            val errorMsg =
+              "The miner addresses for the testnet are invalid. If you want to test mining, please set up your own testnet: " +
+                "https://github.com/alephium/alephium-stack/tree/master/mining-pool-local-testnet"
+            log.error(errorMsg)
+            terminateSystem()
+          }
+          minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
   }

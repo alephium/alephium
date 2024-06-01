@@ -16,9 +16,12 @@
 
 package org.alephium.protocol
 
+import scala.util.Random
+
 import org.alephium.protocol.config.GroupConfigFixture
-import org.alephium.protocol.model.{ChainIndex, HardFork}
-import org.alephium.util.{AlephiumSpec, NumericHelpers, U256}
+import org.alephium.protocol.model.{Address, ChainIndex, HardFork}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, U256}
 
 class ALPHSpec extends AlephiumSpec {
   import ALPH._
@@ -73,5 +76,18 @@ class ALPHSpec extends AlephiumSpec {
     ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.Rhone) is false
     ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 0), HardFork.PreRhoneForTest) is false
     ALPH.isSequentialTxSupported(ChainIndex.unsafe(0, 1), HardFork.PreRhoneForTest) is false
+  }
+
+  it should "test isTestnetMinersWhitelisted" in {
+    val validMiners = AVector.from(
+      ALPH.testnetWhitelistedMiners.map(lockupScript =>
+        Address.from(lockupScript).asInstanceOf[Address.Asset]
+      )
+    )
+    ALPH.isTestnetMinersWhitelisted(validMiners) is true
+    validMiners.foreach(miner => ALPH.isTestnetMinersWhitelisted(AVector(miner)) is true)
+    val index        = Random.nextInt(validMiners.length)
+    val invalidMiner = Address.Asset(LockupScript.p2pkh(PublicKey.generate))
+    ALPH.isTestnetMinersWhitelisted(validMiners.replace(index, invalidMiner)) is false
   }
 }
