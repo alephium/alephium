@@ -30,7 +30,7 @@ import org.alephium.flow.validation._
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, NetworkId}
 import org.alephium.protocol.vm.{LogConfig, WorldState}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, EventBus, EventStream, Hex}
@@ -161,7 +161,12 @@ class BlockChainHandler(
       _ <- validator.headerValidation.validate(block.header, blockFlow).map { _ =>
         blockFlow.cacheHeaderVerifiedBlock(block)
         if (origin != DataOrigin.Local) {
-          interCliqueBroadcast(block.hash, serialize(block), origin)
+          if (
+            networkConfig.networkId != NetworkId.AlephiumTestNet ||
+            validator.validateTestnetMiner(block)
+          ) {
+            interCliqueBroadcast(block.hash, serialize(block), origin)
+          }
         }
       }
       sideResult <- validator.checkBlockAfterHeader(block, blockFlow)

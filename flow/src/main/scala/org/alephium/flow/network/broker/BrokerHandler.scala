@@ -27,7 +27,7 @@ import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
+import org.alephium.flow.validation.{InvalidHeaderStatus, InvalidTestnetMiner, Validation}
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
@@ -198,7 +198,7 @@ trait BrokerHandler extends FlowDataHandler {
       log.debug(s"Failed in adding new block")
     case BlockChainHandler.InvalidBlock(hash, reason) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
-      if (reason.isInstanceOf[InvalidHeaderStatus]) {
+      if (reason.isInstanceOf[InvalidHeaderStatus] || reason == InvalidTestnetMiner) {
         handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
       }
     case HeaderChainHandler.HeaderAdded(_) =>
