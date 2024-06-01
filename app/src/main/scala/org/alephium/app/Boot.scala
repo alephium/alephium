@@ -29,6 +29,7 @@ import io.prometheus.client.Gauge
 import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
+import org.alephium.flow.validation.InvalidTestnetMiner
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Block, NetworkId}
 import org.alephium.util.{AVector, Duration, Env}
@@ -141,10 +142,7 @@ class BootUp extends StrictLogging {
       config.mining.minerAddresses match {
         case Some(miners) =>
           if (!ALPH.isTestnetMinersWhitelisted(miners)) {
-            val errorMsg =
-              "The miner addresses for the testnet are invalid. If you want to test mining, please set up your own testnet: " +
-                "https://github.com/alephium/alephium-stack/tree/master/mining-pool-local-testnet"
-            logger.error(errorMsg)
+            logger.error(InvalidTestnetMiner.errorMessage)
             sys.exit(1)
           }
         case None => ()

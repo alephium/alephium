@@ -25,6 +25,7 @@ import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
+import org.alephium.flow.validation.InvalidTestnetMiner
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
@@ -113,10 +114,7 @@ class ViewHandler(
             networkConfig.networkId == NetworkId.AlephiumTestNet &&
             !ALPH.isTestnetMinersWhitelisted(addresses)
           ) {
-            val errorMsg =
-              "The miner addresses for the testnet are invalid. If you want to test mining, please set up your own testnet: " +
-                "https://github.com/alephium/alephium-stack/tree/master/mining-pool-local-testnet"
-            log.error(errorMsg)
+            log.error(InvalidTestnetMiner.errorMessage)
             terminateSystem()
           }
           minerAddressesOpt = Some(addresses.map(_.lockupScript))
