@@ -17,7 +17,7 @@
 package org.alephium.protocol
 
 import org.alephium.protocol.model.{Address, ChainIndex, HardFork, Weight}
-import org.alephium.util.{Duration, Number, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Number, TimeStamp, U256}
 
 object ALPH {
   // scalastyle:off magic.number
@@ -112,5 +112,9 @@ object ALPH {
       miner("1E3vV7rFCgq5jo4NszxH5PqzyxvNXH5pvk2aQfMwmSxPB"),
       miner("147nW43BH137TYjqEnvA9YfH1oFXKQxcvLZFwZauo7Ahy")
     )
+  }
+
+  @inline def isTestnetMinersWhitelisted(miners: AVector[Address.Asset]): Boolean = {
+    miners.forall(miner => testnetWhitelistedMiners.contains(miner.lockupScript))
   }
 }

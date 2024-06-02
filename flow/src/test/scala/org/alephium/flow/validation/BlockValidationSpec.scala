@@ -1487,9 +1487,8 @@ class BlockValidationSpec extends AlephiumSpec {
     }
 
     implicit lazy val validator = (block: Block) => {
-      val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
-      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      checkTestnetMiner(block, hardFork)
     }
   }
 

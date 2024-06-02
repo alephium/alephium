@@ -28,7 +28,7 @@ import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
 
-import org.alephium.api.{notFound, ApiError, Endpoints, Try}
+import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
@@ -602,11 +602,16 @@ trait EndpointsLogic extends Endpoints {
 
   val minerUpdateAddressesLogic = serverLogic(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
-      Miner
-        .validateAddresses(minerAddresses.addresses)
-        .map(_ => viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses))
-        .left
-        .map(ApiError.BadRequest(_))
+      val validationResult = for {
+        _ <- Miner.validateAddresses(minerAddresses.addresses)
+        _ <- Miner.validateTestnetMiners(minerAddresses.addresses)
+      } yield ()
+      validationResult match {
+        case Right(_) =>
+          viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses)
+          Right(())
+        case Left(error) => Left(badRequest(error))
+      }
     }
   }
 

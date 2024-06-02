@@ -27,9 +27,10 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.{InvalidBlockHeight, InvalidBlockVersion, InvalidTxsMerkleRoot}
+import org.alephium.flow.validation._
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, CliqueId, NetworkId}
 import org.alephium.serde.serialize
 import org.alephium.util.ActorRefT
 
@@ -252,6 +253,27 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
         BlockChainHandler.InvalidBlock(invalidForkedBlock.hash, InvalidBlockHeight)
       )
       listener.expectNoMessage()
+    }
+  }
+
+  it should "not broadcast block if the testnet miner is invalid" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.network-id", 1),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 0)
+    )
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+    blockChainHandler ! InterCliqueManager.SyncedResult(true)
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    ALPH.testnetWhitelistedMiners.contains(block.minerLockupScript) is false
+
+    val brokerProbe = TestProbe()
+    val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)
+
+    blockChainHandler ! BlockChainHandler.Validate(block, broker, dataOrigin)
+    interCliqueListener.expectNoMessage()
+    eventually {
+      brokerProbe.expectMsg(BlockChainHandler.InvalidBlock(block.hash, InvalidTestnetMiner))
     }
   }
 }

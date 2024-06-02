@@ -27,7 +27,7 @@ import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.InvalidHeaderFlow
+import org.alephium.flow.validation.{InvalidHeaderFlow, InvalidTestnetMiner}
 import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
@@ -126,6 +126,17 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     val hash = BlockHash.generate
     brokerHandler ! HeaderChainHandler.InvalidHeader(hash)
     listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
+  }
+
+  it should "publish misbehavior if the block miner is invalid" in new Fixture {
+    receivedHandshakeMessage()
+    val hash = BlockHash.generate
+    watch(brokerHandler)
+    brokerHandler ! BlockChainHandler.InvalidBlock(hash, InvalidTestnetMiner)
+    eventually {
+      listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
+      expectTerminated(brokerHandler)
+    }
   }
 
   it should "send blocks request" in new Fixture {
