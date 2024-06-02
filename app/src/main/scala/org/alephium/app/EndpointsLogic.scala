@@ -40,9 +40,7 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
-import org.alephium.flow.validation.InvalidTestnetMiner
 import org.alephium.http.EndpointSender
-import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
@@ -604,17 +602,14 @@ trait EndpointsLogic extends Endpoints {
 
   val minerUpdateAddressesLogic = serverLogic(minerUpdateAddresses) { minerAddresses =>
     Future.successful {
-      Miner.validateAddresses(minerAddresses.addresses) match {
+      val validationResult = for {
+        _ <- Miner.validateAddresses(minerAddresses.addresses)
+        _ <- Miner.validateTestnetMiners(minerAddresses.addresses)
+      } yield ()
+      validationResult match {
         case Right(_) =>
-          if (
-            networkConfig.networkId == NetworkId.AlephiumTestNet &&
-            !ALPH.isTestnetMinersWhitelisted(minerAddresses.addresses)
-          ) {
-            Left(badRequest(InvalidTestnetMiner.errorMessage))
-          } else {
-            viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses)
-            Right(())
-          }
+          viewHandler ! ViewHandler.UpdateMinerAddresses(minerAddresses.addresses)
+          Right(())
         case Left(error) => Left(badRequest(error))
       }
     }

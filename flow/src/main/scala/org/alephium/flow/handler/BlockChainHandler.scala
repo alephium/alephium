@@ -155,6 +155,7 @@ class BlockChainHandler(
 
   def validateWithSideEffect(
       block: Block,
+      broker: ActorRefT[ChainHandler.Event],
       origin: DataOrigin
   ): ValidationResult[InvalidBlockStatus, Option[WorldState.Cached]] = {
     for {
@@ -162,9 +163,11 @@ class BlockChainHandler(
         blockFlow.cacheHeaderVerifiedBlock(block)
         if (origin != DataOrigin.Local) {
           if (
-            networkConfig.networkId != NetworkId.AlephiumTestNet ||
-            validator.validateTestnetMiner(block)
+            networkConfig.networkId == NetworkId.AlephiumTestNet &&
+            !validator.validateTestnetMiner(block)
           ) {
+            handleInvalidData(block, broker, origin, InvalidTestnetMiner)
+          } else {
             interCliqueBroadcast(block.hash, serialize(block), origin)
           }
         }

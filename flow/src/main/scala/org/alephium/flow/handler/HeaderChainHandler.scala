@@ -87,6 +87,7 @@ class HeaderChainHandler(
 
   def validateWithSideEffect(
       header: BlockHeader,
+      broker: ActorRefT[ChainHandler.Event],
       origin: DataOrigin
   ): ValidationResult[InvalidHeaderStatus, Unit] = {
     validator.validate(header, blockFlow)

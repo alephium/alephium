@@ -111,7 +111,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     chainValidationTotalLabeled.inc()
 
     val startTime           = System.nanoTime()
-    val validationResult    = validateWithSideEffect(data, origin)
+    val validationResult    = validateWithSideEffect(data, broker, origin)
     val elapsedMilliSeconds = (System.nanoTime() - startTime) / 1000000d
 
     chainValidationDurationMilliSecondsLabeled.observe(elapsedMilliSeconds)
@@ -124,7 +124,11 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     }
   }
 
-  def validateWithSideEffect(data: T, origin: DataOrigin): ValidationResult[S, R]
+  def validateWithSideEffect(
+      data: T,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin
+  ): ValidationResult[S, R]
 
   def handleIOError(
       data: T,

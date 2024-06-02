@@ -28,10 +28,9 @@ import com.typesafe.scalalogging.StrictLogging
 import io.prometheus.client.Gauge
 import io.prometheus.client.hotspot.DefaultExports
 
+import org.alephium.flow.mining.Miner
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.flow.validation.InvalidTestnetMiner
-import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{Block, NetworkId}
+import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Env}
 
 object Boot extends App with StrictLogging {
@@ -138,15 +137,11 @@ class BootUp extends StrictLogging {
   def showBlocks(blocks: AVector[Block]): String = blocks.map(_.shortHex).mkString("-")
 
   private def validateTestnetMiners(): Unit = {
-    if (config.network.networkId == NetworkId.AlephiumTestNet) {
-      config.mining.minerAddresses match {
-        case Some(miners) =>
-          if (!ALPH.isTestnetMinersWhitelisted(miners)) {
-            logger.error(InvalidTestnetMiner.errorMessage)
-            sys.exit(1)
-          }
-        case None => ()
-      }
+    Miner.validateTestnetMiners(config.mining.minerAddresses)(config.network) match {
+      case Left(error) =>
+        logger.error(error)
+        sys.exit(1)
+      case Right(_) => ()
     }
   }
 }

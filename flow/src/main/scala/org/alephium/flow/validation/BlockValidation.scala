@@ -496,7 +496,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else {
           checkRewardPreRhone(chainIndex, block, groupView, lockedReward)
         }
-      _ <- checkTestnetMiner(block, hardFork)
     } yield ()
   }
 

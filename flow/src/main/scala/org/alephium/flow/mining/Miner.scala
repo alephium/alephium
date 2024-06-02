@@ -25,7 +25,9 @@ import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.MiningSetting
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.flow.validation.InvalidTestnetMiner
+import org.alephium.protocol.ALPH
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.serde.deserialize
@@ -119,6 +121,29 @@ object Miner extends LazyLogging {
             Left(s"Address ${address.toBase58} doesn't belong to group $i")
           }
         }
+    }
+  }
+
+  @inline def validateTestnetMiners(
+      minersOpt: Option[AVector[Address.Asset]]
+  )(implicit network: NetworkConfig): Either[String, Unit] = {
+    minersOpt match {
+      case Some(miners) => validateTestnetMiners(miners)
+      case None         => Right(())
+    }
+  }
+
+  @inline def validateTestnetMiners(
+      miners: AVector[Address.Asset]
+  )(implicit network: NetworkConfig): Either[String, Unit] = {
+    if (network.networkId == NetworkId.AlephiumTestNet) {
+      if (ALPH.isTestnetMinersWhitelisted(miners)) {
+        Right(())
+      } else {
+        Left(InvalidTestnetMiner.toString)
+      }
+    } else {
+      Right(())
     }
   }
 }
