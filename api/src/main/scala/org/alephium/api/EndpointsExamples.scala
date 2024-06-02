@@ -405,16 +405,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
 
-  implicit val buildTransactionExamples: List[Example[BuildTransaction]] = List(
+  implicit val buildTransactionExamples: List[Example[BuildTransferTransaction]] = List(
     defaultExample(
-      BuildTransaction(
+      BuildTransferTransaction(
         publicKey.bytes,
         None,
         defaultDestinations
       )
     ),
     moreSettingsExample(
-      BuildTransaction(
+      BuildTransferTransaction(
         publicKey.bytes,
         Some(BuildTxCommon.BIP340Schnorr),
         moreSettingsDestinations,
@@ -461,9 +461,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
+  implicit val buildTransactionResultExamples: List[Example[BuildTransferTransactionResult]] =
     simpleExample(
-      BuildTransactionResult(
+      BuildTransferTransactionResult(
         unsignedTx = hexString,
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,

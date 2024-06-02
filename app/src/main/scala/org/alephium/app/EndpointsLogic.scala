@@ -367,12 +367,12 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
-  val buildTransactionLogic = serverLogicRedirect(buildTransaction)(
+  val buildTransactionLogic = serverLogicRedirect(buildTransferTransaction)(
     buildTransaction =>
       withSyncedClique {
         Future.successful(
           serverUtils
-            .buildTransaction(
+            .buildTransferTransaction(
               blockFlow,
               buildTransaction
             )

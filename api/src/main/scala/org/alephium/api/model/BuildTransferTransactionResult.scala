@@ -16,20 +16,32 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
-
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.serde.serialize
+import org.alephium.util.Hex
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromPublicKey: ByteString,
-    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
-    destinations: AVector[Destination],
-    utxos: Option[AVector[OutputRef]] = None,
-    gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon
-    with BuildTxCommon.FromPublicKey
+final case class BuildTransferTransactionResult(
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    fromGroup: Int,
+    toGroup: Int
+) extends GasInfo
+    with ChainIndexInfo
+object BuildTransferTransactionResult {
+
+  def from(
+      unsignedTx: UnsignedTransaction
+  )(implicit groupConfig: GroupConfig): BuildTransferTransactionResult =
+    BuildTransferTransactionResult(
+      Hex.toHexString(serialize(unsignedTx)),
+      unsignedTx.gasAmount,
+      unsignedTx.gasPrice,
+      unsignedTx.id,
+      unsignedTx.fromGroup.value,
+      unsignedTx.toGroup.value
+    )
+}

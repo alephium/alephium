@@ -95,14 +95,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (_, fromPublicKey, _) = genesisKeys(0)
     val message               = Hex.unsafe("FFFF")
     val destination           = generateDestination(ChainIndex.unsafe(0, 1), message)
-    val buildTransaction = serverUtils
-      .buildTransaction(
+    val buildTransferTransaction = serverUtils
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, AVector(destination))
+        BuildTransferTransaction(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
     val unsignedTransaction =
-      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+      serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
     unsignedTransaction.fixedOutputs.head.additionalData is message
   }
@@ -124,16 +124,16 @@ class ServerUtilsSpec extends AlephiumSpec {
       val destination2                       = generateDestination(chainIndex)
 
       val destinations = AVector(destination1, destination2)
-      val buildTransaction = serverUtils
-        .buildTransaction(
+      val buildTransferTransaction = serverUtils
+        .buildTransferTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
       val txTemplate = signAndAddToMemPool(
-        buildTransaction.txId,
-        buildTransaction.unsignedTx,
+        buildTransferTransaction.txId,
+        buildTransferTransaction.unsignedTx,
         chainIndex,
         fromPrivateKey
       )
@@ -184,16 +184,16 @@ class ServerUtilsSpec extends AlephiumSpec {
       val destination2                       = generateDestination(chainIndex)
 
       val destinations = AVector(destination1, destination2)
-      val buildTransaction = serverUtils
-        .buildTransaction(
+      val buildTransferTransaction = serverUtils
+        .buildTransferTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
       val txTemplate = signAndAddToMemPool(
-        buildTransaction.txId,
-        buildTransaction.unsignedTx,
+        buildTransferTransaction.txId,
+        buildTransferTransaction.unsignedTx,
         chainIndex,
         fromPrivateKey
       )
@@ -257,10 +257,10 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils = new ServerUtils
     val destination          = Destination(Address.p2pkh(genesisPubKey), Amount(ALPH.oneAlph))
-    val buildTransaction = serverUtils
-      .buildTransaction(
+    val buildTransferTransaction = serverUtils
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(
+        BuildTransferTransaction(
           fromPublicKey = pubKey.bytes,
           fromPublicKeyType = Some(BuildTxCommon.BIP340Schnorr),
           AVector(destination)
@@ -268,13 +268,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
     val unsignedTransaction =
-      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+      serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
     val signature = BIP340Schnorr.sign(unsignedTransaction.id.bytes, priKey)
     val txTemplate =
       serverUtils
         .createTxTemplate(
-          SubmitTransaction(buildTransaction.unsignedTx, Signature.unsafe(signature.bytes))
+          SubmitTransaction(buildTransferTransaction.unsignedTx, Signature.unsafe(signature.bytes))
         )
         .rightValue
     blockFlow.getGrandPool().add(txTemplate.chainIndex, AVector(txTemplate), TimeStamp.now())
@@ -300,16 +300,16 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sending some coins to itself twice, creating 3 UTXOs in total for the same public key")
       val destinations = AVector(selfDestination, selfDestination)
-      val buildTransaction = serverUtils
-        .buildTransaction(
+      val buildTransferTransaction = serverUtils
+        .buildTransferTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
       val txTemplate = signAndAddToMemPool(
-        buildTransaction.txId,
-        buildTransaction.unsignedTx,
+        buildTransferTransaction.txId,
+        buildTransferTransaction.unsignedTx,
         chainIndex,
         fromPrivateKey
       )
@@ -382,16 +382,16 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       info("Sending some coins to an address, resulting 10 UTXOs for its corresponding public key")
       val destinations = AVector.fill(10)(destination)
-      val buildTransaction = serverUtils
-        .buildTransaction(
+      val buildTransferTransaction = serverUtils
+        .buildTransferTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
       val txTemplate = signAndAddToMemPool(
-        buildTransaction.txId,
-        buildTransaction.unsignedTx,
+        buildTransferTransaction.txId,
+        buildTransferTransaction.unsignedTx,
         chainIndex,
         fromPrivateKey
       )
@@ -563,15 +563,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    val buildTransaction = serverUtils
-      .buildTransaction(
+    val buildTransferTransaction = serverUtils
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, destinations)
+        BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
       )
       .rightValue
 
     val decodedUnsignedTx =
-      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+      serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
     decodedUnsignedTx is unsignedTx
   }
@@ -587,15 +587,15 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
     val selfDestinations = AVector(selfDestination)
-    val buildTransaction = serverUtils
-      .buildTransaction(
+    val buildTransferTransaction = serverUtils
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, selfDestinations)
+        BuildTransferTransaction(fromPublicKey.bytes, None, selfDestinations)
       )
       .rightValue
     val txTemplate = signAndAddToMemPool(
-      buildTransaction.txId,
-      buildTransaction.unsignedTx,
+      buildTransferTransaction.txId,
+      buildTransferTransaction.unsignedTx,
       chainIndex,
       fromPrivateKey
     )
@@ -884,7 +884,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Selected UTXOs must be of asset type"
   }
 
-  "ServerUtils.buildTransaction" should "fail with invalid number of outputs" in new FlowFixtureWithApi {
+  "ServerUtils.buildTransferTransaction" should "fail with invalid number of outputs" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
     val chainIndex            = ChainIndex.unsafe(0, 0)
@@ -893,9 +893,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     info("Output number is zero")
     serverUtils
-      .buildTransaction(
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, emptyDestinations)
+        BuildTransferTransaction(fromPublicKey.bytes, None, emptyDestinations)
       )
       .leftValue
       .detail is "Zero transaction outputs"
@@ -903,9 +903,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     info("Too many outputs")
     val tooManyDestinations = AVector.fill(ALPH.MaxTxOutputNum + 1)(generateDestination(chainIndex))
     serverUtils
-      .buildTransaction(
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, tooManyDestinations)
+        BuildTransferTransaction(fromPublicKey.bytes, None, tooManyDestinations)
       )
       .leftValue
       .detail is "Too many transaction outputs, maximal value: 256"
@@ -944,14 +944,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     val destination2          = generateDestination(chainIndex2)
     val destinations          = AVector(destination1, destination2)
 
-    val buildTransaction = serverUtils
-      .buildTransaction(
+    val buildTransferTransaction = serverUtils
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, destinations)
+        BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
       )
       .leftValue
 
-    buildTransaction.detail is "Different groups for transaction outputs"
+    buildTransferTransaction.detail is "Different groups for transaction outputs"
   }
 
   it should "return mempool statuses" in new Fixture with Generators {
@@ -968,16 +968,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
     val destination                        = generateDestination(chainIndex)
 
-    val buildTransaction = serverUtils
-      .buildTransaction(
+    val buildTransferTransaction = serverUtils
+      .buildTransferTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey.bytes, None, AVector(destination))
+        BuildTransferTransaction(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
 
     val txTemplate = signAndAddToMemPool(
-      buildTransaction.txId,
-      buildTransaction.unsignedTx,
+      buildTransferTransaction.txId,
+      buildTransferTransaction.unsignedTx,
       chainIndex,
       fromPrivateKey
     )
@@ -1006,7 +1006,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(destination)
     )
 
-    val buildTransaction = serverUtils
+    val buildTransferTransaction = serverUtils
       .buildMultiInputsTransaction(
         blockFlow,
         BuildMultiAddressesTransaction(AVector(source))
@@ -1014,7 +1014,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val unsignedTransaction =
-      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+      serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
     unsignedTransaction.inputs.length is 1
     unsignedTransaction.fixedOutputs.length is 2
@@ -1043,7 +1043,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     }
 
-    val buildTransaction = serverUtils
+    val buildTransferTransaction = serverUtils
       .buildMultiInputsTransaction(
         blockFlow,
         BuildMultiAddressesTransaction(sources)
@@ -1051,7 +1051,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val unsignedTransaction =
-      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+      serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
     unsignedTransaction.inputs.length is nbOfInputs
     unsignedTransaction.fixedOutputs.length is 1 + nbOfInputs

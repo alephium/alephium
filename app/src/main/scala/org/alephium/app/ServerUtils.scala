@@ -202,10 +202,10 @@ class ServerUtils(implicit
     Right(result)
   }
 
-  def buildTransaction(
+  def buildTransferTransaction(
       blockFlow: BlockFlow,
-      query: BuildTransaction
-  ): Try[BuildTransactionResult] = {
+      query: BuildTransferTransaction
+  ): Try[BuildTransferTransactionResult] = {
     for {
       lockPair <- query.getLockPair()
       unsignedTx <- prepareUnsignedTransaction(
@@ -219,27 +219,27 @@ class ServerUtils(implicit
         query.targetBlockHash
       )
     } yield {
-      BuildTransactionResult.from(unsignedTx)
+      BuildTransferTransactionResult.from(unsignedTx)
     }
   }
 
   def buildMultiInputsTransaction(
       blockFlow: BlockFlow,
       query: BuildMultiAddressesTransaction
-  ): Try[BuildTransactionResult] = {
+  ): Try[BuildTransferTransactionResult] = {
     for {
       unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
         blockFlow,
         query
       )
     } yield {
-      BuildTransactionResult.from(unsignedTx)
+      BuildTransferTransactionResult.from(unsignedTx)
     }
   }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
-  ): Try[BuildTransactionResult] = {
+  ): Try[BuildTransferTransactionResult] = {
     for {
       _ <- checkGroup(query.fromAddress.lockupScript)
       unlockScript <- buildMultisigUnlockScript(
@@ -256,7 +256,7 @@ class ServerUtils(implicit
         None
       )
     } yield {
-      BuildTransactionResult.from(unsignedTx)
+      BuildTransferTransactionResult.from(unsignedTx)
     }
   }
 

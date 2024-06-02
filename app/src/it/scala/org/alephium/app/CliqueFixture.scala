@@ -150,7 +150,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       restPort: Int
   ): SubmitTxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, destinations)
-    val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
+    val unsignedTx = request[BuildTransferTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[SubmitTxResult](submitTx, restPort)
     res
@@ -162,7 +162,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       restPort: Int
   ): SubmitTxResult = eventually {
     val buildTx          = buildGenericTransaction(inputs)
-    val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
+    val unsignedTx       = request[BuildTransferTransactionResult](buildTx, restPort)
     val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
     val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
@@ -584,7 +584,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def submitTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
+  def submitTransaction(
+      buildTransactionResult: BuildTransferTransactionResult,
+      privateKey: String
+  ) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,
       PrivateKey.unsafe(Hex.unsafe(privateKey))
@@ -602,7 +605,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def signAndSubmitMultisigTransaction(
-      buildTransactionResult: BuildTransactionResult,
+      buildTransactionResult: BuildTransferTransactionResult,
       privateKeys: AVector[String]
   ) = {
     val signatures: AVector[Signature] = privateKeys.map { p =>
@@ -618,7 +621,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitMultisigTransaction(
-      buildTransactionResult: BuildTransactionResult,
+      buildTransactionResult: BuildTransferTransactionResult,
       signatures: AVector[Signature]
   ) = {
     val body =

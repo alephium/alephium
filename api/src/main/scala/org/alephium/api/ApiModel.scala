@@ -262,7 +262,7 @@ trait ApiModelCodec {
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
-  implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
+  implicit val buildTransferTransactionRW: RW[BuildTransferTransaction] = macroRW
 
   implicit val buildMultiAddressesTransactionSourceRW: RW[BuildMultiAddressesTransaction.Source] =
     macroRW
@@ -273,7 +273,7 @@ trait ApiModelCodec {
 
   implicit val groupRW: RW[Group] = macroRW
 
-  implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
+  implicit val buildTransferTransactionResultRW: RW[BuildTransferTransactionResult] = macroRW
 
   implicit val sweepAddressTransactionRW: RW[SweepAddressTransaction] = macroRW
 

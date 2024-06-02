@@ -454,8 +454,8 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
-      val buildTransaction = read[BuildTransaction](ctx.body().asString())
-      val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
+      val buildTransferTransaction = read[BuildTransferTransaction](ctx.body().asString())
+      val amount = buildTransferTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
         acc.addUnsafe(destination.attoAlphAmount.value)
       }
       val unsignedTx = transactionGen().sample.get.unsigned
@@ -469,7 +469,7 @@ object WalletAppSpec extends {
       } else {
         complete(
           ctx,
-          BuildTransactionResult(
+          BuildTransferTransactionResult(
             Hex.toHexString(serialize(unsignedTx)),
             unsignedTx.gasAmount,
             unsignedTx.gasPrice,
