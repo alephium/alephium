@@ -262,7 +262,7 @@ trait ApiModelCodec {
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
-  implicit val buildTransferTransactionRW: RW[BuildTransferTransaction] = macroRW
+  implicit val buildTransferTransactionRW: RW[BuildTransaction.Transfer] = macroRW
 
   implicit val buildMultiAddressesTransactionSourceRW: RW[BuildMultiAddressesTransaction.Source] =
     macroRW
@@ -288,9 +288,9 @@ trait ApiModelCodec {
   implicit val txStatusRW: RW[TxStatus] =
     RW.merge(macroRW[Confirmed], macroRW[MemPooled], macroRW[TxNotFound])
 
-  implicit val buildDeployContractTxRW: RW[BuildDeployContractTx] = macroRW
+  implicit val buildDeployContractTxRW: RW[BuildTransaction.DeployContract] = macroRW
 
-  implicit val buildExecuteScriptTxRW: RW[BuildExecuteScriptTx] = macroRW
+  implicit val buildExecuteScriptTxRW: RW[BuildTransaction.ExecuteScript] = macroRW
 
   implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
 

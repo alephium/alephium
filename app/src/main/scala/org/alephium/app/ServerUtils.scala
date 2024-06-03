@@ -204,7 +204,7 @@ class ServerUtils(implicit
 
   def buildTransferTransaction(
       blockFlow: BlockFlow,
-      query: BuildTransferTransaction
+      query: BuildTransaction.Transfer
   ): Try[BuildTransferTransactionResult] = {
     for {
       lockPair <- query.getLockPair()
@@ -1100,7 +1100,7 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildDeployContractTx(
       blockFlow: BlockFlow,
-      query: BuildDeployContractTx
+      query: BuildTransaction.DeployContract
   ): Try[BuildDeployContractTxResult] = {
     val hardfork = blockFlow.networkConfig.getHardFork(TimeStamp.now())
     for {
@@ -1175,7 +1175,7 @@ class ServerUtils(implicit
 
   def buildExecuteScriptTx(
       blockFlow: BlockFlow,
-      query: BuildExecuteScriptTx
+      query: BuildTransaction.ExecuteScript
   ): Try[BuildExecuteScriptTxResult] = {
     for {
       amounts <- BuildTxCommon

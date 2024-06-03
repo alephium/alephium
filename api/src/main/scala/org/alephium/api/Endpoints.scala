@@ -306,10 +306,10 @@ trait Endpoints
       .summary("Get infos about the chain from the given groups")
 
   val buildTransferTransaction
-      : BaseEndpoint[BuildTransferTransaction, BuildTransferTransactionResult] =
+      : BaseEndpoint[BuildTransaction.Transfer, BuildTransferTransactionResult] =
     transactionsEndpoint.post
       .in("build")
-      .in(jsonBodyWithAlph[BuildTransferTransaction])
+      .in(jsonBodyWithAlph[BuildTransaction.Transfer])
       .out(jsonBody[BuildTransferTransactionResult])
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
@@ -462,10 +462,11 @@ trait Endpoints
       .out(jsonBody[CompileScriptResult])
       .summary("Compile a script")
 
-  val buildExecuteScriptTx: BaseEndpoint[BuildExecuteScriptTx, BuildExecuteScriptTxResult] =
+  val buildExecuteScriptTx
+      : BaseEndpoint[BuildTransaction.ExecuteScript, BuildExecuteScriptTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("execute-script")
-      .in(jsonBody[BuildExecuteScriptTx])
+      .in(jsonBody[BuildTransaction.ExecuteScript])
       .out(jsonBody[BuildExecuteScriptTxResult])
       .summary("Build an unsigned script")
 
@@ -483,10 +484,11 @@ trait Endpoints
       .out(jsonBody[CompileProjectResult])
       .summary("Compile a project")
 
-  val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, BuildDeployContractTxResult] =
+  val buildDeployContractTx
+      : BaseEndpoint[BuildTransaction.DeployContract, BuildDeployContractTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("deploy-contract")
-      .in(jsonBody[BuildDeployContractTx])
+      .in(jsonBody[BuildTransaction.DeployContract])
       .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
 

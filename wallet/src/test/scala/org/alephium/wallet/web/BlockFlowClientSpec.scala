@@ -22,7 +22,7 @@ import org.scalatest.Inside
 import sttp.client3._
 
 import org.alephium.api.Endpoints
-import org.alephium.api.model.{Amount, BuildTransferTransaction, Destination}
+import org.alephium.api.model.{Amount, BuildTransaction, Destination}
 import org.alephium.http.EndpointSender
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
@@ -33,7 +33,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
     val destinations = AVector(Destination(toAddress, value, None, None))
     val buildTransferTransactionIn =
-      BuildTransferTransaction(publicKey.bytes, None, destinations, None, None)
+      BuildTransaction.Transfer(publicKey.bytes, None, destinations, None, None)
     val request =
       endpointSender.createRequest(
         buildTransferTransaction,
@@ -43,7 +43,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     request.uri is uri"http://127.0.0.1:1234/transactions/build"
 
     inside(request.body) { case body: StringBody =>
-      read[BuildTransferTransaction](body.s) is buildTransferTransactionIn
+      read[BuildTransaction.Transfer](body.s) is buildTransferTransactionIn
     }
   }
 

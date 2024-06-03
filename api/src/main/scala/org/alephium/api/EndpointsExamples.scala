@@ -405,16 +405,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
 
-  implicit val buildTransactionExamples: List[Example[BuildTransferTransaction]] = List(
+  implicit val buildTransferTransactionExamples: List[Example[BuildTransaction.Transfer]] = List(
     defaultExample(
-      BuildTransferTransaction(
+      BuildTransaction.Transfer(
         publicKey.bytes,
         None,
         defaultDestinations
       )
     ),
     moreSettingsExample(
-      BuildTransferTransaction(
+      BuildTransaction.Transfer(
         publicKey.bytes,
         Some(BuildTxCommon.BIP340Schnorr),
         moreSettingsDestinations,
@@ -693,10 +693,10 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildDeployContractTxExamples: List[Example[BuildDeployContractTx]] = List(
-    defaultExample(BuildDeployContractTx(publicKey.bytes, None, bytecode = byteString)),
+  implicit val buildDeployContractTxExamples: List[Example[BuildTransaction.DeployContract]] = List(
+    defaultExample(BuildTransaction.DeployContract(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
-      BuildDeployContractTx(
+      BuildTransaction.DeployContract(
         publicKey.bytes,
         Some(BuildTxCommon.BIP340Schnorr),
         byteString,
@@ -710,10 +710,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
-    defaultExample(BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)),
+  implicit val buildExecuteScriptTxExamples: List[Example[BuildTransaction.ExecuteScript]] = List(
+    defaultExample(BuildTransaction.ExecuteScript(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
-      BuildExecuteScriptTx(
+      BuildTransaction.ExecuteScript(
         publicKey.bytes,
         Some(BuildTxCommon.Default),
         byteString,

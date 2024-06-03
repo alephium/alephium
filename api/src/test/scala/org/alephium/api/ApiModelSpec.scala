@@ -361,14 +361,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(result, jsonRaw)
   }
 
-  it should "encode/decode BuildTransferTransaction" in {
+  it should "encode/decode BuildTransaction.Transfer" in {
     val fromPublicKey = PublicKey.generate
     val toKey         = PublicKey.generate
     val toAddress     = Address.p2pkh(toKey)
 
     {
       val transfer =
-        BuildTransferTransaction(
+        BuildTransaction.Transfer(
           fromPublicKey.bytes,
           None,
           AVector(Destination(toAddress, Amount(1)))
@@ -388,7 +388,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val transfer = BuildTransferTransaction(
+      val transfer = BuildTransaction.Transfer(
         fromPublicKey.bytes,
         None,
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
@@ -416,7 +416,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     {
       val tokenId1 = TokenId.hash("tokenId1")
 
-      val transfer = BuildTransferTransaction(
+      val transfer = BuildTransaction.Transfer(
         fromPublicKey.bytes,
         None,
         AVector(
@@ -457,7 +457,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     {
       val tokenId1 = TokenId.hash("tokenId1")
 
-      val transfer = BuildTransferTransaction(
+      val transfer = BuildTransaction.Transfer(
         fromPublicKey.bytes,
         Some(BuildTxCommon.Default),
         AVector(
@@ -500,7 +500,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val tokenId1 = TokenId.hash("tokenId1")
       val utxoKey1 = Hash.hash("utxo1")
 
-      val transfer = BuildTransferTransaction(
+      val transfer = BuildTransaction.Transfer(
         fromPublicKey.bytes,
         Some(BuildTxCommon.BIP340Schnorr),
         AVector(
@@ -858,7 +858,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
-    val buildDeployContractTx = BuildDeployContractTx(
+    val buildDeployContractTx = BuildTransaction.DeployContract(
       fromPublicKey = publicKey.bytes,
       bytecode = ByteString(0, 0),
       issueTokenAmount = Some(Amount(1)),
@@ -907,7 +907,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildScriptTx" in {
     val publicKey = PublicKey.generate
-    val buildExecuteScriptTx = BuildExecuteScriptTx(
+    val buildExecuteScriptTx = BuildTransaction.ExecuteScript(
       fromPublicKey = publicKey.bytes,
       bytecode = ByteString(0, 0),
       gasAmount = Some(GasBox.unsafe(1)),

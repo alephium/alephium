@@ -98,7 +98,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, AVector(destination))
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
     val unsignedTransaction =
@@ -127,7 +127,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransferTransaction = serverUtils
         .buildTransferTransaction(
           blockFlow,
-          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransaction.Transfer(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -187,7 +187,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransferTransaction = serverUtils
         .buildTransferTransaction(
           blockFlow,
-          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransaction.Transfer(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -260,7 +260,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(
+        BuildTransaction.Transfer(
           fromPublicKey = pubKey.bytes,
           fromPublicKeyType = Some(BuildTxCommon.BIP340Schnorr),
           AVector(destination)
@@ -303,7 +303,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransferTransaction = serverUtils
         .buildTransferTransaction(
           blockFlow,
-          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransaction.Transfer(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -385,7 +385,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransferTransaction = serverUtils
         .buildTransferTransaction(
           blockFlow,
-          BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
+          BuildTransaction.Transfer(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -566,7 +566,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, destinations)
       )
       .rightValue
 
@@ -590,7 +590,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, selfDestinations)
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, selfDestinations)
       )
       .rightValue
     val txTemplate = signAndAddToMemPool(
@@ -895,7 +895,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, emptyDestinations)
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, emptyDestinations)
       )
       .leftValue
       .detail is "Zero transaction outputs"
@@ -905,7 +905,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, tooManyDestinations)
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, tooManyDestinations)
       )
       .leftValue
       .detail is "Too many transaction outputs, maximal value: 256"
@@ -947,7 +947,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, destinations)
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, destinations)
       )
       .leftValue
 
@@ -971,7 +971,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
-        BuildTransferTransaction(fromPublicKey.bytes, None, AVector(destination))
+        BuildTransaction.Transfer(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
 
@@ -2687,7 +2687,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     lazy val deployContractTxResult = serverUtils
       .buildDeployContractTx(
         blockFlow,
-        BuildDeployContractTx(
+        BuildTransaction.DeployContract(
           Hex.unsafe(testPubKey.toHexString),
           bytecode = serialize(code) ++ ByteString(0, 0),
           initialAttoAlphAmount = Some(Amount(ALPH.oneAlph))
@@ -2754,7 +2754,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils
         .buildExecuteScriptTx(
           blockFlow,
-          BuildExecuteScriptTx(
+          BuildTransaction.ExecuteScript(
             fromPublicKey = Hex.unsafe(testPubKey.toHexString),
             bytecode = serialize(code),
             gasAmount = Some(gasAmount),
@@ -2802,7 +2802,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val deployContractTxResult = serverUtils
         .buildDeployContractTx(
           blockFlow,
-          BuildDeployContractTx(
+          BuildTransaction.DeployContract(
             Hex.unsafe(testPubKey.toHexString),
             bytecode = serialize(code) ++ ByteString(0, 0),
             initialAttoAlphAmount = Some(initialAttoAlphAmount)
@@ -3301,7 +3301,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract = Compiler.compileContract(code).rightValue
 
     implicit val serverUtils = new ServerUtils()
-    def buildDeployContractTx(query: BuildDeployContractTx): BuildDeployContractTxResult = {
+    def buildDeployContractTx(
+        query: BuildTransaction.DeployContract
+    ): BuildDeployContractTxResult = {
       val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
       val block = mineFromMemPool(blockFlow, chainIndex)
@@ -3344,7 +3346,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
     tokens0.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
 
-    val query = BuildDeployContractTx(
+    val query = BuildTransaction.DeployContract(
       fromPublicKey = publicKey.bytes,
       bytecode = serialize(contract) ++ ByteString(0, 0),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
@@ -3362,7 +3364,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "deploy contract with token issuance" in new ContractDeploymentFixture {
-    val query = BuildDeployContractTx(
+    val query = BuildTransaction.DeployContract(
       fromPublicKey = publicKey.bytes,
       bytecode = serialize(contract) ++ ByteString(0, 0),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
@@ -3389,7 +3391,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail when `issueTokenTo` is specified but `issueTokenAmount` is not" in new ContractDeploymentFixture {
-    val query = BuildDeployContractTx(
+    val query = BuildTransaction.DeployContract(
       fromPublicKey = publicKey.bytes,
       bytecode = serialize(contract) ++ ByteString(0, 0),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),

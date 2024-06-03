@@ -122,7 +122,7 @@ object BlockFlowClient {
       requestFromGroup(
         lockupScript.groupIndex,
         buildTransferTransaction,
-        BuildTransferTransaction(
+        BuildTransaction.Transfer(
           fromPublicKey.bytes,
           None,
           destinations,
