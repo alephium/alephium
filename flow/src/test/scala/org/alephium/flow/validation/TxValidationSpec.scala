@@ -102,7 +102,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           outputs,
           None,
           nonCoinbaseMinGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          AVector.empty
         )
         .rightValue
         .rightValue
@@ -119,7 +120,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           outputs.tail,
           None,
           nonCoinbaseMinGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          AVector.empty
         )
         .rightValue
         .rightValue

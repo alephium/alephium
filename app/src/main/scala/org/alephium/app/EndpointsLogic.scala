@@ -374,7 +374,8 @@ trait EndpointsLogic extends Endpoints {
           serverUtils
             .buildTransferTransaction(
               blockFlow,
-              buildTransaction
+              buildTransaction,
+              AVector.empty
             )
         )
       },
@@ -632,7 +633,7 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val buildDeployContractTxLogic = serverLogic(buildDeployContractTx) { query =>
-    Future.successful(serverUtils.buildDeployContractTx(blockFlow, query))
+    Future.successful(serverUtils.buildDeployContractTx(blockFlow, query, AVector.empty))
   }
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>

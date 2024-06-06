@@ -287,7 +287,8 @@ object ServerFixture {
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
-        utxosLimit: Int
+        utxosLimit: Int,
+        extraUtxos: AVector[AssetOutputInfo]
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
@@ -299,7 +300,8 @@ object ServerFixture {
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
-        utxosLimit: Int
+        utxosLimit: Int,
+        extraUtxos: AVector[AssetOutputInfo]
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }

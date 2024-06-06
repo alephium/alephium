@@ -203,7 +203,8 @@ trait FlowFixture
         AVector(TxOutputInfo(to, amount, tokens, None)),
         None,
         gasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        AVector.empty
       )
       .rightValue
       .rightValue
@@ -251,7 +252,8 @@ trait FlowFixture
           outputInfos,
           Some(gasAmount),
           nonCoinbaseMinGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          AVector.empty
         )
         .rightValue
         .rightValue

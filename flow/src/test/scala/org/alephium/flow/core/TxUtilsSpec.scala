@@ -120,7 +120,8 @@ class TxUtilsSpec extends AlephiumSpec {
         AVector(output0),
         Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        AVector.empty
       )
       .rightValue
       .rightValue
@@ -993,7 +994,8 @@ class TxUtilsSpec extends AlephiumSpec {
         outputInfos,
         None,
         nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        AVector.empty
       )
       .rightValue
       .rightValue
@@ -1190,7 +1192,8 @@ class TxUtilsSpec extends AlephiumSpec {
         AVector(TxOutputInfo(LockupScript.p2pkh(genesisPubKey), ALPH.oneAlph, AVector.empty, None)),
         None,
         nonCoinbaseMinGasPrice,
-        Int.MaxValue
+        Int.MaxValue,
+        AVector.empty
       )
       .rightValue
       .rightValue

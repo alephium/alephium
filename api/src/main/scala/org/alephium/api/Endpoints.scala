@@ -492,6 +492,14 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult.DeployContract])
       .summary("Build an unsigned contract")
 
+  val buildGenericTransactions
+      : BaseEndpoint[AVector[BuildTransaction], AVector[BuildTransactionResult]] =
+    transactionsEndpoint.post
+      .in("build-generic")
+      .in(jsonBody[AVector[BuildTransaction]])
+      .out(jsonBody[AVector[BuildTransactionResult]])
+      .summary("Build a sequence of generic transactions")
+
   lazy val contractState: BaseEndpoint[Address.Contract, ContractState] =
     contractsEndpoint.get
       .in(path[Address.Contract]("address"))

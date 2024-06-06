@@ -517,7 +517,8 @@ class ServerUtilsSpec extends AlephiumSpec {
           destinations,
           None,
           nonCoinbaseMinGasPrice,
-          targetBlockHash
+          targetBlockHash,
+          AVector.empty
         )
         .rightValue
     }
@@ -559,7 +560,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = None,
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .rightValue
 
@@ -624,7 +626,8 @@ class ServerUtilsSpec extends AlephiumSpec {
           destinations,
           gasOpt = Some(minimalGas),
           nonCoinbaseMinGasPrice,
-          targetBlockHashOpt = None
+          targetBlockHashOpt = None,
+          AVector.empty
         )
         .rightValue
     }
@@ -644,7 +647,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = None,
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .rightValue
 
@@ -715,7 +719,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Not enough balance"
@@ -737,7 +742,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Selected UTXOs are not from the same group"
@@ -752,7 +758,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Empty UTXOs"
@@ -772,7 +779,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Provided gas GasBox(100) too small, minimal GasBox(20000)"
@@ -786,7 +794,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(GasBox.unsafe(5000001)),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Provided gas GasBox(5000001) too large, maximal GasBox(5000000)"
@@ -806,7 +815,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(minimalGas),
         GasPrice(coinbaseGasPrice.value - 1),
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
@@ -820,7 +830,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(minimalGas),
         GasPrice(ALPH.MaxALPHValue),
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
@@ -839,7 +850,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         attoAlphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "ALPH amount overflow"
@@ -859,7 +871,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is s"Amount overflow for token $tokenId"
@@ -878,7 +891,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         destinations,
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        targetBlockHashOpt = None
+        targetBlockHashOpt = None,
+        AVector.empty
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"

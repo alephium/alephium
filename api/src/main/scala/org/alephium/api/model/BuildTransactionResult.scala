@@ -27,12 +27,12 @@ sealed trait BuildTransactionResult extends GasInfo with ChainIndexInfo
 object BuildTransactionResult {
   @upickle.implicits.key("Transfer")
   final case class Transfer(
-    unsignedTx: String,
-    gasAmount: GasBox,
-    gasPrice: GasPrice,
-    txId: TransactionId,
-    fromGroup: Int,
-    toGroup: Int
+      unsignedTx: String,
+      gasAmount: GasBox,
+      gasPrice: GasPrice,
+      txId: TransactionId,
+      fromGroup: Int,
+      toGroup: Int
   ) extends BuildTransactionResult
 
   object Transfer {
@@ -51,12 +51,12 @@ object BuildTransactionResult {
 
   @upickle.implicits.key("ExecuteScript")
   final case class ExecuteScript(
-    fromGroup: Int,
-    toGroup: Int,
-    unsignedTx: String,
-    gasAmount: GasBox,
-    gasPrice: GasPrice,
-    txId: TransactionId
+      fromGroup: Int,
+      toGroup: Int,
+      unsignedTx: String,
+      gasAmount: GasBox,
+      gasPrice: GasPrice,
+      txId: TransactionId
   ) extends BuildTransactionResult
 
   object ExecuteScript {
@@ -73,14 +73,15 @@ object BuildTransactionResult {
       )
   }
 
+  @upickle.implicits.key("DeployContract")
   final case class DeployContract(
-    fromGroup: Int,
-    toGroup: Int,
-    unsignedTx: String,
-    gasAmount: GasBox,
-    gasPrice: GasPrice,
-    txId: TransactionId,
-    contractAddress: Address.Contract
+      fromGroup: Int,
+      toGroup: Int,
+      unsignedTx: String,
+      gasAmount: GasBox,
+      gasPrice: GasPrice,
+      txId: TransactionId,
+      contractAddress: Address.Contract
   ) extends BuildTransactionResult
 
   object DeployContract {

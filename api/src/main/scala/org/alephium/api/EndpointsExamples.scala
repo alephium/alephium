@@ -725,6 +725,36 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildGenericTransactionsExamples: List[Example[AVector[BuildTransaction]]] = List(
+    defaultExample(
+      AVector(
+        BuildTransaction.Transfer(publicKey.bytes, None, defaultDestinations),
+        BuildTransaction.ExecuteScript(publicKey.bytes, None, bytecode = byteString)
+      )
+    ),
+    moreSettingsExample(
+      AVector(
+        BuildTransaction.Transfer(
+          publicKey.bytes,
+          Some(BuildTxCommon.BIP340Schnorr),
+          moreSettingsDestinations,
+          Some(AVector(outputRef)),
+          Some(model.minimalGas),
+          Some(model.nonCoinbaseMinGasPrice)
+        ),
+        BuildTransaction.ExecuteScript(
+          publicKey.bytes,
+          Some(BuildTxCommon.Default),
+          byteString,
+          Some(Amount(model.dustUtxoAmount)),
+          Some(tokens),
+          Some(model.minimalGas),
+          Some(model.nonCoinbaseMinGasPrice)
+        )
+      )
+    )
+  )
+
   implicit val buildDeployContractTxResultExamples
       : List[Example[BuildTransactionResult.DeployContract]] =
     simpleExample(
@@ -749,6 +779,29 @@ trait EndpointsExamples extends ErrorExamples {
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
         txId = txId
+      )
+    )
+
+  implicit val buildGenericTransactionsResultExamples
+      : List[Example[AVector[BuildTransactionResult]]] =
+    simpleExample(
+      AVector(
+        BuildTransactionResult.Transfer(
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId,
+          fromGroup = 1,
+          toGroup = 2
+        ),
+        BuildTransactionResult.ExecuteScript(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId
+        )
       )
     )
 

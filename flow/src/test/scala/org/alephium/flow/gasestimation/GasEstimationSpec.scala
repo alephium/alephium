@@ -354,7 +354,8 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         output,
         None,
         nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        AVector.empty
       )
       .rightValue
   }

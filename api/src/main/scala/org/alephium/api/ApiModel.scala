@@ -296,6 +296,9 @@ trait ApiModelCodec {
 
   implicit val buildExecuteScriptTxResultRW: RW[BuildTransactionResult.ExecuteScript] = macroRW
 
+  implicit val buildTransactionRW: ReadWriter[BuildTransaction]             = macroRW
+  implicit val buildTransactionResultRW: ReadWriter[BuildTransactionResult] = macroRW
+
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 
   implicit val buildMultisigAddressResultRW: RW[BuildMultisigAddressResult] = macroRW

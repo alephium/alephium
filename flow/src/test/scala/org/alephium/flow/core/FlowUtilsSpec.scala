@@ -654,7 +654,8 @@ class FlowUtilsSpec extends AlephiumSpec {
           AVector(output),
           None,
           gasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          AVector.empty
         )
         .rightValue
         .rightValue
