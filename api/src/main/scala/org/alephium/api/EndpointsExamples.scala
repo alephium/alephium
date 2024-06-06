@@ -461,9 +461,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildTransactionResultExamples: List[Example[BuildTransferTransactionResult]] =
+  implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult.Transfer]] =
     simpleExample(
-      BuildTransferTransactionResult(
+      BuildTransactionResult.Transfer(
         unsignedTx = hexString,
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
@@ -725,9 +725,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
+  implicit val buildDeployContractTxResultExamples
+      : List[Example[BuildTransactionResult.DeployContract]] =
     simpleExample(
-      BuildDeployContractTxResult(
+      BuildTransactionResult.DeployContract(
         fromGroup = 2,
         toGroup = 2,
         unsignedTx = hexString,
@@ -738,9 +739,10 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
+  implicit val buildExecuteScriptTxResultExamples
+      : List[Example[BuildTransactionResult.ExecuteScript]] =
     simpleExample(
-      BuildExecuteScriptTxResult(
+      BuildTransactionResult.ExecuteScript(
         fromGroup = 2,
         toGroup = 2,
         unsignedTx = hexString,

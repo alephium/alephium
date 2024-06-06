@@ -3303,7 +3303,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit val serverUtils = new ServerUtils()
     def buildDeployContractTx(
         query: BuildTransaction.DeployContract
-    ): BuildDeployContractTxResult = {
+    ): BuildTransactionResult.DeployContract = {
       val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
       val block = mineFromMemPool(blockFlow, chainIndex)

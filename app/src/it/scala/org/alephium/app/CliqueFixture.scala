@@ -150,7 +150,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       restPort: Int
   ): SubmitTxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, destinations)
-    val unsignedTx = request[BuildTransferTransactionResult](buildTx, restPort)
+    val unsignedTx = request[BuildTransactionResult.Transfer](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[SubmitTxResult](submitTx, restPort)
     res
@@ -162,7 +162,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       restPort: Int
   ): SubmitTxResult = eventually {
     val buildTx          = buildGenericTransaction(inputs)
-    val unsignedTx       = request[BuildTransferTransactionResult](buildTx, restPort)
+    val unsignedTx       = request[BuildTransactionResult.Transfer](buildTx, restPort)
     val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
     val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
@@ -585,7 +585,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitTransaction(
-      buildTransactionResult: BuildTransferTransactionResult,
+      buildTransactionResult: BuildTransactionResult.Transfer,
       privateKey: String
   ) = {
     val signature: Signature = SignatureSchema.sign(
@@ -605,7 +605,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def signAndSubmitMultisigTransaction(
-      buildTransactionResult: BuildTransferTransactionResult,
+      buildTransactionResult: BuildTransactionResult.Transfer,
       privateKeys: AVector[String]
   ) = {
     val signatures: AVector[Signature] = privateKeys.map { p =>
@@ -621,7 +621,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitMultisigTransaction(
-      buildTransactionResult: BuildTransferTransactionResult,
+      buildTransactionResult: BuildTransactionResult.Transfer,
       signatures: AVector[Signature]
   ) = {
     val body =
@@ -797,9 +797,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       tokens: Option[(TokenId, U256)] = None,
       gas: Option[Int] = None,
       gasPrice: Option[GasPrice] = None
-  ): BuildExecuteScriptTxResult = {
+  ): BuildTransactionResult.ExecuteScript = {
     val compileResult = request[CompileScriptResult](compileScript(code), restPort)
-    request[BuildExecuteScriptTxResult](
+    request[BuildTransactionResult.ExecuteScript](
       buildExecuteScriptTx(
         fromPublicKey = publicKey,
         code = compileResult.bytecodeTemplate,
@@ -819,7 +819,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       tokens: Option[(TokenId, U256)] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
-  ): BuildExecuteScriptTxResult = {
+  ): BuildTransactionResult.ExecuteScript = {
     val buildResult =
       buildExecuteScriptTxWithPort(code, restPort, attoAlphAmount, tokens, gas, gasPrice)
     submitTxWithPort(buildResult.unsignedTx, buildResult.txId, restPort)

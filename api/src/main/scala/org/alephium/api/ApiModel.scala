@@ -273,7 +273,7 @@ trait ApiModelCodec {
 
   implicit val groupRW: RW[Group] = macroRW
 
-  implicit val buildTransferTransactionResultRW: RW[BuildTransferTransactionResult] = macroRW
+  implicit val buildTransferTransactionResultRW: RW[BuildTransactionResult.Transfer] = macroRW
 
   implicit val sweepAddressTransactionRW: RW[SweepAddressTransaction] = macroRW
 
@@ -292,9 +292,9 @@ trait ApiModelCodec {
 
   implicit val buildExecuteScriptTxRW: RW[BuildTransaction.ExecuteScript] = macroRW
 
-  implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
+  implicit val buildDeployContractTxResultRW: RW[BuildTransactionResult.DeployContract] = macroRW
 
-  implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult] = macroRW
+  implicit val buildExecuteScriptTxResultRW: RW[BuildTransactionResult.ExecuteScript] = macroRW
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 

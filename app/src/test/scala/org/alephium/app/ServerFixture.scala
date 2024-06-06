@@ -107,7 +107,7 @@ trait ServerFixture
     dummyTx.toGroup.value
   )
   def dummyBuildTransactionResult(tx: Transaction) =
-    BuildTransferTransactionResult.from(tx.unsigned)
+    BuildTransactionResult.Transfer.from(tx.unsigned)
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,

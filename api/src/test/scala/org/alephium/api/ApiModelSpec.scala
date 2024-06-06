@@ -662,11 +662,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(buildSweep, jsonRaw)
   }
 
-  it should "encode/decode BuildTransferTransactionResult" in {
+  it should "encode/decode BuildTransactionResult.Transfer" in {
     val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
-    val result   = BuildTransferTransactionResult("tx", gas, gasPrice, txId, 1, 2)
+    val result   = BuildTransactionResult.Transfer("tx", gas, gasPrice, txId, 1, 2)
     val jsonRaw =
       s"""{"unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1", "txId":"${txId.toHexString}", "fromGroup":1,"toGroup":2}"""
     checkData(result, jsonRaw)
@@ -878,10 +878,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(buildDeployContractTx, jsonRaw)
   }
 
-  it should "encode/decode BuildDeployContractTxResult" in {
+  it should "encode/decode BuildTransactionResult.DeployContract" in {
     val txId       = TransactionId.generate
     val contractId = ContractId.generate
-    val buildDeployContractTxResult = BuildDeployContractTxResult(
+    val buildDeployContractTxResult = BuildTransactionResult.DeployContract(
       fromGroup = 2,
       toGroup = 2,
       unsignedTx = "0000",
@@ -925,9 +925,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(buildExecuteScriptTx, jsonRaw)
   }
 
-  it should "encode/decode BuildScriptTxResult" in {
+  it should "encode/decode BuildTransactionResult.ExecuteScript" in {
     val txId = TransactionId.generate
-    val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
+    val buildExecuteScriptTxResult = BuildTransactionResult.ExecuteScript(
       fromGroup = 1,
       toGroup = 1,
       unsignedTx = "0000",

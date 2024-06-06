@@ -205,7 +205,7 @@ class ServerUtils(implicit
   def buildTransferTransaction(
       blockFlow: BlockFlow,
       query: BuildTransaction.Transfer
-  ): Try[BuildTransferTransactionResult] = {
+  ): Try[BuildTransactionResult.Transfer] = {
     for {
       lockPair <- query.getLockPair()
       unsignedTx <- prepareUnsignedTransaction(
@@ -219,27 +219,27 @@ class ServerUtils(implicit
         query.targetBlockHash
       )
     } yield {
-      BuildTransferTransactionResult.from(unsignedTx)
+      BuildTransactionResult.Transfer.from(unsignedTx)
     }
   }
 
   def buildMultiInputsTransaction(
       blockFlow: BlockFlow,
       query: BuildMultiAddressesTransaction
-  ): Try[BuildTransferTransactionResult] = {
+  ): Try[BuildTransactionResult.Transfer] = {
     for {
       unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
         blockFlow,
         query
       )
     } yield {
-      BuildTransferTransactionResult.from(unsignedTx)
+      BuildTransactionResult.Transfer.from(unsignedTx)
     }
   }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
-  ): Try[BuildTransferTransactionResult] = {
+  ): Try[BuildTransactionResult.Transfer] = {
     for {
       _ <- checkGroup(query.fromAddress.lockupScript)
       unlockScript <- buildMultisigUnlockScript(
@@ -256,7 +256,7 @@ class ServerUtils(implicit
         None
       )
     } yield {
-      BuildTransferTransactionResult.from(unsignedTx)
+      BuildTransactionResult.Transfer.from(unsignedTx)
     }
   }
 
@@ -1101,7 +1101,7 @@ class ServerUtils(implicit
   def buildDeployContractTx(
       blockFlow: BlockFlow,
       query: BuildTransaction.DeployContract
-  ): Try[BuildDeployContractTxResult] = {
+  ): Try[BuildTransactionResult.DeployContract] = {
     val hardfork = blockFlow.networkConfig.getHardFork(TimeStamp.now())
     for {
       amounts <- BuildTxCommon
@@ -1137,7 +1137,7 @@ class ServerUtils(implicit
         query.gasAmount,
         query.gasPrice
       )
-    } yield BuildDeployContractTxResult.from(utx)
+    } yield BuildTransactionResult.DeployContract.from(utx)
   }
 
   def getInitialAttoAlphAmount(amountOption: Option[U256], hardfork: HardFork): Try[U256] = {
@@ -1176,7 +1176,7 @@ class ServerUtils(implicit
   def buildExecuteScriptTx(
       blockFlow: BlockFlow,
       query: BuildTransaction.ExecuteScript
-  ): Try[BuildExecuteScriptTxResult] = {
+  ): Try[BuildTransactionResult.ExecuteScript] = {
     for {
       amounts <- BuildTxCommon
         .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
@@ -1196,7 +1196,7 @@ class ServerUtils(implicit
         query.gasAmount,
         query.gasPrice
       )
-    } yield BuildExecuteScriptTxResult.from(utx)
+    } yield BuildTransactionResult.ExecuteScript.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
