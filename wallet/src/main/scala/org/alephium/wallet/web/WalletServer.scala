@@ -16,16 +16,18 @@
 
 package org.alephium.wallet.web
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 import io.vertx.ext.web._
 import sttp.model.StatusCode
+import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter
+import sttp.tapir.swagger.{SwaggerUI, SwaggerUIOptions}
 
 import org.alephium.api.ApiError
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model.ApiKey
-import org.alephium.http.{ServerOptions, SwaggerUI}
+import org.alephium.http.ServerOptions
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{AVector, Duration}
 import org.alephium.wallet.WalletDocumentation
@@ -66,7 +68,20 @@ class WalletServer(
     getWalletLogic
   ).map(route(_))
 
-  lazy val docsRoute = SwaggerUI(openApiJson(walletOpenAPI, maybeApiKey.isEmpty)).map(route(_))
+  lazy val docsRoute = AVector
+    .from[ServerEndpoint[Any, Future]](
+      SwaggerUI(
+        openApiJson(walletOpenAPI, maybeApiKey.isEmpty),
+        new SwaggerUIOptions(
+          List("docs"),
+          "docs.json",
+          Nil,
+          useRelativePaths = true,
+          showExtensions = false
+        )
+      )
+    )
+    .map(route(_))
 }
 
 object WalletServer {

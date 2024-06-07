@@ -24,13 +24,15 @@ import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
+import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
+import sttp.tapir.swagger.{SwaggerUI, SwaggerUIOptions}
 
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
-import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
+import org.alephium.http.{EndpointSender, ServerOptions}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
@@ -60,7 +62,20 @@ class RestServer(
 
   val endpointSender: EndpointSender = new EndpointSender(maybeApiKey)
 
-  private val swaggerUiRoute = SwaggerUI(openApiJson(openAPI, maybeApiKey.isEmpty)).map(route(_))
+  private val swaggerUiRoute = AVector
+    .from[ServerEndpoint[Any, Future]](
+      SwaggerUI(
+        openApiJson(openAPI, maybeApiKey.isEmpty),
+        new SwaggerUIOptions(
+          List("docs"),
+          "docs.json",
+          Nil,
+          useRelativePaths = true,
+          showExtensions = false
+        )
+      )
+    )
+    .map(route(_))
 
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(
