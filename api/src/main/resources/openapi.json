@@ -505,9 +505,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -595,9 +593,7 @@
           }
         ],
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -710,9 +706,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -2113,9 +2107,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -2898,9 +2890,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -3101,9 +3091,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -6588,9 +6576,7 @@
         "summary": "Remove all transactions from mempool",
         "operationId": "deleteMempoolTransactions",
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -6679,9 +6665,7 @@
           }
         ],
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -6759,9 +6743,7 @@
         "summary": "Validate all mempool transactions and remove invalid ones",
         "operationId": "putMempoolTransactionsValidate",
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -9447,9 +9429,7 @@
           "required": true
         },
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
@@ -10224,9 +10204,7 @@
         "summary": "Check and repair the indexing of block hashes",
         "operationId": "putUtilsCheck-hash-indexing",
         "responses": {
-          "200": {
-            
-          },
+          "200": {},
           "400": {
             "description": "BadRequest",
             "content": {
