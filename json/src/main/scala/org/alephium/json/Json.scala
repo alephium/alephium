@@ -66,7 +66,7 @@ object Json extends upickle.AttributeTagged {
         case ujson.Null =>
           None
         case obj: ujson.Obj =>
-          val newValues = obj.value.flatMap { case (key, value) =>
+          val newValues = obj.value.iterator.flatMap { case (key, value) =>
             rec(value).map(key -> _)
           }
           Some(ujson.Obj.from(newValues))

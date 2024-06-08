@@ -17,11 +17,12 @@
 package org.alephium.api
 
 import scala.collection.immutable.ListMap
-import scala.collection.mutable.LinkedHashMap
+import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 
 import sttp.apispec._
 import sttp.apispec.openapi._
+import upickle.core.LinkedHashMap
 
 import org.alephium.json.Json._
 
@@ -82,15 +83,10 @@ object OpenAPIWriters extends EndpointsExamples {
 
   implicit def writerReferenceOr[T: Writer]: Writer[ReferenceOr[T]] = writer[ujson.Value].comap {
     case Left(Reference(ref, summaryOpt, descriptionOpt)) =>
-      val summary = summaryOpt
-        .map(summary => LinkedHashMap(("summary", ujson.Str(summary))))
-        .getOrElse(LinkedHashMap.empty)
-      val description = descriptionOpt
-        .map(description => LinkedHashMap(("description", ujson.Str(description))))
-        .getOrElse(LinkedHashMap.empty)
-      val value: LinkedHashMap[String, ujson.Value] =
-        LinkedHashMap((s"$$ref", ujson.Str(ref))) ++ summary ++ description
-      ujson.Obj.from(value)
+      val values: ArrayBuffer[(String, ujson.Value)] = ArrayBuffer((s"$$ref", ujson.Str(ref)))
+      summaryOpt.foreach(summary => values.addOne(("summary", ujson.Str(summary))))
+      descriptionOpt.foreach(description => values.addOne(("description", ujson.Str(description))))
+      ujson.Obj.from(values)
     case Right(t) => writeJs(t)
   }
 
@@ -246,16 +242,16 @@ object OpenAPIWriters extends EndpointsExamples {
       }
     }
   implicit val writerResponses: Writer[Responses] = writer[ujson.Value].comap { resp =>
-    val extensions = writeJs(resp.extensions).objOpt.getOrElse(LinkedHashMap.empty)
+    val extensions = writeJs(resp.extensions).objOpt.getOrElse(LinkedHashMap()).iterator
     val respJson   = writeJs(resp.responses)
-    respJson.objOpt.map(p => ujson.Obj.from(p ++ extensions)).getOrElse(respJson)
+    respJson.objOpt.map(p => ujson.Obj.from(p.iterator ++ extensions)).getOrElse(respJson)
   }
   implicit val writerOperation: Writer[Operation] = expandExtensions(macroW[Operation])
   implicit val writerPathItem: Writer[PathItem]   = macroW[PathItem]
   implicit val writerPaths: Writer[Paths] = writer[ujson.Value].comap { paths =>
-    val extensions = writeJs(paths.extensions).objOpt.getOrElse(LinkedHashMap.empty)
+    val extensions = writeJs(paths.extensions).objOpt.getOrElse(LinkedHashMap()).iterator
     val pathItems  = writeJs(paths.pathItems)
-    pathItems.objOpt.map(p => ujson.Obj.from(p ++ extensions)).getOrElse(pathItems)
+    pathItems.objOpt.map(p => ujson.Obj.from(p.iterator ++ extensions)).getOrElse(pathItems)
   }
   implicit val writerComponents: Writer[Components] = expandExtensions(macroW[Components])
   implicit val writerServerVariable: Writer[ServerVariable] = expandExtensions(
@@ -299,8 +295,10 @@ object OpenAPIWriters extends EndpointsExamples {
 
   private def expandObjExtensions(jsonObject: ujson.Obj): ujson.Obj = {
     val extensions = ujson.Obj.from(jsonObject.value.find { case (key, _) => key == "extensions" })
-    val jsonWithoutExt = jsonObject.value.filter { case (key, _) => key != "extensions" }
-    ujson.Obj.from(extensions.objOpt.map(ext => ext ++ jsonWithoutExt).getOrElse(jsonWithoutExt))
+    val jsonWithoutExt = jsonObject.value.iterator.filter { case (key, _) => key != "extensions" }
+    ujson.Obj.from(
+      extensions.objOpt.map(ext => ext.iterator ++ jsonWithoutExt).getOrElse(jsonWithoutExt)
+    )
   }
 
   implicit private val openapiWriter: Writer[OpenAPI] = writerMyOpenAPI.comap[OpenAPI] { openapi =>
