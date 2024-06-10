@@ -203,4 +203,69 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     viewHandler ! ViewHandler.UpdateSubscribers
     expectMsg(ViewHandler.SubscribeResult(false))
   }
+
+  behavior of "update best deps"
+
+  trait UpdateBestDepsFixture extends SyncedFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addWithoutViewUpdate(blockFlow, block)
+    blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+  }
+
+  it should "update best deps after receiving FlowDataAdded event" in new UpdateBestDepsFixture {
+    viewHandler.underlyingActor.updateBestDepsCount is 0
+    viewHandler.underlyingActor.updatingBestDeps is false
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+
+    eventually {
+      viewHandler.underlyingActor.updateBestDepsCount is 0
+      viewHandler.underlyingActor.updatingBestDeps is false
+      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "not update best deps if the update task is running" in new UpdateBestDepsFixture {
+    viewHandler.underlyingActor.updatingBestDeps = true
+    viewHandler.underlyingActor.updateBestDepsCount is 0
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    viewHandler.underlyingActor.updatingBestDeps is true
+    viewHandler.underlyingActor.updateBestDepsCount is 1
+    blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    viewHandler.underlyingActor.updatingBestDeps is true
+    viewHandler.underlyingActor.updateBestDepsCount is 2
+    blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler.underlyingActor.updatingBestDeps = false
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      viewHandler.underlyingActor.updateBestDepsCount is 0
+      viewHandler.underlyingActor.updatingBestDeps is false
+      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "update best deps after receiving BestDepsUpdated event" in new UpdateBestDepsFixture {
+    viewHandler.underlyingActor.updateBestDepsCount = 2
+    viewHandler.underlyingActor.updatingBestDeps = true
+    viewHandler ! ViewHandler.BestDepsUpdated
+    eventually {
+      viewHandler.underlyingActor.updateBestDepsCount is 0
+      viewHandler.underlyingActor.updatingBestDeps is false
+      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "not update best deps after receiving BestDepsUpdateFailed event" in new UpdateBestDepsFixture {
+    viewHandler.underlyingActor.updateBestDepsCount = 2
+    viewHandler.underlyingActor.updatingBestDeps = true
+    viewHandler ! ViewHandler.BestDepsUpdateFailed
+    eventually {
+      viewHandler.underlyingActor.updateBestDepsCount is 2
+      viewHandler.underlyingActor.updatingBestDeps is false
+      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+    }
+  }
 }

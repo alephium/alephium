@@ -107,6 +107,7 @@ class ViewHandler(
       updatingBestDeps = false
       tryUpdateBestDeps()
     case ViewHandler.BestDepsUpdateFailed =>
+      updatingBestDeps = false
       log.warning("Updating blockflow deps failed")
 
     case ViewHandler.Subscribe         => subscribe()
@@ -204,7 +205,7 @@ trait BlockFlowUpdaterState extends IOBaseActor {
     if (updateBestDepsCount > 0 && !updatingBestDeps) {
       updateBestDepsCount = 0
       updatingBestDeps = true
-      Future {
+      Future[ViewHandler.Command] {
         blockFlow.updateBestDeps() match {
           case Left(_)  => ViewHandler.BestDepsUpdateFailed
           case Right(_) => ViewHandler.BestDepsUpdated
