@@ -212,7 +212,8 @@ trait BlockFlowUpdaterState extends IOBaseActor {
         }
       }.pipeTo(self)
       ()
-    } else {
+    }
+    if (updatingBestDeps) {
       log.debug("Skip updating best deps due to pending updates")
     }
   }
