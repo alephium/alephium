@@ -95,6 +95,7 @@ class ViewHandler(
 
   def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, _) =>
+      println(s"==== flow data added")
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
@@ -214,7 +215,7 @@ trait BlockFlowUpdaterState extends IOBaseActor {
       ()
     }
     if (updatingBestDeps) {
-      log.debug("Skip updating best deps due to pending updates")
+      log.info("Skip updating best deps due to pending updates")
     }
   }
 }
