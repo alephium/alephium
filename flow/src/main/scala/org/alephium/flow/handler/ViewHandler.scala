@@ -17,8 +17,10 @@
 package org.alephium.flow.handler
 
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorRef, Cancellable, Props}
+import akka.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner
@@ -43,6 +45,8 @@ object ViewHandler {
   )
 
   sealed trait Command
+  case object BestDepsUpdated                                              extends Command
+  case object BestDepsUpdateFailed                                         extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
   case object UpdateSubscribers                                            extends Command
@@ -81,6 +85,7 @@ class ViewHandler(
     val brokerConfig: BrokerConfig,
     val miningSetting: MiningSetting
 ) extends ViewHandlerState
+    with BlockFlowUpdaterState
     with Subscriber
     with Publisher
     with InterCliqueManager.NodeSyncStatus {
@@ -94,9 +99,15 @@ class ViewHandler(
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
       if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
-        blockFlow.updateBestDeps()
+        updateBestDepsCount += 1
+        tryUpdateBestDeps()
       }
       if (isNodeSynced) { updateSubscribers() }
+    case ViewHandler.BestDepsUpdated =>
+      updatingBestDeps = false
+      tryUpdateBestDeps()
+    case ViewHandler.BestDepsUpdateFailed =>
+      log.warning("Updating blockflow deps failed")
 
     case ViewHandler.Subscribe         => subscribe()
     case ViewHandler.Unsubscribe       => unsubscribe()
@@ -178,6 +189,30 @@ trait ViewHandlerState extends IOBaseActor {
     } else {
       log.warning(s"The node is not synced, unsubscribe all actors")
       subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
+    }
+  }
+}
+
+trait BlockFlowUpdaterState extends IOBaseActor {
+  def blockFlow: BlockFlow
+  protected[handler] var updateBestDepsCount: Int  = 0
+  protected[handler] var updatingBestDeps: Boolean = false
+
+  implicit def executionContext: ExecutionContext = context.dispatcher
+
+  def tryUpdateBestDeps(): Unit = {
+    if (updateBestDepsCount > 0 && !updatingBestDeps) {
+      updateBestDepsCount = 0
+      updatingBestDeps = true
+      Future {
+        blockFlow.updateBestDeps() match {
+          case Left(_)  => ViewHandler.BestDepsUpdateFailed
+          case Right(_) => ViewHandler.BestDepsUpdated
+        }
+      }.pipeTo(self)
+      ()
+    } else {
+      log.debug("Skip updating best deps due to pending updates")
     }
   }
 }
