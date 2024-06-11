@@ -22,7 +22,7 @@
       "sourceFile": "greeter/greeter.ral",
       "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "d8a1c2190c6c54f720608a4b264d1c648a9865e0744e942e489c87e64d4e596a",
+      "codeHashDebug": "ac8324a46b81e7efded004fd52d851fbb9dfc2da88bcc8c7a9a73c3fce2635f2",
       "warnings": []
     },
     "GreeterInterface": {
