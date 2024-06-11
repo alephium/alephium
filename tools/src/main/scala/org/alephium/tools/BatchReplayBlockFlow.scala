@@ -18,7 +18,7 @@ package org.alephium.tools
 
 import java.nio.file.{Files, StandardCopyOption}
 
-import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Await
 
 import akka.actor.{ActorSystem, Props}
@@ -31,9 +31,8 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.io.{IOResult, IOUtils, RocksDBSource}
-import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{ActorRefT, AVector, Duration, Env, EventBus, Files => AFiles, TimeStamp}
+import org.alephium.protocol.model.Block
+import org.alephium.util.{ActorRefT, AVector, Duration, Env, EventBus, Files => AFiles}
 
 object BatchReplayBlockFlow extends App with StrictLogging {
   private val sourcePath = Platform.getRootPath()
@@ -109,91 +108,26 @@ object Replayer {
 }
 
 final class Replayer(
-    sourceBlockFlow: BlockFlow,
-    targetBlockFlow: BlockFlow,
+    val sourceBlockFlow: BlockFlow,
+    val targetBlockFlow: BlockFlow,
     dependencyHandler: ActorRefT[DependencyHandler.Command],
     pendingCapacity: Int
-) extends IOBaseActor {
-  private val startLoadingHeight = 1
-  private val brokerConfig       = sourceBlockFlow.brokerConfig
-  private val chainIndexes       = brokerConfig.chainIndexes
-  private val loadedHeights      = chainIndexes.map(_ => startLoadingHeight).toArray
-  private val maxHeights = chainIndexes.map(chainIndex =>
-    sourceBlockFlow.getMaxHeightByWeight(chainIndex) match {
-      case Left(error)   => throw error
-      case Right(height) => height
-    }
-  )
+) extends IOBaseActor
+    with ReplayState {
+  private var pendingBlocks = 0
 
-  private val blockQueue =
-    PriorityQueue.empty(Ordering.by[(Block, Int), TimeStamp](t => t._1.timestamp).reverse)
-  private var replayedBlockCount = 0
-  private var pendingBlocks      = 0
-
-  private val startTs = TimeStamp.now()
-  private var countTs = TimeStamp.now()
-
-  private def loadBlocksAtUnsafe(chainIndex: ChainIndex, height: Int): Unit = {
-    val hashes = sourceBlockFlow.getBlockChain(chainIndex).getHashesUnsafe(height)
-    require(
-      hashes.toArray.distinct.length == hashes.length,
-      s"Hashes from ${chainIndex} at height ${height} are not unique: ${hashes}"
-    )
-    hashes.foreach(blockHash =>
-      blockQueue.enqueue(sourceBlockFlow.getBlockUnsafe(blockHash) -> height)
-    )
-  }
-
-  private def loadInitialBlocks(): IOResult[Unit] = {
-    chainIndexes.foreachE { chainIndex =>
-      val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
-      for {
-        height0 <- targetBlockFlow.getMaxHeightByWeight(chainIndex)
-        height = if (height0 > startLoadingHeight) height0 + 1 else startLoadingHeight
-        _ <- IOUtils.tryExecute(loadBlocksAtUnsafe(chainIndex, height))
-      } yield {
-        loadedHeights(chainIndexOneDim) = height
-      }
-    }
-  }
-
-  private def loadMoreBlocksUnsafe(
-      chainIndex: ChainIndex,
-      maxHeights: AVector[Int],
-      blockHeight: Int
-  ): Unit = {
-    val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
-    val shouldLoadMore =
-      loadedHeights(chainIndexOneDim) == blockHeight && blockHeight < maxHeights(
-        chainIndexOneDim
-      )
-
-    if (shouldLoadMore) {
-      loadBlocksAtUnsafe(chainIndex, blockHeight + 1)
-      loadedHeights(chainIndexOneDim) = blockHeight + 1
-    }
-  }
-
-  private def replayUnsafe(maxHeights: AVector[Int]): Unit = {
+  private def replayUnsafe(): Unit = {
     val blocks = ArrayBuffer.empty[Block]
     while (blockQueue.nonEmpty && blocks.length < pendingCapacity) {
       val (block, blockHeight) = blockQueue.dequeue()
       val chainIndex           = block.chainIndex
       blocks.addOne(block)
-      loadMoreBlocksUnsafe(chainIndex, maxHeights, blockHeight)
+      loadMoreBlocksUnsafe(chainIndex, blockHeight)
       pendingBlocks += 1
     }
 
     if (blocks.nonEmpty) {
       dependencyHandler ! DependencyHandler.AddFlowData(AVector.from(blocks), DataOrigin.Local)
-    }
-  }
-
-  private def fetchBestWorldStateHashes(
-      blockFlow: BlockFlow
-  ): IOResult[AVector[WorldState.Hashes]] = {
-    blockFlow.brokerConfig.cliqueGroupIndexes.mapE { groupIndex =>
-      blockFlow.getBestPersistedWorldState(groupIndex).map(_.toHashes)
     }
   }
 
@@ -211,26 +145,21 @@ final class Replayer(
   }
 
   override def preStart(): Unit = {
-    escapeIOError(loadInitialBlocks())
-    replayedBlockCount = loadedHeights.map(_ - 1).sum
-    escapeIOError(IOUtils.tryExecute(replayUnsafe(maxHeights)))
+    escapeIOError(init())
+    escapeIOError(IOUtils.tryExecute(replayUnsafe()))
+    super.preStart()
   }
 
   def receive: Receive = {
     case _: BlockChainHandler.BlockAdded =>
       replayedBlockCount += 1
-      if (replayedBlockCount % 1000 == 0) {
-        val now           = TimeStamp.now()
-        val eclipsed      = now.deltaUnsafe(startTs).millis
-        val speed         = replayedBlockCount * 1000 / eclipsed
-        val cycleEclipsed = now.deltaUnsafe(countTs).millis
-        val cycleSpeed    = 1000 * 1000 / cycleEclipsed
-        countTs = now
+      if (replayedBlockCount % ReplayState.LogInterval == 0) {
+        val (speed, cycleSpeed) = calcSpeed()
         log.info(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS")
       }
       pendingBlocks -= 1
       if (pendingBlocks < pendingCapacity) {
-        escapeIOError(IOUtils.tryExecute(replayUnsafe(maxHeights)))
+        escapeIOError(IOUtils.tryExecute(replayUnsafe()))
       }
       if (pendingBlocks == 0) {
         escapeIOError(checkStateHashes())
