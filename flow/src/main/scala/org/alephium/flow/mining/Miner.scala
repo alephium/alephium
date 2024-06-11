@@ -195,6 +195,7 @@ trait Miner extends BaseActor with MinerState {
     val fromShift = brokerConfig.groupIndexOfBroker(chainIndex.from)
     val to        = chainIndex.to.value
     increaseCounts(fromShift, to, miningCount)
+    pendingTasks(fromShift)(to) = None
 
     val totalCount = getMiningCount(fromShift, to)
     val txCount    = block.transactions.length
