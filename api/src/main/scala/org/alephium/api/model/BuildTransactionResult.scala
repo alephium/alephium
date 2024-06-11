@@ -22,7 +22,10 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-sealed trait BuildTransactionResult extends GasInfo with ChainIndexInfo
+sealed trait BuildTransactionResult extends GasInfo with ChainIndexInfo {
+  def txId: TransactionId
+  def unsignedTx: String
+}
 
 object BuildTransactionResult {
   @upickle.implicits.key("Transfer")

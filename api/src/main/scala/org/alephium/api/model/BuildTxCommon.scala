@@ -117,4 +117,6 @@ trait GasInfo {
   def gasAmount: GasBox
 
   def gasPrice: GasPrice
+
+  def gasFee: U256 = gasPrice * gasAmount
 }

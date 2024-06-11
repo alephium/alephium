@@ -16,7 +16,14 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.ChainIndex
+
 trait ChainIndexInfo {
   def fromGroup: Int
   def toGroup: Int
+
+  def chainIndex()(implicit config: GroupConfig): Option[ChainIndex] = {
+    ChainIndex.from(fromGroup, toGroup)
+  }
 }

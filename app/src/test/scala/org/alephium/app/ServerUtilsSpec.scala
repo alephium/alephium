@@ -2733,13 +2733,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  trait DustAmountFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
-    implicit val serverUtils  = new ServerUtils
+  trait ExecuteScriptFixture extends Fixture {
+    def serverUtils: ServerUtils
 
-    val chainIndex      = ChainIndex.unsafe(0, 0)
-    val (_, testPubKey) = chainIndex.from.generateKey
-    val testAddress     = Address.p2pkh(testPubKey)
+    val gasAmount = GasBox.unsafe(30000)
+    val gasPrice  = nonCoinbaseMinGasPrice
+    val gasFee    = gasPrice * gasAmount
 
     val script =
       s"""
@@ -2747,11 +2746,32 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  emit Debug(`Hey, I am Foo`)
          |}
          |""".stripMargin
-    val code = Compiler.compileTxScript(script).toOption.get
+    val scriptCode = Compiler.compileTxScript(script).toOption.get
 
-    val gasAmount = GasBox.unsafe(30000)
-    val gasPrice  = nonCoinbaseMinGasPrice
-    val gasFee    = gasPrice * gasAmount
+    def executeTxScript(
+        buildExecuteScript: BuildTransaction.ExecuteScript
+    ): BuildTransactionResult.ExecuteScript = {
+      serverUtils.buildExecuteScriptTx(blockFlow, buildExecuteScript).rightValue
+    }
+
+    def failedExecuteTxScript(
+        buildExecuteScript: BuildTransaction.ExecuteScript,
+        errorDetails: String
+    ) = {
+      serverUtils
+        .buildExecuteScriptTx(blockFlow, buildExecuteScript)
+        .leftValue
+        .detail is errorDetails
+    }
+  }
+
+  trait DustAmountFixture extends ExecuteScriptFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    implicit val serverUtils  = new ServerUtils
+
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val (_, testPubKey) = chainIndex.from.generateKey
+    val testAddress     = Address.p2pkh(testPubKey)
 
     def attoAlphAmount: Option[Amount]
 
@@ -2764,19 +2784,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block2)
     checkAddressBalance(testAddress, alphPerUTXO * 2, utxoNum = 2)
 
-    def executeTxScript() = {
-      serverUtils
-        .buildExecuteScriptTx(
-          blockFlow,
-          BuildTransaction.ExecuteScript(
-            fromPublicKey = Hex.unsafe(testPubKey.toHexString),
-            bytecode = serialize(code),
-            gasAmount = Some(gasAmount),
-            gasPrice = Some(gasPrice),
-            attoAlphAmount = attoAlphAmount
-          )
+    def executeTxScript(): BuildTransactionResult.ExecuteScript = {
+      executeTxScript(
+        BuildTransaction.ExecuteScript(
+          fromPublicKey = Hex.unsafe(testPubKey.toHexString),
+          bytecode = serialize(scriptCode),
+          gasAmount = Some(gasAmount),
+          gasPrice = Some(gasPrice),
+          attoAlphAmount = attoAlphAmount
         )
-        .rightValue
+      )
     }
   }
 
@@ -3420,11 +3437,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  trait GenericTransactionsFixture extends Fixture {
+  trait GenericTransactionsFixture extends ExecuteScriptFixture {
     override val configValues =
       Map(("alephium.broker.groups", 4), ("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val contractCode = Compiler.compileContract(contract).toOption.get
 
     def checkAlphBalance(
         lockupScript: LockupScript,
@@ -3433,6 +3460,20 @@ class ServerUtilsSpec extends AlephiumSpec {
       val (alphAmount, _, _, _, _) =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
       expectedAlphBalance is alphAmount
+    }
+
+    def signAndAndToMemPool(
+        buildTransactionResult: BuildTransactionResult,
+        fromPrivateKey: PrivateKey
+    ): TransactionTemplate = {
+      val chainIndex =
+        ChainIndex.unsafe(buildTransactionResult.fromGroup, buildTransactionResult.toGroup)
+      signAndAddToMemPool(
+        buildTransactionResult.txId,
+        buildTransactionResult.unsignedTx,
+        chainIndex,
+        fromPrivateKey
+      )
     }
 
     def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
@@ -3462,13 +3503,20 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     }
 
+    def failedDeployContract(
+        buildTransfer: BuildTransaction.DeployContract,
+        errorDetails: String
+    ) = {
+      serverUtils.buildDeployContractTx(blockFlow, buildTransfer).leftValue.detail is errorDetails
+    }
+
     object Transfer01 {
       val chainIndex                         = ChainIndex.unsafe(0, 1)
       val lockupScript                       = getGenesisLockupScript(chainIndex)
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
       val (toPrivateKey, toPublicKey)        = chainIndex.to.generateKey
       val toAddress                          = Address.p2pkh(toPublicKey)
-      val destination                        = Destination(toAddress, Amount(ALPH.oneAlph))
+      val destination                        = Destination(toAddress, Amount(ALPH.oneAlph * 2))
     }
   }
 
@@ -3477,13 +3525,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val chainIndex                  = ChainIndex.unsafe(1, 2)
       val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
       val toAddress                   = Address.p2pkh(toPublicKey)
-      val destination                 = Destination(toAddress, Amount(ALPH.oneAlph / 2))
+      val destination                 = Destination(toAddress, Amount(ALPH.oneAlph))
     }
 
     failedBuildTransfer(
       BuildTransaction
         .Transfer(Transfer01.toPublicKey.bytes, None, AVector(Transfer12.destination)),
-      errorDetails = "Not enough balance: got 0, expected 501000000000000000"
+      errorDetails = "Not enough balance: got 0, expected 1001000000000000000"
     )
 
     val buildTransactions = buildGenericTransactions(
@@ -3498,19 +3546,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction12 =
       buildTransactions(1).asInstanceOf[BuildTransactionResult.Transfer]
 
-    signAndAddToMemPool(
-      buildTransferTransaction01.txId,
-      buildTransferTransaction01.unsignedTx,
-      Transfer01.chainIndex,
-      Transfer01.fromPrivateKey
-    )
-    signAndAddToMemPool(
-      buildTransferTransaction12.txId,
-      buildTransferTransaction12.unsignedTx,
-      Transfer12.chainIndex,
-      Transfer01.toPrivateKey
-    )
-
+    signAndAndToMemPool(buildTransferTransaction01, Transfer01.fromPrivateKey)
+    signAndAndToMemPool(buildTransferTransaction12, Transfer01.toPrivateKey)
     confirmNewBlock(blockFlow, Transfer01.chainIndex)
     confirmNewBlock(blockFlow, Transfer12.chainIndex)
 
@@ -3518,9 +3555,76 @@ class ServerUtilsSpec extends AlephiumSpec {
       buildTransferTransaction01.gasPrice * buildTransferTransaction01.gasAmount
     checkAlphBalance(
       Transfer01.toAddress.lockupScript,
-      ALPH.oneAlph / 2 - buildTransferTransaction01GasFee
+      ALPH.oneAlph - buildTransferTransaction01GasFee
     )
-    checkAlphBalance(Transfer12.toAddress.lockupScript, ALPH.oneAlph / 2)
+    checkAlphBalance(Transfer12.toAddress.lockupScript, ALPH.oneAlph)
+  }
+
+  it should "build a transfer transaction followed by an execute script transactions" in new GenericTransactionsFixture {
+    val buildExecuteScript = BuildTransaction.ExecuteScript(
+      fromPublicKey = Transfer01.toPublicKey.bytes,
+      bytecode = serialize(scriptCode),
+      gasAmount = Some(gasAmount),
+      gasPrice = Some(gasPrice),
+      attoAlphAmount = None
+    )
+
+    failedExecuteTxScript(
+      buildExecuteScript,
+      errorDetails = "Not enough balance: got 0, expected 3000000000000000"
+    )
+
+    val buildTransactions = buildGenericTransactions(
+      BuildTransaction
+        .Transfer(Transfer01.fromPublicKey.bytes, None, AVector(Transfer01.destination)),
+      buildExecuteScript
+    )
+
+    buildTransactions.length is 2
+    val buildTransferTransaction =
+      buildTransactions(0).asInstanceOf[BuildTransactionResult.Transfer]
+    val buildExecuteScriptTransaction =
+      buildTransactions(1).asInstanceOf[BuildTransactionResult.ExecuteScript]
+
+    signAndAndToMemPool(buildTransferTransaction, Transfer01.fromPrivateKey)
+    signAndAndToMemPool(buildExecuteScriptTransaction, Transfer01.toPrivateKey)
+    confirmNewBlock(blockFlow, Transfer01.chainIndex)
+    confirmNewBlock(blockFlow, buildExecuteScriptTransaction.chainIndex().value)
+
+    checkAlphBalance(
+      Transfer01.toAddress.lockupScript,
+      ALPH.oneAlph * 2 - buildExecuteScriptTransaction.gasFee
+    )
+  }
+
+  it should "build a transfer transaction followed by a deploy contract transactions" in new GenericTransactionsFixture {
+    val buildDeployContract = BuildTransaction.DeployContract(
+      fromPublicKey = Transfer01.toPublicKey.bytes,
+      bytecode = serialize(contractCode) ++ ByteString(0, 0)
+    )
+
+    failedDeployContract(buildDeployContract, errorDetails = "No UTXO found.")
+
+    val buildTransactions = buildGenericTransactions(
+      BuildTransaction
+        .Transfer(Transfer01.fromPublicKey.bytes, None, AVector(Transfer01.destination)),
+      buildDeployContract
+    )
+    buildTransactions.length is 2
+    val buildTransferTransaction =
+      buildTransactions(0).asInstanceOf[BuildTransactionResult.Transfer]
+    val buildDeployContractTransaction =
+      buildTransactions(1).asInstanceOf[BuildTransactionResult.DeployContract]
+
+    signAndAndToMemPool(buildTransferTransaction, Transfer01.fromPrivateKey)
+    signAndAndToMemPool(buildDeployContractTransaction, Transfer01.toPrivateKey)
+    confirmNewBlock(blockFlow, Transfer01.chainIndex)
+    confirmNewBlock(blockFlow, buildDeployContractTransaction.chainIndex().value)
+
+    checkAlphBalance(
+      Transfer01.toAddress.lockupScript,
+      ALPH.oneAlph * 2 - minimalAlphInContract - buildDeployContractTransaction.gasFee
+    )
   }
 
   it should "get ghost uncles" in new Fixture {
