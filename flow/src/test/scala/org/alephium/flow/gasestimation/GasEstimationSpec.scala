@@ -19,6 +19,7 @@ package org.alephium.flow.gasestimation
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -367,8 +368,10 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     val lockup            = LockupScript.p2pkh(publicKey)
     val unlock            = UnlockScript.p2pkh(publicKey)
     val utxos             = blockFlow.getUsableUtxos(lockup, 100).rightValue
-    val inputs            = utxos.map(_.ref).map(TxInput(_, unlock))
-    val estimator         = TxScriptGasEstimator.Default(blockFlow)
+    val inputs = utxos.map { utxo =>
+      TxInputWithAsset(TxInput(utxo.ref, unlock), utxo)
+    }
+    val estimator = TxScriptGasEstimator.Default(blockFlow)
 
     GasEstimation.estimate(inputs, script, estimator)
   }
