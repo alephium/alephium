@@ -3420,6 +3420,109 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  trait GenericTransactionsFixture extends Fixture {
+    override val configValues =
+      Map(("alephium.broker.groups", 4), ("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    def checkAlphBalance(
+        lockupScript: LockupScript,
+        expectedAlphBalance: U256
+    ) = {
+      val (alphAmount, _, _, _, _) =
+        blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
+      expectedAlphBalance is alphAmount
+    }
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+    }
+
+    def failedBuildTransfer(buildTransfer: BuildTransaction.Transfer, errorDetails: String) = {
+      serverUtils
+        .buildTransferTransaction(
+          blockFlow,
+          buildTransfer
+        )
+        .leftValue
+        .detail is errorDetails
+    }
+
+    def buildGenericTransactions(
+        buildTransactions: BuildTransaction*
+    ): AVector[BuildTransactionResult] = {
+      serverUtils
+        .buildGenericTransactions(
+          blockFlow,
+          AVector.from(buildTransactions)
+        )
+        .rightValue
+    }
+
+    object Transfer01 {
+      val chainIndex                         = ChainIndex.unsafe(0, 1)
+      val lockupScript                       = getGenesisLockupScript(chainIndex)
+      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+      val (toPrivateKey, toPublicKey)        = chainIndex.to.generateKey
+      val toAddress                          = Address.p2pkh(toPublicKey)
+      val destination                        = Destination(toAddress, Amount(ALPH.oneAlph))
+    }
+  }
+
+  it should "build multiple transfers transactions" in new GenericTransactionsFixture {
+    object Transfer12 {
+      val chainIndex                  = ChainIndex.unsafe(1, 2)
+      val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
+      val toAddress                   = Address.p2pkh(toPublicKey)
+      val destination                 = Destination(toAddress, Amount(ALPH.oneAlph / 2))
+    }
+
+    failedBuildTransfer(
+      BuildTransaction
+        .Transfer(Transfer01.toPublicKey.bytes, None, AVector(Transfer12.destination)),
+      errorDetails = "Not enough balance: got 0, expected 501000000000000000"
+    )
+
+    val buildTransactions = buildGenericTransactions(
+      BuildTransaction
+        .Transfer(Transfer01.fromPublicKey.bytes, None, AVector(Transfer01.destination)),
+      BuildTransaction.Transfer(Transfer01.toPublicKey.bytes, None, AVector(Transfer12.destination))
+    )
+
+    buildTransactions.length is 2
+    val buildTransferTransaction01 =
+      buildTransactions(0).asInstanceOf[BuildTransactionResult.Transfer]
+    val buildTransferTransaction12 =
+      buildTransactions(1).asInstanceOf[BuildTransactionResult.Transfer]
+
+    signAndAddToMemPool(
+      buildTransferTransaction01.txId,
+      buildTransferTransaction01.unsignedTx,
+      Transfer01.chainIndex,
+      Transfer01.fromPrivateKey
+    )
+    signAndAddToMemPool(
+      buildTransferTransaction12.txId,
+      buildTransferTransaction12.unsignedTx,
+      Transfer12.chainIndex,
+      Transfer01.toPrivateKey
+    )
+
+    confirmNewBlock(blockFlow, Transfer01.chainIndex)
+    confirmNewBlock(blockFlow, Transfer12.chainIndex)
+
+    val buildTransferTransaction01GasFee =
+      buildTransferTransaction01.gasPrice * buildTransferTransaction01.gasAmount
+    checkAlphBalance(
+      Transfer01.toAddress.lockupScript,
+      ALPH.oneAlph / 2 - buildTransferTransaction01GasFee
+    )
+    checkAlphBalance(Transfer12.toAddress.lockupScript, ALPH.oneAlph / 2)
+  }
+
   it should "get ghost uncles" in new Fixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block0     = emptyBlock(blockFlow, chainIndex)
