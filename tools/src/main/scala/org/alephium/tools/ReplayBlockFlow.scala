@@ -18,51 +18,36 @@ package org.alephium.tools
 
 import java.nio.file.{Files, StandardCopyOption}
 
-import scala.collection.mutable.PriorityQueue
-
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.Platform
 import org.alephium.flow.validation.{BlockValidation, BlockValidationResult}
-import org.alephium.io.IOResult
-import org.alephium.protocol.model.{Block, ChainIndex}
-import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{AVector, Files => AFiles, TimeStamp}
+import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.util.{Files => AFiles, TimeStamp}
 
 class ReplayBlockFlow(
-    sourceBlockFlow: BlockFlow,
-    targetBlockFlow: BlockFlow
-) extends StrictLogging {
-  private val startLoadingHeight = 1
-  private val brokerConfig       = sourceBlockFlow.brokerConfig
-  private val chainIndexes       = brokerConfig.chainIndexes
-  private val validator          = BlockValidation.build(targetBlockFlow)
-  private val loadedHeights      = chainIndexes.map(_ => startLoadingHeight).toArray
-  private val pendingBlocks =
-    PriorityQueue.empty(Ordering.by[(Block, Int), TimeStamp](t => t._1.timestamp).reverse)
+    val sourceBlockFlow: BlockFlow,
+    val targetBlockFlow: BlockFlow
+) extends ReplayState
+    with StrictLogging {
+  private val validator = BlockValidation.build(targetBlockFlow)
 
   def start(): BlockValidationResult[Boolean] = {
     for {
-      maxHeights <- from(
-        chainIndexes.mapE(chainIndex => sourceBlockFlow.getMaxHeightByWeight(chainIndex))
-      )
-      _                 <- from(loadInitialBlocks(targetBlockFlow))
-      _                 <- replay(maxHeights)
-      sourceStateHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
-      targetStateHashes <- fetchBestWorldStateHashes(targetBlockFlow)
+      _                 <- from(init())
+      _                 <- replay()
+      sourceStateHashes <- from(fetchBestWorldStateHashes(sourceBlockFlow))
+      targetStateHashes <- from(fetchBestWorldStateHashes(targetBlockFlow))
     } yield sourceStateHashes == targetStateHashes
   }
 
-  private def replay(maxHeights: AVector[Int]): BlockValidationResult[Unit] = {
-    val startTs = TimeStamp.now()
-    var count   = loadedHeights.map(_ - 1).sum
-    var countTs = TimeStamp.now()
-    var result  = Right(()): BlockValidationResult[Unit]
+  private def replay(): BlockValidationResult[Unit] = {
+    var result = Right(()): BlockValidationResult[Unit]
 
-    while (pendingBlocks.nonEmpty && result.isRight) {
-      val (block, blockHeight) = pendingBlocks.dequeue()
+    while (blockQueue.nonEmpty && result.isRight) {
+      val (block, blockHeight) = blockQueue.dequeue()
       val chainIndex           = block.chainIndex
 
       var endValidationTs = TimeStamp.zero
@@ -71,79 +56,17 @@ class ReplayBlockFlow(
         _ <- from(targetBlockFlow.add(block, sideEffect)).map(_ =>
           endValidationTs = TimeStamp.now()
         )
-        _ <- loadMoreBlocks(chainIndex, maxHeights, blockHeight)
+        _ <- from(IOUtils.tryExecute(loadMoreBlocksUnsafe(chainIndex, blockHeight)))
       } yield ()
 
-      count += 1
-      if (count % 1000 == 0) {
-        val now           = TimeStamp.now()
-        val eclipsed      = now.deltaUnsafe(startTs).millis
-        val speed         = count * 1000 / eclipsed
-        val cycleEclipsed = now.deltaUnsafe(countTs).millis
-        val cycleSpeed    = 1000 * 1000 / cycleEclipsed
-        countTs = now
-        logger.info(s"Replayed #$count blocks, #$speed BPS, #$cycleSpeed cycle BPS")
+      replayedBlockCount += 1
+      if (replayedBlockCount % ReplayState.LogInterval == 0) {
+        val (speed, cycleSpeed) = calcSpeed()
+        logger.info(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS")
       }
     }
 
     result
-  }
-
-  private def loadMoreBlocks(
-      chainIndex: ChainIndex,
-      maxHeights: AVector[Int],
-      blockHeight: Int
-  ): BlockValidationResult[Unit] = {
-    val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
-    val shouldLoadMore =
-      loadedHeights(chainIndexOneDim) == blockHeight && blockHeight < maxHeights(
-        chainIndexOneDim
-      )
-
-    if (shouldLoadMore) {
-      from(
-        loadBlocksAt(chainIndex, blockHeight + 1).map(_ =>
-          loadedHeights(chainIndexOneDim) = blockHeight + 1
-        )
-      )
-    } else {
-      Right(())
-    }
-  }
-
-  private def loadBlocksAt(chainIndex: ChainIndex, height: Int): IOResult[Unit] = {
-    sourceBlockFlow.getHashes(chainIndex, height).map { hashes =>
-      require(
-        hashes.toArray.distinct.length == hashes.length,
-        s"Hashes from ${chainIndex} at height ${height} are not unique: ${hashes}"
-      )
-      hashes.foreach(blockHash =>
-        pendingBlocks.enqueue(sourceBlockFlow.getBlockUnsafe(blockHash) -> height)
-      )
-    }
-  }
-
-  private def fetchBestWorldStateHashes(
-      blockFlow: BlockFlow
-  ): BlockValidationResult[AVector[WorldState.Hashes]] = {
-    from(
-      blockFlow.brokerConfig.cliqueGroupIndexes.mapE { groupIndex =>
-        blockFlow.getBestPersistedWorldState(groupIndex).map(_.toHashes)
-      }
-    )
-  }
-
-  private def loadInitialBlocks(targetBlockFlow: BlockFlow): IOResult[Unit] = {
-    chainIndexes.foreachE { chainIndex =>
-      val chainIndexOneDim = chainIndex.flattenIndex(brokerConfig)
-      for {
-        height0 <- targetBlockFlow.getMaxHeightByWeight(chainIndex)
-        height = if (height0 > startLoadingHeight) height0 + 1 else startLoadingHeight
-        _ <- loadBlocksAt(chainIndex, height)
-      } yield {
-        loadedHeights(chainIndexOneDim) = height
-      }
-    }
   }
 
   private def from[T](result: IOResult[T]): BlockValidationResult[T] = {
