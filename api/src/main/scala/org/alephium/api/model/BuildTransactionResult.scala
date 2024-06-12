@@ -28,7 +28,6 @@ sealed trait BuildTransactionResult extends GasInfo with ChainIndexInfo {
 }
 
 object BuildTransactionResult {
-  @upickle.implicits.key("Transfer")
   final case class Transfer(
       unsignedTx: String,
       gasAmount: GasBox,
@@ -52,7 +51,6 @@ object BuildTransactionResult {
       )
   }
 
-  @upickle.implicits.key("ExecuteScript")
   final case class ExecuteScript(
       fromGroup: Int,
       toGroup: Int,
@@ -76,7 +74,6 @@ object BuildTransactionResult {
       )
   }
 
-  @upickle.implicits.key("DeployContract")
   final case class DeployContract(
       fromGroup: Int,
       toGroup: Int,

@@ -28,7 +28,6 @@ import org.alephium.util.AVector
 sealed trait BuildTransaction extends BuildTxCommon with BuildTxCommon.FromPublicKey
 
 object BuildTransaction {
-  @upickle.implicits.key("Transfer")
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Transfer(
       fromPublicKey: ByteString,
@@ -40,7 +39,6 @@ object BuildTransaction {
       targetBlockHash: Option[BlockHash] = None
   ) extends BuildTransaction
 
-  @upickle.implicits.key("ExecuteScript")
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class ExecuteScript(
       fromPublicKey: ByteString,
@@ -53,7 +51,6 @@ object BuildTransaction {
       targetBlockHash: Option[BlockHash] = None
   ) extends BuildTransaction
 
-  @upickle.implicits.key("DeployContract")
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class DeployContract(
       fromPublicKey: ByteString,

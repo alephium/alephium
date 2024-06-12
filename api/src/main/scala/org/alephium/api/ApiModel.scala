@@ -262,7 +262,33 @@ trait ApiModelCodec {
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
-  implicit val buildTransferTransactionRW: RW[BuildTransaction.Transfer] = macroRW
+
+  implicit val buildTransferTransactionRW: ReadWriter[BuildTransaction.Transfer] = {
+    readwriter[ujson.Value].bimap[BuildTransaction.Transfer](
+      transfer =>
+        dropNullValues(
+          ujson.Obj(
+            "fromPublicKey"     -> writeJs(transfer.fromPublicKey),
+            "fromPublicKeyType" -> writeJs(transfer.fromPublicKeyType),
+            "destinations"      -> writeJs(transfer.destinations),
+            "utxos"             -> writeJs(transfer.utxos),
+            "gasAmount"         -> writeJs(transfer.gasAmount),
+            "gasPrice"          -> writeJs(transfer.gasPrice),
+            "targetBlockHash"   -> writeJs(transfer.targetBlockHash)
+          )
+        ),
+      json =>
+        BuildTransaction.Transfer(
+          read[ByteString](json("fromPublicKey")),
+          readOpt[BuildTxCommon.PublicKeyType](json("fromPublicKeyType")),
+          read[AVector[Destination]](json("destinations")),
+          readOpt[AVector[OutputRef]](json("utxos")),
+          readOpt[GasBox](json("gasAmount")),
+          readOpt[GasPrice](json("gasPrice")),
+          readOpt[BlockHash](json("targetBlockHash"))
+        )
+    )
+  }
 
   implicit val buildMultiAddressesTransactionSourceRW: RW[BuildMultiAddressesTransaction.Source] =
     macroRW
@@ -273,7 +299,30 @@ trait ApiModelCodec {
 
   implicit val groupRW: RW[Group] = macroRW
 
-  implicit val buildTransferTransactionResultRW: RW[BuildTransactionResult.Transfer] = macroRW
+  implicit val buildTransferTransactionResultRW: RW[BuildTransactionResult.Transfer] = {
+    readwriter[ujson.Value].bimap[BuildTransactionResult.Transfer](
+      transfer =>
+        dropNullValues(
+          ujson.Obj(
+            "unsignedTx" -> writeJs(transfer.unsignedTx),
+            "gasAmount"  -> writeJs(transfer.gasAmount),
+            "gasPrice"   -> writeJs(transfer.gasPrice),
+            "txId"       -> writeJs(transfer.txId),
+            "fromGroup"  -> writeJs(transfer.fromGroup),
+            "toGroup"    -> writeJs(transfer.toGroup)
+          )
+        ),
+      json =>
+        BuildTransactionResult.Transfer(
+          read[String](json("unsignedTx")),
+          read[GasBox](json("gasAmount")),
+          read[GasPrice](json("gasPrice")),
+          read[TransactionId](json("txId")),
+          read[Int](json("fromGroup")),
+          read[Int](json("toGroup"))
+        )
+    )
+  }
 
   implicit val sweepAddressTransactionRW: RW[SweepAddressTransaction] = macroRW
 
@@ -288,16 +337,157 @@ trait ApiModelCodec {
   implicit val txStatusRW: RW[TxStatus] =
     RW.merge(macroRW[Confirmed], macroRW[MemPooled], macroRW[TxNotFound])
 
-  implicit val buildDeployContractTxRW: RW[BuildTransaction.DeployContract] = macroRW
+  implicit val buildDeployContractTxRW: ReadWriter[BuildTransaction.DeployContract] = {
+    readwriter[ujson.Value].bimap[BuildTransaction.DeployContract](
+      deployContract =>
+        dropNullValues(
+          ujson.Obj(
+            "fromPublicKey"         -> writeJs(deployContract.fromPublicKey),
+            "fromPublicKeyType"     -> writeJs(deployContract.fromPublicKeyType),
+            "bytecode"              -> writeJs(deployContract.bytecode),
+            "initialAttoAlphAmount" -> writeJs(deployContract.initialAttoAlphAmount),
+            "initialTokenAmounts"   -> writeJs(deployContract.initialTokenAmounts),
+            "issueTokenAmount"      -> writeJs(deployContract.issueTokenAmount),
+            "issueTokenTo"          -> writeJs(deployContract.issueTokenTo),
+            "gasAmount"             -> writeJs(deployContract.gasAmount),
+            "gasPrice"              -> writeJs(deployContract.gasPrice),
+            "targetBlockHash"       -> writeJs(deployContract.targetBlockHash)
+          )
+        ),
+      json =>
+        BuildTransaction.DeployContract(
+          read[ByteString](json("fromPublicKey")),
+          readOpt[BuildTxCommon.PublicKeyType](json("fromPublicKeyType")),
+          read[ByteString](json("bytecode")),
+          readOpt[Amount](json("initialAttoAlphAmount")),
+          readOpt[AVector[Token]](json("initialTokenAmounts")),
+          readOpt[Amount](json("issueTokenAmount")),
+          readOpt[Address.Asset](json("issueTokenTo")),
+          readOpt[GasBox](json("gasAmount")),
+          readOpt[GasPrice](json("gasPrice")),
+          readOpt[BlockHash](json("targetBlockHash"))
+        )
+    )
+  }
 
-  implicit val buildExecuteScriptTxRW: RW[BuildTransaction.ExecuteScript] = macroRW
+  implicit val buildExecuteScriptTxRW: RW[BuildTransaction.ExecuteScript] = {
+    readwriter[ujson.Value].bimap[BuildTransaction.ExecuteScript](
+      executeScript =>
+        dropNullValues(
+          ujson.Obj(
+            "fromPublicKey"     -> writeJs(executeScript.fromPublicKey),
+            "fromPublicKeyType" -> writeJs(executeScript.fromPublicKeyType),
+            "bytecode"          -> writeJs(executeScript.bytecode),
+            "attoAlphAmount"    -> writeJs(executeScript.attoAlphAmount),
+            "tokens"            -> writeJs(executeScript.tokens),
+            "gasAmount"         -> writeJs(executeScript.gasAmount),
+            "gasPrice"          -> writeJs(executeScript.gasPrice),
+            "targetBlockHash"   -> writeJs(executeScript.targetBlockHash)
+          )
+        ),
+      json =>
+        BuildTransaction.ExecuteScript(
+          read[ByteString](json("fromPublicKey")),
+          readOpt[BuildTxCommon.PublicKeyType](json("fromPublicKeyType")),
+          read[ByteString](json("bytecode")),
+          readOpt[Amount](json("attoAlphAmount")),
+          readOpt[AVector[Token]](json("tokens")),
+          readOpt[GasBox](json("gasAmount")),
+          readOpt[GasPrice](json("gasPrice")),
+          readOpt[BlockHash](json("targetBlockHash"))
+        )
+    )
+  }
 
-  implicit val buildDeployContractTxResultRW: RW[BuildTransactionResult.DeployContract] = macroRW
+  implicit val buildDeployContractTxResultRW: RW[BuildTransactionResult.DeployContract] = {
+    readwriter[ujson.Value].bimap[BuildTransactionResult.DeployContract](
+      deployContract =>
+        dropNullValues(
+          ujson.Obj(
+            "fromGroup"       -> writeJs(deployContract.fromGroup),
+            "toGroup"         -> writeJs(deployContract.toGroup),
+            "unsignedTx"      -> writeJs(deployContract.unsignedTx),
+            "gasAmount"       -> writeJs(deployContract.gasAmount),
+            "gasPrice"        -> writeJs(deployContract.gasPrice),
+            "txId"            -> writeJs(deployContract.txId),
+            "contractAddress" -> writeJs(deployContract.contractAddress)
+          )
+        ),
+      json =>
+        BuildTransactionResult.DeployContract(
+          read[Int](json("fromGroup")),
+          read[Int](json("toGroup")),
+          read[String](json("unsignedTx")),
+          read[GasBox](json("gasAmount")),
+          read[GasPrice](json("gasPrice")),
+          read[TransactionId](json("txId")),
+          read[Address.Contract](json("contractAddress"))
+        )
+    )
+  }
 
-  implicit val buildExecuteScriptTxResultRW: RW[BuildTransactionResult.ExecuteScript] = macroRW
+  implicit val buildExecuteScriptTxResultRW: RW[BuildTransactionResult.ExecuteScript] = {
+    readwriter[ujson.Value].bimap[BuildTransactionResult.ExecuteScript](
+      executeScript =>
+        dropNullValues(
+          ujson.Obj(
+            "fromGroup"  -> writeJs(executeScript.fromGroup),
+            "toGroup"    -> writeJs(executeScript.toGroup),
+            "unsignedTx" -> writeJs(executeScript.unsignedTx),
+            "gasAmount"  -> writeJs(executeScript.gasAmount),
+            "gasPrice"   -> writeJs(executeScript.gasPrice),
+            "txId"       -> writeJs(executeScript.txId)
+          )
+        ),
+      json =>
+        BuildTransactionResult.ExecuteScript(
+          read[Int](json("fromGroup")),
+          read[Int](json("toGroup")),
+          read[String](json("unsignedTx")),
+          read[GasBox](json("gasAmount")),
+          read[GasPrice](json("gasPrice")),
+          read[TransactionId](json("txId"))
+        )
+    )
+  }
 
-  implicit val buildTransactionRW: ReadWriter[BuildTransaction]             = macroRW
-  implicit val buildTransactionResultRW: ReadWriter[BuildTransactionResult] = macroRW
+  implicit val buildTransactionRW: ReadWriter[BuildTransaction] = {
+    readwriter[ujson.Value].bimap[BuildTransaction](
+      {
+        case transfer: BuildTransaction.Transfer =>
+          writeJs(transfer).obj += ("type" -> ujson.Str("Transfer"))
+        case executeScript: BuildTransaction.ExecuteScript =>
+          writeJs(executeScript).obj += ("type" -> ujson.Str("ExecuteScript"))
+        case deployContract: BuildTransaction.DeployContract =>
+          writeJs(deployContract).obj += ("type" -> ujson.Str("DeployContract"))
+      },
+      json =>
+        json("type").str match {
+          case "Transfer"       => read[BuildTransaction.Transfer](json)
+          case "ExecuteScript"  => read[BuildTransaction.ExecuteScript](json)
+          case "DeployContract" => read[BuildTransaction.DeployContract](json)
+        }
+    )
+  }
+
+  implicit val buildTransactionResultRW: ReadWriter[BuildTransactionResult] = {
+    readwriter[ujson.Value].bimap[BuildTransactionResult](
+      {
+        case transfer: BuildTransactionResult.Transfer =>
+          writeJs(transfer).obj += ("type" -> ujson.Str("Transfer"))
+        case executeScript: BuildTransactionResult.ExecuteScript =>
+          writeJs(executeScript).obj += ("type" -> ujson.Str("ExecuteScript"))
+        case deployContract: BuildTransactionResult.DeployContract =>
+          writeJs(deployContract).obj += ("type" -> ujson.Str("DeployContract"))
+      },
+      json =>
+        json("type").str match {
+          case "Transfer"       => read[BuildTransactionResult.Transfer](json)
+          case "ExecuteScript"  => read[BuildTransactionResult.ExecuteScript](json)
+          case "DeployContract" => read[BuildTransactionResult.DeployContract](json)
+        }
+    )
+  }
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 

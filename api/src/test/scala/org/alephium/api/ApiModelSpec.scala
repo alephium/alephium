@@ -373,18 +373,22 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
           None,
           AVector(Destination(toAddress, Amount(1)))
         )
-      val jsonRaw = s"""
-                       |{
-                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
-                       |  "destinations": [
-                       |    {
-                       |      "address": "${toAddress.toBase58}",
-                       |      "attoAlphAmount": "1"
-                       |    }
-                       |  ]
-                       |}
+      def jsonRaw(withType: Boolean) = {
+        val typ = if (withType) ""","type": "Transfer"""" else ""
+        s"""
+           |{
+           |  "fromPublicKey": "${fromPublicKey.toHexString}",
+           |  "destinations": [
+           |    {
+           |      "address": "${toAddress.toBase58}",
+           |      "attoAlphAmount": "1"
+           |    }
+           |  ]${typ}
+           |}
         """.stripMargin
-      checkData(transfer, jsonRaw)
+      }
+      checkData(transfer, jsonRaw(false))
+      checkData(transfer.asInstanceOf[BuildTransaction], jsonRaw(true))
     }
 
     {
@@ -667,9 +671,20 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
     val result   = BuildTransactionResult.Transfer("tx", gas, gasPrice, txId, 1, 2)
-    val jsonRaw =
-      s"""{"unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1", "txId":"${txId.toHexString}", "fromGroup":1,"toGroup":2}"""
-    checkData(result, jsonRaw)
+    def jsonRaw(withType: Boolean) = {
+      val typ = if (withType) ""","type": "Transfer"""" else ""
+      s"""
+         |{
+         |  "unsignedTx":"tx",
+         |  "gasAmount": 1,
+         |  "gasPrice": "1",
+         |  "txId":"${txId.toHexString}",
+         |  "fromGroup":1,
+         |  "toGroup":2${typ}
+         |}""".stripMargin
+    }
+    checkData(result, jsonRaw(false))
+    checkData(result.asInstanceOf[BuildTransactionResult], jsonRaw(true))
   }
 
   it should "encode/decode SweepAddressTransaction" in {
@@ -856,7 +871,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
-  it should "encode/decode BuildContract" in {
+  it should "encode/decode BuildContract.DeployContract" in {
     val publicKey = PublicKey.generate
     val buildDeployContractTx = BuildTransaction.DeployContract(
       fromPublicKey = publicKey.bytes,
@@ -865,17 +880,20 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1))
     )
-    val jsonRaw =
+    def jsonRaw(withType: Boolean) = {
+      val typ = if (withType) ""","type": "DeployContract"""" else ""
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
          |  "issueTokenAmount": "1",
          |  "gasAmount": 1,
-         |  "gasPrice": "1"
+         |  "gasPrice": "1"${typ}
          |}
          |""".stripMargin
-    checkData(buildDeployContractTx, jsonRaw)
+    }
+    checkData(buildDeployContractTx, jsonRaw(false))
+    checkData(buildDeployContractTx.asInstanceOf[BuildTransaction], jsonRaw(true))
   }
 
   it should "encode/decode BuildTransactionResult.DeployContract" in {
@@ -890,7 +908,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       txId = txId,
       contractAddress = Address.contract(contractId)
     )
-    val jsonRaw =
+    def jsonRaw(withType: Boolean) = {
+      val typ = if (withType) ""","type": "DeployContract"""" else ""
       s"""
          |{
          |  "fromGroup": 2,
@@ -899,10 +918,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasAmount":1,
          |  "gasPrice":"1",
          |  "txId": "${txId.toHexString}",
-         |  "contractAddress": "${Address.contract(contractId).toBase58}"
+         |  "contractAddress": "${Address.contract(contractId).toBase58}"${typ}
          |}
          |""".stripMargin
-    checkData(buildDeployContractTxResult, jsonRaw)
+    }
+    checkData(buildDeployContractTxResult, jsonRaw(false))
+    checkData(buildDeployContractTxResult.asInstanceOf[BuildTransactionResult], jsonRaw(true))
   }
 
   it should "encode/decode BuildScriptTx" in {
@@ -913,16 +934,19 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1))
     )
-    val jsonRaw =
+    def jsonRaw(withType: Boolean) = {
+      val typ = if (withType) ""","type": "ExecuteScript"""" else ""
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
          |  "gasAmount": 1,
-         |  "gasPrice": "1"
+         |  "gasPrice": "1"${typ}
          |}
          |""".stripMargin
-    checkData(buildExecuteScriptTx, jsonRaw)
+    }
+    checkData(buildExecuteScriptTx, jsonRaw(false))
+    checkData(buildExecuteScriptTx.asInstanceOf[BuildTransaction], jsonRaw(true))
   }
 
   it should "encode/decode BuildTransactionResult.ExecuteScript" in {
@@ -935,7 +959,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       gasPrice = GasPrice(1),
       txId = txId
     )
-    val jsonRaw =
+    def jsonRaw(withType: Boolean) = {
+      val typ = if (withType) ""","type": "ExecuteScript"""" else ""
       s"""
          |{
          |  "fromGroup": 1,
@@ -943,10 +968,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "unsignedTx": "0000",
          |  "gasAmount":1,
          |  "gasPrice":"1",
-         |  "txId": "${txId.toHexString}"
+         |  "txId": "${txId.toHexString}"${typ}
          |}
          |""".stripMargin
-    checkData(buildExecuteScriptTxResult, jsonRaw)
+    }
+    checkData(buildExecuteScriptTxResult, jsonRaw(false))
+    checkData(buildExecuteScriptTxResult.asInstanceOf[BuildTransactionResult], jsonRaw(true))
   }
 
   it should "encode/decode VerifySignature" in {
