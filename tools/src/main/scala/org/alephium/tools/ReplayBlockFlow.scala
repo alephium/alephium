@@ -36,11 +36,10 @@ class ReplayBlockFlow(
 
   def start(): BlockValidationResult[Boolean] = {
     for {
-      _                 <- from(init())
-      _                 <- replay()
-      sourceStateHashes <- from(fetchBestWorldStateHashes(sourceBlockFlow))
-      targetStateHashes <- from(fetchBestWorldStateHashes(targetBlockFlow))
-    } yield sourceStateHashes == targetStateHashes
+      _      <- from(init())
+      _      <- replay()
+      isSame <- from(isStateHashesSame)
+    } yield isSame
   }
 
   private def replay(): BlockValidationResult[Unit] = {

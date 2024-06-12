@@ -132,11 +132,8 @@ final class Replayer(
   }
 
   private def checkStateHashes(): IOResult[Unit] = {
-    for {
-      sourceHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
-      targetHashes <- fetchBestWorldStateHashes(targetBlockFlow)
-    } yield {
-      if (sourceHashes == targetHashes) {
+    isStateHashesSame.map { isSame =>
+      if (isSame) {
         log.info("Replay blocks succeeded")
       } else {
         log.error("All blocks replayed, but state hashes do not match")

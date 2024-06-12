@@ -21,7 +21,7 @@ import scala.collection.mutable.PriorityQueue
 import org.alephium.flow.core.BlockFlow
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex}
 import org.alephium.protocol.vm.WorldState
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -83,12 +83,27 @@ trait ReplayState {
     }
   }
 
-  final protected def fetchBestWorldStateHashes(
+  private def fetchBestWorldStateHashes(
       blockFlow: BlockFlow
   ): IOResult[AVector[WorldState.Hashes]] = {
     blockFlow.brokerConfig.cliqueGroupIndexes.mapE { groupIndex =>
       blockFlow.getBestPersistedWorldState(groupIndex).map(_.toHashes)
     }
+  }
+
+  private def updateTargetBlockFlowBestDeps(): IOResult[Unit] = {
+    IOUtils.tryExecute(brokerConfig.groupRange.foreach { mainGroup =>
+      val deps = targetBlockFlow.calBestDepsUnsafe(GroupIndex.unsafe(mainGroup)(brokerConfig))
+      targetBlockFlow.updateBestDeps(mainGroup, deps)
+    })
+  }
+
+  final protected def isStateHashesSame: IOResult[Boolean] = {
+    for {
+      _            <- updateTargetBlockFlowBestDeps()
+      sourceHashes <- fetchBestWorldStateHashes(sourceBlockFlow)
+      targetHashes <- fetchBestWorldStateHashes(targetBlockFlow)
+    } yield sourceHashes == targetHashes
   }
 
   @inline final protected def calcSpeed(): (Long, Long) = {
