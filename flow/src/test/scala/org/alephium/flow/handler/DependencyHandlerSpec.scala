@@ -19,13 +19,13 @@ package org.alephium.flow.handler
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
+import org.alephium.flow.core.{maxSyncBlocksPerChain}
+import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.setting.NetworkSetting
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
 
@@ -35,16 +35,11 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     lazy val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)
     lazy val origin      = DataOrigin.Local
 
-    lazy val stateActor = TestActorRef[DependencyHandlerState](
-      Props(
-        new DependencyHandlerState {
-          override def blockFlow: BlockFlow           = Self.blockFlow
-          override def networkSetting: NetworkSetting = Self.networkConfig
-          override def receive: Receive               = _ => ()
-        }
-      )
+    lazy val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
+    lazy val dependencyHandler = TestActorRef[DependencyHandler](
+      DependencyHandler.props(blockFlow, allHandlers.blockHandlers, allHandlers.headerHandlers)
     )
-    lazy val state = stateActor.underlyingActor
+    lazy val state = dependencyHandler.underlyingActor
 
     implicit class StatusWrapper(status: DependencyHandler.PendingStatus) {
       def extract(): (FlowData, ActorRefT[ChainHandler.Event], DataOrigin) = {
@@ -59,7 +54,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val blockFlow1 = isolatedBlockFlow()
 
     val block0 = mineFromMemPool(blockFlow1, ChainIndex.unsafe(0, 0))
-    state.addPendingData(block0, broker, origin)
+    state.addPendingData(block0, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(block0.hash).extract() is ((block0, broker, origin))
     state.missing.isEmpty is true
     state.missingIndex.isEmpty is true
@@ -69,8 +64,8 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     addAndCheck(blockFlow1, block0)
     val block1 = mineFromMemPool(blockFlow1, ChainIndex.unsafe(0, 0))
     val block2 = mineFromMemPool(blockFlow1, ChainIndex.unsafe(1, 1))
-    state.addPendingData(block1, broker, origin)
-    state.addPendingData(block2, broker, origin)
+    state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
+    state.addPendingData(block2, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(block1.hash).extract() is ((block1, broker, origin))
     state.pending.unsafe(block2.hash).extract() is ((block2, broker, origin))
     state.missing.keys.toSet is Set(block1.hash, block2.hash)
@@ -83,7 +78,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     addAndCheck(blockFlow1, block1)
     addAndCheck(blockFlow1, block2)
     val block3 = mineFromMemPool(blockFlow1, ChainIndex.unsafe(0, 0))
-    state.addPendingData(block3, broker, origin)
+    state.addPendingData(block3, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(block3.hash).extract() is ((block3, broker, origin))
     state.missing.keys.toSet is Set(block1.hash, block2.hash, block3.hash)
     state.missing(block3.hash).toSet is Set(block1.hash, block2.hash)
@@ -158,7 +153,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val blocks = (0 to n).map { _ =>
       brokerConfig.chainIndexes.map(mineFromMemPool(blockFlow1, _)).map { block =>
         addAndCheck(blockFlow1, block)
-        state.addPendingData(block, broker, origin)
+        state.addPendingData(block, broker, origin, ArrayBuffer.empty)
         block
       }
     }
@@ -184,8 +179,8 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     addAndCheck(blockFlow1, block0)
     val block1 = mineFromMemPool(blockFlow1, ChainIndex.unsafe(0, 0))
 
-    state.addPendingData(block1, broker, origin)
-    state.addPendingData(block0, broker, origin)
+    state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
+    state.addPendingData(block0, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(block0.hash).extract() is ((block0, broker, origin))
     state.pending.unsafe(block1.hash).extract() is ((block1, broker, origin))
     state.missing.keys.toSet is Set(block1.hash)
@@ -201,7 +196,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
 
     val block = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
     addAndCheck(blockFlow, block)
-    state.addPendingData(block, broker, origin)
+    state.addPendingData(block, broker, origin, ArrayBuffer.empty)
     state.pending.isEmpty is true
     state.missing.isEmpty is true
     state.missingIndex.isEmpty is true
@@ -213,12 +208,12 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val block = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
-    state.addPendingData(block, broker, origin)
+    state.addPendingData(block, broker, origin, ArrayBuffer.empty)
     state.extractReadies()
     state.readies.isEmpty is true
     state.processing.isEmpty is false
 
-    (0 until 10).foreach(_ => state.addPendingData(block, broker, origin))
+    (0 until 10).foreach(_ => state.addPendingData(block, broker, origin, ArrayBuffer.empty))
     state.readies.isEmpty is true
     state.processing.isEmpty is false
   }
@@ -232,15 +227,15 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val cacheSize = maxSyncBlocksPerChain * 2
     state.cacheSize is cacheSize
     val block0 = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
-    state.addPendingData(block0, broker, origin)
+    state.addPendingData(block0, broker, origin, ArrayBuffer.empty)
     state.pending.contains(block0.hash) is true
     (0 until cacheSize - 1).foreach { _ =>
       val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.unsecureRandom()))
-      state.addPendingData(block1, broker, origin)
+      state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
       state.pending.contains(block1.hash) is true
     }
     val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.unsecureRandom()))
-    state.addPendingData(block1, broker, origin)
+    state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
     state.pending.contains(block0.hash) is false
   }
 
@@ -255,14 +250,14 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val block0 = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
     val blocks = (0 until 10).map { _ =>
       val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.unsecureRandom()))
-      state.addPendingData(block1, broker, origin)
+      state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
       state.pending.contains(block1.hash) is true
       block1
     }
 
     eventually {
       val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.unsecureRandom()))
-      state.addPendingData(block1, broker, origin)
+      state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
       (state.pending.size < state.cacheSize / 2) is true // the cache should be far from being full
       state.pending.contains(block1.hash) is true
       blocks.foreach(block => state.pending.contains(block.hash) is false)
@@ -278,7 +273,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       block
     }
     blocks.foreach { block =>
-      state.addPendingData(block, broker, origin)
+      state.addPendingData(block, broker, origin, ArrayBuffer.empty)
       state.pending.contains(block.hash)
     }
     state.missing.contains(blocks(0).hash) is false
@@ -338,7 +333,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     main1.parentHash is main0.hash
     main1.ghostUncleHashes.rightValue is AVector(fork0.hash)
 
-    state.addPendingData(main1, broker, origin)
+    state.addPendingData(main1, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(main1.hash).extract() is (main1, broker, origin)
     state.missing.get(main1.hash) is Some(ArrayBuffer(main0.hash, fork0.hash))
     state.missingIndex.get(main0.hash) is Some(ArrayBuffer(main1.hash))
@@ -347,7 +342,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.processing.isEmpty is true
 
     // add block deps
-    state.addPendingData(main0, broker, origin)
+    state.addPendingData(main0, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(main0.hash).extract() is (main0, broker, origin)
     state.readies is mutable.HashSet(main0.hash)
     state.processing.isEmpty is true
@@ -358,7 +353,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.missing.get(main1.hash) is Some(ArrayBuffer(fork0.hash))
 
     // add ghost uncles
-    state.addPendingData(fork0, broker, origin)
+    state.addPendingData(fork0, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(fork0.hash).extract() is (fork0, broker, origin)
     state.readies is mutable.HashSet(fork0.hash, main0.hash)
     state.processing.isEmpty is true
@@ -379,15 +374,15 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val main2 = mineBlock(main1.hash, AVector(fork2.hash))
     addAndCheck(blockFlow0, main2)
 
-    state.addPendingData(main2, broker, origin)
+    state.addPendingData(main2, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(main2.hash).extract() is (main2, broker, origin)
     state.missing.get(main2.hash) is Some(ArrayBuffer(fork2.hash))
     state.missingIndex.get(fork2.hash) is Some(ArrayBuffer(main2.hash))
-    state.addPendingData(fork2, broker, origin)
+    state.addPendingData(fork2, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(fork2.hash).extract() is (fork2, broker, origin)
     state.missing.get(fork2.hash) is Some(ArrayBuffer(fork1.hash))
     state.missingIndex.get(fork1.hash) is Some(ArrayBuffer(fork2.hash))
-    state.addPendingData(fork1, broker, origin)
+    state.addPendingData(fork1, broker, origin, ArrayBuffer.empty)
     state.pending.unsafe(fork1.hash).extract() is (fork1, broker, origin)
     state.readies is mutable.HashSet(fork1.hash)
     state.uponDataProcessed(fork1)
@@ -400,5 +395,61 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.missingIndex.isEmpty is true
     state.extractReadies()
     state.readies.isEmpty is true
+  }
+
+  it should "download missing ghost uncles" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val miner      = getGenesisLockupScript(chainIndex.to)
+
+    def mineBlock(ghostUncles: AVector[SelectedGhostUncle]): Block = {
+      val template0 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val template1 = template0.setGhostUncles(ghostUncles)
+      val block     = mine(blockFlow, template1)
+      block.ghostUncleHashes.rightValue is ghostUncles.map(_.blockHash)
+      block
+    }
+
+    {
+      val uncleBlock  = emptyBlock(blockFlow, chainIndex)
+      val ghostUncles = AVector(SelectedGhostUncle(uncleBlock.hash, miner, 1))
+      val block       = mineBlock(ghostUncles)
+      brokerProbe.send(
+        dependencyHandler,
+        DependencyHandler.AddFlowData(AVector(uncleBlock, block), origin)
+      )
+      brokerProbe.expectNoMessage()
+    }
+
+    {
+      val uncleBlock = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, uncleBlock)
+      val ghostUncles = AVector(SelectedGhostUncle(uncleBlock.hash, miner, 1))
+      val block       = mineBlock(ghostUncles)
+      brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
+      brokerProbe.expectNoMessage()
+    }
+
+    {
+      val ghostUncles = AVector(SelectedGhostUncle(BlockHash.random, miner, 1))
+      val block       = mineBlock(ghostUncles)
+      state.readies.add(ghostUncles.head.blockHash)
+      brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
+      brokerProbe.expectNoMessage()
+    }
+
+    {
+      val ghostUncles = AVector(SelectedGhostUncle(BlockHash.random, miner, 1))
+      val block       = mineBlock(ghostUncles)
+      state.missing(ghostUncles.head.blockHash) = ArrayBuffer.empty
+      brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
+      brokerProbe.expectNoMessage()
+    }
+
+    {
+      val ghostUncles = AVector(SelectedGhostUncle(BlockHash.random, miner, 1))
+      val block       = mineBlock(ghostUncles)
+      brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
+      eventually(brokerProbe.expectMsg(BrokerHandler.DownloadBlocks(ghostUncles.map(_.blockHash))))
+    }
   }
 }
