@@ -25,7 +25,9 @@ import akka.actor.Props
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.io.IOResult
 import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
 import org.alephium.util.EventStream.Subscriber
@@ -67,8 +69,14 @@ class DependencyHandler(
 
   override def receive: Receive = {
     case AddFlowData(datas, origin) =>
-      val broker = ActorRefT[ChainHandler.Event](sender())
-      datas.foreach(addPendingData(_, broker, origin))
+      val broker        = ActorRefT[ChainHandler.Event](sender())
+      val missingUncles = ArrayBuffer.empty[BlockHash]
+      datas.foreach(addPendingData(_, broker, origin, missingUncles))
+      if (missingUncles.nonEmpty) {
+        ActorRefT[BrokerHandler.Command](sender()) ! BrokerHandler.DownloadBlocks(
+          AVector.from(missingUncles)
+        )
+      }
       processReadies()
     case ChainHandler.FlowDataAdded(data, _, _) =>
       uponDataProcessed(data)
@@ -126,35 +134,45 @@ trait DependencyHandlerState extends IOBaseActor {
   val readies      = mutable.HashSet.empty[BlockHash]
   val processing   = mutable.HashSet.empty[BlockHash]
 
-  private def getDeps(flowData: FlowData): AVector[BlockHash] = {
-    flowData match {
-      case header: BlockHeader => header.blockDeps.deps
+  private def getDeps(flowData: FlowData): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
+    val (deps, uncles) = flowData match {
+      case header: BlockHeader => (header.blockDeps.deps, AVector.empty[BlockHash])
       case block: Block =>
         val hardFork = networkSetting.getHardFork(block.timestamp)
         if (hardFork.isRhoneEnabled()) {
           block.ghostUncleHashes(networkSetting) match {
-            case Right(hashes) => block.blockDeps.deps ++ hashes
+            case Right(hashes) => (block.blockDeps.deps ++ hashes, hashes)
             case Left(error) =>
               log.error(s"Failed to deserialize uncles, error: $error")
-              AVector.empty
+              (AVector.empty[BlockHash], AVector.empty[BlockHash])
           }
         } else {
-          block.blockDeps.deps
+          (block.blockDeps.deps, AVector.empty[BlockHash])
         }
     }
+    deps.filterNotE(blockFlow.contains).map(_ -> uncles)
   }
 
   def addPendingData(
       data: FlowData,
       broker: ActorRefT[ChainHandler.Event],
-      origin: DataOrigin
+      origin: DataOrigin,
+      missingGhostUncles: ArrayBuffer[BlockHash]
   ): Unit = {
     if (!pending.contains(data.hash)) {
       escapeIOError(blockFlow.contains(data.hash)) { existing =>
         if (!existing) {
-          escapeIOError(getDeps(data).filterNotE(blockFlow.contains)) { missingDeps =>
+          escapeIOError(getDeps(data)) { case (missingDeps, uncles) =>
             if (missingDeps.nonEmpty) {
               missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
+            } else {
+              readies.addOne(data.hash)
+            }
+
+            if (uncles.nonEmpty) {
+              missingGhostUncles ++= uncles.filter(hash =>
+                missingDeps.contains(hash) && !(missing.contains(hash) || readies.contains(hash))
+              )
             }
 
             missingDeps.foreach { dep =>
@@ -163,8 +181,6 @@ trait DependencyHandlerState extends IOBaseActor {
                 case None           => missingIndex(dep) = ArrayBuffer(data.hash)
               }
             }
-
-            if (missingDeps.isEmpty) readies.addOne(data.hash)
           }
           // update this at the end of this function to avoid cache invalidation issues
           pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
