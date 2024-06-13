@@ -27,7 +27,7 @@ import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class DependencyHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture { Self =>
@@ -451,5 +451,25 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
       eventually(brokerProbe.expectMsg(BrokerHandler.DownloadBlocks(ghostUncles.map(_.blockHash))))
     }
+  }
+
+  it should "clean pending block hashes" in new Fixture {
+    override val configValues = Map(("alephium.network.dependency-expiry-period", "1s"))
+    config.network.dependencyExpiryPeriod is Duration.ofSecondsUnsafe(1)
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    state.addPendingData(block0, broker, origin, ArrayBuffer.empty)
+    val block1 = emptyBlock(blockFlow, chainIndex)
+    val ts     = TimeStamp.now().plusSecondsUnsafe(2)
+    state.pending.put(block1.hash, DependencyHandler.PendingStatus(block1, broker, origin, ts))
+    state.pending.size is 2
+
+    Thread.sleep(2000)
+    state.pending.contains(block0.hash) is false
+    state.pending.contains(block1.hash) is true
+
+    Thread.sleep(2000)
+    state.pending.isEmpty is true
   }
 }

@@ -20,6 +20,7 @@ import java.util.{LinkedHashMap, Map => JMap}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 import akka.actor.Props
 
@@ -44,6 +45,7 @@ object DependencyHandler {
   final case class AddFlowData[T <: FlowData](datas: AVector[T], origin: DataOrigin) extends Command
   final case class Invalid(data: BlockHash)                                          extends Command
   final case object GetPendings                                                      extends Command
+  case object CleanPendings                                                          extends Command
 
   sealed trait Event
   final case class Pendings(datas: AVector[BlockHash]) extends Event
@@ -65,7 +67,15 @@ class DependencyHandler(
     with Subscriber {
   import DependencyHandler._
 
-  subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
+  override def preStart(): Unit = {
+    super.preStart()
+    subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
+    scheduleOnce(
+      self,
+      DependencyHandler.CleanPendings,
+      networkSetting.dependencyExpiryPeriod.divUnsafe(2)
+    )
+  }
 
   override def receive: Receive = {
     case AddFlowData(datas, origin) =>
@@ -85,6 +95,14 @@ class DependencyHandler(
       uponInvalidData(hash)
     case GetPendings =>
       sender() ! Pendings(AVector.from(pending.keys()))
+    case CleanPendings =>
+      val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
+      cleanPendings(pending.entries(), threshold)
+      scheduleOnce(
+        self,
+        DependencyHandler.CleanPendings,
+        networkSetting.dependencyExpiryPeriod.divUnsafe(2)
+      )
   }
 
   def processReadies(): Unit = {
@@ -105,6 +123,23 @@ trait DependencyHandlerState extends IOBaseActor {
   def blockFlow: BlockFlow
   def networkSetting: NetworkSetting
 
+  def cleanPendings(
+      iterator: Iterator[JMap.Entry[BlockHash, PendingStatus]],
+      threshold: TimeStamp
+  ): Unit = {
+    val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
+    var continue = true
+    while (continue && iterator.hasNext) {
+      val entry = iterator.next()
+      if (entry.getValue().timestamp <= threshold) {
+        toRemove.addOne(entry.getKey())
+      } else {
+        continue = false
+      }
+    }
+    toRemove.foreach(removePending)
+  }
+
   val cacheSize =
     maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 2
   val pending = Cache.fifo[BlockHash, PendingStatus] {
@@ -114,18 +149,7 @@ trait DependencyHandlerState extends IOBaseActor {
       }
       val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
       if (eldest.getValue().timestamp <= threshold) {
-        val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
-        val iterator = map.entrySet().iterator()
-        var continue = true
-        while (continue && iterator.hasNext) {
-          val entry = iterator.next()
-          if (entry.getValue().timestamp <= threshold) {
-            toRemove.addOne(entry.getKey())
-          } else {
-            continue = false
-          }
-        }
-        toRemove.foreach(removePending)
+        cleanPendings(map.entrySet().iterator().asScala, threshold)
       }
   }
 
