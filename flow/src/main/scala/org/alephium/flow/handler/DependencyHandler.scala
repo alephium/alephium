@@ -20,12 +20,15 @@ import java.util.{LinkedHashMap, Map => JMap}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 import akka.actor.Props
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.io.IOResult
 import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
 import org.alephium.util.EventStream.Subscriber
@@ -42,6 +45,7 @@ object DependencyHandler {
   final case class AddFlowData[T <: FlowData](datas: AVector[T], origin: DataOrigin) extends Command
   final case class Invalid(data: BlockHash)                                          extends Command
   final case object GetPendings                                                      extends Command
+  case object CleanPendings                                                          extends Command
 
   sealed trait Event
   final case class Pendings(datas: AVector[BlockHash]) extends Event
@@ -63,12 +67,26 @@ class DependencyHandler(
     with Subscriber {
   import DependencyHandler._
 
-  subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
+  override def preStart(): Unit = {
+    super.preStart()
+    subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
+    scheduleOnce(
+      self,
+      DependencyHandler.CleanPendings,
+      networkSetting.dependencyExpiryPeriod.divUnsafe(2)
+    )
+  }
 
   override def receive: Receive = {
     case AddFlowData(datas, origin) =>
-      val broker = ActorRefT[ChainHandler.Event](sender())
-      datas.foreach(addPendingData(_, broker, origin))
+      val broker        = ActorRefT[ChainHandler.Event](sender())
+      val missingUncles = ArrayBuffer.empty[BlockHash]
+      datas.foreach(addPendingData(_, broker, origin, missingUncles))
+      if (missingUncles.nonEmpty) {
+        ActorRefT[BrokerHandler.Command](sender()) ! BrokerHandler.DownloadBlocks(
+          AVector.from(missingUncles)
+        )
+      }
       processReadies()
     case ChainHandler.FlowDataAdded(data, _, _) =>
       uponDataProcessed(data)
@@ -77,6 +95,14 @@ class DependencyHandler(
       uponInvalidData(hash)
     case GetPendings =>
       sender() ! Pendings(AVector.from(pending.keys()))
+    case CleanPendings =>
+      val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
+      cleanPendings(pending.entries(), threshold)
+      scheduleOnce(
+        self,
+        DependencyHandler.CleanPendings,
+        networkSetting.dependencyExpiryPeriod.divUnsafe(2)
+      )
   }
 
   def processReadies(): Unit = {
@@ -97,6 +123,23 @@ trait DependencyHandlerState extends IOBaseActor {
   def blockFlow: BlockFlow
   def networkSetting: NetworkSetting
 
+  def cleanPendings(
+      iterator: Iterator[JMap.Entry[BlockHash, PendingStatus]],
+      threshold: TimeStamp
+  ): Unit = {
+    val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
+    var continue = true
+    while (continue && iterator.hasNext) {
+      val entry = iterator.next()
+      if (entry.getValue().timestamp <= threshold) {
+        toRemove.addOne(entry.getKey())
+      } else {
+        continue = false
+      }
+    }
+    toRemove.foreach(removePending)
+  }
+
   val cacheSize =
     maxSyncBlocksPerChain * blockFlow.brokerConfig.chainNum * 2
   val pending = Cache.fifo[BlockHash, PendingStatus] {
@@ -106,18 +149,7 @@ trait DependencyHandlerState extends IOBaseActor {
       }
       val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
       if (eldest.getValue().timestamp <= threshold) {
-        val toRemove = mutable.ArrayBuffer.empty[BlockHash] // not able to remove by the iterator
-        val iterator = map.entrySet().iterator()
-        var continue = true
-        while (continue && iterator.hasNext) {
-          val entry = iterator.next()
-          if (entry.getValue().timestamp <= threshold) {
-            toRemove.addOne(entry.getKey())
-          } else {
-            continue = false
-          }
-        }
-        toRemove.foreach(removePending)
+        cleanPendings(map.entrySet().iterator().asScala, threshold)
       }
   }
 
@@ -126,45 +158,54 @@ trait DependencyHandlerState extends IOBaseActor {
   val readies      = mutable.HashSet.empty[BlockHash]
   val processing   = mutable.HashSet.empty[BlockHash]
 
-  private def getDeps(flowData: FlowData): AVector[BlockHash] = {
-    flowData match {
-      case header: BlockHeader => header.blockDeps.deps
+  private def getDeps(flowData: FlowData): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
+    val (deps, uncles) = flowData match {
+      case header: BlockHeader => (header.blockDeps.deps, AVector.empty[BlockHash])
       case block: Block =>
         val hardFork = networkSetting.getHardFork(block.timestamp)
         if (hardFork.isRhoneEnabled()) {
           block.ghostUncleHashes(networkSetting) match {
-            case Right(hashes) => block.blockDeps.deps ++ hashes
+            case Right(hashes) => (block.blockDeps.deps ++ hashes, hashes)
             case Left(error) =>
               log.error(s"Failed to deserialize uncles, error: $error")
-              AVector.empty
+              (AVector.empty[BlockHash], AVector.empty[BlockHash])
           }
         } else {
-          block.blockDeps.deps
+          (block.blockDeps.deps, AVector.empty[BlockHash])
         }
     }
+    deps.filterNotE(blockFlow.contains).map(_ -> uncles)
   }
 
   def addPendingData(
       data: FlowData,
       broker: ActorRefT[ChainHandler.Event],
-      origin: DataOrigin
+      origin: DataOrigin,
+      missingGhostUncles: ArrayBuffer[BlockHash]
   ): Unit = {
     if (!pending.contains(data.hash)) {
       escapeIOError(blockFlow.contains(data.hash)) { existing =>
         if (!existing) {
-          escapeIOError(getDeps(data).filterNotE(blockFlow.contains)) { missingDeps =>
+          escapeIOError(getDeps(data)) { case (missingDeps, uncles) =>
             if (missingDeps.nonEmpty) {
               missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
-            }
 
-            missingDeps.foreach { dep =>
-              missingIndex.get(dep) match {
-                case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
-                case None           => missingIndex(dep) = ArrayBuffer(data.hash)
+              if (uncles.nonEmpty) {
+                missingGhostUncles ++= uncles.filter(hash =>
+                  missingDeps.contains(hash) && !(missing.contains(hash) || readies.contains(hash))
+                )
               }
-            }
 
-            if (missingDeps.isEmpty) readies.addOne(data.hash)
+              missingDeps.foreach { dep =>
+                missingIndex.get(dep) match {
+                  case Some(children) =>
+                    if (!children.contains(data.hash)) children.addOne(data.hash)
+                  case None => missingIndex(dep) = ArrayBuffer(data.hash)
+                }
+              }
+            } else {
+              readies.addOne(data.hash)
+            }
           }
           // update this at the end of this function to avoid cache invalidation issues
           pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
