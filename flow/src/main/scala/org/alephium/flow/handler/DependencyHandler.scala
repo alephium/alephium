@@ -165,21 +165,22 @@ trait DependencyHandlerState extends IOBaseActor {
           escapeIOError(getDeps(data)) { case (missingDeps, uncles) =>
             if (missingDeps.nonEmpty) {
               missing(data.hash) = ArrayBuffer.from(missingDeps.toIterable)
+
+              if (uncles.nonEmpty) {
+                missingGhostUncles ++= uncles.filter(hash =>
+                  missingDeps.contains(hash) && !(missing.contains(hash) || readies.contains(hash))
+                )
+              }
+
+              missingDeps.foreach { dep =>
+                missingIndex.get(dep) match {
+                  case Some(children) =>
+                    if (!children.contains(data.hash)) children.addOne(data.hash)
+                  case None => missingIndex(dep) = ArrayBuffer(data.hash)
+                }
+              }
             } else {
               readies.addOne(data.hash)
-            }
-
-            if (uncles.nonEmpty) {
-              missingGhostUncles ++= uncles.filter(hash =>
-                missingDeps.contains(hash) && !(missing.contains(hash) || readies.contains(hash))
-              )
-            }
-
-            missingDeps.foreach { dep =>
-              missingIndex.get(dep) match {
-                case Some(children) => if (!children.contains(data.hash)) children.addOne(data.hash)
-                case None           => missingIndex(dep) = ArrayBuffer(data.hash)
-              }
             }
           }
           // update this at the end of this function to avoid cache invalidation issues
