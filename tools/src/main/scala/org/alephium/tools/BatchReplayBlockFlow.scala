@@ -118,7 +118,7 @@ final class Replayer(
 
   private def replayUnsafe(): Unit = {
     val blocks = ArrayBuffer.empty[Block]
-    while (blockQueue.nonEmpty && blocks.length < pendingCapacity) {
+    while (blockQueue.nonEmpty && blocks.length < 5) {
       val (block, blockHeight) = blockQueue.dequeue()
       val chainIndex           = block.chainIndex
       blocks.addOne(block)
