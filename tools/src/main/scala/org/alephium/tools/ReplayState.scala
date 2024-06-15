@@ -38,7 +38,8 @@ trait ReplayState {
 
   protected val blockQueue =
     PriorityQueue.empty(Ordering.by[(Block, Int), TimeStamp](t => t._1.timestamp).reverse)
-  protected var replayedBlockCount: Int = 0
+  protected var replayedBlockCount: Long = 0
+  protected var loadedBlockCount: Long   = 0
 
   private val startTs = TimeStamp.now()
   private var countTs = TimeStamp.now()
@@ -57,7 +58,10 @@ trait ReplayState {
           loadedHeights(chainIndexOneDim) = height
         }
       }
-      .map(_ => replayedBlockCount = loadedHeights.map(_ - 1).sum)
+      .map { _ =>
+        replayedBlockCount = loadedHeights.map(_ - 1).sum.toLong
+        loadedBlockCount = replayedBlockCount
+      }
   }
 
   private def loadBlocksAtUnsafe(chainIndex: ChainIndex, height: Int): Unit = {
@@ -109,7 +113,7 @@ trait ReplayState {
   @inline final protected def calcSpeed(): (Long, Long) = {
     val now           = TimeStamp.now()
     val eclipsed      = now.deltaUnsafe(startTs).millis
-    val speed         = replayedBlockCount * 1000 / eclipsed
+    val speed         = (replayedBlockCount - loadedBlockCount) * 1000L / eclipsed
     val cycleEclipsed = now.deltaUnsafe(countTs).millis
     val cycleSpeed    = ReplayState.LogInterval * 1000 / cycleEclipsed
     countTs = now

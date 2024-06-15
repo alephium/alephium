@@ -154,6 +154,13 @@ akka {
       throughput = 1
     }
 
+    default-dispatcher {
+      fork-join-executor {
+        parallelism-min = 16
+        parallelism-factor = 1.0
+      }
+    }
+
     guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
   }
 
