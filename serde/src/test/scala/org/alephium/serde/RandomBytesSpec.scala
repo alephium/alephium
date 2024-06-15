@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.crypto
+package org.alephium.serde
 
 import akka.util.ByteString
-import org.bouncycastle.crypto.Digest
-import org.bouncycastle.crypto.digests.SHA3Digest
 
-import org.alephium.serde.RandomBytes
+import org.alephium.util.AlephiumSpec
 
-class Sha3(val bytes: ByteString) extends RandomBytes {
-  def length: Int = Sha3.length
-}
-
-object Sha3 extends BCHashSchema[Sha3](HashSchema.unsafeSha3, _.bytes) {
-  def length: Int = 32
-
-  def provider(): Digest = new SHA3Digest()
+class RandomBytesSpec extends AlephiumSpec {
+  it should "compare random bytes" in {
+    val zeros = ByteString.fromArrayUnsafe(Array.fill(32)(0))
+    RandomBytes.equals(32, zeros, 32, zeros) is true
+    (0 until 32).foreach { k =>
+      val onlyOne = Array.fill(32)(0.toByte)
+      onlyOne(k) = 1.toByte
+      RandomBytes.equals(32, zeros, 32, ByteString.fromArrayUnsafe(onlyOne)) is false
+    }
+  }
 }

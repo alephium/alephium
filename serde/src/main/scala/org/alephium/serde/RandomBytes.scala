@@ -23,30 +23,28 @@ import akka.util.ByteString
 import org.alephium.util.{Bytes, Hex, SecureAndSlowRandom}
 
 trait RandomBytes extends Any {
+  def length: Int
   def bytes: ByteString
 
-  def last: Byte = bytes(bytes.size - 1)
+  def last: Byte = bytes(length - 1)
 
   def beforeLast: Byte = {
-    val size = bytes.size
-    assume(size >= 2)
-    bytes(size - 2)
+    assume(length >= 2)
+    bytes(length - 2)
   }
 
   override def hashCode(): Int = {
-    val size = bytes.size
+    assume(length >= 4)
 
-    assume(size >= 4)
-
-    (bytes(size - 4) & 0xff) << 24 |
-      (bytes(size - 3) & 0xff) << 16 |
-      (bytes(size - 2) & 0xff) << 8 |
-      (bytes(size - 1) & 0xff)
+    (bytes(length - 4) & 0xff) << 24 |
+      (bytes(length - 3) & 0xff) << 16 |
+      (bytes(length - 2) & 0xff) << 8 |
+      (bytes(length - 1) & 0xff)
   }
 
   override def equals(obj: Any): Boolean =
     obj match {
-      case that: RandomBytes => bytes == that.bytes
+      case that: RandomBytes => RandomBytes.equals(this.length, this.bytes, that.length, that.bytes)
       case _                 => false
     }
 
@@ -104,5 +102,17 @@ object RandomBytes {
     }
 
     implicit val serde: Serde[T] = Serde.bytesSerde(length).xmap(unsafe, toBytes)
+  }
+
+  @inline def equals(aLen: Int, a: ByteString, bLen: Int, b: ByteString): Boolean = {
+    var equal = aLen == bLen
+    if (equal) {
+      var index = aLen - 1
+      while (index >= 0 && equal) {
+        equal = a(index) == b(index)
+        index -= 1
+      }
+    }
+    equal
   }
 }

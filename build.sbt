@@ -177,7 +177,7 @@ lazy val app = mainProject("app")
       val alephiumHome = "/alephium-home"
 
       new Dockerfile {
-        from("eclipse-temurin:17-jre")
+        from("eclipse-temurin:21-jre")
 
         // Uncomment the next line and comment the previous one if you want to use GraalVM instead of OpenJDK
         // from("ghcr.io/graalvm/graalvm-ce:java11-21.0.0.2")

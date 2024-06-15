@@ -22,6 +22,8 @@ import org.bouncycastle.crypto.digests.Blake3Digest
 import org.alephium.serde.RandomBytes
 
 class Blake3(val bytes: ByteString) extends RandomBytes {
+  def length: Int = Blake3.length
+
   def toByte32: Byte32 = Byte32.unsafe(bytes)
 }
 
