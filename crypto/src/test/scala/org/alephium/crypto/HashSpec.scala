@@ -29,6 +29,7 @@ class HashSpec extends AlephiumSpec {
     provider.getClass.getSimpleName should "hash correctly" in {
       for ((message, expected) <- tests) {
         val output = provider.hash(message)
+        output.length is 32
         output.bytes is expected
       }
     }

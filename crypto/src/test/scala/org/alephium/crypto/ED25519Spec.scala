@@ -38,6 +38,11 @@ class ED25519Spec extends AlephiumSpec {
         val (_, pk2)   = ED25519.secureGeneratePriPub()
         val signature  = ED25519.sign(message1, sk1)
 
+        sk1.length is 32
+        pk1.length is 32
+        pk2.length is 32
+        signature.length is 64
+
         ED25519.verify(message1, signature, pk1) is true
         ED25519.verify(message2, signature, pk1) is false
         ED25519.verify(message1, signature, pk2) is false

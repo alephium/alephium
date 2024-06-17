@@ -126,6 +126,10 @@ class SecP256K1Spec extends AlephiumSpec {
       val messageHash             = Blake2b.generate.bytes
       val signature               = SecP256K1.sign(messageHash, privateKey)
 
+      privateKey.length is 32
+      publicKey.length is 33
+      signature.length is 64
+
       val expected = publicKey.toEthAddress()
       expected.length is 20
 
