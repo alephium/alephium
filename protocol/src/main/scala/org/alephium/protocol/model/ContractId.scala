@@ -25,6 +25,8 @@ import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes
 
 final case class ContractId private (value: Hash) extends AnyVal with RandomBytes {
+  def length: Int = ContractId.length
+
   def bytes: ByteString = value.bytes
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))

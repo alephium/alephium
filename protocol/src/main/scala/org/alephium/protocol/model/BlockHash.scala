@@ -22,6 +22,8 @@ import org.alephium.crypto.{Blake3, HashUtils}
 import org.alephium.serde.{RandomBytes, Serde}
 
 final case class BlockHash private (value: Blake3) extends AnyVal with RandomBytes {
+  def length: Int = BlockHash.length
+
   def bytes: ByteString = value.bytes
 }
 

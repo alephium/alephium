@@ -30,6 +30,8 @@ import org.alephium.util.U256
 //scalastyle:off magic.number
 
 class BIP340SchnorrPrivateKey(val bytes: ByteString) extends PrivateKey {
+  def length: Int = BIP340SchnorrPrivateKey.length
+
   private def getBigInt() = new BigInteger(1, bytes.toArray)
 
   def publicKey: BIP340SchnorrPublicKey = {
@@ -47,7 +49,9 @@ object BIP340SchnorrPrivateKey
   override def length: Int = 32
 }
 
-class BIP340SchnorrPublicKey(val bytes: ByteString) extends PublicKey
+class BIP340SchnorrPublicKey(val bytes: ByteString) extends PublicKey {
+  def length: Int = BIP340SchnorrPublicKey.length
+}
 
 object BIP340SchnorrPublicKey
     extends RandomBytes.Companion[BIP340SchnorrPublicKey](
@@ -60,7 +64,9 @@ object BIP340SchnorrPublicKey
   override def length: Int = 32
 }
 
-class BIP340SchnorrSignature(val bytes: ByteString) extends Signature
+class BIP340SchnorrSignature(val bytes: ByteString) extends Signature {
+  def length: Int = BIP340SchnorrSignature.length
+}
 
 object BIP340SchnorrSignature
     extends RandomBytes.Companion[BIP340SchnorrSignature](

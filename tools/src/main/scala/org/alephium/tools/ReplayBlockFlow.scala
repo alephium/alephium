@@ -61,7 +61,7 @@ class ReplayBlockFlow(
       replayedBlockCount += 1
       if (replayedBlockCount % ReplayState.LogInterval == 0) {
         val (speed, cycleSpeed) = calcSpeed()
-        logger.info(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS")
+        print(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS\n")
       }
     }
 
@@ -97,7 +97,7 @@ object ReplayBlockFlow extends App with StrictLogging {
   new ReplayBlockFlow(sourceBlockFlow, targetBlockFlow).start() match {
     case Right(valid) =>
       if (valid) {
-        logger.info("Replay blocks succeeded")
+        print("Replay blocks succeeded\n")
       } else {
         logger.error("All blocks replayed, but state hashes do not match")
       }

@@ -38,6 +38,10 @@ class BIP340SchnorrSpec extends AlephiumSpec {
       val result     = parts(6) == "TRUE"
 
       privateKey.foreach { privateKey =>
+        privateKey.length is 32
+        publicKey.length is 32
+        signature.length is 64
+
         privateKey.publicKey is publicKey
         BIP340Schnorr.sign(
           message.bytes.toArrayUnsafe(),

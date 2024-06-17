@@ -22,7 +22,9 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 
 import org.alephium.serde.RandomBytes
 
-class Sha256(val bytes: ByteString) extends RandomBytes
+class Sha256(val bytes: ByteString) extends RandomBytes {
+  def length: Int = Sha256.length
+}
 
 object Sha256 extends BCHashSchema[Sha256](HashSchema.unsafeSha256, _.bytes) {
   def length: Int = 32

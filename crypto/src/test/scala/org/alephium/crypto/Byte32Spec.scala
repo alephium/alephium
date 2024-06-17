@@ -42,6 +42,7 @@ class Byte32Spec extends AlephiumSpec {
 
   it should "serde Byte32" in {
     val b32 = Byte32.from(ByteString.fromArrayUnsafe(Array.fill[Byte](32)(1))).get
+    b32.length is 32
     deserialize[Byte32](serialize(b32)) isE b32
   }
 }

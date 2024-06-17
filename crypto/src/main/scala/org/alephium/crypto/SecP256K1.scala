@@ -34,6 +34,8 @@ import org.alephium.serde.RandomBytes
 //scalastyle:off magic.number
 
 class SecP256K1PrivateKey(val bytes: ByteString) extends PrivateKey {
+  def length: Int = SecP256K1PrivateKey.length
+
   private def getBigInt() = new BigInteger(1, bytes.toArray)
 
   def isZero: Boolean = {
@@ -72,6 +74,8 @@ object SecP256K1PrivateKey
 
 // public key should be compressed, but the format is not checked until signature verification
 class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
+  def length: Int = SecP256K1PublicKey.length
+
   def unsafePoint: ECPoint = SecP256K1.point(bytes)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -92,7 +96,9 @@ object SecP256K1PublicKey
   override def length: Int = 33
 }
 
-class SecP256K1Signature(val bytes: ByteString) extends Signature
+class SecP256K1Signature(val bytes: ByteString) extends Signature {
+  def length: Int = SecP256K1Signature.length
+}
 
 object SecP256K1Signature
     extends RandomBytes.Companion[SecP256K1Signature](

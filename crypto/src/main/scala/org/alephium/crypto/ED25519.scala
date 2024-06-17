@@ -24,6 +24,8 @@ import org.bouncycastle.math.ec.rfc8032.{Ed25519 => bcEd25519}
 import org.alephium.serde.RandomBytes
 
 class ED25519PrivateKey(val bytes: ByteString) extends PrivateKey {
+  def length: Int = ED25519PrivateKey.length
+
   def publicKey: ED25519PublicKey = {
     val privateBytes = bytes.toArray
     val publicBytes  = Array.ofDim[Byte](bcEd25519.PUBLIC_KEY_SIZE)
@@ -44,6 +46,8 @@ object ED25519PrivateKey
 }
 
 class ED25519PublicKey(val bytes: ByteString) extends PublicKey {
+  def length: Int = ED25519PublicKey.length
+
   def toByte32: Byte32 = Byte32.unsafe(bytes)
 }
 
@@ -58,7 +62,9 @@ object ED25519PublicKey
   override def length: Int = bcEd25519.PUBLIC_KEY_SIZE
 }
 
-class ED25519Signature(val bytes: ByteString) extends Signature
+class ED25519Signature(val bytes: ByteString) extends Signature {
+  def length: Int = ED25519Signature.length
+}
 
 object ED25519Signature
     extends RandomBytes.Companion[ED25519Signature](

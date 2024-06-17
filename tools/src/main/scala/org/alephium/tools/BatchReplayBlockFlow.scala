@@ -134,7 +134,7 @@ final class Replayer(
   private def checkStateHashes(): IOResult[Unit] = {
     isStateHashesSame.map { isSame =>
       if (isSame) {
-        log.info("Replay blocks succeeded")
+        print("Replay blocks succeeded\n")
       } else {
         log.error("All blocks replayed, but state hashes do not match")
       }
@@ -152,7 +152,7 @@ final class Replayer(
       replayedBlockCount += 1
       if (replayedBlockCount % ReplayState.LogInterval == 0) {
         val (speed, cycleSpeed) = calcSpeed()
-        log.info(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS")
+        print(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS\n")
       }
       pendingBlocks -= 1
       if (pendingBlocks < pendingCapacity) {
