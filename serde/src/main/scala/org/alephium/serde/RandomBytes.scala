@@ -107,10 +107,10 @@ object RandomBytes {
   @inline def equals(aLen: Int, a: ByteString, bLen: Int, b: ByteString): Boolean = {
     var equal = aLen == bLen
     if (equal) {
-      var index = aLen - 1
-      while (index >= 0 && equal) {
+      var index = 0
+      while (index < aLen && equal) {
         equal = a(index) == b(index)
-        index -= 1
+        index += 1
       }
     }
     equal

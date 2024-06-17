@@ -43,8 +43,12 @@ class HashSpec extends AlephiumSpec {
 
     it should "compute hashCode correctly" in {
       for ((message, inHex) <- tests) {
-        val output  = BigInt(provider.hash(message).hashCode())
-        val expcted = BigInt(inHex.takeRight(4).toArray)
+        val output = BigInt(provider.hash(message).hashCode())
+        val expcted = if (provider != Blake3) {
+          BigInt(inHex.takeRight(4).toArray)
+        } else {
+          BigInt(inHex.dropRight(2).takeRight(4).toArray)
+        }
         output is expcted
       }
     }
