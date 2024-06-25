@@ -353,8 +353,7 @@ class TxUtilsSpec extends AlephiumSpec {
       fixedOutputs.head.amount is ALPH.alph(amountPerOutput + rest)
       fixedOutputs.tail.foreach(_.amount is ALPH.alph(amountPerOutput))
 
-      val gasEstimation =
-        GasEstimation.estimateWithP2PKHInputs(nbOfInputs, nbOfOutputs + nbOfInputs)
+      val gasEstimation = estimateWithDifferentP2PKHInputs(nbOfInputs, nbOfOutputs + nbOfInputs)
 
       utx.gasAmount <= gasEstimation is true
 
@@ -365,6 +364,12 @@ class TxUtilsSpec extends AlephiumSpec {
       changeOutputs.toSeq.distinct.length <= 2 is true
 
       validateSubmit(utx, privateKeys)
+    }
+
+    def estimateWithDifferentP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
+      val inputGas =
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas).mulUnsafe(numInputs)
+      GasEstimation.estimate(inputGas, numOutputs)
     }
   }
 
@@ -983,7 +988,7 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    tx0.gasAmount is GasBox.unsafe(2192360)
+    tx0.gasAmount is GasBox.unsafe(1667060)
     tx0.inputs.length is maxP2PKHInputsAllowedByGas
     tx0.fixedOutputs.length is 256
 
@@ -999,7 +1004,7 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    tx1.gasAmount is GasBox.unsafe(2192360)
+    tx1.gasAmount is GasBox.unsafe(1667060)
     tx1.inputs.length is maxP2PKHInputsAllowedByGas
     tx1.fixedOutputs.length is 256
   }
@@ -1266,16 +1271,16 @@ class TxUtilsSpec extends AlephiumSpec {
       inputIndex += inputSize
     }
 
-    (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
+    (utx.gasAmount > GasEstimation.estimateWithSameP2PKHInputs(
       nbOfInputs,
       nbOfOutputs + nbOfInputs
     )) is true
-    (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
+    (utx.gasAmount > GasEstimation.estimateWithSameP2PKHInputs(
       (1 to nbOfInputs).sum - 1,
       nbOfOutputs + nbOfInputs
     )) is true
 
-    (utx.gasAmount <= GasEstimation.estimateWithP2PKHInputs(
+    (utx.gasAmount <= estimateWithDifferentP2PKHInputs(
       (1 to nbOfInputs).sum,
       nbOfOutputs + nbOfInputs
     )) is true
@@ -1375,8 +1380,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
 
-    val gasEstimation =
-      GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+    val gasEstimation = estimateWithDifferentP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
     utx.gasAmount <= gasEstimation is true
 
     utx.inputs.length is nbOfInputs + 1 // for the extra utxos of first pub key
@@ -1464,7 +1468,7 @@ class TxUtilsSpec extends AlephiumSpec {
         .foreach(_.tokens is AVector.empty[(TokenId, U256)])
 
       val gasEstimation =
-        GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+        estimateWithDifferentP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
 
       utx.gasAmount <= gasEstimation is true
 

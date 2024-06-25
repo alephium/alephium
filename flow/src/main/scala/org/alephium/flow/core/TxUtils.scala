@@ -624,7 +624,7 @@ trait TxUtils { Self: FlowUtils =>
 
         val changeOutputLength = 1 + changeTokenOutputs
         val outGas             = GasSchedule.txOutputBaseGas.mulUnsafe(changeOutputLength)
-        val inGas              = GasEstimation.gasForP2PKHInputs(selected.assets.length)
+        val inGas              = GasEstimation.gasForSameP2PKHInputs(selected.assets.length)
         val inOutGas           = inGas.addUnsafe(outGas)
 
         (input, selected.copy(gas = inOutGas), selected.gas)

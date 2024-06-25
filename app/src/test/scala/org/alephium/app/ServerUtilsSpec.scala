@@ -653,7 +653,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromLockupScript    = LockupScript.p2pkh(fromPublicKey)
       val outputLockupScripts = fromLockupScript +: destinations.map(_.address.lockupScript)
       val defaultGas =
-        GasEstimation.estimateWithP2PKHInputs(outputRefs.length, outputLockupScripts.length)
+        GasEstimation.estimateWithSameP2PKHInputs(outputRefs.length, outputLockupScripts.length)
       val defaultGasFee = nonCoinbaseMinGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
     }
