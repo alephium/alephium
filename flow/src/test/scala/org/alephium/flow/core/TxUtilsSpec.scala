@@ -381,18 +381,18 @@ class TxUtilsSpec extends AlephiumSpec {
       AVector(output1)
     }
 
-    noException should be thrownBy {
-      UnsignedTransaction
-        .buildTransferTx(
-          fromLockupScript,
-          fromUnlockScript,
-          inputs,
-          outputs,
-          minimalGas,
-          nonCoinbaseMinGasPrice
-        )
-        .rightValue
-    }
+    val unsignedTx = UnsignedTransaction
+      .buildTransferTx(
+        fromLockupScript,
+        fromUnlockScript,
+        inputs,
+        outputs,
+        minimalGas,
+        nonCoinbaseMinGasPrice
+      )
+      .rightValue
+    unsignedTx.inputs.head.unlockScript is fromUnlockScript
+    unsignedTx.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
   }
 
   it should "fail without enough ALPH" in new UnsignedTransactionFixture {
@@ -476,6 +476,8 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
 
     unsignedTx.fixedOutputs.length is 8
+    unsignedTx.inputs.head.unlockScript is fromUnlockScript
+    unsignedTx.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
 
     info("verify change output")
     unsignedTx.fixedOutputs(5).amount is dustUtxoAmount
@@ -1254,6 +1256,15 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
+    utx.inputs.length is 10
+    var inputIndex = 0
+    publicKeys.foreachWithIndex { case (pubKey, index) =>
+      val inputSize     = index + 1
+      val inputsFromKey = utx.inputs.slice(inputIndex, inputIndex + inputSize)
+      inputsFromKey.head.unlockScript is UnlockScript.p2pkh(pubKey)
+      inputsFromKey.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
+      inputIndex += inputSize
+    }
 
     (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
       nbOfInputs,
@@ -1635,7 +1646,7 @@ class TxUtilsSpec extends AlephiumSpec {
         approvedAlph: U256,
         approvedTokens: (TokenId, U256)*
     ) = {
-      UnsignedTransaction
+      val result = UnsignedTransaction
         .buildScriptTx(
           script,
           fromLockupScript,
@@ -1646,6 +1657,12 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
+      result.foreach { tx =>
+        tx.inputs.length is inputs.length
+        tx.inputs.head.unlockScript is fromUnlockScript
+        tx.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
+      }
+      result
     }
   }
 
