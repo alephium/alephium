@@ -20,14 +20,14 @@ import org.alephium.protocol.vm.GasBox
 
 final case class GasEstimationMultiplier private (value: Double) extends AnyVal {
   def *(gas: GasBox): GasBox = {
-    val denominator = math.pow(10, GasEstimationMultiplier.MaxPrecision.toDouble).toInt
-    val numerator   = (value * denominator).toInt
-    GasBox.unsafe(gas.value * numerator / denominator)
+    val numerator = (value * GasEstimationMultiplier.Denominator).toInt
+    GasBox.unsafe(gas.value * numerator / GasEstimationMultiplier.Denominator)
   }
 }
 
 object GasEstimationMultiplier {
   private val MaxPrecision = 2
+  private val Denominator  = math.pow(10, GasEstimationMultiplier.MaxPrecision.toDouble).toInt
 
   def from(multiplier: Option[Double]): Either[String, Option[GasEstimationMultiplier]] = {
     multiplier match {
