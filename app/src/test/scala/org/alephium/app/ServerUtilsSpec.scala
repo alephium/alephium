@@ -3520,33 +3520,26 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "estimate gas using gas estimation multiplier" in new ContractFixture {
     val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
     val (privateKey, publicKey)                  = chainIndex.from.generateKey
-    val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(10))
-    addAndCheck(blockFlow, block)
+    (0 to 10).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
+      addAndCheck(blockFlow, block)
+    }
 
     val foo =
       s"""
-         |Contract Foo(mut bytes: ByteVec, mut firstTime: Bool) {
-         |  mapping[ByteVec, U256] map
-         |
-         |  @using(preapprovedAssets = true, updateFields = true, checkExternalCaller = false)
+         |Contract Foo(mut bytes: ByteVec) {
          |  pub fn foo() -> () {
-         |    let count = if (firstTime) 1 else 2
-         |    firstTime = false
-         |    let caller = callerAddress!()
-         |    for (let mut i = 0; i < count; i = i + 1) {
-         |      bytes = bytes ++ #00
-         |      map.insert!(caller, bytes, 0)
-         |    }
+         |    bytes = bytes ++ #00
          |  }
          |}
          |""".stripMargin
 
     val (_, fooId) =
-      createContract(foo, AVector[vm.Val](vm.Val.ByteVec(ByteString.empty), vm.Val.True))
+      createContract(foo, AVector[vm.Val](vm.Val.ByteVec(ByteString.empty)))
     val script =
       s"""
          |TxScript Main {
-         |  Foo(#${fooId.toHexString}).foo{callerAddress!() -> ALPH: 1 alph}()
+         |  Foo(#${fooId.toHexString}).foo()
          |}
          |$foo
          |""".stripMargin
@@ -3558,7 +3551,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildExecuteScriptTx(
           fromPublicKey = publicKey.bytes,
           bytecode = scriptBytecode,
-          attoAlphAmount = Some(Amount(ALPH.oneAlph))
+          attoAlphAmount = Some(Amount(ALPH.alph(10)))
         )
       )
       .rightValue
@@ -3568,8 +3561,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildExecuteScriptTx(
           fromPublicKey = publicKey.bytes,
           bytecode = scriptBytecode,
-          attoAlphAmount = Some(Amount(ALPH.oneAlph)),
-          gasEstimationMultiplier = Some(1.8)
+          attoAlphAmount = Some(Amount(ALPH.alph(10))),
+          gasEstimationMultiplier = Some(1.01)
         )
       )
       .rightValue
