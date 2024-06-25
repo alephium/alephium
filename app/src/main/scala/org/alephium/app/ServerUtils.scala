@@ -992,7 +992,8 @@ class ServerUtils(implicit
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[UnsignedTransaction] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
@@ -1003,7 +1004,8 @@ class ServerUtils(implicit
         fromLockupScript,
         fromUnlockScript,
         gas,
-        gasPrice
+        gasPrice,
+        gasEstimationMultiplier
       )
       unsignedTx <- wrapError {
         val inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
@@ -1030,7 +1032,8 @@ class ServerUtils(implicit
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[Selected] = {
     val result = tryBuildSelectedUtxos(
       blockFlow,
@@ -1040,7 +1043,8 @@ class ServerUtils(implicit
       fromLockupScript,
       fromUnlockScript,
       gas,
-      gasPrice
+      gasPrice,
+      gasEstimationMultiplier
     )
 
     result match {
@@ -1058,7 +1062,8 @@ class ServerUtils(implicit
             fromLockupScript,
             fromUnlockScript,
             Some(res.gas),
-            gasPrice
+            gasPrice,
+            None
           )
         } else {
           Right(res)
@@ -1075,7 +1080,8 @@ class ServerUtils(implicit
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[Selected] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
     val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
@@ -1083,7 +1089,9 @@ class ServerUtils(implicit
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
-          .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
+          .Build(
+            ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
+          )
           .select(
             AssetAmounts(amount, tokens),
             fromUnlockScript,
@@ -1135,7 +1143,8 @@ class ServerUtils(implicit
         lockPair._1,
         lockPair._2,
         query.gasAmount,
-        query.gasPrice
+        query.gasPrice,
+        None
       )
     } yield BuildDeployContractTxResult.from(utx)
   }
@@ -1178,6 +1187,8 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
     for {
+      _          <- query.check().left.map(badRequest)
+      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
       amounts <- BuildTxCommon
         .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
         .left
@@ -1194,7 +1205,8 @@ class ServerUtils(implicit
         lockPair._1,
         lockPair._2,
         query.gasAmount,
-        query.gasPrice
+        query.gasPrice,
+        multiplier
       )
     } yield BuildExecuteScriptTxResult.from(utx)
   }
