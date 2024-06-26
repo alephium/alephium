@@ -28,7 +28,7 @@ import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
-import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
@@ -206,7 +206,7 @@ class ServerUtils(implicit
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
       query: BuildTransaction.Transfer,
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
       lockPair <- query.getLockPair()
@@ -219,7 +219,7 @@ class ServerUtils(implicit
         query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash,
-        extraUtxos
+        extraUtxosInfo
       )
     } yield unsignedTx
   }
@@ -228,10 +228,10 @@ class ServerUtils(implicit
   def buildTransferTransaction(
       blockFlow: BlockFlow,
       query: BuildTransaction.Transfer,
-      extraUtxos: AVector[AssetOutputInfo] = AVector.empty
+      extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildTransactionResult.Transfer] = {
     for {
-      unsignedTx <- buildTransferUnsignedTransaction(blockFlow, query, extraUtxos)
+      unsignedTx <- buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
     } yield BuildTransactionResult.Transfer.from(unsignedTx)
   }
 
@@ -266,7 +266,7 @@ class ServerUtils(implicit
         query.gas,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
     } yield {
       BuildTransactionResult.Transfer.from(unsignedTx)
@@ -771,7 +771,7 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash],
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
@@ -784,7 +784,7 @@ class ServerUtils(implicit
       gasOpt,
       gasPrice,
       targetBlockHashOpt,
-      extraUtxos
+      extraUtxosInfo
     )
   }
 
@@ -798,7 +798,7 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash],
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -827,7 +827,7 @@ class ServerUtils(implicit
           gasOpt,
           gasPrice,
           apiConfig.defaultUtxosLimit,
-          extraUtxos
+          extraUtxosInfo
         )
     }
 
@@ -902,7 +902,7 @@ class ServerUtils(implicit
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash],
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     prepareUnsignedTransaction(
       blockFlow,
@@ -913,7 +913,7 @@ class ServerUtils(implicit
       gasOpt,
       gasPrice,
       targetBlockHashOpt,
-      extraUtxos
+      extraUtxosInfo
     )
   }
 
@@ -1014,7 +1014,7 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
@@ -1026,7 +1026,7 @@ class ServerUtils(implicit
         fromUnlockScript,
         gas,
         gasPrice,
-        extraUtxos
+        extraUtxosInfo
       )
       unsignedTx <- wrapError {
         val inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
@@ -1054,7 +1054,7 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[Selected] = {
     val result = tryBuildSelectedUtxos(
       blockFlow,
@@ -1065,7 +1065,7 @@ class ServerUtils(implicit
       fromUnlockScript,
       gas,
       gasPrice,
-      extraUtxos
+      extraUtxosInfo
     )
     result match {
       case Right(res) =>
@@ -1083,7 +1083,7 @@ class ServerUtils(implicit
             fromUnlockScript,
             Some(res.gas),
             gasPrice,
-            extraUtxos
+            extraUtxosInfo
           )
         } else {
           Right(res)
@@ -1101,20 +1101,19 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[Selected] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
     val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
     for {
       utxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
-      allUtxos = extraUtxos ++ utxos
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
           .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
           .select(
             AssetAmounts(amount, tokens),
             fromUnlockScript,
-            allUtxos,
+            extraUtxosInfo.merge(utxos),
             txOutputsLength = estimatedTxOutputsLength,
             Some(script),
             AssetScriptGasEstimator.Default(blockFlow),
@@ -1127,7 +1126,7 @@ class ServerUtils(implicit
   def buildDeployContractUnsignedTx(
       blockFlow: BlockFlow,
       query: BuildTransaction.DeployContract,
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     val hardfork = blockFlow.networkConfig.getHardFork(TimeStamp.now())
     for {
@@ -1163,7 +1162,7 @@ class ServerUtils(implicit
         lockPair._2,
         query.gasAmount,
         query.gasPrice,
-        extraUtxos
+        extraUtxosInfo
       )
     } yield utx
   }
@@ -1172,10 +1171,10 @@ class ServerUtils(implicit
   def buildDeployContractTx(
       blockFlow: BlockFlow,
       query: BuildTransaction.DeployContract,
-      extraUtxos: AVector[AssetOutputInfo] = AVector.empty
+      extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildTransactionResult.DeployContract] = {
     for {
-      utx <- buildDeployContractUnsignedTx(blockFlow, query, extraUtxos)
+      utx <- buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
     } yield BuildTransactionResult.DeployContract.from(utx)
   }
 
@@ -1184,22 +1183,22 @@ class ServerUtils(implicit
       buildTransactionRequests: AVector[BuildTransaction]
   ): Try[AVector[BuildTransactionResult]] = {
     val buildResults = buildTransactionRequests.foldE(
-      (AVector.empty[BuildTransactionResult], AVector.empty[AssetOutputInfo])
-    ) { case ((buildTransactionResults, assetOutputInfos), buildTransactionRequest) =>
+      (AVector.empty[BuildTransactionResult], ExtraUtxosInfo.empty)
+    ) { case ((buildTransactionResults, extraUtxosInfo), buildTransactionRequest) =>
       for {
         keyPair <- buildTransactionRequest.getLockPair()
-        (utxosForThisLockupScript, restOfUtxos) = assetOutputInfos.partition(
+        (newUtxosForThisLockupScript, restOfUtxos) = extraUtxosInfo.newUtxos.partition(
           _.output.lockupScript == keyPair._1
         )
         buildResult <- buildGenericTransaction(
           blockFlow,
           buildTransactionRequest,
-          utxosForThisLockupScript
+          extraUtxosInfo.copy(newUtxos = newUtxosForThisLockupScript)
         )
-        (buildTransactionResult, updatedAssetOutputInfos) = buildResult
+        (buildTransactionResult, updatedExtraUtxosInfo) = buildResult
       } yield (
         buildTransactionResults :+ buildTransactionResult,
-        updatedAssetOutputInfos ++ restOfUtxos
+        updatedExtraUtxosInfo.copy(newUtxos = updatedExtraUtxosInfo.newUtxos ++ restOfUtxos)
       )
     }
 
@@ -1209,44 +1208,53 @@ class ServerUtils(implicit
   def buildGenericTransaction(
       blockFlow: BlockFlow,
       buildTransaction: BuildTransaction,
-      extraUtxos: AVector[AssetOutputInfo]
-  ): Try[(BuildTransactionResult, AVector[AssetOutputInfo])] = {
+      extraUtxosInfo: ExtraUtxosInfo
+  ): Try[(BuildTransactionResult, ExtraUtxosInfo)] = {
     buildTransaction match {
       case buildTransfer: BuildTransaction.Transfer =>
         for {
-          unsignedTx <- buildTransferUnsignedTransaction(blockFlow, buildTransfer, extraUtxos)
+          unsignedTx <- buildTransferUnsignedTransaction(blockFlow, buildTransfer, extraUtxosInfo)
         } yield (
           BuildTransactionResult.Transfer.from(unsignedTx),
-          updateUtxosWithUnsignedTx(extraUtxos, unsignedTx)
+          updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
       case buildExecuteScript: BuildTransaction.ExecuteScript =>
         for {
-          unsignedTx <- buildExecuteScriptUnsignedTx(blockFlow, buildExecuteScript, extraUtxos)
+          unsignedTx <- buildExecuteScriptUnsignedTx(blockFlow, buildExecuteScript, extraUtxosInfo)
         } yield (
           BuildTransactionResult.ExecuteScript.from(unsignedTx),
-          updateUtxosWithUnsignedTx(extraUtxos, unsignedTx)
+          updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
       case buildDeployContract: BuildTransaction.DeployContract =>
         for {
-          unsignedTx <- buildDeployContractUnsignedTx(blockFlow, buildDeployContract, extraUtxos)
+          unsignedTx <- buildDeployContractUnsignedTx(
+            blockFlow,
+            buildDeployContract,
+            extraUtxosInfo
+          )
         } yield (
           BuildTransactionResult.DeployContract.from(unsignedTx),
-          updateUtxosWithUnsignedTx(extraUtxos, unsignedTx)
+          updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
     }
   }
 
-  def updateUtxosWithUnsignedTx(
-      utxos: AVector[AssetOutputInfo],
+  def updateExtraUtxosInfoWithUnsignedTx(
+      extraUtxosInfo: ExtraUtxosInfo,
       unsignedTx: UnsignedTransaction
-  ): AVector[AssetOutputInfo] = {
-    val notSpentUtxos = utxos.filterNot(utxo => unsignedTx.inputs.exists(_.outputRef == utxo))
-    val newUtxos = unsignedTx.fixedOutputs.mapWithIndex { (txOutput, index) =>
+  ): ExtraUtxosInfo = {
+    val remainingNewUtxos = extraUtxosInfo.newUtxos.filterNot { utxo =>
+      unsignedTx.inputs.exists(_.outputRef == utxo.ref)
+    }
+    val newUtxosFromTx = unsignedTx.fixedOutputs.mapWithIndex { (txOutput, index) =>
       val txOutputRef = AssetOutputRef.from(txOutput, TxOutputRef.key(unsignedTx.id, index))
       AssetOutputInfo(txOutputRef, txOutput, MemPoolOutput)
     }
 
-    notSpentUtxos ++ newUtxos
+    extraUtxosInfo.copy(
+      newUtxos = remainingNewUtxos ++ newUtxosFromTx,
+      spentUtxos = extraUtxosInfo.spentUtxos ++ unsignedTx.inputs.map(_.outputRef)
+    )
   }
 
   def getInitialAttoAlphAmount(amountOption: Option[U256], hardfork: HardFork): Try[U256] = {
@@ -1285,7 +1293,7 @@ class ServerUtils(implicit
   def buildExecuteScriptUnsignedTx(
       blockFlow: BlockFlow,
       query: BuildTransaction.ExecuteScript,
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
       amounts <- BuildTxCommon
@@ -1305,7 +1313,7 @@ class ServerUtils(implicit
         lockPair._2,
         query.gasAmount,
         query.gasPrice,
-        extraUtxos
+        extraUtxosInfo
       )
     } yield utx
   }
@@ -1314,10 +1322,10 @@ class ServerUtils(implicit
   def buildExecuteScriptTx(
       blockFlow: BlockFlow,
       query: BuildTransaction.ExecuteScript,
-      extraUtxos: AVector[AssetOutputInfo] = AVector.empty
+      extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildTransactionResult.ExecuteScript] = {
     for {
-      utx <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxos)
+      utx <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
     } yield BuildTransactionResult.ExecuteScript.from(utx)
   }
 

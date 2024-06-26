@@ -19,6 +19,7 @@ package org.alephium.flow.gasestimation
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
@@ -356,7 +357,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         None,
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
   }

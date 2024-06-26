@@ -94,7 +94,7 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice,
       utxosLimit: Int,
       txOutputLength: Int,
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UtxoSelectionAlgo.Selected]] = {
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
@@ -103,7 +103,7 @@ trait TxUtils { Self: FlowUtils =>
           .select(
             AssetAmounts(totalAmount, totalAmountPerToken),
             fromUnlockScript,
-            utxos ++ extraUtxos,
+            extraUtxosInfo.merge(utxos),
             txOutputLength,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
@@ -201,7 +201,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxoLimit: Int,
-      extraUtxos: AVector[AssetOutputInfo] = AVector.empty
+      extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): IOResult[Either[String, UnsignedTransaction]] = {
     transfer(
       fromPublicKey,
@@ -209,7 +209,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt,
       gasPrice,
       utxoLimit,
-      extraUtxos
+      extraUtxosInfo
     )
   }
 
@@ -219,7 +219,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxoLimit: Int,
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
@@ -231,7 +231,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt,
       gasPrice,
       utxoLimit,
-      extraUtxos
+      extraUtxosInfo
     )
   }
 
@@ -341,7 +341,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int,
-      extraUtxos: AVector[AssetOutputInfo]
+      extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
@@ -362,7 +362,7 @@ trait TxUtils { Self: FlowUtils =>
           gasPrice,
           utxosLimit,
           txOutputLength,
-          extraUtxos
+          extraUtxosInfo
         ).map { utxoSelectionResult =>
           for {
             selected <- utxoSelectionResult
@@ -525,7 +525,7 @@ trait TxUtils { Self: FlowUtils =>
           gasPrice,
           utxosLimit,
           txOutputLength,
-          AVector.empty
+          ExtraUtxosInfo.empty
         ).map(_.map { selected =>
           AssetOutputInfoWithGas(
             selected.assets.map(asset => (asset.ref, asset.output)),

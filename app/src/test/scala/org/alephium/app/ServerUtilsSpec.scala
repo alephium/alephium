@@ -28,7 +28,8 @@ import org.alephium.api.ApiError
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{AMMContract, BlockFlow}
+import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol._
@@ -518,7 +519,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           None,
           nonCoinbaseMinGasPrice,
           targetBlockHash,
-          AVector.empty
+          ExtraUtxosInfo.empty
         )
         .rightValue
     }
@@ -561,7 +562,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = None,
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
 
@@ -627,7 +628,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           gasOpt = Some(minimalGas),
           nonCoinbaseMinGasPrice,
           targetBlockHashOpt = None,
-          AVector.empty
+          ExtraUtxosInfo.empty
         )
         .rightValue
     }
@@ -648,7 +649,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = None,
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
 
@@ -720,7 +721,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Not enough balance"
@@ -743,7 +744,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Selected UTXOs are not from the same group"
@@ -759,7 +760,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Empty UTXOs"
@@ -780,7 +781,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(GasBox.unsafe(100)),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Provided gas GasBox(100) too small, minimal GasBox(20000)"
@@ -795,7 +796,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(GasBox.unsafe(5000001)),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Provided gas GasBox(5000001) too large, maximal GasBox(5000000)"
@@ -816,7 +817,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         GasPrice(coinbaseGasPrice.value - 1),
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
@@ -831,7 +832,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         GasPrice(ALPH.MaxALPHValue),
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
@@ -851,7 +852,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "ALPH amount overflow"
@@ -872,7 +873,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is s"Amount overflow for token $tokenId"
@@ -892,7 +893,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         gasOpt = Some(minimalGas),
         nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"
@@ -3697,6 +3698,56 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.isBlockInMainChain(blockFlow, block.hash).rightValue is true
     serverUtils.isBlockInMainChain(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+  }
+
+  "ServerUtils.updateExtraUtxosInfoWithUnsignedTx" should "update UTXO info" in new Fixture
+    with TxGenerators {
+
+    val chainIndex  = ChainIndex.unsafe(0, 0)
+    val serverUtils = new ServerUtils()
+
+    {
+      info("Empty extraUtxosInfo")
+
+      val assetInfos = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+      val unsignedTx = unsignedTxGen(chainIndex)(assetInfos).sample.value
+
+      val extraUtxosInfo = ExtraUtxosInfo.empty
+      val updatedExtraUtxosInfo =
+        serverUtils.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+      updatedExtraUtxosInfo.newUtxos.map(_.output) is unsignedTx.fixedOutputs
+      updatedExtraUtxosInfo.spentUtxos is unsignedTx.inputs.map(_.outputRef)
+    }
+
+    {
+      info("Non-empty extraUtxosInfo")
+
+      val assetInfos   = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+      val unsignedTx   = unsignedTxGen(chainIndex)(assetInfos).sample.value
+      val assetOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
+
+      val utxoRefToBeSpent = unsignedTx.inputs(0).outputRef
+      val utxoToBeSpent    = AssetOutputInfo(utxoRefToBeSpent, assetOutputs(0), MemPoolOutput)
+      val restOfUtxos = assetOutputs.tail.map { assetOutput =>
+        val txInputRef = assetOutputRefGen(chainIndex.from).sample.value
+        AssetOutputInfo(txInputRef, assetOutput, MemPoolOutput)
+      }
+
+      val alreadySpentUtxos =
+        AVector.from(Gen.nonEmptyListOf(assetOutputRefGen(chainIndex.from)).sample.value)
+
+      val extraUtxosInfo = ExtraUtxosInfo(
+        newUtxos = utxoToBeSpent +: restOfUtxos,
+        spentUtxos = alreadySpentUtxos
+      )
+
+      val updatedExtraUtxosInfo =
+        serverUtils.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+      updatedExtraUtxosInfo.newUtxos
+        .filterNot(_.ref == utxoToBeSpent)
+        .map(_.output) is restOfUtxos.map(_.output) ++ unsignedTx.fixedOutputs
+      updatedExtraUtxosInfo.spentUtxos is alreadySpentUtxos ++ unsignedTx.inputs.map(_.outputRef)
+    }
   }
 
   @scala.annotation.tailrec

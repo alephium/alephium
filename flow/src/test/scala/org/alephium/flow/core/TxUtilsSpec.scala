@@ -22,6 +22,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
@@ -121,7 +122,7 @@ class TxUtilsSpec extends AlephiumSpec {
         Some(minimalGas),
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue
@@ -995,7 +996,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue
@@ -1193,7 +1194,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         nonCoinbaseMinGasPrice,
         Int.MaxValue,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue

@@ -23,7 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
-import org.alephium.flow.core.{BlockFlow, FlowUtils}
+import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -204,7 +204,7 @@ trait FlowFixture
         None,
         gasPrice,
         defaultUtxoLimit,
-        AVector.empty
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue
@@ -253,7 +253,7 @@ trait FlowFixture
           Some(gasAmount),
           nonCoinbaseMinGasPrice,
           defaultUtxoLimit,
-          AVector.empty
+          ExtraUtxosInfo.empty
         )
         .rightValue
         .rightValue
