@@ -25,10 +25,12 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
+import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.flow.validation.{InvalidBlockVersion, InvalidTxsMerkleRoot}
+import org.alephium.flow.validation._
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
-import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{Block, BlockHeader, BrokerInfo, ChainIndex, CliqueId, NetworkId}
 import org.alephium.serde.serialize
 import org.alephium.util.ActorRefT
 
@@ -39,10 +41,11 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     val dataOrigin          = DataOrigin.InterClique(brokerInfo): DataOrigin
     val interCliqueListener = TestProbe()
     val intraCliqueListener = TestProbe()
+    val maxForkDepth        = 5
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
     lazy val blockChainHandler =
       TestActorRef[BlockChainHandler](
-        BlockChainHandler.props(blockFlow, chainIndex, ActorRefT(TestProbe().ref))
+        BlockChainHandler.props(blockFlow, chainIndex, ActorRefT(TestProbe().ref), maxForkDepth)
       )
 
     system.eventStream.subscribe(
@@ -165,7 +168,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
       blockMsg(invalidBlock),
       dataOrigin
     )
-    blockFlow.getHeaderVerifiedBlock(invalidBlock.hash) isE invalidBlock
+    blockFlow.getHeaderVerifiedBlockBytes(invalidBlock.hash) isE serialize(invalidBlock)
     blockFlow.getBlock(invalidBlock.hash).isLeft is true
     interCliqueListener.expectMsg(interCliqueMessage)
     intraCliqueListener.expectNoMessage()
@@ -211,5 +214,66 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
       )
     )
     intraCliqueListener.expectNoMessage()
+  }
+
+  it should "publish misbehavior when receiving deep forked blocks from remote" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val invalidForkedBlock = emptyBlock(blockFlow, chainIndex)
+    val listener           = TestProbe()
+    val blockChain         = blockFlow.getBlockChain(chainIndex)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    blockChain.maxHeightByWeightUnsafe is 2
+    val validForkedBlock = emptyBlock(blockFlow, chainIndex)
+    (0 until maxForkDepth).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+    blockChain.maxHeightByWeightUnsafe is (2 + maxForkDepth)
+
+    val brokerProbe = TestProbe()
+    val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)
+    blockChainHandler ! BlockChainHandler.Validate(validForkedBlock, broker, dataOrigin)
+    eventually {
+      blockChain.contains(validForkedBlock) isE true
+      brokerProbe.expectMsg(BlockChainHandler.BlockAdded(validForkedBlock.hash))
+    }
+
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    blockChainHandler ! BlockChainHandler.Validate(invalidForkedBlock, broker, dataOrigin)
+    eventually {
+      brokerProbe.expectMsg(
+        BlockChainHandler.InvalidBlock(invalidForkedBlock.hash, InvalidBlockHeight)
+      )
+      listener.expectMsg(MisbehaviorManager.DeepForkBlock(brokerInfo.address))
+    }
+
+    blockChainHandler ! BlockChainHandler.Validate(invalidForkedBlock, broker, DataOrigin.Local)
+    eventually {
+      brokerProbe.expectMsg(
+        BlockChainHandler.InvalidBlock(invalidForkedBlock.hash, InvalidBlockHeight)
+      )
+      listener.expectNoMessage()
+    }
+  }
+
+  it should "not broadcast block if the testnet miner is invalid" in new Fixture {
+    override val configValues = Map(
+      ("alephium.network.network-id", 1),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 0)
+    )
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+    blockChainHandler ! InterCliqueManager.SyncedResult(true)
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    ALPH.testnetWhitelistedMiners.contains(block.minerLockupScript) is false
+
+    val brokerProbe = TestProbe()
+    val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)
+
+    blockChainHandler ! BlockChainHandler.Validate(block, broker, dataOrigin)
+    interCliqueListener.expectNoMessage()
+    eventually {
+      brokerProbe.expectMsg(BlockChainHandler.InvalidBlock(block.hash, InvalidTestnetMiner))
+    }
   }
 }

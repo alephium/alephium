@@ -25,7 +25,9 @@ import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.MiningSetting
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.flow.validation.InvalidTestnetMiner
+import org.alephium.protocol.ALPH
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.serde.deserialize
@@ -121,6 +123,29 @@ object Miner extends LazyLogging {
         }
     }
   }
+
+  @inline def validateTestnetMiners(
+      minersOpt: Option[AVector[Address.Asset]]
+  )(implicit network: NetworkConfig): Either[String, Unit] = {
+    minersOpt match {
+      case Some(miners) => validateTestnetMiners(miners)
+      case None         => Right(())
+    }
+  }
+
+  @inline def validateTestnetMiners(
+      miners: AVector[Address.Asset]
+  )(implicit network: NetworkConfig): Either[String, Unit] = {
+    if (network.networkId == NetworkId.AlephiumTestNet) {
+      if (ALPH.isTestnetMinersWhitelisted(miners)) {
+        Right(())
+      } else {
+        Left(InvalidTestnetMiner.toString)
+      }
+    } else {
+      Right(())
+    }
+  }
 }
 
 trait Miner extends BaseActor with MinerState {
@@ -170,6 +195,7 @@ trait Miner extends BaseActor with MinerState {
     val fromShift = brokerConfig.groupIndexOfBroker(chainIndex.from)
     val to        = chainIndex.to.value
     increaseCounts(fromShift, to, miningCount)
+    pendingTasks(fromShift)(to) = None
 
     val totalCount = getMiningCount(fromShift, to)
     val txCount    = block.transactions.length

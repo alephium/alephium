@@ -18,14 +18,14 @@ package org.alephium.io
 
 import org.rocksdb.{ReadOptions, WriteOptions}
 
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 
 trait RocksDBKeyValueCompanion[S <: RocksDBKeyValueStorage[_, _]] {
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily): S =
-    apply(storage, cf, Settings.writeOptions, Settings.readOptions)
+    apply(storage, cf, ProdSettings.writeOptions, ProdSettings.readOptions)
 
   def apply(storage: RocksDBSource, cf: RocksDBSource.ColumnFamily, writeOptions: WriteOptions): S =
-    apply(storage, cf, writeOptions, Settings.readOptions)
+    apply(storage, cf, writeOptions, ProdSettings.readOptions)
 
   def apply(
       storage: RocksDBSource,

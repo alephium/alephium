@@ -25,7 +25,8 @@ import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{model => protocol}
+import org.alephium.protocol.{model => protocol, ALPH}
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.vm
 import org.alephium.serde.deserialize
 import org.alephium.util._
@@ -113,10 +114,23 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
 
       checkData[BlockEntry, protocol.Block](
         block,
-        BlockEntry.from(_, 0), // height not needed for protocol
+        BlockEntry
+          .from(_, 0)(NetworkConfigFixture.PreRhone) // height not needed for protocol
+          .rightValue,
         _.toProtocol().rightValue
       )
     }
+  }
+
+  it should "convert genesis block" in new Fixture {
+    val block = blockGen(chainIndexGen.sample.value).sample.value
+    val genesis = block
+      .copy(header = block.header.copy(timestamp = ALPH.GenesisTimestamp))
+      .copy(transactions = AVector.empty)
+
+    genesis.isGenesis is true
+    genesis.transactions.isEmpty is true
+    BlockEntry.from(genesis, 0).isRight is true
   }
 
   trait Fixture extends ApiModelFixture {

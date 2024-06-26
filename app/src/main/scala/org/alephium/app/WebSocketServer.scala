@@ -32,7 +32,6 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
-import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.rpc.model.JsonRPC._
@@ -55,7 +54,9 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   private val vertx         = Vertx.vertx()
   private val vertxEventBus = vertx.eventBus()
   private val server = {
-    val options = new HttpServerOptions().setMaxWebSocketFrameSize(1024 * 1024)
+    val options = new HttpServerOptions()
+      .setMaxWebSocketFrameSize(1024 * 1024)
+      .setRegisterWebSocketWriteHandlers(true)
     vertx.createHttpServer(options)
   }
 
@@ -129,10 +130,7 @@ object WebSocketServer {
     private val subscribers: mutable.HashSet[String] = mutable.HashSet.empty
 
     def receive: Receive = {
-      case event: EventBus.Event =>
-        subscribers.foreach { subscriber =>
-          vertxEventBus.send(subscriber, handleEvent(event))
-        }
+      case event: EventBus.Event => handleEvent(event)
       case EventHandler.Subscribe(subscriber) =>
         if (!subscribers.contains(subscriber)) { subscribers += subscriber }
       case EventHandler.Unsubscribe(subscriber) =>
@@ -140,23 +138,19 @@ object WebSocketServer {
       case EventHandler.ListSubscribers =>
         sender() ! AVector.unsafe(subscribers.toArray)
     }
-  }
 
-  def handleEvent(event: EventBus.Event)(implicit writer: Writer[BlockEntry]): String = {
-    event match {
-      case bn @ FlowHandler.BlockNotify(_, _) =>
-        val params       = blockNotifyEncode(bn)
-        val notification = Notification("block_notify", params)
-        write(notification)
+    private def handleEvent(event: EventBus.Event): Unit = {
+      event match {
+        case FlowHandler.BlockNotify(block, height) =>
+          BlockEntry.from(block, height) match {
+            case Right(blockEntry) =>
+              val params       = writeJs(blockEntry)
+              val notification = write(Notification("block_notify", params))
+              subscribers.foreach(subscriber => vertxEventBus.send(subscriber, notification))
+            case _ => // this should never happen
+              log.error(s"Received invalid block $block")
+          }
+      }
     }
   }
-
-  private def blockHeaderEntryfrom(blockNotify: BlockNotify): BlockEntry = {
-    BlockEntry.from(blockNotify.block, blockNotify.height)
-  }
-
-  def blockNotifyEncode(blockNotify: BlockNotify)(implicit
-      writer: Writer[BlockEntry]
-  ): ujson.Value =
-    writeJs(blockHeaderEntryfrom(blockNotify))
 }

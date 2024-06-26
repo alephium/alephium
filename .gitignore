@@ -1,3 +1,10 @@
 target
 log
 .DS_Store
+hs_err_*
+
+.bloop
+.metals
+project/.bloop
+project/project
+project/metals.sbt

@@ -118,7 +118,7 @@ trait ApiModelCodec {
     _.toHexString
   )
   implicit val hashReader: Reader[Hash] =
-    byteStringReader.map(Hash.from(_).getOrElse(throw new Abort("cannot decode hash")))
+    byteStringReader.map(Hash.from(_).getOrElse(throw new Abort("cannot decode 32 bytes hash")))
 
   implicit val blockHashWriter: Writer[BlockHash] = StringWriter.comap[BlockHash](
     _.toHexString
@@ -212,6 +212,8 @@ trait ApiModelCodec {
   implicit val transactionRW: RW[Transaction] = macroRW
 
   implicit val exportFileRW: RW[ExportFile] = macroRW
+
+  implicit val ghostUncleBlockEntryRW: RW[GhostUncleBlockEntry] = macroRW
 
   implicit val blockEntryRW: RW[BlockEntry] = macroRW
 

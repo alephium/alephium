@@ -22,7 +22,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.reflect.ClassTag
 
 import akka.util.ByteString
-import upickle.core.Util
+import upickle.core.ParseUtils
 
 import org.alephium.json.Json._
 import org.alephium.util.{AVector, Hex, TimeStamp}
@@ -48,7 +48,7 @@ object UtilJson {
         index: Int
     ) = {
       if (decIndex == -1 && expIndex == -1) {
-        BigInteger.valueOf(Util.parseIntegralNum(s, decIndex, expIndex, index))
+        BigInteger.valueOf(ParseUtils.parseIntegralNum(s, decIndex, expIndex, index))
       } else {
         throw upickle.core.Abort(expectedMsg + " but was float")
       }

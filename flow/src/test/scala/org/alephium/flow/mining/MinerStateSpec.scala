@@ -47,7 +47,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
         to        <- 0 until brokerConfig.groups
       } {
         val job = Job.from(templates(fromShift)(to))
-        pendingTasks(fromShift)(to) = job
+        pendingTasks(fromShift)(to) = Some(job)
       }
       startNewTasks()
     }

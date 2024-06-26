@@ -45,7 +45,7 @@ alephium {
     sync-peer-sample-size = 5
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
-    dependency-expiry-period = 10 minute
+    dependency-expiry-period = 2 minute
     update-synced-frequency = 5 second
 
     txs-broadcast-delay = 5 second
@@ -152,11 +152,18 @@ akka {
       type = Dispatcher
       executor = "fork-join-executor"
       fork-join-executor {
-        parallelism-min = 8
-        parallelism-max = 8
+        parallelism-min = 4
+        parallelism-max = 4
         parallelism-factor = 1
       }
       throughput = 1
+    }
+
+    default-dispatcher {
+      fork-join-executor {
+        parallelism-min = 16
+        parallelism-factor = 1.0
+      }
     }
 
     guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"

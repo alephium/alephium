@@ -690,7 +690,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     def mineBlockWith1Uncle(heightDiff: Int): Block = {
       (0 until heightDiff).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
-      val maxHeight  = blockFlow.getMaxHeight(chainIndex).rightValue
+      val maxHeight  = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
       val parentHash = blockFlow.getHashes(chainIndex, maxHeight - heightDiff).rightValue.head
       addAndCheck(blockFlow, mineBlock(parentHash))
       val block            = mineBlockTemplate(blockFlow, chainIndex)
@@ -706,7 +706,7 @@ class BlockValidationSpec extends AlephiumSpec {
       (0 until ALPH.MaxGhostUncleAge).foreach(_ =>
         addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
       )
-      val maxHeight   = blockFlow.getMaxHeight(chainIndex).rightValue
+      val maxHeight   = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
       val parentHash0 = blockFlow.getHashes(chainIndex, maxHeight - heightDiff0).rightValue.head
       addAndCheck(blockFlow, mineBlock(parentHash0))
       val parentHash1 = blockFlow.getHashes(chainIndex, maxHeight - heightDiff1).rightValue.head
@@ -1045,7 +1045,7 @@ class BlockValidationSpec extends AlephiumSpec {
     }
 
     addAndCheck(blockFlow, emptyBlockWithMiner(blockFlow, chainIndex, miner))
-    (blockFlow.getMaxHeight(chainIndex).rightValue -
+    (blockFlow.getMaxHeightByWeight(chainIndex).rightValue -
       blockFlow.getHeightUnsafe(block0.hash)) > ALPH.MaxGhostUncleAge is true
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     val invalidBlock =
@@ -1344,7 +1344,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val polwTarget      = randomPoLWTarget(consensusConfig.blockTargetTime)
       assume(consensusConfig.emission.shouldEnablePoLW(polwTarget))
       val header      = block.header.copy(target = polwTarget)
-      val blockHeight = blockFlow.getMaxHeight(chainIndex).rightValue + 1
+      val blockHeight = blockFlow.getMaxHeightByWeight(chainIndex).rightValue + 1
       val uncles = block.ghostUncleHashes.rightValue.take(uncleSize).map { hash =>
         val uncleMiner  = blockFlow.getBlockUnsafe(hash).minerLockupScript
         val uncleHeight = blockFlow.getHeightUnsafe(hash)
@@ -1489,9 +1489,8 @@ class BlockValidationSpec extends AlephiumSpec {
     }
 
     implicit lazy val validator = (block: Block) => {
-      val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
-      checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      checkTestnetMiner(block, hardFork)
     }
   }
 

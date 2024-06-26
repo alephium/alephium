@@ -37,7 +37,7 @@ class BlockHeaderStorageSpec
   }
 
   it should "create database" in {
-    RocksDBSource.open(dbPath, RocksDBSource.Compaction.HDD).isLeft is true
+    RocksDBSource.open(dbPath).isLeft is true
   }
 
   it should "check existence" in {

@@ -27,7 +27,7 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TestUtils, TxHandler}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
@@ -37,13 +37,8 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{
-  BlockHash,
-  ChainIndex,
-  CliqueInfo,
-  NoIndexModelGeneratorsLike,
-  TransactionId
-}
+import org.alephium.protocol.model._
+import org.alephium.serde.serialize
 import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {
@@ -101,7 +96,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "not mark block seen when receive BlocksResponse/HeadersResponse/InvResponse" in new Fixture {
     val block = emptyBlock(blockFlow, chainIndex)
-    brokerHandler ! BaseBrokerHandler.Received(BlocksResponse(RequestId.random(), AVector(block)))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksResponse.fromBlockBytes(RequestId.random(), AVector(serialize(block)))
+    )
     eventually(brokerHandlerActor.seenBlocks.contains(block.hash)) is false
 
     val blockHeader = emptyBlock(blockFlow, chainIndex).header
@@ -128,7 +125,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.cacheHeaderVerifiedBlock(block)
     requestBlocks()
     connectionHandler.expectMsg {
-      val payload = BlocksResponse(requestId, AVector(block))
+      val payload = BlocksResponse.fromBlockBytes(requestId, AVector(serialize(block)))
       ConnectionHandler.Send(Message.serialize(payload))
     }
   }
@@ -186,29 +183,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val message = Message.serialize(NewBlockHash(blockHash2))
     connectionHandler.expectMsg(ConnectionHandler.Send(message))
     brokerHandlerActor.seenBlocks.contains(blockHash2) is true
-  }
-
-  it should "publish misbehavior when receive deep forked block" in new Fixture {
-    val invalidForkedBlock = emptyBlock(blockFlow, chainIndex)
-    val listener           = TestProbe()
-    val blockChain         = blockFlow.getBlockChain(chainIndex)
-
-    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
-    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
-    blockChain.maxHeightUnsafe is 2
-    val validForkedBlock = emptyBlock(blockFlow, chainIndex)
-    (0 until maxForkDepth).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
-    blockChain.maxHeightUnsafe is (2 + maxForkDepth)
-
-    brokerHandler ! BaseBrokerHandler.Received(NewBlock(validForkedBlock))
-    val message = DependencyHandler.AddFlowData(AVector(validForkedBlock), dataOrigin)
-    allHandlerProbes.dependencyHandler.expectMsg(message)
-
-    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
-    val remoteAddress = brokerHandlerActor.remoteAddress
-    watch(brokerHandler)
-    brokerHandler ! BaseBrokerHandler.Received(NewBlock(invalidForkedBlock))
-    listener.expectMsg(MisbehaviorManager.DeepForkBlock(remoteAddress))
   }
 
   it should "cleanup cache based on capacity" in new Fixture {
@@ -414,7 +388,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val cliqueManager         = TestProbe()
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
-    val maxForkDepth          = 5
     val seenTxExpiryDuration  = Duration.ofSecondsUnsafe(3)
 
     lazy val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe
@@ -428,7 +401,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
         ActorRefT(cliqueManager.ref),
         ActorRefT(blockFlowSynchronizer.ref),
         ActorRefT(connectionHandler.ref),
-        maxForkDepth,
         seenTxExpiryDuration
       )
     )
@@ -468,7 +440,6 @@ object TestBrokerHandler {
       cliqueManager: ActorRefT[CliqueManager.Command],
       blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-      maxForkDepth: Int,
       seenTxExpiryDuration: Duration
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
@@ -481,7 +452,6 @@ object TestBrokerHandler {
         cliqueManager,
         blockFlowSynchronizer,
         brokerConnectionHandler,
-        maxForkDepth,
         seenTxExpiryDuration
       )
     )
@@ -496,7 +466,6 @@ class TestBrokerHandler(
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
     override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-    override val maxForkDepth: Int,
     override val seenTxExpiryDuration: Duration
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseInboundBrokerHandler

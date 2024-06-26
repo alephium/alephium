@@ -185,7 +185,11 @@ trait FlowUtils
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
-      FlowUtils.truncateTxs(candidates3, maximalTxsInOneBlock, getMaximalGasPerBlock(hardFork))
+      FlowUtils.truncateTxs(
+        candidates3,
+        maximalTxsInOneBlock,
+        getMaximalGasPerBlock(hardFork).subUnsafe(minimalGas) // remove the coinbase transaction gas
+      )
     }
   }
 
@@ -377,9 +381,9 @@ trait FlowUtils
           case _: InvalidGhostUncleStatus =>
             logger.warn("Assemble block with empty uncles due to invalid uncles")
             Right(rebuild(template, template.transactions.init, AVector.empty, miner))
-          case ExistInvalidTx(t, _) =>
+          case ExistInvalidTx(t, e) =>
             logger.warn(
-              s"Remove invalid mempool tx: ${t.id.toHexString} - ${Hex.toHexString(serialize(t))}"
+              s"Remove invalid mempool tx: ${t.id.toHexString} - $e - ${Hex.toHexString(serialize(t))}"
             )
             logger.warn("Assemble block with empty txs due to invalid txs")
             this.getMemPool(chainIndex).removeUnusedTxs(AVector(t.toTemplate))

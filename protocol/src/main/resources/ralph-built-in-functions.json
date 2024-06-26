@@ -66,9 +66,7 @@
     "category": "Contract",
     "signature": "fn selfAddress!() -> (Address)",
     "doc": "Returns the address of the contract.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the address of the contract"
   },
   {
@@ -76,9 +74,7 @@
     "category": "Contract",
     "signature": "fn selfContractId!() -> (ByteVec)",
     "doc": "Returns the id (ByteVec) of the contract.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the id (ByteVec) of the contract"
   },
   {
@@ -86,9 +82,7 @@
     "category": "Contract",
     "signature": "fn selfTokenId!() -> (ByteVec)",
     "doc": "Returns the token id (ByteVec) of the contract.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the token id (ByteVec) of the contract"
   },
   {
@@ -126,9 +120,7 @@
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",
     "doc": "Returns the contract id of the caller.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the contract id of the caller"
   },
   {
@@ -136,9 +128,7 @@
     "category": "Contract",
     "signature": "fn callerAddress!() -> (Address)",
     "doc": "Returns the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails"
   },
   {
@@ -166,9 +156,7 @@
     "category": "Contract",
     "signature": "fn callerInitialStateHash!() -> (ByteVec)",
     "doc": "Returns the initial state hash of the caller contract.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the initial state hash of the caller contract"
   },
   {
@@ -176,9 +164,7 @@
     "category": "Contract",
     "signature": "fn callerCodeHash!() -> (ByteVec)",
     "doc": "Returns the contract code hash of the caller contract.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the contract code hash of the caller contract"
   },
   {
@@ -228,9 +214,7 @@
     "category": "Contract",
     "signature": "fn isCalledFromTxScript!() -> (Bool)",
     "doc": "Checks whether the function is called by a TxScript.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns true if the function is called by a TxScript, false otherwise"
   },
   {
@@ -238,9 +222,7 @@
     "category": "Contract",
     "signature": "fn selfContract!() -> (<Contract>)",
     "doc": "Returns self contract",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns self contract"
   },
   {
@@ -549,9 +531,7 @@
     "category": "Utils",
     "signature": "fn u256Max!() -> (U256)",
     "doc": "Returns the max value of U256.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the max value of U256"
   },
   {
@@ -559,9 +539,7 @@
     "category": "Utils",
     "signature": "fn i256Max!() -> (I256)",
     "doc": "Returns the max value of I256.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the max value of I256"
   },
   {
@@ -569,9 +547,7 @@
     "category": "Utils",
     "signature": "fn i256Min!() -> (I256)",
     "doc": "Returns the min value of I256.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the min value of I256"
   },
   {
@@ -589,9 +565,7 @@
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",
     "doc": "Returns the null contract address with contract id being zeros.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the null contract address with contract id being zeros"
   },
   {
@@ -599,9 +573,7 @@
     "category": "Utils",
     "signature": "fn minimalContractDeposit!() -> (U256)",
     "doc": "The minimal contract deposit",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the minimal ALPH amount for contract deposit"
   },
   {
@@ -609,9 +581,7 @@
     "category": "Utils",
     "signature": "fn mapEntryDeposit!() -> (U256)",
     "doc": "The amount of ALPH required to create a map entry, which is '0.1 ALPH' since Rhone upgrade",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the amount of ALPH required to create a map entry"
   },
   {
@@ -619,9 +589,7 @@
     "category": "Chain",
     "signature": "fn networkId!() -> (ByteVec)",
     "doc": "Returns the network id (a single byte).",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the network id (a single byte)"
   },
   {
@@ -629,9 +597,7 @@
     "category": "Chain",
     "signature": "fn blockTimeStamp!() -> (U256)",
     "doc": "Returns the block timestamp.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the block timestamp"
   },
   {
@@ -639,9 +605,7 @@
     "category": "Chain",
     "signature": "fn blockTarget!() -> (U256)",
     "doc": "Returns the block difficulty target.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the block difficulty target"
   },
   {
@@ -649,9 +613,7 @@
     "category": "Chain",
     "signature": "fn txId!() -> (ByteVec)",
     "doc": "Returns the current transaction id.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the current transaction id"
   },
   {
@@ -669,9 +631,7 @@
     "category": "Chain",
     "signature": "fn txInputsSize!() -> (U256)",
     "doc": "Returns the number of transaction inputs.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the number of transaction inputs"
   },
   {
@@ -679,9 +639,7 @@
     "category": "Chain",
     "signature": "fn txGasPrice!() -> (U256)",
     "doc": "Returns the current transaction gas price.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the current transaction gas price"
   },
   {
@@ -689,9 +647,7 @@
     "category": "Chain",
     "signature": "fn txGasAmount!() -> (U256)",
     "doc": "Returns the current transaction gas amount.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the current transaction gas amount"
   },
   {
@@ -699,9 +655,7 @@
     "category": "Chain",
     "signature": "fn txGasFee!() -> (U256)",
     "doc": "Returns the current transaction gas fee.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the current transaction gas fee"
   },
   {
@@ -730,9 +684,7 @@
     "category": "Chain",
     "signature": "fn dustAmount!() -> (U256)",
     "doc": "Returns the dust amount of an UTXO.",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the dust amount of an UTXO"
   },
   {
@@ -1032,9 +984,7 @@
     "category": "Cryptography",
     "signature": "fn getSegregatedSignature!() -> (ByteVec)",
     "doc": "The segregated signature of the transaction",
-    "params": [
-      
-    ],
+    "params": [],
     "returns": "@returns the segregated signature of the transaction"
   },
   {

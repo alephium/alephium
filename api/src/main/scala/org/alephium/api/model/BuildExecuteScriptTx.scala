@@ -31,6 +31,17 @@ final case class BuildExecuteScriptTx(
     tokens: Option[AVector[Token]] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
+    targetBlockHash: Option[BlockHash] = None,
+    gasEstimationMultiplier: Option[Double] = None
 ) extends BuildTxCommon
-    with BuildTxCommon.FromPublicKey
+    with BuildTxCommon.FromPublicKey {
+  def check(): Either[String, Unit] = {
+    if (gasAmount.isEmpty || gasEstimationMultiplier.isEmpty) {
+      Right(())
+    } else {
+      Left(
+        "Parameters `gasAmount` and `gasEstimationMultiplier` cannot be specified simultaneously"
+      )
+    }
+  }
+}

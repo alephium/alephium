@@ -128,7 +128,7 @@ object Storages {
 
   def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
     val dbPath = rootPath.resolve(dbFolder)
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    RocksDBSource.openUnsafe(dbPath)
   }
 }
 

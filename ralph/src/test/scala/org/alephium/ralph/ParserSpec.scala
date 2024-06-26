@@ -1383,7 +1383,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
            |""".stripMargin
       parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
         None,
-        useMethodSelector = false,
+        useMethodSelector = true,
         TypeId("Child"),
         Seq(
           FuncDef(
@@ -1465,7 +1465,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       fastparse.parse(interface(""), StatefulParser.interface(_)).isSuccess is true
       val result0 = fastparse.parse(interface(), StatefulParser.interface(_)).get.value
       result0.stdId is None
-      result0.useMethodSelector is false
+      result0.useMethodSelector is true
 
       val result1 = fastparse
         .parse(interface("@using(methodSelector = false)"), StatefulParser.interface(_))

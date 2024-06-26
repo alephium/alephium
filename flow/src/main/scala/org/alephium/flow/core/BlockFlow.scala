@@ -25,7 +25,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSettings, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -122,12 +122,16 @@ object BlockFlow extends StrictLogging {
   type WorldStateUpdater = (WorldState.Cached, Block) => IOResult[Unit]
 
   def emptyUnsafe(config: AlephiumConfig): BlockFlow = {
+    emptyAndStoragesUnsafe(config)._1
+  }
+
+  def emptyAndStoragesUnsafe(config: AlephiumConfig): (BlockFlow, Storages) = {
     val storages =
-      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, Settings.writeOptions)(
+      Storages.createUnsafe(Files.tmpDir, BlockHash.random.toHexString, ProdSettings.writeOptions)(
         config.broker,
         config.node
       )
-    fromGenesisUnsafe(storages, config.genesisBlocks)(
+    val blockFlow = fromGenesisUnsafe(storages, config.genesisBlocks)(
       config.broker,
       config.network,
       config.consensus,
@@ -135,6 +139,7 @@ object BlockFlow extends StrictLogging {
       config.node.eventLogConfig,
       config.node.indexesConfig
     )
+    (blockFlow, storages)
   }
 
   def fromGenesisUnsafe(config: AlephiumConfig, storages: Storages): BlockFlow = {
@@ -192,7 +197,7 @@ object BlockFlow extends StrictLogging {
   private def cacheBlockChain(blockflow: BlockFlow, chain: BlockChain)(implicit
       consensusSettings: ConsensusSettings
   ): Unit = {
-    val maxHeight = chain.maxHeightUnsafe
+    val maxHeight = chain.maxHeightByWeightUnsafe
     val startHeight =
       Math.max(ALPH.GenesisHeight, maxHeight - consensusSettings.blockCacheCapacityPerChain)
     (startHeight to maxHeight).foreach { height =>
@@ -205,7 +210,7 @@ object BlockFlow extends StrictLogging {
   private def cacheHeaderChain(chain: BlockHeaderChain)(implicit
       consensusSettings: ConsensusSettings
   ): Unit = {
-    val maxHeight = chain.maxHeightUnsafe
+    val maxHeight = chain.maxHeightByWeightUnsafe
     val startHeight =
       Math.max(ALPH.GenesisHeight, maxHeight - consensusSettings.blockCacheCapacityPerChain * 2)
     (startHeight to maxHeight).foreach { height =>

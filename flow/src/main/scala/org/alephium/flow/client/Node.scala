@@ -32,7 +32,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{AlephiumConfig, Configs}
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.util.{ActorRefT, Env, EventBus, Service}
 
 trait Node extends Service {
@@ -142,7 +142,7 @@ object Node {
     val config = AlephiumConfig.load(typesafeConfig, "alephium")
     val dbPath = rootPath.resolve(config.network.networkId.nodeFolder)
     val storages =
-      Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker, config.node)
+      Storages.createUnsafe(dbPath, "db", ProdSettings.writeOptions)(config.broker, config.node)
     buildBlockFlowUnsafe(storages)(config) -> storages
   }
 

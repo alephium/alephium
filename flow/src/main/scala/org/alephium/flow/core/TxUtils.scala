@@ -98,7 +98,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
         UtxoSelectionAlgo
-          .Build(ProvidedGas(gasOpt, gasPrice))
+          .Build(ProvidedGas(gasOpt, gasPrice, None))
           .select(
             AssetAmounts(totalAmount, totalAmountPerToken),
             fromUnlockScript,
@@ -255,7 +255,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(None, fromLockupScript, Int.MaxValue)
       .map { utxos =>
         UtxoSelectionAlgo
-          .Build(ProvidedGas(None, coinbaseGasPrice))
+          .Build(ProvidedGas(None, coinbaseGasPrice, None))
           .select(
             AssetAmounts(totalAmount, AVector.empty),
             fromUnlockScript,
@@ -857,7 +857,7 @@ trait TxUtils { Self: FlowUtils =>
     iter(fromTipHeight + 1) match {
       case None => 0
       case Some(firstConfirmationHeight) =>
-        fromChain.maxHeightUnsafe - firstConfirmationHeight + 1
+        fromChain.maxHeightByWeightUnsafe - firstConfirmationHeight + 1
     }
   }
 
@@ -885,12 +885,12 @@ trait TxUtils { Self: FlowUtils =>
     }
 
     if (header.isGenesis) {
-      toChain.maxHeightUnsafe - ALPH.GenesisHeight + 1
+      toChain.maxHeightByWeightUnsafe - ALPH.GenesisHeight + 1
     } else {
       iter(toTipHeight + 1) match {
         case None => 0
         case Some(firstConfirmationHeight) =>
-          toChain.maxHeightUnsafe - firstConfirmationHeight + 1
+          toChain.maxHeightByWeightUnsafe - firstConfirmationHeight + 1
       }
     }
   }

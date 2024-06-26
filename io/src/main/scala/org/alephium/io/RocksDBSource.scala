@@ -17,13 +17,13 @@
 package org.alephium.io
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 
 import com.typesafe.scalalogging.LazyLogging
 import org.rocksdb._
-import org.rocksdb.util.SizeUnit
+import org.rocksdb.util.{SizeUnit, StdErrLogger}
 
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Env => AEnv}
 
 object RocksDBSource {
   import IOUtils.tryExecute
@@ -68,87 +68,82 @@ object RocksDBSource {
       )
   }
 
-  final case class Compaction(
-      initialFileSize: Long,
-      blockSize: Long,
-      writeRateLimit: Option[Long]
-  )
-
-  object Compaction {
-    import SizeUnit._
-
-    val SSD: Compaction = Compaction(
-      initialFileSize = 64 * MB,
-      blockSize = 16 * KB,
-      writeRateLimit = None
-    )
-
-    val HDD: Compaction = Compaction(
-      initialFileSize = 256 * MB,
-      blockSize = 64 * KB,
-      writeRateLimit = Some(16 * MB)
-    )
-  }
-
-  object Settings {
+  // scalastyle:off magic.number
+  object TestSettings {
     RocksDB.loadLibrary()
-
-    // TODO All options should become part of configuration
-    val MaxOpenFiles: Int           = 512
-    val BytesPerSync: Long          = 1 * SizeUnit.MB
-    val MemoryBudget: Long          = 128 * SizeUnit.MB
-    val WriteBufferMemoryRatio: Int = 2
-    val BlockCacheMemoryRatio: Int  = 3
-    val CPURatio: Int               = 2
 
     val readOptions: ReadOptions   = (new ReadOptions).setVerifyChecksums(false)
     val writeOptions: WriteOptions = new WriteOptions
     val syncWrite: WriteOptions    = (new WriteOptions).setSync(true)
 
-    val columns: Int             = ColumnFamily.values.length
-    val memoryBudgetPerCol: Long = MemoryBudget / columns
-
-    def databaseOptions(compaction: Compaction): DBOptions =
-      databaseOptionsForBudget(compaction, memoryBudgetPerCol)
-
-    def databaseOptionsForBudget(compaction: Compaction, memoryBudgetPerCol: Long): DBOptions = {
-      val options = new DBOptions()
+    def databaseOptions(): DBOptions = {
+      new DBOptions()
         .setUseFsync(false)
         .setCreateIfMissing(true)
         .setCreateMissingColumnFamilies(true)
-        .setMaxOpenFiles(MaxOpenFiles)
+        .setMaxOpenFiles(512)
         .setKeepLogFileNum(1)
-        .setBytesPerSync(BytesPerSync)
-        .setDbWriteBufferSize(memoryBudgetPerCol / WriteBufferMemoryRatio)
-        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime.availableProcessors() / CPURatio))
-
-      compaction.writeRateLimit match {
-        case Some(rateLimit) => options.setRateLimiter(new RateLimiter(rateLimit))
-        case None            => options
-      }
+        .setBytesPerSync(1 * SizeUnit.MB)
+        .setDbWriteBufferSize(8 * SizeUnit.MB)
+        .setIncreaseParallelism(Math.max(1, Runtime.getRuntime.availableProcessors() / 2))
+        .setRateLimiter(new RateLimiter(16 * SizeUnit.MB))
     }
 
-    def columnOptions(compaction: Compaction): ColumnFamilyOptions =
-      columnOptionsForBudget(compaction, memoryBudgetPerCol)
-
-    def columnOptionsForBudget(
-        compaction: Compaction,
-        memoryBudgetPerCol: Long
-    ): ColumnFamilyOptions = {
+    def columnOptions(): ColumnFamilyOptions = {
       import scala.jdk.CollectionConverters._
 
       (new ColumnFamilyOptions)
         .setLevelCompactionDynamicLevelBytes(true)
         .setTableFormatConfig(
           new BlockBasedTableConfig()
-            .setBlockSize(compaction.blockSize)
-            .setBlockCache(new LRUCache(MemoryBudget / BlockCacheMemoryRatio))
+            .setBlockSize(64 * SizeUnit.KB)
+            .setBlockCache(new LRUCache(5 * SizeUnit.MB))
             .setCacheIndexAndFilterBlocks(true)
             .setPinL0FilterAndIndexBlocksInCache(true)
         )
-        .optimizeLevelStyleCompaction(memoryBudgetPerCol)
-        .setTargetFileSizeBase(compaction.initialFileSize)
+        .optimizeLevelStyleCompaction(8 * SizeUnit.MB)
+        .setTargetFileSizeBase(256 * SizeUnit.MB)
         .setCompressionPerLevel(Nil.asJava)
+    }
+  }
+
+  object ProdSettings {
+    RocksDB.loadLibrary()
+
+    val readOptions: ReadOptions = (new ReadOptions).setVerifyChecksums(false)
+    val writeOptions: WriteOptions =
+      (new WriteOptions).setNoSlowdown(true).setIgnoreMissingColumnFamilies(true)
+    val syncWrite: WriteOptions = (new WriteOptions).setNoSlowdown(true).setSync(true)
+
+    def databaseOptions(): DBOptions = {
+      new DBOptions()
+        .setCreateIfMissing(true)
+        .setCreateMissingColumnFamilies(true)
+        .setMaxOpenFiles(1024)
+        .setLogFileTimeToRoll(86_400L) // one day
+        .setKeepLogFileNum(7)
+        .setDbWriteBufferSize(256 * SizeUnit.MB)
+        .setLogger(new StdErrLogger(InfoLogLevel.ERROR_LEVEL))
+        .setEnv(Env.getDefault().setBackgroundThreads(6))
+        .setMaxTotalWalSize(1_073_741_824L) // 1GB
+        .setRecycleLogFileNum(16)
+    }
+
+    def columnOptions(ioHeavy: Boolean): ColumnFamilyOptions = {
+      (new ColumnFamilyOptions)
+        .setLevelCompactionDynamicLevelBytes(true)
+        .setTtl(0)
+        .setCompressionType(CompressionType.LZ4_COMPRESSION)
+        .setTableFormatConfig(
+          new BlockBasedTableConfig()
+            .setFormatVersion(5) // Since RocksDB 6.6
+            .setBlockCache(new LRUCache(32 * SizeUnit.MB))
+            .setFilterPolicy(new BloomFilter(10, false))
+            .setPartitionFilters(true)
+            .setCacheIndexAndFilterBlocks(false)
+            .setBlockSize(32 * SizeUnit.KB)
+        )
+        .setWriteBufferSize(if (ioHeavy) 128 * SizeUnit.MB else 64 * SizeUnit.MB)
     }
   }
 
@@ -159,33 +154,40 @@ object RocksDBSource {
       path
     }
     val dbPath = path.resolve(dbName)
-    RocksDBSource.openUnsafe(dbPath, RocksDBSource.Compaction.HDD)
+    RocksDBSource.openUnsafe(dbPath)
   }
 
-  def open(path: Path, compaction: Compaction): IOResult[RocksDBSource] =
+  def open(path: Path): IOResult[RocksDBSource] =
     tryExecute {
-      openUnsafe(path, compaction)
+      openUnsafe(path)
     }
 
-  def openUnsafe(path: Path, compaction: Compaction): RocksDBSource =
-    openUnsafeWithOptions(
-      path,
-      Settings.databaseOptions(compaction),
-      Settings.columnOptions(compaction)
-    )
+  def openUnsafe(path: Path): RocksDBSource = {
+    val (databaseOptions, columnOptions) = AEnv.resolve() match {
+      case AEnv.Test =>
+        (TestSettings.databaseOptions(), (_: Boolean) => TestSettings.columnOptions())
+      case _ => (ProdSettings.databaseOptions(), ProdSettings.columnOptions)
+    }
+    openUnsafeWithOptions(path, databaseOptions, columnOptions)
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def openUnsafeWithOptions(
+  private def openUnsafeWithOptions(
       path: Path,
       databaseOptions: DBOptions,
-      columnOptions: ColumnFamilyOptions
+      columnOptions: (Boolean) => ColumnFamilyOptions
   ): RocksDBSource = {
     import scala.jdk.CollectionConverters._
 
     val handles = new scala.collection.mutable.ArrayBuffer[ColumnFamilyHandle]()
     val descriptors = (ColumnFamily.values.map(_.name) :+ "default").map { name =>
-      new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8), columnOptions)
+      new ColumnFamilyDescriptor(
+        name.getBytes(StandardCharsets.UTF_8),
+        columnOptions(name == ColumnFamily.Trie.name)
+      )
     }
+
+    if (!Files.exists(path)) path.toFile.mkdir()
 
     val db = RocksDB.open(
       databaseOptions,

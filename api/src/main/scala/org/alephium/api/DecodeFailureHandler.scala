@@ -16,9 +16,12 @@
 
 package org.alephium.api
 
+import scala.concurrent.Future
+
 import sttp.model.{Header, StatusCode}
 import sttp.tapir._
 import sttp.tapir.server.interceptor._
+import sttp.tapir.server.interceptor.decodefailure.DefaultDecodeFailureHandler
 import sttp.tapir.server.interceptor.decodefailure.DefaultDecodeFailureHandler._
 import sttp.tapir.server.model.ValuedEndpointOutput
 
@@ -47,13 +50,5 @@ trait DecodeFailureHandler {
   }
 
   val myDecodeFailureHandler =
-    default.copy(
-      response = failureResponse,
-      respond = respond(
-        _,
-        badRequestOnPathErrorIfPathShapeMatches = true,
-        badRequestOnPathInvalidIfPathShapeMatches = true
-      ),
-      failureMessage = failureMessage
-    )
+    DefaultDecodeFailureHandler[Future](respond, failureMessage, failureResponse)
 }

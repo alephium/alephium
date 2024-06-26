@@ -107,11 +107,11 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     }
 
   // the max height is the height of the tip of max weight
-  def maxHeight: IOResult[Int] = {
-    IOUtils.tryExecute(maxHeightUnsafe)
+  def maxHeightByWeight: IOResult[Int] = {
+    IOUtils.tryExecute(maxHeightByWeightUnsafe)
   }
 
-  def maxHeightUnsafe: Int = {
+  def maxHeightByWeightUnsafe: Int = {
     val (maxHeight, _) =
       tips.keys().foldLeft((ALPH.GenesisHeight, ALPH.GenesisWeight)) {
         case ((height, weight), tip) =>
@@ -122,6 +122,24 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       }
 
     maxHeight
+  }
+
+  def maxHeight: IOResult[Int] = {
+    IOUtils.tryExecute(maxHeightUnsafe)
+  }
+
+  def maxHeightUnsafe: Int = {
+    tips
+      .keys()
+      .foldLeft((ALPH.GenesisHeight, genesisHash)) { case ((height, hash), tip) =>
+        val tipHeight = getHeightUnsafe(tip)
+        if (BlockHashPool.compareHeight(tip, tipHeight, hash, height) > 0) {
+          (tipHeight, tip)
+        } else {
+          (height, hash)
+        }
+      }
+      ._1
   }
 
   def isCanonical(hash: BlockHash): IOResult[Boolean] = {
@@ -136,7 +154,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   protected[core] lazy val stateCache =
-    FlowCache.states(consensusConfigs.blockCacheCapacityPerChain * 4)
+    FlowCache.states(consensusConfigs.blockCacheCapacityPerChain * 6)
 
   def cacheState(hash: BlockHash, state: BlockState): Unit = stateCache.put(hash, state)
   def contains(hash: BlockHash): IOResult[Boolean] =
@@ -359,10 +377,6 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
         diff      <- calHashDiffFromSameHeight(newParent, oldParent)
       } yield ChainDiff(diff.toRemove :+ oldHash, diff.toAdd :+ newHash)
     }
-  }
-
-  def isRecentHeight(height: Int): IOResult[Boolean] = {
-    maxHeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
   }
 }
 // scalastyle:on number.of.methods

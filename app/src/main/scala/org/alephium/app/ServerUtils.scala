@@ -68,10 +68,12 @@ class ServerUtils(implicit
   }
 
   def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
-    getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      BlocksPerTimeStampRange(heightedBlocks.map(_._2.map { case (block, height) =>
-        BlockEntry.from(block, height)
-      }))
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          BlockEntry.from(block, height).left.map(failed)
+        })
+        .map(BlocksPerTimeStampRange)
     }
   }
 
@@ -82,10 +84,13 @@ class ServerUtils(implicit
     getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
-          val blockEntry = BlockEntry.from(block, height)
-          getEventsByBlockHash(blockFlow, blockEntry.hash).map(events =>
+          for {
+            blockEntry <- BlockEntry.from(block, height).left.map(failed)
+            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+          } yield {
             BlockAndEvents(blockEntry, events.events)
-          )
+          }
+
         })
         .map(BlocksAndEventsPerTimeStampRange)
     }
@@ -435,18 +440,57 @@ class ServerUtils(implicit
     } yield count
   }
 
+  private def handleBlockError(blockHash: BlockHash, error: IOError) = {
+    error match {
+      case _: IOError.KeyNotFound =>
+        failed(
+          s"The block ${blockHash.toHexString} does not exist, please check if your full node synced"
+        )
+      case other =>
+        failed(s"Fail fetching block with hash ${blockHash.toHexString}, error: $other")
+    }
+  }
+
   def getBlock(blockFlow: BlockFlow, hash: BlockHash): Try[BlockEntry] =
     for {
       _ <- checkHashChainIndex(hash)
       block <- blockFlow
         .getBlock(hash)
         .left
-        .map(_ => failed(s"Fail fetching block with header ${hash.toHexString}"))
+        .map(handleBlockError(hash, _))
       height <- blockFlow
         .getHeight(block.header)
         .left
         .map(failedInIO)
-    } yield BlockEntry.from(block, height)
+      blockEntry <- BlockEntry.from(block, height).left.map(failed)
+    } yield blockEntry
+
+  def getMainChainBlockByGhostUncle(
+      blockFlow: BlockFlow,
+      ghostUncleHash: BlockHash
+  ): Try[BlockEntry] =
+    for {
+      chainIndex <- checkHashChainIndex(ghostUncleHash)
+      result <- blockFlow
+        .getMainChainBlockByGhostUncle(chainIndex, ghostUncleHash)
+        .left
+        .map(handleBlockError(ghostUncleHash, _))
+      blockEntry <- result match {
+        case None =>
+          isBlockInMainChain(blockFlow, ghostUncleHash).flatMap { isMainChainBlock =>
+            if (isMainChainBlock) {
+              val message =
+                s"The block ${ghostUncleHash.toHexString} is not a ghost uncle block, you should use a ghost uncle block hash to call this endpoint"
+              Left(failed(message))
+            } else {
+              val resource =
+                s"The mainchain block that references the ghost uncle block ${ghostUncleHash.toHexString}"
+              Left(notFound(resource))
+            }
+          }
+        case Some((block, height)) => BlockEntry.from(block, height).left.map(failed)
+      }
+    } yield blockEntry
 
   def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
     for {
@@ -459,7 +503,7 @@ class ServerUtils(implicit
       height <- blockFlow
         .getHeight(blockHash)
         .left
-        .map(_ => failed(s"Fail fetching block height with hash ${blockHash.toHexString}"))
+        .map(handleBlockError(blockHash, _))
       hashes <- blockFlow
         .getHashes(ChainIndex.from(blockHash), height)
         .left
@@ -472,7 +516,7 @@ class ServerUtils(implicit
       blockHeader <- blockFlow
         .getBlockHeader(hash)
         .left
-        .map(_ => failed(s"Fail fetching block header with hash ${hash}"))
+        .map(handleBlockError(hash, _))
       height <- blockFlow
         .getHeight(hash)
         .left
@@ -494,7 +538,7 @@ class ServerUtils(implicit
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
     for {
       maxHeight <- blockFlow
-        .getMaxHeight(chainIndex)
+        .getMaxHeightByWeight(chainIndex)
         .left
         .map(failedInIO)
     } yield ChainInfo(maxHeight)
@@ -949,7 +993,8 @@ class ServerUtils(implicit
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[UnsignedTransaction] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
@@ -960,7 +1005,8 @@ class ServerUtils(implicit
         fromLockupScript,
         fromUnlockScript,
         gas,
-        gasPrice
+        gasPrice,
+        gasEstimationMultiplier
       )
       unsignedTx <- wrapError {
         val inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
@@ -987,7 +1033,8 @@ class ServerUtils(implicit
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[Selected] = {
     val result = tryBuildSelectedUtxos(
       blockFlow,
@@ -997,7 +1044,8 @@ class ServerUtils(implicit
       fromLockupScript,
       fromUnlockScript,
       gas,
-      gasPrice
+      gasPrice,
+      gasEstimationMultiplier
     )
 
     result match {
@@ -1015,7 +1063,8 @@ class ServerUtils(implicit
             fromLockupScript,
             fromUnlockScript,
             Some(res.gas),
-            gasPrice
+            gasPrice,
+            None
           )
         } else {
           Right(res)
@@ -1032,7 +1081,8 @@ class ServerUtils(implicit
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice]
+      gasPrice: Option[GasPrice],
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[Selected] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
     val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
@@ -1040,7 +1090,9 @@ class ServerUtils(implicit
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
-          .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
+          .Build(
+            ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
+          )
           .select(
             AssetAmounts(amount, tokens),
             fromUnlockScript,
@@ -1092,7 +1144,8 @@ class ServerUtils(implicit
         lockPair._1,
         lockPair._2,
         query.gasAmount,
-        query.gasPrice
+        query.gasPrice,
+        None
       )
     } yield BuildDeployContractTxResult.from(utx)
   }
@@ -1135,6 +1188,8 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
     for {
+      _          <- query.check().left.map(badRequest)
+      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
       amounts <- BuildTxCommon
         .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
         .left
@@ -1151,7 +1206,8 @@ class ServerUtils(implicit
         lockPair._1,
         lockPair._2,
         query.gasAmount,
-        query.gasPrice
+        query.gasPrice,
+        multiplier
       )
     } yield BuildExecuteScriptTxResult.from(utx)
   }

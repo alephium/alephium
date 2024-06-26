@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.Storages
-import org.alephium.io.RocksDBSource.Settings
+import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
 import org.alephium.util.AVector
@@ -36,7 +36,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
 
     def buildGenesis(): BlockChainWithState = {
       val dbFolder = "db-" + Hash.random.toHexString
-      val storages = Storages.createUnsafe(rootPath, dbFolder, Settings.syncWrite)
+      val storages = Storages.createUnsafe(rootPath, dbFolder, ProdSettings.syncWrite)
       BlockChainWithState.createUnsafe(
         genesis,
         storages,
@@ -89,7 +89,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     chain.getAllTips.toSet is Set(longChain.last.hash, shortChain.last.hash)
     chain.getBestTipUnsafe() is shortChain.last.hash
     chain.maxWeight isE Weight(3)
-    chain.maxHeight isE 2
-    chain.maxHeightUnsafe is 2
+    chain.maxHeightByWeight isE 2
+    chain.maxHeightByWeightUnsafe is 2
   }
 }

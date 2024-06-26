@@ -24,6 +24,8 @@ import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
 
 final case class TransactionId private (value: Hash) extends AnyVal with RandomBytes {
+  def length: Int = TransactionId.length
+
   def bytes: ByteString = value.bytes
 }
 

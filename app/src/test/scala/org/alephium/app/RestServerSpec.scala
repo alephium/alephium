@@ -1060,8 +1060,18 @@ abstract class RestServerSpec(
     }
   }
 
+  trait RedirectFixture {
+    allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
+      msg match {
+        case InterCliqueManager.IsSynced =>
+          sender ! InterCliqueManager.SyncedResult(true)
+          TestActor.KeepRunning
+      }
+    )
+  }
+
   // scalastyle:off no.equal
-  it should "get events for contract id with wrong group" in {
+  it should "get events for contract id with wrong group" in new RedirectFixture {
     val blockHash       = dummyBlock.hash
     val contractId      = ContractId.random
     val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
@@ -1139,7 +1149,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for tx id with wrong group" in {
+  it should "get events for tx id with wrong group" in new RedirectFixture {
     val blockHash  = dummyBlock.hash
     val txId       = Hash.random
     val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
@@ -1216,7 +1226,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for block hash with wrong group" in {
+  it should "get events for block hash with wrong group" in new RedirectFixture {
     val blockHash  = dummyBlock.hash
     val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
     val wrongGroup = (chainIndex.from.value + 1) % groupConfig.groups

@@ -36,7 +36,11 @@ import org.alephium.util.AVector
   )
 )
 abstract class Parser[Ctx <: StatelessContext] {
-  implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
+  implicit object RalphWhitespace extends Whitespace {
+    def apply(ctx: fastparse.ParsingRun[_]): P[Unit] = {
+      Lexer.emptyChars(ctx)
+    }
+  }
 
   def fileURI: Option[java.net.URI]
 
@@ -1190,7 +1194,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
       val usingFields = Parser.InterfaceUsingAnnotation.extractFields(
         annotations,
-        Parser.InterfaceUsingAnnotationFields(methodSelector = false)
+        Parser.InterfaceUsingAnnotationFields(methodSelector = true)
       )
       Ast
         .ContractInterface(

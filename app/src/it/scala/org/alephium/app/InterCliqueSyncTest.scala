@@ -17,10 +17,11 @@
 package org.alephium.app
 
 import java.net.InetSocketAddress
+import java.util.concurrent.ConcurrentLinkedQueue
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.util.{Failure, Random, Success}
+import scala.util.Random
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp
@@ -314,55 +315,38 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "sync ghost uncle blocks" in new CliqueFixture {
-    val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
+    val allSubmittedBlocks = new ConcurrentLinkedQueue[Block]()
 
-    case object StopMiningUncles
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {
-      private val allBlocks        = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
-      private var stopMiningUncles = false
-
-      override def receive: Receive = super.receive orElse handleStopMiningUncles
-
-      private def handleStopMiningUncles: Receive = { case StopMiningUncles =>
-        stopMiningUncles = true
-      }
+      private val allBlocks = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
 
       private def publishBlocks(blocks: mutable.ArrayBuffer[Block]): Unit = {
         // avoid overflowing the DependencyHandler pending cache
         val minedBlocks = if (Random.nextBoolean()) blocks.drop(blocks.length / 2) else blocks
         minedBlocks.zipWithIndex.foreach { case (block, index) =>
           val delayMs = index * 500
-          val task = Future {
+          Future {
             Thread.sleep(delayMs.toLong)
             val message    = SubmitBlock(serialize(block))
             val serialized = ClientMessage.serialize(message)
             apiConnections.head.foreach(_ ! ConnectionHandler.Send(serialized))
-          }(context.dispatcher)
-          task.onComplete {
-            case Success(_) =>
-              log.info(s"Block ${block.hash.toHexString} is submitted")
-              allSubmittedBlocks.addOne(block)
-            case Failure(error) =>
-              log.error(s"Submit block ${block.shortHex} failed ${error.getMessage}")
+            allSubmittedBlocks.add(block)
+            log.info(s"Block ${block.hash.toHexString} is submitted")
           }(context.dispatcher)
         }
       }
 
       override def publishNewBlock(block: Block): Unit = {
-        if (stopMiningUncles) {
-          super.publishNewBlock(block)
-        } else {
-          setIdle(block.chainIndex)
-          allBlocks.get(block.parentHash) match {
-            case None =>
-              allBlocks += block.parentHash -> mutable.ArrayBuffer(block)
-            case Some(blocks) =>
-              blocks.addOne(block)
-              if (blocks.length >= 2) {
-                allBlocks.remove(block.parentHash)
-                publishBlocks(Random.shuffle(blocks))
-              }
-          }
+        setIdle(block.chainIndex)
+        allBlocks.get(block.parentHash) match {
+          case None =>
+            allBlocks += block.parentHash -> mutable.ArrayBuffer(block)
+          case Some(blocks) =>
+            blocks.addOne(block)
+            if (blocks.length >= 2) {
+              allBlocks.remove(block.parentHash)
+              publishBlocks(Random.shuffle(blocks))
+            }
         }
       }
     }
@@ -380,17 +364,15 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
     Thread.sleep(50 * 1000)
 
-    val blocks = allSubmittedBlocks.toSeq
-    blocks.nonEmpty is true
-    blocks.foreach { block =>
+    allSubmittedBlocks.isEmpty is false
+    allSubmittedBlocks.forEach(block => {
       eventually {
         val response = request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
         response.toProtocol()(networkConfig).rightValue.header is block.header
       }
-    }
+      ()
+    })
 
-    miner ! StopMiningUncles
-    Thread.sleep(20 * 1000)
     miner ! Miner.Stop
 
     val clique1 =

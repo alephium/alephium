@@ -454,6 +454,12 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
+  private[flow] def validateTestnetMiner(block: Block): Boolean = {
+    block.transactions.nonEmpty &&
+    block.coinbase.unsigned.fixedOutputs.nonEmpty &&
+    checkTestnetMiner(block, networkConfig.getHardFork(block.timestamp)).isRight
+  }
+
   private[validation] def checkTestnetMiner(
       block: Block,
       hardFork: HardFork
@@ -490,7 +496,6 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else {
           checkRewardPreRhone(chainIndex, block, groupView, lockedReward)
         }
-      _ <- checkTestnetMiner(block, hardFork)
     } yield ()
   }
 

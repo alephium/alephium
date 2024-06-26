@@ -22,7 +22,9 @@ import org.bouncycastle.crypto.digests.SHA3Digest
 
 import org.alephium.serde.RandomBytes
 
-class Sha3(val bytes: ByteString) extends RandomBytes
+class Sha3(val bytes: ByteString) extends RandomBytes {
+  def length: Int = Sha3.length
+}
 
 object Sha3 extends BCHashSchema[Sha3](HashSchema.unsafeSha3, _.bytes) {
   def length: Int = 32

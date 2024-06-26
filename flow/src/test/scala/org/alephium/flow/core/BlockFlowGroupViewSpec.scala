@@ -28,13 +28,14 @@ import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 class BlockFlowGroupViewSpec extends AlephiumSpec {
   it should "fetch preOutputs" in new FlowFixture {
     val blockFlow1 = isolatedBlockFlow()
-    val block0     = transfer(blockFlow1, ChainIndex.unsafe(0, 1))
+    val now        = TimeStamp.now()
+    val block0     = transfer(blockFlow1, ChainIndex.unsafe(0, 1), now)
     addAndCheck(blockFlow1, block0)
-    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2))
+    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2), now.plusMillisUnsafe(1))
     addAndCheck(blockFlow1, block1)
-    val block2 = transfer(blockFlow1, ChainIndex.unsafe(0, 1))
+    val block2 = transfer(blockFlow1, ChainIndex.unsafe(0, 1), now.plusMillisUnsafe(2))
     addAndCheck(blockFlow1, block2)
-    val block3 = transfer(blockFlow1, ChainIndex.unsafe(0, 0))
+    val block3 = transfer(blockFlow1, ChainIndex.unsafe(0, 0), now.plusMillisUnsafe(3))
     addAndCheck(blockFlow1, block3)
 
     addAndCheck(blockFlow, block0)
@@ -51,7 +52,6 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView1.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
-    val now = TimeStamp.now()
     grandPool.add(block1.chainIndex, tx1, now)
     mempool.contains(tx1) is true
 

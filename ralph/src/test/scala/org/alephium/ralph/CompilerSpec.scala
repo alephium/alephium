@@ -2513,6 +2513,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }(address, tokenAmount)
          |}
          |
+         |@using(methodSelector = false)
          |Interface Swap {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
@@ -2686,6 +2687,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  Foo(fooId).foo{address -> ALPH: 1}()
          |}
          |
+         |@using(methodSelector = false)
          |Interface Foo {
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> ()
@@ -6728,8 +6730,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val result3 = Compiler.compileContractFull(code3).rightValue
-    result3.code.methods(0).instrs.head isnot a[MethodSelector]
-    result3.code.methods(1).instrs.head is a[MethodSelector]
+    result3.code.methods.foreach(_.instrs.head is a[MethodSelector])
   }
 
   it should "not use method selector for private functions" in {
@@ -6953,6 +6954,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("throw an error if the interface not use method selector but parents does")
       val code =
         s"""
+           |@using(methodSelector = false)
            |Interface $$Foo$$ extends Bar {
            |  pub fn foo() -> ()
            |}

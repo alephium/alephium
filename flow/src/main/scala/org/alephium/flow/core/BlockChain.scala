@@ -18,6 +18,8 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 
+import akka.util.ByteString
+
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
@@ -27,7 +29,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.serde.Serde
+import org.alephium.serde.{serialize, Serde}
 import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -61,6 +63,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     blockCache.getUnsafe(hash)(blockStorage.getUnsafe(hash))
   }
 
+  def getBlockBytes(hash: BlockHash): IOResult[ByteString] = {
+    IOUtils.tryExecute(getBlockBytesUnsafe(hash))
+  }
+
+  def getBlockBytesUnsafe(hash: BlockHash): ByteString = {
+    blockCache.get(hash).map(serialize(_)).getOrElse(blockStorage.getRawUnsafe(hash))
+  }
+
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
     val reversed           = locators.reverse
     val lastCanonicalIndex = reversed.indexWhere(isCanonicalUnsafe)
@@ -74,74 +84,9 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
-    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
-    if (Utils.unsafe(isRecentHeight(heightFrom))) {
-      getRecentDataUnsafe(heightFrom, heightTo)
-    } else {
-      getSyncDataUnsafe(heightFrom, heightTo)
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def getHashWithUncleDepsUnsafe(
-      header: BlockHeader,
-      acc: AVector[BlockHash]
-  ): AVector[BlockHash] = {
-    val hardFork = networkConfig.getHardFork(header.timestamp)
-    if (hardFork.isRhoneEnabled()) {
-      val block = getBlockUnsafe(header.hash)
-      val uncles = block.ghostUncleHashes match {
-        case Right(hashes) => hashes
-        case Left(error)   => throw error
-      }
-      val newAcc = if (acc.contains(header.hash)) acc else acc :+ header.hash
-      uncles.fold(newAcc) { case (acc, uncleHash) =>
-        val uncleHeader = getBlockHeaderUnsafe(uncleHash)
-        getHashWithUncleDepsUnsafe(uncleHeader, acc)
-      }
-    } else {
-      acc :+ header.hash
-    }
-  }
-
-  // heightFrom is exclusive, heightTo is inclusive
-  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
-    @tailrec
-    def iter(
-        currentHeader: BlockHeader,
-        currentHeight: Int,
-        acc: AVector[BlockHash]
-    ): AVector[BlockHash] = {
-      if (currentHeight <= heightFrom) {
-        getHashWithUncleDepsUnsafe(currentHeader, acc)
-      } else {
-        val newAcc       = getHashWithUncleDepsUnsafe(currentHeader, acc)
-        val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
-        iter(parentHeader, currentHeight - 1, newAcc)
-      }
-    }
-
-    val startHeader = Utils.unsafe(getHashes(heightTo).map(_.head).flatMap(getBlockHeader))
-    iter(startHeader, heightTo, AVector.empty).reverse
-  }
-
-  def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
-    // For a block with a height from `heightFrom` to `uncleHeightTo`, its uncle's height may lower than `heightFrom`
-    val uncleHeightTo = math.min(heightFrom + ALPH.MaxGhostUncleAge - 1, heightTo)
-    val hashes = AVector
-      .from(heightFrom to uncleHeightTo)
-      .fold(AVector.ofCapacity[BlockHash](heightTo - heightFrom + 1)) { case (acc, height) =>
-        val hashes = getHashesUnsafe(height)
-        hashes.fold(acc) { case (acc, hash) =>
-          val header = getBlockHeaderUnsafe(hash)
-          getHashWithUncleDepsUnsafe(header, acc)
-        }
-      }
-    if (uncleHeightTo < heightTo) {
-      hashes ++ AVector.from((uncleHeightTo + 1) to heightTo).flatMap(getHashesUnsafe)
-    } else {
-      hashes
-    }
+    val maxHeight = maxHeightUnsafe
+    val heightTo  = math.min(heightFrom + maxSyncBlocksPerChain, maxHeight)
+    AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
   }
 
   private def getUsedGhostUnclesAndAncestorsUnsafe(
@@ -238,7 +183,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       toTs: TimeStamp
   ): IOResult[(ChainIndex, AVector[(Block, Int)])] =
     for {
-      height <- maxHeight
+      height <- maxHeightByWeight
       result <- searchByTimestampHeight(height, fromTs, toTs)
     } yield (chainIndex, result)
 
@@ -433,7 +378,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getTxStatusUnsafe(txId: TransactionId): Option[TxStatus] = {
     getCanonicalTxIndex(txId).flatMap { selectedIndex =>
       val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
-      val maxHeight          = maxHeightUnsafe
+      val maxHeight          = maxHeightByWeightUnsafe
       val chainConfirmations = maxHeight - selectedHeight + 1
       Some(TxStatus(selectedIndex, chainConfirmations))
     }

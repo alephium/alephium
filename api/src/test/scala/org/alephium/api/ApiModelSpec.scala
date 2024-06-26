@@ -40,6 +40,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
+  val ghostUncleHash: BlockHash =
+    BlockHash.unsafe(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
+  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(
       BlockHash.zero,
@@ -53,7 +56,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       1.toByte,
       Hash.zero,
       Hash.zero,
-      ByteString.empty
+      ByteString.empty,
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript)))
     )
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
@@ -90,7 +94,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
        |  "version":${blockEntry.version},
        |  "depStateHash":"${blockEntry.depStateHash.toHexString}",
        |  "txsHash":"${blockEntry.txsHash.toHexString}",
-       |  "target":"${Hex.toHexString(blockEntry.target)}"
+       |  "target":"${Hex.toHexString(blockEntry.target)}",
+       |  "ghostUncles":${write(blockEntry.ghostUncles)}
        |}""".stripMargin
   }
   def parseFail[A: Reader](jsonRaw: String): String = {
@@ -120,6 +125,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     read[Amount.Hint](""""1234000000000"""") is Amount.Hint(small)
 
     parseFail[Amount.Hint](""""1 alph"""")
+  }
+
+  it should "encode/decode GhostUncleBlockEntry" in {
+    val entry = GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))
+    val jsonRaw =
+      """{"blockHash":"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5","miner":"1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n"}"""
+    checkData(entry, jsonRaw)
   }
 
   it should "encode/decode empty BlocksPerTimeStampRange" in {

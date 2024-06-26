@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
@@ -62,6 +64,23 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         val parentWeight = chain.getWeightUnsafe(block.parentHash)
         chain.add(block, parentWeight + block.weight).isRight is true
       }
+    }
+
+    def addChain(chain: BlockChain, blockNum: Int) = {
+      val blocks = chainGenOf(chain.chainIndex, blockNum, genesis.hash, TimeStamp.now()).sample.get
+      addBlocks(chain, blocks)
+      chain.maxHeightUnsafe is blockNum
+      chain.maxHeightByWeightUnsafe is blockNum
+      blocks
+    }
+
+    def addMaxWeightBlock(chain: BlockChain) = {
+      val maxWeight = chain.maxWeight.rightValue + Weight(BigInteger.ONE)
+      val block     = blockGen(chain.chainIndex, TimeStamp.now(), genesis.hash).sample.get
+      chain.add(block, maxWeight).isRight is true
+      chain.maxHeightUnsafe isnot chain.maxHeightByWeightUnsafe
+      chain.maxHeightByWeightUnsafe is 1
+      block
     }
   }
 
@@ -288,7 +307,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.isTip(headBlock) is false
     chain.isTip(lastBlock) is true
     chain.getBestTipUnsafe() is lastBlock.hash
-    chain.maxHeight isE blocks.length
+    chain.maxHeightByWeight isE blocks.length
     chain.getAllTips is AVector(lastBlock.hash)
 
     val diff = chain.calHashDiff(blocks.last.hash, genesis.hash).rightValue
@@ -310,7 +329,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.isTip(shortChain.last) is true
 
     addBlocks(chain, longChain.init)
-    chain.maxHeight isE longChain.length - 1
+    chain.maxHeightByWeight isE longChain.length - 1
     chain.getAllTips.toIterable.toSet is Set(longChain.init.last.hash, shortChain.last.hash)
 
     addBlock(chain, longChain.last)
@@ -321,7 +340,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.isTip(longChain.head) is false
     chain.isTip(longChain.last) is true
     chain.getBestTipUnsafe() is longChain.last.hash
-    chain.maxHeight isE longChain.length
+    chain.maxHeightByWeight isE longChain.length
     chain.getAllTips.toIterable.toSet is Set(longChain.last.hash, shortChain.last.hash)
   }
 
@@ -447,11 +466,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val blocks          = chainGenOf(5).sample.get
     val chain           = createBlockChain(blocks.init)
     blocks.init.foreach(block => chain.contains(block) isE true)
-    chain.maxHeight isE 3
+    chain.maxHeightByWeight isE 3
     chain.maxWeight isE consensusConfig.minBlockWeight * 3
     addBlock(chain, blocks.last)
     chain.contains(blocks.last) isE true
-    chain.maxHeight isE 4
+    chain.maxHeightByWeight isE 4
     chain.maxWeight isE consensusConfig.minBlockWeight * 4
   }
 
@@ -464,7 +483,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     blocks1.foreach(block => chain.contains(block) isE true)
     blocks2.foreach(block => chain.contains(block) isE true)
-    chain.maxHeight isE 4
+    chain.maxHeightByWeight isE 4
     chain.maxWeight isE consensusConfig.minBlockWeight * 4
     chain.getHashesAfter(blocks1.head.hash) isE {
       val branch1 = blocks1.tail
@@ -835,7 +854,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   it should "select uncles and calc the block diff" in new RhoneFixture {
     val length = ALPH.MaxGhostUncleAge + 1
     val chain  = createBlockChain(length)
-    chain.maxHeightUnsafe is length
+    chain.maxHeightByWeightUnsafe is length
     val parentHeight = Random.between(1, length - 2)
     val parentHash   = chain.getHashesUnsafe(parentHeight).head
     val uncle        = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
@@ -848,165 +867,73 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     )
   }
 
-  trait GetSyncDataFixture extends Fixture {
-    val chainIndex   = genesis.chainIndex
-    val lockupScript = assetLockupGen(chainIndex.to).sample.get
-    val blockChain   = buildBlockChain()
+  it should "get sync data based on max height" in new Fixture {
+    val chain  = buildBlockChain()
+    val blocks = addChain(chain, 4)
+    addMaxWeightBlock(chain)
 
-    var main  = AVector.empty[Block]
-    var fork0 = AVector.empty[Block]
-    var fork1 = AVector.empty[Block]
+    blocks.foreachWithIndex { case (block, index) =>
+      chain.getSyncDataUnsafe(AVector(block.hash)) is blocks.drop(index + 1).map(_.hash)
+    }
+  }
 
-    def createBlockChain(length: Int): Unit = {
-      (0 until length).foreach { _ =>
-        val now = TimeStamp.now()
-        val block = blockGen(
-          chainIndex,
-          now,
-          main.lastOption.getOrElse(genesis).hash,
-          fork0.lastOption
-            .map(block => AVector(SelectedGhostUncle(block.hash, lockupScript, 1)))
-            .getOrElse(AVector.empty)
-        ).sample.get
-        val fork0Block = blockGen(
-          chainIndex,
-          now,
-          fork0.lastOption.getOrElse(genesis).hash,
-          fork1.lastOption
-            .map(block => AVector(SelectedGhostUncle(block.hash, lockupScript, 1)))
-            .getOrElse(AVector.empty)
-        ).sample.get
-        val fork1Block =
-          blockGen(chainIndex, now, fork1.lastOption.getOrElse(genesis).hash).sample.get
-        main = main :+ block
-        fork0 = fork0 :+ fork0Block
-        fork1 = fork1 :+ fork1Block
+  it should "get latest hashes based on max height" in new Fixture {
+    val chain          = buildBlockChain()
+    val blocks0        = addChain(chain, 25)
+    val maxWeightBlock = addMaxWeightBlock(chain)
+    val result0        = blocks0.drop(4).map(_.hash)
+    chain.getLatestHashesUnsafe() is result0
+
+    val forkChainLength = 5
+    val parentHash      = blocks0(3).hash
+    val blocks1 =
+      chainGenOf(chain.chainIndex, forkChainLength, parentHash, TimeStamp.now()).sample.get
+    addBlocks(chain, blocks1)
+    chain.getAllTips.toSet is Set(blocks0.last.hash, maxWeightBlock.hash, blocks1.last.hash)
+    val result1 = AVector.from(0 until forkChainLength).flatMap { index =>
+      AVector(result0(index), blocks1(index).hash)
+    } ++ result0.drop(forkChainLength)
+    chain.getLatestHashesUnsafe() is result1
+  }
+
+  it should "test getSyncDataFromHeightUnsafe" in new Fixture {
+    val chain      = buildBlockChain()
+    val chainIndex = chain.chainIndex
+    val blocks0    = chainGenOf(chainIndex, 10, genesis.hash, TimeStamp.now()).sample.get
+    val blocks1    = chainGenOf(chainIndex, 5, genesis.hash, TimeStamp.now()).sample.get
+    addBlocks(chain, blocks0)
+    addBlocks(chain, blocks1)
+    chain.maxHeightUnsafe is 10
+
+    (1 to 5).foreach { height =>
+      val hashes0 = AVector.from(height to 5).flatMap { height =>
+        AVector(blocks0(height - 1).hash, blocks1(height - 1).hash)
       }
+      chain.getSyncDataFromHeightUnsafe(height) is hashes0 ++ blocks0.drop(5).map(_.hash)
+    }
+    (6 to 10).foreach { height =>
+      chain.getSyncDataFromHeightUnsafe(height) is blocks0.drop(height - 1).map(_.hash)
     }
 
-    def getHashesAtHeight(height: Int): AVector[BlockHash] = {
-      assume(height <= main.length)
-      val index = height - 1
-      AVector(main(index).hash, fork0(index).hash, fork1(index).hash)
+    val blocks2 = chainGenOf(chainIndex, maxSyncBlocksPerChain, blocks0.last).sample.get
+    addBlocks(chain, blocks2)
+    chain.maxHeightUnsafe is 10 + maxSyncBlocksPerChain
+    val fork0 = blocks0 ++ blocks2
+    val fork1 = blocks1
+    (1 to 5).foreach { from =>
+      val hashes0 = AVector.from(from to 5).flatMap { height =>
+        AVector(fork0(height - 1).hash, fork1(height - 1).hash)
+      }
+      val to = from + maxSyncBlocksPerChain
+      chain.getSyncDataFromHeightUnsafe(from) is hashes0 ++ fork0.slice(5, to).map(_.hash)
     }
-  }
-
-  it should "get sync data" in new GetSyncDataFixture {
-    val length = ALPH.MaxGhostUncleAge + 1
-    createBlockChain(length)
-
-    val uncles = AVector(SelectedGhostUncle(fork1.last.hash, lockupScript, 1))
-    val block  = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
-    // make sure `main` is the canonical chain
-    addBlocks(blockChain, (main :+ block) ++ fork0 ++ fork1)
-
-    val result0 = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, length)
-    result0.length is 21
-    val expected =
-      (AVector(main.head, fork0.head, main(1)) ++ AVector.from(2 until length).flatMap { index =>
-        AVector(fork1(index - 2), fork0(index - 1), main(index))
-      }).map(_.hash)
-    result0 is expected
-
-    val result1 = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
-    result1 is (result0 ++ AVector(uncles.head.blockHash, block.hash))
-
-    val hashes = (0 until ALPH.MaxGhostUncleAge).map { _ =>
-      val parentHash = blockChain.getBestTipUnsafe()
-      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
-      addBlock(blockChain, block)
-      block.hash
+    (6 to 9).foreach { from =>
+      val to = from + maxSyncBlocksPerChain
+      chain.getSyncDataFromHeightUnsafe(from) is fork0.slice(from - 1, to).map(_.hash)
     }
-    val result2 =
-      blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
-    result2 is (result1 ++ AVector.from(hashes))
-  }
-
-  it should "get recent data" in new GetSyncDataFixture {
-    val length = ALPH.MaxGhostUncleAge + 1
-    createBlockChain(length)
-
-    val uncles = AVector(SelectedGhostUncle(fork1.last.hash, lockupScript, 1))
-    val block0 = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
-    addBlocks(blockChain, (main :+ block0) ++ fork0 ++ fork1)
-
-    blockChain.getRecentDataUnsafe(length - 1, length) is
-      AVector(main(length - 2).hash, fork0(length - 3).hash, fork1(length - 4).hash) ++
-      AVector(fork0(length - 2).hash, fork1(length - 3).hash, fork1(length - 2).hash) ++
-      getHashesAtHeight(length)
-
-    val result0 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length - 1)
-    result0 is AVector.from(1 to (length - 1)).flatMap(getHashesAtHeight)
-
-    val result1 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length)
-    result1 is AVector.from(1 to length).flatMap(getHashesAtHeight)
-
-    val result2 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
-    result2 is (result1 :+ block0.hash)
-
-    // `main` and `fork0` has same uncles at height `length + 1`
-    val block2 = blockGen(chainIndex, TimeStamp.now(), fork0.last.hash, uncles).sample.get
-    val block3 = blockGen(chainIndex, TimeStamp.now(), block0.hash).sample.get
-    addBlocks(blockChain, AVector(block3, block2))
-
-    val result3 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
-    result3 is (result1 ++ AVector(block0.hash, block2.hash))
-
-    val hashes = (0 until ALPH.MaxGhostUncleAge).map { _ =>
-      val parentHash = blockChain.getBestTipUnsafe()
-      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
-      addBlock(blockChain, block)
-      block.hash
+    val maxHeight = chain.maxHeightUnsafe
+    (10 to maxHeight).foreach { from =>
+      chain.getSyncDataFromHeightUnsafe(from) is fork0.slice(from - 1, maxHeight).map(_.hash)
     }
-    val result4 =
-      blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
-    result4 is (result1 ++ AVector(block0.hash, block2.hash, block3.hash) ++ AVector.from(hashes))
-  }
-
-  it should "not include duplicate hashes" in new Fixture {
-    val chainIndex   = genesis.chainIndex
-    val lockupScript = assetLockupGen(chainIndex.to).sample.get
-    val blockChain   = buildBlockChain()
-
-    //                /<--- uncle1
-    //               /
-    // genesis <- block0 <- block1 <- block2 <- block3 <- block4
-    //                        \
-    //                         \<---- uncle2
-
-    val blocks = (0 until 3).map { _ =>
-      val parentHash = blockChain.getBestTipUnsafe()
-      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
-      addBlock(blockChain, block)
-      block
-    }
-    blockChain.maxHeightUnsafe is 3
-    val Seq(block0, block1, block2) = blocks
-    val uncle1                      = blockGen(chainIndex, TimeStamp.now(), block0.hash).sample.get
-    addBlock(blockChain, uncle1)
-
-    val selectedUncle1 = AVector(SelectedGhostUncle(uncle1.hash, lockupScript, 1))
-    val block3 = blockGen(chainIndex, TimeStamp.now(), block2.hash, selectedUncle1).sample.get
-    addBlock(blockChain, block3)
-    blockChain.maxHeightUnsafe is 4
-
-    val uncle2 = blockGen(chainIndex, TimeStamp.now(), block1.hash, selectedUncle1).sample.get
-    addBlock(blockChain, uncle2)
-
-    val selectedUncle2 = AVector(SelectedGhostUncle(uncle2.hash, lockupScript, 1))
-    val block4 = blockGen(chainIndex, TimeStamp.now(), block3.hash, selectedUncle2).sample.get
-    addBlock(blockChain, block4)
-    blockChain.maxHeightUnsafe is 5
-
-    val hashes = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeightUnsafe)
-    hashes is AVector(
-      block4.hash,
-      uncle2.hash,
-      uncle1.hash,
-      block3.hash,
-      block2.hash,
-      block1.hash,
-      block0.hash
-    ).reverse
   }
 }

@@ -165,6 +165,8 @@ trait EndpointsExamples extends ErrorExamples {
     hash.bytes
   )
 
+  private val ghostUncleBlockEntry = GhostUncleBlockEntry(blockHash, address)
+
   private val blockEntry = BlockEntry(
     blockHash,
     timestamp = ts,
@@ -177,7 +179,8 @@ trait EndpointsExamples extends ErrorExamples {
     1.toByte,
     hash,
     hash,
-    hash.bytes
+    hash.bytes,
+    AVector(ghostUncleBlockEntry)
   )
 
   private val eventByBlockHash = ContractEventByBlockHash(

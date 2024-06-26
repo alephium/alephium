@@ -69,9 +69,13 @@ final case class ExistInvalidTx(t: Transaction, e: InvalidTxStatus) extends Inva
 final case object InvalidFlowDeps                                   extends InvalidBlockStatus
 final case object InvalidFlowTxs                                    extends InvalidBlockStatus
 final case object InvalidTestnetMiner extends InvalidBlockStatus {
-  override def toString: String =
-    "The testnet is currently limited to whitelisted miners only. To test miners or pools, please set up a local testnet following the documentation."
+  lazy val errorMessage =
+    "The testnet is currently limited to whitelisted miners only. To test miners or pools, please set up a local testnet following the documentation: " +
+      "https://github.com/alephium/alephium-stack/tree/master/mining-pool-local-testnet"
+
+  override def toString: String = errorMessage
 }
+case object InvalidBlockHeight extends InvalidBlockStatus
 
 sealed trait InvalidPoLWStatus                  extends InvalidBlockStatus
 case object InvalidPoLWInputUnlockScript        extends InvalidPoLWStatus

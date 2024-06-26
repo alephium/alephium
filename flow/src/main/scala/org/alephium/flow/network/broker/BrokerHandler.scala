@@ -27,7 +27,7 @@ import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
+import org.alephium.flow.validation.{InvalidHeaderStatus, InvalidTestnetMiner, Validation}
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
@@ -37,6 +37,7 @@ import org.alephium.protocol.model.{
   BrokerInfo,
   ChainIndex,
   FlowData,
+  ReleaseVersion,
   TransactionId
 }
 import org.alephium.util._
@@ -105,10 +106,16 @@ trait BrokerHandler extends FlowDataHandler {
       case Received(hello: Hello) =>
         log.debug(s"Hello message received: $hello")
         cancelHandshakeTick()
-        handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
 
-        pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
-        context become (exchanging orElse pingPong)
+        if (!ReleaseVersion.checkClientId(hello.clientId)) {
+          log.warning(s"Unknown client id from ${remoteAddress}: ${hello.clientId}")
+          stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
+        } else {
+          handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
+
+          pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
+          context become (exchanging orElse pingPong)
+        }
       case HandShakeTimeout =>
         log.warning(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
         stop(MisbehaviorManager.RequestTimeout(remoteAddress))
@@ -149,14 +156,21 @@ trait BrokerHandler extends FlowDataHandler {
         case Right(_) => // Dead branch since deserialized NewBlock should always contain block
           log.error("Unexpected NewBlock data")
       }
-    case Received(BlocksResponse(requestId, blocks)) =>
-      log.debug(
-        s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress with $requestId"
-      )
-      handleFlowData(blocks, dataOrigin, isBlock = true)
+    case Received(BlocksResponse(requestId, blocksEither)) =>
+      blocksEither match {
+        case Left(blocks) =>
+          log.debug(
+            s"Received #${blocks.length} blocks ${Utils.showDataDigest(blocks)} from $remoteAddress with $requestId"
+          )
+          handleFlowData(blocks, dataOrigin, isBlock = true)
+        case Right(_) =>
+          // Dead branch since deserialized BlocksResponse should always contain blocks
+          log.error("Unexpected BlocksResponse data")
+      }
     case Received(BlocksRequest(requestId, hashes)) =>
-      escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlock), "load blocks") { blocks =>
-        send(BlocksResponse(requestId, blocks))
+      escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlockBytes), "load blocks") {
+        blockBytes =>
+          send(BlocksResponse.fromBlockBytes(requestId, blockBytes))
       }
     case Received(NewHeader(header)) =>
       log.debug(
@@ -184,7 +198,7 @@ trait BrokerHandler extends FlowDataHandler {
       log.debug(s"Failed in adding new block")
     case BlockChainHandler.InvalidBlock(hash, reason) =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
-      if (reason.isInstanceOf[InvalidHeaderStatus]) {
+      if (reason.isInstanceOf[InvalidHeaderStatus] || reason == InvalidTestnetMiner) {
         handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
       }
     case HeaderChainHandler.HeaderAdded(_) =>

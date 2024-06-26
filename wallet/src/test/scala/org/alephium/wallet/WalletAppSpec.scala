@@ -369,7 +369,13 @@ class WalletAppSpec
 
     sign("non-hex-data") check { response =>
       val error = response.as[ApiError.BadRequest]
-      error.detail is "Invalid hex string"
+      error.detail is "Invalid value for: body (Invalid hex string: non-hex-data at index 8: decoding failure)"
+      response.code is StatusCode.BadRequest
+    }
+
+    sign(Hex.toHexString(serialize(unsignedTx))) check { response =>
+      val error = response.as[ApiError.BadRequest]
+      error.detail is "Invalid value for: body (cannot decode 32 bytes hash at index 8: decoding failure)"
       response.code is StatusCode.BadRequest
     }
 

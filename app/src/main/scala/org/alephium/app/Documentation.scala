@@ -45,6 +45,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getBlocks,
     getBlocksAndEvents,
     getBlock,
+    getMainChainBlockByGhostUncle,
     getBlockAndEvents,
     isBlockInMainChain,
     getBalance,

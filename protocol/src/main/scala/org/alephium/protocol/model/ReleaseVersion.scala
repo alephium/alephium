@@ -17,7 +17,9 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol.BuildInfo
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde.Serde
+import org.alephium.util.TimeStamp
 
 final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
     extends Ordered[ReleaseVersion] {
@@ -33,6 +35,21 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
   }
 
   override def toString: String = s"v$major.$minor.$patch"
+
+  // scalastyle:off magic.number
+  def checkRhoneUpgrade()(implicit networkConfig: NetworkConfig): Boolean = {
+    if (networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled()) {
+      if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
+        this >= ReleaseVersion(3, 0, 0)
+      } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
+        this >= ReleaseVersion(2, 14, 6)
+      } else {
+        true
+      }
+    } else {
+      true
+    }
+  }
 }
 
 object ReleaseVersion {
@@ -43,6 +60,19 @@ object ReleaseVersion {
   )
 
   val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
+
+  def checkClientId(clientId: String)(implicit networkConfig: NetworkConfig): Boolean = {
+    ReleaseVersion.fromClientId(clientId).exists(_.checkRhoneUpgrade())
+  }
+
+  def fromClientId(clientId: String): Option[ReleaseVersion] = {
+    val parts = clientId.split("/")
+    if (parts.length < 2) {
+      None
+    } else {
+      from(parts(1))
+    }
+  }
 
   def from(release: String): Option[ReleaseVersion] = {
     val regex = """v?(\d+)\.(\d+)\.(\d+)(.*)?""".r

@@ -22,7 +22,7 @@ import io.prometheus.client.Counter
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
-import org.alephium.serde._
+import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
 import org.alephium.util.{AVector, TimeStamp}
 
 //scalastyle:off number.of.types
@@ -270,13 +270,34 @@ object Pong extends Payload.Serding[Pong] with Payload.Code {
   val serde: Serde[Pong] = Serde.forProduct1(apply, p => p.id)
 }
 
-final case class BlocksResponse(id: RequestId, blocks: AVector[Block]) extends Payload.Solicited {
+final case class BlocksResponse(id: RequestId, blocks: Either[AVector[Block], AVector[ByteString]])
+    extends Payload.Solicited {
   override def measure(): Unit = BlocksResponse.payloadLabeled.inc()
 }
 
 object BlocksResponse extends Payload.Serding[BlocksResponse] with Payload.Code {
-  implicit val blockSerde: Serde[Block]     = Block.serde
-  implicit val serde: Serde[BlocksResponse] = Serde.forProduct2(apply, p => (p.id, p.blocks))
+  implicit val blockSerde: Serde[Block] = Block.serde
+  implicit val serde: Serde[BlocksResponse] = new Serde[BlocksResponse] {
+    def _deserialize(input: ByteString): SerdeResult[Staging[BlocksResponse]] = {
+      for {
+        idResult     <- _decode[RequestId](input)
+        blocksResult <- _decode[AVector[Block]](idResult.rest)
+      } yield Staging(BlocksResponse(idResult.value, Left(blocksResult.value)), blocksResult.rest)
+    }
+
+    def serialize(input: BlocksResponse): ByteString = {
+      encode(input.id) ++ (input.blocks match {
+        case Left(blocks) => encode(blocks)
+        case Right(bytes) =>
+          bytes.fold(CompactInteger.Signed.encode(bytes.length))(_ ++ _)
+      })
+    }
+  }
+
+  def fromBlocks(id: RequestId, blocks: AVector[Block]): BlocksResponse =
+    BlocksResponse(id, Left(blocks))
+  def fromBlockBytes(id: RequestId, blockBytes: AVector[ByteString]): BlocksResponse =
+    BlocksResponse(id, Right(blockBytes))
 }
 
 final case class BlocksRequest(id: RequestId, locators: AVector[BlockHash])

@@ -26,11 +26,12 @@ import org.scalacheck.Gen
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.BIP340Schnorr
+import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
@@ -1240,19 +1241,25 @@ class ServerUtilsSpec extends AlephiumSpec {
     outputs(2).additionalDataOpt.isDefined is true
   }
 
-  trait CallContractFixture extends Fixture {
+  trait ContractFixture extends Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val chainIndex    = ChainIndex.unsafe(0, 0)
-    val lockupScript  = getGenesisLockupScript(chainIndex)
-    val callerAddress = Address.Asset(lockupScript)
-    val inputAsset    = TestInputAsset(callerAddress, AssetState(ALPH.oneAlph))
-    val serverUtils   = new ServerUtils()
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val lockupScript = getGenesisLockupScript(chainIndex)
+    val serverUtils  = new ServerUtils()
 
-    def executeScript(script: vm.StatefulScript) = {
-      val block = payableCall(blockFlow, chainIndex, script)
+    def executeScript(
+        script: vm.StatefulScript,
+        keyPairOpt: Option[(PrivateKey, PublicKey)] = None
+    ): Block = {
+      val block = payableCall(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
       addAndCheck(blockFlow, block)
       block
+    }
+
+    def executeScript(code: String, keyPairOpt: Option[(PrivateKey, PublicKey)]): Block = {
+      val script = Compiler.compileTxScript(code).rightValue
+      executeScript(script, keyPairOpt)
     }
 
     def createContract(code: String, mutFields: AVector[vm.Val]): (Block, ContractId) = {
@@ -1263,6 +1270,11 @@ class ServerUtilsSpec extends AlephiumSpec {
       val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
       (block, contractId)
     }
+  }
+
+  trait CallContractFixture extends ContractFixture {
+    val callerAddress = Address.Asset(lockupScript)
+    val inputAsset    = TestInputAsset(callerAddress, AssetState(ALPH.oneAlph))
 
     val barCode =
       s"""
@@ -1314,7 +1326,6 @@ class ServerUtilsSpec extends AlephiumSpec {
          |
          |$fooCode
          |""".stripMargin
-    val callScript = Compiler.compileTxScript(callScriptCode).rightValue
 
     def checkContractStates(contractId: ContractId, value: U256, attoAlphAmount: U256) = {
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
@@ -1326,7 +1337,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   "ServerUtils.callContract" should "call contract" in new CallContractFixture {
-    executeScript(callScript)
+    executeScript(callScriptCode, None)
     checkContractStates(barId, U256.unsafe(1), minimalAlphInContract)
     checkContractStates(fooId, U256.unsafe(1), minimalAlphInContract + ALPH.oneNanoAlph)
 
@@ -2869,19 +2880,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       rhoneHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
     )
 
-    val contractAddress = deployContract(fooContract)
-
-    def script =
-      s"""
-         |TxScript Main {
-         |  Foo(#${contractAddress.toBase58}).foo()
-         |}
-         |
-         |$fooContract
-         |""".stripMargin
-
-    val exception = intercept[AssertionError](executeScript(script))
-    exception.getMessage() is "Right(TxScriptExeFailed(InactiveInstr(PayGasFee)))"
+    intercept[AssertionError](deployContract(fooContract)).getMessage is
+      "BadRequest(Execution error when estimating gas for tx script or contract: InactiveInstr(MethodSelector(Selector(-1928645066))))"
   }
 
   it should "not charge caller gas fee when contract is paying gas" in new GasFeeFixture {
@@ -3413,6 +3413,200 @@ class ServerUtilsSpec extends AlephiumSpec {
         "`issueTokenTo` is specified, but `issueTokenAmount` is not specified"
       )
     )
+  }
+
+  it should "get ghost uncles" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0, block1)
+    val block2 = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block2)
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 2
+
+    val ghostUncleHash  = blockFlow.getHashes(chainIndex, 1).rightValue.last
+    val ghostUncleBlock = blockFlow.getBlock(ghostUncleHash).rightValue
+    val serverUtils     = new ServerUtils()
+    serverUtils.getBlock(blockFlow, block2.hash).rightValue.ghostUncles is
+      AVector(
+        GhostUncleBlockEntry(ghostUncleHash, Address.Asset(ghostUncleBlock.minerLockupScript))
+      )
+  }
+
+  it should "get mainchain block by ghost uncle hash" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0, block1)
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
+
+    val serverUtils    = new ServerUtils()
+    val ghostUncleHash = blockFlow.getHashes(chainIndex, 1).rightValue.last
+    val blockNum       = Random.between(0, ALPH.MaxGhostUncleAge)
+    (0 until blockNum).foreach { _ =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      block.ghostUncleHashes.rightValue.isEmpty is true
+      addAndCheck(blockFlow, block)
+    }
+    serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).leftValue.detail is
+      s"The mainchain block that references the ghost uncle block ${ghostUncleHash.toHexString} not found"
+
+    val block = mineBlockTemplate(blockFlow, chainIndex)
+    block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
+    addAndCheck(blockFlow, block)
+    val blockHeight = blockNum + 2
+    serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
+      BlockEntry.from(block, blockHeight).rightValue
+
+    val invalidBlockHash = randomBlockHash(chainIndex)
+    serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+    serverUtils.getMainChainBlockByGhostUncle(blockFlow, block.hash).leftValue.detail is
+      s"The block ${block.hash.toHexString} is not a ghost uncle block, you should use a ghost uncle block hash to call this endpoint"
+  }
+
+  it should "return error if the block does not exist" in new Fixture {
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val serverUtils      = new ServerUtils()
+    val invalidBlockHash = randomBlockHash(chainIndex)
+    val block            = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry.from(block, 1).rightValue
+    serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+
+    serverUtils.getBlockHeader(blockFlow, block.hash).rightValue is BlockHeaderEntry.from(
+      block.header,
+      1
+    )
+    serverUtils.getBlockHeader(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+
+    serverUtils.isBlockInMainChain(blockFlow, block.hash).rightValue is true
+    serverUtils.isBlockInMainChain(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+  }
+
+  it should "return error if the BuildExecuteScriptTx is invalid" in new Fixture {
+    val chainIndex        = ChainIndex.unsafe(0, 0)
+    val (_, publicKey, _) = genesisKeys(chainIndex.from.value)
+    val serverUtils       = new ServerUtils()
+    serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = publicKey.bytes,
+          bytecode = ByteString.empty,
+          gasEstimationMultiplier = Some(1.05),
+          gasAmount = Some(GasBox.unsafe(20000))
+        )
+      )
+      .leftValue
+      .detail is "Parameters `gasAmount` and `gasEstimationMultiplier` cannot be specified simultaneously"
+
+    serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = publicKey.bytes,
+          bytecode = ByteString.empty,
+          gasEstimationMultiplier = Some(1.005)
+        )
+      )
+      .leftValue
+      .detail is "Invalid gas estimation multiplier precision, maximum allowed precision is 2"
+  }
+
+  it should "estimate gas using gas estimation multiplier" in new ContractFixture {
+    val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val (privateKey, publicKey)                  = chainIndex.from.generateKey
+    val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(10))
+    addAndCheck(blockFlow, block)
+
+    val foo =
+      s"""
+         |Contract Foo(mut bytes: ByteVec, mut firstTime: Bool) {
+         |  mapping[ByteVec, U256] map
+         |
+         |  @using(preapprovedAssets = true, updateFields = true, checkExternalCaller = false)
+         |  pub fn foo() -> () {
+         |    let count = if (firstTime) 1 else 2
+         |    firstTime = false
+         |    let caller = callerAddress!()
+         |    for (let mut i = 0; i < count; i = i + 1) {
+         |      bytes = bytes ++ #00
+         |      map.insert!(caller, bytes, 0)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val (_, fooId) =
+      createContract(foo, AVector[vm.Val](vm.Val.ByteVec(ByteString.empty), vm.Val.True))
+    val script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooId.toHexString}).foo{callerAddress!() -> ALPH: 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+
+    val scriptBytecode = serialize(Compiler.compileTxScript(script).rightValue)
+    val result0 = serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = publicKey.bytes,
+          bytecode = scriptBytecode,
+          attoAlphAmount = Some(Amount(ALPH.oneAlph))
+        )
+      )
+      .rightValue
+    val result1 = serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = publicKey.bytes,
+          bytecode = scriptBytecode,
+          attoAlphAmount = Some(Amount(ALPH.oneAlph)),
+          gasEstimationMultiplier = Some(1.8)
+        )
+      )
+      .rightValue
+    result1.gasAmount.value > result0.gasAmount.value is true
+
+    executeScript(script, Some((genesisPrivateKey, genesisPublicKey)))
+
+    def createTxTemplate(result: BuildExecuteScriptTxResult): TransactionTemplate = {
+      val signature = SecP256K1.sign(result.txId.bytes, privateKey)
+      serverUtils.createTxTemplate(SubmitTransaction(result.unsignedTx, signature)).rightValue
+    }
+
+    def submitTx(txTemplate: TransactionTemplate): Block = {
+      blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
+      mineFromMemPool(blockFlow, chainIndex)
+    }
+
+    val validator = blockFlow.templateValidator.nonCoinbaseValidation
+    val tx0       = createTxTemplate(result0)
+    validator.validateMempoolTxTemplate(tx0, blockFlow).leftValue isE TxScriptExeFailed(vm.OutOfGas)
+    val block0 = submitTx(tx0)
+    block0.nonCoinbase.head.scriptExecutionOk is false
+    blockFlow.getGrandPool().clear()
+
+    val tx1 = createTxTemplate(result1)
+    validator.validateMempoolTxTemplate(tx1, blockFlow) isE ()
+    val block1 = submitTx(tx1)
+    block1.nonCoinbase.head.scriptExecutionOk is true
+    addAndCheck(blockFlow, block1)
+  }
+
+  @scala.annotation.tailrec
+  private def randomBlockHash(
+      chainIndex: ChainIndex
+  )(implicit groupConfig: GroupConfig): BlockHash = {
+    val blockHash = BlockHash.random
+    if (ChainIndex.from(blockHash) == chainIndex) blockHash else randomBlockHash(chainIndex)
   }
 
   private def generateDestination(
