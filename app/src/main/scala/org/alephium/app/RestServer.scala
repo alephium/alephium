@@ -115,6 +115,7 @@ class RestServer(
       compileContractLogic,
       compileProjectLogic,
       buildDeployContractTxLogic,
+      buildGenericTransactionsLogic,
       contractStateLogic,
       testContractLogic,
       callContractLogic,
