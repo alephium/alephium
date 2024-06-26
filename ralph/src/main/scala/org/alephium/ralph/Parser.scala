@@ -1194,7 +1194,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
       val usingFields = Parser.InterfaceUsingAnnotation.extractFields(
         annotations,
-        Parser.InterfaceUsingAnnotationFields(methodSelector = false)
+        Parser.InterfaceUsingAnnotationFields(methodSelector = true)
       )
       Ast
         .ContractInterface(

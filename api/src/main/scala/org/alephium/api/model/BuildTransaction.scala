@@ -48,8 +48,19 @@ object BuildTransaction {
       tokens: Option[AVector[Token]] = None,
       gasAmount: Option[GasBox] = None,
       gasPrice: Option[GasPrice] = None,
-      targetBlockHash: Option[BlockHash] = None
-  ) extends BuildTransaction
+      targetBlockHash: Option[BlockHash] = None,
+      gasEstimationMultiplier: Option[Double] = None
+  ) extends BuildTransaction {
+    def check(): Either[String, Unit] = {
+      if (gasAmount.isEmpty || gasEstimationMultiplier.isEmpty) {
+        Right(())
+      } else {
+        Left(
+          "Parameters `gasAmount` and `gasEstimationMultiplier` cannot be specified simultaneously"
+        )
+      }
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class DeployContract(

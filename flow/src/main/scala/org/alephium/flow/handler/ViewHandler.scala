@@ -102,9 +102,9 @@ class ViewHandler(
         updateBestDepsCount += 1
         tryUpdateBestDeps()
       }
-      if (isNodeSynced) { updateSubscribers() }
     case ViewHandler.BestDepsUpdated =>
       updatingBestDeps = false
+      if (isNodeSynced) { updateSubscribers() }
       tryUpdateBestDeps()
     case ViewHandler.BestDepsUpdateFailed =>
       updatingBestDeps = false

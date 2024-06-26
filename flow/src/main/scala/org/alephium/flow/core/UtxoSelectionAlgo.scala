@@ -80,7 +80,8 @@ object UtxoSelectionAlgo extends StrictLogging {
   final case class SelectedSoFar(alph: U256, selected: AVector[Asset], rest: AVector[Asset])
   final case class ProvidedGas(
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      gasEstimationMultiplier: Option[GasEstimationMultiplier]
   )
   final case class AssetAmounts(alph: U256, tokens: AVector[(TokenId, U256)])
   final case class TxInputWithAsset(input: TxInput, asset: Asset)
@@ -166,7 +167,10 @@ object UtxoSelectionAlgo extends StrictLogging {
               case None =>
                 Right(GasBox.zero)
               case Some(txScript) =>
-                GasEstimation.estimate(inputWithAssets, txScript, txScriptGasEstimator)
+                GasEstimation.estimate(inputWithAssets, txScript, txScriptGasEstimator).map {
+                  scriptGas =>
+                    providedGas.gasEstimationMultiplier.map(_ * scriptGas).getOrElse(scriptGas)
+                }
             }
             scriptGasFee = gasPrice * scriptGas
             totalAttoAlphAmount <- scriptGasFee

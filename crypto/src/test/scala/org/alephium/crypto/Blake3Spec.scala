@@ -17,17 +17,17 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
-import org.bouncycastle.crypto.Digest
-import org.bouncycastle.crypto.digests.SHA3Digest
 
-import org.alephium.serde.RandomBytes
+import org.alephium.util.AlephiumSpec
 
-class Sha3(val bytes: ByteString) extends RandomBytes {
-  def length: Int = Sha3.length
-}
-
-object Sha3 extends BCHashSchema[Sha3](HashSchema.unsafeSha3, _.bytes) {
-  def length: Int = 32
-
-  def provider(): Digest = new SHA3Digest()
+class Blake3Spec extends AlephiumSpec {
+  it should "compare random bytes" in {
+    val zeros = Blake3.zero
+    Blake3.equals(32, zeros.bytes, 32, zeros.bytes) is true
+    (0 until 32).foreach { k =>
+      val onlyOne = Array.fill(32)(0.toByte)
+      onlyOne(k) = 1.toByte
+      Blake3.equals(32, zeros.bytes, 32, ByteString.fromArrayUnsafe(onlyOne)) is false
+    }
+  }
 }

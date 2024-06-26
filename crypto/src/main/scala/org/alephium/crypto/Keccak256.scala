@@ -23,6 +23,8 @@ import org.bouncycastle.crypto.digests.KeccakDigest
 import org.alephium.serde.RandomBytes
 
 class Keccak256(val bytes: ByteString) extends RandomBytes {
+  def length: Int = Keccak256.length
+
   def toByte32: Byte32 = Byte32.unsafe(bytes)
 }
 

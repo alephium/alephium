@@ -21,8 +21,8 @@ import org.alephium.protocol.model.AssetOutputRef
 import org.alephium.util.AVector
 
 final case class ExtraUtxosInfo(
-  newUtxos: AVector[AssetOutputInfo],
-  spentUtxos: AVector[AssetOutputRef]
+    newUtxos: AVector[AssetOutputInfo],
+    spentUtxos: AVector[AssetOutputRef]
 ) {
   def merge(utxos: AVector[AssetOutputInfo]): AVector[AssetOutputInfo] = {
     utxos.filterNot(utxo => spentUtxos.contains(utxo.ref)) ++ newUtxos

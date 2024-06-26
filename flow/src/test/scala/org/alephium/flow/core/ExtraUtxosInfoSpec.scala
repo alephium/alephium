@@ -26,8 +26,8 @@ import org.alephium.util.AVector
 
 class ExtraUtxosInfoSpec extends AlephiumSpec {
 
-  "ExtraUtxosInfoSpec.merge" should "merge UTXOs" in new FlowFixture with ModelGenerators  {
-    val chainIndex  = ChainIndex.unsafe(0, 0)
+  "ExtraUtxosInfoSpec.merge" should "merge UTXOs" in new FlowFixture with ModelGenerators {
+    val chainIndex = ChainIndex.unsafe(0, 0)
     val spentUtxos = AVector.from(Gen.listOf(assetOutputRefGen(chainIndex.from)).sample.value)
 
     def genUtxos(): AVector[AssetOutputInfo] = {
@@ -37,11 +37,13 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
         AssetOutputInfo(txInputRef, assetOutput, MemPoolOutput)
       }
     }
-    val newUtxos = genUtxos()
+    val newUtxos       = genUtxos()
     val extraUtxosInfo = ExtraUtxosInfo(newUtxos, spentUtxos)
 
     val utxos = genUtxos()
-    extraUtxosInfo.merge(utxos.replace(0, utxos(0).copy(ref = spentUtxos(0)))) is utxos.tail ++ newUtxos
+    extraUtxosInfo.merge(
+      utxos.replace(0, utxos(0).copy(ref = spentUtxos(0)))
+    ) is utxos.tail ++ newUtxos
     extraUtxosInfo.merge(utxos) is utxos ++ newUtxos
   }
 }

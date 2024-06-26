@@ -25,6 +25,7 @@ import org.alephium.util.Bytes.byteStringOrdering
 
 /** 160bits identifier of a Peer * */
 class CliqueId(val publicKey: PublicKey) extends RandomBytes with Ordered[CliqueId] {
+  def length: Int       = CliqueId.length
   val bytes: ByteString = publicKey.bytes
   def hammingDist(another: CliqueId): Int = {
     CliqueId.hammingDist(this, another)

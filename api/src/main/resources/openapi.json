@@ -12312,6 +12312,10 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "gasEstimationMultiplier": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -12394,6 +12398,10 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "gasEstimationMultiplier": {
+            "type": "number",
+            "format": "double"
           },
           "type": {
             "type": "string"
