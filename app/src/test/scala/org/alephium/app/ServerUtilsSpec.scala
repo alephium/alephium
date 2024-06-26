@@ -3515,6 +3515,19 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     }
 
+    def failedGenericTransactions(
+        buildTransactions: AVector[BuildTransaction],
+        errorDetails: String
+    ) = {
+      serverUtils
+        .buildGenericTransactions(
+          blockFlow,
+          buildTransactions
+        )
+        .leftValue
+        .detail is errorDetails
+    }
+
     def failedDeployContract(
         buildTransfer: BuildTransaction.DeployContract,
         errorDetails: String
@@ -3522,34 +3535,71 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.buildDeployContractTx(blockFlow, buildTransfer).leftValue.detail is errorDetails
     }
 
-    object Transfer01 {
-      val chainIndex                         = ChainIndex.unsafe(0, 1)
-      val lockupScript                       = getGenesisLockupScript(chainIndex)
-      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
-      val (toPrivateKey, toPublicKey)        = chainIndex.to.generateKey
-      val toAddress                          = Address.p2pkh(toPublicKey)
-      val destination                        = Destination(toAddress, Amount(ALPH.oneAlph * 2))
+    trait GroupInfo {
+      val groupIndex: GroupIndex
+      val privateKey: PrivateKey
+      val publicKey: PublicKey
+      val address                  = Address.p2pkh(publicKey)
+      def destination(value: U256) = Destination(address, Amount(value))
     }
+
+    def groupInfo(group: Int): GroupInfo = {
+      new GroupInfo {
+        lazy val groupIndex: GroupIndex  = GroupIndex.unsafe(group)
+        lazy val (privateKey, publicKey) = groupIndex.generateKey
+      }
+    }
+
+    lazy val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(0)
+
+    val groupInfo0 = groupInfo(0)
+    val groupInfo1 = groupInfo(1)
+    val groupInfo2 = groupInfo(2)
+    val groupInfo3 = groupInfo(3)
+
+    val address0InitBalance = ALPH.alph(3)
+    val transferToAddress0 = serverUtils
+      .buildTransferTransaction(
+        blockFlow,
+        BuildTransaction
+          .Transfer(
+            genesisPublicKey.bytes,
+            None,
+            AVector(groupInfo0.destination(address0InitBalance))
+          )
+      )
+      .rightValue
+    signAndAndToMemPool(transferToAddress0, genesisPrivateKey)
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    checkAlphBalance(groupInfo0.address.lockupScript, address0InitBalance)
   }
 
   it should "build multiple transfers transactions" in new GenericTransactionsFixture {
-    object Transfer12 {
-      val chainIndex                  = ChainIndex.unsafe(1, 2)
-      val (toPrivateKey, toPublicKey) = chainIndex.to.generateKey
-      val toAddress                   = Address.p2pkh(toPublicKey)
-      val destination                 = Destination(toAddress, Amount(ALPH.oneAlph))
-    }
-
     failedBuildTransfer(
       BuildTransaction
-        .Transfer(Transfer01.toPublicKey.bytes, None, AVector(Transfer12.destination)),
+        .Transfer(groupInfo1.publicKey.bytes, None, AVector(groupInfo2.destination(ALPH.oneAlph))),
       errorDetails = "Not enough balance: got 0, expected 1001000000000000000"
+    )
+
+    failedGenericTransactions(
+      AVector(
+        BuildTransaction
+          .Transfer(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(ALPH.alph(2)))
+          ),
+        BuildTransaction
+          .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo2.destination(ALPH.oneAlph)))
+      ),
+      errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
     )
 
     val buildTransactions = buildGenericTransactions(
       BuildTransaction
-        .Transfer(Transfer01.fromPublicKey.bytes, None, AVector(Transfer01.destination)),
-      BuildTransaction.Transfer(Transfer01.toPublicKey.bytes, None, AVector(Transfer12.destination))
+        .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo1.destination(ALPH.alph(2)))),
+      BuildTransaction
+        .Transfer(groupInfo1.publicKey.bytes, None, AVector(groupInfo2.destination(ALPH.oneAlph)))
     )
 
     buildTransactions.length is 2
@@ -3558,23 +3608,23 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransferTransaction12 =
       buildTransactions(1).asInstanceOf[BuildTransactionResult.Transfer]
 
-    signAndAndToMemPool(buildTransferTransaction01, Transfer01.fromPrivateKey)
-    signAndAndToMemPool(buildTransferTransaction12, Transfer01.toPrivateKey)
-    confirmNewBlock(blockFlow, Transfer01.chainIndex)
-    confirmNewBlock(blockFlow, Transfer12.chainIndex)
+    signAndAndToMemPool(buildTransferTransaction01, groupInfo0.privateKey)
+    signAndAndToMemPool(buildTransferTransaction12, groupInfo1.privateKey)
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 2))
 
     val buildTransferTransaction01GasFee =
       buildTransferTransaction01.gasPrice * buildTransferTransaction01.gasAmount
     checkAlphBalance(
-      Transfer01.toAddress.lockupScript,
+      groupInfo1.address.lockupScript,
       ALPH.oneAlph - buildTransferTransaction01GasFee
     )
-    checkAlphBalance(Transfer12.toAddress.lockupScript, ALPH.oneAlph)
+    checkAlphBalance(groupInfo2.address.lockupScript, ALPH.oneAlph)
   }
 
   it should "build a transfer transaction followed by an execute script transactions" in new GenericTransactionsFixture {
-    val buildExecuteScript = BuildTransaction.ExecuteScript(
-      fromPublicKey = Transfer01.toPublicKey.bytes,
+    def buildExecuteScript(publicKey: PublicKey) = BuildTransaction.ExecuteScript(
+      fromPublicKey = publicKey.bytes,
       bytecode = serialize(scriptCode),
       gasAmount = Some(gasAmount),
       gasPrice = Some(gasPrice),
@@ -3582,14 +3632,27 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     failedExecuteTxScript(
-      buildExecuteScript,
+      buildExecuteScript(groupInfo1.publicKey),
       errorDetails = "Not enough balance: got 0, expected 3000000000000000"
+    )
+
+    failedGenericTransactions(
+      AVector(
+        BuildTransaction
+          .Transfer(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(address0InitBalance - nonCoinbaseMinGasFee * 2))
+          ),
+        buildExecuteScript(groupInfo0.publicKey)
+      ),
+      errorDetails = "Not enough balance: got 2000000000000000, expected 3000000000000000"
     )
 
     val buildTransactions = buildGenericTransactions(
       BuildTransaction
-        .Transfer(Transfer01.fromPublicKey.bytes, None, AVector(Transfer01.destination)),
-      buildExecuteScript
+        .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo1.destination(ALPH.alph(2)))),
+      buildExecuteScript(groupInfo1.publicKey)
     )
 
     buildTransactions.length is 2
@@ -3598,29 +3661,43 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildExecuteScriptTransaction =
       buildTransactions(1).asInstanceOf[BuildTransactionResult.ExecuteScript]
 
-    signAndAndToMemPool(buildTransferTransaction, Transfer01.fromPrivateKey)
-    signAndAndToMemPool(buildExecuteScriptTransaction, Transfer01.toPrivateKey)
-    confirmNewBlock(blockFlow, Transfer01.chainIndex)
+    signAndAndToMemPool(buildTransferTransaction, groupInfo0.privateKey)
+    signAndAndToMemPool(buildExecuteScriptTransaction, groupInfo1.privateKey)
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
     confirmNewBlock(blockFlow, buildExecuteScriptTransaction.chainIndex().value)
 
     checkAlphBalance(
-      Transfer01.toAddress.lockupScript,
+      groupInfo1.address.lockupScript,
       ALPH.oneAlph * 2 - buildExecuteScriptTransaction.gasFee
     )
   }
 
   it should "build a transfer transaction followed by a deploy contract transactions" in new GenericTransactionsFixture {
-    val buildDeployContract = BuildTransaction.DeployContract(
-      fromPublicKey = Transfer01.toPublicKey.bytes,
+    def buildDeployContract(publicKey: PublicKey) = BuildTransaction.DeployContract(
+      fromPublicKey = publicKey.bytes,
       bytecode = serialize(contractCode) ++ ByteString(0, 0)
     )
 
-    failedDeployContract(buildDeployContract, errorDetails = "No UTXO found.")
+    failedDeployContract(buildDeployContract(groupInfo1.publicKey), errorDetails = "No UTXO found.")
+
+    failedGenericTransactions(
+      AVector(
+        BuildTransaction
+          .Transfer(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(address0InitBalance - nonCoinbaseMinGasFee * 10))
+          ),
+        buildDeployContract(groupInfo0.publicKey)
+      ),
+      errorDetails =
+        s"Execution error when estimating gas for tx script or contract: Not enough approved balance for address ${groupInfo0.address.toBase58}, tokenId: ALPH, expected: 100000000000000000, got: 16000000000000000"
+    )
 
     val buildTransactions = buildGenericTransactions(
       BuildTransaction
-        .Transfer(Transfer01.fromPublicKey.bytes, None, AVector(Transfer01.destination)),
-      buildDeployContract
+        .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo1.destination(ALPH.alph(2)))),
+      buildDeployContract(groupInfo1.publicKey)
     )
     buildTransactions.length is 2
     val buildTransferTransaction =
@@ -3628,13 +3705,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildDeployContractTransaction =
       buildTransactions(1).asInstanceOf[BuildTransactionResult.DeployContract]
 
-    signAndAndToMemPool(buildTransferTransaction, Transfer01.fromPrivateKey)
-    signAndAndToMemPool(buildDeployContractTransaction, Transfer01.toPrivateKey)
-    confirmNewBlock(blockFlow, Transfer01.chainIndex)
+    signAndAndToMemPool(buildTransferTransaction, groupInfo0.privateKey)
+    signAndAndToMemPool(buildDeployContractTransaction, groupInfo1.privateKey)
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
     confirmNewBlock(blockFlow, buildDeployContractTransaction.chainIndex().value)
 
     checkAlphBalance(
-      Transfer01.toAddress.lockupScript,
+      groupInfo1.address.lockupScript,
       ALPH.oneAlph * 2 - minimalAlphInContract - buildDeployContractTransaction.gasFee
     )
   }
