@@ -175,7 +175,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val to         = chainIndex.to.generateKey._2
     val txs = AVector.from(0 until txNum).map { _ =>
       val (privateKey, publicKey) = chainIndex.to.generateKey
-      val block = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+      val block                   = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
       addAndCheck(blockFlow, block)
       block.coinbase.unsigned.gasAmount is minimalGas
       transfer(blockFlow, privateKey, to, ALPH.oneAlph).nonCoinbase.head
