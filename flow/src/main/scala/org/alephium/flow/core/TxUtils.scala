@@ -98,7 +98,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
         UtxoSelectionAlgo
-          .Build(ProvidedGas(gasOpt, gasPrice))
+          .Build(ProvidedGas(gasOpt, gasPrice, None))
           .select(
             AssetAmounts(totalAmount, totalAmountPerToken),
             fromUnlockScript,
@@ -255,7 +255,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(None, fromLockupScript, Int.MaxValue)
       .map { utxos =>
         UtxoSelectionAlgo
-          .Build(ProvidedGas(None, coinbaseGasPrice))
+          .Build(ProvidedGas(None, coinbaseGasPrice, None))
           .select(
             AssetAmounts(totalAmount, AVector.empty),
             fromUnlockScript,
