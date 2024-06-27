@@ -746,6 +746,13 @@ trait TxUtils { Self: FlowUtils =>
     )
   }
 
+  @inline private def isConsolidation(
+      fromLockupScript: LockupScript.Asset,
+      toLockupScript: LockupScript.Asset
+  ): Boolean = {
+    fromLockupScript == toLockupScript
+  }
+
   private[core] def buildSweepTokenTxs(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
@@ -759,10 +766,17 @@ trait TxUtils { Self: FlowUtils =>
     assume(maxTokenPerAssetUtxo == 1)
     assume(allTokenUtxos.forall(_.output.tokens.length == 1))
 
+    val utxosPerToken = allTokenUtxos.groupBy(_.output.tokens.head._1).view
+    val filteredTokenUtxos = if (isConsolidation(fromLockupScript, toLockupScript)) {
+      utxosPerToken.filter(_._2.length > 1)
+    } else {
+      utxosPerToken
+    }
+
     // group based on token id, so that utxos with the same token can
     // be included in a single transaction as much as possible
     val groupedTokenUtxos = AVector
-      .from(allTokenUtxos.groupBy(_.output.tokens.head._1).flatMap(_._2))
+      .from(filteredTokenUtxos.flatMap(_._2))
       .groupedWithRemainder(ALPH.MaxTxInputNum / 2)
     groupedTokenUtxos.fold((AVector.empty[UnsignedTransaction], allAlphUtxos)) {
       case ((txs, alphUtxos), tokenUtxos) =>
@@ -916,19 +930,23 @@ trait TxUtils { Self: FlowUtils =>
     val sortedAlphUtxos  = allAlphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph)
     val groupedAlphUtxos = sortedAlphUtxos.groupedWithRemainder(ALPH.MaxTxInputNum)
     groupedAlphUtxos.fold(AVector.empty[UnsignedTransaction]) { case (txs, alphUtxos) =>
-      tryBuildSweepAlphTx(
-        fromLockupScript,
-        fromUnlockScript,
-        toLockupScript,
-        lockTimeOpt,
-        alphUtxos,
-        gasOpt,
-        gasPrice
-      ) match {
-        case Right(unsignedTx) => txs :+ unsignedTx
-        case Left(error) =>
-          logger.info(s"Build sweep ALPH tx returns error: $error")
-          txs
+      if (isConsolidation(fromLockupScript, toLockupScript) && alphUtxos.length == 1) {
+        txs
+      } else {
+        tryBuildSweepAlphTx(
+          fromLockupScript,
+          fromUnlockScript,
+          toLockupScript,
+          lockTimeOpt,
+          alphUtxos,
+          gasOpt,
+          gasPrice
+        ) match {
+          case Right(unsignedTx) => txs :+ unsignedTx
+          case Left(error) =>
+            logger.info(s"Build sweep ALPH tx returns error: $error")
+            txs
+        }
       }
     }
   }

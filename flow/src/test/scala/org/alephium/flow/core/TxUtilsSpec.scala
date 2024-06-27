@@ -725,7 +725,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "estimate gas for sweep all tx" in new FlowFixture {
     val txValidation = TxValidation.build
-    def test(inputNum: Int) = {
+    def test(inputNum: Int, numOfTxs: Int) = {
       val blockflow = isolatedBlockFlow()
       val block     = transfer(blockflow, ChainIndex.unsafe(0, 0))
       val tx        = block.nonCoinbase.head
@@ -748,7 +748,7 @@ class TxUtilsSpec extends AlephiumSpec {
         )
         .rightValue
         .rightValue
-      unsignedTxs.length is 1
+      unsignedTxs.length is numOfTxs
       unsignedTxs.foreach { unsignedTx =>
         unsignedTx.fixedOutputs.length is 1
         unsignedTx.gasAmount is GasEstimation.sweepAddress(inputNum, 1)
@@ -757,16 +757,18 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
-    (1 to 10).foreach(test)
+    test(1, 0)
+    (2 to 10).foreach(test(_, 1))
   }
 
   trait SweepAlphFixture extends FlowFixture {
+    lazy val isConsolidation         = Random.nextBoolean()
     lazy val chainIndex              = ChainIndex.unsafe(0, 0)
     lazy val (privateKey, publicKey) = chainIndex.from.generateKey
     lazy val fromLockupScript        = LockupScript.p2pkh(publicKey)
     lazy val fromUnlockScript        = UnlockScript.p2pkh(publicKey)
     lazy val toLockupScript = {
-      if (Random.nextBoolean()) {
+      if (isConsolidation) {
         fromLockupScript
       } else {
         LockupScript.p2pkh(chainIndex.to.generateKey._2)
@@ -840,7 +842,6 @@ class TxUtilsSpec extends AlephiumSpec {
         gasOpt,
         nonCoinbaseMinGasPrice
       )
-      unsignedTxs.length is (utxos.length - 1) / ALPH.MaxTxInputNum + 1
       unsignedTxs.map { unsignedTx =>
         unsignedTx.fixedOutputs.length is 1
         checkAndSignTx(unsignedTx)
@@ -855,26 +856,62 @@ class TxUtilsSpec extends AlephiumSpec {
       (alph, tokens)
     }
 
-    def submitSweepTxsAndCheckBalances(txs: AVector[Transaction]) = {
-      val (alph0, tokens0) = getBalances(fromLockupScript)
-      val totalGasFee = txs.fold(U256.Zero) { case (acc, tx) =>
+    def submitSweepTxs(txs: AVector[Transaction]) = {
+      txs.fold(U256.Zero) { case (acc, tx) =>
         blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
         val block = mineFromMemPool(blockFlow, chainIndex)
         block.nonCoinbase is AVector(tx)
         addAndCheck(blockFlow, block)
         acc.addUnsafe(tx.gasFeeUnsafe)
       }
+    }
+
+    def submitSweepTxsAndCheckBalances(txs: AVector[Transaction]) = {
+      val (alph0, tokens0) = getBalances(fromLockupScript)
+      val totalGasFee      = submitSweepTxs(txs)
       val (alph1, tokens1) = getBalances(toLockupScript)
       alph0.subUnsafe(totalGasFee) is alph1
       tokens0.sortBy(_._1) is tokens1.sortBy(_._1)
+      if (!isConsolidation) {
+        blockFlow.getUsableUtxos(fromLockupScript, Int.MaxValue).rightValue.isEmpty is true
+      }
+    }
+
+    def sweep() = {
+      blockFlow
+        .sweepAddress(
+          None,
+          publicKey,
+          toLockupScript,
+          None,
+          None,
+          nonCoinbaseMinGasPrice,
+          None,
+          Int.MaxValue
+        )
+        .rightValue
     }
   }
 
   it should "sweep ALPH" in new SweepAlphFixture {
-    val numOfUtxos = Random.between(1, 1000)
-    val utxos      = getAlphOutputs(numOfUtxos)
+    override lazy val isConsolidation = false
+    val numOfUtxos                    = Random.between(1, 1000)
+    val utxos                         = getAlphOutputs(numOfUtxos)
     utxos.length is numOfUtxos
     val txs = testSweepALPH(utxos)
+    txs.length is (utxos.length - 1) / ALPH.MaxTxInputNum + 1
+    submitSweepTxsAndCheckBalances(txs)
+  }
+
+  it should "consolidate ALPH" in new SweepAlphFixture {
+    override lazy val isConsolidation = true
+    val numOfUtxos                    = Random.between(1, 1000)
+    val utxos                         = getAlphOutputs(numOfUtxos)
+    utxos.length is numOfUtxos
+    val txs = testSweepALPH(utxos)
+    val numOfTxs =
+      numOfUtxos / ALPH.MaxTxInputNum + (if (numOfUtxos % ALPH.MaxTxInputNum > 1) 1 else 0)
+    txs.length is numOfTxs
     submitSweepTxsAndCheckBalances(txs)
   }
 
@@ -895,6 +932,28 @@ class TxUtilsSpec extends AlephiumSpec {
     (ALPH.MaxTxInputNum until numOfUtxos).foreach { index =>
       utxos(index).ref is txs.last.unsigned.inputs(index - ALPH.MaxTxInputNum).outputRef
     }
+    submitSweepTxsAndCheckBalances(txs)
+  }
+
+  it should "not create txs if there is only one utxo left when consolidating" in new SweepAlphFixture {
+    override lazy val isConsolidation = true
+
+    val utxos0 = getAlphOutputs(1)
+    utxos0.length is 1
+    testSweepALPH(utxos0).length is 0
+
+    val utxos1 = getAlphOutputs(ALPH.MaxTxInputNum - 1) ++ utxos0
+    utxos1.length is ALPH.MaxTxInputNum
+    testSweepALPH(utxos1).length is 1
+
+    val utxos2 = getAlphOutputs(1) ++ utxos1
+    utxos2.length is ALPH.MaxTxInputNum + 1
+    testSweepALPH(utxos2).length is 1
+
+    val utxos3 = getAlphOutputs(1) ++ utxos2
+    utxos3.length is ALPH.MaxTxInputNum + 2
+    val txs = testSweepALPH(utxos3)
+    txs.length is 2
     submitSweepTxsAndCheckBalances(txs)
   }
 
@@ -1028,17 +1087,40 @@ class TxUtilsSpec extends AlephiumSpec {
     submitSweepTxsAndCheckBalances(txs)
   }
 
+  it should "not consolidate tokens that have only one utxo" in new SweepTokenFixture {
+    override lazy val isConsolidation = true
+    val tokenOutputs0                 = getTokenOutputs(100, 1, U256.One)
+    val tokenOutputs1                 = getTokenOutputs(50, 2, U256.One)
+    val allTokenOutputs               = tokenOutputs0 ++ tokenOutputs1
+    val txs                           = testSweepToken(allTokenOutputs, AVector.empty, 1)
+    tokenOutputs0.foreach { output =>
+      txs.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is false
+    }
+    tokenOutputs1.foreach { output =>
+      txs.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is true
+    }
+    submitSweepTxsAndCheckBalances(txs)
+  }
+
+  it should "return empty txs if all tokens have only one utxo when consolidating" in new SweepTokenFixture {
+    override lazy val isConsolidation = true
+    val tokenOutputs                  = getTokenOutputs(100, 1, U256.One)
+    val alphOutputs                   = getAlphOutputs(1)
+    testSweepToken(tokenOutputs, alphOutputs, 0)
+  }
+
   it should "not use ALPH utxos if token utxos can cover the gas fee" in new SweepTokenFixture {
     val tokenOutputs = getTokenOutputs(3, 40)
-    val alphOutputs  = getAlphOutputs(1)
+    val alphOutputs  = getAlphOutputs(2)
     val txs          = testSweepToken(tokenOutputs, alphOutputs, 1, None, _ is alphOutputs)
     submitSweepTxsAndCheckBalances(txs)
   }
 
   it should "use ALPH utxos if token utxos cannot cover the gas fee" in new SweepTokenFixture {
-    val tokenOutputs = getTokenOutputs(500, 1)
-    val alphOutputs  = getAlphOutputs(4)
-    val txs          = testSweepToken(tokenOutputs, alphOutputs, 4, None, _.isEmpty is true)
+    override lazy val isConsolidation = false
+    val tokenOutputs                  = getTokenOutputs(500, 1)
+    val alphOutputs                   = getAlphOutputs(4)
+    val txs = testSweepToken(tokenOutputs, alphOutputs, 4, None, _.isEmpty is true)
     submitSweepTxsAndCheckBalances(txs)
   }
 
@@ -1104,6 +1186,34 @@ class TxUtilsSpec extends AlephiumSpec {
       _.map(_.output.amount) is alphAmounts.take(3)
     )
     submitSweepTxsAndCheckBalances(txs)
+  }
+
+  it should "test the extreme case" in new SweepTokenFixture {
+    override lazy val isConsolidation = false
+    ALPH.MaxTxInputNum / 2 is 128
+    val tokenOutputs = getTokenOutputs(128, 1)
+    val alphOutputs  = getAlphOutputs(128, dustUtxoAmount)
+    val txs          = testSweepToken(tokenOutputs, alphOutputs, 1)
+    submitSweepTxsAndCheckBalances(txs)
+  }
+
+  it should "complete the sweep in multiple rounds" in new SweepTokenFixture {
+    override lazy val isConsolidation = true
+    getTokenOutputs(2, 200)
+    getAlphOutputs(ALPH.MaxTxInputNum + 1, dustUtxoAmount)
+    val (alph0, tokens0) = getBalances(fromLockupScript)
+
+    val txs0 = sweep().rightValue
+    txs0.length is 5
+    val gasFee0 = submitSweepTxs(txs0.map(checkAndSignTx))
+    val txs1    = sweep().rightValue
+    txs1.length is 2
+    val gasFee1     = submitSweepTxs(txs1.map(checkAndSignTx))
+    val totalGasFee = gasFee0.addUnsafe(gasFee1)
+
+    val (alph1, tokens1) = getBalances(toLockupScript)
+    alph0.subUnsafe(totalGasFee) is alph1
+    tokens0.sortBy(_._1) is tokens1.sortBy(_._1)
   }
 
   trait LargeUtxos extends FlowFixture {
