@@ -762,7 +762,7 @@ trait TxUtils { Self: FlowUtils =>
       allAlphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
-  ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo]) = {
+  ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo], AVector[String]) = {
     assume(maxTokenPerAssetUtxo == 1)
     assume(allTokenUtxos.forall(_.output.tokens.length == 1))
 
@@ -778,42 +778,43 @@ trait TxUtils { Self: FlowUtils =>
     val groupedTokenUtxos = AVector
       .from(filteredTokenUtxos.flatMap(_._2))
       .groupedWithRemainder(ALPH.MaxTxInputNum / 2)
-    groupedTokenUtxos.fold((AVector.empty[UnsignedTransaction], allAlphUtxos)) {
-      case ((txs, alphUtxos), tokenUtxos) =>
-        tryBuildSweepTokenTx(
-          fromLockupScript,
-          fromUnlockScript,
-          toLockupScript,
-          lockTimeOpt,
-          tokenUtxos,
-          alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
-          gasOpt,
-          gasPrice
-        ) match {
-          case Right((unsignedTx, restAlphUtxos)) =>
-            (txs :+ unsignedTx, restAlphUtxos)
-          case Left(error) =>
-            logger.info(
-              s"Build sweep tx with ascending order returns error: $error, try descending order instead"
-            )
+    groupedTokenUtxos.fold(
+      (AVector.empty[UnsignedTransaction], allAlphUtxos, AVector.empty[String])
+    ) { case ((txs, alphUtxos, errors), tokenUtxos) =>
+      tryBuildSweepTokenTx(
+        fromLockupScript,
+        fromUnlockScript,
+        toLockupScript,
+        lockTimeOpt,
+        tokenUtxos,
+        alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
+        gasOpt,
+        gasPrice
+      ) match {
+        case Right((unsignedTx, restAlphUtxos)) =>
+          (txs :+ unsignedTx, restAlphUtxos, errors)
+        case Left(error) =>
+          logger.info(
+            s"Build sweep tx with ascending order returns error: $error, try descending order instead"
+          )
 
-            tryBuildSweepTokenTx(
-              fromLockupScript,
-              fromUnlockScript,
-              toLockupScript,
-              lockTimeOpt,
-              tokenUtxos,
-              alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
-              gasOpt,
-              gasPrice
-            ) match {
-              case Right((unsignedTx, restAlphUtxos)) =>
-                (txs :+ unsignedTx, restAlphUtxos)
-              case Left(error) =>
-                logger.info(s"Build sweep tx with descending order returns error: $error")
-                (txs, alphUtxos)
-            }
-        }
+          tryBuildSweepTokenTx(
+            fromLockupScript,
+            fromUnlockScript,
+            toLockupScript,
+            lockTimeOpt,
+            tokenUtxos,
+            alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
+            gasOpt,
+            gasPrice
+          ) match {
+            case Right((unsignedTx, restAlphUtxos)) =>
+              (txs :+ unsignedTx, restAlphUtxos, errors)
+            case Left(error) =>
+              logger.info(s"Build sweep tx with descending order returns error: $error")
+              (txs, alphUtxos, errors :+ error)
+          }
+      }
     }
   }
 
@@ -924,30 +925,31 @@ trait TxUtils { Self: FlowUtils =>
       allAlphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
-  ): AVector[UnsignedTransaction] = {
+  ): (AVector[UnsignedTransaction], AVector[String]) = {
     assume(allAlphUtxos.forall(_.output.tokens.isEmpty))
 
     val sortedAlphUtxos  = allAlphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph)
     val groupedAlphUtxos = sortedAlphUtxos.groupedWithRemainder(ALPH.MaxTxInputNum)
-    groupedAlphUtxos.fold(AVector.empty[UnsignedTransaction]) { case (txs, alphUtxos) =>
-      if (isConsolidation(fromLockupScript, toLockupScript) && alphUtxos.length == 1) {
-        txs
-      } else {
-        tryBuildSweepAlphTx(
-          fromLockupScript,
-          fromUnlockScript,
-          toLockupScript,
-          lockTimeOpt,
-          alphUtxos,
-          gasOpt,
-          gasPrice
-        ) match {
-          case Right(unsignedTx) => txs :+ unsignedTx
-          case Left(error) =>
-            logger.info(s"Build sweep ALPH tx returns error: $error")
-            txs
+    groupedAlphUtxos.fold((AVector.empty[UnsignedTransaction], AVector.empty[String])) {
+      case ((txs, errors), alphUtxos) =>
+        if (isConsolidation(fromLockupScript, toLockupScript) && alphUtxos.length == 1) {
+          (txs, errors)
+        } else {
+          tryBuildSweepAlphTx(
+            fromLockupScript,
+            fromUnlockScript,
+            toLockupScript,
+            lockTimeOpt,
+            alphUtxos,
+            gasOpt,
+            gasPrice
+          ) match {
+            case Right(unsignedTx) => (txs :+ unsignedTx, errors)
+            case Left(error) =>
+              logger.info(s"Build sweep ALPH tx returns error: $error")
+              (txs, errors :+ error)
+          }
         }
-      }
     }
   }
 
@@ -974,7 +976,7 @@ trait TxUtils { Self: FlowUtils =>
             case None => allUtxosUnfiltered
           }
           val (allAlphUtxos, allTokenUtxos) = allUtxos.partition(_.output.tokens.isEmpty)
-          val (sweepTokenTxs, restAlphUtxos) = buildSweepTokenTxs(
+          val (sweepTokenTxs, restAlphUtxos, errors0) = buildSweepTokenTxs(
             fromLockupScript,
             fromUnlockScript,
             toLockupScript,
@@ -984,7 +986,7 @@ trait TxUtils { Self: FlowUtils =>
             gasOpt,
             gasPrice
           )
-          val sweepAlphTxs = buildSweepAlphTxs(
+          val (sweepAlphTxs, errors1) = buildSweepAlphTxs(
             fromLockupScript,
             fromUnlockScript,
             toLockupScript,
@@ -993,7 +995,13 @@ trait TxUtils { Self: FlowUtils =>
             gasOpt,
             gasPrice
           )
-          Right(sweepTokenTxs ++ sweepAlphTxs)
+          val txs    = sweepTokenTxs ++ sweepAlphTxs
+          val errors = errors0 ++ errors1
+          if (errors.nonEmpty && txs.isEmpty) {
+            Left(errors.head)
+          } else {
+            Right(txs)
+          }
         }
 
       case Left(e) => Right(Left(e))

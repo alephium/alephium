@@ -833,7 +833,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     def testSweepALPH(utxos: AVector[AssetOutputInfo], gasOpt: Option[GasBox] = None) = {
-      val unsignedTxs = blockFlow.buildSweepAlphTxs(
+      val (unsignedTxs, _) = blockFlow.buildSweepAlphTxs(
         fromLockupScript,
         fromUnlockScript,
         toLockupScript,
@@ -987,6 +987,11 @@ class TxUtilsSpec extends AlephiumSpec {
       .leftValue is "The specified gas amount is not enough"
   }
 
+  it should "return an error if the sweep of ALPH fails" in new SweepAlphFixture {
+    getAlphOutputs(2, dustUtxoAmount)
+    sweep().leftValue is "Not enough ALPH for transaction output"
+  }
+
   trait SweepTokenFixture extends SweepAlphFixture {
     def getTokenOutputs(
         numOfTokens: Int,
@@ -1029,7 +1034,7 @@ class TxUtilsSpec extends AlephiumSpec {
         gasOpt: Option[GasBox] = None,
         checker: AVector[AssetOutputInfo] => Assertion = _ => Succeeded
     ) = {
-      val (sweepTokenTxs, restAlphUtxos) = blockFlow.buildSweepTokenTxs(
+      val (sweepTokenTxs, restAlphUtxos, _) = blockFlow.buildSweepTokenTxs(
         fromLockupScript,
         fromUnlockScript,
         toLockupScript,
@@ -1214,6 +1219,12 @@ class TxUtilsSpec extends AlephiumSpec {
     val (alph1, tokens1) = getBalances(toLockupScript)
     alph0.subUnsafe(totalGasFee) is alph1
     tokens0.sortBy(_._1) is tokens1.sortBy(_._1)
+  }
+
+  it should "return an error if the sweep of token fails" in new SweepTokenFixture {
+    getTokenOutputs(1, 2)
+    getAlphOutputs(2, dustUtxoAmount)
+    sweep().leftValue is "Not enough ALPH for gas fee in sweeping"
   }
 
   trait LargeUtxos extends FlowFixture {
