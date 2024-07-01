@@ -366,6 +366,68 @@ class TxUtilsSpec extends AlephiumSpec {
 
       validateSubmit(utx, privateKeys)
     }
+
+    type TestGasUpdateResult =
+      (
+          Int,
+          Int,
+          AVector[TxUtils.AssetOutputInfoWithGas],
+          AVector[TxUtils.AssetOutputInfoWithGas],
+          GasBox
+      )
+
+    def testGasUpdate(gasAdjuster: GasBox => GasBox)(test: TestGasUpdateResult => Assertion) = {
+      forAll(
+        Gen.choose(1, 100),
+        Gen.choose(1, 5),
+        Gen.choose(1, 5),
+        Gen.choose(1, 5),
+        Gen.choose(1, 5)
+      ) { case (baseGas, destinationOutputLengths, nbOfInputs, numGasNone, numGasSome) =>
+        val inputs = buildInputs(nbOfInputs)
+
+        val baseGasInfo = TxUtils.AssetOutputInfoWithGas(inputs, GasBox.unsafe(baseGas))
+
+        val inputsWithAllGasToNone = AVector.fill(numGasNone + numGasSome) {
+          (inputData, baseGasInfo)
+        }
+
+        val allGasToNoneUpdated =
+          blockFlow.updateSelectedGas(inputsWithAllGasToNone, destinationOutputLengths)
+
+        val averageGas =
+          allGasToNoneUpdated.map(_._2.gas.value).sum / inputsWithAllGasToNone.length
+        val adjustedGas              = gasAdjuster(GasBox.unsafe(averageGas))
+        val inputDataWithAdjustedGas = inputData.copy(gasOpt = Some(adjustedGas))
+        val gasInfoWithAdjustedGas   = TxUtils.AssetOutputInfoWithGas(inputs, adjustedGas)
+
+        val inputsWithNoneGas = AVector.fill(numGasNone) {
+          (inputData, baseGasInfo)
+        }
+
+        val inputsWithSomeGas = AVector.fill(numGasSome) {
+          (inputDataWithAdjustedGas, gasInfoWithAdjustedGas)
+        }
+
+        val mixGasUpdated =
+          blockFlow.updateSelectedGas(
+            inputsWithNoneGas ++ inputsWithSomeGas,
+            destinationOutputLengths
+          )
+
+        val expectedGas = GasBox.unsafe(allGasToNoneUpdated.map(_._2.gas.value).sum)
+
+        test(
+          (
+            numGasNone,
+            numGasSome,
+            allGasToNoneUpdated.map(_._2),
+            mixGasUpdated.map(_._2),
+            expectedGas
+          )
+        )
+      }
+    }
   }
 
   "UnsignedTransaction.buildTransferTx" should "build transaction successfully" in new UnsignedTransactionFixture {
@@ -1547,28 +1609,11 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .leftValue is "Selected UTXOs different from lockup script group"
     }
-
-    {
-      info("Not all gasAmount are defined")
-      val i1     = buildInputData(pub1, amount, gas = Some(GasBox.zero))
-      val i2     = buildInputData(pub1, amount, gas = None)
-      val inputs = AVector(i1, i2)
-      blockFlow
-        .transferMultiInputs(
-          inputs,
-          outputInfos,
-          nonCoinbaseMinGasPrice,
-          Int.MaxValue,
-          None
-        )
-        .rightValue
-        .leftValue is "Missing `gasAmount` in some inputs"
-    }
   }
 
   "TxUtils.updateSelectedGas" should "Update selected gas" in new MultiInputTransactionFixture {
     {
-      info("empty list")
+
       blockFlow.updateSelectedGas(AVector.empty, 0) is AVector
         .empty[(TxUtils.InputData, TxUtils.AssetOutputInfoWithGas)]
     }
@@ -1622,6 +1667,72 @@ class TxUtilsSpec extends AlephiumSpec {
       updated.length is entries.length
       // TODO do we want to test how much was reduced?
       updated.head._2.gas < gas is true
+    }
+    {
+      info("Some inputs defined gas to 0 and other not")
+      testGasUpdate(_ => GasBox.zero) { case (nbGasNone, _, _, updated2, expectedGas) =>
+        updated2.map(_.gas.value).sum is expectedGas.value
+        updated2.take(nbGasNone).map(_.gas.value).sum is expectedGas.value
+        updated2.drop(nbGasNone).map(_.gas.value).sum is 0
+      }
+    }
+    {
+      info("Some inputs defined a bit of gas, but not enough, and other not")
+      val bitOfGas = GasBox.unsafe(100)
+      testGasUpdate(_ => bitOfGas) { case (nbGasNone, nbGasSome, _, updated2, expectedGas) =>
+        updated2.map(_.gas.value).sum is expectedGas.value
+        updated2.drop(nbGasNone).foreach { selected =>
+          selected.gas is bitOfGas
+        }
+
+        updated2
+          .take(nbGasNone)
+          .map(_.gas.value)
+          .sum is expectedGas.value - (bitOfGas.value * nbGasSome)
+      }
+    }
+    {
+      info(
+        "Some inputs defined a bit to much of gas for their own input, we can reduce others inputs gas"
+      )
+
+      val gasToAdd = 100
+
+      testGasUpdate(_.addUnsafe(GasBox.unsafe(gasToAdd))) {
+        case (nbGasNone, nbGasSome, updated, updated2, expectedGas) =>
+          updated2.map(_.gas.value).sum is expectedGas.value
+          val gasPayByUndefined  = updated.take(nbGasNone).map(_.gas.value)
+          val gasPayByUndefined2 = updated2.take(nbGasNone).map(_.gas.value)
+
+          val totalTooMuch = gasToAdd * nbGasSome
+          val shared       = totalTooMuch / nbGasNone
+          val sharedRest   = totalTooMuch % nbGasNone
+
+          gasPayByUndefined.toSeq.zip(gasPayByUndefined2.toSeq).zipWithIndex.foreach {
+            case ((gas, gas2), i) =>
+              val expected = if (i == 0) gas - shared - sharedRest else gas - shared
+              gas2 is expected
+          }
+          // Input with undefined gas are still paying, but less
+          gasPayByUndefined2.sum > 0 is true
+          gasPayByUndefined.sum > gasPayByUndefined2.sum is true
+      }
+    }
+    {
+      info("Some inputs defined too much gas and other not")
+      val tooMuchGas = GasBox.unsafe(10000000)
+
+      testGasUpdate(_ => tooMuchGas) { case (nbGasNone, _, _, updated2, expectedGas) =>
+        val finalGas = updated2.map(_.gas.value).sum
+        updated2.take(nbGasNone).foreach { selected =>
+          selected.gas is GasBox.zero
+        }
+        updated2.drop(nbGasNone).foreach { selected =>
+          selected.gas is tooMuchGas
+        }
+        // The final gas is more than expected, but only payed by the inputs that had gas undefined
+        finalGas > expectedGas.value is true
+      }
     }
   }
 
