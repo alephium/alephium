@@ -116,10 +116,6 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   def getContractUtxos(lockupScript: LockupScript.P2C): IOResult[ContractOutput] = {
     worldState.getContractAsset(lockupScript.contractId)
   }
-
-  def getTxIdFromOutputRef(outputRef: AssetOutputRef): IOResult[Option[TransactionId]] = {
-    worldState.getTxIdFromOutputRef(outputRef)
-  }
 }
 
 object BlockFlowGroupView {

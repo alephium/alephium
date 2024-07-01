@@ -246,8 +246,6 @@ trait WorldState[T, R1, R2, R3] {
       maxOutputs: Int,
       predicate: (TxOutputRef, TxOutput) => Boolean
   ): IOResult[AVector[(AssetOutputRef, AssetOutput)]]
-
-  def getTxIdFromOutputRef(outputRef: AssetOutputRef): IOResult[Option[TransactionId]]
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Unit] {
@@ -345,10 +343,6 @@ object WorldState {
           (outputRef, output) => outputRef.isContractType && output.isContract
         )
         .map(_.asUnsafe[(ContractOutputRef, ContractOutput)])
-    }
-
-    def getTxIdFromOutputRef(outputRef: AssetOutputRef): IOResult[Option[TransactionId]] = {
-      txOutputRefIndexState.getOpt(outputRef.key)
     }
 
     def getContractStates(): IOResult[AVector[(ContractId, ContractStorageState)]] = {
@@ -651,10 +645,6 @@ object WorldState {
         maxOutputs: Int,
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
-
-    def getTxIdFromOutputRef(outputRef: AssetOutputRef): IOResult[Option[TransactionId]] = {
-      txOutputRefIndexState.getOpt(outputRef.key)
-    }
   }
 
   final case class Cached(

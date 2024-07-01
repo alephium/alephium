@@ -1295,7 +1295,7 @@ class ServerUtils(implicit
     for {
       txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
       txId <- txIdOpt.toRight(
-        notFound(s"No transaction id found for output ref ${outputRef.key.value.toHexString}")
+        notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
       )
     } yield txId
   }

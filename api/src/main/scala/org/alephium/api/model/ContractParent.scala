@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import org.alephium.protocol.model.Address
 
-final case class ContractParent(parent: Option[Address])
+final case class ContractParent(parent: Option[Address]) extends AnyVal

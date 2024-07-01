@@ -704,31 +704,50 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
-  val subContractsLogic = serverLogic(subContracts) { case (contractAddress, counterRange) =>
-    Future.successful {
-      serverUtils.getSubContracts(
-        blockFlow,
-        counterRange.start,
-        counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
-        contractAddress
-      )
+  val subContractsLogic = serverLogicRedirect(subContracts)(
+    { case (contractAddress, counterRange) =>
+      Future.successful {
+        serverUtils.getSubContracts(
+          blockFlow,
+          counterRange.start,
+          counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
+          contractAddress
+        )
+      }
+    },
+    {
+      case (contractAddress, _) => {
+        Right(Some(contractAddress.groupIndex))
+      }
     }
-  }
+  )
 
-  val subContractsCurrentCountLogic = serverLogic(subContractsCurrentCount) { contractAddress =>
-    Future.successful {
-      serverUtils.getSubContractsCurrentCount(blockFlow, contractAddress)
+  val subContractsCurrentCountLogic = serverLogicRedirect(subContractsCurrentCount)(
+    { case contractAddress =>
+      Future.successful {
+        serverUtils.getSubContractsCurrentCount(blockFlow, contractAddress)
+      }
+    },
+    { case contractAddress =>
+      Right(Some(contractAddress.groupIndex))
     }
-  }
+  )
 
-  val getTxIdFromOutputRefLogic = serverLogic(getTxIdFromOutputRef) { outputRef =>
-    Future.successful {
+  val getTxIdFromOutputRefLogic = serverLogicRedirect(getTxIdFromOutputRef)(
+    { case outputRef =>
+      Future.successful {
+        for {
+          assetOutputRef <- outputRef.toAssetOutputRef()
+          result         <- serverUtils.getTxIdFromOutputRef(blockFlow, assetOutputRef)
+        } yield result
+      }
+    },
+    { case outputRef =>
       for {
         assetOutputRef <- outputRef.toAssetOutputRef()
-        result         <- serverUtils.getTxIdFromOutputRef(blockFlow, assetOutputRef)
-      } yield result
+      } yield Some(assetOutputRef.hint.groupIndex)
     }
-  }
+  )
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     // Run the export in background

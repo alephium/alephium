@@ -29,10 +29,7 @@ trait NodeIndexesUtils { Self: FlowUtils =>
   def getTxIdFromOutputRef(
       outputRef: AssetOutputRef
   ): IOResult[Option[TransactionId]] = {
-    for {
-      blockFlowGroupView <- getMutableGroupView(outputRef.hint.groupIndex)
-      result             <- blockFlowGroupView.getTxIdFromOutputRef(outputRef)
-    } yield result
+    txOutputRefIndexStorage(outputRef.hint.groupIndex).getOpt(outputRef.key)
   }
 
   def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {

@@ -866,8 +866,9 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /contracts/<address>/sub-contracts/current-count" in {
-    val contractWithCount    = Address.contract(ContractId.random)
-    val contractWithoutCount = Address.contract(ContractId.zero)
+    val contractWithCount =
+      Address.contract(ContractId.from(TransactionId.random, 0, GroupIndex.unsafe(0)))
+    val contractWithoutCount = dummyContractAddress
     Get(s"/contracts/${contractWithCount.toBase58}/sub-contracts/current-count") check { response =>
       response.code is StatusCode.Ok
       response.as[Int] is 10
@@ -895,7 +896,7 @@ abstract class RestServerSpec(
       response.code is StatusCode.NotFound
       response
         .as[ApiError.NotFound]
-        .resource is s"No transaction id found for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
+        .resource is s"Transaction id for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
     }
 
     Get(s"/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
