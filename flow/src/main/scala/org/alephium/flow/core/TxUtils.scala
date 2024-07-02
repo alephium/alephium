@@ -766,11 +766,12 @@ trait TxUtils { Self: FlowUtils =>
     assume(allTokenUtxos.forall(_.output.tokens.length == 1))
 
     val utxosPerToken = allTokenUtxos.groupBy(_.output.tokens.head._1).view
-    val filteredTokenUtxos = if (isConsolidation(fromLockupScript, toLockupScript)) {
-      utxosPerToken.filter(_._2.length > 1)
-    } else {
-      utxosPerToken
-    }
+    val filteredTokenUtxos =
+      if (isConsolidation(fromLockupScript, toLockupScript) && lockTimeOpt.isEmpty) {
+        utxosPerToken.filter(_._2.length > 1)
+      } else {
+        utxosPerToken
+      }
 
     // group based on token id, so that utxos with the same token can
     // be included in a single transaction as much as possible
@@ -934,7 +935,7 @@ trait TxUtils { Self: FlowUtils =>
     val consolidation    = isConsolidation(fromLockupScript, toLockupScript)
     val error = groupedAlphUtxos
       .foreachE { alphUtxos =>
-        if (consolidation && alphUtxos.length == 1) {
+        if (consolidation && alphUtxos.length == 1 && lockTimeOpt.isEmpty) {
           Right(())
         } else {
           tryBuildSweepAlphTx(

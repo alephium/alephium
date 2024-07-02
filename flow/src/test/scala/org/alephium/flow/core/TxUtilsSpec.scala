@@ -832,12 +832,16 @@ class TxUtilsSpec extends AlephiumSpec {
       sweepTx
     }
 
-    def testSweepALPH(utxos: AVector[AssetOutputInfo], gasOpt: Option[GasBox] = None) = {
+    def testSweepALPH(
+        utxos: AVector[AssetOutputInfo],
+        gasOpt: Option[GasBox] = None,
+        lockTimeOpt: Option[TimeStamp] = None
+    ) = {
       val (unsignedTxs, _) = blockFlow.buildSweepAlphTxs(
         fromLockupScript,
         fromUnlockScript,
         toLockupScript,
-        None,
+        lockTimeOpt,
         utxos,
         gasOpt,
         nonCoinbaseMinGasPrice
@@ -938,21 +942,25 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "not create txs if there is only one utxo left when consolidating" in new SweepAlphFixture {
     override lazy val isConsolidation = true
 
-    val utxos0 = getAlphOutputs(1)
+    val utxos0   = getAlphOutputs(1)
+    val lockTime = Some(TimeStamp.zero)
     utxos0.length is 1
     testSweepALPH(utxos0).length is 0
+    testSweepALPH(utxos0, None, lockTime).length is 1
 
     val utxos1 = getAlphOutputs(ALPH.MaxTxInputNum - 1) ++ utxos0
     utxos1.length is ALPH.MaxTxInputNum
     testSweepALPH(utxos1).length is 1
+    testSweepALPH(utxos1, None, lockTime).length is 1
 
     val utxos2 = getAlphOutputs(1) ++ utxos1
     utxos2.length is ALPH.MaxTxInputNum + 1
     testSweepALPH(utxos2).length is 1
+    testSweepALPH(utxos2, None, lockTime).length is 2
 
     val utxos3 = getAlphOutputs(1) ++ utxos2
     utxos3.length is ALPH.MaxTxInputNum + 2
-    val txs = testSweepALPH(utxos3)
+    val txs = testSweepALPH(utxos3, None, lockTime)
     txs.length is 2
     submitSweepTxsAndCheckBalances(txs)
   }
@@ -1033,13 +1041,14 @@ class TxUtilsSpec extends AlephiumSpec {
         alphUtxos: AVector[AssetOutputInfo],
         numOfTxs: Int,
         gasOpt: Option[GasBox] = None,
+        lockTimeOpt: Option[TimeStamp] = None,
         checker: AVector[AssetOutputInfo] => Assertion = _ => Succeeded
     ) = {
       val (sweepTokenTxs, restAlphUtxos, _) = blockFlow.buildSweepTokenTxs(
         fromLockupScript,
         fromUnlockScript,
         toLockupScript,
-        None,
+        lockTimeOpt,
         tokenUtxos,
         alphUtxos,
         gasOpt,
@@ -1048,7 +1057,7 @@ class TxUtilsSpec extends AlephiumSpec {
       checker(restAlphUtxos)
       sweepTokenTxs.length is numOfTxs
       val sweepAlphTxs = if (restAlphUtxos.nonEmpty) {
-        testSweepALPH(restAlphUtxos, gasOpt)
+        testSweepALPH(restAlphUtxos, gasOpt, lockTimeOpt)
       } else {
         AVector.empty
       }
@@ -1095,17 +1104,28 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "not consolidate tokens that have only one utxo" in new SweepTokenFixture {
     override lazy val isConsolidation = true
-    val tokenOutputs0                 = getTokenOutputs(100, 1, U256.One)
-    val tokenOutputs1                 = getTokenOutputs(50, 2, U256.One)
-    val allTokenOutputs               = tokenOutputs0 ++ tokenOutputs1
-    val txs                           = testSweepToken(allTokenOutputs, AVector.empty, 1)
+
+    val lockTime        = Some(TimeStamp.zero)
+    val tokenOutputs0   = getTokenOutputs(100, 1, U256.One)
+    val tokenOutputs1   = getTokenOutputs(50, 2, U256.One)
+    val allTokenOutputs = tokenOutputs0 ++ tokenOutputs1
+    val txs0            = testSweepToken(allTokenOutputs, AVector.empty, 1)
     tokenOutputs0.foreach { output =>
-      txs.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is false
+      txs0.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is false
     }
     tokenOutputs1.foreach { output =>
-      txs.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is true
+      txs0.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is true
     }
-    submitSweepTxsAndCheckBalances(txs)
+
+    val alphOutputs = getAlphOutputs(2)
+    val txs1        = testSweepToken(allTokenOutputs, alphOutputs, 2, None, lockTime)
+    tokenOutputs0.foreach { output =>
+      txs1.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is true
+    }
+    tokenOutputs1.foreach { output =>
+      txs1.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is true
+    }
+    submitSweepTxsAndCheckBalances(txs1)
   }
 
   it should "return empty txs if all tokens have only one utxo when consolidating" in new SweepTokenFixture {
@@ -1118,7 +1138,7 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "not use ALPH utxos if token utxos can cover the gas fee" in new SweepTokenFixture {
     val tokenOutputs = getTokenOutputs(3, 40)
     val alphOutputs  = getAlphOutputs(2)
-    val txs          = testSweepToken(tokenOutputs, alphOutputs, 1, None, _ is alphOutputs)
+    val txs          = testSweepToken(tokenOutputs, alphOutputs, 1, None, None, _ is alphOutputs)
     submitSweepTxsAndCheckBalances(txs)
   }
 
@@ -1126,7 +1146,7 @@ class TxUtilsSpec extends AlephiumSpec {
     override lazy val isConsolidation = false
     val tokenOutputs                  = getTokenOutputs(500, 1)
     val alphOutputs                   = getAlphOutputs(4)
-    val txs = testSweepToken(tokenOutputs, alphOutputs, 4, None, _.isEmpty is true)
+    val txs = testSweepToken(tokenOutputs, alphOutputs, 4, None, None, _.isEmpty is true)
     submitSweepTxsAndCheckBalances(txs)
   }
 
@@ -1190,6 +1210,7 @@ class TxUtilsSpec extends AlephiumSpec {
       alphOutputs,
       1,
       Some(gas),
+      None,
       _.map(_.output.amount) is alphAmounts.take(3)
     )
     submitSweepTxsAndCheckBalances(txs)
