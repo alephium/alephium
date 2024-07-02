@@ -984,7 +984,8 @@ class TxUtilsSpec extends AlephiumSpec {
         Some(minimalGas),
         nonCoinbaseMinGasPrice
       )
-      .leftValue is "The specified gas amount is not enough"
+      .leftValue
+      .startsWith("The specified gas amount is not enough") is true
   }
 
   it should "return an error if the sweep of ALPH fails" in new SweepAlphFixture {
@@ -1159,7 +1160,8 @@ class TxUtilsSpec extends AlephiumSpec {
         Some(minimalGas),
         nonCoinbaseMinGasPrice
       )
-      .leftValue is "The specified gas amount is not enough"
+      .leftValue
+      .startsWith("The specified gas amount is not enough") is true
   }
 
   it should "fall back to the descending order when ascending order doesn't work" in new SweepTokenFixture {

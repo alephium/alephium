@@ -762,8 +762,7 @@ trait TxUtils { Self: FlowUtils =>
       allAlphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
-  ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo], AVector[String]) = {
-    assume(maxTokenPerAssetUtxo == 1)
+  ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo], Option[String]) = {
     assume(allTokenUtxos.forall(_.output.tokens.length == 1))
 
     val utxosPerToken = allTokenUtxos.groupBy(_.output.tokens.head._1).view
@@ -778,44 +777,47 @@ trait TxUtils { Self: FlowUtils =>
     val groupedTokenUtxos = AVector
       .from(filteredTokenUtxos.flatMap(_._2))
       .groupedWithRemainder(ALPH.MaxTxInputNum / 2)
-    groupedTokenUtxos.fold(
-      (AVector.empty[UnsignedTransaction], allAlphUtxos, AVector.empty[String])
-    ) { case ((txs, alphUtxos, errors), tokenUtxos) =>
-      tryBuildSweepTokenTx(
-        fromLockupScript,
-        fromUnlockScript,
-        toLockupScript,
-        lockTimeOpt,
-        tokenUtxos,
-        alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
-        gasOpt,
-        gasPrice
-      ) match {
-        case Right((unsignedTx, restAlphUtxos)) =>
-          (txs :+ unsignedTx, restAlphUtxos, errors)
-        case Left(error) =>
-          logger.info(
-            s"Build sweep tx with ascending order returns error: $error, try descending order instead"
-          )
+    val unsignedTxs = mutable.ArrayBuffer.empty[UnsignedTransaction]
+    var alphUtxos   = allAlphUtxos
+    val error = groupedTokenUtxos
+      .foreachE { tokenUtxos =>
+        tryBuildSweepTokenTx(
+          fromLockupScript,
+          fromUnlockScript,
+          toLockupScript,
+          lockTimeOpt,
+          tokenUtxos,
+          alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
+          gasOpt,
+          gasPrice
+        ) match {
+          case Right((unsignedTx, restAlphUtxos)) =>
+            unsignedTxs.addOne(unsignedTx)
+            alphUtxos = restAlphUtxos
+            Right(())
+          case Left(error) =>
+            logger.info(
+              s"Build sweep tx with ascending order returns error: $error, try descending order instead"
+            )
 
-          tryBuildSweepTokenTx(
-            fromLockupScript,
-            fromUnlockScript,
-            toLockupScript,
-            lockTimeOpt,
-            tokenUtxos,
-            alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
-            gasOpt,
-            gasPrice
-          ) match {
-            case Right((unsignedTx, restAlphUtxos)) =>
-              (txs :+ unsignedTx, restAlphUtxos, errors)
-            case Left(error) =>
-              logger.info(s"Build sweep tx with descending order returns error: $error")
-              (txs, alphUtxos, errors :+ error)
-          }
+            tryBuildSweepTokenTx(
+              fromLockupScript,
+              fromUnlockScript,
+              toLockupScript,
+              lockTimeOpt,
+              tokenUtxos,
+              alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
+              gasOpt,
+              gasPrice
+            ).map { case (unsignedTx, restAlphUtxos) =>
+              unsignedTxs.addOne(unsignedTx)
+              alphUtxos = restAlphUtxos
+            }
+        }
       }
-    }
+      .left
+      .toOption
+    (AVector.from(unsignedTxs), alphUtxos, error)
   }
 
   @inline private def buildTokenOutputs(
@@ -838,8 +840,6 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
-    assume(maxTokenPerAssetUtxo == 1)
-
     for {
       totalAlphAmount <- checkTotalAttoAlphAmount(tokenUtxos.map(_.output.amount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
@@ -879,7 +879,7 @@ trait TxUtils { Self: FlowUtils =>
       estimatedGas: GasBox
   ): Either[String, GasBox] = {
     if (gasOpt.exists(_ < estimatedGas)) {
-      Left("The specified gas amount is not enough")
+      Left(s"The specified gas amount is not enough, estimated gas: ${estimatedGas.value}")
     } else {
       Right(estimatedGas)
     }
@@ -925,15 +925,17 @@ trait TxUtils { Self: FlowUtils =>
       allAlphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
-  ): (AVector[UnsignedTransaction], AVector[String]) = {
+  ): (AVector[UnsignedTransaction], Option[String]) = {
     assume(allAlphUtxos.forall(_.output.tokens.isEmpty))
 
     val sortedAlphUtxos  = allAlphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph)
     val groupedAlphUtxos = sortedAlphUtxos.groupedWithRemainder(ALPH.MaxTxInputNum)
-    groupedAlphUtxos.fold((AVector.empty[UnsignedTransaction], AVector.empty[String])) {
-      case ((txs, errors), alphUtxos) =>
-        if (isConsolidation(fromLockupScript, toLockupScript) && alphUtxos.length == 1) {
-          (txs, errors)
+    val unsignedTxs      = mutable.ArrayBuffer.empty[UnsignedTransaction]
+    val consolidation    = isConsolidation(fromLockupScript, toLockupScript)
+    val error = groupedAlphUtxos
+      .foreachE { alphUtxos =>
+        if (consolidation && alphUtxos.length == 1) {
+          Right(())
         } else {
           tryBuildSweepAlphTx(
             fromLockupScript,
@@ -943,17 +945,16 @@ trait TxUtils { Self: FlowUtils =>
             alphUtxos,
             gasOpt,
             gasPrice
-          ) match {
-            case Right(unsignedTx) => (txs :+ unsignedTx, errors)
-            case Left(error) =>
-              logger.info(s"Build sweep ALPH tx returns error: $error")
-              (txs, errors :+ error)
-          }
+          ).map(unsignedTx => unsignedTxs.addOne(unsignedTx))
         }
-    }
+      }
+      .left
+      .toOption
+    (AVector.from(unsignedTxs), error)
   }
 
   // scalastyle:off parameter.number
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def sweepAddressFromScripts(
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
@@ -976,7 +977,7 @@ trait TxUtils { Self: FlowUtils =>
             case None => allUtxosUnfiltered
           }
           val (allAlphUtxos, allTokenUtxos) = allUtxos.partition(_.output.tokens.isEmpty)
-          val (sweepTokenTxs, restAlphUtxos, errors0) = buildSweepTokenTxs(
+          val (sweepTokenTxs, restAlphUtxos, error0) = buildSweepTokenTxs(
             fromLockupScript,
             fromUnlockScript,
             toLockupScript,
@@ -986,7 +987,7 @@ trait TxUtils { Self: FlowUtils =>
             gasOpt,
             gasPrice
           )
-          val (sweepAlphTxs, errors1) = buildSweepAlphTxs(
+          val (sweepAlphTxs, error1) = buildSweepAlphTxs(
             fromLockupScript,
             fromUnlockScript,
             toLockupScript,
@@ -995,13 +996,9 @@ trait TxUtils { Self: FlowUtils =>
             gasOpt,
             gasPrice
           )
-          val txs    = sweepTokenTxs ++ sweepAlphTxs
-          val errors = errors0 ++ errors1
-          if (errors.nonEmpty && txs.isEmpty) {
-            Left(errors.head)
-          } else {
-            Right(txs)
-          }
+          val txs   = sweepTokenTxs ++ sweepAlphTxs
+          val error = error0.orElse(error1)
+          if (error.nonEmpty && txs.isEmpty) Left(error.get) else Right(txs)
         }
 
       case Left(e) => Right(Left(e))
