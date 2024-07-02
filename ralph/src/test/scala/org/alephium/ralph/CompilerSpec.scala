@@ -22,7 +22,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -2194,7 +2194,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) implements Bar {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    approveToken!(selfAddress!(), ALPH, 1 alph)
+           |    let _ = selfAddress!()
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2211,7 +2211,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) extends Bar() {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    approveToken!(selfAddress!(), ALPH, 1 alph)
+           |    let _ = selfAddress!()
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -5895,6 +5895,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Foo { $mut a: [U256; $size] }
            |Contract Bar() {
            |  mapping[U256, Foo] map
+           |  @using(preapprovedAssets = true)
            |  pub fn bar(address: Address) -> () {
            |    map.insert!(address, 1, $$Foo { a: [0; $size] }$$)
            |  }
@@ -6010,9 +6011,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val updateStatements =
         Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
       updateStatements.foreach { statement =>
-        Compiler.compileContractFull(code(statement)).rightValue.warnings is warnings
         Compiler
-          .compileContractFull(code(statement, "@using(checkExternalCaller = false)"))
+          .compileContractFull(code(statement, "@using(preapprovedAssets = true)"))
+          .rightValue
+          .warnings is warnings
+        Compiler
+          .compileContractFull(
+            code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
+          )
           .rightValue
           .warnings is AVector.empty[String]
       }
@@ -6709,6 +6715,47 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         replace(code("assetsInContract = true", "approveToken!(selfAddress!(), ALPH, 1 alph)"))
       )
       .isRight is true
+  }
+
+  it should "check the preapprovedAssets annotation" in {
+    def code(annotation: String, statement: String) =
+      s"""
+         |Contract Foo() {
+         |  $$@using(checkExternalCaller = false$annotation)
+         |  pub fn foo() -> () {
+         |    $statement
+         |  }$$
+         |}
+         |""".stripMargin
+
+    val tokenId = TokenId.generate.toHexString
+    val statements = Seq(
+      "approveToken!(selfAddress!(), ALPH, 1 alph)",
+      s"approveToken!(selfAddress!(), #$tokenId, 1 alph)",
+      "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)",
+      s"transferToken!(callerAddress!(), selfAddress!(), #$tokenId, 1 alph)",
+      s"burnToken!(selfAddress!(), #$tokenId, 1 alph)"
+    )
+    statements.foreach { statement =>
+      testContractError(
+        code("", statement),
+        "Function \"Foo.foo\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+      Compiler
+        .compileContract(replace(code(", assetsInContract = true", statement)))
+        .isRight is true
+      Compiler
+        .compileContract(replace(code(", preapprovedAssets = true", statement)))
+        .isRight is true
+      Compiler
+        .compileContract(replace(code(", payToContractOnly = true", statement)))
+        .isRight is true
+      Compiler
+        .compileContract(
+          replace(code(", preapprovedAssets = true, assetsInContract = true", statement))
+        )
+        .isRight is true
+    }
   }
 
   it should "generate method selector instr" in {
