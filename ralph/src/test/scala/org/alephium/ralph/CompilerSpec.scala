@@ -2733,7 +2733,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(useAssetsInContract: String = "false", instr: String = "return"): String =
       s"""
          |Contract Foo() {
-         |  $$@using(assetsInContract = $useAssetsInContract)
+         |  $$@using(assetsInContract = $useAssetsInContract, preapprovedAssets = true)
          |  fn foo() -> () {
          |    $instr
          |  }$$
@@ -3738,7 +3738,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(assetsInContract = true)
+           |  @using(assetsInContract = true, preapprovedAssets = true)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
            |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
@@ -6620,7 +6620,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |Contract Foo() {
          |  @using(preapprovedAssets = false, assetsInContract = false, payToContractOnly = true)
          |  pub fn foo0() -> () {
-         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |    transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)
          |  }
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn foo1() -> () {
@@ -6643,7 +6643,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(payToContractOnly: String = "false", stmt: String = "return"): String =
       s"""
          |Contract Foo() {
-         |  $$@using(payToContractOnly = $payToContractOnly, checkExternalCaller = false)
+         |  $$@using(payToContractOnly = $payToContractOnly, checkExternalCaller = false, preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    $stmt
          |  }$$
@@ -6669,6 +6669,46 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
       )
     }
+  }
+
+  it should "check the preapprovedAssets annotation if the function pays to the contract" in {
+    def code(
+        annotations: String,
+        statement: String = "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)"
+    ) =
+      s"""
+         |Contract Foo() {
+         |  $$@using($annotations)
+         |  pub fn foo() -> () {
+         |    $statement
+         |  }$$
+         |}
+         |""".stripMargin
+
+    testContractError(
+      code("payToContractOnly = true"),
+      "Function \"Foo.foo\" transfers assets to the contract, please use annotation `preapprovedAssets = true`."
+    )
+    testContractError(
+      code("assetsInContract = true"),
+      "Function \"Foo.foo\" transfers assets to the contract, please use annotation `preapprovedAssets = true`."
+    )
+    Compiler
+      .compileContract(replace(code("payToContractOnly = true, preapprovedAssets = true")))
+      .isRight is true
+    Compiler
+      .compileContract(replace(code("assetsInContract = true, preapprovedAssets = true")))
+      .isRight is true
+    Compiler
+      .compileContract(
+        replace(code("payToContractOnly = true", "approveToken!(selfAddress!(), ALPH, 1 alph)"))
+      )
+      .isRight is true
+    Compiler
+      .compileContract(
+        replace(code("assetsInContract = true", "approveToken!(selfAddress!(), ALPH, 1 alph)"))
+      )
+      .isRight is true
   }
 
   it should "generate method selector instr" in {

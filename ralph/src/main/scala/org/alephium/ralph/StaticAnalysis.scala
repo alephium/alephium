@@ -125,13 +125,19 @@ object StaticAnalysis {
       )
     }
 
-    if (
-      !func.usePayToContractOnly &&
-      func.useAssetsInContract == Ast.NotUseContractAssets &&
-      method.instrs.exists(payToContractInstrsExceptSelfAddress.contains)
-    ) {
+    val hasPayToContractInstr = method.instrs.exists(payToContractInstrsExceptSelfAddress.contains)
+    val isUseContractAssets =
+      func.usePayToContractOnly || func.useAssetsInContract != Ast.NotUseContractAssets
+    if (!isUseContractAssets && hasPayToContractInstr) {
       throw Compiler.Error(
         s"Function ${Ast.funcName(contractId, func.id)} transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true.",
+        func.sourceIndex
+      )
+    }
+
+    if (isUseContractAssets && hasPayToContractInstr && !func.usePreapprovedAssets) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} transfers assets to the contract, please use annotation `preapprovedAssets = true`.",
         func.sourceIndex
       )
     }
