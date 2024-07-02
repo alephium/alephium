@@ -101,9 +101,17 @@ trait Warnings {
     }
   }
 
-  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
-      s" If this is intentional, consider using anonymous variables to suppress this warning."
+  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId, retSize: Int): Unit = {
+    assume(retSize > 0)
+    if (!compilerOptions.ignoreUnusedFunctionReturnWarnings) {
+      val prefix = if (retSize == 1) {
+        "`let _ = `"
+      } else {
+        s"`let ${Seq.fill(retSize)("_").mkString("(", ", ", ")")} = `"
+      }
+      warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
+        s" Please add $prefix before the function call to explicitly ignore its return value."
+    }
   }
 
   def warningMutableStructField(

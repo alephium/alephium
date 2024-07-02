@@ -1550,7 +1550,7 @@ object Ast {
         retTypes: Seq[Type]
     ): Unit = {
       if (retTypes.nonEmpty && retTypes != Seq(Type.Panic)) {
-        state.warningUnusedCallReturn(typeId, funcId)
+        state.warningUnusedCallReturn(typeId, funcId, retTypes.length)
       }
     }
   }

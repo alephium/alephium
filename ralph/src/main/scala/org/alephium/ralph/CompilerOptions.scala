@@ -22,7 +22,8 @@ final case class CompilerOptions(
     ignoreUnusedFieldsWarnings: Boolean,
     ignoreUnusedPrivateFunctionsWarnings: Boolean,
     ignoreUpdateFieldsCheckWarnings: Boolean,
-    ignoreCheckExternalCallerWarnings: Boolean
+    ignoreCheckExternalCallerWarnings: Boolean,
+    ignoreUnusedFunctionReturnWarnings: Boolean
 )
 
 object CompilerOptions {
@@ -32,6 +33,7 @@ object CompilerOptions {
     ignoreUnusedFieldsWarnings = false,
     ignoreUpdateFieldsCheckWarnings = false,
     ignoreUnusedPrivateFunctionsWarnings = false,
-    ignoreCheckExternalCallerWarnings = false
+    ignoreCheckExternalCallerWarnings = false,
+    ignoreUnusedFunctionReturnWarnings = false
   )
 }

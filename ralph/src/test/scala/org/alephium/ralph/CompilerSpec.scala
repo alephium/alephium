@@ -4660,19 +4660,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       "f1()",
       AVector(
-        "The return values of the function \"Foo.f1\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Foo.f1\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       )
     )
     test(
       "bar.bar0()",
       AVector(
-        "The return values of the function \"Bar.bar0\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Bar.bar0\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       )
     )
     test(
       "Bar.encodeFields!()",
       AVector(
-        "The return values of the function \"Bar.encodeFields\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Bar.encodeFields\" are not used. Please add `let (_, _) = ` before the function call to explicitly ignore its return value."
       )
     )
   }
