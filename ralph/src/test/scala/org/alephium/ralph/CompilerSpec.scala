@@ -4975,32 +4975,48 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Baz { a: U256 }
            |struct Qux { mut a: U256 }
            |struct Foo { x: U256, $fields }
-           |Contract Bar(mut foo: Foo) {
+           |Contract Bar($$mut foo: Foo$$) {
            |  pub fn f() -> U256 {
            |    return foo.x
            |  }
            |}
            |""".stripMargin
 
-      Compiler.compileContractFull(code("y: U256")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("y: [U256; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("y: Baz")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("y: [Baz; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("mut y: Baz")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("mut y: [Baz; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("y: Qux")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("y: [Qux; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      Compiler.compileContractFull(code("mut y: U256")).rightValue.warnings.isEmpty is true
-      Compiler.compileContractFull(code("mut y: Qux")).rightValue.warnings.isEmpty is true
-      Compiler.compileContractFull(code("mut y: [Qux; 2]")).rightValue.warnings.isEmpty is true
+      testContractError(
+        code("y: U256"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: [U256; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: Baz"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: [Baz; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("mut y: Baz"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("mut y: [Baz; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: Qux"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: [Qux; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      Compiler.compileContractFull(replace(code("mut y: U256"))).isRight is true
+      Compiler.compileContractFull(replace(code("mut y: Qux"))).isRight is true
+      Compiler.compileContractFull(replace(code("mut y: [Qux; 2]"))).isRight is true
     }
 
     {

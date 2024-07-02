@@ -113,15 +113,6 @@ trait Warnings {
         s" Please add $prefix before the function call to explicitly ignore its return value."
     }
   }
-
-  def warningMutableStructField(
-      typeId: Ast.TypeId,
-      fieldId: Ast.Ident,
-      structId: Ast.TypeId
-  ): Unit = {
-    warnings +=
-      s"The struct ${structId.name} is immutable, you can remove the `mut` from ${typeId.name}.${fieldId.name}"
-  }
 }
 
 object Warnings {

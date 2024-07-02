@@ -2126,12 +2126,15 @@ object Ast {
     }
 
     private def checkFields(state: Compiler.State[StatefulContext]): Unit = {
-      fields.foreach { case Argument(fieldId, tpe, isFieldMutable, _) =>
+      fields.foreach { case field @ Argument(fieldId, tpe, isFieldMutable, _) =>
         state.resolveType(tpe) match {
           case Type.Struct(structId) =>
             val isStructImmutable = state.flattenTypeMutability(tpe, isMutable = true).forall(!_)
             if (isFieldMutable && isStructImmutable) {
-              state.warningMutableStructField(ident, fieldId, structId)
+              throw Compiler.Error(
+                s"The struct ${structId.name} is immutable, please remove the `mut` from ${ident.name}.${fieldId.name}",
+                field.sourceIndex
+              )
             }
           case _ => ()
         }
