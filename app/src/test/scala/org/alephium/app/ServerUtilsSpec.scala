@@ -464,11 +464,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit val serverUtils = new ServerUtils
 
     val (_, fromPublicKey, _) = genesisKeys(0)
+    val (_, toPublicKey)      = GroupIndex.unsafe(0).generateKey
 
     val result0 = serverUtils
       .buildSweepAddressTransactions(
         blockFlow,
-        BuildSweepAddressTransactions(fromPublicKey, Address.p2pkh(fromPublicKey), None)
+        BuildSweepAddressTransactions(fromPublicKey, Address.p2pkh(toPublicKey), None)
       )
       .rightValue
     result0.unsignedTxs.length is 1
@@ -478,7 +479,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         blockFlow,
         BuildSweepAddressTransactions(
           fromPublicKey,
-          Address.p2pkh(fromPublicKey),
+          Address.p2pkh(toPublicKey),
           Some(Amount(U256.One))
         )
       )
