@@ -94,6 +94,17 @@ object ApiError {
       reader[ujson.Value].map(json => BadRequest(read[String](json("detail"))))
   }
 
+  final case class PreconditionFailed(detail: String)
+      extends ApiError[StatusCode.PreconditionFailed.type]
+
+  object PreconditionFailed
+      extends Companion[StatusCode.PreconditionFailed.type, PreconditionFailed](
+        StatusCode.PreconditionFailed
+      ) {
+    def readerE: Reader[PreconditionFailed] =
+      reader[ujson.Value].map(json => PreconditionFailed(read[String](json("detail"))))
+  }
+
   final case class ServiceUnavailable(detail: String)
       extends ApiError[StatusCode.ServiceUnavailable.type] {}
 

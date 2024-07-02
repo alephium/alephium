@@ -1254,11 +1254,14 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       contractAddress: Address.Contract
   ): Try[ContractParent] = {
-    wrapResult(
-      blockFlow.getParentContractId(contractAddress.contractId).map { contractIdOpt =>
-        ContractParent(contractIdOpt.map(Address.contract))
-      }
-    )
+    for {
+      _ <- checkSubcontractIndexConfig()
+      result <- wrapResult(
+        blockFlow.getParentContractId(contractAddress.contractId).map { contractIdOpt =>
+          ContractParent(contractIdOpt.map(Address.contract))
+        }
+      )
+    } yield result
   }
 
   def getSubContracts(
@@ -1267,12 +1270,15 @@ class ServerUtils(implicit
       limit: Int,
       contractAddress: Address.Contract
   ): Try[SubContracts] = {
-    wrapResult(
-      blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
-        case (nextStart, contractIds) =>
-          SubContracts(contractIds.map(Address.contract), nextStart)
-      }
-    )
+    for {
+      _ <- checkSubcontractIndexConfig()
+      result <- wrapResult(
+        blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
+          case (nextStart, contractIds) =>
+            SubContracts(contractIds.map(Address.contract), nextStart)
+        }
+      )
+    } yield result
   }
 
   def getSubContractsCurrentCount(
@@ -1281,6 +1287,7 @@ class ServerUtils(implicit
   ): Try[Int] = {
     val contractId = contractAddress.contractId
     for {
+      _        <- checkSubcontractIndexConfig()
       countOpt <- wrapResult(blockFlow.getSubContractsCurrentCount(contractId))
       count <- countOpt.toRight(
         notFound(s"Current sub-contracts count for contract $contractAddress")
@@ -1293,6 +1300,13 @@ class ServerUtils(implicit
       outputRef: AssetOutputRef
   ): Try[TransactionId] = {
     for {
+      _ <- Either.cond(
+        nodeIndexesConfig.txOutputRefIndex,
+        (),
+        preconditionFailed(
+          "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
+        )
+      )
       txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
       txId <- txIdOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
@@ -1746,6 +1760,16 @@ class ServerUtils(implicit
         initialMutState,
         outputRef,
         output
+      )
+    )
+  }
+
+  def checkSubcontractIndexConfig(): Try[Unit] = {
+    Either.cond(
+      nodeIndexesConfig.subcontractIndex,
+      (),
+      preconditionFailed(
+        "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
       )
     )
   }

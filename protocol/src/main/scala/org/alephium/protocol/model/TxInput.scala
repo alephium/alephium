@@ -74,7 +74,7 @@ object AssetOutputRef {
   def from(output: AssetOutput, key: TxOutputRef.Key): AssetOutputRef =
     new AssetOutputRef(output.hint, key)
 
-  // Only use this to initialize Merkle tree of ouptuts
+  // Only use this to initialize Merkle tree of outputs
   def forSMT: AssetOutputRef = {
     val hint = Hint.ofAsset(ScriptHint.fromHash(0))
     unsafe(hint, TxOutputRef.unsafeKey(Hash.zero))
