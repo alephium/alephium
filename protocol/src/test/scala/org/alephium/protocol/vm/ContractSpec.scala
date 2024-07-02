@@ -327,7 +327,7 @@ class ContractSpec extends AlephiumSpec {
   trait MethodSelectorFixture {
     private val instrs = Instr.statelessInstrs0.filter(_.isInstanceOf[Instr[_]])
     def methodGen: Gen[Method[StatefulContext]] = {
-      val size         = Random.nextInt(instrs.length)
+      val size         = Random.between(1, instrs.length)
       val methodInstrs = instrs.take(size)
       Gen.const(()).map { _ =>
         Method(

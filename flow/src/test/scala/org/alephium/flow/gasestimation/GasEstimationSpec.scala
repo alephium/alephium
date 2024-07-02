@@ -29,13 +29,11 @@ import org.alephium.util._
 class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
   "GasEstimation.estimateWithP2PKHInputs" should "estimate the gas for P2PKH inputs" in {
-    GasEstimation.estimateWithP2PKHInputs(0, 0) is minimalGas
-    GasEstimation.estimateWithP2PKHInputs(1, 0) is minimalGas
-    GasEstimation.estimateWithP2PKHInputs(0, 1) is minimalGas
-    GasEstimation.estimateWithP2PKHInputs(1, 1) is minimalGas
-    GasEstimation.estimateWithP2PKHInputs(2, 3) is GasBox.unsafe(22620)
-    GasEstimation.estimateWithP2PKHInputs(3, 3) is GasBox.unsafe(26680)
-    GasEstimation.estimateWithP2PKHInputs(5, 10) is GasBox.unsafe(66300)
+    GasEstimation.estimateWithSameP2PKHInputs(1, 0) is minimalGas
+    GasEstimation.estimateWithSameP2PKHInputs(1, 1) is minimalGas
+    GasEstimation.estimateWithSameP2PKHInputs(2, 3) is GasBox.unsafe(20560)
+    GasEstimation.estimateWithSameP2PKHInputs(3, 3) is GasBox.unsafe(22560)
+    GasEstimation.estimateWithSameP2PKHInputs(5, 10) is GasBox.unsafe(58060)
   }
 
   "GasEstimation.sweepAddress" should "behave the same as GasEstimation.estimateWithP2PKHInputs" in {
@@ -44,7 +42,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
     forAll(inputNumGen, outputNumGen) { case (inputNum, outputNum) =>
       val sweepAddressGas = GasEstimation.sweepAddress(inputNum, outputNum)
-      sweepAddressGas is GasEstimation.estimateWithP2PKHInputs(inputNum, outputNum)
+      sweepAddressGas is GasEstimation.estimateWithSameP2PKHInputs(inputNum, outputNum)
     }
   }
 
@@ -96,9 +94,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator).rightValue is GasBox
         .unsafe(20000)
       GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator).rightValue is GasBox
-        .unsafe(26240)
+        .unsafe(20060)
       GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator).rightValue is GasBox
-        .unsafe(50600)
+        .unsafe(32060)
     }
 
     info("P2MPKH")
@@ -110,9 +108,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       GasEstimation.estimateWithInputScript(script, 1, 2, mockEstimator).rightValue is GasBox
         .unsafe(20000)
       GasEstimation.estimateWithInputScript(script, 4, 2, mockEstimator).rightValue is GasBox
-        .unsafe(34480)
+        .unsafe(22120)
       GasEstimation.estimateWithInputScript(script, 10, 2, mockEstimator).rightValue is GasBox
-        .unsafe(71200)
+        .unsafe(34120)
     }
 
     info("P2SH, no signature required")
@@ -147,7 +145,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         transferFromP2sh(lockup, unlock)
 
         val estimator = assetScriptGasEstimator(lockup, unlock)
-        GasEstimation.estimateInputGas(unlock, None, estimator).rightValue
+        GasEstimation.estimateInputGas(unlock, estimator).rightValue
       }
 
       p2shNoSignature(4) is GasBox.unsafe(2815)
@@ -178,7 +176,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       transferFromP2sh(lockup, unlock)
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
-      GasEstimation.estimateInputGas(unlock, None, estimator) isE GasBox.unsafe(4277)
+      GasEstimation.estimateInputGas(unlock, estimator) isE GasBox.unsafe(4277)
     }
 
     info("P2SH, other execution error, e.g. ArithmeticError")
@@ -202,7 +200,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation
-        .estimateInputGas(unlock, None, estimator)
+        .estimateInputGas(unlock, estimator)
         .leftValue
         .startsWith("Execution error when estimating gas for P2SH script: ArithmeticError") is true
     }
@@ -281,13 +279,37 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       ),
       1,
       AssetScriptGasEstimator.NotImplemented
-    ) isE GasBox.unsafe(25860)
+    ) isE GasBox.unsafe(20000)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        UnlockScript.SameAsPrevious,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        UnlockScript.SameAsPrevious,
+        p2mpkhUnlockScript
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(29860)
 
     GasEstimation.estimate(
       AVector(
         p2pkhUnlockScript,
         p2pkhUnlockScript,
         p2mpkhUnlockScript,
+        p2mpkhUnlockScript
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(20000)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2pkhUnlockScript,
         p2mpkhUnlockScript
       ),
       1,
@@ -305,7 +327,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       ),
       1,
       AssetScriptGasEstimator.NotImplemented
-    ) isE GasBox.unsafe(36040)
+    ) isE GasBox.unsafe(23680)
 
     GasEstimation.estimate(
       AVector(
@@ -318,21 +340,41 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       ),
       1,
       AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(23680)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
     ) isE GasBox.unsafe(36040)
 
     GasEstimation.estimateInputGas(
-      UnlockScript.SameAsPrevious,
-      Some(GasBox.unsafe(1111)),
+      p2pkhUnlockScript,
       AssetScriptGasEstimator.NotImplemented
-    ) isE GasBox.unsafe(1111)
+    ) isE GasBox.unsafe(4060)
 
-    GasEstimation
-      .estimateInputGas(
-        UnlockScript.SameAsPrevious,
-        None,
-        AssetScriptGasEstimator.NotImplemented
-      )
-      .leftValue is "Error estimating gas for SameAsPrevious unlock script"
+    GasEstimation.estimateInputGas(
+      p2mpkhUnlockScript,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(6120)
+
+    GasEstimation.estimateInputGas(
+      UnlockScript.SameAsPrevious,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(2000)
+  }
+
+  it should "estimate the gas for multiple inputs from the same address" in {
+    GasEstimation.gasForSameP2PKHInputs(1) is GasBox.unsafe(4060)
+    GasEstimation.gasForSameP2PKHInputs(2) is GasBox.unsafe(4060 + 2000)
+    GasEstimation.gasForSameP2PKHInputs(3) is GasBox.unsafe(4060 + 2000 * 2)
   }
 
   private def transferFromP2sh(

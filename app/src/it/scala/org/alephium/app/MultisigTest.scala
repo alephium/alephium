@@ -73,7 +73,7 @@ class MultisigTest extends AlephiumActorSpec {
 
     submitSuccessfulMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(22240))
+    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20000))
 
     clique.stopMining()
     clique.stop()
@@ -108,7 +108,7 @@ class MultisigTest extends AlephiumActorSpec {
     val unsignedTx =
       submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey, privateKey3))
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(22240))
+    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20000))
 
     clique.stopMining()
     clique.stop()
@@ -129,7 +129,7 @@ class MultisigTest extends AlephiumActorSpec {
       AVector(privateKey, privateKey3, privateKey4)
     )
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(26360))
+    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20180))
 
     clique.stopMining()
     clique.stop()

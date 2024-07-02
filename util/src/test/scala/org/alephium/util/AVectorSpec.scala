@@ -676,6 +676,24 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       AVector.from(vc.view) is vc
     }
   }
+
+  it should "partition" in new Fixture {
+    AVector.empty[Int].partition(_ % 2 == 0) is (AVector.empty, AVector.empty)
+    AVector(0, 1, 2, 3, 4, 5).partition(_ % 2 == 0) is (AVector(0, 2, 4), AVector(1, 3, 5))
+
+    def test(intGen: Gen[Int]) = {
+      forAll(Gen.listOf(intGen)) { posNums =>
+        val posNumsAVector = AVector.from(posNums)
+        val even           = posNumsAVector.filter(_ % 2 == 0)
+        val odd            = posNumsAVector.filterNot(_ % 2 == 0)
+        posNumsAVector.partition(_ % 2 == 0) is (even, odd)
+      }
+    }
+
+    test(Gen.posNum[Int])
+    test(Gen.negNum[Int])
+    test(Gen.chooseNum[Int](-100000, 100000))
+  }
 }
 
 class SpecialAVectorSpec extends AlephiumSpec {

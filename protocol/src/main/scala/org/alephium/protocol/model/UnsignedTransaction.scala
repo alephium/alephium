@@ -138,6 +138,20 @@ object UnsignedTransaction {
     )
   }
 
+  private def buildInputs(
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[(AssetOutputRef, AssetOutput)]
+  ): AVector[TxInput] = {
+    assume(fromUnlockScript != UnlockScript.SameAsPrevious)
+    inputs.mapWithIndex { case ((outputRef, _), index) =>
+      if (index == 0) {
+        TxInput(outputRef, fromUnlockScript)
+      } else {
+        TxInput(outputRef, UnlockScript.SameAsPrevious)
+      }
+    }
+  }
+
   // scalastyle:off parameter.number
   def buildScriptTx(
       script: StatefulScript,
@@ -165,9 +179,7 @@ object UnsignedTransaction {
         Some(script),
         gasAmount,
         gasPrice,
-        inputs.map { case (ref, _) =>
-          TxInput(ref, fromUnlockScript)
-        },
+        buildInputs(fromUnlockScript, inputs),
         fixedOutputs
       )
     }
@@ -234,9 +246,7 @@ object UnsignedTransaction {
         None,
         gas,
         gasPrice,
-        inputs.map { case (ref, _) =>
-          TxInput(ref, fromUnlockScript)
-        },
+        buildInputs(fromUnlockScript, inputs),
         txOutputs ++ changeOutputs
       )
     }
@@ -304,11 +314,7 @@ object UnsignedTransaction {
         scriptOpt = None,
         gas,
         gasPrice,
-        from.flatMap { in =>
-          in.assets.map { case (ref, _) =>
-            TxInput(ref, in.fromUnlockScript)
-          }
-        },
+        from.flatMap(in => buildInputs(in.fromUnlockScript, in.assets)),
         outputs
       )
     }
