@@ -614,6 +614,16 @@ final class AVector[@sp A](
     }
   }
 
+  def partition(f: A => Boolean): (AVector[A], AVector[A]) = {
+    fold((AVector.empty, AVector.empty)) { case ((left, right), elem) =>
+      if (f(elem)) {
+        (left :+ elem, right)
+      } else {
+        (left, right :+ elem)
+      }
+    }
+  }
+
   def groupBy[K](f: A => K): Map[K, AVector[A]] = {
     fold(Map.empty[K, AVector[A]]) { case (acc, elem) =>
       val key = f(elem)
