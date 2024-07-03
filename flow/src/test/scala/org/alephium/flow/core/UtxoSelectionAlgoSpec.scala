@@ -86,12 +86,12 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     }
   }
 
-  // Gas is calculated using GasEstimation.estimateWithP2PKHInputs
+  // Gas is calculated using GasEstimation.estimateWithSameP2PKHInputs
   // 1 input:  20000
-  // 2 inputs: 22620
-  // 3 inputs: 26680
-  // 4 inputs: 30740
-  // 5 inputs: 34800
+  // 2 inputs: 20560
+  // 3 inputs: 22560
+  // 4 inputs: 24560
+  // 5 inputs: 26560
   it should "return the correct utxos when gas is considered" in new Fixture {
     {
       info("without tokens")
@@ -101,10 +101,10 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(3000).verifyWithGas(1)
       UtxoSelection(3001).verifyWithGas(1, 0)
       UtxoSelection(30000).verifyWithGas(1, 0)
-      UtxoSelection(40380).verifyWithGas(1, 0)
-      UtxoSelection(40381).verifyWithGas(1, 0, 2)
-      UtxoSelection(91320).verifyWithGas(1, 0, 2)
-      UtxoSelection(91321).leftValueWithGas.startsWith("Not enough balance for fee") is true
+      UtxoSelection(42440).verifyWithGas(1, 0)
+      UtxoSelection(42441).verifyWithGas(1, 0, 2)
+      UtxoSelection(95440).verifyWithGas(1, 0, 2)
+      UtxoSelection(95441).leftValueWithGas.startsWith("Not enough balance for fee") is true
     }
 
     {
@@ -137,8 +137,8 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(23100, (tokenId2, 21)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(173210, (tokenId2, 15), (tokenId1, 11)).verifyWithGas(1, 4, 0, 2, 3)
-      UtxoSelection(173211, (tokenId2, 15), (tokenId1, 11)).leftValueWithGas
+      UtxoSelection(181450, (tokenId2, 15), (tokenId1, 11)).verifyWithGas(1, 4, 0, 2, 3)
+      UtxoSelection(181451, (tokenId2, 15), (tokenId1, 11)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
     }
   }
@@ -273,12 +273,12 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     implicit val utxos = buildUtxos(40000, 20, 55000)
 
     // Ascending order
-    //   68340 = 40000 + 20 + 55000 - 26680
-    //   where 26680 is the estimated gas for 3 outputs
-    UtxoSelection(68340).verifyWithGas(1, 0, 2)
+    //   72460 = 40000 + 20 + 55000 - 22560
+    //   where 22560 is the estimated gas for 3 outputs
+    UtxoSelection(72460).verifyWithGas(1, 0, 2)
 
     // Descending order
-    UtxoSelection(68341).verifyWithGas(2, 0)
+    UtxoSelection(72461).verifyWithGas(2, 0)
   }
 
   it should "work when tx has more potential outputs than max gas allows" in new Fixture {
@@ -392,7 +392,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       def verifyWithGas(utxoIndexes: Int*): Assertion = {
         val selectedUtxos = AVector.from(utxoIndexes).map(utxos(_))
         val gas = gasOpt.getOrElse(
-          GasEstimation.estimateWithP2PKHInputs(selectedUtxos.length, outputs.length)
+          GasEstimation.estimateWithSameP2PKHInputs(selectedUtxos.length, outputs.length)
         )
         valueWithGas isE Selected(selectedUtxos, gas)
       }
