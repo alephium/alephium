@@ -267,7 +267,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       // scalastyle:on no.equal
     }
 
-    info("Not enough balance for gas fee")
+    info("Insufficient funds for gas")
 
     {
       val (_, pubKey) = GroupIndex.unsafe(0).generateKey
@@ -278,7 +278,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |}
            |""".stripMargin,
         pubKey
-      ).leftValue is "Not enough balance for gas fee"
+      ).leftValue is "Insufficient funds for gas"
     }
   }
 

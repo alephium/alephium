@@ -82,7 +82,7 @@ object GasEstimation extends StrictLogging {
       txScriptGasEstimator: TxScriptGasEstimator
   ): Either[String, GasBox] = {
     if (inputs.isEmpty) {
-      Left("Not enough balance for gas fee")
+      Left("Insufficient funds for gas")
     } else {
       txScriptGasEstimator.estimate(inputs, script)
     }
