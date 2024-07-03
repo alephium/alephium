@@ -1912,6 +1912,89 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse(script("(x: U256)"), StatefulParser.txScript(_)).isSuccess is true
   }
 
+  it should "it should allow explicit definition of main function in TxScript" in {
+    {
+      info("Explicit definition")
+      val script =
+        s"""
+           |TxScript Main {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |  pub fn main() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      parse(script, StatefulParser.txScript(_)).get.value.funcs.map(_.name) is Seq("main", "foo")
+    }
+
+    {
+      info("Return from main function")
+      val script =
+        s"""
+           |TxScript Main {
+           |  @using(preapprovedAssets = false)
+           |  pub fn main() -> ([U256; 2], Bool) {
+           |    return [0, 1], false
+           |  }
+           |}
+           |""".stripMargin
+      val parsed = parse(script, StatefulParser.txScript(_)).get.value
+      parsed.funcs.length is 1
+      parsed.funcs.head.name is "main"
+      parsed.funcs.head.usePreapprovedAssets is false
+      parsed.funcs.head.rtypes is Seq(Type.FixedSizeArray(Type.U256, 2), Type.Bool)
+    }
+
+    {
+      info("Implicit definition")
+      val script =
+        s"""
+           |TxScript Main {
+           |  foo()
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      parse(script, StatefulParser.txScript(_)).get.value.funcs.map(_.name) is Seq("main", "foo")
+    }
+
+    {
+      info("No main function definition")
+      val script =
+        s"""
+           |TxScript Main {
+           |  pub fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(script, StatefulParser.txScript(_)))
+      error.message is "Expected main statements for type `Main`"
+    }
+
+    {
+      info("Conflict main function definitions")
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(true, 0)
+           |
+           |  pub fn $$main() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      val error =
+        intercept[Compiler.Error](parse(script.replace("$", ""), StatefulParser.txScript(_)))
+      error.message is "The main function already defined in script `Main`"
+      error.position is script.indexOf("$")
+    }
+  }
+
   it should "fail to define Debug event" in {
     val code =
       s"""

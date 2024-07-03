@@ -943,13 +943,10 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def rawTxScript[Unknown: P]: P[Ast.TxScript] =
     P(
-      annotation.rep ~
-        Lexer.token(
-          Keyword.TxScript
-        ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~~ Index ~ statement
-          .rep(0) ~ func
-          .rep(0) ~ "}"
-        ~~ Index
+      annotation.rep ~ Lexer.token(Keyword.TxScript) ~/
+        Lexer.typeId ~ templateParams.? ~ "{" ~~
+        Index ~ statement.rep(0) ~ func.rep(0) ~
+        "}" ~~ Index
     )
       .map {
         case (
@@ -962,11 +959,17 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               funcs,
               endIndex
             ) =>
-          if (mainStmts.isEmpty) {
+          val mainFuncOpt = funcs.find(_.name == "main")
+          if (mainStmts.isEmpty && mainFuncOpt.isEmpty) {
             throw CompilerError.`Expected main statements`(
               typeId,
               mainStmtsIndex,
               fileURI
+            )
+          } else if (mainStmts.nonEmpty && mainFuncOpt.nonEmpty) {
+            throw Compiler.Error(
+              s"The main function already defined in script `${typeId.name}`",
+              mainFuncOpt.flatMap(_.id.sourceIndex)
             )
           } else {
             val usingAnnotation = Parser.FunctionUsingAnnotation.extractFields(
@@ -980,14 +983,17 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
                 methodIndex = None
               )
             )
-            val mainFunc = Ast.FuncDef.main(
-              mainStmts,
-              usingAnnotation.preapprovedAssets,
-              usingAnnotation.assetsInContract,
-              usingAnnotation.updateFields
+            val mainFunc = mainFuncOpt.getOrElse(
+              Ast.FuncDef.main(
+                mainStmts,
+                usingAnnotation.preapprovedAssets,
+                usingAnnotation.assetsInContract,
+                usingAnnotation.updateFields
+              )
             )
+            val restFuncs = funcs.filter(_.name != "main")
             Ast
-              .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
+              .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: restFuncs)
               .atSourceIndex(scriptIndex.index, endIndex, fileURI)
           }
       }
