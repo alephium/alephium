@@ -19,7 +19,7 @@ package org.alephium.flow.gasestimation
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.ALPH
+import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript, Val}
@@ -243,14 +243,14 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     info("Signature required")
 
     {
-      val (pubKey, _) = keypairGen.sample.value
+      val (_, pubKey) = keypairGen.sample.value
       estimateTxScript(
         s"""
            |TxScript Main {
            |  verifyTxSignature!(#${pubKey.toHexString})
            |}
            |""".stripMargin
-      ) isE GasBox.unsafe(6745)
+      ) isE GasBox.unsafe(6746)
     }
 
     info("Other execution error, e.g. AssertionFailed")
@@ -265,6 +265,20 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |""".stripMargin
       ).leftValue is "Execution error when estimating gas for tx script or contract: Assertion Failed in TxScript, Error Code: 0"
       // scalastyle:on no.equal
+    }
+
+    info("Not enough balance for gas fee")
+
+    {
+      val (_, pubKey) = GroupIndex.unsafe(0).generateKey
+      estimateTxScript(
+        s"""
+           |TxScript Main {
+           |  assert!(true, 0)
+           |}
+           |""".stripMargin,
+        pubKey
+      ).leftValue is "Not enough balance for gas fee"
     }
   }
 
@@ -359,15 +373,16 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       .rightValue
   }
 
-  private def estimateTxScript(raw: String): Either[String, GasBox] = {
-    val script            = Compiler.compileTxScript(raw).rightValue
-    val chainIndex        = ChainIndex.unsafe(0, 0)
-    val (_, publicKey, _) = genesisKeys(chainIndex.from.value)
-    val lockup            = LockupScript.p2pkh(publicKey)
-    val unlock            = UnlockScript.p2pkh(publicKey)
-    val utxos             = blockFlow.getUsableUtxos(lockup, 100).rightValue
-    val inputs            = utxos.map(_.ref).map(TxInput(_, unlock))
-    val estimator         = TxScriptGasEstimator.Default(blockFlow)
+  private def estimateTxScript(
+      raw: String,
+      publicKey: PublicKey = genesisKeys(0)._2
+  ): Either[String, GasBox] = {
+    val script    = Compiler.compileTxScript(raw).rightValue
+    val lockup    = LockupScript.p2pkh(publicKey)
+    val unlock    = UnlockScript.p2pkh(publicKey)
+    val utxos     = blockFlow.getUsableUtxos(lockup, 100).rightValue
+    val inputs    = utxos.map(_.ref).map(TxInput(_, unlock))
+    val estimator = TxScriptGasEstimator.Default(blockFlow)
 
     GasEstimation.estimate(inputs, script, estimator)
   }
