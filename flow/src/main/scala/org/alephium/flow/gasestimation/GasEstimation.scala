@@ -84,7 +84,11 @@ object GasEstimation extends StrictLogging {
       script: StatefulScript,
       txScriptGasEstimator: TxScriptGasEstimator
   ): Either[String, GasBox] = {
-    txScriptGasEstimator.estimate(inputs, script)
+    if (inputs.isEmpty) {
+      Left("Insufficient funds for gas")
+    } else {
+      txScriptGasEstimator.estimate(inputs, script)
+    }
   }
 
   private[gasestimation] def estimateInputGas(
