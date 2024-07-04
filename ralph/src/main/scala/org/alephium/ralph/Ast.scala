@@ -191,6 +191,7 @@ object Ast {
   trait Typed[Ctx <: StatelessContext, T] extends Positioned {
     private var tpe: Option[T] = None
     protected def _getType(state: Compiler.State[Ctx]): T
+    def getType: Option[T] = tpe
     def getType(state: Compiler.State[Ctx]): T =
       tpe match {
         case Some(ts) => ts
