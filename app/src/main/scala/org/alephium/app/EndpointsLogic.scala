@@ -693,6 +693,15 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.multipleCallContract(blockFlow, params))
   }
 
+  val callTxScriptLogic = serverLogicRedirect(callTxScript)(
+    { params: CallTxScript =>
+      Future.successful(serverUtils.callTxScript(blockFlow, params))
+    },
+    { params: CallTxScript =>
+      getGroupIndex(GroupIndex.from(params.group))
+    }
+  )
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     // Run the export in background
     Future.successful(
