@@ -16,24 +16,15 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, BlockHash, TransactionId}
+import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class CallContract(
-    group: Int,
-    worldStateBlockHash: Option[BlockHash] = None,
-    txId: Option[TransactionId] = None,
-    address: Address.Contract,
-    callerAddress: Option[Address.Contract] = None,
-    methodIndex: Int,
-    args: Option[AVector[Val]] = None,
-    existingContracts: Option[AVector[Address.Contract]] = None,
-    inputAssets: Option[AVector[TestInputAsset]] = None
-) extends CallBase {
-  def fromAddress: Option[Address] = Some(address)
-  def allContractAddresses: AVector[Address.Contract] =
-    existingContracts.getOrElse(AVector.empty) :+ address
-}
-
-final case class MultipleCallContract(calls: AVector[CallContract])
+final case class CallTxScriptResult(
+    returns: AVector[Val],
+    gasUsed: Int,
+    contracts: AVector[ContractState],
+    txInputs: AVector[Address],
+    txOutputs: AVector[Output],
+    events: AVector[ContractEventByTxId],
+    debugMessages: AVector[DebugMessage]
+)
