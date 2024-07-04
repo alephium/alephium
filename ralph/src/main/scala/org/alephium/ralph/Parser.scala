@@ -991,6 +991,12 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
                 usingAnnotation.updateFields
               )
             )
+            if (mainFunc.args.nonEmpty) {
+              throw Compiler.Error(
+                "The main function cannot have parameters. Please declare the parameters as script parameters",
+                mainFuncOpt.flatMap(_.id.sourceIndex)
+              )
+            }
             val restFuncs = funcs.filter(_.name != "main")
             Ast
               .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: restFuncs)

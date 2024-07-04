@@ -1993,6 +1993,22 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.message is "The main function already defined in script `Main`"
       error.position is script.indexOf("$")
     }
+
+    {
+      info("Main function cannot have parameters")
+      val script =
+        s"""
+           |TxScript Main {
+           |  pub fn $$main(v: U256) -> U256 {
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+      val error =
+        intercept[Compiler.Error](parse(script.replace("$", ""), StatefulParser.txScript(_)))
+      error.message is "The main function cannot have parameters. Please declare the parameters as script parameters"
+      error.position is script.indexOf("$")
+    }
   }
 
   it should "fail to define Debug event" in {
