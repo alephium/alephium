@@ -1472,7 +1472,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |      }
          |    }
          |  ],
-         |  "existingContracts": [
+         |  "interestedContracts": [
          |    "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
          |  ]
          |}
