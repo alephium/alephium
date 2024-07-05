@@ -1263,6 +1263,25 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(script)
   }
 
+  it should "test len builtin" in new ContractFixture {
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(len!([1, 2]) == 2, 0)
+         |  assert!(len!([[1, 1], [2, 2], [3, 3]]) == 3, 0)
+         |  let array0 = [0; 2]
+         |  assert!(len!(array0) == 2, 0)
+         |  let array1 = [[0; 2]; 3]
+         |  assert!(len!(array1) == 3, 0)
+         |  assert!(len!(array1[0]) == 2, 0)
+         |  assert!(len!(array1[1]) == 2, 0)
+         |}
+         |""".stripMargin
+
+    testSimpleScript(script)
+  }
+
   it should "test contract exists" in new ContractFixture {
     val foo =
       s"""
