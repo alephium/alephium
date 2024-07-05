@@ -1990,7 +1990,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
            |""".stripMargin
       val error =
         intercept[Compiler.Error](parse(script.replace("$", ""), StatefulParser.txScript(_)))
-      error.message is "The main function already defined in script `Main`"
+      error.message is "The main function is already defined in script `Main`"
       error.position is script.indexOf("$")
     }
 

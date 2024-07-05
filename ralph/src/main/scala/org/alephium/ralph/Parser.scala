@@ -968,7 +968,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             )
           } else if (mainStmts.nonEmpty && mainFuncOpt.nonEmpty) {
             throw Compiler.Error(
-              s"The main function already defined in script `${typeId.name}`",
+              s"The main function is already defined in script `${typeId.name}`",
               mainFuncOpt.flatMap(_.id.sourceIndex)
             )
           } else {

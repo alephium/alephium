@@ -1252,7 +1252,7 @@ class ServerUtils(implicit
   private def call[P <: CallBase](
       blockFlow: BlockFlow,
       params: P,
-      func: (
+      execute: (
           WorldState.Staging,
           GroupIndex,
           BlockHash
@@ -1267,7 +1267,7 @@ class ServerUtils(implicit
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
       )
-      resultPair <- func(worldState, groupIndex, blockHash)
+      resultPair <- execute(worldState, groupIndex, blockHash)
       (returns, exeResult) = resultPair
       contractsState <- params.allContractAddresses.mapE(address =>
         fetchContractState(worldState, address.contractId)
