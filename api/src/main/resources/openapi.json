@@ -8203,7 +8203,7 @@
                     "value": "0"
                   }
                 ],
-                "existingContracts": [
+                "interestedContracts": [
                   "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
                 ],
                 "inputAssets": [
@@ -8415,7 +8415,7 @@
                         "value": "0"
                       }
                     ],
-                    "existingContracts": [
+                    "interestedContracts": [
                       "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
                     ],
                     "inputAssets": [
@@ -11468,7 +11468,7 @@
               "$ref": "#/components/schemas/Val"
             }
           },
-          "existingContracts": {
+          "interestedContracts": {
             "type": "array",
             "items": {
               "type": "string",
@@ -11611,7 +11611,7 @@
               "$ref": "#/components/schemas/TestInputAsset"
             }
           },
-          "existingContracts": {
+          "interestedContracts": {
             "type": "array",
             "items": {
               "type": "string",

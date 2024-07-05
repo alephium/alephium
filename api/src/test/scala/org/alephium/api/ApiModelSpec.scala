@@ -1453,7 +1453,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       worldStateBlockHash = Some(ghostUncleHash),
       txId = Some(TransactionId.zero),
       inputAssets = Some(AVector(TestInputAsset(Address.Asset(lockupScript), AssetState(1)))),
-      existingContracts = Some(AVector(generateContractAddress()))
+      interestedContracts = Some(AVector(generateContractAddress()))
     )
 
     val jsonRaw =

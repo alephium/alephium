@@ -29,9 +29,9 @@ final case class CallTxScript(
     worldStateBlockHash: Option[BlockHash] = None,
     txId: Option[TransactionId] = None,
     inputAssets: Option[AVector[TestInputAsset]] = None,
-    existingContracts: Option[AVector[Address.Contract]] = None
+    interestedContracts: Option[AVector[Address.Contract]] = None
 ) extends CallBase {
   def fromAddress: Option[Address] = callerAddress
   def allContractAddresses: AVector[Address.Contract] =
-    existingContracts.getOrElse(AVector.empty)
+    interestedContracts.getOrElse(AVector.empty)
 }

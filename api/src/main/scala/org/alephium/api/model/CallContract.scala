@@ -28,12 +28,12 @@ final case class CallContract(
     callerAddress: Option[Address.Contract] = None,
     methodIndex: Int,
     args: Option[AVector[Val]] = None,
-    existingContracts: Option[AVector[Address.Contract]] = None,
+    interestedContracts: Option[AVector[Address.Contract]] = None,
     inputAssets: Option[AVector[TestInputAsset]] = None
 ) extends CallBase {
   def fromAddress: Option[Address] = Some(address)
   def allContractAddresses: AVector[Address.Contract] =
-    existingContracts.getOrElse(AVector.empty) :+ address
+    interestedContracts.getOrElse(AVector.empty) :+ address
 }
 
 final case class MultipleCallContract(calls: AVector[CallContract])
