@@ -836,6 +836,24 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(MultipleCallContractResult(AVector(callContractResultExample)))
   }
 
+  implicit val callTxScriptExamples: List[Example[CallTxScript]] = {
+    simpleExample(CallTxScript(group = 0, bytecode = Hex.unsafe("0011")))
+  }
+
+  implicit val callTxScriptResultExamples: List[Example[CallTxScriptResult]] = {
+    simpleExample(
+      CallTxScriptResult(
+        returns = AVector[Val](ValU256(U256.One), ValBool(false)),
+        gasUsed = 100000,
+        contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
+        txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
+        events = AVector.empty,
+        debugMessages = AVector.empty
+      )
+    )
+  }
+
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))
 

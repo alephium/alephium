@@ -351,6 +351,9 @@ trait ApiModelCodec {
   implicit val callContractFailedRW: ReadWriter[CallContractFailed]       = macroRW
   implicit val callContractResultRW: ReadWriter[CallContractResult]       = macroRW
 
+  implicit val callTxScriptRW: ReadWriter[CallTxScript]             = macroRW
+  implicit val callTxScriptResultRW: ReadWriter[CallTxScriptResult] = macroRW
+
   implicit val multipleCallContractRW: ReadWriter[MultipleCallContract]             = macroRW
   implicit val multipleCallContractResultRW: ReadWriter[MultipleCallContractResult] = macroRW
 

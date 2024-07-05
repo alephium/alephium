@@ -76,6 +76,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   val compilerOptions = CompilerOptions(ignoreUnusedConstantsWarnings = Some(true))
 
+  val contractState = ContractState(
+    generateContractAddress(),
+    StatefulContract.forSMT.toContract().rightValue,
+    codeHash = Hash.zero,
+    initialStateHash = Some(Hash.zero),
+    immFields = AVector.empty,
+    mutFields = AVector.empty,
+    AssetState.from(ALPH.alph(1), AVector.empty)
+  )
+
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
     Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
@@ -1385,16 +1395,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode MultipleCallContractResult" in {
-    val contractState = ContractState(
-      generateContractAddress(),
-      StatefulContract.forSMT.toContract().rightValue,
-      codeHash = Hash.zero,
-      initialStateHash = Some(Hash.zero),
-      immFields = AVector.empty,
-      mutFields = AVector.empty,
-      AssetState.from(ALPH.alph(1), AVector.empty)
-    )
-
     val callResults = MultipleCallContractResult(
       AVector(
         CallContractSucceeded(
@@ -1443,6 +1443,91 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |""".stripMargin
 
     checkData(callResults, jsonRaw)
+  }
+
+  it should "encode/decode CallTxScript" in {
+    val params = CallTxScript(
+      group = 0,
+      bytecode = Hex.unsafe("0011"),
+      callerAddress = Some(Address.Asset(lockupScript)),
+      worldStateBlockHash = Some(ghostUncleHash),
+      txId = Some(TransactionId.zero),
+      inputAssets = Some(AVector(TestInputAsset(Address.Asset(lockupScript), AssetState(1)))),
+      existingContracts = Some(AVector(generateContractAddress()))
+    )
+
+    val jsonRaw =
+      s"""
+         |{
+         |  "group": 0,
+         |  "bytecode": "0011",
+         |  "callerAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+         |  "worldStateBlockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+         |  "txId": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "inputAssets": [
+         |    {
+         |      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n",
+         |      "asset": {
+         |        "attoAlphAmount": "1"
+         |      }
+         |    }
+         |  ],
+         |  "existingContracts": [
+         |    "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+         |  ]
+         |}
+         |""".stripMargin
+
+    checkData(params, jsonRaw)
+  }
+
+  it should "encode/decode CallTxScriptResult" in {
+    val callResult = CallTxScriptResult(
+      returns = AVector[Val](ValU256(1), ValBool(false)),
+      gasUsed = 100000,
+      contracts = AVector(contractState),
+      txInputs = AVector.empty,
+      txOutputs = AVector.empty,
+      events = AVector.empty,
+      debugMessages = AVector.empty
+    )
+
+    val jsonRaw =
+      s"""
+         |{
+         |  "returns": [
+         |    {
+         |      "type": "U256",
+         |      "value": "1"
+         |    },
+         |    {
+         |      "type": "Bool",
+         |      "value": false
+         |    }
+         |  ],
+         |  "gasUsed": 100000,
+         |  "contracts": [
+         |    {
+         |      "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+         |      "bytecode": "00010700000000000118",
+         |      "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |      "initialStateHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |      "immFields": [],
+         |      "mutFields": [],
+         |      "asset": {
+         |        "attoAlphAmount": "1000000000000000000",
+         |        "tokens": []
+         |      }
+         |    }
+         |  ],
+         |  "txInputs": [],
+         |  "txOutputs": [],
+         |  "events": [],
+         |  "debugMessages": []
+         |}
+         |""".stripMargin
+
+    checkData(callResult, jsonRaw)
   }
 
   it should "get alph and token amounts" in {
