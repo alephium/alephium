@@ -808,7 +808,7 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(ContractId.zero),
     methodIndex = 0,
     args = Some(AVector[Val](ValU256(U256.Zero))),
-    existingContracts = Some(AVector(contractAddress)),
+    interestedContracts = Some(AVector(contractAddress)),
     inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
   )
   implicit val callContractExamples: List[Example[CallContract]] = {

@@ -7210,4 +7210,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     compiled1.debugCode is compiled3.debugCode
     compiled1.warnings is compiled3.warnings
   }
+
+  it should "compile the len!(array)" in {
+    def code(tpe: String) =
+      s"""
+         |Contract Foo(value: $tpe) {
+         |  pub fn foo() -> U256 {
+         |    return $$len!(value)$$
+         |  }
+         |}
+         |""".stripMargin
+
+    compileContract(replace(code("[U256; 2]"))).isRight is true
+    testContractError(code("U256"), "Expected an array, got \"U256\"")
+  }
 }

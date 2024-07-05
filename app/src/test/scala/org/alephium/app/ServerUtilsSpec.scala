@@ -1352,7 +1352,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       address = fooAddress,
       methodIndex = 0,
       inputAssets = Some(AVector(inputAsset)),
-      existingContracts = Some(AVector(barAddress))
+      interestedContracts = Some(AVector(barAddress))
     )
     val callContractResult0 =
       serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractSucceeded]
@@ -1451,7 +1451,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val params = CallTxScript(
         group = 0,
         bytecode = bytecode,
-        existingContracts = Some(AVector(Address.contract(fooId)))
+        interestedContracts = Some(AVector(Address.contract(fooId)))
       )
       val result = serverUtils.callTxScript(blockFlow, params).rightValue
       result.returns is AVector[Val](ValU256(1), ValBool(true))
@@ -1508,7 +1508,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         group = 0,
         bytecode = bytecode,
         callerAddress = Some(callerAddress),
-        existingContracts = Some(AVector(fooAddress)),
+        interestedContracts = Some(AVector(fooAddress)),
         worldStateBlockHash = Some(blockHash),
         inputAssets = Some(AVector(TestInputAsset(callerAddress, AssetState(ALPH.oneAlph))))
       )
@@ -1611,7 +1611,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       address = fooAddress,
       methodIndex = 0,
       inputAssets = Some(AVector(inputAsset)),
-      existingContracts = Some(AVector(barAddress))
+      interestedContracts = Some(AVector(barAddress))
     )
     val callContractResult0 =
       serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractFailed]
