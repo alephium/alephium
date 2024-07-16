@@ -87,6 +87,8 @@ abstract class SizedLruCache[K, V](var maxByteSize: Int, getEntrySize: (K, V) =>
   }
 
   def put(key: K, value: V): Unit = writeOnly {
+    Option(m.get(key)).foreach(oldValue => _currentByteSize -= getEntrySize(key, oldValue))
+
     _currentByteSize += getEntrySize(key, value)
     m.put(key, value)
     ()
