@@ -6437,7 +6437,8 @@ class VMSpec extends AlephiumSpec with Generators {
     getAlphBalance(blockFlow, receiver) is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
   }
 
-  it should "check inactive instrs when creating contract" in new ContractFixture {
+  // Inactive instrs check will be enabled in future upgrades
+  ignore should "check inactive instrs when creating contract" in new ContractFixture {
     override val configValues =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
