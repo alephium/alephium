@@ -3041,7 +3041,8 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
   }
 
-  it should "should throw exception for payGasFee instr before Rhone hardfork" in new GasFeeFixture {
+  // Inactive instrs check will be enabled in future upgrades
+  ignore should "should throw exception for payGasFee instr before Rhone hardfork" in new GasFeeFixture {
     implicit override lazy val networkConfig: NetworkSetting = config.network.copy(
       rhoneHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
     )

@@ -16,6 +16,8 @@
 
 package org.alephium.util
 
+import scala.util.Random
+
 class SizedLruCacheSpec extends AlephiumSpec {
   it should "work as map" in {
     for (safety <- Seq(true, false)) {
@@ -101,5 +103,14 @@ class SizedLruCacheSpec extends AlephiumSpec {
     cache.clear()
     cache.size is 0
     cache.currentByteSize is 0
+  }
+
+  it should "count size correctly when value is updated" in {
+    val cache = SizedLruCache.threadSafe[Int, Int](50, (_, _) => 1)
+    (0 until 10).foreach { _ =>
+      Random.shuffle(Seq.from(1 until 100)).foreach(k => cache.put(k, k))
+    }
+    cache.currentByteSize is 50
+    cache.entries().size is 50
   }
 }
