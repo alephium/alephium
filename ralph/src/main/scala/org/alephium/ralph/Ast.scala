@@ -137,6 +137,14 @@ object Ast {
       }
       address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveTokens
     }
+
+    def reset(): Unit = {
+      address.reset()
+      tokenAmounts.foreach { case (tokenExpr, amountExpr) =>
+        tokenExpr.reset()
+        amountExpr.reset()
+      }
+    }
   }
 
   sealed trait ContractAssetsAnnotation {
@@ -181,8 +189,9 @@ object Ast {
   }
 
   trait Typed[Ctx <: StatelessContext, T] extends Positioned {
-    var tpe: Option[T] = None
+    private var tpe: Option[T] = None
     protected def _getType(state: Compiler.State[Ctx]): T
+    def getCachedType(): Option[T] = tpe
     def getType(state: Compiler.State[Ctx]): T =
       tpe match {
         case Some(ts) => ts
@@ -191,6 +200,7 @@ object Ast {
           tpe = Some(t)
           t
       }
+    def reset(): Unit = tpe = None
   }
 
   sealed trait Expr[Ctx <: StatelessContext]
@@ -238,6 +248,10 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       elements.flatMap(_.genCode(state))
+    }
+    override def reset(): Unit = {
+      elements.foreach(_.reset())
+      super.reset()
     }
   }
 
@@ -467,6 +481,11 @@ object Ast {
           codes ++ subRef.genLoadCode(state, selectors.last)
       }
     }
+    override def reset(): Unit = {
+      base.reset()
+      selectors.foreach(_.reset())
+      super.reset()
+    }
   }
   final case class MapContains(ident: Ident, index: Expr[StatefulContext])
       extends Expr[StatefulContext] {
@@ -486,6 +505,10 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val pathCodes = MapOps.genSubContractPath(state, ident, index)
       pathCodes ++ Seq(SubContractId, ContractExists)
+    }
+    override def reset(): Unit = {
+      index.reset()
+      super.reset()
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -514,6 +537,10 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       expr.genCode(state) ++ op.genCode(expr.getType(state))
     }
+    override def reset(): Unit = {
+      expr.reset()
+      super.reset()
+    }
   }
   final case class Binop[Ctx <: StatelessContext](op: Operator, left: Expr[Ctx], right: Expr[Ctx])
       extends Expr[Ctx] {
@@ -527,6 +554,11 @@ object Ast {
           left.getType(state) ++ right.getType(state)
         )
       )
+    }
+    override def reset(): Unit = {
+      left.reset()
+      right.reset()
+      super.reset()
     }
   }
   final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
@@ -548,6 +580,10 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       address.genCode(state)
+    override def reset(): Unit = {
+      address.reset()
+      super.reset()
+    }
   }
 
   sealed trait CallAst[Ctx <: StatelessContext] extends ApproveAssets[Ctx] {
@@ -628,6 +664,12 @@ object Ast {
       ) // don't put this in _getType, otherwise the statement might get skipped
       _genCode(state)
     }
+
+    override def reset(): Unit = {
+      approveAssets.foreach(_.reset())
+      args.foreach(_.reset())
+      super.reset()
+    }
   }
 
   final case class ContractStaticCallExpr[Ctx <: StatelessContext](
@@ -651,6 +693,12 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       _genCode(state)
+    }
+
+    override def reset(): Unit = {
+      approveAssets.foreach(_.reset())
+      args.foreach(_.reset())
+      super.reset()
     }
   }
 
@@ -736,6 +784,12 @@ object Ast {
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       genContractCall(state, false)
     }
+    override def reset(): Unit = {
+      obj.reset()
+      approveAssets.foreach(_.reset())
+      args.foreach(_.reset())
+      super.reset()
+    }
   }
   final case class ParenExpr[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] =
@@ -743,6 +797,10 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       expr.genCode(state)
+    override def reset(): Unit = {
+      expr.reset()
+      super.reset()
+    }
   }
 
   trait IfBranch[Ctx <: StatelessContext] extends Positioned {
@@ -799,11 +857,16 @@ object Ast {
       expr: Expr[Ctx]
   ) extends IfBranch[Ctx] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = expr.genCode(state)
+    def reset(): Unit = {
+      condition.reset()
+      expr.reset()
+    }
   }
   final case class ElseBranchExpr[Ctx <: StatelessContext](
       expr: Expr[Ctx]
   ) extends ElseBranch[Ctx] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = expr.genCode(state)
+    def reset(): Unit                                        = expr.reset()
   }
   final case class IfElseExpr[Ctx <: StatelessContext](
       ifBranches: Seq[IfBranchExpr[Ctx]],
@@ -825,6 +888,11 @@ object Ast {
         }
       }
       elseBranchType
+    }
+    override def reset(): Unit = {
+      ifBranches.foreach(_.reset())
+      elseBranch.reset()
+      super.reset()
     }
   }
 
@@ -909,6 +977,10 @@ object Ast {
         case (field, None)   => state.genLoadCode(field)
       }
     }
+    override def reset(): Unit = {
+      fields.foreach { case (_, expr) => expr.foreach(_.reset()) }
+      super.reset()
+    }
   }
 
   final case class MapDef(ident: Ident, tpe: Type.Map) extends UniqueDef with Positioned {
@@ -921,6 +993,7 @@ object Ast {
       with Serializable {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+    def reset(): Unit
   }
   object Statement {
     @inline def getCondIR[Ctx <: StatelessContext](
@@ -965,6 +1038,7 @@ object Ast {
         throw Compiler.Error(s"Invalid args type $argTypes, expected $expected", sourceIndex)
       }
     }
+    override def reset(): Unit = mapType = None
   }
 
   private def genMapDebug(
@@ -1019,6 +1093,10 @@ object Ast {
       val createContractCodes = genCreateContract(state)
       approveALPHCodes ++ createContractCodes
     }
+    override def reset(): Unit = {
+      args.foreach(_.reset())
+      super.reset()
+    }
   }
 
   final case class RemoveFromMap(ident: Ident, args: Seq[Expr[StatefulContext]])
@@ -1034,6 +1112,10 @@ object Ast {
         ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
         ConstInstr.u256(Val.U256(U256.Zero))
       ) ++ objCodes :+ CallExternal(CreateMapEntry.DestroyMethodIndex)
+    }
+    override def reset(): Unit = {
+      args.foreach(_.reset())
+      super.reset()
     }
   }
 
@@ -1072,6 +1154,7 @@ object Ast {
       }
       value.genCode(state) ++ storeCodes.reverse.flatten
     }
+    def reset(): Unit = value.reset()
   }
 
   trait UniqueDef extends Positioned {
@@ -1254,6 +1337,12 @@ object Ast {
         AVector.from(instrs)
       )
     }
+
+    def reset(): Unit = {
+      funcAccessedVarsCache = None
+      methodSelector = None
+      body.foreach(_.reset())
+    }
   }
 
   object FuncDef {
@@ -1317,6 +1406,7 @@ object Ast {
         loadCodes ++ storeCodes
       }
     }
+    def reset(): Unit = expr.reset()
   }
 
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
@@ -1350,7 +1440,12 @@ object Ast {
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
-  sealed trait DataSelector                                                 extends Positioned
+  sealed trait DataSelector extends Positioned {
+    def reset(): Unit = this match {
+      case IndexSelector(expr) => expr.reset()
+      case _: IdentSelector    => ()
+    }
+  }
   final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx]) extends DataSelector
   final case class IdentSelector(ident: Ident)                              extends DataSelector
   final case class AssignmentSelectedTarget[Ctx <: StatelessContext](
@@ -1461,6 +1556,10 @@ object Ast {
           subRef.genStoreCode(state, selectors.last)
       }
     }
+    override def reset(): Unit = {
+      selectors.foreach(_.reset())
+      super.reset()
+    }
   }
 
   final case class ConstantVarDef[Ctx <: StatelessContext](
@@ -1520,6 +1619,7 @@ object Ast {
       val logOpCode = Compiler.genLogs(args.length, id.sourceIndex)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
+    def reset(): Unit = args.foreach(_.reset())
   }
 
   final case class Assign[Ctx <: StatelessContext](
@@ -1540,6 +1640,10 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       rhs.genCode(state) ++ targets.flatMap(_.genStore(state)).reverse.flatten
+    }
+    def reset(): Unit = {
+      targets.foreach(_.reset())
+      rhs.reset()
     }
   }
   sealed trait CallStatement[Ctx <: StatelessContext] extends Statement[Ctx] {
@@ -1577,6 +1681,10 @@ object Ast {
       ) // don't put this in _getType, otherwise the statement might get skipped
       _genCode(state)
     }
+    def reset(): Unit = {
+      approveAssets.foreach(_.reset())
+      args.foreach(_.reset())
+    }
   }
   final case class StaticContractFuncCall[Ctx <: StatelessContext](
       contractId: TypeId,
@@ -1601,6 +1709,10 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       _genCode(state)
     }
+    def reset(): Unit = {
+      approveAssets.foreach(_.reset())
+      args.foreach(_.reset())
+    }
   }
   final case class ContractCall(
       obj: Expr[StatefulContext],
@@ -1618,6 +1730,11 @@ object Ast {
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       genContractCall(state, true)
     }
+    def reset(): Unit = {
+      obj.reset()
+      approveAssets.foreach(_.reset())
+      args.foreach(_.reset())
+    }
   }
 
   final case class IfBranchStatement[Ctx <: StatelessContext](
@@ -1625,11 +1742,16 @@ object Ast {
       body: Seq[Statement[Ctx]]
   ) extends IfBranch[Ctx] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = body.flatMap(_.genCode(state))
+    def reset(): Unit = {
+      condition.reset()
+      body.foreach(_.reset())
+    }
   }
   final case class ElseBranchStatement[Ctx <: StatelessContext](
       body: Seq[Statement[Ctx]]
   ) extends ElseBranch[Ctx] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = body.flatMap(_.genCode(state))
+    def reset(): Unit                                        = body.foreach(_.reset())
   }
   final case class IfElseStatement[Ctx <: StatelessContext](
       ifBranches: Seq[IfBranchStatement[Ctx]],
@@ -1640,6 +1762,10 @@ object Ast {
       ifBranches.foreach(_.checkCondition(state))
       ifBranches.foreach(_.body.foreach(_.check(state)))
       elseBranchOpt.foreach(_.body.foreach(_.check(state)))
+    }
+    def reset(): Unit = {
+      ifBranches.foreach(_.reset())
+      elseBranchOpt.foreach(_.reset())
     }
   }
   final case class While[Ctx <: StatelessContext](
@@ -1662,6 +1788,10 @@ object Ast {
         throw Compiler.Error(s"Too many instructions for if-else branches", sourceIndex)
       }
       condIR ++ bodyIR :+ Jump(-whileLen)
+    }
+    def reset(): Unit = {
+      condition.reset()
+      body.foreach(_.reset())
     }
   }
   final case class ForLoop[Ctx <: StatelessContext](
@@ -1688,6 +1818,12 @@ object Ast {
       val jumpLength     = condIR.length + fullBodyLength
       initializeIR ++ condIR ++ bodyIR ++ updateIR :+ Jump(-jumpLength)
     }
+    def reset(): Unit = {
+      initialize.reset()
+      condition.reset()
+      update.reset()
+      body.foreach(_.reset())
+    }
   }
   final case class ReturnStmt[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]])
       extends Statement[Ctx] {
@@ -1696,6 +1832,7 @@ object Ast {
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       exprs.flatMap(_.genCode(state)) :+ Return
+    def reset(): Unit = exprs.foreach(_.reset())
   }
 
   final case class Debug[Ctx <: StatelessContext](
@@ -1714,6 +1851,7 @@ object Ast {
         Seq.empty
       }
     }
+    def reset(): Unit = interpolationParts.foreach(_.reset())
   }
 
   object TemplateVar {
@@ -1931,6 +2069,7 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
+    def reset(): Unit = funcs.foreach(_.reset())
   }
 
   final case class AssetScript(

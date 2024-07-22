@@ -123,6 +123,7 @@ class RestServer(
       subContractsLogic,
       subContractsCurrentCountLogic,
       getTxIdFromOutputRefLogic,
+      callTxScriptLogic,
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,

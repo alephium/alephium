@@ -1000,18 +1000,19 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def validate() = {
       val unsignedTx0 = prepareOutputs(lockup, unlock, 2)
       unsignedTx0.inputs.length is 3
-      unsignedTx0.inputs.foreach(_.unlockScript is unlock)
+      unsignedTx0.inputs.head.unlockScript is unlock
+      unsignedTx0.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
       val tx0 = toSignedTx(unsignedTx0)
       tx0.pass()(lemanValidator)
-      tx0.pass()(preLemanValidator)
+      tx0.fail(InvalidUnlockScriptType)(preLemanValidator)
 
       val newInputs = unsignedTx0.inputs.head +: unsignedTx0.inputs.tail.map(
-        _.copy(unlockScript = UnlockScript.SameAsPrevious)
+        _.copy(unlockScript = unlock)
       )
       val unsignedTx1 = unsignedTx0.copy(inputs = newInputs)
       val tx1         = toSignedTx(unsignedTx1)
       tx1.pass()(lemanValidator)
-      tx1.fail(InvalidUnlockScriptType)(preLemanValidator)
+      tx1.pass()(preLemanValidator)
     }
   }
 

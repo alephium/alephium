@@ -1319,7 +1319,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val publicKey    = privateKey.publicKey
       val lockupScript = LockupScript.p2pkh(publicKey)
       val unlockScript = UnlockScript.polw(publicKey)
-      val gas = GasEstimation.estimateWithP2PKHInputs(utxos.length, rewardOutputs.length + 1)
+      val gas = GasEstimation.estimateWithSameP2PKHInputs(utxos.length, rewardOutputs.length + 1)
       val unsignedTx =
         blockFlow
           .polwCoinbase(lockupScript, unlockScript, rewardOutputs, reward.burntAmount, utxos, gas)
