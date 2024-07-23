@@ -2022,7 +2022,7 @@ object Ast {
       }
       val globalState = GlobalState[Ctx](structs.toSeq, constantVars.toSeq)
       UniqueDef.checkDuplicates(globalState.constantVars, "constant variables")
-      constantVars.foreach(globalState.calcAndAndConstant)
+      constantVars.foreach(globalState.calcAndAddConstant)
       globalState
     }
   }
@@ -2118,8 +2118,7 @@ object Ast {
   final case class AssetScript(
       ident: TypeId,
       templateVars: Seq[Argument],
-      funcs: Seq[FuncDef[StatelessContext]],
-      structs: Seq[Struct]
+      funcs: Seq[FuncDef[StatelessContext]]
   ) extends ContractT[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
@@ -2281,7 +2280,7 @@ object Ast {
       val constants = constantVars.map { v =>
         v.expr.getType(state) match {
           case Seq(tpe) if Type.primitives.contains(tpe) =>
-            v.ident -> state.calcAndAndConstant(v)
+            v.ident -> state.calcAndAddConstant(v)
           case _ =>
             Constants.invalidConstantDef(v.expr)
         }

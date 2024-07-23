@@ -593,6 +593,13 @@ abstract class Parser[Ctx <: StatelessContext] {
           .Annotation(id, fieldsOpt.getOrElse(Seq.empty))
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }
+
+  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[Ctx]] =
+    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
+      .map { case (from, ident, expr) =>
+        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
+      }
 }
 
 final case class FuncDefTmp[Ctx <: StatelessContext](
@@ -835,14 +842,20 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
       varDef | structDestruction | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
     )
 
-  def assetScript[Unknown: P]: P[Ast.AssetScript] =
+  private def globalDefinitions[Unknown: P]: P[Ast.GlobalDefinition] = P(
+    rawStruct | constantVarDef
+  )
+
+  def assetScript[Unknown: P]: P[(Ast.AssetScript, Ast.GlobalState[StatelessContext])] =
     P(
-      Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
-        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput(fileURI)
-    ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
-      Ast
-        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
+      Start ~ globalDefinitions.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
+        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput(fileURI)
+    ).map { case (defs, assetIndex, typeId, templateVars, funcs, endIndex) =>
+      val globalState = Ast.GlobalState.from[StatelessContext](defs)
+      val assetScript = Ast
+        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
         .atSourceIndex(assetIndex.index, endIndex, fileURI)
+      (assetScript, globalState)
     }
 }
 
@@ -1033,13 +1046,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       }
     }
   }
-
-  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
-    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
-      .map { case (from, ident, expr) =>
-        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
-        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
-      }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>

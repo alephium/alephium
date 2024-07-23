@@ -54,8 +54,8 @@ object Compiler {
   ): Either[Error, (StatelessScript, AVector[String])] =
     try {
       fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
-        case Parsed.Success(script, _) =>
-          val state = State.buildFor(script)(compilerOptions)
+        case Parsed.Success((script, globalState), _) =>
+          val state = State.buildFor(script, globalState)(compilerOptions)
           Right((script.genCodeFull(state), state.getWarnings))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
@@ -401,11 +401,11 @@ object Compiler {
       }
     }
 
-    def buildFor(script: Ast.AssetScript)(implicit
-        compilerOptions: CompilerOptions
-    ): State[StatelessContext] = {
-      val globalState = Ast.GlobalState.from[StatelessContext](script.structs)
-      val funcTable   = script.funcTable(globalState)
+    def buildFor(
+        script: Ast.AssetScript,
+        globalState: Ast.GlobalState[StatelessContext]
+    )(implicit compilerOptions: CompilerOptions): State[StatelessContext] = {
+      val funcTable = script.funcTable(globalState)
       StateForScript(
         script.ident,
         mutable.HashMap.empty,

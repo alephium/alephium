@@ -23,7 +23,7 @@ trait Constants[Ctx <: StatelessContext] {
   def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx]
   def addConstant(ident: Ast.Ident, value: Val): Unit
 
-  def calcAndAndConstant(constantVarDef: Ast.ConstantVarDef[Ctx]): Val = {
+  def calcAndAddConstant(constantVarDef: Ast.ConstantVarDef[Ctx]): Val = {
     val value = calcConstant(constantVarDef.expr)
     addConstant(constantVarDef.ident, value)
     value
