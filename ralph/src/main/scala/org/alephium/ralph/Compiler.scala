@@ -109,7 +109,7 @@ object Compiler {
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
+        (statefulContracts, statefulScripts, AVector.from(multiContract.globalState.structs))
       }
     } catch {
       case e: Error => Left(e)
@@ -365,63 +365,6 @@ object Compiler {
   object State {
     private[ralph] val maxVarIndex: Int = 0xff
 
-    private[ralph] def throwConstantVarDefException[Ctx <: StatelessContext](
-        expr: Ast.Expr[Ctx]
-    ) = {
-      val label = expr match {
-        case _: Ast.CreateArrayExpr[_] => "arrays"
-        case _: Ast.StructCtor[_]      => "structs"
-        case _: Ast.ContractConv[_]    => "contract instances"
-        case _: Ast.Positioned         => "other expressions"
-      }
-      val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
-      throw Error(
-        s"Expected constant value with primitive types $primitiveTypes, $label are not supported",
-        expr.sourceIndex
-      )
-    }
-
-    @scala.annotation.tailrec
-    def calcConstant[Ctx <: StatelessContext](
-        state: Compiler.State[Ctx],
-        expr: Ast.Expr[Ctx]
-    ): Val = {
-      expr match {
-        case e: Ast.Const[Ctx @unchecked] => e.v
-        case Ast.Variable(ident) =>
-          state.getConstant(ident).value
-        case Ast.ParenExpr(expr) => calcConstant(state, expr)
-        case expr: Ast.Binop[Ctx @unchecked] =>
-          calcBinOp(state, expr)
-        case expr: Ast.UnaryOp[Ctx @unchecked] =>
-          calcUnaryOp(state, expr)
-        case _ => throwConstantVarDefException(expr)
-      }
-    }
-
-    private def calcBinOp[Ctx <: StatelessContext](
-        state: Compiler.State[Ctx],
-        expr: Ast.Binop[Ctx]
-    ): Val = {
-      val left  = calcConstant(state, expr.left)
-      val right = calcConstant(state, expr.right)
-      expr.op.calc(Seq(left, right)) match {
-        case Right(value) => value
-        case Left(error)  => throw Error(error, expr.sourceIndex)
-      }
-    }
-
-    private def calcUnaryOp[Ctx <: StatelessContext](
-        state: Compiler.State[Ctx],
-        expr: Ast.UnaryOp[Ctx]
-    ): Val = {
-      val value = calcConstant(state, expr.expr)
-      expr.op.calc(Seq(value)) match {
-        case Right(value) => value
-        case Left(error)  => throw Error(error, expr.sourceIndex)
-      }
-    }
-
     // scalastyle:off cyclomatic.complexity method.length
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     // we have checked the index type(U256)
@@ -461,7 +404,7 @@ object Compiler {
     def buildFor(script: Ast.AssetScript)(implicit
         compilerOptions: CompilerOptions
     ): State[StatelessContext] = {
-      val globalState = Ast.GlobalState(script.structs)
+      val globalState = Ast.GlobalState.from[StatelessContext](script.structs)
       val funcTable   = script.funcTable(globalState)
       StateForScript(
         script.ident,
@@ -567,7 +510,8 @@ object Compiler {
       extends CallGraph
       with Warnings
       with Scope
-      with PhaseLike {
+      with PhaseLike
+      with Constants[Ctx] {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[String, VarInfo]
@@ -584,7 +528,7 @@ object Compiler {
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
-    def globalState: Ast.GlobalState
+    def globalState: Ast.GlobalState[Ctx]
     val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]
     def eventsInfo: Seq[EventInfo]
 
@@ -780,8 +724,9 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstantVariable(ident: Ast.Ident, value: Val): Unit = {
+    def addConstant(ident: Ast.Ident, value: Val): Unit = {
       val sname = checkNewVariable(ident)
+      assume(ident.name == sname)
       varTable(sname) = VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr))
     }
 
@@ -818,7 +763,7 @@ object Compiler {
       val (varName, varInfo) = varTable.get(sname) match {
         case Some(varInfo) => (sname, varInfo)
         case None =>
-          varTable.get(name) match {
+          varTable.get(name).orElse(globalState.getConstantOpt(ident)) match {
             case Some(varInfo) => (name, varInfo)
             case None =>
               throw Error(
@@ -1141,7 +1086,7 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]],
-      globalState: Ast.GlobalState
+      globalState: Ast.GlobalState[StatelessContext]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
@@ -1235,7 +1180,7 @@ object Compiler {
       eventsInfo: Seq[EventInfo],
       methodSelectorTable: immutable.Map[(Ast.TypeId, Ast.FuncId), Boolean],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]],
-      globalState: Ast.GlobalState
+      globalState: Ast.GlobalState[StatefulContext]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {

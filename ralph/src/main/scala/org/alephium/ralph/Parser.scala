@@ -1221,20 +1221,23 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
-  private def entities[Unknown: P]: P[Ast.Entity] = P(
-    rawTxScript | rawContract | rawInterface | rawStruct
+  private def globalDefinition[Unknown: P]: P[Ast.GlobalDefinition] = P(
+    rawTxScript | rawContract | rawInterface | rawStruct | constantVarDef
   )
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
-    P(Start ~~ Index ~ entities.rep(1) ~~ Index ~ End)
-      .map { case (fromIndex, defs, endIndex) =>
-        val contracts = defs
-          .filter(_.isInstanceOf[Ast.ContractWithState])
-          .asInstanceOf[Seq[Ast.ContractWithState]]
-        val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
+    P(Start ~~ Index ~ globalDefinition.rep(1) ~~ Index ~ End)
+      .map { case (fromIndex, definitions, endIndex) =>
+        val (contracts, defs) = definitions.partition(_.isInstanceOf[Ast.ContractWithState])
+        val globalState       = Ast.GlobalState.from[StatefulContext](defs)
         Ast
-          .MultiContract(contracts, structs, None, None)
+          .MultiContract(
+            contracts.asInstanceOf[Seq[Ast.ContractWithState]],
+            globalState,
+            None,
+            None
+          )
           .atSourceIndex(fromIndex, endIndex, fileURI)
       }
 

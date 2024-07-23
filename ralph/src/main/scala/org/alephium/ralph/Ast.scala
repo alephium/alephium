@@ -901,8 +901,8 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
-  sealed trait Entity
-  final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef with Entity {
+  sealed trait GlobalDefinition extends UniqueDef
+  final case class Struct(id: TypeId, fields: Seq[StructField]) extends GlobalDefinition {
     lazy val tpe: Type.Struct = Type.Struct(id)
 
     def name: String = id.name
@@ -1211,7 +1211,7 @@ object Ast {
     private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
 
     private[ralph] var methodSelector: Option[Method.Selector] = None
-    def getMethodSelector(globalState: GlobalState): Method.Selector = {
+    def getMethodSelector(globalState: GlobalState[_]): Method.Selector = {
       methodSelector match {
         case Some(selector) => selector
         case None =>
@@ -1565,7 +1565,7 @@ object Ast {
   final case class ConstantVarDef[Ctx <: StatelessContext](
       ident: Ident,
       expr: Expr[Ctx]
-  ) extends UniqueDef {
+  ) extends GlobalDefinition {
     def name: String = ident.name
   }
 
@@ -1867,7 +1867,34 @@ object Ast {
     }
   }
 
-  final case class GlobalState(structs: Seq[Struct]) {
+  final case class GlobalState[Ctx <: StatelessContext](
+      structs: Seq[Struct],
+      constantVars: Seq[Ast.ConstantVarDef[Ctx]]
+  ) extends Constants[Ctx] {
+    private[ralph] val constants = mutable.Map.empty[Ast.Ident, Compiler.VarInfo.Constant[Ctx]]
+
+    def getCalculatedConstants(): Seq[(Ident, Val)] = {
+      constantVars.map(c => (c.ident, constants(c.ident).value))
+    }
+
+    @inline def getConstantOpt(ident: Ident): Option[Compiler.VarInfo.Constant[Ctx]] =
+      constants.get(ident)
+
+    def getConstant(ident: Ident): Compiler.VarInfo.Constant[Ctx] = {
+      constants.get(ident) match {
+        case Some(v: Compiler.VarInfo.Constant[Ctx @unchecked]) => v
+        case _ =>
+          throw Compiler.Error(
+            s"Constant variable ${ident.name} does not exist or is used before declaration",
+            ident.sourceIndex
+          )
+      }
+    }
+    def addConstant(ident: Ident, value: Val): Unit = {
+      constants(ident) =
+        Compiler.VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr))
+    }
+
     private val flattenSizeCache = mutable.Map.empty[Type, Int]
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def flattenSize(tpe: Type, accessedTypes: Seq[TypeId]): Int = {
@@ -1984,7 +2011,23 @@ object Ast {
     }
   }
 
-  sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef with Entity {
+  object GlobalState {
+    def from[Ctx <: StatelessContext](definitions: Seq[GlobalDefinition]): GlobalState[Ctx] = {
+      val structs      = mutable.ArrayBuffer.empty[Ast.Struct]
+      val constantVars = mutable.ArrayBuffer.empty[Ast.ConstantVarDef[Ctx]]
+      definitions.foreach {
+        case s: Ast.Struct                         => structs.addOne(s)
+        case c: Ast.ConstantVarDef[Ctx @unchecked] => constantVars.addOne(c)
+        case d => throw Compiler.Error(s"Invalid global definition: ${d.name}", d.sourceIndex)
+      }
+      val globalState = GlobalState[Ctx](structs.toSeq, constantVars.toSeq)
+      UniqueDef.checkDuplicates(globalState.constantVars, "constant variables")
+      constantVars.foreach(globalState.calcAndAndConstant)
+      globalState
+    }
+  }
+
+  sealed trait ContractT[Ctx <: StatelessContext] extends GlobalDefinition {
     def ident: TypeId
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
@@ -1992,11 +2035,11 @@ object Ast {
 
     def name: String = ident.name
 
-    def builtInContractFuncs(globalState: GlobalState): Seq[Compiler.ContractFunc[Ctx]]
+    def builtInContractFuncs(globalState: GlobalState[Ctx]): Seq[Compiler.ContractFunc[Ctx]]
 
     private var functionTable: Option[Map[FuncId, Compiler.ContractFunc[Ctx]]] = None
 
-    def funcTable(globalState: GlobalState): Map[FuncId, Compiler.ContractFunc[Ctx]] = {
+    def funcTable(globalState: GlobalState[Ctx]): Map[FuncId, Compiler.ContractFunc[Ctx]] = {
       functionTable match {
         case Some(funcs) => funcs
         case None =>
@@ -2081,7 +2124,7 @@ object Ast {
     val fields: Seq[Argument] = Seq.empty
 
     def builtInContractFuncs(
-        globalState: GlobalState
+        globalState: GlobalState[StatelessContext]
     ): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
@@ -2112,7 +2155,7 @@ object Ast {
     def enums: Seq[EnumDef[StatefulContext]]
 
     def builtInContractFuncs(
-        globalState: GlobalState
+        globalState: GlobalState[StatefulContext]
     ): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
@@ -2145,7 +2188,7 @@ object Ast {
     def getTemplateVarsMutability(): AVector[Boolean] =
       AVector.from(templateVars.view.map(_.isMutable))
 
-    def withTemplateVarDefs(globalState: GlobalState): TxScript = {
+    def withTemplateVarDefs(globalState: GlobalState[StatefulContext]): TxScript = {
       val templateVarDefs = templateVars.foldLeft(Seq.empty[Statement[StatefulContext]]) {
         case (acc, arg) =>
           val argType = globalState.resolveType(arg.tpe)
@@ -2212,7 +2255,7 @@ object Ast {
     def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
 
     override def builtInContractFuncs(
-        globalState: GlobalState
+        globalState: GlobalState[StatefulContext]
     ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
       Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState))
@@ -2238,18 +2281,16 @@ object Ast {
       val constants = constantVars.map { v =>
         v.expr.getType(state) match {
           case Seq(tpe) if Type.primitives.contains(tpe) =>
-            val value = Compiler.State.calcConstant(state, v.expr)
-            state.addConstantVariable(v.ident, value)
-            v.ident -> value
+            v.ident -> state.calcAndAndConstant(v)
           case _ =>
-            Compiler.State.throwConstantVarDefException(v.expr)
+            Constants.invalidConstantDef(v.expr)
         }
       }
       if (constants.nonEmpty) calculatedConstants = Some(constants)
       UniqueDef.checkDuplicates(enums, "enums")
       enums.foreach(e =>
         e.fields.foreach(field =>
-          state.addConstantVariable(EnumDef.fieldIdent(e.id, field.ident), field.value.v)
+          state.addConstant(EnumDef.fieldIdent(e.id, field.ident), field.value.v)
         )
       )
     }
@@ -2403,12 +2444,10 @@ object Ast {
 
   final case class MultiContract(
       contracts: Seq[ContractWithState],
-      structs: Seq[Struct],
+      globalState: GlobalState[StatefulContext],
       dependencies: Option[Map[TypeId, Seq[TypeId]]],
       methodSelectorTable: Option[Map[(TypeId, FuncId), Boolean]]
   ) extends Positioned {
-    lazy val globalState = GlobalState(structs)
-
     lazy val contractsTable = contracts.map { contract =>
       val kind = contract match {
         case _: Ast.ContractInterface =>
@@ -2420,6 +2459,8 @@ object Ast {
       }
       contract.ident -> Compiler.ContractInfo(kind, contract.funcTable(globalState))
     }.toMap
+
+    def structs: Seq[Struct] = globalState.structs
 
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
@@ -2535,7 +2576,7 @@ object Ast {
             .atSourceIndex(i.sourceIndex)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
-      MultiContract(newContracts, structs, Some(dependencies), Some(methodSelectorTable.toMap))
+      MultiContract(newContracts, globalState, Some(dependencies), Some(methodSelectorTable.toMap))
     }
 
     def genStatefulScripts()(implicit compilerOptions: CompilerOptions): AVector[CompiledScript] = {
