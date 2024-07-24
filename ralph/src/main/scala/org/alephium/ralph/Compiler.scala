@@ -100,16 +100,18 @@ object Compiler {
     }
   }
 
+  type CompileProjectResult =
+    (AVector[CompiledContract], AVector[CompiledScript], Ast.GlobalState[StatefulContext])
+
   def compileProject(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript], AVector[Ast.Struct])] = {
+  ): Either[Error, CompileProjectResult] = {
     try {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        val structs         = AVector.from(multiContract.globalState.structs)
         val unusedGlobalConstantWarning = if (compilerOptions.ignoreUnusedConstantsWarnings) {
           None
         } else {
@@ -119,8 +121,8 @@ object Compiler {
           case Some(warning) =>
             val newContracts = statefulContracts.map(c => c.copy(warnings = c.warnings :+ warning))
             val newScripts   = statefulScripts.map(s => s.copy(warnings = s.warnings :+ warning))
-            (newContracts, newScripts, structs)
-          case None => (statefulContracts, statefulScripts, structs)
+            (newContracts, newScripts, multiContract.globalState)
+          case None => (statefulContracts, statefulScripts, multiContract.globalState)
         }
       }
     } catch {

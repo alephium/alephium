@@ -2504,6 +2504,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
     val rawCode =
       s"""
+         |const A = 0
+         |enum Error { Err0 = 0 }
+         |struct Baz { x: U256 }
          |Interface Foo {
          |  pub fn foo() -> ()
          |}
@@ -2516,9 +2519,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Bar(id).foo()
          |}
          |""".stripMargin
-    val (contracts, scripts, _) = Compiler.compileProject(rawCode).rightValue
-    val query                   = Compile.Project(rawCode)
-    val result                  = serverUtils.compileProject(query).rightValue
+    val (contracts, scripts, globalState) = Compiler.compileProject(rawCode).rightValue
+    val query                             = Compile.Project(rawCode)
+    val result                            = serverUtils.compileProject(query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2529,6 +2532,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     scripts.length is 1
     val scriptCode = result.scripts(0).bytecodeTemplate
     scriptCode is scripts(0).code.toTemplateString()
+
+    result.structs is Some(AVector(CompileResult.StructSig.from(globalState.structs(0))))
+    result.enums is Some(AVector(CompileResult.Enum.from(globalState.enums(0))))
+    val constant = globalState.getCalculatedConstants()(0)
+    result.constants is Some(AVector(CompileResult.Constant.from(constant._1, constant._2)))
   }
 
   it should "compile script" in new Fixture {
