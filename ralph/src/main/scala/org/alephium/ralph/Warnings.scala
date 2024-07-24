@@ -45,14 +45,14 @@ trait Warnings {
     }
   }
 
-  def warnUnusedConstants(
+  def warnUnusedLocalConstants(
       typeId: Ast.TypeId,
       unusedConstants: mutable.ArrayBuffer[String]
   ): Unit = {
-    warnUnusedConstants(typeId, unusedConstants.sorted.mkString(", "))
+    warnUnusedLocalConstants(typeId, unusedConstants.sorted.mkString(", "))
   }
 
-  def warnUnusedConstants(typeId: Ast.TypeId, unusedConstants: String): Unit = {
+  def warnUnusedLocalConstants(typeId: Ast.TypeId, unusedConstants: String): Unit = {
     if (!compilerOptions.ignoreUnusedConstantsWarnings) {
       warnings += s"Found unused constants in ${typeId.name}: ${unusedConstants}"
     }
@@ -120,5 +120,9 @@ object Warnings {
   def noCheckExternalCallerMsg(typeId: String, funcId: String): String = {
     s"""No external caller check for function "${typeId}.${funcId}". """ +
       s"""Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
+  }
+
+  def unusedGlobalConstants(names: Seq[String]): String = {
+    s"Found unused global constants: ${names.sorted.mkString(", ")}"
   }
 }

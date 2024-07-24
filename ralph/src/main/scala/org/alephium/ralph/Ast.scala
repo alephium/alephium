@@ -1872,16 +1872,24 @@ object Ast {
       constantVars: Seq[Ast.ConstantVarDef[Ctx]]
   ) extends Constants[Ctx] {
     private[ralph] val constants = mutable.Map.empty[Ast.Ident, Compiler.VarInfo.Constant[Ctx]]
+    private val usedConstants: mutable.Set[Ast.Ident] = mutable.Set.empty
 
     def getCalculatedConstants(): Seq[(Ident, Val)] = {
       constantVars.map(c => (c.ident, constants(c.ident).value))
     }
 
-    @inline def getConstantOpt(ident: Ident): Option[Compiler.VarInfo.Constant[Ctx]] =
+    @inline def getConstantOpt(ident: Ident): Option[Compiler.VarInfo.Constant[Ctx]] = {
+      usedConstants.addOne(ident)
       constants.get(ident)
+    }
+
+    def getUnusedGlobalConstantsWarning(): Option[String] = {
+      val unused = constantVars.view.filter(c => !usedConstants.contains(c.ident)).map(_.name)
+      if (unused.isEmpty) None else Some(Warnings.unusedGlobalConstants(unused.toSeq))
+    }
 
     def getConstant(ident: Ident): Compiler.VarInfo.Constant[Ctx] = {
-      constants.get(ident) match {
+      getConstantOpt(ident) match {
         case Some(v: Compiler.VarInfo.Constant[Ctx @unchecked]) => v
         case _ =>
           throw Compiler.Error(
@@ -2103,7 +2111,7 @@ object Ast {
       checkConstants(state)
       funcs.foreach(_.check(state))
       state.checkUnusedMaps()
-      state.checkUnusedFields()
+      state.checkUnusedFieldsAndConstants()
       state.checkUnassignedMutableFields()
     }
 

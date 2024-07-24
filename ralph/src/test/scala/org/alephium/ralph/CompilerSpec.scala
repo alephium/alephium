@@ -7308,5 +7308,64 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Local constant A conflicts with an existing global constant, please use a fresh name"
       )
     }
+
+    {
+      info("check unused global constants - case 0")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(B == 2, 0)
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings is AVector("Found unused global constants: A")
+      result._2.head.warnings is AVector("Found unused global constants: A")
+    }
+
+    {
+      info("check unused global constants - case 1")
+      val code =
+        s"""
+           |const A = 1
+           |const B = A
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileProject(code).rightValue._1.head
+      compiled.warnings.isEmpty is true
+    }
+
+    {
+      info("check unused global constants - case 2")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(A == 1, 0)
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings.isEmpty is true
+      result._2.head.warnings.isEmpty is true
+    }
   }
 }

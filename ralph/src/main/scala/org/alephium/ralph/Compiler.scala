@@ -109,7 +109,14 @@ object Compiler {
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        (statefulContracts, statefulScripts, AVector.from(multiContract.globalState.structs))
+        val structs         = AVector.from(multiContract.globalState.structs)
+        multiContract.globalState.getUnusedGlobalConstantsWarning() match {
+          case Some(warning) =>
+            val newContracts = statefulContracts.map(c => c.copy(warnings = c.warnings :+ warning))
+            val newScripts   = statefulScripts.map(s => s.copy(warnings = s.warnings :+ warning))
+            (newContracts, newScripts, structs)
+          case None => (statefulContracts, statefulScripts, structs)
+        }
       }
     } catch {
       case e: Error => Left(e)
@@ -834,22 +841,22 @@ object Compiler {
       }
     }
 
-    def checkUnusedFields(): Unit = {
+    def checkUnusedFieldsAndConstants(): Unit = {
       val unusedVars = varTable.filter { case (name, varInfo) =>
         !varInfo.isGenerated &&
         !varInfo.isUnused &&
         !accessedVars.contains(ReadVariable(name)) &&
         !varInfo.tpe.isMapType
       }
-      val unusedConstants = mutable.ArrayBuffer.empty[String]
-      val unusedFields    = mutable.ArrayBuffer.empty[String]
+      val unusedLocalConstants = mutable.ArrayBuffer.empty[String]
+      val unusedFields         = mutable.ArrayBuffer.empty[String]
       unusedVars.foreach {
-        case (name, _: VarInfo.Constant[_])      => unusedConstants.addOne(name)
+        case (name, _: VarInfo.Constant[_])      => unusedLocalConstants.addOne(name)
         case (name, varInfo) if !varInfo.isLocal => unusedFields.addOne(name)
         case _                                   => ()
       }
-      if (unusedConstants.nonEmpty) {
-        warnUnusedConstants(typeId, unusedConstants)
+      if (unusedLocalConstants.nonEmpty) {
+        warnUnusedLocalConstants(typeId, unusedLocalConstants)
       }
       if (unusedFields.nonEmpty) {
         warnUnusedFields(typeId, unusedFields)
