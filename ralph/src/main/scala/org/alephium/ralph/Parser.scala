@@ -600,6 +600,33 @@ abstract class Parser[Ctx <: StatelessContext] {
         val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
         Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
       }
+
+  def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[Ctx]] =
+    PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
+      Ast.EnumFieldSelector(enumId, field)
+    }
+
+  def enumField[Unknown: P]: P[Ast.EnumField[Ctx]] =
+    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
+      Ast.EnumField(ident, value)
+    }
+  def rawEnumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] =
+    PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
+      case (enumIndex, id, fields) =>
+        if (fields.isEmpty) {
+          val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
+          throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
+        }
+        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
+        if (fields.distinctBy(_.value.v.tpe).size != 1) {
+          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
+        }
+        if (fields.distinctBy(_.value.v).size != fields.length) {
+          throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
+        }
+        Ast.EnumDef(id, fields)
+    }
+  def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }
 
 final case class FuncDefTmp[Ctx <: StatelessContext](
@@ -843,7 +870,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     )
 
   private def globalDefinitions[Unknown: P]: P[Ast.GlobalDefinition] = P(
-    rawStruct | constantVarDef
+    rawStruct | constantVarDef | rawEnumDef
   )
 
   def assetScript[Unknown: P]: P[(Ast.AssetScript, Ast.GlobalState[StatelessContext])] =
@@ -1047,33 +1074,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
-    PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
-      Ast.EnumFieldSelector(enumId, field)
-    }
-
-  def enumField[Unknown: P]: P[Ast.EnumField[StatefulContext]] =
-    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
-      Ast.EnumField(ident, value)
-    }
-  def rawEnumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] =
-    PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
-      case (enumIndex, id, fields) =>
-        if (fields.length == 0) {
-          val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
-          throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
-        }
-        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.v.tpe).size != 1) {
-          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
-        }
-        if (fields.distinctBy(_.value.v).size != fields.length) {
-          throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
-        }
-        Ast.EnumDef(id, fields)
-    }
-  def enumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] = P(Start ~ rawEnumDef ~ End)
-
   // scalastyle:off method.length
   // scalastyle:off cyclomatic.complexity
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -1228,7 +1228,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
   private def globalDefinition[Unknown: P]: P[Ast.GlobalDefinition] = P(
-    rawTxScript | rawContract | rawInterface | rawStruct | constantVarDef
+    rawTxScript | rawContract | rawInterface | rawStruct | constantVarDef | rawEnumDef
   )
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))

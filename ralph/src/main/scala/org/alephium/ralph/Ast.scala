@@ -1574,7 +1574,7 @@ object Ast {
     def name: String = ident.name
   }
   final case class EnumDef[Ctx <: StatelessContext](id: TypeId, fields: Seq[EnumField[Ctx]])
-      extends UniqueDef {
+      extends GlobalDefinition {
     def name: String = id.name
   }
   object EnumDef {
@@ -1869,7 +1869,8 @@ object Ast {
 
   final case class GlobalState[Ctx <: StatelessContext](
       structs: Seq[Struct],
-      constantVars: Seq[Ast.ConstantVarDef[Ctx]]
+      constantVars: Seq[Ast.ConstantVarDef[Ctx]],
+      enums: Seq[Ast.EnumDef[Ctx]]
   ) extends Constants[Ctx] {
     private[ralph] val constants = mutable.Map.empty[Ast.Ident, Compiler.VarInfo.Constant[Ctx]]
     private val usedConstants: mutable.Set[Ast.Ident] = mutable.Set.empty
@@ -1884,7 +1885,16 @@ object Ast {
     }
 
     def getUnusedGlobalConstantsWarning(): Option[String] = {
-      val unused = constantVars.view.filter(c => !usedConstants.contains(c.ident)).map(_.name)
+      val unused = mutable.ArrayBuffer.empty[String]
+      constantVars.foreach { c =>
+        if (!usedConstants.contains(c.ident)) unused.addOne(c.name)
+      }
+      enums.foreach(e =>
+        e.fields.foreach { field =>
+          val fieldIdent = EnumDef.fieldIdent(e.id, field.ident)
+          if (!usedConstants.contains(fieldIdent)) unused.addOne(fieldIdent.name)
+        }
+      )
       if (unused.isEmpty) None else Some(Warnings.unusedGlobalConstants(unused.toSeq))
     }
 
@@ -2023,14 +2033,16 @@ object Ast {
     def from[Ctx <: StatelessContext](definitions: Seq[GlobalDefinition]): GlobalState[Ctx] = {
       val structs      = mutable.ArrayBuffer.empty[Ast.Struct]
       val constantVars = mutable.ArrayBuffer.empty[Ast.ConstantVarDef[Ctx]]
+      val enums        = mutable.ArrayBuffer.empty[Ast.EnumDef[Ctx]]
       definitions.foreach {
         case s: Ast.Struct                         => structs.addOne(s)
         case c: Ast.ConstantVarDef[Ctx @unchecked] => constantVars.addOne(c)
+        case e: Ast.EnumDef[Ctx @unchecked]        => enums.addOne(e)
         case d => throw Compiler.Error(s"Invalid global definition: ${d.name}", d.sourceIndex)
       }
-      val globalState = GlobalState[Ctx](structs.toSeq, constantVars.toSeq)
-      UniqueDef.checkDuplicates(globalState.constantVars, "constant variables")
-      constantVars.foreach(globalState.calcAndAddConstant)
+      val globalState = GlobalState[Ctx](structs.toSeq, constantVars.toSeq, enums.toSeq)
+      globalState.addConstants(globalState.constantVars)
+      globalState.addEnums(globalState.enums)
       globalState
     }
   }
@@ -2284,28 +2296,25 @@ object Ast {
     def getCalculatedConstants(): Seq[(Ident, Val)] = calculatedConstants.getOrElse(Seq.empty)
 
     override def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
-      UniqueDef.checkDuplicates(constantVars, "constant variables")
-      val constants = constantVars.map { v =>
-        if (state.globalState.constantVars.exists(_.ident == v.ident)) {
+      constantVars.foreach { c =>
+        if (state.globalState.constantVars.exists(_.ident == c.ident)) {
           throw Compiler.Error(
-            s"Local constant ${v.name} conflicts with an existing global constant, please use a fresh name",
-            v.sourceIndex
+            s"Local constant ${c.name} conflicts with an existing global constant, please use a fresh name",
+            c.sourceIndex
           )
         }
-        v.expr.getType(state) match {
-          case Seq(tpe) if Type.primitives.contains(tpe) =>
-            v.ident -> state.calcAndAddConstant(v)
-          case _ =>
-            Constants.invalidConstantDef(v.expr)
+      }
+      val constants = state.addConstants(constantVars)
+      if (constants.nonEmpty) calculatedConstants = Some(constants)
+      enums.foreach { e =>
+        if (state.globalState.enums.exists(_.id == e.id)) {
+          throw Compiler.Error(
+            s"Local enum ${e.name} conflicts with an existing global enum, please use a fresh name",
+            e.sourceIndex
+          )
         }
       }
-      if (constants.nonEmpty) calculatedConstants = Some(constants)
-      UniqueDef.checkDuplicates(enums, "enums")
-      enums.foreach(e =>
-        e.fields.foreach(field =>
-          state.addConstant(EnumDef.fieldIdent(e.id, field.ident), field.value.v)
-        )
-      )
+      state.addEnums(enums)
     }
 
     private def checkInheritances(state: Compiler.State[StatefulContext]): Unit = {
@@ -2473,7 +2482,8 @@ object Ast {
       contract.ident -> Compiler.ContractInfo(kind, contract.funcTable(globalState))
     }.toMap
 
-    def structs: Seq[Struct] = globalState.structs
+    def structs: Seq[Struct]                 = globalState.structs
+    def enums: Seq[EnumDef[StatefulContext]] = globalState.enums
 
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
@@ -2558,7 +2568,10 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiContract = {
-      UniqueDef.checkDuplicates(contracts ++ structs, "TxScript/Contract/Interface/Struct")
+      UniqueDef.checkDuplicates(
+        contracts ++ structs ++ enums,
+        "TxScript/Contract/Interface/Struct/Enum"
+      )
 
       val methodSelectorTable = mutable.Map.empty[(TypeId, Ast.FuncId), Boolean]
       val parentsCache        = buildDependencies()
@@ -2953,8 +2966,9 @@ object Ast {
     }
 
     def mergeEnums(enums: Seq[EnumDef[StatefulContext]]): Seq[EnumDef[StatefulContext]] = {
+      val (enums0, enums1) = enums.partition(e => enums.count(_.id == e.id) == 1)
       val mergedEnums = mutable.Map.empty[TypeId, mutable.ArrayBuffer[EnumField[StatefulContext]]]
-      enums.foreach { enumDef =>
+      enums1.foreach { enumDef =>
         mergedEnums.get(enumDef.id) match {
           case Some(fields) =>
             // enum fields will never be empty
@@ -2977,7 +2991,7 @@ object Ast {
           case None => mergedEnums(enumDef.id) = mutable.ArrayBuffer.from(enumDef.fields)
         }
       }
-      mergedEnums.view.map(pair => EnumDef(pair._1, pair._2.toSeq)).toSeq
+      enums0 ++ mergedEnums.view.map(pair => EnumDef(pair._1, pair._2.toSeq)).toSeq
     }
 
     def checkFuncs(

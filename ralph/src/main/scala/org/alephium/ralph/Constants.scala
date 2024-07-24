@@ -23,7 +23,21 @@ trait Constants[Ctx <: StatelessContext] {
   def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx]
   def addConstant(ident: Ast.Ident, value: Val): Unit
 
-  def calcAndAddConstant(constantVarDef: Ast.ConstantVarDef[Ctx]): Val = {
+  def addConstants(constantVars: Seq[Ast.ConstantVarDef[Ctx]]): Seq[(Ast.Ident, Val)] = {
+    Ast.UniqueDef.checkDuplicates(constantVars, "constant variables")
+    constantVars.map(c => (c.ident, calcAndAddConstant(c)))
+  }
+
+  def addEnums(enums: Seq[Ast.EnumDef[Ctx]]): Unit = {
+    Ast.UniqueDef.checkDuplicates(enums, "enums")
+    enums.foreach(e =>
+      e.fields.foreach(field =>
+        addConstant(Ast.EnumDef.fieldIdent(e.id, field.ident), field.value.v)
+      )
+    )
+  }
+
+  private def calcAndAddConstant(constantVarDef: Ast.ConstantVarDef[Ctx]): Val = {
     val value = calcConstant(constantVarDef.expr)
     addConstant(constantVarDef.ident, value)
     value
@@ -47,15 +61,17 @@ trait Constants[Ctx <: StatelessContext] {
   private def calcBinOp(expr: Ast.Binop[Ctx]): Val = {
     val left  = calcConstant(expr.left)
     val right = calcConstant(expr.right)
-    expr.op.calc(Seq(left, right)) match {
-      case Right(value) => value
-      case Left(error)  => throw Error(error, expr.sourceIndex)
-    }
+    checkAndCalc(expr, expr.op, Seq(left, right))
   }
 
   private def calcUnaryOp(expr: Ast.UnaryOp[Ctx]): Val = {
     val value = calcConstant(expr.expr)
-    expr.op.calc(Seq(value)) match {
+    checkAndCalc(expr, expr.op, Seq(value))
+  }
+
+  private def checkAndCalc(expr: Ast.Expr[Ctx], op: Operator, values: Seq[Val]): Val = {
+    expr.positionedError(op.getReturnType(values.map(v => Type.fromVal(v.tpe))))
+    op.calc(values) match {
       case Right(value) => value
       case Left(error)  => throw Error(error, expr.sourceIndex)
     }

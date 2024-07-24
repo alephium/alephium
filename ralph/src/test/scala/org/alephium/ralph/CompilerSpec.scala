@@ -4733,7 +4733,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(
         code,
-        "These TxScript/Contract/Interface/Struct are defined multiple times: Foo"
+        "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Foo"
       )
     }
 
@@ -7225,7 +7225,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     testContractError(code("U256"), "Expected an array, got \"U256\"")
   }
 
-  it should "compile global constants" in new Fixture {
+  it should "compile global definitions" in new Fixture {
+    {
+      info("duplicated global definitions")
+      val code =
+        s"""
+           |$$enum Bar { Red = 0 }$$
+           |struct Bar { x: U256 }
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Bar"
+      )
+    }
+
     {
       info("constant does not exist")
       val code =
@@ -7366,6 +7382,129 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val result = Compiler.compileProject(code).rightValue
       result._1.head.warnings.isEmpty is true
       result._2.head.warnings.isEmpty is true
+    }
+
+    {
+      info("use global enums")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 0, 0)
+           |    assert!(Color.Blue == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("local enum conflicts with a global enum")
+      val code =
+        s"""
+           |enum Color { Red = 0 }
+           |Contract Foo() {
+           |  $$enum Color { Blue = 1 }$$
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Local enum Color conflicts with an existing global enum, please use a fresh name"
+      )
+    }
+
+    {
+      info("check unused global enums - case 0")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileProject(code).rightValue._1.head
+      compiled.warnings is AVector("Found unused global constants: Color.Blue")
+    }
+
+    {
+      info("check unused global enums - case 1")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(Color.Blue == 1, 0)
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings.isEmpty is true
+      result._2.head.warnings.isEmpty is true
+    }
+
+    {
+      info("check unused global enums - case 2")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(Color.Green == 2, 0)
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings is AVector("Found unused global constants: Color.Blue")
+      result._2.head.warnings is AVector("Found unused global constants: Color.Blue")
+    }
+
+    {
+      info("check unused global constants and enums")
+      val code =
+        s"""
+           |const A = 0
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings is AVector(
+        "Found unused global constants: A, Color.Blue, Color.Green"
+      )
     }
   }
 }

@@ -755,7 +755,7 @@ class AstSpec extends AlephiumSpec {
                   |}
                   |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
-    error.message is "These TxScript/Contract/Interface/Struct are defined multiple times: Bar, Foo, Main"
+    error.message is "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Bar, Foo, Main"
   }
 
   it should "check interface std id" in {

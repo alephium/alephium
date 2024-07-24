@@ -1844,6 +1844,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val script = s"""
                     |const A = 0
                     |struct Foo { x: U256 }
+                    |enum Color { Red = 0 }
                     |AssetScript Main(x: U256) {
                     |  pub fn main(foo: Foo) -> Foo {
                     |    return foo
@@ -1874,7 +1875,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
     result._2 is GlobalState(
       Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256)))),
-      Seq(ConstantVarDef[StatelessContext](Ident("A"), Const(Val.U256(U256.Zero))))
+      Seq(ConstantVarDef[StatelessContext](Ident("A"), Const(Val.U256(U256.Zero)))),
+      Seq(
+        EnumDef[StatelessContext](
+          TypeId("Color"),
+          Seq(EnumField(Ident("Red"), Const(Val.U256(U256.Zero))))
+        )
+      )
     )
   }
 
@@ -2271,25 +2278,36 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     }
   }
 
-  it should "parse global constants" in {
+  it should "parse global definitions" in {
     val code =
       s"""
          |const A = 1
          |const B = 2
          |const C = false
+         |struct Bar { x: U256 }
          |Contract Foo() {
          |  pub fn foo() -> () {}
          |}
          |const D = A + B
+         |enum Color { Red = 0 }
          |""".stripMargin
     val result = parse(code, StatefulParser.multiContract(_)).get.value
     result.contracts.map(_.name) is Seq("Foo")
-    result.globalState.constants.size is 4
+    result.globalState.constants.size is 5
     result.globalState.getCalculatedConstants() is Seq(
       (Ident("A"), Val.U256(U256.One)),
       (Ident("B"), Val.U256(U256.Two)),
       (Ident("C"), Val.False),
       (Ident("D"), Val.U256(U256.unsafe(3)))
+    )
+    result.globalState.structs is Seq(
+      Struct(TypeId("Bar"), Seq(StructField(Ident("x"), false, Type.U256)))
+    )
+    result.globalState.enums is Seq(
+      EnumDef[StatefulContext](
+        TypeId("Color"),
+        Seq(EnumField(Ident("Red"), Const(Val.U256(U256.Zero))))
+      )
     )
   }
 }
