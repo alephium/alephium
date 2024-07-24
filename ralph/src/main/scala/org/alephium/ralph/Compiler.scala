@@ -110,7 +110,12 @@ object Compiler {
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
         val structs         = AVector.from(multiContract.globalState.structs)
-        multiContract.globalState.getUnusedGlobalConstantsWarning() match {
+        val unusedGlobalConstantWarning = if (compilerOptions.ignoreUnusedConstantsWarnings) {
+          None
+        } else {
+          multiContract.globalState.getUnusedGlobalConstantsWarning()
+        }
+        unusedGlobalConstantWarning match {
           case Some(warning) =>
             val newContracts = statefulContracts.map(c => c.copy(warnings = c.warnings :+ warning))
             val newScripts   = statefulScripts.map(s => s.copy(warnings = s.warnings :+ warning))

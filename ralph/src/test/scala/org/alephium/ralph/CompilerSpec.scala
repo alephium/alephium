@@ -7506,5 +7506,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Found unused global constants: A, Color.Blue, Color.Green"
       )
     }
+
+    {
+      info("ignore unused global constants warning")
+      val code =
+        s"""
+           |const A = 0
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
+      val result          = Compiler.compileProject(code, compilerOptions).rightValue
+      result._1.head.warnings.isEmpty is true
+    }
   }
 }
