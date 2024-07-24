@@ -2278,6 +2278,12 @@ object Ast {
     override def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(constantVars, "constant variables")
       val constants = constantVars.map { v =>
+        if (state.globalState.constantVars.exists(_.ident == v.ident)) {
+          throw Compiler.Error(
+            s"Local constant ${v.name} conflicts with an existing global constant, please use a fresh name",
+            v.sourceIndex
+          )
+        }
         v.expr.getType(state) match {
           case Seq(tpe) if Type.primitives.contains(tpe) =>
             v.ident -> state.calcAndAddConstant(v)

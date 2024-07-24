@@ -7290,5 +7290,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       test(code)
     }
+
+    {
+      info("local constant conflicts with a global constant")
+      val code =
+        s"""
+           |const A = 1
+           |Contract Foo() {
+           |  $$const A = 2$$
+           |  pub fn foo() -> U256 {
+           |    return A
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Local constant A conflicts with an existing global constant, please use a fresh name"
+      )
+    }
   }
 }
