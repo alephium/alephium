@@ -191,8 +191,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           |3 |  event Add(a: U256, b: U256)
           |  |  ^^^^^^^^^^
           |  |  Expected "}"
-          |  |----------------------------------------------------------------------------------------------------
-          |  |Trace log: Expected multiContract:1:1 / entities:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |  |------------------------------------------------------------------------------------------------------------
+          |  |Trace log: Expected multiContract:1:1 / globalDefinition:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
           |""".stripMargin
     }
   }
@@ -6787,7 +6787,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val compiledFoo     = compileContractFull(fooCode, 1).rightValue
     val funcs           = compiledFoo.ast.funcs
-    val globalState     = Ast.GlobalState(Seq.empty)
+    val globalState     = Ast.GlobalState.from[StatefulContext](Seq.empty)
     val methodSelector0 = funcs(0).getMethodSelector(globalState)
     val methodSelector1 = funcs(1).getMethodSelector(globalState)
     compiledFoo.code.methods(0).instrs.head is MethodSelector(methodSelector0)
@@ -7223,5 +7223,72 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     compileContract(replace(code("[U256; 2]"))).isRight is true
     testContractError(code("U256"), "Expected an array, got \"U256\"")
+  }
+
+  it should "compile global constants" in new Fixture {
+    {
+      info("constant does not exist")
+      val code =
+        s"""
+           |const A = 0
+           |const C = A + $$B$$
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Constant variable B does not exist or is used before declaration")
+    }
+
+    {
+      info("constant is used before declaration")
+      val code =
+        s"""
+           |const A = 0
+           |const C = A + $$B$$
+           |const B = 1
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Constant variable B does not exist or is used before declaration")
+    }
+
+    {
+      info("calculate global constants")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |const C = A + B
+           |const D = #00 ++ #11
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    assert!(A == 1, 0)
+           |    assert!(B == 2, 0)
+           |    assert!(C == 3, 0)
+           |    assert!(D == #0011, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("calculate local constants")
+      val code =
+        s"""
+           |const A = 1
+           |Contract Foo() {
+           |  const B = 2
+           |  const C = A + B
+           |  pub fn foo() -> () {
+           |    assert!(A == 1, 0)
+           |    assert!(B == 2, 0)
+           |    assert!(C == 3, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
   }
 }

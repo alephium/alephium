@@ -1842,6 +1842,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
   it should "parse AssetScript" in {
     val script = s"""
+                    |const A = 0
                     |struct Foo { x: U256 }
                     |AssetScript Main(x: U256) {
                     |  pub fn main(foo: Foo) -> Foo {
@@ -1850,28 +1851,31 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
                     |}
                     |""".stripMargin
 
-    parse(script, StatelessParser.assetScript(_)).get.value is
-      AssetScript(
-        TypeId("Main"),
-        Seq(Argument(Ident("x"), Type.U256, false, false)),
-        Seq(
-          FuncDef(
-            Seq.empty,
-            FuncId("main", false),
-            isPublic = true,
-            usePreapprovedAssets = false,
-            Ast.NotUseContractAssets,
-            usePayToContractOnly = false,
-            useCheckExternalCaller = true,
-            useUpdateFields = false,
-            useMethodIndex = None,
-            Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
-            Seq(Type.NamedType(TypeId("Foo"))),
-            Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
-          )
-        ),
-        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256))))
+    val result = fastparse.parse(script, StatelessParser.assetScript(_)).get.value
+    result._1 is AssetScript(
+      TypeId("Main"),
+      Seq(Argument(Ident("x"), Type.U256, false, false)),
+      Seq(
+        FuncDef(
+          Seq.empty,
+          FuncId("main", false),
+          isPublic = true,
+          usePreapprovedAssets = false,
+          Ast.NotUseContractAssets,
+          usePayToContractOnly = false,
+          useCheckExternalCaller = true,
+          useUpdateFields = false,
+          useMethodIndex = None,
+          Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
+          Seq(Type.NamedType(TypeId("Foo"))),
+          Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
+        )
       )
+    )
+    result._2 is GlobalState(
+      Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256)))),
+      Seq(ConstantVarDef[StatelessContext](Ident("A"), Const(Val.U256(U256.Zero))))
+    )
   }
 
   // scalastyle:off no.equal
@@ -2265,6 +2269,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val result = fastparse.parse(str, StatelessParser.const(_)).get.value
       result.sourceIndex.get.width is num.toString.length
     }
+  }
+
+  it should "parse global constants" in {
+    val code =
+      s"""
+         |const A = 1
+         |const B = 2
+         |const C = false
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |const D = A + B
+         |""".stripMargin
+    val result = parse(code, StatefulParser.multiContract(_)).get.value
+    result.contracts.map(_.name) is Seq("Foo")
+    result.globalState.constants.size is 4
+    result.globalState.getCalculatedConstants() is Seq(
+      (Ident("A"), Val.U256(U256.One)),
+      (Ident("B"), Val.U256(U256.Two)),
+      (Ident("C"), Val.False),
+      (Ident("D"), Val.U256(U256.unsafe(3)))
+    )
   }
 }
 
