@@ -1085,15 +1085,18 @@ class ServerUtils(implicit
   ): Try[Selected] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
     val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
+    val estimatedTotalDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength))
+
     for {
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
+      totalAmount <- amount.add(estimatedTotalDustAmount).toRight(failed("ALPH amount overflow"))
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
           .Build(
             ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
           )
           .select(
-            AssetAmounts(amount, tokens),
+            AssetAmounts(totalAmount, tokens),
             fromUnlockScript,
             allUtxos,
             txOutputsLength = estimatedTxOutputsLength,

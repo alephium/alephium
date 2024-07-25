@@ -3761,7 +3761,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block1)
   }
 
-  it should "reproduce error with not enough ALPH for change output" in new ContractFixture {
+  it should "consider dustUtxoAmount for outputs when building execute script tx" in new ContractFixture {
     val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
     val (_, testPublicKey)        = chainIndex.from.generateKey
     val testLockupScript          = LockupScript.p2pkh(testPublicKey)
@@ -3830,18 +3830,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
     }
 
-    {
-      info("Works with small amount of gas")
-
-      buildExecuteScript(10).rightValue
-    }
-
-    {
-      info("Shows not enough ALPH for change output error with larger amount of gas")
-
-      buildExecuteScript(1000).leftValue.detail
-        .startsWith("Not enough ALPH for ALPH and token change output, expected")
-    }
+    buildExecuteScript(10).rightValue
+    buildExecuteScript(1000).rightValue
   }
 
   @scala.annotation.tailrec
