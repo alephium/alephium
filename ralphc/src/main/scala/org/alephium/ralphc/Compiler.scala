@@ -159,7 +159,15 @@ object Compiler {
   def getSourceFiles(path: Path, ext: String, recursive: Boolean = true): Seq[Path] = {
     if (Files.isDirectory(path)) {
       val (allFiles, allDirs) =
-        Files.list(path).iterator().asScala.toSeq.partition(p => !Files.isDirectory(p))
+        Using(Files.list(path)) { files =>
+          files.iterator().asScala.toSeq.partition(p => !Files.isDirectory(p))
+        } match {
+          case Failure(exception) =>
+            throw exception
+
+          case Success(result) =>
+            result
+        }
       val expectedFiles = allFiles.filter(p => p.toString().endsWith(ext))
       if (recursive) {
         expectedFiles ++ allDirs.flatMap(getSourceFiles(_, ext))

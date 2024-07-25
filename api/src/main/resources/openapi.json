@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.3.0"
+    "version": "3.3.1"
   },
   "servers": [
     {
@@ -3195,7 +3195,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/HashRateResponse"
                 },
                 "example": {
                   "hashrate": "100 MH/s"
@@ -3296,7 +3296,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/HashRateResponse"
                 },
                 "example": {
                   "hashrate": "100 MH/s"
@@ -3385,8 +3385,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "bigint"
+                  "$ref": "#/components/schemas/CurrentDifficulty"
                 },
                 "example": {
                   "difficulty": "224000000000000"
@@ -12212,6 +12211,19 @@
           }
         }
       },
+      "CurrentDifficulty": {
+        "title": "CurrentDifficulty",
+        "type": "object",
+        "required": [
+          "difficulty"
+        ],
+        "properties": {
+          "difficulty": {
+            "type": "string",
+            "format": "bigint"
+          }
+        }
+      },
       "DebugMessage": {
         "title": "DebugMessage",
         "type": "object",
@@ -12528,6 +12540,18 @@
           "group": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "HashRateResponse": {
+        "title": "HashRateResponse",
+        "type": "object",
+        "required": [
+          "hashrate"
+        ],
+        "properties": {
+          "hashrate": {
+            "type": "string"
           }
         }
       },
