@@ -3761,6 +3761,89 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block1)
   }
 
+  it should "reproduce error with not enough ALPH for change output" in new ContractFixture {
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val (_, testPublicKey)        = chainIndex.from.generateKey
+    val testLockupScript          = LockupScript.p2pkh(testPublicKey)
+    val genesisLockupScript       = lockupScript
+
+    val tokenCode =
+      s"""
+         |Contract Token() {
+         |  pub fn supply() -> () {}
+         |}
+         |""".stripMargin
+    val tokenContract = Compiler.compileContract(tokenCode).rightValue
+    val tokenIssuance = TokenIssuance.Info(vm.Val.U256(100), Some(genesisLockupScript))
+    val contractCreationScript = contractCreation(
+      tokenContract,
+      AVector.empty,
+      AVector.empty,
+      genesisLockupScript,
+      minimalAlphInContract,
+      Some(tokenIssuance)
+    )
+    val tokenIssuanceBlock = payableCall(blockFlow, chainIndex, contractCreationScript)
+    addAndCheck(blockFlow, tokenIssuanceBlock)
+    val tokenId =
+      TokenId.from(ContractId.from(tokenIssuanceBlock.transactions.head.id, 0, chainIndex.from))
+
+    // Transfer tokens
+    (1 to 8).foreach { _ =>
+      val block = transfer(
+        blockFlow,
+        genesisPrivateKey,
+        testLockupScript,
+        tokens = AVector((tokenId, 10)),
+        dustUtxoAmount
+      )
+      addAndCheck(blockFlow, block)
+    }
+
+    // Transfer ALPH
+    (1 to 3).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, testPublicKey, dustUtxoAmount * 2)
+      addAndCheck(blockFlow, block)
+    }
+
+    def buildExecuteScript(iterations: Int) = {
+      val script = s"""
+                      |TxScript Main {
+                      |  let mut sum = 0
+                      |  for(let mut i = 0; i < ${iterations}; i = i + 1) {
+                      |    sum = sum + 1
+                      |  }
+                      |}
+                      |""".stripMargin
+
+      val scriptBytecode = serialize(Compiler.compileTxScript(script).rightValue)
+
+      serverUtils
+        .buildExecuteScriptTx(
+          blockFlow,
+          BuildExecuteScriptTx(
+            fromPublicKey = testPublicKey.bytes,
+            bytecode = scriptBytecode,
+            attoAlphAmount = Some(Amount(dustUtxoAmount * 2)),
+            tokens = Some(AVector(Token(tokenId, U256.unsafe(78))))
+          )
+        )
+    }
+
+    {
+      info("Works with small amount of gas")
+
+      buildExecuteScript(10).rightValue
+    }
+
+    {
+      info("Shows not enough ALPH for change output error with larger amount of gas")
+
+      buildExecuteScript(1000).leftValue.detail
+        .startsWith("Not enough ALPH for ALPH and token change output, expected")
+    }
+  }
+
   @scala.annotation.tailrec
   private def randomBlockHash(
       chainIndex: ChainIndex
