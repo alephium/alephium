@@ -49,19 +49,8 @@ trait Warnings {
       typeId: Ast.TypeId,
       unusedConstants: mutable.ArrayBuffer[String]
   ): Unit = {
-    warnUnusedLocalConstants(typeId, unusedConstants.sorted.mkString(", "))
-  }
-
-  def warnUnusedLocalConstants(typeId: Ast.TypeId, unusedConstants: String): Unit = {
     if (!compilerOptions.ignoreUnusedConstantsWarnings) {
-      warnings += s"Found unused constants in ${typeId.name}: ${unusedConstants}"
-    }
-  }
-
-  def warnUnusedParentConstants(parentId: Ast.TypeId, unusedConstants: Seq[String]): Unit = {
-    if (!compilerOptions.ignoreUnusedConstantsWarnings) {
-      val constants = unusedConstants.sorted.mkString(", ")
-      warnings += s"Found unused constants from parent ${parentId.name}: $constants"
+      warnings += Warnings.unusedLocalConstants(typeId, unusedConstants)
     }
   }
 
@@ -131,5 +120,9 @@ object Warnings {
 
   def unusedGlobalConstants(names: Seq[String]): String = {
     s"Found unused global constants: ${names.sorted.mkString(", ")}"
+  }
+
+  def unusedLocalConstants(typeId: Ast.TypeId, unusedConstants: collection.Seq[String]): String = {
+    s"Found unused constants in ${typeId.name}: ${unusedConstants.sorted.mkString(", ")}"
   }
 }

@@ -2519,9 +2519,10 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Bar(id).foo()
          |}
          |""".stripMargin
-    val (contracts, scripts, globalState) = Compiler.compileProject(rawCode).rightValue
-    val query                             = Compile.Project(rawCode)
-    val result                            = serverUtils.compileProject(query).rightValue
+    val (contracts, scripts, globalState, globalWarnings) =
+      Compiler.compileProject(rawCode).rightValue
+    val query  = Compile.Project(rawCode)
+    val result = serverUtils.compileProject(query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2537,6 +2538,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.enums is Some(AVector(CompileResult.Enum.from(globalState.enums(0))))
     val constant = globalState.getCalculatedConstants()(0)
     result.constants is Some(AVector(CompileResult.Constant.from(constant._1, constant._2)))
+
+    globalWarnings is AVector("Found unused global constants: A, Error.Err0")
   }
 
   it should "compile script" in new Fixture {

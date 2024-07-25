@@ -2656,23 +2656,9 @@ object Ast {
       }
     }
 
-    private def getChildren(parentId: TypeId): collection.Seq[TypeId] = {
-      val children = mutable.ArrayBuffer.empty[TypeId]
-      dependencies.foreach(_.foreach { case (child, parents) =>
-        if (parents.contains(parentId)) {
-          getContract(child) match {
-            case contract: Contract if !contract.isAbstract =>
-              children.addOne(child)
-            case _ => ()
-          }
-        }
-      })
-      children
-    }
-
     private def checkUnusedLocalConstants(
         states: Map[TypeId, (Contract, Compiler.State[StatefulContext])]
-    ): Unit = {
+    ): AVector[String] = {
       val constants = mutable.Set.empty[(TypeId, String)]
       states.foreach { case (_, (contract, _)) =>
         if (contract.isAbstract) {
@@ -2688,18 +2674,18 @@ object Ast {
         }
       }
       if (constants.nonEmpty) {
-        constants.groupBy(_._1).foreach { case (parentId, value) =>
-          val unusedConstants = value.map(_._2).toSeq
-          getChildren(parentId).foreach { childId =>
-            states(childId)._2.warnUnusedParentConstants(parentId, unusedConstants)
-          }
+        val warnings = constants.groupBy(_._1).map { case (parentId, value) =>
+          Warnings.unusedLocalConstants(parentId, value.map(_._2).toSeq)
         }
+        AVector.from(warnings)
+      } else {
+        AVector.empty[String]
       }
     }
 
     def genStatefulContracts()(implicit
         compilerOptions: CompilerOptions
-    ): AVector[(CompiledContract, Int)] = {
+    ): (AVector[String], AVector[(CompiledContract, Int)]) = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
@@ -2710,13 +2696,15 @@ object Ast {
           (statefulDebugContract, contract, state, index)
       })
       StaticAnalysis.checkExternalCalls(this, states)
-      if (!compilerOptions.ignoreUnusedConstantsWarnings) {
+      val warnings = if (!compilerOptions.ignoreUnusedConstantsWarnings) {
         val contractStates = contracts.view.zipWithIndex.collect {
           case (contract: Contract, index) => (contract.ident, (contract, states(index)))
         }.toMap
         checkUnusedLocalConstants(contractStates)
+      } else {
+        AVector.empty[String]
       }
-      statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
+      val compiled = statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
         val statefulContract = genReleaseCode(contract, statefulDebugContract, state)
         StaticAnalysis.checkMethods(contract, statefulDebugContract, state)
         CompiledContract(
@@ -2726,6 +2714,7 @@ object Ast {
           statefulDebugContract
         ) -> index
       }
+      (warnings, compiled)
     }
 
     def genReleaseCode(
@@ -2752,7 +2741,7 @@ object Ast {
               contract.sourceIndex
             )
           }
-          val statefulContracts = genStatefulContracts()
+          val statefulContracts = genStatefulContracts()._2
           statefulContracts.find(_._2 == contractIndex) match {
             case Some(v) => v._1
             case None => // should never happen

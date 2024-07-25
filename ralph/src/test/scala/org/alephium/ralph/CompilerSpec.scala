@@ -3557,7 +3557,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
-      val (contracts, _, _) = Compiler.compileProject(code).rightValue
+      val contracts = Compiler.compileProject(code).rightValue._1
       contracts.length is 2
       contracts.foreach(_.warnings.isEmpty is true)
     }
@@ -3935,7 +3935,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all contracts" in new MultiContractFixture {
-    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)
+    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)._2
     contracts.length is 2
     contracts(0)._1.ast.ident.name is "Foo"
     contracts(0)._2 is 1
@@ -7195,15 +7195,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val options        = CompilerOptions.Default
     val multiContract  = Compiler.compileMultiContract(code).rightValue
-    val (compiled1, _) = multiContract.genStatefulContracts()(options).head
-    val (compiled2, _) = multiContract.genStatefulContracts()(options).head
+    val (compiled1, _) = multiContract.genStatefulContracts()(options)._2.head
+    val (compiled2, _) = multiContract.genStatefulContracts()(options)._2.head
     compiled1.code is compiled2.code
     compiled1.ast is compiled2.ast
     compiled1.debugCode is compiled2.debugCode
     compiled1.warnings isnot compiled2.warnings
 
     multiContract.contracts.foreach(_.reset())
-    val (compiled3, _) = multiContract.genStatefulContracts()(options).head
+    val (compiled3, _) = multiContract.genStatefulContracts()(options)._2.head
 
     compiled1.code is compiled3.code
     compiled1.ast is compiled3.ast
@@ -7341,9 +7341,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val result = Compiler.compileProject(code).rightValue
-      result._1.head.warnings is AVector("Found unused global constants: A")
-      result._2.head.warnings is AVector("Found unused global constants: A")
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: A")
     }
 
     {
@@ -7433,8 +7432,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val compiled = Compiler.compileProject(code).rightValue._1.head
-      compiled.warnings is AVector("Found unused global constants: Color.Blue")
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: Color.Blue")
     }
 
     {
@@ -7455,9 +7454,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val result = Compiler.compileProject(code).rightValue
-      result._1.head.warnings.isEmpty is true
-      result._2.head.warnings.isEmpty is true
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings.isEmpty is true
     }
 
     {
@@ -7479,9 +7477,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val result = Compiler.compileProject(code).rightValue
-      result._1.head.warnings is AVector("Found unused global constants: Color.Blue")
-      result._2.head.warnings is AVector("Found unused global constants: Color.Blue")
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: Color.Blue")
     }
 
     {
@@ -7501,10 +7498,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val result = Compiler.compileProject(code).rightValue
-      result._1.head.warnings is AVector(
-        "Found unused global constants: A, Color.Blue, Color.Green"
-      )
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: A, Color.Blue, Color.Green")
     }
 
     {
@@ -7525,22 +7520,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
-      val result          = Compiler.compileProject(code, compilerOptions).rightValue
-      result._1.head.warnings.isEmpty is true
+      val warnings        = Compiler.compileProject(code, compilerOptions).rightValue._4
+      warnings.isEmpty is true
     }
   }
 
   it should "report the correct warnings for unused constants" in {
-    def check(code: String, allWarnings: AVector[(String, AVector[String])]) = {
-      val contracts0 = Compiler.compileProject(code).rightValue._1
-      contracts0.zipWithIndex.foreach { case (contract, index) =>
-        val value = allWarnings(index)
+    def check(
+        code: String,
+        contractWarnings: AVector[(String, AVector[String])],
+        globalWarnings: AVector[String]
+    ) = {
+      val result = Compiler.compileProject(code).rightValue
+      result._4 is globalWarnings
+      result._1.zipWithIndex.foreach { case (contract, index) =>
+        val value = contractWarnings(index)
         contract.ast.ident.name is value._1
         contract.warnings is value._2
       }
       val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
-      val contracts1 = Compiler.compileProject(code, compilerOptions).rightValue._1
-      contracts1.foreach(_.warnings.isEmpty is true)
+      val contracts       = Compiler.compileProject(code, compilerOptions).rightValue._1
+      contracts.foreach(_.warnings.isEmpty is true)
     }
 
     {
@@ -7566,10 +7566,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       check(
         code,
-        AVector(
-          ("Bar", AVector("Found unused constants from parent Foo: Foo2")),
-          ("Baz", AVector("Found unused constants from parent Foo: Foo2"))
-        )
+        AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
+        AVector("Found unused constants in Foo: Foo2")
       )
     }
 
@@ -7599,15 +7597,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       check(
         code,
         AVector(
-          ("Bar", AVector("Found unused constants from parent Foo: Foo2")),
+          ("Bar", AVector.empty[String]),
           (
             "Baz",
             AVector(
-              "Found unused constants in Baz: Baz0",
-              "Found unused constants from parent Foo: Foo2"
+              "Found unused constants in Baz: Baz0"
             )
           )
-        )
+        ),
+        AVector("Found unused constants in Foo: Foo2")
       )
     }
 
@@ -7637,9 +7635,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       check(
         code,
         AVector(
-          ("Bar", AVector("Found unused constants from parent Foo: ErrorCode.Err2")),
-          ("Baz", AVector("Found unused constants from parent Foo: ErrorCode.Err2"))
-        )
+          ("Bar", AVector.empty[String]),
+          ("Baz", AVector.empty[String])
+        ),
+        AVector("Found unused constants in Foo: ErrorCode.Err2")
       )
     }
 
@@ -7672,15 +7671,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       check(
         code,
         AVector(
-          ("Bar", AVector("Found unused constants from parent Foo: ErrorCode.Err2")),
+          ("Bar", AVector.empty[String]),
           (
             "Baz",
             AVector(
-              "Found unused constants in Baz: ErrorCode.Err3",
-              "Found unused constants from parent Foo: ErrorCode.Err2"
+              "Found unused constants in Baz: ErrorCode.Err3"
             )
           )
-        )
+        ),
+        AVector("Found unused constants in Foo: ErrorCode.Err2")
       )
     }
 
@@ -7716,7 +7715,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(code, AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])))
+      check(
+        code,
+        AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
+        AVector.empty[String]
+      )
     }
   }
 }
