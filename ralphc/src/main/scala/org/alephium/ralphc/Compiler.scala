@@ -133,7 +133,7 @@ final case class Compiler(config: Config) {
             ),
             config.artifactPath.resolve(".project.json")
           )
-          CompileProjectResult.from(p._1, p._2, p._3)
+          CompileProjectResult.from(p._1, p._2, p._3, p._4)
         })
         .left
         .map(_.toString)

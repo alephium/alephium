@@ -11832,6 +11832,24 @@
             "items": {
               "$ref": "#/components/schemas/StructSig"
             }
+          },
+          "constants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Constant"
+            }
+          },
+          "enums": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Enum"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

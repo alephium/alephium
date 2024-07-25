@@ -1233,7 +1233,7 @@ class ServerUtils(implicit
   def compileProject(query: Compile.Project): Try[CompileProjectResult] = {
     Compiler
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
-      .map(p => CompileProjectResult.from(p._1, p._2, p._3))
+      .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
       .left
       .map(error => failed(error.format(query.code)))
   }
