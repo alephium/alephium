@@ -2310,6 +2310,47 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       )
     )
   }
+
+  it should "set the origin contract id for constants" in {
+    val code =
+      s"""
+         |const G0 = 0
+         |enum G1 { V = 0 }
+         |Abstract Contract Foo() {
+         |  const Foo0 = 0
+         |  enum Foo1 { V = 1 }
+         |  pub fn foo() -> () {}
+         |}
+         |Contract Bar() extends Foo() {
+         |  const Bar0 = 0
+         |  enum Bar1 { V = 1 }
+         |  pub fn bar() -> () {}
+         |}
+         |""".stripMargin
+
+    val multiContract = parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+    val globalState   = multiContract.globalState
+    globalState.constantVars.foreach(_.origin is None)
+    globalState.enums.foreach(_.fields.foreach(_.origin is None))
+
+    val foo = multiContract.get(0).asInstanceOf[Contract]
+    foo.isAbstract is true
+    foo.selfDefinedConstants is Seq(Ident("Foo0"), Ident("Foo1.V"))
+    foo.constantVars.length is 1
+    foo.constantVars(0).origin is Some(TypeId("Foo"))
+    foo.enums.length is 1
+    foo.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
+
+    val bar = multiContract.get(1).asInstanceOf[Contract]
+    bar.isAbstract is false
+    bar.selfDefinedConstants is Seq(Ident("Bar0"), Ident("Bar1.V"))
+    bar.constantVars.length is 2
+    bar.constantVars(0).origin is Some(TypeId("Foo"))
+    bar.constantVars(1).origin is Some(TypeId("Bar"))
+    bar.enums.length is 2
+    bar.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
+    bar.enums(1).fields.foreach(_.origin is Some(TypeId("Bar")))
+  }
 }
 
 class ParseNoFileSpec extends ParserSpec(None)

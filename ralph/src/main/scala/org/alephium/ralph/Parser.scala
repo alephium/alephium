@@ -1076,7 +1076,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   // scalastyle:off method.length
   // scalastyle:off cyclomatic.complexity
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
       annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
@@ -1116,19 +1115,19 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
-          case c: Ast.ConstantVarDef[_] =>
+          case c: Ast.ConstantVarDef[StatefulContext @unchecked] =>
             if (funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
-            constantVars += c.asInstanceOf[Ast.ConstantVarDef[StatefulContext]]
-          case e: Ast.EnumDef[_] =>
+            constantVars += c.withOrigin(typeId)
+          case e: Ast.EnumDef[StatefulContext @unchecked] =>
             if (funcs.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
-            enums += e.asInstanceOf[Ast.EnumDef[StatefulContext]]
-          case f: Ast.FuncDef[_] =>
-            funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
-          case _ =>
+            e.fields.foreach(_.withOrigin(typeId))
+            enums += e
+          case f: Ast.FuncDef[StatefulContext @unchecked] => funcs += f
+          case _                                          =>
         }
 
         Ast

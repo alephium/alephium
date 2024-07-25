@@ -119,14 +119,16 @@ final case class CompileProjectResult(
     scripts: AVector[CompileScriptResult],
     structs: Option[AVector[CompileResult.StructSig]] = None,
     constants: Option[AVector[CompileResult.Constant]] = None,
-    enums: Option[AVector[CompileResult.Enum]] = None
+    enums: Option[AVector[CompileResult.Enum]] = None,
+    warnings: Option[AVector[String]] = None
 )
 
 object CompileProjectResult {
   def from(
       contracts: AVector[CompiledContract],
       scripts: AVector[CompiledScript],
-      globalState: Ast.GlobalState[StatefulContext]
+      globalState: Ast.GlobalState[StatefulContext],
+      warnings: AVector[String]
   ): CompileProjectResult = {
     val compiledContracts = contracts.map(c => CompileContractResult.from(c))
     val compiledScripts   = scripts.map(s => CompileScriptResult.from(s))
@@ -138,7 +140,8 @@ object CompileProjectResult {
       compiledScripts,
       Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from)),
       Option.when(constants.nonEmpty)(constants.map(CompileResult.Constant.from.tupled)),
-      Option.when(enums.nonEmpty)(enums.map(CompileResult.Enum.from))
+      Option.when(enums.nonEmpty)(enums.map(CompileResult.Enum.from)),
+      Option.when(warnings.nonEmpty)(warnings)
     )
   }
 
