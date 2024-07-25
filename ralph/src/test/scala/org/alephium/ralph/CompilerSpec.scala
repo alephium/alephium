@@ -7529,4 +7529,194 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       result._1.head.warnings.isEmpty is true
     }
   }
+
+  it should "report the correct warnings for unused constants" in {
+    def check(code: String, allWarnings: AVector[(String, AVector[String])]) = {
+      val contracts0 = Compiler.compileProject(code).rightValue._1
+      contracts0.zipWithIndex.foreach { case (contract, index) =>
+        val value = allWarnings(index)
+        contract.ast.ident.name is value._1
+        contract.warnings is value._2
+      }
+      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
+      val contracts1 = Compiler.compileProject(code, compilerOptions).rightValue._1
+      contracts1.foreach(_.warnings.isEmpty is true)
+    }
+
+    {
+      info("unused parent constants")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  const Foo2 = 2
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> U256 {
+           |    return Foo0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> U256 {
+           |    return Foo1
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector("Found unused constants from parent Foo: Foo2")),
+          ("Baz", AVector("Found unused constants from parent Foo: Foo2"))
+        )
+      )
+    }
+
+    {
+      info("unused local constants and parent constants")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  const Foo2 = 2
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  const Bar0 = 0
+           |  pub fn bar() -> U256 {
+           |    return Foo0 + Bar0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  const Baz0 = 0
+           |  pub fn baz() -> U256 {
+           |    return Foo1
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector("Found unused constants from parent Foo: Foo2")),
+          (
+            "Baz",
+            AVector(
+              "Found unused constants in Baz: Baz0",
+              "Found unused constants from parent Foo: Foo2"
+            )
+          )
+        )
+      )
+    }
+
+    {
+      info("unused parent enums")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |    Err2 = 2
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> () {
+           |    assert!(true, ErrorCode.Err0)
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> () {
+           |    assert!(true, ErrorCode.Err1)
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector("Found unused constants from parent Foo: ErrorCode.Err2")),
+          ("Baz", AVector("Found unused constants from parent Foo: ErrorCode.Err2"))
+        )
+      )
+    }
+
+    {
+      info("unused local enums and parent enums")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |    Err2 = 2
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  enum ErrorCode { Err3 = 3 }
+           |  pub fn bar() -> () {
+           |    assert!(true, ErrorCode.Err0)
+           |    assert!(true, ErrorCode.Err3)
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  enum ErrorCode { Err3 = 3 }
+           |  pub fn baz() -> () {
+           |    assert!(true, ErrorCode.Err1)
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector("Found unused constants from parent Foo: ErrorCode.Err2")),
+          (
+            "Baz",
+            AVector(
+              "Found unused constants in Baz: ErrorCode.Err3",
+              "Found unused constants from parent Foo: ErrorCode.Err2"
+            )
+          )
+        )
+      )
+    }
+
+    {
+      info("no warnings")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  const Bar0 = 0
+           |  enum ErrorCode { Err2 = 2 }
+           |  pub fn bar() -> U256 {
+           |    assert!(true, ErrorCode.Err0)
+           |    assert!(true, ErrorCode.Err2)
+           |    return Foo0 + Bar0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  const Baz0 = 0
+           |  enum ErrorCode { Err2 = 2 }
+           |  pub fn baz() -> U256 {
+           |    assert!(true, ErrorCode.Err1)
+           |    assert!(true, ErrorCode.Err2)
+           |    return Foo1 + Baz0
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])))
+    }
+  }
 }

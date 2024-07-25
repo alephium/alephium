@@ -237,7 +237,8 @@ object Compiler {
     final case class Constant[Ctx <: StatelessContext](
         tpe: Type,
         value: Val,
-        instrs: Seq[Instr[Ctx]]
+        instrs: Seq[Instr[Ctx]],
+        constantDef: Ast.ConstantDefinition
     ) extends VarInfo {
       def isMutable: Boolean   = false
       def isUnused: Boolean    = false
@@ -738,10 +739,11 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstant(ident: Ast.Ident, value: Val): Unit = {
+    def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
-      varTable(sname) = VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr))
+      varTable(sname) =
+        VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr), constantDef)
     }
 
     private def checkNewVariable(ident: Ast.Ident): String = {
@@ -858,7 +860,10 @@ object Compiler {
       val unusedLocalConstants = mutable.ArrayBuffer.empty[String]
       val unusedFields         = mutable.ArrayBuffer.empty[String]
       unusedVars.foreach {
-        case (name, _: VarInfo.Constant[_])      => unusedLocalConstants.addOne(name)
+        case (name, c: VarInfo.Constant[_]) =>
+          if (c.constantDef.origin.contains(typeId)) {
+            unusedLocalConstants.addOne(name)
+          }
         case (name, varInfo) if !varInfo.isLocal => unusedFields.addOne(name)
         case _                                   => ()
       }
@@ -868,6 +873,22 @@ object Compiler {
       if (unusedFields.nonEmpty) {
         warnUnusedFields(typeId, unusedFields)
       }
+    }
+
+    private[ralph] def getUsedParentConstants(): Iterable[(Ast.TypeId, String)] = {
+      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, String)]
+      varTable.foreach {
+        case (name, c: VarInfo.Constant[_]) =>
+          if (accessedVars.contains(ReadVariable(name))) {
+            c.constantDef.origin match {
+              case Some(originContractId) if originContractId != typeId =>
+                used.addOne((originContractId, name))
+              case _ => ()
+            }
+          }
+        case _ => ()
+      }
+      used
     }
 
     def checkUnassignedMutableFields(): Unit = {

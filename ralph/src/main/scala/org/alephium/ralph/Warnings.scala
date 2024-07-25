@@ -58,6 +58,13 @@ trait Warnings {
     }
   }
 
+  def warnUnusedParentConstants(parentId: Ast.TypeId, unusedConstants: Seq[String]): Unit = {
+    if (!compilerOptions.ignoreUnusedConstantsWarnings) {
+      val constants = unusedConstants.sorted.mkString(", ")
+      warnings += s"Found unused constants from parent ${parentId.name}: $constants"
+    }
+  }
+
   def warnUnusedFields(typeId: Ast.TypeId, unusedFields: mutable.ArrayBuffer[String]): Unit = {
     warnUnusedFields(typeId, unusedFields.sorted.mkString(", "))
   }
