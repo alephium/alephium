@@ -3808,7 +3808,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block)
     }
 
-    def buildExecuteScriptTx(iterations: Int) = {
+    def buildExecuteScriptTx(approvedAlphAmount: U256, iterations: Int) = {
       val script = s"""
                       |TxScript Main {
                       |  let mut sum = 0
@@ -3826,14 +3826,17 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildExecuteScriptTx(
             fromPublicKey = testPublicKey.bytes,
             bytecode = scriptBytecode,
-            attoAlphAmount = Some(Amount(dustUtxoAmount * 2)),
+            attoAlphAmount = Some(Amount(approvedAlphAmount)),
             tokens = Some(AVector(Token(tokenId, U256.unsafe(78))))
           )
         )
     }
 
-    buildExecuteScriptTx(10).rightValue
-    buildExecuteScriptTx(1000).rightValue
+    buildExecuteScriptTx(dustUtxoAmount * 2, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount * 2, 1000).rightValue
+    buildExecuteScriptTx(dustUtxoAmount, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 10).rightValue
+    buildExecuteScriptTx(U256.Zero, 10).rightValue
   }
 
   it should "consider dustUtxoAmount for outputs when building transfer tx" in new VerifyTxOutputFixture {
