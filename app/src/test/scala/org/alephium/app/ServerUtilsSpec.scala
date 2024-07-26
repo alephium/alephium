@@ -3761,11 +3761,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block1)
   }
 
-  it should "consider dustUtxoAmount for outputs when building execute script tx" in new ContractFixture {
-    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
-    val (_, testPublicKey)        = chainIndex.from.generateKey
-    val testLockupScript          = LockupScript.p2pkh(testPublicKey)
-    val genesisLockupScript       = lockupScript
+  trait VerifyTxOutputFixture extends ContractFixture {
+    val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val (_, testPublicKey)                       = chainIndex.from.generateKey
+    val testLockupScript                         = LockupScript.p2pkh(testPublicKey)
+    val genesisLockupScript                      = lockupScript
 
     val tokenCode =
       s"""
@@ -3787,7 +3787,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, tokenIssuanceBlock)
     val tokenId =
       TokenId.from(ContractId.from(tokenIssuanceBlock.transactions.head.id, 0, chainIndex.from))
+  }
 
+  it should "consider dustUtxoAmount for outputs when building execute script tx" in new VerifyTxOutputFixture {
     // Transfer tokens
     (1 to 8).foreach { _ =>
       val block = transfer(
@@ -3806,7 +3808,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block)
     }
 
-    def buildExecuteScript(iterations: Int) = {
+    def buildExecuteScriptTx(iterations: Int) = {
       val script = s"""
                       |TxScript Main {
                       |  let mut sum = 0
@@ -3830,8 +3832,35 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
     }
 
-    buildExecuteScript(10).rightValue
-    buildExecuteScript(1000).rightValue
+    buildExecuteScriptTx(10).rightValue
+    buildExecuteScriptTx(1000).rightValue
+  }
+
+  it should "consider dustUtxoAmount for outputs when building transfer tx" in new VerifyTxOutputFixture {
+    def buildTransferTx(alphAmount: U256) = {
+      serverUtils
+        .buildTransaction(
+          blockFlow,
+          BuildTransaction(
+            fromPublicKey = genesisPublicKey.bytes,
+            destinations = AVector(
+              Destination(
+                address = Address.Asset(testLockupScript),
+                attoAlphAmount = Amount(alphAmount),
+                tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
+              )
+            )
+          )
+        )
+    }
+
+    buildTransferTx(U256.Zero).leftValue.detail is "Not enough ALPH for transaction output"
+
+    buildTransferTx(
+      dustUtxoAmount.subUnsafe(1)
+    ).leftValue.detail is "Not enough ALPH for transaction output"
+
+    buildTransferTx(dustUtxoAmount).rightValue
   }
 
   @scala.annotation.tailrec
