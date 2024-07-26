@@ -679,9 +679,11 @@ class ServerUtils(implicit
           AVector.empty[(TokenId, U256)]
       }
 
+      val tokensDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokensInfo.length))
+
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.attoAlphAmount.value,
+        Math.max(destination.attoAlphAmount.value, tokensDustAmount),
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -1088,7 +1090,7 @@ class ServerUtils(implicit
     val estimatedTotalDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength))
 
     for {
-      allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
+      allUtxos    <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
       totalAmount <- amount.add(estimatedTotalDustAmount).toRight(failed("ALPH amount overflow"))
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo

@@ -3854,13 +3854,11 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
     }
 
-    buildTransferTx(U256.Zero).leftValue.detail is "Not enough ALPH for transaction output"
-
-    buildTransferTx(
-      dustUtxoAmount.subUnsafe(1)
-    ).leftValue.detail is "Not enough ALPH for transaction output"
-
+    buildTransferTx(U256.Zero).rightValue
+    buildTransferTx(dustUtxoAmount.subUnsafe(1)).rightValue
     buildTransferTx(dustUtxoAmount).rightValue
+    buildTransferTx(dustUtxoAmount.addUnsafe(1)).rightValue
+    buildTransferTx(dustUtxoAmount.mulUnsafe(10)).rightValue
   }
 
   @scala.annotation.tailrec
