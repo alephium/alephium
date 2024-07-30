@@ -16,12 +16,14 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable
+
 import org.alephium.protocol.vm.{StatelessContext, Val}
 import org.alephium.ralph.Compiler.{Error, VarInfo}
 
 trait Constants[Ctx <: StatelessContext] {
   def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx]
-  def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit
+  protected def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit
 
   def addConstants(constantVars: Seq[Ast.ConstantVarDef[Ctx]]): Seq[(Ast.Ident, Val)] = {
     Ast.UniqueDef.checkDuplicates(constantVars, "constant variables")
@@ -44,7 +46,7 @@ trait Constants[Ctx <: StatelessContext] {
   }
 
   @scala.annotation.tailrec
-  private def calcConstant(expr: Ast.Expr[Ctx]): Val = {
+  final private[ralph] def calcConstant(expr: Ast.Expr[Ctx]): Val = {
     expr match {
       case e: Ast.Const[Ctx @unchecked] => e.v
       case Ast.Variable(ident) =>
@@ -93,5 +95,27 @@ object Constants {
       s"Expected constant value with primitive types $primitiveTypes, $label are not supported",
       expr.sourceIndex
     )
+  }
+
+  private[ralph] def empty[Ctx <: StatelessContext]: Constants[Ctx] = {
+    new Constants[Ctx] {
+      private val constants = mutable.Map.empty[Ast.Ident, Compiler.VarInfo.Constant[Ctx]]
+      def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx] = {
+        constants.get(ident) match {
+          case Some(v: Compiler.VarInfo.Constant[Ctx @unchecked]) => v
+          case _ =>
+            throw Compiler.Error(
+              s"Constant variable ${ident.name} does not exist or is used before declaration",
+              ident.sourceIndex
+            )
+        }
+      }
+
+      def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+        val tpe = Type.fromVal(value.tpe)
+        constants(ident) =
+          Compiler.VarInfo.Constant(tpe, value, Seq(value.toConstInstr), constantDef)
+      }
+    }
   }
 }
