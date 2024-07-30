@@ -555,7 +555,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         mutFields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
-      val compiled = compileContractFull(input).rightValue
+      testContract(input, args, output, immFields, mutFields, methodIndex, 0)
+    }
+
+    def testContract(
+        input: String,
+        args: AVector[Val] = AVector.empty,
+        output: AVector[Val] = AVector.empty,
+        immFields: AVector[Val] = AVector.empty,
+        mutFields: AVector[Val] = AVector.empty,
+        methodIndex: Int = 0,
+        contractIndex: Int = 0
+    ): Assertion = {
+      val compiled = compileContractFull(input, contractIndex).rightValue
       compiled.code is compiled.debugCode
       val contract = compiled.code
 
@@ -7720,6 +7732,91 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
         AVector.empty[String]
       )
+    }
+  }
+
+  it should "use constants as array size" in new Fixture {
+    {
+      info("Global constants as array size")
+      val code =
+        s"""
+           |const SIZE = 2
+           |enum E { SIZE = 3 }
+           |Contract Foo() {
+           |  pub fn getValues0() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |  pub fn getValues1() -> [U256; SIZE * 2] {
+           |    return [1; 4]
+           |  }
+           |  pub fn getValues2() -> [U256; E.SIZE] {
+           |    return [2; E.SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, output = AVector.fill(2)(Val.U256(0)))
+      test(code, output = AVector.fill(4)(Val.U256(1)), methodIndex = 1)
+      test(code, output = AVector.fill(3)(Val.U256(2)), methodIndex = 2)
+    }
+
+    {
+      info("Local constants as array size")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const SIZE = 2
+           |  enum E { SIZE = 3 }
+           |  pub fn getValues0() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |  pub fn getValues1() -> [U256; SIZE * 2] {
+           |    return [1; 4]
+           |  }
+           |  pub fn getValues2() -> [U256; E.SIZE] {
+           |    return [2; E.SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, output = AVector.fill(2)(Val.U256(0)))
+      test(code, output = AVector.fill(4)(Val.U256(1)), methodIndex = 1)
+      test(code, output = AVector.fill(3)(Val.U256(2)), methodIndex = 2)
+    }
+
+    {
+      info("Different sizes in different contracts")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const SIZE = 2
+           |  pub fn getValues() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |}
+           |Contract Bar() {
+           |  const SIZE = 3
+           |  pub fn getValues() -> [U256; SIZE] {
+           |    return [1; SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, output = AVector.fill(2)(Val.U256(0)))
+      testContract(code, output = AVector.fill(3)(Val.U256(1)), contractIndex = 1)
+    }
+
+    {
+      info("Invalid array size")
+      val code =
+        s"""
+           |const SIZE = 2i
+           |Contract Foo(@unused values: [U256; $$SIZE$$]) {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Invalid array size, expected a constant U256 value")
     }
   }
 }

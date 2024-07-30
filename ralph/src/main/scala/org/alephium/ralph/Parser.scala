@@ -46,7 +46,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   lazy val Lexer: Lexer = new Lexer(fileURI)
 
-  lazy val constants: Constants[Ctx] = Constants.empty[Ctx]
+  lazy val constants: Constants[Ctx] = Constants.lazyEvaluated[Ctx]
 
   /*
    * PP: Positioned Parser

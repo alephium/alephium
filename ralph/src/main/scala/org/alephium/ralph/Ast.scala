@@ -520,12 +520,13 @@ object Ast {
   }
   final case class EnumFieldSelector[Ctx <: StatelessContext](enumId: TypeId, field: Ident)
       extends Expr[Ctx] {
+    lazy val fieldIdent = EnumDef.fieldIdent(enumId, field)
+
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] =
-      Seq(state.getVariable(EnumDef.fieldIdent(enumId, field)).tpe)
+      Seq(state.getVariable(fieldIdent).tpe)
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val ident = EnumDef.fieldIdent(enumId, field)
-      state.genLoadCode(ident)
+      state.genLoadCode(fieldIdent)
     }
   }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
