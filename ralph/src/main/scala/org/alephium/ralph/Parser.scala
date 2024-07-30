@@ -1226,7 +1226,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
-  private def globalDefinition[Unknown: P]: P[Ast.GlobalDefinition] = P(
+  def globalDefinition[Unknown: P]: P[Ast.MultiContractDef] = P(
     rawTxScript | rawContract | rawInterface | rawStruct | constantVarDef | rawEnumDef
   )
 

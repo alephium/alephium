@@ -902,7 +902,8 @@ object Ast {
   }
 
   sealed trait GlobalDefinition extends UniqueDef
-  final case class Struct(id: TypeId, fields: Seq[StructField]) extends GlobalDefinition {
+  sealed trait MultiContractDef extends GlobalDefinition
+  final case class Struct(id: TypeId, fields: Seq[StructField]) extends MultiContractDef {
     lazy val tpe: Type.Struct = Type.Struct(id)
 
     def name: String = id.name
@@ -1574,7 +1575,7 @@ object Ast {
   final case class ConstantVarDef[Ctx <: StatelessContext](
       ident: Ident,
       expr: Expr[Ctx]
-  ) extends GlobalDefinition
+  ) extends MultiContractDef
       with ConstantDefinition {
     def name: String = ident.name
   }
@@ -1585,7 +1586,7 @@ object Ast {
     def name: String = ident.name
   }
   final case class EnumDef[Ctx <: StatelessContext](id: TypeId, fields: Seq[EnumField[Ctx]])
-      extends GlobalDefinition {
+      extends MultiContractDef {
     def name: String = id.name
   }
   object EnumDef {
@@ -2174,7 +2175,7 @@ object Ast {
     }
   }
 
-  sealed trait ContractWithState extends ContractT[StatefulContext] {
+  sealed trait ContractWithState extends ContractT[StatefulContext] with MultiContractDef {
     def inheritances: Seq[Inheritance]
 
     def templateVars: Seq[Argument]
