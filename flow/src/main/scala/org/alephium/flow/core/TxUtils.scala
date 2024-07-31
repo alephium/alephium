@@ -633,7 +633,7 @@ trait TxUtils { Self: FlowUtils =>
 
         val changeOutputLength = 1 + changeTokenOutputs
         val outGas             = GasSchedule.txOutputBaseGas.mulUnsafe(changeOutputLength)
-        val inGas              = GasEstimation.gasForP2PKHInputs(selected.assets.length)
+        val inGas              = GasEstimation.gasForSameP2PKHInputs(selected.assets.length)
         val inOutGas           = inGas.addUnsafe(outGas)
 
         (input, selected.copy(gas = inOutGas), selected.gas)
@@ -755,7 +755,216 @@ trait TxUtils { Self: FlowUtils =>
     )
   }
 
+  @inline private def isConsolidation(
+      fromLockupScript: LockupScript.Asset,
+      toLockupScript: LockupScript.Asset
+  ): Boolean = {
+    fromLockupScript == toLockupScript
+  }
+
+  private[core] def buildSweepTokenTxs(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      allTokenUtxos: AVector[AssetOutputInfo],
+      allAlphUtxos: AVector[AssetOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo], Option[String]) = {
+    assume(allTokenUtxos.forall(_.output.tokens.length == 1))
+
+    val utxosPerToken = allTokenUtxos.groupBy(_.output.tokens.head._1).view
+    val filteredTokenUtxos =
+      if (isConsolidation(fromLockupScript, toLockupScript) && lockTimeOpt.isEmpty) {
+        utxosPerToken.filter(_._2.length > 1)
+      } else {
+        utxosPerToken
+      }
+
+    // group based on token id, so that utxos with the same token can
+    // be included in a single transaction as much as possible
+    val groupedTokenUtxos = AVector
+      .from(filteredTokenUtxos.flatMap(_._2))
+      .groupedWithRemainder(ALPH.MaxTxInputNum / 2)
+    val unsignedTxs = mutable.ArrayBuffer.empty[UnsignedTransaction]
+    var alphUtxos   = allAlphUtxos
+    val error = groupedTokenUtxos
+      .foreachE { tokenUtxos =>
+        tryBuildSweepTokenTx(
+          fromLockupScript,
+          fromUnlockScript,
+          toLockupScript,
+          lockTimeOpt,
+          tokenUtxos,
+          alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
+          gasOpt,
+          gasPrice
+        ) match {
+          case Right((unsignedTx, restAlphUtxos)) =>
+            unsignedTxs.addOne(unsignedTx)
+            alphUtxos = restAlphUtxos
+            Right(())
+          case Left(error) =>
+            logger.info(
+              s"Build sweep tx with ascending order returns error: $error, try descending order instead"
+            )
+
+            tryBuildSweepTokenTx(
+              fromLockupScript,
+              fromUnlockScript,
+              toLockupScript,
+              lockTimeOpt,
+              tokenUtxos,
+              alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
+              gasOpt,
+              gasPrice
+            ).map { case (unsignedTx, restAlphUtxos) =>
+              unsignedTxs.addOne(unsignedTx)
+              alphUtxos = restAlphUtxos
+            }
+        }
+      }
+      .left
+      .toOption
+    (AVector.from(unsignedTxs), alphUtxos, error)
+  }
+
+  @inline private def buildTokenOutputs(
+      tokens: AVector[(TokenId, U256)],
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp]
+  ): AVector[TxOutputInfo] = {
+    tokens.map { case (tokenId, amount) =>
+      TxOutputInfo(toLockupScript, dustUtxoAmount, AVector((tokenId, amount)), lockTimeOpt)
+    }
+  }
+
+  private[core] def tryBuildSweepTokenTx(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      tokenUtxos: AVector[AssetOutputInfo],
+      alphUtxos: AVector[AssetOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
+    for {
+      totalAlphAmount <- checkTotalAttoAlphAmount(tokenUtxos.map(_.output.amount))
+      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
+        tokenUtxos.flatMap(_.output.tokens)
+      )
+      totalNumOfOutputs  = totalAmountPerToken.length + 1 // 1 for ALPH change output
+      requiredAlphAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(totalNumOfOutputs))
+      selected <- UtxoSelectionAlgo
+        .SelectionWithGasEstimation(gasPrice)
+        .select(
+          fromUnlockScript,
+          totalNumOfOutputs,
+          UtxoSelectionAlgo.SelectedSoFar(totalAlphAmount, tokenUtxos, alphUtxos),
+          requiredAlphAmount,
+          AssetScriptGasEstimator.Default(blockFlow)
+        )
+        .left
+        .map(_ => "Not enough ALPH for gas fee in sweeping")
+      (selectedSoFor, estimatedGas) = selected
+      gas <- checkEstimatedGas(gasOpt, estimatedGas)
+      tokenDustAmount    = requiredAlphAmount.subUnsafe(dustUtxoAmount)
+      changeOutputAmount = selectedSoFor.alph.subUnsafe(gasPrice * gas).subUnsafe(tokenDustAmount)
+      changeOutput = TxOutputInfo(toLockupScript, changeOutputAmount, AVector.empty, lockTimeOpt)
+      unsignedTx <- UnsignedTransaction.buildTransferTx(
+        fromLockupScript,
+        fromUnlockScript,
+        (tokenUtxos ++ selectedSoFor.selected).map(asset => (asset.ref, asset.output)),
+        buildTokenOutputs(totalAmountPerToken, toLockupScript, lockTimeOpt) :+ changeOutput,
+        gas,
+        gasPrice
+      )
+    } yield (unsignedTx, selectedSoFor.rest)
+  }
+
+  private def checkEstimatedGas(
+      gasOpt: Option[GasBox],
+      estimatedGas: GasBox
+  ): Either[String, GasBox] = {
+    if (gasOpt.exists(_ < estimatedGas)) {
+      Left(s"The specified gas amount is not enough, estimated gas: ${estimatedGas.value}")
+    } else {
+      Right(estimatedGas)
+    }
+  }
+
+  private[core] def tryBuildSweepAlphTx(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      alphUtxos: AVector[AssetOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, UnsignedTransaction] = {
+    for {
+      estimatedGas <- GasEstimation.estimateWithInputScript(
+        fromUnlockScript,
+        alphUtxos.length,
+        1,
+        AssetScriptGasEstimator.Default(blockFlow)
+      )
+      gas             <- checkEstimatedGas(gasOpt, estimatedGas)
+      totalAlphAmount <- checkTotalAttoAlphAmount(alphUtxos.map(_.output.amount))
+      outputAmount <- totalAlphAmount
+        .sub(gasPrice * gas)
+        .toRight(s"Not enough ALPH for transaction output in sweeping")
+      unsignedTx <- UnsignedTransaction.buildTransferTx(
+        fromLockupScript,
+        fromUnlockScript,
+        alphUtxos.map(asset => (asset.ref, asset.output)),
+        AVector(TxOutputInfo(toLockupScript, outputAmount, AVector.empty, lockTimeOpt)),
+        gas,
+        gasPrice
+      )
+    } yield unsignedTx
+  }
+
+  private[core] def buildSweepAlphTxs(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      allAlphUtxos: AVector[AssetOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): (AVector[UnsignedTransaction], Option[String]) = {
+    assume(allAlphUtxos.forall(_.output.tokens.isEmpty))
+
+    val sortedAlphUtxos  = allAlphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph)
+    val groupedAlphUtxos = sortedAlphUtxos.groupedWithRemainder(ALPH.MaxTxInputNum)
+    val unsignedTxs      = mutable.ArrayBuffer.empty[UnsignedTransaction]
+    val consolidation    = isConsolidation(fromLockupScript, toLockupScript)
+    val error = groupedAlphUtxos
+      .foreachE { alphUtxos =>
+        if (consolidation && alphUtxos.length == 1 && lockTimeOpt.isEmpty) {
+          Right(())
+        } else {
+          tryBuildSweepAlphTx(
+            fromLockupScript,
+            fromUnlockScript,
+            toLockupScript,
+            lockTimeOpt,
+            alphUtxos,
+            gasOpt,
+            gasPrice
+          ).map(unsignedTx => unsignedTxs.addOne(unsignedTx))
+        }
+      }
+      .left
+      .toOption
+    (AVector.from(unsignedTxs), error)
+  }
+
   // scalastyle:off parameter.number
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def sweepAddressFromScripts(
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
@@ -772,38 +981,37 @@ trait TxUtils { Self: FlowUtils =>
     checkResult match {
       case Right(()) =>
         getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit).map { allUtxosUnfiltered =>
-          // Sweep as much as we can, taking maximalGasPerTx into consideration
-          // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx
           val allUtxos = maxAttoAlphPerUTXOOpt match {
             case Some(maxAttoAlphPerUTXO) =>
               allUtxosUnfiltered.filter(_.output.amount < maxAttoAlphPerUTXO)
             case None => allUtxosUnfiltered
           }
-          val groupedUtxos = allUtxos.groupedWithRemainder(ALPH.MaxTxInputNum / 2)
-          groupedUtxos.mapE { utxos =>
-            for {
-              txOutputsWithGas <- buildSweepAddressTxOutputsWithGas(
-                toLockupScript,
-                lockTimeOpt,
-                utxos.map(_.output),
-                gasOpt,
-                gasPrice
-              )
-              unsignedTx <- UnsignedTransaction
-                .buildTransferTx(
-                  fromLockupScript,
-                  fromUnlockScript,
-                  utxos.map(asset => (asset.ref, asset.output)),
-                  txOutputsWithGas._1,
-                  txOutputsWithGas._2,
-                  gasPrice
-                )
-            } yield unsignedTx
-          }
+          val (allAlphUtxos, allTokenUtxos) = allUtxos.partition(_.output.tokens.isEmpty)
+          val (sweepTokenTxs, restAlphUtxos, error0) = buildSweepTokenTxs(
+            fromLockupScript,
+            fromUnlockScript,
+            toLockupScript,
+            lockTimeOpt,
+            allTokenUtxos,
+            allAlphUtxos,
+            gasOpt,
+            gasPrice
+          )
+          val (sweepAlphTxs, error1) = buildSweepAlphTxs(
+            fromLockupScript,
+            fromUnlockScript,
+            toLockupScript,
+            lockTimeOpt,
+            restAlphUtxos,
+            gasOpt,
+            gasPrice
+          )
+          val txs   = sweepTokenTxs ++ sweepAlphTxs
+          val error = error0.orElse(error1)
+          if (error.nonEmpty && txs.isEmpty) Left(error.get) else Right(txs)
         }
 
-      case Left(e) =>
-        Right(Left(e))
+      case Left(e) => Right(Left(e))
     }
   }
   // scalastyle:on method.length
@@ -1156,53 +1364,6 @@ object TxUtils {
 
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
-  }
-
-  // Normally there is one output for the `sweepAddress` transaction. However, If there are more
-  // tokens than `maxTokenPerUtxo`, instead of failing the transaction validation, we will
-  // try to build a valid transaction by creating more outputs.
-  def buildSweepAddressTxOutputsWithGas(
-      toLockupScript: LockupScript.Asset,
-      lockTimeOpt: Option[TimeStamp],
-      utxos: AVector[AssetOutput],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice
-  ): Either[String, (AVector[TxOutputInfo], GasBox)] = {
-    for {
-      totalAmount <- checkTotalAttoAlphAmount(utxos.map(_.amount))
-      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
-        utxos.flatMap(_.tokens)
-      )
-      extraNumOfOutputs =
-        (totalAmountPerToken.length + maxTokenPerAssetUtxo - 1) / maxTokenPerAssetUtxo
-      gas = gasOpt.getOrElse(GasEstimation.sweepAddress(utxos.length, extraNumOfOutputs + 1))
-      totalAmountWithoutGas <- totalAmount
-        .sub(gasPrice * gas)
-        .toRight("Not enough balance for gas fee in Sweeping")
-      amountRequiredForExtraOutputs <- dustUtxoAmount
-        .mul(U256.unsafe(extraNumOfOutputs))
-        .toRight("Too many tokens")
-      amountOfFirstOutput <- totalAmountWithoutGas
-        .sub(amountRequiredForExtraOutputs)
-        .toRight("Not enough ALPH balance for transaction outputs")
-      _ <- amountOfFirstOutput
-        .sub(dustUtxoAmount)
-        .toRight("Not enough ALPH balance for transaction outputs")
-    } yield {
-      val firstOutput =
-        TxOutputInfo(toLockupScript, amountOfFirstOutput, AVector.empty, lockTimeOpt)
-      val restOfTokens = totalAmountPerToken.grouped(maxTokenPerAssetUtxo)
-      val restOfOutputs = restOfTokens.map { tokens =>
-        TxOutputInfo(
-          toLockupScript,
-          dustUtxoAmount,
-          tokens,
-          lockTimeOpt
-        )
-      }
-
-      (firstOutput +: restOfOutputs, gas)
-    }
   }
 
   class TokenBalances(balances: mutable.Map[TokenId, U256]) {

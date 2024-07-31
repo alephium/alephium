@@ -75,6 +75,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     testContract,
     callContract,
     multiCallContract,
+    callTxScript,
     buildMultisigAddress,
     buildMultisig,
     buildSweepMultisig,

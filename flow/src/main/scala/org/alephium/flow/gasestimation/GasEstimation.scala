@@ -27,15 +27,16 @@ import org.alephium.util._
 //   - UnlockScript, including P2PKH, P2MPKH and P2SH
 //   - TxScript
 object GasEstimation extends StrictLogging {
-  def sweepAddress: (Int, Int) => GasBox = estimateWithP2PKHInputs _
+  def sweepAddress: (Int, Int) => GasBox = estimateWithSameP2PKHInputs _
 
-  def gasForP2PKHInputs(numInputs: Int): GasBox = {
-    val inputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
-    inputGas.mulUnsafe(numInputs)
+  def gasForSameP2PKHInputs(numInputs: Int): GasBox = {
+    assume(numInputs > 0)
+    val firstInputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
+    firstInputGas.addUnsafe(GasSchedule.txInputBaseGas.mulUnsafe(numInputs - 1))
   }
 
-  def estimateWithP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
-    val inputGas = gasForP2PKHInputs(numInputs)
+  def estimateWithSameP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
+    val inputGas = gasForSameP2PKHInputs(numInputs)
     estimate(inputGas, numOutputs)
   }
 
@@ -54,15 +55,17 @@ object GasEstimation extends StrictLogging {
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
-    val inputGas: Either[String, (GasBox, Option[GasBox])] =
-      unlockScripts.foldE((GasBox.zero, None: Option[GasBox])) {
-        case ((sum, previousGas), unlock) =>
-          estimateInputGas(unlock, previousGas, assetScriptGasEstimator).map { gas =>
-            (sum.addUnsafe(gas), Some(gas))
-          }
+    val inputGas: Either[String, GasBox] =
+      unlockScripts.foldWithIndexE(GasBox.zero) { case (sum, unlock, index) =>
+        val sameAsPrevious = index > 0 && unlockScripts(index - 1) == unlock
+        if (sameAsPrevious) {
+          Right(sum.addUnsafe(GasSchedule.txInputBaseGas))
+        } else {
+          estimateInputGas(unlock, assetScriptGasEstimator).map(_.addUnsafe(sum))
+        }
       }
 
-    inputGas.map { case (gas, _) => estimate(gas, numOutputs) }
+    inputGas.map { gas => estimate(gas, numOutputs) }
   }
 
   def estimate(inputGas: GasBox, numOutputs: Int): GasBox = {
@@ -82,12 +85,15 @@ object GasEstimation extends StrictLogging {
       script: StatefulScript,
       txScriptGasEstimator: TxScriptGasEstimator
   ): Either[String, GasBox] = {
-    txScriptGasEstimator.estimate(inputWithAssets, script)
+    if (inputWithAssets.isEmpty) {
+      Left("Insufficient funds for gas")
+    } else {
+      txScriptGasEstimator.estimate(inputWithAssets, script)
+    }
   }
 
   private[gasestimation] def estimateInputGas(
       unlockScript: UnlockScript,
-      previousGas: Option[GasBox],
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
     unlockScript match {
@@ -104,7 +110,7 @@ object GasEstimation extends StrictLogging {
           .estimate(p2sh)
           .map(GasSchedule.txInputBaseGas.addUnsafe(_))
       case UnlockScript.SameAsPrevious =>
-        previousGas.toRight("Error estimating gas for SameAsPrevious unlock script")
+        Right(GasSchedule.txInputBaseGas)
     }
   }
 }

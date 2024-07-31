@@ -48,6 +48,7 @@ import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.ralph.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -1225,6 +1226,29 @@ abstract class RestServerSpec(
       val badRequest = response.as[ApiError.BadRequest]
 
       badRequest.detail is "Invalid target string: 1234"
+    }
+  }
+
+  it should "call /contracts/call-tx-script" in {
+    val script =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |""".stripMargin
+    val bytecode = serialize(Compiler.compileTxScript(script).rightValue)
+    Post(
+      s"/contracts/call-tx-script",
+      body = s"""
+                |{
+                |  "group": 0,
+                |  "bytecode": "${Hex.toHexString(bytecode)}"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.as[CallTxScriptResult].returns is AVector[Val](ValU256(1))
     }
   }
 

@@ -54,8 +54,8 @@ object Compiler {
   ): Either[Error, (StatelessScript, AVector[String])] =
     try {
       fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
-        case Parsed.Success(script, _) =>
-          val state = State.buildFor(script)(compilerOptions)
+        case Parsed.Success((script, globalState), _) =>
+          val state = State.buildFor(script, globalState)(compilerOptions)
           Right((script.genCodeFull(state), state.getWarnings))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
@@ -100,16 +100,32 @@ object Compiler {
     }
   }
 
+  type CompileProjectResult = (
+      AVector[CompiledContract],
+      AVector[CompiledScript],
+      Ast.GlobalState[StatefulContext],
+      AVector[String]
+  )
+
   def compileProject(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript], AVector[Ast.Struct])] = {
+  ): Either[Error, CompileProjectResult] = {
     try {
       compileMultiContract(input).map { multiContract =>
-        val statefulContracts =
-          multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
-        val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
+        val (warnings0, compiled) = multiContract.genStatefulContracts()(compilerOptions)
+        val statefulContracts     = compiled.map(_._1)
+        val statefulScripts       = multiContract.genStatefulScripts()(compilerOptions)
+        val unusedGlobalConstantWarning = if (compilerOptions.ignoreUnusedConstantsWarnings) {
+          None
+        } else {
+          multiContract.globalState.getUnusedGlobalConstantsWarning()
+        }
+        val warnings1 = unusedGlobalConstantWarning match {
+          case Some(warning) => warnings0 :+ warning
+          case None          => warnings0
+        }
+        (statefulContracts, statefulScripts, multiContract.globalState, warnings1)
       }
     } catch {
       case e: Error => Left(e)
@@ -223,7 +239,8 @@ object Compiler {
     final case class Constant[Ctx <: StatelessContext](
         tpe: Type,
         value: Val,
-        instrs: Seq[Instr[Ctx]]
+        instrs: Seq[Instr[Ctx]],
+        constantDef: Ast.ConstantDefinition
     ) extends VarInfo {
       def isMutable: Boolean   = false
       def isUnused: Boolean    = false
@@ -365,63 +382,6 @@ object Compiler {
   object State {
     private[ralph] val maxVarIndex: Int = 0xff
 
-    private[ralph] def throwConstantVarDefException[Ctx <: StatelessContext](
-        expr: Ast.Expr[Ctx]
-    ) = {
-      val label = expr match {
-        case _: Ast.CreateArrayExpr[_] => "arrays"
-        case _: Ast.StructCtor[_]      => "structs"
-        case _: Ast.ContractConv[_]    => "contract instances"
-        case _: Ast.Positioned         => "other expressions"
-      }
-      val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
-      throw Error(
-        s"Expected constant value with primitive types $primitiveTypes, $label are not supported",
-        expr.sourceIndex
-      )
-    }
-
-    @scala.annotation.tailrec
-    def calcConstant[Ctx <: StatelessContext](
-        state: Compiler.State[Ctx],
-        expr: Ast.Expr[Ctx]
-    ): Val = {
-      expr match {
-        case e: Ast.Const[Ctx @unchecked] => e.v
-        case Ast.Variable(ident) =>
-          state.getConstant(ident).value
-        case Ast.ParenExpr(expr) => calcConstant(state, expr)
-        case expr: Ast.Binop[Ctx @unchecked] =>
-          calcBinOp(state, expr)
-        case expr: Ast.UnaryOp[Ctx @unchecked] =>
-          calcUnaryOp(state, expr)
-        case _ => throwConstantVarDefException(expr)
-      }
-    }
-
-    private def calcBinOp[Ctx <: StatelessContext](
-        state: Compiler.State[Ctx],
-        expr: Ast.Binop[Ctx]
-    ): Val = {
-      val left  = calcConstant(state, expr.left)
-      val right = calcConstant(state, expr.right)
-      expr.op.calc(Seq(left, right)) match {
-        case Right(value) => value
-        case Left(error)  => throw Error(error, expr.sourceIndex)
-      }
-    }
-
-    private def calcUnaryOp[Ctx <: StatelessContext](
-        state: Compiler.State[Ctx],
-        expr: Ast.UnaryOp[Ctx]
-    ): Val = {
-      val value = calcConstant(state, expr.expr)
-      expr.op.calc(Seq(value)) match {
-        case Right(value) => value
-        case Left(error)  => throw Error(error, expr.sourceIndex)
-      }
-    }
-
     // scalastyle:off cyclomatic.complexity method.length
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     // we have checked the index type(U256)
@@ -458,11 +418,11 @@ object Compiler {
       }
     }
 
-    def buildFor(script: Ast.AssetScript)(implicit
-        compilerOptions: CompilerOptions
-    ): State[StatelessContext] = {
-      val globalState = Ast.GlobalState(script.structs)
-      val funcTable   = script.funcTable(globalState)
+    def buildFor(
+        script: Ast.AssetScript,
+        globalState: Ast.GlobalState[StatelessContext]
+    )(implicit compilerOptions: CompilerOptions): State[StatelessContext] = {
+      val funcTable = script.funcTable(globalState)
       StateForScript(
         script.ident,
         mutable.HashMap.empty,
@@ -567,7 +527,8 @@ object Compiler {
       extends CallGraph
       with Warnings
       with Scope
-      with PhaseLike {
+      with PhaseLike
+      with Constants[Ctx] {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[String, VarInfo]
@@ -584,7 +545,7 @@ object Compiler {
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
-    def globalState: Ast.GlobalState
+    def globalState: Ast.GlobalState[Ctx]
     val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]
     def eventsInfo: Seq[EventInfo]
 
@@ -780,9 +741,11 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstantVariable(ident: Ast.Ident, value: Val): Unit = {
+    def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
       val sname = checkNewVariable(ident)
-      varTable(sname) = VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr))
+      assume(ident.name == sname)
+      varTable(sname) =
+        VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr), constantDef)
     }
 
     private def checkNewVariable(ident: Ast.Ident): String = {
@@ -818,7 +781,7 @@ object Compiler {
       val (varName, varInfo) = varTable.get(sname) match {
         case Some(varInfo) => (sname, varInfo)
         case None =>
-          varTable.get(name) match {
+          varTable.get(name).orElse(globalState.getConstantOpt(ident)) match {
             case Some(varInfo) => (name, varInfo)
             case None =>
               throw Error(
@@ -889,26 +852,45 @@ object Compiler {
       }
     }
 
-    def checkUnusedFields(): Unit = {
+    def checkUnusedFieldsAndConstants(): Unit = {
       val unusedVars = varTable.filter { case (name, varInfo) =>
         !varInfo.isGenerated &&
         !varInfo.isUnused &&
         !accessedVars.contains(ReadVariable(name)) &&
         !varInfo.tpe.isMapType
       }
-      val unusedConstants = mutable.ArrayBuffer.empty[String]
-      val unusedFields    = mutable.ArrayBuffer.empty[String]
+      val unusedLocalConstants = mutable.ArrayBuffer.empty[String]
+      val unusedFields         = mutable.ArrayBuffer.empty[String]
       unusedVars.foreach {
-        case (name, _: VarInfo.Constant[_])      => unusedConstants.addOne(name)
+        case (name, c: VarInfo.Constant[_]) =>
+          if (c.constantDef.origin.contains(typeId)) {
+            unusedLocalConstants.addOne(name)
+          }
         case (name, varInfo) if !varInfo.isLocal => unusedFields.addOne(name)
         case _                                   => ()
       }
-      if (unusedConstants.nonEmpty) {
-        warnUnusedConstants(typeId, unusedConstants)
+      if (unusedLocalConstants.nonEmpty) {
+        warnUnusedLocalConstants(typeId, unusedLocalConstants)
       }
       if (unusedFields.nonEmpty) {
         warnUnusedFields(typeId, unusedFields)
       }
+    }
+
+    private[ralph] def getUsedParentConstants(): Iterable[(Ast.TypeId, String)] = {
+      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, String)]
+      varTable.foreach {
+        case (name, c: VarInfo.Constant[_]) =>
+          if (accessedVars.contains(ReadVariable(name))) {
+            c.constantDef.origin match {
+              case Some(originContractId) if originContractId != typeId =>
+                used.addOne((originContractId, name))
+              case _ => ()
+            }
+          }
+        case _ => ()
+      }
+      used
     }
 
     def checkUnassignedMutableFields(): Unit = {
@@ -1141,7 +1123,7 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]],
-      globalState: Ast.GlobalState
+      globalState: Ast.GlobalState[StatelessContext]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
@@ -1235,7 +1217,7 @@ object Compiler {
       eventsInfo: Seq[EventInfo],
       methodSelectorTable: immutable.Map[(Ast.TypeId, Ast.FuncId), Boolean],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]],
-      globalState: Ast.GlobalState
+      globalState: Ast.GlobalState[StatefulContext]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {

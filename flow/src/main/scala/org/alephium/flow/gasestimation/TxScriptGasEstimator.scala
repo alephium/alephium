@@ -39,14 +39,14 @@ object TxScriptGasEstimator {
       flow: BlockFlow
   )(implicit networkConfig: NetworkConfig, config: GroupConfig, logConfig: LogConfig)
       extends TxScriptGasEstimator {
+
     def estimate(
         inputWithAssets: AVector[TxInputWithAsset],
         script: StatefulScript
     ): Either[String, GasBox] = {
-      val chainIndexOpt =
-        inputWithAssets.headOption.map(inputWithAsset =>
-          ChainIndex(inputWithAsset.input.fromGroup, inputWithAsset.input.fromGroup)
-        )
+      assume(inputWithAssets.nonEmpty)
+      val groupIndex      = inputWithAssets.head.input.fromGroup
+      val chainIndex      = ChainIndex(groupIndex, groupIndex)
       val maximalGasPerTx = getMaximalGasPerTx()
 
       def runScript(
@@ -82,9 +82,8 @@ object TxScriptGasEstimator {
       }
 
       for {
-        chainIndex <- chainIndexOpt.toRight("No UTXO found.")
-        blockEnv   <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
-        groupView  <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
+        blockEnv  <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
+        groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
         preOutputs = inputWithAssets.map(_.asset.output)
         result <- runScript(blockEnv, groupView, preOutputs)
       } yield {

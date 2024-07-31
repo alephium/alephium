@@ -1038,6 +1038,44 @@ object BuiltIn {
       retComment = "the group of the input address"
     )
 
+  val len: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
+    val name: String = "len"
+
+    def category: Category                                = Category.Utils
+    def usePreapprovedAssets: Boolean                     = false
+    def useAssetsInContract: Ast.ContractAssetsAnnotation = Ast.NotUseContractAssets
+
+    def getReturnType[C <: StatelessContext](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      inputType match {
+        case Seq(Type.FixedSizeArray(_, _)) => Seq(Type.U256)
+        case _ =>
+          throw Compiler.Error(
+            s"Expected an array, got ${quoteTypes(inputType)}",
+            inputType.headOption.flatMap(_.sourceIndex)
+          )
+      }
+    }
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      inputType match {
+        case Seq(Type.FixedSizeArray(_, size)) => Seq(ConstInstr.u256(Val.U256.unsafe(size)))
+        case _ => // dead branch
+          throw Compiler.Error(
+            s"Expected an array, got ${quoteTypes(inputType)}",
+            inputType.headOption.flatMap(_.sourceIndex)
+          )
+      }
+    }
+
+    def signature: String   = s"fn $name!(array) -> (U256)"
+    def params: Seq[String] = Seq("@param an array")
+    def returns: String     = "@returns the length of an array"
+    def doc: String         = "Get the length of an array"
+  }
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1096,7 +1134,8 @@ object BuiltIn {
     u256Max,
     i256Max,
     i256Min,
-    groupOfAddress
+    groupOfAddress,
+    len
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
@@ -1907,7 +1946,7 @@ object BuiltIn {
   def encodeFields[Ctx <: StatelessContext](
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
+      globalState: Ast.GlobalState[Ctx]
   ): Compiler.ContractFunc[Ctx] = {
     val fieldsMutability =
       fields.flatMap(arg => globalState.flattenTypeMutability(arg.tpe, arg.isMutable))

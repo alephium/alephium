@@ -2106,7 +2106,8 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       immFields         <- prepareImmFields(frame)
       _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
       contractCode      <- prepareContractCode(frame)
-      _                 <- checkInactiveInstructions(frame, contractCode)
+      // Enable the check below for new network upgrades
+//      _                 <- checkInactiveInstructions(frame, contractCode)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,

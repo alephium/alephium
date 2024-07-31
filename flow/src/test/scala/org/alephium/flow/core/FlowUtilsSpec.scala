@@ -176,7 +176,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     val to         = chainIndex.to.generateKey._2
     val txs = AVector.from(0 until txNum).map { _ =>
       val (privateKey, publicKey) = chainIndex.to.generateKey
-      addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10)))
+      val block                   = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+      addAndCheck(blockFlow, block)
+      block.coinbase.unsigned.gasAmount is minimalGas
       transfer(blockFlow, privateKey, to, ALPH.oneAlph).nonCoinbase.head
     }
 
@@ -202,12 +204,20 @@ class FlowUtilsSpec extends AlephiumSpec {
     test(HardFork.Rhone, txs0)
 
     val txs1 = prepareTxs(maximalGasPerBlockPreRhone.value / 5)
-    test(HardFork.Leman, txs1.take(5))
+    test(HardFork.Leman, txs1.take(4))
     test(HardFork.Rhone, txs1.take(1))
 
     val txs2 = prepareTxs(maximalGasPerBlock.value / 5)
     test(HardFork.Leman, txs2)
-    test(HardFork.Rhone, txs2.take(5))
+    test(HardFork.Rhone, txs2.take(4))
+
+    val txs3 = prepareTxs(maximalGasPerBlockPreRhone.subUnsafe(minimalGas).value / 5)
+    test(HardFork.Leman, txs3.take(5))
+    test(HardFork.Rhone, txs3.take(1))
+
+    val txs4 = prepareTxs(maximalGasPerBlock.subUnsafe(minimalGas).value / 5)
+    test(HardFork.Leman, txs4)
+    test(HardFork.Rhone, txs4.take(5))
   }
 
   trait CoinbaseRewardFixture extends FlowFixture {
