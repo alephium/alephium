@@ -2139,7 +2139,7 @@ class VMSpec extends AlephiumSpec with Generators {
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
 
       worldState
-        .getAssetOutputs(ByteString.empty, Int.MaxValue, (_, _) => true)
+        .getAssetOutputs(ByteString.empty, Int.MaxValue, false, (_, _) => true)
         .rightValue
         .length is numAssetOutput
       worldState

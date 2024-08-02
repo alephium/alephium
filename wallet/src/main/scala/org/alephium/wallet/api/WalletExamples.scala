@@ -128,8 +128,7 @@ trait WalletExamples extends EndpointsExamples {
             balance,
             balance.hint,
             Amount.Zero,
-            Amount.Zero.hint,
-            None
+            Amount.Zero.hint
           )
         )
       )
