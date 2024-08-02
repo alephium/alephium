@@ -30,11 +30,10 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.{LockupScript, TokenIssuance}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256, UnsecureRandom}
 
 // scalastyle:off file.size.limit
-
 class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
     config.genesisBlocks.flatMap(identity).foreach { block =>
@@ -997,17 +996,56 @@ class BlockFlowSpec extends AlephiumSpec {
       ("alephium.node.indexes.subcontract-index", "false")
     )
 
-    val (fromPriKey, _, _) = genesisKeys(0)
-    val (_, toPubKey)      = GroupIndex.unsafe(0).generateKey
-    val block              = transfer(blockFlow, fromPriKey, toPubKey, ALPH.alph(10))
-    addAndCheck(blockFlow, block)
+    def verifyTxIdIndex(lockupScript: LockupScript, block: Block) = {
+      val utxos = blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue
+      utxos.length is 1
+      val txOutputRef = utxos.head.ref
+      val txIdResult  = if (enableTxOutputRefIndex) Some(block.nonCoinbase.head.id) else None
+      blockFlow.getTxIdFromOutputRef(txOutputRef) isE txIdResult
+    }
 
-    val utxos = blockFlow.getUTXOs(LockupScript.p2pkh(toPubKey), Int.MaxValue, true).rightValue
-    utxos.length is 1
+    val tokenContract =
+      s"""
+         |Contract Token() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw(address: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
+         |  }
+         |}
+         |""".stripMargin
 
-    val txOutputRef = utxos.head.ref
-    val txIdResult  = if (enableTxOutputRefIndex) Some(block.nonCoinbase.head.id) else None
-    blockFlow.getTxIdFromOutputRef(txOutputRef.asInstanceOf[AssetOutputRef]) isE txIdResult
+    def callContract(contractId: ContractId) = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  let token = Token(#${contractId.toHexString})
+           |  token.withdraw(@${genesisAddress.toBase58}, 1024)
+           |}
+           |
+           |$tokenContract
+           |""".stripMargin
+      )
+    }
+
+    val (fromPriKey, fromPubKey, _) = genesisKeys(0)
+    val (_, toPubKey)               = GroupIndex.unsafe(0).generateKey
+    val genesisAddress              = Address.p2pkh(fromPubKey)
+
+    val transferBlock = transfer(blockFlow, fromPriKey, toPubKey, ALPH.alph(10))
+    addAndCheck(blockFlow, transferBlock)
+    verifyTxIdIndex(LockupScript.p2pkh(toPubKey), transferBlock)
+
+    val (contractId, _, contractCreationblock) = createContract(
+      tokenContract,
+      AVector.empty,
+      AVector.empty,
+      tokenIssuanceInfo = Some(TokenIssuance.Info(1024)),
+      chainIndex = ChainIndex.unsafe(0)
+    )
+    verifyTxIdIndex(LockupScript.p2c(contractId), contractCreationblock)
+
+    val withdrawBlock = callContract(contractId)
+    verifyTxIdIndex(LockupScript.p2c(contractId), withdrawBlock)
   }
 
   it should "not store txOutputRef index when it is disabled" in new TxOutputRefIndexFixture {

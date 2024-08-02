@@ -187,7 +187,15 @@ object NodeIndexesConfig {
 final case class NodeIndexesConfig(
     txOutputRefIndex: Boolean,
     subcontractIndex: Boolean
-)
+) {
+  def toTxOutputRefIndexConfig(txId: TransactionId): TxOutputRefIndexConfig = {
+    if (txOutputRefIndex) {
+      TxOutputRefIndexConfig.Enabled(txId)
+    } else {
+      TxOutputRefIndexConfig.Disabled
+    }
+  }
+}
 
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
@@ -455,7 +463,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         initialMutFields,
         outputRef,
         contractOutput,
-        getHardFork().isLemanEnabled()
+        getHardFork().isLemanEnabled(),
+        nodeIndexesConfig.toTxOutputRefIndexConfig(txId)
       )
 
     result match {
@@ -506,7 +515,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
     for {
       _ <- markAssetFlushed(contractId)
       _ <- worldState
-        .updateContract(contractId, outputRef, output)
+        .updateContract(
+          contractId,
+          outputRef,
+          output,
+          nodeIndexesConfig.toTxOutputRefIndexConfig(txId)
+        )
         .left
         .map(e => Left(IOErrorUpdateState(e)))
     } yield ()

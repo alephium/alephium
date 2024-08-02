@@ -736,16 +736,11 @@ trait EndpointsLogic extends Endpoints {
   val getTxIdFromOutputRefLogic = serverLogicRedirect(getTxIdFromOutputRef)(
     { case outputRef =>
       Future.successful {
-        for {
-          assetOutputRef <- outputRef.toAssetOutputRef()
-          result         <- serverUtils.getTxIdFromOutputRef(blockFlow, assetOutputRef)
-        } yield result
+        serverUtils.getTxIdFromOutputRef(blockFlow, outputRef.toTxOutputRef())
       }
     },
     { case outputRef =>
-      for {
-        assetOutputRef <- outputRef.toAssetOutputRef()
-      } yield Some(assetOutputRef.hint.groupIndex)
+      Right(Some(Hint.unsafe(outputRef.hint).groupIndex))
     }
   )
 

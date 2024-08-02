@@ -901,10 +901,10 @@ abstract class RestServerSpec(
     }
 
     Get(s"/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
-      response.code is StatusCode.BadRequest
-      response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        "Expect asset output ref, got contract output ref instead"
-      )
+      response.code is StatusCode.NotFound
+      response
+        .as[ApiError.NotFound]
+        .resource is s"Transaction id for output ref ${contractOutputRef.key.value.toHexString}"
     }
   }
 
@@ -1421,7 +1421,9 @@ trait RestServerFixture
     Map[String, Any](
       ("alephium.broker.broker-num", nbOfNodes),
       ("alephium.api.api-key-enabled", apiKeyEnabled),
-      ("alephium.api.default-utxos-limit", utxosLimit)
+      ("alephium.api.default-utxos-limit", utxosLimit),
+      ("alephium.node.indexes.tx-output-ref-index", true),
+      ("alephium.node.indexes.subcontract-index", true)
     ) ++ apiKey
       .map(key => Map(("alephium.api.api-key", key.value)))
       .getOrElse(Map.empty)

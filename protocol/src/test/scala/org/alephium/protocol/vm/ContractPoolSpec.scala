@@ -73,7 +73,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
           fields(immFieldLength),
           fields(mutFieldLength),
           outputRef,
-          output
+          output,
+          TxOutputRefIndexConfig.Disabled
         ) isE ()
       pool.worldState.getContractObj(contractId) isE
         contract
@@ -235,7 +236,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       StatefulContract.forSMT,
       AVector.empty,
       outputRef,
-      output
+      output,
+      TxOutputRefIndexConfig.Disabled
     ) isE ()
 
     pool.gasRemaining is initialGas

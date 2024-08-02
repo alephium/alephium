@@ -207,7 +207,7 @@ class VMSpec extends AlephiumSpec with Generators {
           networkConfig.getHardFork(TimeStamp.now())
         )
     ): (ContractId, ContractOutputRef) = {
-      val (contractId, contractOutputRef) =
+      val (contractId, contractOutputRef, _) =
         createContract(
           input,
           initialImmState,
@@ -557,7 +557,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
+    val (barContractId, _, _) =
+      createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
     getContractAsset(barContractId).amount is minimalAlphInContract * 2
 
     val foo =
@@ -570,7 +571,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$bar
          |""".stripMargin
-    val (fooContractId, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
+    val (fooContractId, _, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
     getContractAsset(fooContractId).amount is minimalAlphInContract
 
     val script =
@@ -2770,7 +2771,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def success(contract: String) = {
-      val (contractId, contractOutputRef) =
+      val (contractId, contractOutputRef, _) =
         createContract(contract, AVector.empty, AVector(Val.U256(0)))
       val contractIdHex = contractId.toHexString
       checkContractState(contractIdHex, contract, contractOutputRef, true)
@@ -4509,7 +4510,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val (fooId, fooOutputRef) = createContract(foo)
+    val (fooId, fooOutputRef, _) = createContract(foo)
 
     val script =
       s"""
@@ -4573,7 +4574,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val tokenIssuanceInfo = TokenIssuance.Info(Val.U256(U256.unsafe(1024)), Some(genesisLockup))
-    val (fooId, _)        = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
+    val (fooId, _, _)     = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
     val fooAddress        = Address.contract(fooId)
 
     def barCode(assertStmt: String): String = {
@@ -4602,8 +4603,8 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def verifyTransferToken(func: String, assertValue: String) = {
-      val bar        = barCode(s"$func!(foo) == $assertValue")
-      val (barId, _) = createContract(bar)
+      val bar           = barCode(s"$func!(foo) == $assertValue")
+      val (barId, _, _) = createContract(bar)
       val script =
         s"""
            |TxScript Main {
@@ -4829,7 +4830,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$fooV0
          |""".stripMargin
-    val (foo0ContractId, _) = createContract(foo0)
+    val (foo0ContractId, _, _) = createContract(foo0)
 
     val foo =
       s"""
@@ -4853,7 +4854,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$fooV1
          |""".stripMargin
-    val (foo1ContractId, _) = createContract(foo1)
+    val (foo1ContractId, _, _) = createContract(foo1)
     val script =
       s"""
          |TxScript Main {

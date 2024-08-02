@@ -105,7 +105,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         mutFields,
         contractOutputRef,
         contractOutput,
-        isLemanFork
+        isLemanFork,
+        TxOutputRefIndexConfig.Disabled
       )
     }
     worldState.getContractObj(contractId) isE contractObj
@@ -126,7 +127,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         newState,
         contractOutputRef1,
         contractOutput1,
-        isLemanFork
+        isLemanFork,
+        TxOutputRefIndexConfig.Disabled
       )
     )
     checkCode(worldState, isLemanFork, code, 2)
@@ -192,7 +194,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       code,
       mutFields,
       contractOutputRef,
-      contractOutput
+      contractOutput,
+      TxOutputRefIndexConfig.Disabled
     ) isE ()
     val newWorldState = cached.persist().rightValue
     newWorldState.getContractObj(contractId).isRight is true
@@ -216,7 +219,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       AVector.empty,
       mutFields,
       contractOutputRef,
-      contractOutput
+      contractOutput,
+      TxOutputRefIndexConfig.Disabled
     ) isE ()
     val oldWorldState = cached.persist().rightValue
     val oldContractState =
@@ -303,7 +307,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       mutFields,
       contractOutputRef,
       contractOutput,
-      isLemanFork
+      isLemanFork,
+      TxOutputRefIndexConfig.Disabled
     ) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true

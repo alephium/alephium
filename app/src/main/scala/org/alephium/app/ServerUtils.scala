@@ -1297,7 +1297,7 @@ class ServerUtils(implicit
 
   def getTxIdFromOutputRef(
       blockFlow: BlockFlow,
-      outputRef: AssetOutputRef
+      outputRef: TxOutputRef
   ): Try[TransactionId] = {
     for {
       _ <- Either.cond(
@@ -1479,9 +1479,9 @@ class ServerUtils(implicit
     for {
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _          <- testContract.existingContracts.foreachE(createContract(worldState, _))
-      _          <- createContract(worldState, contractId, testContract)
-      method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, testContract.txId))
+      _ <- createContract(worldState, contractId, testContract)
+      method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       executionResultPair <- executeContractMethod(
         worldState,
         groupIndex,
@@ -1787,7 +1787,8 @@ class ServerUtils(implicit
 
   def createContract(
       worldState: WorldState.Staging,
-      existingContract: ContractState
+      existingContract: ContractState,
+      txId: TransactionId
   ): Try[Unit] = {
     createContract(
       worldState,
@@ -1795,7 +1796,8 @@ class ServerUtils(implicit
       existingContract.bytecode,
       toVmVal(existingContract.immFields),
       toVmVal(existingContract.mutFields),
-      existingContract.asset
+      existingContract.asset,
+      nodeIndexesConfig.toTxOutputRefIndexConfig(txId)
     )
   }
 
@@ -1810,7 +1812,8 @@ class ServerUtils(implicit
       testContract.code,
       toVmVal(testContract.initialImmFields),
       toVmVal(testContract.initialMutFields),
-      testContract.initialAsset
+      testContract.initialAsset,
+      nodeIndexesConfig.toTxOutputRefIndexConfig(testContract.txId)
     )
   }
 
@@ -1820,10 +1823,12 @@ class ServerUtils(implicit
       code: StatefulContract,
       initialImmState: AVector[vm.Val],
       initialMutState: AVector[vm.Val],
-      asset: AssetState
+      asset: AssetState,
+      indexConfig: TxOutputRefIndexConfig
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
+
     wrapResult(
       worldState.createContractLemanUnsafe(
         contractId,
@@ -1831,7 +1836,8 @@ class ServerUtils(implicit
         initialImmState,
         initialMutState,
         outputRef,
-        output
+        output,
+        indexConfig
       )
     )
   }

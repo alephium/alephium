@@ -71,7 +71,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         code,
         mutFields,
         contractOutputRef,
-        contractOutput
+        contractOutput,
+        TxOutputRefIndexConfig.Disabled
       )
       contractId
     }

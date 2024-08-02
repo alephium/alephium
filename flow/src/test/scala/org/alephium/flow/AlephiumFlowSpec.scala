@@ -862,7 +862,7 @@ trait FlowFixture
       tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
       initialAttoAlphAmount: U256 = minimalAlphInContract,
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
-  ): (ContractId, ContractOutputRef) = {
+  ): (ContractId, ContractOutputRef, Block) = {
     val contract = Compiler.compileContract(input).rightValue
     createCompiledContract(
       contract,
@@ -881,7 +881,7 @@ trait FlowFixture
       tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
       initialAttoAlphAmount: U256 = minimalAlphInContract,
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
-  ): (ContractId, ContractOutputRef) = {
+  ): (ContractId, ContractOutputRef, Block) = {
     val genesisLockup = getGenesisLockupScript(chainIndex)
     val txScript =
       contractCreation(
@@ -904,7 +904,7 @@ trait FlowFixture
     deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
       .toContract() isE contract
     addAndCheck(blockFlow, block)
-    (contractId, contractOutputRef)
+    (contractId, contractOutputRef, block)
   }
 
   def callTxScript(

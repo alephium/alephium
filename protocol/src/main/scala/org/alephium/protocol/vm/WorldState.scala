@@ -149,13 +149,22 @@ trait WorldState[T, R1, R2, R3] {
       mutFields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput,
-      isLemanActivated: Boolean
+      isLemanActivated: Boolean,
+      indexConfig: TxOutputRefIndexConfig
   ): IOResult[T] = {
     if (isLemanActivated) {
-      createContractLemanUnsafe(contractId, code, immFields, mutFields, outputRef, output)
+      createContractLemanUnsafe(
+        contractId,
+        code,
+        immFields,
+        mutFields,
+        outputRef,
+        output,
+        indexConfig
+      )
     } else {
       assume(immFields.isEmpty)
-      createContractLegacyUnsafe(contractId, code, mutFields, outputRef, output)
+      createContractLegacyUnsafe(contractId, code, mutFields, outputRef, output, indexConfig)
     }
   }
 
@@ -164,7 +173,8 @@ trait WorldState[T, R1, R2, R3] {
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
-      output: ContractOutput
+      output: ContractOutput,
+      indexConfig: TxOutputRefIndexConfig
   ): IOResult[T]
 
   def createContractLemanUnsafe(
@@ -173,7 +183,8 @@ trait WorldState[T, R1, R2, R3] {
       immFields: AVector[Val],
       mutFields: AVector[Val],
       outputRef: ContractOutputRef,
-      output: ContractOutput
+      output: ContractOutput,
+      indexConfig: TxOutputRefIndexConfig
   ): IOResult[T]
 
   def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[T]
@@ -181,7 +192,8 @@ trait WorldState[T, R1, R2, R3] {
   def updateContract(
       key: ContractId,
       outputRef: ContractOutputRef,
-      output: ContractOutput
+      output: ContractOutput,
+      indexConfig: TxOutputRefIndexConfig
   ): IOResult[T]
 
   protected[vm] def updateContract(key: ContractId, state: ContractStorageState): IOResult[T]
@@ -266,7 +278,8 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
   def updateContract(
       key: ContractId,
       outputRef: ContractOutputRef,
-      output: ContractOutput
+      output: ContractOutput,
+      indexConfig: TxOutputRefIndexConfig
   ): IOResult[Unit]
 }
 
@@ -355,15 +368,10 @@ object WorldState {
         indexConfig: TxOutputRefIndexConfig
     ): IOResult[Persisted] = {
       for {
-        updateOutputState <- outputState.put(outputRef, output)
-        _ <- indexConfig match {
-          case TxOutputRefIndexConfig.Enabled(txId) =>
-            txOutputRefIndexState.put(outputRef.key, txId)
-          case TxOutputRefIndexConfig.Disabled => Right(())
-        }
+        updatedOutputState <- updateOutputState(outputRef, output, indexConfig)
       } yield {
         Persisted(
-          updateOutputState,
+          updatedOutputState,
           contractState,
           contractImmutableState,
           codeState,
@@ -379,11 +387,12 @@ object WorldState {
         code: StatefulContract.HalfDecoded,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Persisted] = {
       val state = ContractLegacyState.unsafe(code, fields, outputRef)
       for {
-        newOutputState   <- outputState.put(outputRef, output)
+        newOutputState   <- updateOutputState(outputRef, output, indexConfig)
         newContractState <- contractState.put(contractId, state)
         recordOpt        <- codeState.getOpt(code.hash)
         newCodeState     <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
@@ -404,11 +413,12 @@ object WorldState {
         immFields: AVector[Val],
         mutFields: AVector[Val],
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Persisted] = {
       val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
       for {
-        newOutputState   <- outputState.put(outputRef, output)
+        newOutputState   <- updateOutputState(outputRef, output, indexConfig)
         newContractState <- contractState.put(contractId, state.mutable)
         _ <- contractImmutableState.put(state.mutable.immutableStateHash, Left(state.immutable))
         _ <- contractImmutableState.put(state.codeHash, Right(code))
@@ -445,11 +455,12 @@ object WorldState {
     def updateContract(
         key: ContractId,
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Persisted] = {
       for {
         state            <- getContractState(key)
-        newOutputState   <- outputState.put(outputRef, output)
+        newOutputState   <- updateOutputState(outputRef, output, indexConfig)
         newContractState <- _updateContract(key, state.updateOutputRef(outputRef))
       } yield Persisted(
         newOutputState,
@@ -519,6 +530,21 @@ object WorldState {
 
     def toHashes: WorldState.Hashes =
       WorldState.Hashes(outputState.rootHash, contractState.rootHash, codeState.rootHash)
+
+    private def updateOutputState(
+        outputRef: TxOutputRef,
+        output: TxOutput,
+        indexConfig: TxOutputRefIndexConfig
+    ): IOResult[SparseMerkleTrie[TxOutputRef, TxOutput]] = {
+      for {
+        updateOutputState <- outputState.put(outputRef, output)
+        _ <- indexConfig match {
+          case TxOutputRefIndexConfig.Enabled(txId) =>
+            txOutputRefIndexState.put(outputRef.key, txId)
+          case TxOutputRefIndexConfig.Disabled => Right(())
+        }
+      } yield updateOutputState
+    }
   }
 
   sealed abstract class AbstractCached extends MutableWorldState {
@@ -549,11 +575,12 @@ object WorldState {
         code: StatefulContract.HalfDecoded,
         mutFields: AVector[Val],
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Unit] = {
       val state = ContractLegacyState.unsafe(code, mutFields, outputRef)
       for {
-        _         <- outputState.put(outputRef, output)
+        _         <- addAsset(outputRef, output, indexConfig)
         _         <- contractState.put(contractId, state)
         recordOpt <- codeState.getOpt(code.hash)
         _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
@@ -566,11 +593,12 @@ object WorldState {
         immFields: AVector[Val],
         mutFields: AVector[Val],
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Unit] = {
       val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
       for {
-        _ <- outputState.put(outputRef, output)
+        _ <- addAsset(outputRef, output, indexConfig)
         _ <- contractState.put(contractId, state.mutable)
         _ <- contractImmutableState.put(state.mutable.immutableStateHash, Left(state.immutable))
         _ <- contractImmutableState.put(state.codeHash, Right(code))
@@ -584,11 +612,12 @@ object WorldState {
     def updateContract(
         key: ContractId,
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        indexConfig: TxOutputRefIndexConfig
     ): IOResult[Unit] = {
       for {
         state <- getContractState(key)
-        _     <- outputState.put(outputRef, output)
+        _     <- addAsset(outputRef, output, indexConfig)
         _     <- updateContract(key, state.updateOutputRef(outputRef))
       } yield ()
     }
