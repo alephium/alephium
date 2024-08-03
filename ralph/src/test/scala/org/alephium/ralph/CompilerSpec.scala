@@ -64,9 +64,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val endIndex   = index(newCode)
     val error      = f(replace(newCode)).leftValue
 
+    error.message is message
     error.position is startIndex
     error.foundLength is (endIndex - startIndex)
-    error.message is message
 
     error
   }
@@ -7817,6 +7817,98 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       testContractError(code, "Invalid array size, expected a constant U256 value")
+    }
+  }
+
+  it should "calculate the correct scope for variables" in {
+    {
+      info("If statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      let mut a = 1
+           |    }
+           |    $$a$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("If-else statement")
+      val code =
+        s"""
+           |Contract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      let mut a = 1
+           |    } else {
+           |      $$a$$ = 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("Nested if-else")
+      val code =
+        s"""
+           |Contract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      if (false) {
+           |        assert!(1 == 2, 0)
+           |      } else {
+           |        let mut a = 1
+           |      }
+           |      $$a$$ = 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("While statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    while (true) {
+           |      let mut a = 1
+           |    }
+           |    $$a$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("While statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    for (let mut i = 1; i < 5; i = i + 1) {
+           |      i = i + 1
+           |    }
+           |    $$i$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.i is not defined in the current scope")
     }
   }
 }
