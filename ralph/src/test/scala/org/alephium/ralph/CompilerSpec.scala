@@ -7895,7 +7895,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("While statement")
+      info("For statement")
       val code =
         s"""
            |Contract Foo() {

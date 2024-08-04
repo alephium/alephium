@@ -813,12 +813,14 @@ object Compiler {
 
     def checkVariableScope(sname: String, ident: Ast.Ident, varInfo: VarInfo): Unit = {
       val checkKey = sname -> ident.sourceIndex
-      if (!variableScopeChecked.contains(checkKey)) {
+      if (phase == Phase.Check && !variableScopeChecked.contains(checkKey)) {
         variableScopeChecked += checkKey
-        varInfo.getVariableScope().foreach { variableScope =>
-          if (!variableScope.include(this.variableScope)) {
-            throw Error(s"Variable $sname is not defined in the current scope", ident.sourceIndex)
-          }
+        varInfo.getVariableScope() match {
+          case Some(variableScope) =>
+            if (!variableScope.include(this.variableScope)) {
+              throw Error(s"Variable $sname is not defined in the current scope", ident.sourceIndex)
+            }
+          case None => ()
         }
       }
     }
