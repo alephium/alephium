@@ -1402,7 +1402,19 @@ class ServerUtils(implicit
         failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
       )
     } else {
-      Right(MultipleCallContractResult(params.calls.map(call => callContract(blockFlow, call))))
+      val bestDepss = blockFlow.brokerConfig.groupRange.map(group =>
+        blockFlow.getBestDeps(GroupIndex.unsafe(group))
+      )
+      params.calls
+        .mapE { call =>
+          call.validate().map { groupIndex =>
+            val blockHash = call.worldStateBlockHash.getOrElse(
+              bestDepss(groupIndex.value).uncleHash(groupIndex)
+            )
+            callContract(blockFlow, call.copy(worldStateBlockHash = Some(blockHash)))
+          }
+        }
+        .flatMap(results => Right(MultipleCallContractResult(results)))
     }
   }
 

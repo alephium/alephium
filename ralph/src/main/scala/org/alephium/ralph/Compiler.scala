@@ -196,6 +196,13 @@ object Compiler {
     def isUnused: Boolean
     def isGenerated: Boolean
     def isLocal: Boolean
+
+    def getVariableScope(): Option[VariableScope] = {
+      this match {
+        case variable: VarInfo.Local => Some(variable.variableScope)
+        case _                       => None
+      }
+    }
   }
   object VarInfo {
     final case class Local(
@@ -203,7 +210,8 @@ object Compiler {
         isMutable: Boolean,
         isUnused: Boolean,
         index: Byte,
-        isGenerated: Boolean
+        isGenerated: Boolean,
+        variableScope: VariableScope
     ) extends VarInfo {
       def isLocal: Boolean = true
     }
@@ -485,6 +493,7 @@ object Compiler {
 
   trait CallGraph {
     def currentScope: Ast.FuncId
+    def variableScope: VariableScope
 
     // caller -> callees
     val internalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[Ast.FuncId]]
@@ -527,6 +536,7 @@ object Compiler {
       extends CallGraph
       with Warnings
       with Scope
+      with VariableScoped
       with PhaseLike
       with Constants[Ctx] {
     def typeId: Ast.TypeId
@@ -579,7 +589,7 @@ object Compiler {
         isLocal = true,
         isGenerated = true,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local(_, _, _, _, _, variableScope)
       )
       val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
       (ref, codes)
@@ -696,7 +706,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local(_, _, _, _, _, variableScope)
       )
     }
     // scalastyle:off parameter.number
@@ -712,6 +722,7 @@ object Compiler {
         varInfoBuilder: Compiler.VarInfoBuilder
     ): Unit = {
       val sname = checkNewVariable(ident)
+      variableScopeChecked += sname -> ident.sourceIndex
       tpe match {
         case tpe: Type.NamedType => // this should never happen
           throw Error(s"Unresolved named type $tpe", ident.sourceIndex)
@@ -795,7 +806,23 @@ object Compiler {
       } else {
         currentScopeAccessedVars.add(ReadVariable(varName))
       }
+
+      checkVariableScope(sname, ident, varInfo)
       varInfo
+    }
+
+    def checkVariableScope(sname: String, ident: Ast.Ident, varInfo: VarInfo): Unit = {
+      val checkKey = sname -> ident.sourceIndex
+      if (phase == Phase.Check && !variableScopeChecked.contains(checkKey)) {
+        variableScopeChecked += checkKey
+        varInfo.getVariableScope() match {
+          case Some(variableScope) =>
+            if (!variableScope.include(this.variableScope)) {
+              throw Error(s"Variable $sname is not defined in the current scope", ident.sourceIndex)
+            }
+          case None => ()
+        }
+      }
     }
 
     def addAccessedVars(vars: Set[AccessVariable]): Unit = accessedVars.addAll(vars)

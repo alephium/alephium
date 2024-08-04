@@ -1772,8 +1772,12 @@ object Ast {
       with Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       ifBranches.foreach(_.checkCondition(state))
-      ifBranches.foreach(_.body.foreach(_.check(state)))
-      elseBranchOpt.foreach(_.body.foreach(_.check(state)))
+      ifBranches.foreach { ifBranch =>
+        state.withScope(ifBranch) { ifBranch.body.foreach(_.check(state)) }
+      }
+      elseBranchOpt.foreach { elseBranch =>
+        state.withScope(elseBranch) { elseBranch.body.foreach(_.check(state)) }
+      }
     }
     def reset(): Unit = {
       ifBranches.foreach(_.reset())
@@ -1784,7 +1788,7 @@ object Ast {
       condition: Expr[Ctx],
       body: Seq[Statement[Ctx]]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit = {
+    override def check(state: Compiler.State[Ctx]): Unit = state.withScope(this) {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of conditional expr ${quote(condition)}", sourceIndex)
       }
@@ -1812,7 +1816,7 @@ object Ast {
       update: Statement[Ctx],
       body: Seq[Statement[Ctx]]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit = {
+    override def check(state: Compiler.State[Ctx]): Unit = state.withScope(this) {
       initialize.check(state)
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid condition type: $condition", sourceIndex)
