@@ -43,6 +43,7 @@ trait Scope { self: Compiler.State[_] =>
 
   def setFuncScope(funcId: Ast.FuncId): Unit = {
     currentScopeAccessedVars.clear()
+    variableScopeChecked.clear()
     scopes.get(funcId) match {
       case Some(scopeState) =>
         currentScope = funcId
