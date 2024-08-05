@@ -34,6 +34,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.Compiler
@@ -3803,7 +3804,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     // Transfer ALPH
-    (1 to 3).foreach { _ =>
+    (1 to 4).foreach { _ =>
       val block = transfer(blockFlow, genesisPrivateKey, testPublicKey, dustUtxoAmount * 2)
       addAndCheck(blockFlow, block)
     }
@@ -3835,33 +3836,57 @@ class ServerUtilsSpec extends AlephiumSpec {
     buildExecuteScriptTx(dustUtxoAmount * 2, 10).rightValue
     buildExecuteScriptTx(dustUtxoAmount * 2, 1000).rightValue
     buildExecuteScriptTx(dustUtxoAmount, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount, 1000).rightValue
     buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 1000).rightValue
     buildExecuteScriptTx(U256.Zero, 10).rightValue
+    buildExecuteScriptTx(U256.Zero, 1000).rightValue
   }
 
   it should "consider dustUtxoAmount for outputs when building transfer tx" in new VerifyTxOutputFixture {
-    def buildTransferTx(alphAmount: U256) = {
-      serverUtils
-        .buildTransaction(
+    def verifyBuildTransferTx(alphAmount: U256) = {
+      val unsignedTx = serverUtils
+        .prepareUnsignedTransaction(
           blockFlow,
-          BuildTransaction(
-            fromPublicKey = genesisPublicKey.bytes,
-            destinations = AVector(
-              Destination(
-                address = Address.Asset(testLockupScript),
-                attoAlphAmount = Amount(alphAmount),
-                tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
-              )
+          LockupScript.p2pkh(genesisPublicKey),
+          UnlockScript.p2pkh(genesisPublicKey),
+          outputRefsOpt = None,
+          destinations = AVector(
+            Destination(
+              address = Address.Asset(testLockupScript),
+              attoAlphAmount = Amount(alphAmount),
+              tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
             )
-          )
+          ),
+          gasOpt = None,
+          gasPrice = nonCoinbaseMinGasPrice,
+          targetBlockHashOpt = None
         )
+        .rightValue
+
+      AVector(
+        model.AssetOutput(
+          dustUtxoAmount,
+          testLockupScript,
+          TimeStamp.zero,
+          AVector(tokenId -> 10),
+          ByteString.empty
+        ),
+        model.AssetOutput(
+          dustUtxoAmount,
+          LockupScript.p2pkh(genesisPublicKey),
+          TimeStamp.zero,
+          AVector(tokenId -> 90),
+          ByteString.empty
+        )
+      ).forall(unsignedTx.fixedOutputs.contains) is true
     }
 
-    buildTransferTx(U256.Zero).rightValue
-    buildTransferTx(dustUtxoAmount.subUnsafe(1)).rightValue
-    buildTransferTx(dustUtxoAmount).rightValue
-    buildTransferTx(dustUtxoAmount.addUnsafe(1)).rightValue
-    buildTransferTx(dustUtxoAmount.mulUnsafe(10)).rightValue
+    verifyBuildTransferTx(U256.Zero)
+    verifyBuildTransferTx(dustUtxoAmount.subUnsafe(1))
+    verifyBuildTransferTx(dustUtxoAmount)
+    verifyBuildTransferTx(dustUtxoAmount.addUnsafe(1))
+    verifyBuildTransferTx(dustUtxoAmount.mulUnsafe(10))
   }
 
   @scala.annotation.tailrec
