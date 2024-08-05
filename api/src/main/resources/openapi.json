@@ -11882,6 +11882,9 @@
           },
           "ignoreCheckExternalCallerWarnings": {
             "type": "boolean"
+          },
+          "ignoreUnusedFunctionReturnWarnings": {
+            "type": "boolean"
           }
         }
       },
