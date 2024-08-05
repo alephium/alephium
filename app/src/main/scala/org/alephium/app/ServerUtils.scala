@@ -1089,7 +1089,7 @@ class ServerUtils(implicit
     val estimatedTxOutputsLength = tokens.length + 1
     // Allocate extra dust amounts for potential fixed outputs as well as generated outputs
     val estimatedTotalDustAmount =
-      dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength)).mulUnsafe(U256.unsafe(2))
+      dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength * 2))
 
     for {
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
