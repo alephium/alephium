@@ -689,9 +689,11 @@ class ServerUtils(implicit
           AVector.empty[(TokenId, U256)]
       }
 
+      val tokensDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokensInfo.length))
+
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.attoAlphAmount.value,
+        Math.max(destination.attoAlphAmount.value, tokensDustAmount),
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -1094,16 +1096,23 @@ class ServerUtils(implicit
       gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[Selected] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
-    val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
+    val estimatedTxOutputsLength = tokens.length + 1
+    // Allocate extra dust amounts for potential fixed outputs as well as generated outputs
+    val estimatedTotalDustAmount =
+      dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength * 2))
+
     for {
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
+      totalSelectAmount <- amount
+        .add(estimatedTotalDustAmount)
+        .toRight(failed("ALPH amount overflow"))
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
           .Build(
             ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
           )
           .select(
-            AssetAmounts(amount, tokens),
+            AssetAmounts(totalSelectAmount, tokens),
             fromUnlockScript,
             allUtxos,
             txOutputsLength = estimatedTxOutputsLength,

@@ -34,6 +34,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.Compiler
@@ -3770,6 +3771,133 @@ class ServerUtilsSpec extends AlephiumSpec {
     val block1 = submitTx(tx1)
     block1.nonCoinbase.head.scriptExecutionOk is true
     addAndCheck(blockFlow, block1)
+  }
+
+  trait VerifyTxOutputFixture extends ContractFixture {
+    val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val (_, testPublicKey)                       = chainIndex.from.generateKey
+    val testLockupScript                         = LockupScript.p2pkh(testPublicKey)
+    val genesisLockupScript                      = lockupScript
+
+    val tokenCode =
+      s"""
+         |Contract Token() {
+         |  pub fn supply() -> () {}
+         |}
+         |""".stripMargin
+    val tokenContract = Compiler.compileContract(tokenCode).rightValue
+    val tokenIssuance = TokenIssuance.Info(vm.Val.U256(100), Some(genesisLockupScript))
+    val contractCreationScript = contractCreation(
+      tokenContract,
+      AVector.empty,
+      AVector.empty,
+      genesisLockupScript,
+      minimalAlphInContract,
+      Some(tokenIssuance)
+    )
+    val tokenIssuanceBlock = payableCall(blockFlow, chainIndex, contractCreationScript)
+    addAndCheck(blockFlow, tokenIssuanceBlock)
+    val tokenId =
+      TokenId.from(ContractId.from(tokenIssuanceBlock.transactions.head.id, 0, chainIndex.from))
+  }
+
+  it should "consider dustUtxoAmount for outputs when building execute script tx" in new VerifyTxOutputFixture {
+    // Transfer tokens
+    (1 to 8).foreach { _ =>
+      val block = transfer(
+        blockFlow,
+        genesisPrivateKey,
+        testLockupScript,
+        tokens = AVector((tokenId, 10)),
+        dustUtxoAmount
+      )
+      addAndCheck(blockFlow, block)
+    }
+
+    // Transfer ALPH
+    (1 to 4).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, testPublicKey, dustUtxoAmount * 2)
+      addAndCheck(blockFlow, block)
+    }
+
+    def buildExecuteScriptTx(approvedAlphAmount: U256, iterations: Int) = {
+      val script = s"""
+                      |TxScript Main {
+                      |  let mut sum = 0
+                      |  for(let mut i = 0; i < ${iterations}; i = i + 1) {
+                      |    sum = sum + 1
+                      |  }
+                      |}
+                      |""".stripMargin
+
+      val scriptBytecode = serialize(Compiler.compileTxScript(script).rightValue)
+
+      serverUtils
+        .buildExecuteScriptTx(
+          blockFlow,
+          BuildExecuteScriptTx(
+            fromPublicKey = testPublicKey.bytes,
+            bytecode = scriptBytecode,
+            attoAlphAmount = Some(Amount(approvedAlphAmount)),
+            tokens = Some(AVector(Token(tokenId, U256.unsafe(78))))
+          )
+        )
+    }
+
+    buildExecuteScriptTx(dustUtxoAmount * 2, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount * 2, 1000).rightValue
+    buildExecuteScriptTx(dustUtxoAmount, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount, 1000).rightValue
+    buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 1000).rightValue
+    buildExecuteScriptTx(U256.Zero, 10).rightValue
+    buildExecuteScriptTx(U256.Zero, 1000).rightValue
+  }
+
+  it should "consider dustUtxoAmount for outputs when building transfer tx" in new VerifyTxOutputFixture {
+    def verifyBuildTransferTx(alphAmount: U256) = {
+      val unsignedTx = serverUtils
+        .prepareUnsignedTransaction(
+          blockFlow,
+          LockupScript.p2pkh(genesisPublicKey),
+          UnlockScript.p2pkh(genesisPublicKey),
+          outputRefsOpt = None,
+          destinations = AVector(
+            Destination(
+              address = Address.Asset(testLockupScript),
+              attoAlphAmount = Amount(alphAmount),
+              tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
+            )
+          ),
+          gasOpt = None,
+          gasPrice = nonCoinbaseMinGasPrice,
+          targetBlockHashOpt = None
+        )
+        .rightValue
+
+      AVector(
+        model.AssetOutput(
+          dustUtxoAmount,
+          testLockupScript,
+          TimeStamp.zero,
+          AVector(tokenId -> 10),
+          ByteString.empty
+        ),
+        model.AssetOutput(
+          dustUtxoAmount,
+          LockupScript.p2pkh(genesisPublicKey),
+          TimeStamp.zero,
+          AVector(tokenId -> 90),
+          ByteString.empty
+        )
+      ).forall(unsignedTx.fixedOutputs.contains) is true
+    }
+
+    verifyBuildTransferTx(U256.Zero)
+    verifyBuildTransferTx(dustUtxoAmount.subUnsafe(1))
+    verifyBuildTransferTx(dustUtxoAmount)
+    verifyBuildTransferTx(dustUtxoAmount.addUnsafe(1))
+    verifyBuildTransferTx(dustUtxoAmount.mulUnsafe(10))
   }
 
   it should "return an error if there are too many utxos" in new Fixture {
