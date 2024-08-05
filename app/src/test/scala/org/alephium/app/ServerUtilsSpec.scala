@@ -2505,6 +2505,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
     val rawCode =
       s"""
+         |const A = 0
+         |enum Error { Err0 = 0 }
+         |struct Baz { x: U256 }
          |Interface Foo {
          |  pub fn foo() -> ()
          |}
@@ -2517,9 +2520,10 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Bar(id).foo()
          |}
          |""".stripMargin
-    val (contracts, scripts, _) = Compiler.compileProject(rawCode).rightValue
-    val query                   = Compile.Project(rawCode)
-    val result                  = serverUtils.compileProject(query).rightValue
+    val (contracts, scripts, globalState, globalWarnings) =
+      Compiler.compileProject(rawCode).rightValue
+    val query  = Compile.Project(rawCode)
+    val result = serverUtils.compileProject(query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2530,6 +2534,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     scripts.length is 1
     val scriptCode = result.scripts(0).bytecodeTemplate
     scriptCode is scripts(0).code.toTemplateString()
+
+    result.structs is Some(AVector(CompileResult.StructSig.from(globalState.structs(0))))
+    result.enums is Some(AVector(CompileResult.Enum.from(globalState.enums(0))))
+    val constant = globalState.getCalculatedConstants()(0)
+    result.constants is Some(AVector(CompileResult.Constant.from(constant._1, constant._2)))
+
+    globalWarnings is AVector("Found unused global constants: A, Error.Err0")
   }
 
   it should "compile script" in new Fixture {
@@ -3887,6 +3898,59 @@ class ServerUtilsSpec extends AlephiumSpec {
     verifyBuildTransferTx(dustUtxoAmount)
     verifyBuildTransferTx(dustUtxoAmount.addUnsafe(1))
     verifyBuildTransferTx(dustUtxoAmount.mulUnsafe(10))
+  }
+
+  it should "return an error if there are too many utxos" in new Fixture {
+    def createServerUtils(utxosLimit: Int): ServerUtils = {
+      new ServerUtils()(
+        brokerConfig,
+        consensusConfigs,
+        networkConfig,
+        apiConfig.copy(defaultUtxosLimit = utxosLimit),
+        logConfig,
+        ec
+      )
+    }
+
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val (_, publicKey)            = chainIndex.from.generateKey
+    (0 until 10).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
+      addAndCheck(blockFlow, block)
+    }
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
+
+    val serverUtils0 = createServerUtils(9)
+    serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+    serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+
+    val serverUtils1 = createServerUtils(10)
+    serverUtils1
+      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .rightValue
+      .balance
+      .value is ALPH.alph(10)
+    serverUtils1
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .rightValue
+      .utxos
+      .length is 10
+
+    val serverUtils2 = createServerUtils(11)
+    serverUtils2
+      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .rightValue
+      .balance
+      .value is ALPH.alph(10)
+    serverUtils2
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .rightValue
+      .utxos
+      .length is 10
   }
 
   @scala.annotation.tailrec

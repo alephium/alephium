@@ -1946,7 +1946,7 @@ object BuiltIn {
   def encodeFields[Ctx <: StatelessContext](
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
+      globalState: Ast.GlobalState[Ctx]
   ): Compiler.ContractFunc[Ctx] = {
     val fieldsMutability =
       fields.flatMap(arg => globalState.flattenTypeMutability(arg.tpe, arg.isMutable))

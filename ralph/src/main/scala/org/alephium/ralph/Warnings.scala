@@ -45,16 +45,12 @@ trait Warnings {
     }
   }
 
-  def warnUnusedConstants(
+  def warnUnusedLocalConstants(
       typeId: Ast.TypeId,
       unusedConstants: mutable.ArrayBuffer[String]
   ): Unit = {
-    warnUnusedConstants(typeId, unusedConstants.sorted.mkString(", "))
-  }
-
-  def warnUnusedConstants(typeId: Ast.TypeId, unusedConstants: String): Unit = {
     if (!compilerOptions.ignoreUnusedConstantsWarnings) {
-      warnings += s"Found unused constants in ${typeId.name}: ${unusedConstants}"
+      warnings += Warnings.unusedLocalConstants(typeId, unusedConstants)
     }
   }
 
@@ -101,18 +97,17 @@ trait Warnings {
     }
   }
 
-  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
-      s" If this is intentional, consider using anonymous variables to suppress this warning."
-  }
-
-  def warningMutableStructField(
-      typeId: Ast.TypeId,
-      fieldId: Ast.Ident,
-      structId: Ast.TypeId
-  ): Unit = {
-    warnings +=
-      s"The struct ${structId.name} is immutable, you can remove the `mut` from ${typeId.name}.${fieldId.name}"
+  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId, retSize: Int): Unit = {
+    assume(retSize > 0)
+    if (!compilerOptions.ignoreUnusedFunctionReturnWarnings) {
+      val prefix = if (retSize == 1) {
+        "`let _ = `"
+      } else {
+        s"`let ${Seq.fill(retSize)("_").mkString("(", ", ", ")")} = `"
+      }
+      warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
+        s" Please add $prefix before the function call to explicitly ignore its return value."
+    }
   }
 }
 
@@ -120,5 +115,13 @@ object Warnings {
   def noCheckExternalCallerMsg(typeId: String, funcId: String): String = {
     s"""No external caller check for function "${typeId}.${funcId}". """ +
       s"""Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
+  }
+
+  def unusedGlobalConstants(names: Seq[String]): String = {
+    s"Found unused global constants: ${names.sorted.mkString(", ")}"
+  }
+
+  def unusedLocalConstants(typeId: Ast.TypeId, unusedConstants: collection.Seq[String]): String = {
+    s"Found unused constants in ${typeId.name}: ${unusedConstants.sorted.mkString(", ")}"
   }
 }

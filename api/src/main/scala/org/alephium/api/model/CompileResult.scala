@@ -117,21 +117,31 @@ object CompileContractResult {
 final case class CompileProjectResult(
     contracts: AVector[CompileContractResult],
     scripts: AVector[CompileScriptResult],
-    structs: Option[AVector[CompileResult.StructSig]] = None
+    structs: Option[AVector[CompileResult.StructSig]] = None,
+    constants: Option[AVector[CompileResult.Constant]] = None,
+    enums: Option[AVector[CompileResult.Enum]] = None,
+    warnings: Option[AVector[String]] = None
 )
 
 object CompileProjectResult {
   def from(
       contracts: AVector[CompiledContract],
       scripts: AVector[CompiledScript],
-      structs: AVector[Ast.Struct]
+      globalState: Ast.GlobalState[StatefulContext],
+      warnings: AVector[String]
   ): CompileProjectResult = {
     val compiledContracts = contracts.map(c => CompileContractResult.from(c))
     val compiledScripts   = scripts.map(s => CompileScriptResult.from(s))
+    val structs           = AVector.from(globalState.structs)
+    val constants         = AVector.from(globalState.getCalculatedConstants())
+    val enums             = AVector.from(globalState.enums)
     CompileProjectResult(
       compiledContracts,
       compiledScripts,
-      Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from))
+      Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from)),
+      Option.when(constants.nonEmpty)(constants.map(CompileResult.Constant.from.tupled)),
+      Option.when(enums.nonEmpty)(enums.map(CompileResult.Enum.from)),
+      Option.when(warnings.nonEmpty)(warnings)
     )
   }
 

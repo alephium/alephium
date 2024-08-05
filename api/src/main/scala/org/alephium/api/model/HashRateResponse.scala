@@ -16,4 +16,4 @@
 
 package org.alephium.api.model
 
-final case class HashRateResponse(hashrate: String) extends AnyVal
+final case class HashRateResponse(hashrate: String)

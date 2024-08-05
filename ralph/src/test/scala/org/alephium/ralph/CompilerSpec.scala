@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -64,9 +64,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val endIndex   = index(newCode)
     val error      = f(replace(newCode)).leftValue
 
+    error.message is message
     error.position is startIndex
     error.foundLength is (endIndex - startIndex)
-    error.message is message
 
     error
   }
@@ -191,8 +191,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           |3 |  event Add(a: U256, b: U256)
           |  |  ^^^^^^^^^^
           |  |  Expected "}"
-          |  |----------------------------------------------------------------------------------------------------
-          |  |Trace log: Expected multiContract:1:1 / entities:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |  |------------------------------------------------------------------------------------------------------------
+          |  |Trace log: Expected multiContract:1:1 / globalDefinition:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
           |""".stripMargin
     }
   }
@@ -555,7 +555,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         mutFields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
-      val compiled = compileContractFull(input).rightValue
+      testContract(input, args, output, immFields, mutFields, methodIndex, 0)
+    }
+
+    def testContract(
+        input: String,
+        args: AVector[Val] = AVector.empty,
+        output: AVector[Val] = AVector.empty,
+        immFields: AVector[Val] = AVector.empty,
+        mutFields: AVector[Val] = AVector.empty,
+        methodIndex: Int = 0,
+        contractIndex: Int = 0
+    ): Assertion = {
+      val compiled = compileContractFull(input, contractIndex).rightValue
       compiled.code is compiled.debugCode
       val contract = compiled.code
 
@@ -2217,7 +2229,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) implements Bar {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    approveToken!(selfAddress!(), ALPH, 1 alph)
+           |    let _ = selfAddress!()
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2234,7 +2246,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo(addr: Address) extends Bar() {
            |  $implAnnotations
            |  fn bar() -> () {
-           |    approveToken!(selfAddress!(), ALPH, 1 alph)
+           |    let _ = selfAddress!()
            |    checkCaller!(true, 0)
            |    return
            |  }
@@ -2756,7 +2768,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(useAssetsInContract: String = "false", instr: String = "return"): String =
       s"""
          |Contract Foo() {
-         |  $$@using(assetsInContract = $useAssetsInContract)
+         |  $$@using(assetsInContract = $useAssetsInContract, preapprovedAssets = true)
          |  fn foo() -> () {
          |    $instr
          |  }$$
@@ -3557,7 +3569,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
-      val (contracts, _, _) = Compiler.compileProject(code).rightValue
+      val contracts = Compiler.compileProject(code).rightValue._1
       contracts.length is 2
       contracts.foreach(_.warnings.isEmpty is true)
     }
@@ -3761,7 +3773,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(assetsInContract = true)
+           |  @using(assetsInContract = true, preapprovedAssets = true)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
            |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
@@ -3935,7 +3947,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all contracts" in new MultiContractFixture {
-    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)
+    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)._2
     contracts.length is 2
     contracts(0)._1.ast.ident.name is "Foo"
     contracts(0)._2 is 1
@@ -4672,19 +4684,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(
       "f1()",
       AVector(
-        "The return values of the function \"Foo.f1\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Foo.f1\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       )
     )
     test(
       "bar.bar0()",
       AVector(
-        "The return values of the function \"Bar.bar0\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Bar.bar0\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       )
     )
     test(
       "Bar.encodeFields!()",
       AVector(
-        "The return values of the function \"Bar.encodeFields\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Bar.encodeFields\" are not used. Please add `let (_, _) = ` before the function call to explicitly ignore its return value."
       )
     )
   }
@@ -4733,7 +4745,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(
         code,
-        "These TxScript/Contract/Interface/Struct are defined multiple times: Foo"
+        "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Foo"
       )
     }
 
@@ -4982,32 +4994,48 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Baz { a: U256 }
            |struct Qux { mut a: U256 }
            |struct Foo { x: U256, $fields }
-           |Contract Bar(mut foo: Foo) {
+           |Contract Bar($$mut foo: Foo$$) {
            |  pub fn f() -> U256 {
            |    return foo.x
            |  }
            |}
            |""".stripMargin
 
-      compileContractFull(code("y: U256")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("y: [U256; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("y: Baz")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("y: [Baz; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("mut y: Baz")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("mut y: [Baz; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("y: Qux")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("y: [Qux; 2]")).rightValue.warnings is
-        AVector("The struct Foo is immutable, you can remove the `mut` from Bar.foo")
-      compileContractFull(code("mut y: U256")).rightValue.warnings.isEmpty is true
-      compileContractFull(code("mut y: Qux")).rightValue.warnings.isEmpty is true
-      compileContractFull(code("mut y: [Qux; 2]")).rightValue.warnings.isEmpty is true
+      testContractError(
+        code("y: U256"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: [U256; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: Baz"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: [Baz; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("mut y: Baz"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("mut y: [Baz; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: Qux"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      testContractError(
+        code("y: [Qux; 2]"),
+        "The struct Foo is immutable, please remove the `mut` from Bar.foo"
+      )
+      compileContractFull(replace(code("mut y: U256"))).isRight is true
+      compileContractFull(replace(code("mut y: Qux"))).isRight is true
+      compileContractFull(replace(code("mut y: [Qux; 2]"))).isRight is true
     }
 
     {
@@ -5886,6 +5914,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |struct Foo { $mut a: [U256; $size] }
            |Contract Bar() {
            |  mapping[U256, Foo] map
+           |  @using(preapprovedAssets = true)
            |  pub fn bar(address: Address) -> () {
            |    map.insert!(address, 1, $$Foo { a: [0; $size] }$$)
            |  }
@@ -6001,9 +6030,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val updateStatements =
         Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
       updateStatements.foreach { statement =>
-        compileContractFull(code(statement)).rightValue.warnings is warnings
         compileContractFull(
-          code(statement, "@using(checkExternalCaller = false)")
+          code(statement, "@using(preapprovedAssets = true)")
+        ).rightValue.warnings is warnings
+        compileContractFull(
+          code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
         ).rightValue.warnings is AVector.empty[String]
       }
       compileContractFull(code("let _ = map[0]")).rightValue.warnings is
@@ -6609,7 +6640,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |Contract Foo() {
          |  @using(preapprovedAssets = false, assetsInContract = false, payToContractOnly = true)
          |  pub fn foo0() -> () {
-         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |    transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)
          |  }
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn foo1() -> () {
@@ -6632,7 +6663,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(payToContractOnly: String = "false", stmt: String = "return"): String =
       s"""
          |Contract Foo() {
-         |  $$@using(payToContractOnly = $payToContractOnly, checkExternalCaller = false)
+         |  $$@using(payToContractOnly = $payToContractOnly, checkExternalCaller = false, preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    $stmt
          |  }$$
@@ -6657,6 +6688,87 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code("false", stmt),
         "Function \"Foo.foo\" transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true."
       )
+    }
+  }
+
+  it should "check the preapprovedAssets annotation if the function pays to the contract" in {
+    def code(
+        annotations: String,
+        statement: String = "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)"
+    ) =
+      s"""
+         |Contract Foo() {
+         |  $$@using($annotations)
+         |  pub fn foo() -> () {
+         |    $statement
+         |  }$$
+         |}
+         |""".stripMargin
+
+    testContractError(
+      code("payToContractOnly = true"),
+      "Function \"Foo.foo\" transfers assets to the contract, please use annotation `preapprovedAssets = true`."
+    )
+    testContractError(
+      code("assetsInContract = true"),
+      "Function \"Foo.foo\" transfers assets to the contract, please use annotation `preapprovedAssets = true`."
+    )
+    Compiler
+      .compileContract(replace(code("payToContractOnly = true, preapprovedAssets = true")))
+      .isRight is true
+    Compiler
+      .compileContract(replace(code("assetsInContract = true, preapprovedAssets = true")))
+      .isRight is true
+    Compiler
+      .compileContract(
+        replace(code("payToContractOnly = true", "approveToken!(selfAddress!(), ALPH, 1 alph)"))
+      )
+      .isRight is true
+    Compiler
+      .compileContract(
+        replace(code("assetsInContract = true", "approveToken!(selfAddress!(), ALPH, 1 alph)"))
+      )
+      .isRight is true
+  }
+
+  it should "check the preapprovedAssets annotation" in {
+    def code(annotation: String, statement: String) =
+      s"""
+         |Contract Foo() {
+         |  $$@using(checkExternalCaller = false$annotation)
+         |  pub fn foo() -> () {
+         |    $statement
+         |  }$$
+         |}
+         |""".stripMargin
+
+    val tokenId = TokenId.generate.toHexString
+    val statements = Seq(
+      "approveToken!(selfAddress!(), ALPH, 1 alph)",
+      s"approveToken!(selfAddress!(), #$tokenId, 1 alph)",
+      "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)",
+      s"transferToken!(callerAddress!(), selfAddress!(), #$tokenId, 1 alph)",
+      s"burnToken!(selfAddress!(), #$tokenId, 1 alph)"
+    )
+    statements.foreach { statement =>
+      testContractError(
+        code("", statement),
+        "Function \"Foo.foo\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+      Compiler
+        .compileContract(replace(code(", assetsInContract = true", statement)))
+        .isRight is true
+      Compiler
+        .compileContract(replace(code(", preapprovedAssets = true", statement)))
+        .isRight is true
+      Compiler
+        .compileContract(replace(code(", payToContractOnly = true", statement)))
+        .isRight is true
+      Compiler
+        .compileContract(
+          replace(code(", preapprovedAssets = true, assetsInContract = true", statement))
+        )
+        .isRight is true
     }
   }
 
@@ -6787,7 +6899,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val compiledFoo     = compileContractFull(fooCode, 1).rightValue
     val funcs           = compiledFoo.ast.funcs
-    val globalState     = Ast.GlobalState(Seq.empty)
+    val globalState     = Ast.GlobalState.from[StatefulContext](Seq.empty)
     val methodSelector0 = funcs(0).getMethodSelector(globalState)
     val methodSelector1 = funcs(1).getMethodSelector(globalState)
     compiledFoo.code.methods(0).instrs.head is MethodSelector(methodSelector0)
@@ -7195,15 +7307,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val options        = CompilerOptions.Default
     val multiContract  = Compiler.compileMultiContract(code).rightValue
-    val (compiled1, _) = multiContract.genStatefulContracts()(options).head
-    val (compiled2, _) = multiContract.genStatefulContracts()(options).head
+    val (compiled1, _) = multiContract.genStatefulContracts()(options)._2.head
+    val (compiled2, _) = multiContract.genStatefulContracts()(options)._2.head
     compiled1.code is compiled2.code
     compiled1.ast is compiled2.ast
     compiled1.debugCode is compiled2.debugCode
     compiled1.warnings isnot compiled2.warnings
 
     multiContract.contracts.foreach(_.reset())
-    val (compiled3, _) = multiContract.genStatefulContracts()(options).head
+    val (compiled3, _) = multiContract.genStatefulContracts()(options)._2.head
 
     compiled1.code is compiled3.code
     compiled1.ast is compiled3.ast
@@ -7223,5 +7335,680 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     compileContract(replace(code("[U256; 2]"))).isRight is true
     testContractError(code("U256"), "Expected an array, got \"U256\"")
+  }
+
+  it should "compile global definitions" in new Fixture {
+    {
+      info("duplicated global definitions")
+      val code =
+        s"""
+           |$$enum Bar { Red = 0 }$$
+           |struct Bar { x: U256 }
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Bar"
+      )
+    }
+
+    {
+      info("constant does not exist")
+      val code =
+        s"""
+           |const A = 0
+           |const C = A + $$B$$
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Constant variable B does not exist or is used before declaration")
+    }
+
+    {
+      info("constant is used before declaration")
+      val code =
+        s"""
+           |const A = 0
+           |const C = A + $$B$$
+           |const B = 1
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Constant variable B does not exist or is used before declaration")
+    }
+
+    {
+      info("calculate global constants")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |const C = A + B
+           |const D = #00 ++ #11
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    assert!(A == 1, 0)
+           |    assert!(B == 2, 0)
+           |    assert!(C == 3, 0)
+           |    assert!(D == #0011, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("calculate local constants")
+      val code =
+        s"""
+           |const A = 1
+           |Contract Foo() {
+           |  const B = 2
+           |  const C = A + B
+           |  pub fn foo() -> () {
+           |    assert!(A == 1, 0)
+           |    assert!(B == 2, 0)
+           |    assert!(C == 3, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("local constant conflicts with a global constant")
+      val code =
+        s"""
+           |const A = 1
+           |Contract Foo() {
+           |  $$const A = 2$$
+           |  pub fn foo() -> U256 {
+           |    return A
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Local constant A conflicts with an existing global constant, please use a fresh name"
+      )
+    }
+
+    {
+      info("check unused global constants - case 0")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(B == 2, 0)
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: A")
+    }
+
+    {
+      info("check unused global constants - case 1")
+      val code =
+        s"""
+           |const A = 1
+           |const B = A
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileProject(code).rightValue._1.head
+      compiled.warnings.isEmpty is true
+    }
+
+    {
+      info("check unused global constants - case 2")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(A == 1, 0)
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings.isEmpty is true
+      result._2.head.warnings.isEmpty is true
+    }
+
+    {
+      info("use global enums")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 0, 0)
+           |    assert!(Color.Blue == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("local enum conflicts with a global enum")
+      val code =
+        s"""
+           |enum Color { Red = 0 }
+           |Contract Foo() {
+           |  $$enum Color { Blue = 1 }$$
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Local enum Color conflicts with an existing global enum, please use a fresh name"
+      )
+    }
+
+    {
+      info("check unused global enums - case 0")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: Color.Blue")
+    }
+
+    {
+      info("check unused global enums - case 1")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(Color.Blue == 1, 0)
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings.isEmpty is true
+    }
+
+    {
+      info("check unused global enums - case 2")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(Color.Green == 2, 0)
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: Color.Blue")
+    }
+
+    {
+      info("check unused global constants and enums")
+      val code =
+        s"""
+           |const A = 0
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: A, Color.Blue, Color.Green")
+    }
+
+    {
+      info("ignore unused global constants warning")
+      val code =
+        s"""
+           |const A = 0
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
+      val warnings        = Compiler.compileProject(code, compilerOptions).rightValue._4
+      warnings.isEmpty is true
+    }
+  }
+
+  it should "report the correct warnings for unused constants" in {
+    def check(
+        code: String,
+        contractWarnings: AVector[(String, AVector[String])],
+        globalWarnings: AVector[String]
+    ) = {
+      val result = Compiler.compileProject(code).rightValue
+      result._4 is globalWarnings
+      result._1.zipWithIndex.foreach { case (contract, index) =>
+        val value = contractWarnings(index)
+        contract.ast.ident.name is value._1
+        contract.warnings is value._2
+      }
+      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
+      val contracts       = Compiler.compileProject(code, compilerOptions).rightValue._1
+      contracts.foreach(_.warnings.isEmpty is true)
+    }
+
+    {
+      info("unused parent constants")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  const Foo2 = 2
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> U256 {
+           |    return Foo0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> U256 {
+           |    return Foo1
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
+        AVector("Found unused constants in Foo: Foo2")
+      )
+    }
+
+    {
+      info("unused local constants and parent constants")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  const Foo2 = 2
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  const Bar0 = 0
+           |  pub fn bar() -> U256 {
+           |    return Foo0 + Bar0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  const Baz0 = 0
+           |  pub fn baz() -> U256 {
+           |    return Foo1
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector.empty[String]),
+          (
+            "Baz",
+            AVector(
+              "Found unused constants in Baz: Baz0"
+            )
+          )
+        ),
+        AVector("Found unused constants in Foo: Foo2")
+      )
+    }
+
+    {
+      info("unused parent enums")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |    Err2 = 2
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> () {
+           |    assert!(true, ErrorCode.Err0)
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> () {
+           |    assert!(true, ErrorCode.Err1)
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector.empty[String]),
+          ("Baz", AVector.empty[String])
+        ),
+        AVector("Found unused constants in Foo: ErrorCode.Err2")
+      )
+    }
+
+    {
+      info("unused local enums and parent enums")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |    Err2 = 2
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  enum ErrorCode { Err3 = 3 }
+           |  pub fn bar() -> () {
+           |    assert!(true, ErrorCode.Err0)
+           |    assert!(true, ErrorCode.Err3)
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  enum ErrorCode { Err3 = 3 }
+           |  pub fn baz() -> () {
+           |    assert!(true, ErrorCode.Err1)
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector.empty[String]),
+          (
+            "Baz",
+            AVector(
+              "Found unused constants in Baz: ErrorCode.Err3"
+            )
+          )
+        ),
+        AVector("Found unused constants in Foo: ErrorCode.Err2")
+      )
+    }
+
+    {
+      info("no warnings")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  const Bar0 = 0
+           |  enum ErrorCode { Err2 = 2 }
+           |  pub fn bar() -> U256 {
+           |    assert!(true, ErrorCode.Err0)
+           |    assert!(true, ErrorCode.Err2)
+           |    return Foo0 + Bar0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  const Baz0 = 0
+           |  enum ErrorCode { Err2 = 2 }
+           |  pub fn baz() -> U256 {
+           |    assert!(true, ErrorCode.Err1)
+           |    assert!(true, ErrorCode.Err2)
+           |    return Foo1 + Baz0
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
+        AVector.empty[String]
+      )
+    }
+  }
+
+  it should "use constants as array size" in new Fixture {
+    {
+      info("Global constants as array size")
+      val code =
+        s"""
+           |const SIZE = 2
+           |enum E { SIZE = 3 }
+           |Contract Foo() {
+           |  pub fn getValues0() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |  pub fn getValues1() -> [U256; SIZE * 2] {
+           |    return [1; 4]
+           |  }
+           |  pub fn getValues2() -> [U256; E.SIZE] {
+           |    return [2; E.SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, output = AVector.fill(2)(Val.U256(0)))
+      test(code, output = AVector.fill(4)(Val.U256(1)), methodIndex = 1)
+      test(code, output = AVector.fill(3)(Val.U256(2)), methodIndex = 2)
+    }
+
+    {
+      info("Local constants as array size")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const SIZE = 2
+           |  enum E { SIZE = 3 }
+           |  pub fn getValues0() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |  pub fn getValues1() -> [U256; SIZE * 2] {
+           |    return [1; 4]
+           |  }
+           |  pub fn getValues2() -> [U256; E.SIZE] {
+           |    return [2; E.SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, output = AVector.fill(2)(Val.U256(0)))
+      test(code, output = AVector.fill(4)(Val.U256(1)), methodIndex = 1)
+      test(code, output = AVector.fill(3)(Val.U256(2)), methodIndex = 2)
+    }
+
+    {
+      info("Different sizes in different contracts")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const SIZE = 2
+           |  pub fn getValues() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |}
+           |Contract Bar() {
+           |  const SIZE = 3
+           |  pub fn getValues() -> [U256; SIZE] {
+           |    return [1; SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, output = AVector.fill(2)(Val.U256(0)))
+      testContract(code, output = AVector.fill(3)(Val.U256(1)), contractIndex = 1)
+    }
+
+    {
+      info("Invalid array size")
+      val code =
+        s"""
+           |const SIZE = 2i
+           |Contract Foo(@unused values: [U256; $$SIZE$$]) {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Invalid array size, expected a constant U256 value")
+    }
+  }
+
+  it should "calculate the correct scope for variables" in {
+    {
+      info("If statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      let mut a = 1
+           |    }
+           |    $$a$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("If-else statement")
+      val code =
+        s"""
+           |Contract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      let mut a = 1
+           |    } else {
+           |      $$a$$ = 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("Nested if-else")
+      val code =
+        s"""
+           |Contract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      if (false) {
+           |        assert!(1 == 2, 0)
+           |      } else {
+           |        let mut a = 1
+           |      }
+           |      $$a$$ = 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("While statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    while (true) {
+           |      let mut a = 1
+           |    }
+           |    $$a$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("For statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    for (let mut i = 1; i < 5; i = i + 1) {
+           |      i = i + 1
+           |    }
+           |    $$i$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.i is not defined in the current scope")
+    }
   }
 }
