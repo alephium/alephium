@@ -42,7 +42,7 @@ class StatelessParserSpec extends AlephiumSpec {
 
       val failure =
         intercept[CompilerError.`Expected an immutable variable`] {
-          fastparse.parse(program, StatelessParser.assetScript(_))
+          fastparse.parse(program, StatelessParser.assetScript(_).map(_._1))
         }
 
       val formatter = failure.toFormatter(program)
@@ -72,7 +72,7 @@ class StatelessParserSpec extends AlephiumSpec {
 
       val failure =
         intercept[CompilerError.`Expected an immutable variable`] {
-          fastparse.parse(program, StatelessParser.assetScript(_))
+          fastparse.parse(program, StatelessParser.assetScript(_).map(_._1))
         }
 
       val formatter = failure.toFormatter(program)
@@ -109,7 +109,7 @@ class StatelessParserSpec extends AlephiumSpec {
 
     val failure =
       fastparse
-        .parse(program, StatelessParser.assetScript(_))
+        .parse(program, StatelessParser.assetScript(_).map(_._1))
         .asInstanceOf[Parsed.Failure]
         .trace()
 
@@ -149,7 +149,7 @@ class StatelessParserSpec extends AlephiumSpec {
 
     val error =
       intercept[CompilerError.ExpectedEndOfInput](
-        fastparse.parse(program, StatelessParser.assetScript(_))
+        fastparse.parse(program, StatelessParser.assetScript(_).map(_._1))
       )
 
     val indexOfB = program.indexOf("Blah")

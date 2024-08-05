@@ -17,6 +17,7 @@
 package org.alephium.ralph
 
 import scala.collection.mutable
+import scala.util.Random
 
 import akka.util.ByteString
 import org.scalatest.Assertion
@@ -38,11 +39,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   def index(code: String): Int = code.indexOf("$")
 
   def testContractError(code: String, message: String): Compiler.Error = {
-    testErrorT(code, message, Compiler.compileContract(_))
+    testErrorT(code, message, compileContract(_))
   }
 
   def testContractFullError(code: String, message: String): Compiler.Error = {
-    testErrorT(code, message, Compiler.compileContractFull(_))
+    testErrorT(code, message, compileContractFull(_))
   }
 
   def testMultiContractError(code: String, message: String): Compiler.Error = {
@@ -63,15 +64,38 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val endIndex   = index(newCode)
     val error      = f(replace(newCode)).leftValue
 
+    error.message is message
     error.position is startIndex
     error.foundLength is (endIndex - startIndex)
-    error.message is message
 
     error
   }
 
   def methodSelectorOf(signature: String): MethodSelector = {
     MethodSelector(Method.Selector(DjbHash.intHash(ByteString.fromString(signature))))
+  }
+
+  def compileContract(input: String, index: Int = 0): Either[Compiler.Error, StatefulContract] =
+    compileContractFull(input, index).map(_.debugCode)
+
+  def compileContractFull(
+      input: String,
+      index: Int = 0
+  ): Either[Compiler.Error, CompiledContract] = {
+    try {
+      Compiler.compileMultiContract(input) match {
+        case Right(multiContract) =>
+          var result = multiContract.genStatefulContract(index)(CompilerOptions.Default)
+          if (Random.nextBoolean()) {
+            multiContract.contracts.foreach(_.reset())
+            result = multiContract.genStatefulContract(index)(CompilerOptions.Default)
+          }
+          Right(result)
+        case Left(error) => throw error
+      }
+    } catch {
+      case e: Compiler.Error => Left(e)
+    }
   }
 
   it should "compile asset script" in {
@@ -167,8 +191,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           |3 |  event Add(a: U256, b: U256)
           |  |  ^^^^^^^^^^
           |  |  Expected "}"
-          |  |----------------------------------------------------------------------------------------------------
-          |  |Trace log: Expected multiContract:1:1 / entities:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |  |------------------------------------------------------------------------------------------------------------
+          |  |Trace log: Expected multiContract:1:1 / globalDefinition:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
           |""".stripMargin
     }
   }
@@ -201,7 +225,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(contract).isRight is true
+      compileContract(contract).isRight is true
     }
 
     {
@@ -271,7 +295,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(contract).isRight is validity
+      compileContract(contract).isRight is validity
     }
 
     check("mut", "a", "U256", "b", "U256", "U256", "foo", true)
@@ -308,8 +332,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(input, 0).isRight is true
-    Compiler.compileContract(input, 1).isRight is true
+    compileContract(input, 0).isRight is true
+    compileContract(input, 1).isRight is true
   }
 
   it should "check function return types" in {
@@ -436,7 +460,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     )
     succeed.foreach { code =>
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
   }
 
@@ -518,7 +542,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     )
     succeed.foreach { code =>
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
   }
 
@@ -531,7 +555,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         mutFields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
-      val compiled = Compiler.compileContractFull(input).rightValue
+      testContract(input, args, output, immFields, mutFields, methodIndex, 0)
+    }
+
+    def testContract(
+        input: String,
+        args: AVector[Val] = AVector.empty,
+        output: AVector[Val] = AVector.empty,
+        immFields: AVector[Val] = AVector.empty,
+        mutFields: AVector[Val] = AVector.empty,
+        methodIndex: Int = 0,
+        contractIndex: Int = 0
+    ): Assertion = {
+      val compiled = compileContractFull(input, contractIndex).rightValue
       compiled.code is compiled.debugCode
       val contract = compiled.code
 
@@ -547,7 +583,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         immFields: AVector[Val] = AVector.empty,
         mutFields: AVector[Val] = AVector.empty
     ): Assertion = {
-      val contract = Compiler.compileContract(input).toOption.get
+      val contract = compileContract(input).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, immFields, mutFields)
@@ -644,15 +680,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(replace(code())).isRight is true
-    Compiler.compileContract(replace(code(initialize = "true"))).isLeft is true
+    compileContract(replace(code())).isRight is true
+    compileContract(replace(code(initialize = "true"))).isLeft is true
     testContractError(
       code(condition = "1", forKey = "$for"),
       "Invalid condition type: Const(U256(1))"
     )
-    Compiler.compileContract(code(update = "true")).isLeft is true
+    compileContract(code(update = "true")).isLeft is true
     testContractError(code(update = "$i = true$"), "Cannot assign \"Bool\" to \"U256\"")
-    Compiler.compileContract(code(body = "")).isLeft is true
+    compileContract(code(body = "")).isLeft is true
     testContractError(
       code(initialize = "", forKey = "$for$"),
       "No initialize statement in for loop"
@@ -1363,7 +1399,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract = Compiler.compileContract(code).rightValue
+    val contract = compileContract(code).rightValue
     // format: off
     contract.methods(0) is Method[StatefulContext](
       isPublic = false,
@@ -1441,7 +1477,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract = Compiler.compileContract(code).rightValue
+    val contract = compileContract(code).rightValue
     val (obj, context) =
       prepareContract(contract, AVector(Val.U256(0)), AVector.fill(6)(Val.U256(0)))
 
@@ -1633,7 +1669,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    val compiled = Compiler.compileContractFull(code).rightValue
+    val compiled = compileContractFull(code).rightValue
     compiled.code is compiled.debugCode
   }
 
@@ -1714,7 +1750,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     )
 
-    codes.foreach(Compiler.compileContract(_).isLeft is true)
+    codes.foreach(compileContract(_).isLeft is true)
   }
 
   it should "test return multiple values" in new Fixture {
@@ -1828,7 +1864,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(code).rightValue.methods.head is
+    compileContract(code).rightValue.methods.head is
       Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
@@ -1871,7 +1907,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(contract).isRight is true
+      compileContract(contract).isRight is true
     }
 
     {
@@ -1891,7 +1927,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(contract).isRight is true
+      compileContract(contract).isRight is true
     }
 
     {
@@ -2010,7 +2046,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$parent
            |""".stripMargin
 
-      Compiler.compileContract(child).isRight is true
+      compileContract(child).isRight is true
     }
 
     {
@@ -2174,16 +2210,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val contract = Compiler.compileContract(code).rightValue
+      val contract = compileContract(code).rightValue
       contract.methodsLength is 4
       contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
 
     def wrongSignature(code: String, funcName: String) = {
-      Compiler
-        .compileContract(code)
-        .leftValue
-        .message is s"""Function "$funcName" is implemented with wrong signature"""
+      compileContract(
+        code
+      ).leftValue.message is s"""Function "$funcName" is implemented with wrong signature"""
     }
 
     {
@@ -2228,23 +2263,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           mustBeEqual: Boolean,
           code: (String, String) => String
       ): Assertion = {
-        Compiler.compileContract(code("", "")).isRight is true
-        Compiler
-          .compileContract(code(s"@using($annotation = true)", s"@using($annotation = true)"))
-          .isRight is true
-        Compiler
-          .compileContract(code(s"@using($annotation = false)", s"@using($annotation = false)"))
-          .isRight is true
+        compileContract(code("", "")).isRight is true
+        compileContract(
+          code(s"@using($annotation = true)", s"@using($annotation = true)")
+        ).isRight is true
+        compileContract(
+          code(s"@using($annotation = false)", s"@using($annotation = false)")
+        ).isRight is true
         if (mustBeEqual) {
-          Compiler.compileContract(code(s"@using($annotation = false)", "")).isRight is true
+          compileContract(code(s"@using($annotation = false)", "")).isRight is true
           wrongSignature(code(s"@using($annotation = true)", ""), "bar")
           wrongSignature(code(s"@using($annotation = true)", s"@using($annotation = false)"), "bar")
           wrongSignature(code(s"@using($annotation = false)", s"@using($annotation = true)"), "bar")
         } else {
-          Compiler.compileContract(code(s"@using($annotation = true)", "")).isRight is true
-          Compiler.compileContract(code(s"@using($annotation = false)", "")).isRight is true
-          Compiler.compileContract(code("", s"@using($annotation = true)")).isRight is true
-          Compiler.compileContract(code("", s"@using($annotation = false)")).isRight is true
+          compileContract(code(s"@using($annotation = true)", "")).isRight is true
+          compileContract(code(s"@using($annotation = false)", "")).isRight is true
+          compileContract(code("", s"@using($annotation = true)")).isRight is true
+          compileContract(code("", s"@using($annotation = false)")).isRight is true
         }
       }
 
@@ -2271,9 +2306,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code("pub", "a: U256", "U256")).isRight is true
-      Compiler.compileContract(code("pub", "@unused a: U256", "U256")).isRight is true
-      Compiler.compileContract(code("pub", "b: U256", "U256")).isRight is true
+      compileContract(code("pub", "a: U256", "U256")).isRight is true
+      compileContract(code("pub", "@unused a: U256", "U256")).isRight is true
+      compileContract(code("pub", "b: U256", "U256")).isRight is true
       wrongSignature(code("", "a: U256", "U256"), "bar")
       wrongSignature(code("pub", "mut a: U256", "U256"), "bar")
       wrongSignature(code("pub", "a: ByteVec", "U256"), "bar")
@@ -2463,8 +2498,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$foo1
            |$foo2
            |""".stripMargin
-      Compiler.compileContract(bar1).isRight is true
-      Compiler.compileContract(bar2).isRight is true
+      compileContract(bar1).isRight is true
+      compileContract(bar2).isRight is true
     }
 
     {
@@ -2739,7 +2774,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }$$
          |}
          |""".stripMargin
-    Compiler.compileContract(replace(code())).isRight is true
+    compileContract(replace(code())).isRight is true
 
     val statements = Seq(
       "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)",
@@ -2750,7 +2785,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "approveToken!(selfAddress!(), ALPH, 1 alph)"
     )
     statements.foreach { stmt =>
-      Compiler.compileContract(replace(code("true", stmt))).isRight is true
+      compileContract(replace(code("true", stmt))).isRight is true
     }
     testContractError(
       code("true"),
@@ -2762,7 +2797,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "Function \"Foo.foo\" does not use contract assets, but the annotation `assetsInContract` is enabled. " +
         "Please remove the `assetsInContract` annotation or set it to `enforced`"
     )
-    Compiler.compileContract(replace(code("enforced"))).isRight is true
+    compileContract(replace(code("enforced"))).isRight is true
     statements.take(3).foreach { stmt =>
       testContractError(
         code("false", stmt),
@@ -2833,7 +2868,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     }
-    Compiler.compileContract(replace(code(false))).isRight is true
+    compileContract(replace(code(false))).isRight is true
     testContractError(code(true), "Max 8 fields allowed for contract events")
   }
 
@@ -2850,7 +2885,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           ConstTrue,
           IfFalse(1),
@@ -2904,7 +2939,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           ConstTrue,
           IfFalse(2),
@@ -2930,7 +2965,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           ConstTrue,
           IfFalse(2),
@@ -2998,7 +3033,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           ConstTrue,
           IfFalse(2),
@@ -3020,7 +3055,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           ConstFalse,
           IfFalse(2),
@@ -3063,7 +3098,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code).leftValue.format(code) is
+      compileContract(code).leftValue.format(code) is
         """-- error (5:3): Syntax error
           |5 |  }
           |  |  ^
@@ -3391,7 +3426,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector("Found unused variables in Foo: foo.a, foo.b")
     }
 
@@ -3405,7 +3440,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector("Found unused fields in Foo: a, c")
     }
 
@@ -3423,7 +3458,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector("Found unused fields in Foo: b, c")
     }
 
@@ -3487,7 +3522,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector("Found unused constants in Foo: C0")
     }
 
@@ -3512,7 +3547,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
     }
 
@@ -3534,7 +3569,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
-      val (contracts, _, _) = Compiler.compileProject(code).rightValue
+      val contracts = Compiler.compileProject(code).rightValue._1
       contracts.length is 2
       contracts.foreach(_.warnings.isEmpty is true)
     }
@@ -3551,7 +3586,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           methodSelectorOf("foo()->()"),
           U256Const0,
@@ -3574,7 +3609,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).rightValue.methods.head.instrs is
+      compileContract(code).rightValue.methods.head.instrs is
         AVector[Instr[StatefulContext]](
           methodSelectorOf("foo()->(U256)"),
           CallLocal(1),
@@ -3647,8 +3682,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val fooContract = Compiler.compileContract(foo).rightValue
-    val barContract = Compiler.compileContract(bar).rightValue
+    val fooContract = compileContract(foo).rightValue
+    val barContract = compileContract(bar).rightValue
     fooContract is barContract
   }
 
@@ -3664,7 +3699,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("Fields and variables are unused")
-      val warnings = Compiler.compileContractFull(code("")).rightValue.warnings
+      val warnings = compileContractFull(code("")).rightValue.warnings
       warnings.toSet is Set(
         "Found unused variables in Foo: foo.x, foo.y",
         "Found unused fields in Foo: a, b"
@@ -3673,7 +3708,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("Fields and variables are annotated as unused")
-      val warnings = Compiler.compileContractFull(code("@unused")).rightValue.warnings
+      val warnings = compileContractFull(code("@unused")).rightValue.warnings
       warnings.isEmpty is true
     }
   }
@@ -3699,7 +3734,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3713,7 +3748,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector(
           s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function."""
         )
@@ -3730,7 +3765,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn bar() -> () {}
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3745,7 +3780,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3759,7 +3794,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings is
         AVector(
           s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function."""
         )
@@ -3779,7 +3814,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3798,7 +3833,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3813,7 +3848,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code, 0).rightValue.warnings is AVector.empty[String]
+      compileContractFull(code, 0).rightValue.warnings is AVector.empty[String]
     }
 
     {
@@ -3828,7 +3863,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3850,7 +3885,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -3867,8 +3902,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn bar() -> ()
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code(false)).isRight is true
-      Compiler.compileContractFull(code(true)).isRight is true
+      compileContractFull(code(false)).isRight is true
+      compileContractFull(code(true)).isRight is true
     }
 
     {
@@ -3882,7 +3917,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(
         s"""Function "Foo.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
       )
@@ -3912,7 +3947,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all contracts" in new MultiContractFixture {
-    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)
+    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)._2
     contracts.length is 2
     contracts(0)._1.ast.ident.name is "Foo"
     contracts(0)._2 is 1
@@ -3964,11 +3999,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       TransferAlphToSelf,
       TransferAlphFromSelf
     )
-    val method0 = Compiler.compileContract(code).rightValue.methods(0)
+    val method0 = compileContract(code).rightValue.methods(0)
     tokenInstrs.foreach(instr => method0.instrs.contains(instr) is false)
     alphInstrs.foreach(instr => method0.instrs.contains(instr) is true)
 
-    val method1 = Compiler.compileContract(code).rightValue.methods(1)
+    val method1 = compileContract(code).rightValue.methods(1)
     tokenInstrs.foreach(instr => method1.instrs.contains(instr) is true)
     alphInstrs.foreach(instr => method1.instrs.contains(instr) is false)
   }
@@ -3990,7 +4025,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compileContract(code).rightValue
+    val contract = compileContract(code).rightValue
     contract is StatefulContract(
       6,
       methods = AVector(
@@ -4059,7 +4094,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compileContract(code).rightValue
+    val contract = compileContract(code).rightValue
     contract is StatefulContract(
       6,
       methods = AVector(
@@ -4141,21 +4176,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     }
 
-    Compiler.compileContract(code("I256", "I256", "**", "I256")).leftValue.message is
+    compileContract(code("I256", "I256", "**", "I256")).leftValue.message is
       "Invalid param types List(I256, I256) for ** operator"
-    Compiler.compileContract(code("U256", "U256", "**", "U256")).isRight is true
-    Compiler.compileContract(code("U256", "U256", "**", "I256")).leftValue.message is
+    compileContract(code("U256", "U256", "**", "U256")).isRight is true
+    compileContract(code("U256", "U256", "**", "I256")).leftValue.message is
       s"""Invalid return types "List(U256)" for func foo, expected "List(I256)""""
-    Compiler.compileContract(code("I256", "U256", "**", "I256")).isRight is true
-    Compiler.compileContract(code("I256", "U256", "**", "U256")).leftValue.message is
+    compileContract(code("I256", "U256", "**", "I256")).isRight is true
+    compileContract(code("I256", "U256", "**", "U256")).leftValue.message is
       s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
 
-    Compiler.compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
+    compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
       "|**| accepts U256 only"
-    Compiler.compileContract(code("U256", "U256", "|**|", "U256")).isRight is true
-    Compiler.compileContract(code("I256", "U256", "|**|", "U256")).leftValue.message is
+    compileContract(code("U256", "U256", "|**|", "U256")).isRight is true
+    compileContract(code("I256", "U256", "|**|", "U256")).leftValue.message is
       "Invalid param types List(I256, U256) for |**| operator"
-    Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
+    compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
       """Invalid return types "List(U256)" for func foo, expected "List(I256)""""
   }
 
@@ -4173,14 +4208,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     def success(inputType: String, op: String) = {
-      Compiler.compileContract(code(inputType, op)).isRight is true
+      compileContract(code(inputType, op)).isRight is true
     }
 
     def fail(inputType: String, op: String) = {
-      Compiler
-        .compileContract(code(inputType, op))
-        .leftValue
-        .message is s"Expect I256/U256 for $op operator"
+      compileContract(code(inputType, op)).leftValue.message is s"Expect I256/U256 for $op operator"
     }
 
     Seq(">", "<", "<=", ">=", "==", "!=").foreach(success("I256", _))
@@ -4248,7 +4280,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -4301,7 +4333,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -4315,7 +4347,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -4329,7 +4361,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
   }
 
@@ -4371,7 +4403,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -4436,7 +4468,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -4450,7 +4482,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
 
     {
@@ -4464,7 +4496,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).isRight is true
+      compileContract(code).isRight is true
     }
   }
 
@@ -4482,16 +4514,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    Compiler.compileContract(code("", "")).rightValue.fieldLength is 0
-    Compiler.compileContract(code("", "@std(id = #0001)")).rightValue.fieldLength is 1
-    Compiler
-      .compileContract(code("@std(enabled = true)", "@std(id = #0001)"))
-      .rightValue
-      .fieldLength is 1
-    Compiler
-      .compileContract(code("@std(enabled = false)", "@std(id = #0001)"))
-      .rightValue
-      .fieldLength is 0
+    compileContract(code("", "")).rightValue.fieldLength is 0
+    compileContract(code("", "@std(id = #0001)")).rightValue.fieldLength is 1
+    compileContract(code("@std(enabled = true)", "@std(id = #0001)")).rightValue.fieldLength is 1
+    compileContract(code("@std(enabled = false)", "@std(id = #0001)")).rightValue.fieldLength is 0
   }
 
   it should "use built-in contract functions" in {
@@ -4519,16 +4545,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    Compiler.compileContract(code("", "", "1", "2i")).rightValue.fieldLength is 2
-    Compiler.compileContract(code("", "@std(id = #0001)", "1", "2i")).rightValue.fieldLength is 3
-    Compiler
-      .compileContract(code("@std(enabled = true)", "@std(id = #0001)", "1", "2i"))
-      .rightValue
-      .fieldLength is 3
-    Compiler
-      .compileContract(code("@std(enabled = false)", "@std(id = #0001)", "1", "2i"))
-      .rightValue
-      .fieldLength is 2
+    compileContract(code("", "", "1", "2i")).rightValue.fieldLength is 2
+    compileContract(code("", "@std(id = #0001)", "1", "2i")).rightValue.fieldLength is 3
+    compileContract(
+      code("@std(enabled = true)", "@std(id = #0001)", "1", "2i")
+    ).rightValue.fieldLength is 3
+    compileContract(
+      code("@std(enabled = false)", "@std(id = #0001)", "1", "2i")
+    ).rightValue.fieldLength is 2
   }
 
   it should "check whether a function is static or not" in {
@@ -4647,7 +4671,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn bar1() -> () {}
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is warnings
+      compileContractFull(code).rightValue.warnings is warnings
     }
 
     test("f2()", AVector.empty)
@@ -4721,7 +4745,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(
         code,
-        "These TxScript/Contract/Interface/Struct are defined multiple times: Foo"
+        "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Foo"
       )
     }
 
@@ -4760,7 +4784,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code(s"$$foo.x = 1$$"),
         "Cannot assign to immutable field x in struct Foo."
       )
-      Compiler.compileContractFull(code("foo.y = 1")).isRight is true
+      compileContractFull(code("foo.y = 1")).isRight is true
     }
 
     {
@@ -4842,14 +4866,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code(s"$$foos[0][0].x = 2$$", "", "mut"),
         "Cannot assign to immutable field x in struct Foo."
       )
-      Compiler
-        .compileContractFull(code("foos = [[Foo { x : 2 }; 2]; 2]", "mut", "mut"))
-        .isRight is true
-      Compiler
-        .compileContractFull(code("foos[0] = [Foo { x : 2 }; 2]", "mut", "mut"))
-        .isRight is true
-      Compiler.compileContractFull(code("foos[0][0] = Foo { x : 2 }", "mut", "mut")).isRight is true
-      Compiler.compileContractFull(code("foos[0][0].x = 2", "mut", "mut")).isRight is true
+      compileContractFull(code("foos = [[Foo { x : 2 }; 2]; 2]", "mut", "mut")).isRight is true
+      compileContractFull(code("foos[0] = [Foo { x : 2 }; 2]", "mut", "mut")).isRight is true
+      compileContractFull(code("foos[0][0] = Foo { x : 2 }", "mut", "mut")).isRight is true
+      compileContractFull(code("foos[0][0].x = 2", "mut", "mut")).isRight is true
     }
 
     {
@@ -4881,9 +4901,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code(s"$$foo.bars[0].x = 2$$"),
         "Cannot assign to immutable field x in struct Bar."
       )
-      Compiler.compileContractFull(code("foo = Foo{bars: [Bar{x: 1}; 2]}", "mut")).isRight is true
-      Compiler.compileContractFull(code("foo.bars = [Bar{x: 1}; 2]", "mut")).isRight is true
-      Compiler.compileContractFull(code("foo.bars[0].x = 2", "mut")).isRight is true
+      compileContractFull(code("foo = Foo{bars: [Bar{x: 1}; 2]}", "mut")).isRight is true
+      compileContractFull(code("foo.bars = [Bar{x: 1}; 2]", "mut")).isRight is true
+      compileContractFull(code("foo.bars[0].x = 2", "mut")).isRight is true
     }
 
     {
@@ -4918,7 +4938,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContractFull(code).leftValue.message is
+      compileContractFull(code).leftValue.message is
         s"Invalid param types List(Foo, Foo) for == operator"
     }
 
@@ -4933,10 +4953,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler
-        .compileContractFull(code)
-        .leftValue
-        .message is "Invalid param types List(Foo, Foo) for == operator"
+      compileContractFull(
+        code
+      ).leftValue.message is "Invalid param types List(Foo, Foo) for == operator"
     }
 
     {
@@ -5014,9 +5033,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code("y: [Qux; 2]"),
         "The struct Foo is immutable, please remove the `mut` from Bar.foo"
       )
-      Compiler.compileContractFull(replace(code("mut y: U256"))).isRight is true
-      Compiler.compileContractFull(replace(code("mut y: Qux"))).isRight is true
-      Compiler.compileContractFull(replace(code("mut y: [Qux; 2]"))).isRight is true
+      compileContractFull(replace(code("mut y: U256"))).isRight is true
+      compileContractFull(replace(code("mut y: Qux"))).isRight is true
+      compileContractFull(replace(code("mut y: [Qux; 2]"))).isRight is true
     }
 
     {
@@ -5084,8 +5103,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code(s"$$a$$: x1"), "Field a does not exist in struct Foo")
       testContractError(code(s"mut $$a$$: x1"), "Field a does not exist in struct Foo")
-      Compiler.compileContract(code("x")).isRight is true
-      Compiler.compileContract(code("mut x: x1", "x1 = 2")).isRight is true
+      compileContract(code("x")).isRight is true
+      compileContract(code("mut x: x1", "x1 = 2")).isRight is true
     }
 
     {
@@ -5102,7 +5121,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code(s"$$x$$"), "Local variables have the same name: x")
-      Compiler.compileContract(code("x: x1")).isRight is true
+      compileContract(code("x: x1")).isRight is true
     }
 
     {
@@ -5118,7 +5137,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code(), "Cannot assign to immutable variable x.")
-      Compiler.compileContractFull(code("mut").replace("$", "")).isRight is true
+      compileContractFull(code("mut").replace("$", "")).isRight is true
     }
   }
 
@@ -5772,13 +5791,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code(s"$$map[0].y[0].a = 1$$"),
         "Cannot assign to immutable field a in struct Foo."
       )
-      Compiler.compileContractFull(code("map[0].x = 1", "", "mut")).isRight is true
-      Compiler.compileContractFull(code("map[0].y[0] = Foo{a: 0}", "mut")).isRight is true
-      Compiler.compileContractFull(code("map[0].y[0].a = 1", "mut")).isRight is true
-      Compiler.compileContractFull(code("map[0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
-      Compiler
-        .compileContractFull(code("map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
-        .isRight is true
+      compileContractFull(code("map[0].x = 1", "", "mut")).isRight is true
+      compileContractFull(code("map[0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      compileContractFull(code("map[0].y[0].a = 1", "mut")).isRight is true
+      compileContractFull(code("map[0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      compileContractFull(
+        code("map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut")
+      ).isRight is true
     }
 
     {
@@ -5818,16 +5837,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code(s"$$map[0][0].y[0].a = 1$$"),
         "Cannot assign to immutable field a in struct Foo."
       )
-      Compiler.compileContractFull(code("map[0][0].x = 1", "", "mut")).isRight is true
-      Compiler.compileContractFull(code("map[0][0].y[0] = Foo{a: 0}", "mut")).isRight is true
-      Compiler.compileContractFull(code("map[0][0].y[0].a = 1", "mut")).isRight is true
-      Compiler.compileContractFull(code("map[0][0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
-      Compiler
-        .compileContractFull(code("map[0][0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
-        .isRight is true
-      Compiler
-        .compileContractFull(code("map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut"))
-        .isRight is true
+      compileContractFull(code("map[0][0].x = 1", "", "mut")).isRight is true
+      compileContractFull(code("map[0][0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      compileContractFull(code("map[0][0].y[0].a = 1", "mut")).isRight is true
+      compileContractFull(code("map[0][0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      compileContractFull(
+        code("map[0][0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut")
+      ).isRight is true
+      compileContractFull(
+        code("map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut")
+      ).isRight is true
     }
 
     {
@@ -5906,8 +5925,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code(256, ""), "The number of struct fields exceeds the maximum limit")
       // we have an extra immutable field `parentContractId`
       testContractError(code(255, ""), "The number of struct fields exceeds the maximum limit")
-      Compiler.compileContractFull(code(255, "mut").replace("$", "")).isRight is true
-      Compiler.compileContractFull(code(254, "").replace("$", "")).isRight is true
+      compileContractFull(code(255, "mut").replace("$", "")).isRight is true
+      compileContractFull(code(254, "").replace("$", "")).isRight is true
     }
 
     {
@@ -5925,7 +5944,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val methods = Compiler.compileContractFull(code).rightValue.code.methods
+      val methods = compileContractFull(code).rightValue.code.methods
       methods(0).argsLength is 0
       methods(0).localsLength is 1
       methods(1).argsLength is 0
@@ -5947,7 +5966,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val methods = Compiler.compileContractFull(code).rightValue.code.methods
+      val methods = compileContractFull(code).rightValue.code.methods
       methods(0).argsLength is 0
       methods(0).localsLength is 0
       methods(1).argsLength is 0
@@ -5989,7 +6008,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code).rightValue.warnings is AVector(
+      compileContractFull(code).rightValue.warnings is AVector(
         "Found unused maps in Foo: map"
       )
     }
@@ -6011,20 +6030,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val updateStatements =
         Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
       updateStatements.foreach { statement =>
-        Compiler
-          .compileContractFull(code(statement, "@using(preapprovedAssets = true)"))
-          .rightValue
-          .warnings is warnings
-        Compiler
-          .compileContractFull(
-            code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
-          )
-          .rightValue
-          .warnings is AVector.empty[String]
+        compileContractFull(
+          code(statement, "@using(preapprovedAssets = true)")
+        ).rightValue.warnings is warnings
+        compileContractFull(
+          code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
+        ).rightValue.warnings is AVector.empty[String]
       }
-      Compiler.compileContractFull(code("let _ = map[0]")).rightValue.warnings is
+      compileContractFull(code("let _ = map[0]")).rightValue.warnings is
         AVector.empty[String]
-      Compiler.compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings is
+      compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings is
         AVector.empty[String]
     }
 
@@ -6211,31 +6226,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("valid constant expressions")
-      Compiler.compileContract(code("A + B")).isRight is true
-      Compiler.compileContract(code("C + D")).isRight is true
-      Compiler.compileContract(code("B - A")).isRight is true
-      Compiler.compileContract(code("C - D")).isRight is true
-      Compiler.compileContract(code("A * B")).isRight is true
-      Compiler.compileContract(code("A / B")).isRight is true
-      Compiler.compileContract(code("A % B")).isRight is true
-      Compiler.compileContract(code(s"""b`hello` ++ E""")).isRight is true
-      Compiler.compileContract(code("A ** B")).isRight is true
-      Compiler.compileContract(code("A |+| B")).isRight is true
-      Compiler.compileContract(code("A |-| B")).isRight is true
-      Compiler.compileContract(code("A |*| B")).isRight is true
-      Compiler.compileContract(code("A |**| B")).isRight is true
-      Compiler.compileContract(code("A << 2")).isRight is true
-      Compiler.compileContract(code("B << 2")).isRight is true
-      Compiler.compileContract(code("A ^ B")).isRight is true
-      Compiler.compileContract(code("!F")).isRight is true
-      Compiler.compileContract(code("A == 2")).isRight is true
-      Compiler.compileContract(code("A != B")).isRight is true
-      Compiler.compileContract(code("(A == 2) && F")).isRight is true
-      Compiler.compileContract(code("(A > 2) || F")).isRight is true
-      Compiler.compileContract(code("A <= B")).isRight is true
-      Compiler.compileContract(code("C < D")).isRight is true
-      Compiler.compileContract(code("A >= B")).isRight is true
-      Compiler.compileContract(code("C > D")).isRight is true
+      compileContract(code("A + B")).isRight is true
+      compileContract(code("C + D")).isRight is true
+      compileContract(code("B - A")).isRight is true
+      compileContract(code("C - D")).isRight is true
+      compileContract(code("A * B")).isRight is true
+      compileContract(code("A / B")).isRight is true
+      compileContract(code("A % B")).isRight is true
+      compileContract(code(s"""b`hello` ++ E""")).isRight is true
+      compileContract(code("A ** B")).isRight is true
+      compileContract(code("A |+| B")).isRight is true
+      compileContract(code("A |-| B")).isRight is true
+      compileContract(code("A |*| B")).isRight is true
+      compileContract(code("A |**| B")).isRight is true
+      compileContract(code("A << 2")).isRight is true
+      compileContract(code("B << 2")).isRight is true
+      compileContract(code("A ^ B")).isRight is true
+      compileContract(code("!F")).isRight is true
+      compileContract(code("A == 2")).isRight is true
+      compileContract(code("A != B")).isRight is true
+      compileContract(code("(A == 2) && F")).isRight is true
+      compileContract(code("(A > 2) || F")).isRight is true
+      compileContract(code("A <= B")).isRight is true
+      compileContract(code("C < D")).isRight is true
+      compileContract(code("A >= B")).isRight is true
+      compileContract(code("C > D")).isRight is true
     }
   }
 
@@ -6261,12 +6276,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       if (success) {
-        Compiler.compileContract(code).rightValue
+        compileContract(code).rightValue
       } else {
-        Compiler
-          .compileContract(code)
-          .leftValue
-          .message is "Contract statements should be in the order of `maps`, `events`, `consts`, `enums` and `methods`"
+        compileContract(
+          code
+        ).leftValue.message is "Contract statements should be in the order of `maps`, `events`, `consts`, `enums` and `methods`"
       }
     }
 
@@ -6422,12 +6436,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code(3)).leftValue.message is
+      compileContract(code(3)).leftValue.message is
         "The method index of these functions is out of bound: f0, total number of methods: 2"
-      Compiler.compileContract(code(4)).leftValue.message is
+      compileContract(code(4)).leftValue.message is
         "The method index of these functions is out of bound: f0, total number of methods: 2"
-      Compiler.compileContract(replace(code(1))).isRight is true
-      Compiler.compileContract(replace(code(0))).isRight is true
+      compileContract(replace(code(1))).isRight is true
+      compileContract(replace(code(0))).isRight is true
     }
 
     {
@@ -6450,18 +6464,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code()).isRight is true
-      Compiler.compileContract(code(index0 = 1)).isRight is true
-      Compiler.compileContract(code(index0 = 2, index1 = 3)).isRight is true
-      Compiler.compileContract(code(index0 = 3)).isRight is true
-      Compiler.compileContract(code(index0 = 4)).leftValue.message is
+      compileContract(code()).isRight is true
+      compileContract(code(index0 = 1)).isRight is true
+      compileContract(code(index0 = 2, index1 = 3)).isRight is true
+      compileContract(code(index0 = 3)).isRight is true
+      compileContract(code(index0 = 4)).leftValue.message is
         "The method index of these functions is out of bound: f0, total number of methods: 4"
-      Compiler.compileContract(code(index1 = 0)).leftValue.message is
+      compileContract(code(index1 = 0)).leftValue.message is
         "Function Bar.f2 have invalid predefined method index 0"
-      Compiler.compileContract(code(index1 = 1)).leftValue.message is
+      compileContract(code(index1 = 1)).leftValue.message is
         "Function Bar.f2 have invalid predefined method index 1"
-      Compiler.compileContract(code(index1 = 3)).isRight is true
-      Compiler.compileContract(code(index1 = 4)).leftValue.message is
+      compileContract(code(index1 = 3)).isRight is true
+      compileContract(code(index1 = 4)).leftValue.message is
         "The method index of these functions is out of bound: f2, total number of methods: 4"
     }
 
@@ -6482,11 +6496,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f2() -> ()
            |}
            |""".stripMargin
-      Compiler.compileContract(code(0)).leftValue.message is
+      compileContract(code(0)).leftValue.message is
         "Function Bar.f2 have invalid predefined method index 0"
-      Compiler.compileContract(code(1)).leftValue.message is
+      compileContract(code(1)).leftValue.message is
         "Function Bar.f2 have invalid predefined method index 1"
-      Compiler.compileContract(code(2)).isRight is true
+      compileContract(code(2)).isRight is true
     }
 
     {
@@ -6510,14 +6524,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code(0)).leftValue.message is
+      compileContract(code(0)).leftValue.message is
         "Function Bar.f3 have invalid predefined method index 0"
-      Compiler.compileContract(code(1)).leftValue.message is
+      compileContract(code(1)).leftValue.message is
         "Function Bar.f3 have invalid predefined method index 1"
-      Compiler.compileContract(code(2)).leftValue.message is
+      compileContract(code(2)).leftValue.message is
         "Function Bar.f3 have invalid predefined method index 2"
-      Compiler.compileContract(code(3)).isRight is true
-      Compiler.compileContract(code(2, 3)).isRight is true
+      compileContract(code(3)).isRight is true
+      compileContract(code(2, 3)).isRight is true
     }
   }
 
@@ -6535,7 +6549,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn f1() -> ()
          |}
          |""".stripMargin
-    Compiler.compileContract(code0).leftValue.message is
+    compileContract(code0).leftValue.message is
       s"Function Foo.f1 have invalid predefined method index 0"
 
     val code1 =
@@ -6553,7 +6567,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn bar() -> ()
          |}
          |""".stripMargin
-    Compiler.compileContract(code1).leftValue.message is
+    compileContract(code1).leftValue.message is
       s"Function Bar.bar have invalid predefined method index 1"
   }
 
@@ -6634,7 +6648,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    val contract = Compiler.compileContract(code).rightValue
+    val contract = compileContract(code).rightValue
     val method0  = contract.methods(0)
     method0.usePreapprovedAssets is false
     method0.useContractAssets is false
@@ -6655,7 +6669,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }$$
          |}
          |""".stripMargin
-    Compiler.compileContractFull(replace(code())).rightValue.warnings.isEmpty is true
+    compileContractFull(replace(code())).rightValue.warnings.isEmpty is true
 
     val statements = Seq(
       "transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)",
@@ -6663,7 +6677,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "transferToken!(callerAddress!(), selfAddress!(), ALPH, 1 alph)"
     )
     statements.foreach { stmt =>
-      Compiler.compileContractFull(replace(code("true", stmt))).isRight is true
+      compileContractFull(replace(code("true", stmt))).isRight is true
     }
     testContractError(
       code("true"),
@@ -6772,10 +6786,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val compiled0 = Compiler.compileContractFull(code(), 1).rightValue.code
+    val compiled0 = compileContractFull(code(), 1).rightValue.code
     compiled0.methods.foreach(_.instrs.head isnot a[MethodSelector])
 
-    val compiled1 = Compiler.compileContractFull(code("true"), 1).rightValue
+    val compiled1 = compileContractFull(code("true"), 1).rightValue
     val funcs     = compiled1.ast.funcs
     compiled1.code.methods(0).instrs.head is MethodSelector(funcs(0).methodSelector.get)
     compiled1.code.methods(1).instrs.head is MethodSelector(funcs(1).methodSelector.get)
@@ -6790,7 +6804,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val result0 = Compiler.compileContractFull(code0).rightValue
+    val result0 = compileContractFull(code0).rightValue
     result0.code.methods.foreach(_.instrs.head is a[MethodSelector])
 
     val code1 =
@@ -6804,7 +6818,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn func0() -> ()
          |}
          |""".stripMargin
-    val result1 = Compiler.compileContractFull(code1).rightValue
+    val result1 = compileContractFull(code1).rightValue
     result1.code.methods(0).instrs.head isnot a[MethodSelector]
     result1.code.methods(1).instrs.head is a[MethodSelector]
 
@@ -6819,7 +6833,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn func0() -> ()
          |}
          |""".stripMargin
-    val result2 = Compiler.compileContractFull(code2).rightValue
+    val result2 = compileContractFull(code2).rightValue
     result2.code.methods.foreach(_.instrs.head is a[MethodSelector])
 
     val code3 =
@@ -6832,7 +6846,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn func0() -> ()
          |}
          |""".stripMargin
-    val result3 = Compiler.compileContractFull(code3).rightValue
+    val result3 = compileContractFull(code3).rightValue
     result3.code.methods.foreach(_.instrs.head is a[MethodSelector])
   }
 
@@ -6846,7 +6860,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  fn func1() -> () { return }
          |}
          |""".stripMargin
-    val result0 = Compiler.compileContractFull(code0).rightValue
+    val result0 = compileContractFull(code0).rightValue
     result0.code.methods(0).instrs.head is a[MethodSelector]
     result0.code.methods(1).instrs.head isnot a[MethodSelector]
 
@@ -6864,7 +6878,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  fn func1() -> ()
          |}
          |""".stripMargin
-    val result1 = Compiler.compileContractFull(code1).rightValue
+    val result1 = compileContractFull(code1).rightValue
     result1.code.methods(0).instrs.head is a[MethodSelector]
     result1.code.methods(1).instrs.head isnot a[MethodSelector]
   }
@@ -6883,9 +6897,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val compiledFoo     = Compiler.compileContractFull(fooCode, 1).rightValue
+    val compiledFoo     = compileContractFull(fooCode, 1).rightValue
     val funcs           = compiledFoo.ast.funcs
-    val globalState     = Ast.GlobalState(Seq.empty)
+    val globalState     = Ast.GlobalState.from[StatefulContext](Seq.empty)
     val methodSelector0 = funcs(0).getMethodSelector(globalState)
     val methodSelector1 = funcs(1).getMethodSelector(globalState)
     compiledFoo.code.methods(0).instrs.head is MethodSelector(methodSelector0)
@@ -6905,7 +6919,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$fooCode
            |""".stripMargin
 
-      Compiler.compileContractFull(barCode).rightValue.code
+      compileContractFull(barCode).rightValue.code
     }
 
     val instrs =
@@ -7109,7 +7123,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val compiled = Compiler.compileContractFull(code).rightValue.code
+      val compiled = compileContractFull(code).rightValue.code
       compiled.methods
         .take(4)
         .foreach(_.instrs.exists(_.isInstanceOf[CallExternalBySelector]) is false)
@@ -7153,7 +7167,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn bar() -> U256
            |}
            |""".stripMargin
-      val result = Compiler.compileContractFull(code).rightValue
+      val result = compileContractFull(code).rightValue
       result.ast.funcs.map(_.name) is Seq("foo", "bar")
       val compiled = result.code
       compiled.methods(0).instrs.head isnot a[MethodSelector]
@@ -7179,7 +7193,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val compiled = Compiler.compileContractFull(code).rightValue
+      val compiled = compileContractFull(code).rightValue
       compiled.ast.funcs.map(_.name) is Seq("bar", "foo", "baz")
       compiled.code.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
       compiled.code.methods.last.instrs isnot a[MethodSelector]
@@ -7217,7 +7231,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val compiled = Compiler.compileContractFull(code).rightValue
+      val compiled = compileContractFull(code).rightValue
       compiled.ast.funcs.map(_.name) is Seq("foo", "bar", "baz")
       compiled.code.methods.foreach(_.instrs.head is a[MethodSelector])
     }
@@ -7250,7 +7264,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val compiled = Compiler.compileContractFull(code).rightValue
+      val compiled = compileContractFull(code).rightValue
       compiled.ast.funcs.map(_.name) is Seq("bar", "foo", "baz")
       compiled.code.methods.take(2).foreach(_.instrs.head is a[MethodSelector])
       compiled.code.methods.last.instrs isnot a[MethodSelector]
@@ -7266,7 +7280,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    Compiler.compileContract(replace(code)).isRight is true
+    compileContract(replace(code)).isRight is true
 
     val multiContracts = Compiler.compileMultiContract(replace(code)).rightValue
     val foo            = multiContracts.contracts.head.asInstanceOf[Ast.Contract]
@@ -7276,5 +7290,725 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val error = intercept[Compiler.Error](foo.genMethods(state))
     error.message is "Function bar's method selector conflicts with function foo's method selector. Please use a new function name."
     error.position is code.indexOf("$")
+  }
+
+  it should "have consistent warnings" in {
+    val code =
+      """
+        |Contract Bar(foo: IFoo) {
+        |  pub fn bar() -> Bool {
+        |    return foo.foo()
+        |  }
+        |}
+        |Interface IFoo {
+        |   pub fn foo() -> Bool
+        |}
+        |""".stripMargin
+
+    val options        = CompilerOptions.Default
+    val multiContract  = Compiler.compileMultiContract(code).rightValue
+    val (compiled1, _) = multiContract.genStatefulContracts()(options)._2.head
+    val (compiled2, _) = multiContract.genStatefulContracts()(options)._2.head
+    compiled1.code is compiled2.code
+    compiled1.ast is compiled2.ast
+    compiled1.debugCode is compiled2.debugCode
+    compiled1.warnings isnot compiled2.warnings
+
+    multiContract.contracts.foreach(_.reset())
+    val (compiled3, _) = multiContract.genStatefulContracts()(options)._2.head
+
+    compiled1.code is compiled3.code
+    compiled1.ast is compiled3.ast
+    compiled1.debugCode is compiled3.debugCode
+    compiled1.warnings is compiled3.warnings
+  }
+
+  it should "compile the len!(array)" in {
+    def code(tpe: String) =
+      s"""
+         |Contract Foo(value: $tpe) {
+         |  pub fn foo() -> U256 {
+         |    return $$len!(value)$$
+         |  }
+         |}
+         |""".stripMargin
+
+    compileContract(replace(code("[U256; 2]"))).isRight is true
+    testContractError(code("U256"), "Expected an array, got \"U256\"")
+  }
+
+  it should "compile global definitions" in new Fixture {
+    {
+      info("duplicated global definitions")
+      val code =
+        s"""
+           |$$enum Bar { Red = 0 }$$
+           |struct Bar { x: U256 }
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Bar"
+      )
+    }
+
+    {
+      info("constant does not exist")
+      val code =
+        s"""
+           |const A = 0
+           |const C = A + $$B$$
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Constant variable B does not exist or is used before declaration")
+    }
+
+    {
+      info("constant is used before declaration")
+      val code =
+        s"""
+           |const A = 0
+           |const C = A + $$B$$
+           |const B = 1
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Constant variable B does not exist or is used before declaration")
+    }
+
+    {
+      info("calculate global constants")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |const C = A + B
+           |const D = #00 ++ #11
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    assert!(A == 1, 0)
+           |    assert!(B == 2, 0)
+           |    assert!(C == 3, 0)
+           |    assert!(D == #0011, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("calculate local constants")
+      val code =
+        s"""
+           |const A = 1
+           |Contract Foo() {
+           |  const B = 2
+           |  const C = A + B
+           |  pub fn foo() -> () {
+           |    assert!(A == 1, 0)
+           |    assert!(B == 2, 0)
+           |    assert!(C == 3, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("local constant conflicts with a global constant")
+      val code =
+        s"""
+           |const A = 1
+           |Contract Foo() {
+           |  $$const A = 2$$
+           |  pub fn foo() -> U256 {
+           |    return A
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Local constant A conflicts with an existing global constant, please use a fresh name"
+      )
+    }
+
+    {
+      info("check unused global constants - case 0")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(B == 2, 0)
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: A")
+    }
+
+    {
+      info("check unused global constants - case 1")
+      val code =
+        s"""
+           |const A = 1
+           |const B = A
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = Compiler.compileProject(code).rightValue._1.head
+      compiled.warnings.isEmpty is true
+    }
+
+    {
+      info("check unused global constants - case 2")
+      val code =
+        s"""
+           |const A = 1
+           |const B = 2
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return B
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(A == 1, 0)
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.head.warnings.isEmpty is true
+      result._2.head.warnings.isEmpty is true
+    }
+
+    {
+      info("use global enums")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 0, 0)
+           |    assert!(Color.Blue == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("local enum conflicts with a global enum")
+      val code =
+        s"""
+           |enum Color { Red = 0 }
+           |Contract Foo() {
+           |  $$enum Color { Blue = 1 }$$
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Local enum Color conflicts with an existing global enum, please use a fresh name"
+      )
+    }
+
+    {
+      info("check unused global enums - case 0")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: Color.Blue")
+    }
+
+    {
+      info("check unused global enums - case 1")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(Color.Blue == 1, 0)
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings.isEmpty is true
+    }
+
+    {
+      info("check unused global enums - case 2")
+      val code =
+        s"""
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |TxScript Main {
+           |  assert!(Color.Green == 2, 0)
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: Color.Blue")
+    }
+
+    {
+      info("check unused global constants and enums")
+      val code =
+        s"""
+           |const A = 0
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileProject(code).rightValue._4
+      warnings is AVector("Found unused global constants: A, Color.Blue, Color.Green")
+    }
+
+    {
+      info("ignore unused global constants warning")
+      val code =
+        s"""
+           |const A = 0
+           |enum Color {
+           |  Red = 0
+           |  Blue = 1
+           |  Green = 2
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return Color.Red
+           |  }
+           |}
+           |""".stripMargin
+
+      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
+      val warnings        = Compiler.compileProject(code, compilerOptions).rightValue._4
+      warnings.isEmpty is true
+    }
+  }
+
+  it should "report the correct warnings for unused constants" in {
+    def check(
+        code: String,
+        contractWarnings: AVector[(String, AVector[String])],
+        globalWarnings: AVector[String]
+    ) = {
+      val result = Compiler.compileProject(code).rightValue
+      result._4 is globalWarnings
+      result._1.zipWithIndex.foreach { case (contract, index) =>
+        val value = contractWarnings(index)
+        contract.ast.ident.name is value._1
+        contract.warnings is value._2
+      }
+      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
+      val contracts       = Compiler.compileProject(code, compilerOptions).rightValue._1
+      contracts.foreach(_.warnings.isEmpty is true)
+    }
+
+    {
+      info("unused parent constants")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  const Foo2 = 2
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> U256 {
+           |    return Foo0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> U256 {
+           |    return Foo1
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
+        AVector("Found unused constants in Foo: Foo2")
+      )
+    }
+
+    {
+      info("unused local constants and parent constants")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  const Foo2 = 2
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  const Bar0 = 0
+           |  pub fn bar() -> U256 {
+           |    return Foo0 + Bar0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  const Baz0 = 0
+           |  pub fn baz() -> U256 {
+           |    return Foo1
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector.empty[String]),
+          (
+            "Baz",
+            AVector(
+              "Found unused constants in Baz: Baz0"
+            )
+          )
+        ),
+        AVector("Found unused constants in Foo: Foo2")
+      )
+    }
+
+    {
+      info("unused parent enums")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |    Err2 = 2
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> () {
+           |    assert!(true, ErrorCode.Err0)
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> () {
+           |    assert!(true, ErrorCode.Err1)
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector.empty[String]),
+          ("Baz", AVector.empty[String])
+        ),
+        AVector("Found unused constants in Foo: ErrorCode.Err2")
+      )
+    }
+
+    {
+      info("unused local enums and parent enums")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |    Err2 = 2
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  enum ErrorCode { Err3 = 3 }
+           |  pub fn bar() -> () {
+           |    assert!(true, ErrorCode.Err0)
+           |    assert!(true, ErrorCode.Err3)
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  enum ErrorCode { Err3 = 3 }
+           |  pub fn baz() -> () {
+           |    assert!(true, ErrorCode.Err1)
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(
+          ("Bar", AVector.empty[String]),
+          (
+            "Baz",
+            AVector(
+              "Found unused constants in Baz: ErrorCode.Err3"
+            )
+          )
+        ),
+        AVector("Found unused constants in Foo: ErrorCode.Err2")
+      )
+    }
+
+    {
+      info("no warnings")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  const Foo0 = 0
+           |  const Foo1 = 1
+           |  enum ErrorCode {
+           |    Err0 = 0
+           |    Err1 = 1
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |Contract Bar() extends Foo() {
+           |  const Bar0 = 0
+           |  enum ErrorCode { Err2 = 2 }
+           |  pub fn bar() -> U256 {
+           |    assert!(true, ErrorCode.Err0)
+           |    assert!(true, ErrorCode.Err2)
+           |    return Foo0 + Bar0
+           |  }
+           |}
+           |Contract Baz() extends Foo() {
+           |  const Baz0 = 0
+           |  enum ErrorCode { Err2 = 2 }
+           |  pub fn baz() -> U256 {
+           |    assert!(true, ErrorCode.Err1)
+           |    assert!(true, ErrorCode.Err2)
+           |    return Foo1 + Baz0
+           |  }
+           |}
+           |""".stripMargin
+      check(
+        code,
+        AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
+        AVector.empty[String]
+      )
+    }
+  }
+
+  it should "use constants as array size" in new Fixture {
+    {
+      info("Global constants as array size")
+      val code =
+        s"""
+           |const SIZE = 2
+           |enum E { SIZE = 3 }
+           |Contract Foo() {
+           |  pub fn getValues0() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |  pub fn getValues1() -> [U256; SIZE * 2] {
+           |    return [1; 4]
+           |  }
+           |  pub fn getValues2() -> [U256; E.SIZE] {
+           |    return [2; E.SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, output = AVector.fill(2)(Val.U256(0)))
+      test(code, output = AVector.fill(4)(Val.U256(1)), methodIndex = 1)
+      test(code, output = AVector.fill(3)(Val.U256(2)), methodIndex = 2)
+    }
+
+    {
+      info("Local constants as array size")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const SIZE = 2
+           |  enum E { SIZE = 3 }
+           |  pub fn getValues0() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |  pub fn getValues1() -> [U256; SIZE * 2] {
+           |    return [1; 4]
+           |  }
+           |  pub fn getValues2() -> [U256; E.SIZE] {
+           |    return [2; E.SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, output = AVector.fill(2)(Val.U256(0)))
+      test(code, output = AVector.fill(4)(Val.U256(1)), methodIndex = 1)
+      test(code, output = AVector.fill(3)(Val.U256(2)), methodIndex = 2)
+    }
+
+    {
+      info("Different sizes in different contracts")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const SIZE = 2
+           |  pub fn getValues() -> [U256; SIZE] {
+           |    return [0; SIZE]
+           |  }
+           |}
+           |Contract Bar() {
+           |  const SIZE = 3
+           |  pub fn getValues() -> [U256; SIZE] {
+           |    return [1; SIZE]
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, output = AVector.fill(2)(Val.U256(0)))
+      testContract(code, output = AVector.fill(3)(Val.U256(1)), contractIndex = 1)
+    }
+
+    {
+      info("Invalid array size")
+      val code =
+        s"""
+           |const SIZE = 2i
+           |Contract Foo(@unused values: [U256; $$SIZE$$]) {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Invalid array size, expected a constant U256 value")
+    }
+  }
+
+  it should "calculate the correct scope for variables" in {
+    {
+      info("If statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      let mut a = 1
+           |    }
+           |    $$a$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("If-else statement")
+      val code =
+        s"""
+           |Contract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      let mut a = 1
+           |    } else {
+           |      $$a$$ = 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("Nested if-else")
+      val code =
+        s"""
+           |Contract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    if (true) {
+           |      if (false) {
+           |        assert!(1 == 2, 0)
+           |      } else {
+           |        let mut a = 1
+           |      }
+           |      $$a$$ = 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("While statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    while (true) {
+           |      let mut a = 1
+           |    }
+           |    $$a$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.a is not defined in the current scope")
+    }
+
+    {
+      info("For statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    for (let mut i = 1; i < 5; i = i + 1) {
+           |      i = i + 1
+           |    }
+           |    $$i$$ = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Variable foo.i is not defined in the current scope")
+    }
   }
 }

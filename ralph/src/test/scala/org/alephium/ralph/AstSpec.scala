@@ -719,7 +719,7 @@ class AstSpec extends AlephiumSpec {
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin
-    val (contracts, _, _) = Compiler.compileProject(code1).rightValue
+    val contracts = Compiler.compileProject(code1).rightValue._1
     contracts.length is 2
     contracts.foreach(_.warnings.isEmpty is true)
   }
@@ -756,7 +756,7 @@ class AstSpec extends AlephiumSpec {
                   |}
                   |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
-    error.message is "These TxScript/Contract/Interface/Struct are defined multiple times: Bar, Foo, Main"
+    error.message is "These TxScript/Contract/Interface/Struct/Enum are defined multiple times: Bar, Foo, Main"
   }
 
   it should "check interface std id" in {

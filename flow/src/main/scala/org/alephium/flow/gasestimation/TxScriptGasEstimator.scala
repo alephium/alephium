@@ -17,6 +17,7 @@
 package org.alephium.flow.gasestimation
 
 import org.alephium.flow.core._
+import org.alephium.io.IOError
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -36,8 +37,9 @@ object TxScriptGasEstimator {
   )(implicit networkConfig: NetworkConfig, config: GroupConfig, logConfig: LogConfig)
       extends TxScriptGasEstimator {
     def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
-      val chainIndexOpt =
-        inputs.headOption.map(input => ChainIndex(input.fromGroup, input.fromGroup))
+      assume(inputs.nonEmpty)
+      val groupIndex      = inputs.head.fromGroup
+      val chainIndex      = ChainIndex(groupIndex, groupIndex)
       val maximalGasPerTx = getMaximalGasPerTx()
 
       def runScript(
@@ -73,16 +75,19 @@ object TxScriptGasEstimator {
       }
 
       for {
-        chainIndex    <- chainIndexOpt.toRight("No UTXO found.")
-        blockEnv      <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
-        groupView     <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
-        preOutputsOpt <- groupView.getPreOutputs(inputs).left.map(_.toString())
+        blockEnv  <- flow.getDryrunBlockEnv(chainIndex).left.map(ioErrorMessage)
+        groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(ioErrorMessage)
+        preOutputsOpt <- groupView.getPreOutputs(inputs).left.map(ioErrorMessage)
         preOutputs    <- preOutputsOpt.toRight("Tx inputs do not exit")
         result        <- runScript(blockEnv, groupView, preOutputs)
       } yield {
         maximalGasPerTx.subUnsafe(result.gasBox)
       }
     }
+  }
+
+  private def ioErrorMessage(error: IOError): String = {
+    s"IO error when estimating gas for tx script or contract: $error"
   }
 
   object Mock extends TxScriptGasEstimator {

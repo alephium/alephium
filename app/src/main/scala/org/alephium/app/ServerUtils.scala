@@ -1233,7 +1233,7 @@ class ServerUtils(implicit
   def compileProject(query: Compile.Project): Try[CompileProjectResult] = {
     Compiler
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
-      .map(p => CompileProjectResult.from(p._1, p._2, p._3))
+      .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
       .left
       .map(error => failed(error.format(query.code)))
   }
@@ -1249,8 +1249,16 @@ class ServerUtils(implicit
     } yield state
   }
 
-  def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
-    val result = for {
+  private def call[P <: CallBase](
+      blockFlow: BlockFlow,
+      params: P,
+      execute: (
+          WorldState.Staging,
+          GroupIndex,
+          BlockHash
+      ) => Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)]
+  ) = {
+    for {
       groupIndex <- params.validate()
       _          <- checkGroup(groupIndex)
       blockHash = params.worldStateBlockHash.getOrElse(
@@ -1259,11 +1267,115 @@ class ServerUtils(implicit
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
       )
-      contractId = params.address.contractId
+      resultPair <- execute(worldState, groupIndex, blockHash)
+      (returns, exeResult) = resultPair
+      contractsState <- params.allContractAddresses.mapE(address =>
+        fetchContractState(worldState, address.contractId)
+      )
+      events = fetchContractEvents(worldState)
+      eventsSplit <- extractDebugMessages(events)
+    } yield (returns, exeResult, contractsState, eventsSplit._1, eventsSplit._2)
+  }
+
+  def callTxScript(blockFlow: BlockFlow, params: CallTxScript): Try[CallTxScriptResult] = {
+    val txId        = params.txId.getOrElse(TransactionId.random)
+    val inputAssets = params.inputAssets.getOrElse(AVector.empty)
+    for {
+      script <- deserialize[StatefulScript](params.bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+      result <- call(blockFlow, params, callTxScript(_, _, txId, _, inputAssets, script))
+    } yield {
+      val (returns, exeResult, contractsState, events, debugMessages) = result
+      CallTxScriptResult(
+        returns.map(Val.from),
+        maximalGasPerTx.subUnsafe(exeResult.gasBox).value,
+        contractsState,
+        exeResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
+        exeResult.generatedOutputs.mapWithIndex { case (output, index) =>
+          Output.from(output, txId, index)
+        },
+        events,
+        debugMessages
+      )
+    }
+  }
+
+  private def callTxScript(
+      worldState: WorldState.Staging,
+      groupIndex: GroupIndex,
+      txId: TransactionId,
+      blockHash: BlockHash,
+      inputAssets: AVector[TestInputAsset],
+      script: StatefulScript
+  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val blockEnv = mockupBlockEnv(groupIndex, blockHash, TimeStamp.now())
+    val txEnv    = mockupTxEnv(txId, inputAssets)
+    val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+    wrapExeResult(StatefulVM.runTxScriptWithOutputsTestOnly(context, script))
+  }
+
+  @inline private def mockupBlockEnv(
+      groupIndex: GroupIndex,
+      blockHash: BlockHash,
+      blockTimeStamp: TimeStamp
+  ) = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(blockTimeStamp)
+    BlockEnv(
+      ChainIndex(groupIndex, groupIndex),
+      networkConfig.networkId,
+      blockTimeStamp,
+      consensusConfig.maxMiningTarget,
+      Some(blockHash)
+    )
+  }
+
+  @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
+    TxEnv.mockup(
+      txId = txId,
+      signatures = Stack.popOnly(AVector.empty[Signature]),
+      prevOutputs = inputAssets.map(_.toAssetOutput),
+      fixedOutputs = AVector.empty[AssetOutput],
+      gasPrice = nonCoinbaseMinGasPrice,
+      gasAmount = maximalGasPerTx,
+      isEntryMethodPayable = true
+    )
+  }
+
+  def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
+    val txId = params.txId.getOrElse(TransactionId.random)
+    val result = call(blockFlow, params, callContract(params, _, _, _, txId)).map {
+      case (returns, exeResult, contractsState, events, debugMessages) =>
+        CallContractSucceeded(
+          returns.map(Val.from),
+          maximalGasPerTx.subUnsafe(exeResult.gasBox).value,
+          contractsState,
+          exeResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
+          exeResult.generatedOutputs.mapWithIndex { case (output, index) =>
+            Output.from(output, txId, index)
+          },
+          events,
+          debugMessages
+        )
+    }
+    result match {
+      case Right(result) => result
+      case Left(error)   => CallContractFailed(error.detail)
+    }
+  }
+
+  private def callContract(
+      params: CallContract,
+      worldState: WorldState.Staging,
+      groupIndex: GroupIndex,
+      blockHash: BlockHash,
+      txId: TransactionId
+  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val contractId = params.address.contractId
+    for {
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
-      txId = params.txId.getOrElse(TransactionId.random)
-      resultPair <- executeContractMethod(
+      result <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
@@ -1276,32 +1388,7 @@ class ServerUtils(implicit
         params.args.getOrElse(AVector.empty),
         method
       )
-      (returns, result) = resultPair
-      contractAddresses = params.existingContracts.getOrElse(
-        AVector.empty
-      ) :+ params.address
-      contractsState <- contractAddresses.mapE(address =>
-        fetchContractState(worldState, address.contractId)
-      )
-      events = fetchContractEvents(worldState)
-      eventsSplit <- extractDebugMessages(events)
-    } yield {
-      CallContractSucceeded(
-        returns.map(Val.from),
-        maximalGasPerTx.subUnsafe(result.gasBox).value,
-        contractsState,
-        result.contractPrevOutputs.map(_.lockupScript).map(Address.from),
-        result.generatedOutputs.mapWithIndex { case (output, index) =>
-          Output.from(output, txId, index)
-        },
-        events = eventsSplit._1,
-        debugMessages = eventsSplit._2
-      )
-    }
-    result match {
-      case Right(result) => result
-      case Left(error)   => CallContractFailed(error.detail)
-    }
+    } yield result
   }
 
   val maxCallsInMultipleCall: Int = ServerUtils.maxCallsInMultipleCall
@@ -1315,7 +1402,19 @@ class ServerUtils(implicit
         failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
       )
     } else {
-      Right(MultipleCallContractResult(params.calls.map(call => callContract(blockFlow, call))))
+      val bestDepss = blockFlow.brokerConfig.groupRange.map(group =>
+        blockFlow.getBestDeps(GroupIndex.unsafe(group))
+      )
+      params.calls
+        .mapE { call =>
+          call.validate().map { groupIndex =>
+            val blockHash = call.worldStateBlockHash.getOrElse(
+              bestDepss(groupIndex.value).uncleHash(groupIndex)
+            )
+            callContract(blockFlow, call.copy(worldStateBlockHash = Some(blockHash)))
+          }
+        }
+        .flatMap(results => Right(MultipleCallContractResult(results)))
     }
   }
 
@@ -1490,25 +1589,10 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val consensusConfig = consensusConfigs.getConsensusConfig(blockTimeStamp)
-    val blockEnv = BlockEnv(
-      ChainIndex(groupIndex, groupIndex),
-      networkConfig.networkId,
-      blockTimeStamp,
-      consensusConfig.maxMiningTarget,
-      Some(blockHash)
-    )
+    val blockEnv   = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
     val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
-    val txEnv: TxEnv = TxEnv.mockup(
-      txId = txId,
-      signatures = Stack.popOnly(AVector.empty[Signature]),
-      prevOutputs = inputAssets.map(_.toAssetOutput),
-      fixedOutputs = AVector.empty[AssetOutput],
-      gasPrice = nonCoinbaseMinGasPrice,
-      gasAmount = maximalGasPerTx,
-      isEntryMethodPayable = true
-    )
-    val context = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+    val txEnv      = mockupTxEnv(txId, inputAssets)
+    val context    = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
     for {
       _ <- checkArgs(args, method)
       result <- runWithDebugError(

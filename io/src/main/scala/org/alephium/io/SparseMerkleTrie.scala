@@ -685,8 +685,8 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
   }
 
   def applyActions(result: TrieUpdateActions): Unit = {
-    result.toAdd.foreach(node => writeBuffer.put(node.hash, node))
     result.toDelete.foreach(hash => writeBuffer -= hash)
+    result.toAdd.foreach(node => writeBuffer.put(node.hash, node))
     result.nodeOpt.foreach(node => rootHash = node.hash)
   }
 

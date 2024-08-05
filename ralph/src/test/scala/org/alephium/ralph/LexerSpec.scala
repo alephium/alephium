@@ -164,7 +164,7 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
         val failure =
           intercept[CompilerError.`Expected an U256 value`] {
-            parsePositioned(errorScript, StatelessParser.assetScript(_))
+            parsePositioned(errorScript, StatelessParser.assetScript(_).map(_._1))
           }
 
         failure.format(errorScript) is

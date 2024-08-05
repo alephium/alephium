@@ -561,6 +561,16 @@
     "returns": "@returns the group of the input address"
   },
   {
+    "name": "len",
+    "category": "Utils",
+    "signature": "fn len!(array) -> (U256)",
+    "doc": "Get the length of an array",
+    "params": [
+      "@param an array"
+    ],
+    "returns": "@returns the length of an array"
+  },
+  {
     "name": "nullContractAddress",
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",

@@ -3329,7 +3329,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         callerFrameOpt = Some(callerFrame)
       )(NetworkConfigFixture.Leman)
       values.foreach(preRhoneFrame.opStack.push)
-      instr.runWith(preRhoneFrame).leftValue isE a[InactiveInstr[_]]
+      // Inactive instrs check will be enabled in future upgrades
+      instr.runWith(preRhoneFrame).leftValue isnotE a[InactiveInstr[_]]
     }
   }
 
