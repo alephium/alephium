@@ -3794,11 +3794,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     val lockupScript = LockupScript.p2pkh(publicKey)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
-    val serverUtils0 = createServerUtils(5)
+    val serverUtils0 = createServerUtils(9)
     serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
-      "Your address has too many UTXOs and exceeds the read limit. Please consolidate your UTXOs first."
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
     serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
-      "Your address has too many UTXOs and exceeds the read limit. Please consolidate your UTXOs first."
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1

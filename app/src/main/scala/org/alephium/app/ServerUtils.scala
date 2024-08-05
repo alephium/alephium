@@ -120,9 +120,9 @@ class ServerUtils(implicit
 
   private def tooManyUtxos[T](error: IOError): Try[T] = {
     error match {
-      case IOError.ExceedMaxNodes =>
+      case IOError.MaxNodeReadLimitExceeded =>
         val message =
-          "Your address has too many UTXOs and exceeds the read limit. Please consolidate your UTXOs first."
+          "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
         Left(ApiError.InternalServerError(message))
       case error => failed(error)
     }

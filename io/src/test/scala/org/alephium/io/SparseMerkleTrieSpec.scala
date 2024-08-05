@@ -374,9 +374,9 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       fixture.trie.getAll(ByteString.empty, maxNodes, errorIfExceedMaxNodes, (_, _) => true)
     }
 
-    getAll(50, true).leftValue is IOError.ExceedMaxNodes
+    getAll(50, true).leftValue is IOError.MaxNodeReadLimitExceeded
     getAll(50, false).rightValue.length is 50
-    getAll(100, true).leftValue is IOError.ExceedMaxNodes
+    getAll(100, true).leftValue is IOError.MaxNodeReadLimitExceeded
     getAll(100, false).rightValue.length is 100
     getAll(101, true).rightValue.length is 101
     getAll(101, false).rightValue.length is 101

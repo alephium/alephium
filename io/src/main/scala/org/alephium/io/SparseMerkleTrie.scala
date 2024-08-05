@@ -601,7 +601,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
             )
               .map(leafNodes ++ _)
           } else if (errorIfExceedMaxNodes) {
-            Left(IOError.ExceedMaxNodes)
+            Left(IOError.MaxNodeReadLimitExceeded)
           } else {
             Right(leafNodes)
           }
