@@ -16,24 +16,30 @@
 
 package org.alephium.ralph
 
-final case class CompilerOptions(
-    ignoreUnusedConstantsWarnings: Boolean,
-    ignoreUnusedVariablesWarnings: Boolean,
-    ignoreUnusedFieldsWarnings: Boolean,
-    ignoreUnusedPrivateFunctionsWarnings: Boolean,
-    ignoreUpdateFieldsCheckWarnings: Boolean,
-    ignoreCheckExternalCallerWarnings: Boolean,
-    ignoreUnusedFunctionReturnWarnings: Boolean
-)
+import org.alephium.util.AlephiumSpec
 
-object CompilerOptions {
-  val Default: CompilerOptions = CompilerOptions(
-    ignoreUnusedConstantsWarnings = false,
-    ignoreUnusedVariablesWarnings = false,
-    ignoreUnusedFieldsWarnings = false,
-    ignoreUpdateFieldsCheckWarnings = false,
-    ignoreUnusedPrivateFunctionsWarnings = false,
-    ignoreCheckExternalCallerWarnings = false,
-    ignoreUnusedFunctionReturnWarnings = false
-  )
+class VariableScopeSpec extends AlephiumSpec {
+  it should "check variable scope" in {
+    val ref0 = Ast.Ident("0")
+    val ref1 = Ast.Ident("1")
+    val ref2 = Ast.Ident("2")
+
+    val scope0    = ChildScope(FunctionRoot, ref0, 1)
+    val scope1    = ChildScope(scope0, ref1, 2)
+    val scope2    = ChildScope(scope0, ref2, 2)
+    val allScopes = Seq(FunctionRoot, scope0, scope1, scope2)
+
+    allScopes.foreach { scope =>
+      FunctionRoot.include(scope) is true
+      if (scope != FunctionRoot) {
+        scope.include(FunctionRoot) is false
+      }
+      scope.include(scope) is true
+    }
+
+    scope0.include(scope1) is true
+    scope0.include(scope2) is true
+    scope1.include(scope2) is false
+    scope2.include(scope1) is false
+  }
 }
