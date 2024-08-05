@@ -91,13 +91,13 @@ trait WalletEndpointsLogic extends WalletEndpoints {
       .getBalances(wallet)
       .map(_.map { balances =>
         val totalBalance =
-          Amount(balances.map { case (_, amount, _, _) => amount }.fold(U256.Zero) {
+          Amount(balances.map { case (_, amount, _) => amount }.fold(U256.Zero) {
             case (acc, amount) =>
               acc.addUnsafe(amount.value)
           })
-        val balancesPerAddress = balances.map { case (address, amount, lockedAmount, warning) =>
+        val balancesPerAddress = balances.map { case (address, amount, lockedAmount) =>
           model.Balances
-            .AddressBalance(address, amount, amount.hint, lockedAmount, lockedAmount.hint, warning)
+            .AddressBalance(address, amount, amount.hint, lockedAmount, lockedAmount.hint)
         }
         model.Balances(totalBalance, totalBalance.hint, balancesPerAddress)
       }.left.map(toApiError))

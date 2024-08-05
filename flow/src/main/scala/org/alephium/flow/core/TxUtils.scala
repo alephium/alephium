@@ -76,7 +76,11 @@ trait TxUtils { Self: FlowUtils =>
     assume(brokerConfig.contains(groupIndex))
     for {
       groupView <- getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
-      outputs   <- groupView.getRelevantUtxos(lockupScript, maxUtxosToRead)
+      outputs <- groupView.getRelevantUtxos(
+        lockupScript,
+        maxUtxosToRead,
+        errorIfExceedMaxUtxos = false
+      )
     } yield {
       val currentTs = TimeStamp.now()
       outputs.filter(_.output.lockTime <= currentTs)
@@ -180,7 +184,7 @@ trait TxUtils { Self: FlowUtils =>
           getImmutableGroupView(groupIndex)
         }
         blockFlowGroupView.flatMap(
-          _.getRelevantUtxos(ls, utxosLimit).map(_.as[OutputInfo])
+          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos = true).map(_.as[OutputInfo])
         )
       case ls: LockupScript.P2C =>
         getBestPersistedWorldState(groupIndex).flatMap(

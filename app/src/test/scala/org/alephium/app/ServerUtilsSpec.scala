@@ -3772,6 +3772,59 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block1)
   }
 
+  it should "return an error if there are too many utxos" in new Fixture {
+    def createServerUtils(utxosLimit: Int): ServerUtils = {
+      new ServerUtils()(
+        brokerConfig,
+        consensusConfigs,
+        networkConfig,
+        apiConfig.copy(defaultUtxosLimit = utxosLimit),
+        logConfig,
+        ec
+      )
+    }
+
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val (_, publicKey)            = chainIndex.from.generateKey
+    (0 until 10).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
+      addAndCheck(blockFlow, block)
+    }
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
+
+    val serverUtils0 = createServerUtils(9)
+    serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+    serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+
+    val serverUtils1 = createServerUtils(10)
+    serverUtils1
+      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .rightValue
+      .balance
+      .value is ALPH.alph(10)
+    serverUtils1
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .rightValue
+      .utxos
+      .length is 10
+
+    val serverUtils2 = createServerUtils(11)
+    serverUtils2
+      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .rightValue
+      .balance
+      .value is ALPH.alph(10)
+    serverUtils2
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .rightValue
+      .utxos
+      .length is 10
+  }
+
   @scala.annotation.tailrec
   private def randomBlockHash(
       chainIndex: ChainIndex

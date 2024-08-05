@@ -28,6 +28,8 @@ sealed abstract class AppIOError(reason: AppException) extends IOError(reason)
 object IOError {
   final case class Serde(e: SerdeError)         extends AppIOError(e)
   final case class KeyNotFound(e: AppException) extends AppIOError(e)
+  final object MaxNodeReadLimitExceeded
+      extends AppIOError(new AppException("MaxNodeReadLimitExceeded"))
 
   final case class JavaIO(e: java.io.IOException)     extends IOError(e)
   final case class JavaSecurity(e: SecurityException) extends IOError(e)

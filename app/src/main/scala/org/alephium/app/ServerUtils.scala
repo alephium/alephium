@@ -118,6 +118,16 @@ class ServerUtils(implicit
     wrapResult(blockFlow.getDifficultyMetric().map(_.value))
   }
 
+  private def tooManyUtxos[T](error: IOError): Try[T] = {
+    error match {
+      case IOError.MaxNodeReadLimitExceeded =>
+        val message =
+          "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+        Left(ApiError.InternalServerError(message))
+      case error => failed(error)
+    }
+  }
+
   def getBalance(blockFlow: BlockFlow, address: Address, getMempoolUtxos: Boolean): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
@@ -128,9 +138,9 @@ class ServerUtils(implicit
           utxosLimit,
           getMempoolUtxos
         )
-        .map(Balance.from(_, utxosLimit))
+        .map(Balance.from)
         .left
-        .flatMap(failed)
+        .flatMap(tooManyUtxos)
     } yield balance
   }
 
@@ -142,8 +152,8 @@ class ServerUtils(implicit
         .getUTXOs(address.lockupScript, utxosLimit, getMempoolUtxos = true)
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
-        .flatMap(failed)
-    } yield UTXOs.from(utxos, utxosLimit)
+        .flatMap(tooManyUtxos)
+    } yield UTXOs.from(utxos)
   }
 
   def getContractGroup(

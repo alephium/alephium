@@ -653,6 +653,7 @@ class AstSpec extends AlephiumSpec {
     val code0 =
       s"""
          |Contract Foo(to: Address) {
+         |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    bar{callerAddress!() -> ALPH: 1 alph}(callerAddress!())
          |  }

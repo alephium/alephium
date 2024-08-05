@@ -19,18 +19,8 @@ package org.alephium.api.model
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class UTXOs(
-    utxos: AVector[UTXO],
-    warning: Option[String] = None
-)
+final case class UTXOs(utxos: AVector[UTXO])
 
 object UTXOs {
-  def from(utxos: AVector[UTXO], utxosLimit: Int): UTXOs = {
-    val warning =
-      Option.when(utxosLimit == utxos.length)(
-        "Result might not contains all utxos"
-      )
-
-    UTXOs(utxos, warning)
-  }
+  def from(utxos: AVector[UTXO]): UTXOs = UTXOs(utxos)
 }

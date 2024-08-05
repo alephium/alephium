@@ -492,16 +492,17 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
       maxNodes: Int
   ): IOResult[AVector[(K, V)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes: Int, (_, _) => true)
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes, false, (_, _) => true)
   }
 
   def getAll(
       prefix: ByteString,
       maxNodes: Int,
+      errorIfExceedMaxNodes: Boolean,
       predicate: (K, V) => Boolean
   ): IOResult[AVector[(K, V)]] = {
     val prefixNibbles = SparseMerkleTrie.bytes2Nibbles(prefix)
-    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes: Int, predicate)
+    getAllRaw(prefixNibbles, rootHash, ByteString.empty, maxNodes, errorIfExceedMaxNodes, predicate)
   }
 
   protected def getAllRaw(
@@ -509,12 +510,13 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
       hash: Hash,
       acc: ByteString,
       maxNodes: Int,
+      errorIfExceedMaxNodes: Boolean,
       predicate: (K, V) => Boolean
   ): IOResult[AVector[(K, V)]] = {
     if (prefix.isEmpty) {
-      getAllRaw(hash, acc, maxNodes, predicate)
+      getAllRaw(hash, acc, maxNodes, errorIfExceedMaxNodes, predicate)
     } else {
-      getNode(hash).flatMap(getAllRaw(prefix, _, acc, maxNodes, predicate))
+      getNode(hash).flatMap(getAllRaw(prefix, _, acc, maxNodes, errorIfExceedMaxNodes, predicate))
     }
   }
 
@@ -524,13 +526,14 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
       node: Node,
       acc: ByteString,
       maxNodes: Int,
+      errorIfExceedMaxNodes: Boolean,
       predicate: (K, V) => Boolean
   ): IOResult[AVector[(K, V)]] = {
     node match {
       case n: BranchNode =>
         if (n.path.length >= prefix.length) {
           if (n.path.startsWith(prefix)) {
-            getAllRaw(n, acc, maxNodes, predicate)
+            getAllRaw(n, acc, maxNodes, errorIfExceedMaxNodes, predicate)
           } else {
             Right(AVector.empty)
           }
@@ -546,6 +549,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
                   child,
                   acc ++ n.path ++ ByteString(nibble),
                   maxNodes,
+                  errorIfExceedMaxNodes,
                   predicate
                 )
               case None => Right(AVector.empty)
@@ -567,10 +571,11 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
       hash: Hash,
       acc: ByteString,
       maxNodes: Int,
+      errorIfExceedMaxNodes: Boolean,
       predicate: (K, V) => Boolean
   ): IOResult[AVector[(K, V)]] = {
     getNode(hash).flatMap {
-      case n: BranchNode => getAllRaw(n, acc, maxNodes, predicate)
+      case n: BranchNode => getAllRaw(n, acc, maxNodes, errorIfExceedMaxNodes, predicate)
       case n: LeafNode   => deserializeKV(acc ++ n.path, n, predicate)
     }
   }
@@ -579,14 +584,27 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
       node: BranchNode,
       acc: ByteString,
       maxNodes: Int,
+      errorIfExceedMaxNodes: Boolean,
       predicate: (K, V) => Boolean
   ): IOResult[AVector[(K, V)]] = {
     node.children.foldWithIndexE(AVector.empty[(K, V)]) { case (leafNodes, childOpt, index) =>
       val restNodes = maxNodes - leafNodes.length
       childOpt match {
-        case Some(child) if restNodes > 0 =>
-          getAllRaw(child, acc ++ node.path ++ ByteString(index.toByte), restNodes, predicate)
-            .map(leafNodes ++ _)
+        case Some(child) =>
+          if (restNodes > 0) {
+            getAllRaw(
+              child,
+              acc ++ node.path ++ ByteString(index.toByte),
+              restNodes,
+              errorIfExceedMaxNodes,
+              predicate
+            )
+              .map(leafNodes ++ _)
+          } else if (errorIfExceedMaxNodes) {
+            Left(IOError.MaxNodeReadLimitExceeded)
+          } else {
+            Right(leafNodes)
+          }
         case _ => Right(leafNodes)
       }
     }

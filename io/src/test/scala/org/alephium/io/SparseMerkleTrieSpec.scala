@@ -226,19 +226,32 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       trie.getAll(ByteString.empty, k).rightValue.length is k
     }
 
-    val filter0 = trie.getAll(ByteString.empty, 1001, (key, _) => key.hashCode() > 0).rightValue
-    val filter1 = trie.getAll(ByteString.empty, 1001, (key, _) => key.hashCode() <= 0).rightValue
+    val filter0 =
+      trie.getAll(ByteString.empty, 1001, false, (key, _) => key.hashCode() > 0).rightValue
+    val filter1 =
+      trie.getAll(ByteString.empty, 1001, false, (key, _) => key.hashCode() <= 0).rightValue
     filter0.length + filter1.length is 1001
 
-    val filter2 = trie.getAll(ByteString.empty, 100, (key, _) => key.hashCode() > 0).rightValue
-    val filter3 = trie.getAll(ByteString.empty, 100, (key, _) => key.hashCode() <= 0).rightValue
+    val filter2 =
+      trie.getAll(ByteString.empty, 100, false, (key, _) => key.hashCode() > 0).rightValue
+    val filter3 =
+      trie.getAll(ByteString.empty, 100, false, (key, _) => key.hashCode() <= 0).rightValue
     (filter2.length + filter3.length > 100) is true
     (filter2.length + filter3.length <= 200) is true
 
     val samples = Set(keys.take(500).sample(), keys.drop(500).sample())
-    trie.getAll(ByteString.empty, 1, (key, _) => samples.contains(key)).rightValue.length is 1
-    trie.getAll(ByteString.empty, 2, (key, _) => samples.contains(key)).rightValue.length is 2
-    trie.getAll(ByteString.empty, 3, (key, _) => samples.contains(key)).rightValue.length is 2
+    trie
+      .getAll(ByteString.empty, 1, false, (key, _) => samples.contains(key))
+      .rightValue
+      .length is 1
+    trie
+      .getAll(ByteString.empty, 2, false, (key, _) => samples.contains(key))
+      .rightValue
+      .length is 2
+    trie
+      .getAll(ByteString.empty, 3, false, (key, _) => samples.contains(key))
+      .rightValue
+      .length is 2
 
     keys.foreach { key =>
       trie.getOpt(key).map(_.nonEmpty) isE true
@@ -348,6 +361,27 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
 
   it should "persist empty trie" in withTrieFixture { fixture =>
     fixture.inMemTrie.persistInBatch().rightValue.rootHash is fixture.trie.rootHash
+  }
+
+  it should "return an error if it exceeds the maximum max nodes" in withTrieFixture { fixture =>
+    (0 until 100).foreach { _ =>
+      val (key, value) = generateKV()
+      fixture.trie = fixture.trie.put(key, value).rightValue
+    }
+    fixture.trie.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 101
+
+    def getAll(maxNodes: Int, errorIfExceedMaxNodes: Boolean) = {
+      fixture.trie.getAll(ByteString.empty, maxNodes, errorIfExceedMaxNodes, (_, _) => true)
+    }
+
+    getAll(50, true).leftValue is IOError.MaxNodeReadLimitExceeded
+    getAll(50, false).rightValue.length is 50
+    getAll(100, true).leftValue is IOError.MaxNodeReadLimitExceeded
+    getAll(100, false).rightValue.length is 100
+    getAll(101, true).rightValue.length is 101
+    getAll(101, false).rightValue.length is 101
+    getAll(102, true).rightValue.length is 101
+    getAll(102, false).rightValue.length is 101
   }
 }
 

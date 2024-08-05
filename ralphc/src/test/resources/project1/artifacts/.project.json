@@ -5,7 +5,8 @@
     "ignoreUnusedFieldsWarnings": false,
     "ignoreUnusedPrivateFunctionsWarnings": false,
     "ignoreUpdateFieldsCheckWarnings": false,
-    "ignoreCheckExternalCallerWarnings": false
+    "ignoreCheckExternalCallerWarnings": false,
+    "ignoreUnusedFunctionReturnWarnings": false
   },
   "infos": {
     "Add": {
@@ -38,7 +39,7 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "",
       "warnings": [
-        "The return values of the function \"Add.add\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
+        "The return values of the function \"Add.add\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       ]
     },
     "Sub": {
