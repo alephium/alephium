@@ -1842,7 +1842,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
   it should "parse AssetScript" in {
     val script = s"""
+                    |const A = 0
                     |struct Foo { x: U256 }
+                    |enum Color { Red = 0 }
                     |AssetScript Main(x: U256) {
                     |  pub fn main(foo: Foo) -> Foo {
                     |    return foo
@@ -1850,28 +1852,37 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
                     |}
                     |""".stripMargin
 
-    parse(script, StatelessParser.assetScript(_)).get.value is
-      AssetScript(
-        TypeId("Main"),
-        Seq(Argument(Ident("x"), Type.U256, false, false)),
-        Seq(
-          FuncDef(
-            Seq.empty,
-            FuncId("main", false),
-            isPublic = true,
-            usePreapprovedAssets = false,
-            Ast.NotUseContractAssets,
-            usePayToContractOnly = false,
-            useCheckExternalCaller = true,
-            useUpdateFields = false,
-            useMethodIndex = None,
-            Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
-            Seq(Type.NamedType(TypeId("Foo"))),
-            Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
-          )
-        ),
-        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256))))
+    val result = fastparse.parse(script, StatelessParser.assetScript(_)).get.value
+    result._1 is AssetScript(
+      TypeId("Main"),
+      Seq(Argument(Ident("x"), Type.U256, false, false)),
+      Seq(
+        FuncDef(
+          Seq.empty,
+          FuncId("main", false),
+          isPublic = true,
+          usePreapprovedAssets = false,
+          Ast.NotUseContractAssets,
+          usePayToContractOnly = false,
+          useCheckExternalCaller = true,
+          useUpdateFields = false,
+          useMethodIndex = None,
+          Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
+          Seq(Type.NamedType(TypeId("Foo"))),
+          Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
+        )
       )
+    )
+    result._2 is GlobalState(
+      Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256)))),
+      Seq(ConstantVarDef[StatelessContext](Ident("A"), Const(Val.U256(U256.Zero)))),
+      Seq(
+        EnumDef[StatelessContext](
+          TypeId("Color"),
+          Seq(EnumField(Ident("Red"), Const(Val.U256(U256.Zero))))
+        )
+      )
+    )
   }
 
   // scalastyle:off no.equal
@@ -2265,6 +2276,80 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val result = fastparse.parse(str, StatelessParser.const(_)).get.value
       result.sourceIndex.get.width is num.toString.length
     }
+  }
+
+  it should "parse global definitions" in {
+    val code =
+      s"""
+         |const A = 1
+         |const B = 2
+         |const C = false
+         |struct Bar { x: U256 }
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |const D = A + B
+         |enum Color { Red = 0 }
+         |""".stripMargin
+    val result = parse(code, StatefulParser.multiContract(_)).get.value
+    result.contracts.map(_.name) is Seq("Foo")
+    result.globalState.constants.size is 5
+    result.globalState.getCalculatedConstants() is Seq(
+      (Ident("A"), Val.U256(U256.One)),
+      (Ident("B"), Val.U256(U256.Two)),
+      (Ident("C"), Val.False),
+      (Ident("D"), Val.U256(U256.unsafe(3)))
+    )
+    result.globalState.structs is Seq(
+      Struct(TypeId("Bar"), Seq(StructField(Ident("x"), false, Type.U256)))
+    )
+    result.globalState.enums is Seq(
+      EnumDef[StatefulContext](
+        TypeId("Color"),
+        Seq(EnumField(Ident("Red"), Const(Val.U256(U256.Zero))))
+      )
+    )
+  }
+
+  it should "set the origin contract id for constants" in {
+    val code =
+      s"""
+         |const G0 = 0
+         |enum G1 { V = 0 }
+         |Abstract Contract Foo() {
+         |  const Foo0 = 0
+         |  enum Foo1 { V = 1 }
+         |  pub fn foo() -> () {}
+         |}
+         |Contract Bar() extends Foo() {
+         |  const Bar0 = 0
+         |  enum Bar1 { V = 1 }
+         |  pub fn bar() -> () {}
+         |}
+         |""".stripMargin
+
+    val multiContract = parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+    val globalState   = multiContract.globalState
+    globalState.constantVars.foreach(_.origin is None)
+    globalState.enums.foreach(_.fields.foreach(_.origin is None))
+
+    val foo = multiContract.get(0).asInstanceOf[Contract]
+    foo.isAbstract is true
+    foo.selfDefinedConstants is Seq(Ident("Foo0"), Ident("Foo1.V"))
+    foo.constantVars.length is 1
+    foo.constantVars(0).origin is Some(TypeId("Foo"))
+    foo.enums.length is 1
+    foo.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
+
+    val bar = multiContract.get(1).asInstanceOf[Contract]
+    bar.isAbstract is false
+    bar.selfDefinedConstants is Seq(Ident("Bar0"), Ident("Bar1.V"))
+    bar.constantVars.length is 2
+    bar.constantVars(0).origin is Some(TypeId("Foo"))
+    bar.constantVars(1).origin is Some(TypeId("Bar"))
+    bar.enums.length is 2
+    bar.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
+    bar.enums(1).fields.foreach(_.origin is Some(TypeId("Bar")))
   }
 }
 

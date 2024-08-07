@@ -34,6 +34,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.Compiler
@@ -2504,6 +2505,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
     val rawCode =
       s"""
+         |const A = 0
+         |enum Error { Err0 = 0 }
+         |struct Baz { x: U256 }
          |Interface Foo {
          |  pub fn foo() -> ()
          |}
@@ -2516,9 +2520,10 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Bar(id).foo()
          |}
          |""".stripMargin
-    val (contracts, scripts, _) = Compiler.compileProject(rawCode).rightValue
-    val query                   = Compile.Project(rawCode)
-    val result                  = serverUtils.compileProject(query).rightValue
+    val (contracts, scripts, globalState, globalWarnings) =
+      Compiler.compileProject(rawCode).rightValue
+    val query  = Compile.Project(rawCode)
+    val result = serverUtils.compileProject(query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2529,6 +2534,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     scripts.length is 1
     val scriptCode = result.scripts(0).bytecodeTemplate
     scriptCode is scripts(0).code.toTemplateString()
+
+    result.structs is Some(AVector(CompileResult.StructSig.from(globalState.structs(0))))
+    result.enums is Some(AVector(CompileResult.Enum.from(globalState.enums(0))))
+    val constant = globalState.getCalculatedConstants()(0)
+    result.constants is Some(AVector(CompileResult.Constant.from(constant._1, constant._2)))
+
+    globalWarnings is AVector("Found unused global constants: A, Error.Err0")
   }
 
   it should "compile script" in new Fixture {
@@ -3869,6 +3881,187 @@ class ServerUtilsSpec extends AlephiumSpec {
       .leftValue
       .detail is errorMsg
     serverUtils.getSubContracts(blockFlow, 0, 1, parentContractAddr).leftValue.detail is errorMsg
+  }
+
+  trait VerifyTxOutputFixture extends ContractFixture {
+    val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val (_, testPublicKey)                       = chainIndex.from.generateKey
+    val testLockupScript                         = LockupScript.p2pkh(testPublicKey)
+    val genesisLockupScript                      = lockupScript
+
+    val tokenCode =
+      s"""
+         |Contract Token() {
+         |  pub fn supply() -> () {}
+         |}
+         |""".stripMargin
+    val tokenContract = Compiler.compileContract(tokenCode).rightValue
+    val tokenIssuance = TokenIssuance.Info(vm.Val.U256(100), Some(genesisLockupScript))
+    val contractCreationScript = contractCreation(
+      tokenContract,
+      AVector.empty,
+      AVector.empty,
+      genesisLockupScript,
+      minimalAlphInContract,
+      Some(tokenIssuance)
+    )
+    val tokenIssuanceBlock = payableCall(blockFlow, chainIndex, contractCreationScript)
+    addAndCheck(blockFlow, tokenIssuanceBlock)
+    val tokenId =
+      TokenId.from(ContractId.from(tokenIssuanceBlock.transactions.head.id, 0, chainIndex.from))
+  }
+
+  it should "consider dustUtxoAmount for outputs when building execute script tx" in new VerifyTxOutputFixture {
+    // Transfer tokens
+    (1 to 8).foreach { _ =>
+      val block = transfer(
+        blockFlow,
+        genesisPrivateKey,
+        testLockupScript,
+        tokens = AVector((tokenId, 10)),
+        dustUtxoAmount
+      )
+      addAndCheck(blockFlow, block)
+    }
+
+    // Transfer ALPH
+    (1 to 4).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, testPublicKey, dustUtxoAmount * 2)
+      addAndCheck(blockFlow, block)
+    }
+
+    def buildExecuteScriptTx(approvedAlphAmount: U256, iterations: Int) = {
+      val script = s"""
+                      |TxScript Main {
+                      |  let mut sum = 0
+                      |  for(let mut i = 0; i < ${iterations}; i = i + 1) {
+                      |    sum = sum + 1
+                      |  }
+                      |}
+                      |""".stripMargin
+
+      val scriptBytecode = serialize(Compiler.compileTxScript(script).rightValue)
+
+      serverUtils
+        .buildExecuteScriptTx(
+          blockFlow,
+          BuildExecuteScriptTx(
+            fromPublicKey = testPublicKey.bytes,
+            bytecode = scriptBytecode,
+            attoAlphAmount = Some(Amount(approvedAlphAmount)),
+            tokens = Some(AVector(Token(tokenId, U256.unsafe(78))))
+          )
+        )
+    }
+
+    buildExecuteScriptTx(dustUtxoAmount * 2, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount * 2, 1000).rightValue
+    buildExecuteScriptTx(dustUtxoAmount, 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount, 1000).rightValue
+    buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 10).rightValue
+    buildExecuteScriptTx(dustUtxoAmount.subUnsafe(1), 1000).rightValue
+    buildExecuteScriptTx(U256.Zero, 10).rightValue
+    buildExecuteScriptTx(U256.Zero, 1000).rightValue
+  }
+
+  it should "consider dustUtxoAmount for outputs when building transfer tx" in new VerifyTxOutputFixture {
+    def verifyBuildTransferTx(alphAmount: U256) = {
+      val unsignedTx = serverUtils
+        .prepareUnsignedTransaction(
+          blockFlow,
+          LockupScript.p2pkh(genesisPublicKey),
+          UnlockScript.p2pkh(genesisPublicKey),
+          outputRefsOpt = None,
+          destinations = AVector(
+            Destination(
+              address = Address.Asset(testLockupScript),
+              attoAlphAmount = Amount(alphAmount),
+              tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
+            )
+          ),
+          gasOpt = None,
+          gasPrice = nonCoinbaseMinGasPrice,
+          targetBlockHashOpt = None
+        )
+        .rightValue
+
+      AVector(
+        model.AssetOutput(
+          dustUtxoAmount,
+          testLockupScript,
+          TimeStamp.zero,
+          AVector(tokenId -> 10),
+          ByteString.empty
+        ),
+        model.AssetOutput(
+          dustUtxoAmount,
+          LockupScript.p2pkh(genesisPublicKey),
+          TimeStamp.zero,
+          AVector(tokenId -> 90),
+          ByteString.empty
+        )
+      ).forall(unsignedTx.fixedOutputs.contains) is true
+    }
+
+    verifyBuildTransferTx(U256.Zero)
+    verifyBuildTransferTx(dustUtxoAmount.subUnsafe(1))
+    verifyBuildTransferTx(dustUtxoAmount)
+    verifyBuildTransferTx(dustUtxoAmount.addUnsafe(1))
+    verifyBuildTransferTx(dustUtxoAmount.mulUnsafe(10))
+  }
+
+  it should "return an error if there are too many utxos" in new Fixture {
+    def createServerUtils(utxosLimit: Int): ServerUtils = {
+      new ServerUtils()(
+        brokerConfig,
+        consensusConfigs,
+        networkConfig,
+        apiConfig.copy(defaultUtxosLimit = utxosLimit),
+        logConfig,
+        nodeIndexesConfig,
+        ec
+      )
+    }
+
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val (_, publicKey)            = chainIndex.from.generateKey
+    (0 until 10).foreach { _ =>
+      val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
+      addAndCheck(blockFlow, block)
+    }
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
+
+    val serverUtils0 = createServerUtils(9)
+    serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+    serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
+      "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+
+    val serverUtils1 = createServerUtils(10)
+    serverUtils1
+      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .rightValue
+      .balance
+      .value is ALPH.alph(10)
+    serverUtils1
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .rightValue
+      .utxos
+      .length is 10
+
+    val serverUtils2 = createServerUtils(11)
+    serverUtils2
+      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .rightValue
+      .balance
+      .value is ALPH.alph(10)
+    serverUtils2
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .rightValue
+      .utxos
+      .length is 10
   }
 
   @scala.annotation.tailrec

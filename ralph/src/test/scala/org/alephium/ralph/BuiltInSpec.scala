@@ -64,7 +64,7 @@ class BuiltInSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val ast         = Compiler.compileContractFull(code).rightValue.ast
-    val globalState = Ast.GlobalState(Seq.empty)
+    val globalState = Ast.GlobalState.from[StatefulContext](Seq.empty)
     ast.builtInContractFuncs(globalState).length is 1
     val funcTable = ast.funcTable(globalState)
     funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
@@ -87,7 +87,7 @@ class BuiltInSpec extends AlephiumSpec {
 
     def test(enabled: Boolean) = {
       val ast         = Compiler.compileContractFull(code(enabled)).rightValue.ast
-      val globalState = Ast.GlobalState(Seq.empty)
+      val globalState = Ast.GlobalState.from[StatefulContext](Seq.empty)
       val funcTable   = ast.funcTable(globalState)
       funcTable.size is 2
       ast.builtInContractFuncs(globalState).length is 1

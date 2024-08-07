@@ -119,6 +119,16 @@ class ServerUtils(implicit
     wrapResult(blockFlow.getDifficultyMetric().map(_.value))
   }
 
+  private def tooManyUtxos[T](error: IOError): Try[T] = {
+    error match {
+      case IOError.MaxNodeReadLimitExceeded =>
+        val message =
+          "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+        Left(ApiError.InternalServerError(message))
+      case error => failed(error)
+    }
+  }
+
   def getBalance(blockFlow: BlockFlow, address: Address, getMempoolUtxos: Boolean): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
@@ -129,9 +139,9 @@ class ServerUtils(implicit
           utxosLimit,
           getMempoolUtxos
         )
-        .map(Balance.from(_, utxosLimit))
+        .map(Balance.from)
         .left
-        .flatMap(failed)
+        .flatMap(tooManyUtxos)
     } yield balance
   }
 
@@ -143,8 +153,8 @@ class ServerUtils(implicit
         .getUTXOs(address.lockupScript, utxosLimit, getMempoolUtxos = true)
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
-        .flatMap(failed)
-    } yield UTXOs.from(utxos, utxosLimit)
+        .flatMap(tooManyUtxos)
+    } yield UTXOs.from(utxos)
   }
 
   def getContractGroup(
@@ -680,9 +690,11 @@ class ServerUtils(implicit
           AVector.empty[(TokenId, U256)]
       }
 
+      val tokensDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokensInfo.length))
+
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.attoAlphAmount.value,
+        Math.max(destination.attoAlphAmount.value, tokensDustAmount),
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -1085,16 +1097,23 @@ class ServerUtils(implicit
       gasEstimationMultiplier: Option[GasEstimationMultiplier]
   ): Try[Selected] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
-    val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
+    val estimatedTxOutputsLength = tokens.length + 1
+    // Allocate extra dust amounts for potential fixed outputs as well as generated outputs
+    val estimatedTotalDustAmount =
+      dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength * 2))
+
     for {
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
+      totalSelectAmount <- amount
+        .add(estimatedTotalDustAmount)
+        .toRight(failed("ALPH amount overflow"))
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
           .Build(
             ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
           )
           .select(
-            AssetAmounts(amount, tokens),
+            AssetAmounts(totalSelectAmount, tokens),
             fromUnlockScript,
             allUtxos,
             txOutputsLength = estimatedTxOutputsLength,
@@ -1234,7 +1253,7 @@ class ServerUtils(implicit
   def compileProject(query: Compile.Project): Try[CompileProjectResult] = {
     Compiler
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
-      .map(p => CompileProjectResult.from(p._1, p._2, p._3))
+      .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
       .left
       .map(error => failed(error.format(query.code)))
   }
@@ -1467,7 +1486,19 @@ class ServerUtils(implicit
         failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
       )
     } else {
-      Right(MultipleCallContractResult(params.calls.map(call => callContract(blockFlow, call))))
+      val bestDepss = blockFlow.brokerConfig.groupRange.map(group =>
+        blockFlow.getBestDeps(GroupIndex.unsafe(group))
+      )
+      params.calls
+        .mapE { call =>
+          call.validate().map { groupIndex =>
+            val blockHash = call.worldStateBlockHash.getOrElse(
+              bestDepss(groupIndex.value).uncleHash(groupIndex)
+            )
+            callContract(blockFlow, call.copy(worldStateBlockHash = Some(blockHash)))
+          }
+        }
+        .flatMap(results => Right(MultipleCallContractResult(results)))
     }
   }
 

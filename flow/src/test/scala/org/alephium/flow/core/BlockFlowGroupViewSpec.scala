@@ -50,7 +50,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
     val groupView1 = blockFlow.getImmutableGroupView(mainGroup).rightValue
     groupView1.getPreOutputs(tx1.unsigned.inputs).rightValue.get is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
-    groupView1.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
+    groupView1.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue.map(_.output) is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
     grandPool.add(block1.chainIndex, tx1, now)
     mempool.contains(tx1) is true
@@ -60,7 +60,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
     groupView2.getPreOutputs(tx1.unsigned.inputs).rightValue.isEmpty is true
     groupView2.getPreOutputs(tx2.unsigned.inputs).rightValue.get is
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
-    groupView2.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
+    groupView2.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue.map(_.output) is
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
     grandPool.add(block2.chainIndex, tx2, now.plusMillisUnsafe(1))
     mempool.contains(tx2) is true
@@ -71,7 +71,7 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
     groupView3.getPreOutputs(tx2.unsigned.inputs).rightValue.isEmpty is true
     groupView3.getPreOutputs(tx3.unsigned.inputs).rightValue.get is
       block2.nonCoinbase.head.unsigned.fixedOutputs.tail
-    groupView3.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
+    groupView3.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue.map(_.output) is
       block2.nonCoinbase.head.unsigned.fixedOutputs.tail
 
     val outputInfos = tx1.unsigned.inputs.map { input =>

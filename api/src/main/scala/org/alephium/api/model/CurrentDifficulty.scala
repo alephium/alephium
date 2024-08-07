@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import java.math.BigInteger
 
-final case class CurrentDifficulty(difficulty: BigInteger) extends AnyVal
+final case class CurrentDifficulty(difficulty: BigInteger)

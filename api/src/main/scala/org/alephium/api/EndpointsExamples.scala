@@ -373,8 +373,7 @@ trait EndpointsExamples extends ErrorExamples {
         halfBalance.hint,
         Some(tokens),
         Some(lockedTokens),
-        utxoNum = 3,
-        None
+        utxoNum = 3
       )
     ),
     moreSettingsExample(
@@ -385,15 +384,13 @@ trait EndpointsExamples extends ErrorExamples {
         halfBalance.hint,
         Some(tokens),
         Some(lockedTokens),
-        utxoNum = 3,
-        Some("Result might not include all utxos and is maybe unprecise")
+        utxoNum = 3
       )
     )
   )
 
   implicit val utxosExamples: List[Example[UTXOs]] = List(
-    defaultExample(UTXOs(AVector(utxo), None)),
-    moreSettingsExample(UTXOs(AVector(utxo), Some("Result might not contains all utxos")))
+    defaultExample(UTXOs(AVector(utxo)))
   )
 
   implicit val groupExamples: List[Example[Group]] =

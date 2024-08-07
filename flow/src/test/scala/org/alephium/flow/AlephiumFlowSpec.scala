@@ -741,7 +741,7 @@ trait FlowFixture
     contractState.contractOutputRef is outputRef
 
     worldState
-      .getAssetOutputs(ByteString.empty, Int.MaxValue, (_, _) => true)
+      .getAssetOutputs(ByteString.empty, Int.MaxValue, false, (_, _) => true)
       .rightValue
       .length is numAssets
     worldState.getContractOutputs(ByteString.empty, Int.MaxValue).rightValue.length is numContracts

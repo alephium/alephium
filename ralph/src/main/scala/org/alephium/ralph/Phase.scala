@@ -55,7 +55,7 @@ trait PhaseLike { self: Compiler.State[_] =>
 
   private def resetForGenCode(): Unit = {
     assume(phase == Phase.GenCode)
-    phase = Phase.Check
+    phase = Phase.GenCode
 
     varTable --= genCodePhaseNewVars
     scopes.foreach { case (scopeId, scopeState) =>

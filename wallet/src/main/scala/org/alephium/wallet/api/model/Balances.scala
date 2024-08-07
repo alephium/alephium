@@ -38,8 +38,7 @@ object Balances {
       balance: Amount,
       balanceHint: Amount.Hint,
       lockedBalance: Amount,
-      lockedBalanceHint: Amount.Hint,
-      warning: Option[String] = None
+      lockedBalanceHint: Amount.Hint
   )
 
   object AddressBalance {
@@ -47,15 +46,13 @@ object Balances {
     def from(
         address: Address.Asset,
         balance: Amount,
-        lockedBalance: Amount,
-        warning: Option[String] = None
+        lockedBalance: Amount
     ): AddressBalance = AddressBalance(
       address,
       balance,
       balance.hint,
       lockedBalance,
-      lockedBalance.hint,
-      warning
+      lockedBalance.hint
     )
   }
 }

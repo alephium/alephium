@@ -143,14 +143,6 @@ abstract class RestServerSpec(
         response.code is StatusCode.Ok
         response.as[Balance] is dummyBalance
       }
-    } else {
-      Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
-        response.code is StatusCode.Ok
-        response
-          .as[Balance]
-          .warning
-          .get is "Result might not include all utxos and is maybe unprecise"
-      }
     }
   }
 
@@ -171,7 +163,6 @@ abstract class RestServerSpec(
       response.code is StatusCode.Ok
       val utxos = response.as[UTXOs]
       utxos.utxos.length is 2
-      utxos.warning is None
     }
   }
 

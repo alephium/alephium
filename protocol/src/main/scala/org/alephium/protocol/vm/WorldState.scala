@@ -256,6 +256,7 @@ trait WorldState[T, R1, R2, R3] {
   def getAssetOutputs(
       outputRefPrefix: ByteString,
       maxOutputs: Int,
+      errorIfExceedMaxUtxos: Boolean,
       predicate: (TxOutputRef, TxOutput) => Boolean
   ): IOResult[AVector[(AssetOutputRef, AssetOutput)]]
 }
@@ -333,12 +334,14 @@ object WorldState {
     def getAssetOutputs(
         outputRefPrefix: ByteString,
         maxOutputs: Int,
+        errorIfExceedMaxUtxos: Boolean,
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = {
       outputState
         .getAll(
           outputRefPrefix,
           maxOutputs,
+          errorIfExceedMaxUtxos,
           (outputRef, output) =>
             predicate(outputRef, output) && outputRef.isAssetType && output.isAsset
         )
@@ -353,6 +356,7 @@ object WorldState {
         .getAll(
           outputRefPrefix,
           maxOutputs,
+          errorIfExceedMaxNodes = false,
           (outputRef, output) => outputRef.isContractType && output.isContract
         )
         .map(_.asUnsafe[(ContractOutputRef, ContractOutput)])
@@ -672,6 +676,7 @@ object WorldState {
     def getAssetOutputs(
         outputRefPrefix: ByteString,
         maxOutputs: Int,
+        errorIfExceedMaxUtxos: Boolean,
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
   }

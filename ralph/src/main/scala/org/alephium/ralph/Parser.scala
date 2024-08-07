@@ -46,6 +46,8 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   lazy val Lexer: Lexer = new Lexer(fileURI)
 
+  lazy val constants: Constants[Ctx] = Constants.lazyEvaluated[Ctx]
+
   /*
    * PP: Positioned Parser
    * Help adding source index to the result, it works well on easy case, but it fails for
@@ -72,7 +74,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.CreateArrayExpr.apply(elems)
     }
   def createArray2[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
-    PP("[" ~ (expr ~ ";" ~ nonNegativeNum("array size")) ~ "]") { case ((expr, size)) =>
+    PP("[" ~ (expr ~ ";" ~ arraySize) ~ "]") { case ((expr, size)) =>
       Ast.CreateArrayExpr(Seq.fill(size)(expr))
     }
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
@@ -130,16 +132,16 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   }
 
-  def nonNegativeNum[Unknown: P](errorMsg: String): P[Int] = P(Index ~ Lexer.num ~~ Index).map {
-    case (fromIndex, (value, _), endIndex) =>
-      val idx = value.intValue()
-      if (idx < 0) {
-        throw Compiler.Error(
-          s"Invalid $errorMsg: $idx",
-          Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        )
+  def arraySize[Unknown: P]: P[Int] = P(Index ~ expr ~~ Index).map {
+    case (fromIndex, expr, endIndex) =>
+      constants.calcConstant(expr) match {
+        case Val.U256(value) => value.v.intValue()
+        case _ =>
+          throw Compiler.Error(
+            "Invalid array size, expected a constant U256 value",
+            Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+          )
       }
-      idx
   }
 
   def indexSelector[Unknown: P]: P[Ast.DataSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
@@ -337,7 +339,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
+    P("[" ~ baseType ~ ";" ~ arraySize ~ "]").map { case (tpe, size) =>
       Type.FixedSizeArray(tpe, size)
     }
   }
@@ -593,6 +595,44 @@ abstract class Parser[Ctx <: StatelessContext] {
           .Annotation(id, fieldsOpt.getOrElse(Seq.empty))
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }
+
+  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[Ctx]] =
+    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
+      .map { case (from, ident, expr) =>
+        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+        val constantDef = Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
+        constants.addConstants(Seq(constantDef))
+        constantDef
+      }
+
+  def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[Ctx]] =
+    PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
+      Ast.EnumFieldSelector(enumId, field)
+    }
+
+  def enumField[Unknown: P]: P[Ast.EnumField[Ctx]] =
+    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
+      Ast.EnumField(ident, value)
+    }
+  def rawEnumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] =
+    PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
+      case (enumIndex, id, fields) =>
+        if (fields.isEmpty) {
+          val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
+          throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
+        }
+        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
+        if (fields.distinctBy(_.value.v.tpe).size != 1) {
+          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
+        }
+        if (fields.distinctBy(_.value.v).size != fields.length) {
+          throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
+        }
+        val enumDef = Ast.EnumDef(id, fields)
+        constants.addEnums(Seq(enumDef))
+        enumDef
+    }
+  def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }
 
 final case class FuncDefTmp[Ctx <: StatelessContext](
@@ -835,14 +875,20 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
       varDef | structDestruction | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
     )
 
-  def assetScript[Unknown: P]: P[Ast.AssetScript] =
+  private def globalDefinitions[Unknown: P]: P[Ast.GlobalDefinition] = P(
+    rawStruct | constantVarDef | rawEnumDef
+  )
+
+  def assetScript[Unknown: P]: P[(Ast.AssetScript, Ast.GlobalState[StatelessContext])] =
     P(
-      Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
-        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput(fileURI)
-    ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
-      Ast
-        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
+      Start ~ globalDefinitions.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
+        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput(fileURI)
+    ).map { case (defs, assetIndex, typeId, templateVars, funcs, endIndex) =>
+      val globalState = Ast.GlobalState.from[StatelessContext](defs)
+      val assetScript = Ast
+        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
         .atSourceIndex(assetIndex.index, endIndex, fileURI)
+      (assetScript, globalState)
     }
 }
 
@@ -1034,43 +1080,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef[StatefulContext]] =
-    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
-      .map { case (from, ident, expr) =>
-        val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
-        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
-      }
-
-  def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
-    PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
-      Ast.EnumFieldSelector(enumId, field)
-    }
-
-  def enumField[Unknown: P]: P[Ast.EnumField[StatefulContext]] =
-    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
-      Ast.EnumField(ident, value)
-    }
-  def rawEnumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] =
-    PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
-      case (enumIndex, id, fields) =>
-        if (fields.length == 0) {
-          val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
-          throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
-        }
-        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.v.tpe).size != 1) {
-          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
-        }
-        if (fields.distinctBy(_.value.v).size != fields.length) {
-          throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
-        }
-        Ast.EnumDef(id, fields)
-    }
-  def enumDef[Unknown: P]: P[Ast.EnumDef[StatefulContext]] = P(Start ~ rawEnumDef ~ End)
-
   // scalastyle:off method.length
   // scalastyle:off cyclomatic.complexity
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
       annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
@@ -1110,19 +1121,19 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
-          case c: Ast.ConstantVarDef[_] =>
+          case c: Ast.ConstantVarDef[StatefulContext @unchecked] =>
             if (funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
-            constantVars += c.asInstanceOf[Ast.ConstantVarDef[StatefulContext]]
-          case e: Ast.EnumDef[_] =>
+            constantVars += c.withOrigin(typeId)
+          case e: Ast.EnumDef[StatefulContext @unchecked] =>
             if (funcs.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
-            enums += e.asInstanceOf[Ast.EnumDef[StatefulContext]]
-          case f: Ast.FuncDef[_] =>
-            funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
-          case _ =>
+            e.fields.foreach(_.withOrigin(typeId))
+            enums += e
+          case f: Ast.FuncDef[StatefulContext @unchecked] => funcs += f
+          case _                                          =>
         }
 
         Ast
@@ -1221,20 +1232,23 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
-  private def entities[Unknown: P]: P[Ast.Entity] = P(
-    rawTxScript | rawContract | rawInterface | rawStruct
+  private def globalDefinition[Unknown: P]: P[Ast.GlobalDefinition] = P(
+    rawTxScript | rawContract | rawInterface | rawStruct | constantVarDef | rawEnumDef
   )
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
-    P(Start ~~ Index ~ entities.rep(1) ~~ Index ~ End)
-      .map { case (fromIndex, defs, endIndex) =>
-        val contracts = defs
-          .filter(_.isInstanceOf[Ast.ContractWithState])
-          .asInstanceOf[Seq[Ast.ContractWithState]]
-        val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
+    P(Start ~~ Index ~ globalDefinition.rep(1) ~~ Index ~ End)
+      .map { case (fromIndex, definitions, endIndex) =>
+        val (contracts, defs) = definitions.partition(_.isInstanceOf[Ast.ContractWithState])
+        val globalState       = Ast.GlobalState.from[StatefulContext](defs)
         Ast
-          .MultiContract(contracts, structs, None, None)
+          .MultiContract(
+            contracts.asInstanceOf[Seq[Ast.ContractWithState]],
+            globalState,
+            None,
+            None
+          )
           .atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
@@ -1245,7 +1259,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def constOrArray[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] = P(
     const.map(Seq(_)) |
       P("[" ~ constOrArray.rep(0, ",").map(_.flatten) ~ "]") |
-      P("[" ~ constOrArray ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (consts, size) =>
+      P("[" ~ constOrArray ~ ";" ~ arraySize ~ "]").map { case (consts, size) =>
         (0 until size).flatMap(_ => consts)
       }
   )

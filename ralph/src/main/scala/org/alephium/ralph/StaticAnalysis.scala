@@ -48,6 +48,7 @@ object StaticAnalysis {
     ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
       checkCodeUsingContractAssets(ast.ident, func, method)
       checkCodeUsingPayToContract(ast.ident, func, method)
+      checkCodeUsingAssets(ast.ident, func, method)
     }
   }
 
@@ -125,13 +126,39 @@ object StaticAnalysis {
       )
     }
 
-    if (
-      !func.usePayToContractOnly &&
-      func.useAssetsInContract == Ast.NotUseContractAssets &&
-      method.instrs.exists(payToContractInstrsExceptSelfAddress.contains)
-    ) {
+    val hasPayToContractInstr = method.instrs.exists(payToContractInstrsExceptSelfAddress.contains)
+    val isUseContractAssets =
+      func.usePayToContractOnly || func.useAssetsInContract != Ast.NotUseContractAssets
+    if (!isUseContractAssets && hasPayToContractInstr) {
       throw Compiler.Error(
         s"Function ${Ast.funcName(contractId, func.id)} transfers assets to the contract, please set either `assetsInContract` or `payToContractOnly` to true.",
+        func.sourceIndex
+      )
+    }
+
+    if (isUseContractAssets && hasPayToContractInstr && !func.usePreapprovedAssets) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} transfers assets to the contract, please use annotation `preapprovedAssets = true`.",
+        func.sourceIndex
+      )
+    }
+  }
+
+  private lazy val useAssetsInstrs: Set[vm.Instr[_]] =
+    Set(vm.ApproveAlph, vm.ApproveToken, vm.TransferAlph, vm.TransferToken, vm.BurnToken)
+
+  private def checkCodeUsingAssets(
+      contractId: Ast.TypeId,
+      func: Ast.FuncDef[vm.StatefulContext],
+      method: vm.Method[vm.StatefulContext]
+  ): Unit = {
+    val isNotUseAssets =
+      !func.usePreapprovedAssets &&
+        func.useAssetsInContract == Ast.NotUseContractAssets &&
+        !func.usePayToContractOnly
+    if (isNotUseAssets && method.instrs.exists(useAssetsInstrs.contains)) {
+      throw Compiler.Error(
+        s"Function ${Ast.funcName(contractId, func.id)} uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`",
         func.sourceIndex
       )
     }
