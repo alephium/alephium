@@ -427,6 +427,16 @@ trait Endpoints
       .out(jsonBody[Transaction])
       .summary("Get transaction details")
 
+  lazy val getRawTransaction
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), RawTransaction] =
+    transactionsEndpoint.get
+      .in("raw")
+      .in(path[TransactionId]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[RawTransaction])
+      .summary("Get raw transaction in hex format")
+
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post
       .in("cpu-mining")
@@ -542,6 +552,13 @@ trait Endpoints
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockHeaderEntry])
       .summary("Get block header")
+
+  val getRawBlock: BaseEndpoint[BlockHash, RawBlock] =
+    blockflowEndpoint.get
+      .in("raw-blocks")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[RawBlock])
+      .summary("Get raw block in hex format")
 
   val verifySignature: BaseEndpoint[VerifySignature, Boolean] =
     utilsEndpoint.post
