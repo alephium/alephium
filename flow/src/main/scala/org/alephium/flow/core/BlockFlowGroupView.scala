@@ -110,7 +110,8 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
 
   def getRelevantUtxos(
       lockupScript: LockupScript.Asset,
-      maxUtxosToRead: Int
+      maxUtxosToRead: Int,
+      errorIfExceedMaxUtxos: Boolean
   ): IOResult[AVector[AssetOutputInfo]]
 
   def getContractUtxos(lockupScript: LockupScript.P2C): IOResult[ContractOutput] = {
@@ -159,13 +160,15 @@ object BlockFlowGroupView {
 
     private def getPersistedUtxos(
         lockupScript: LockupScript.Asset,
-        maxUtxosToRead: Int
+        maxUtxosToRead: Int,
+        errorIfExceedMaxUtxos: Boolean
     ): IOResult[AVector[AssetOutputInfo]] = {
       for {
         persistedUtxos <- worldState
           .getAssetOutputs(
             lockupScript.hintBytes,
             maxUtxosToRead,
+            errorIfExceedMaxUtxos,
             (_, output) => output.lockupScript == lockupScript
           )
           .map(
@@ -223,9 +226,10 @@ object BlockFlowGroupView {
 
     def getRelevantUtxos(
         lockupScript: LockupScript.Asset,
-        maxUtxosToRead: Int
+        maxUtxosToRead: Int,
+        errorIfExceedMaxUtxos: Boolean
     ): IOResult[AVector[AssetOutputInfo]] = {
-      getPersistedUtxos(lockupScript, maxUtxosToRead).map { persistedUtxos =>
+      getPersistedUtxos(lockupScript, maxUtxosToRead, errorIfExceedMaxUtxos).map { persistedUtxos =>
         val cachedResult = getUtxosInCache(lockupScript, persistedUtxos)
         mergeUtxos(persistedUtxos, cachedResult._1, cachedResult._2)
       }
@@ -250,10 +254,12 @@ object BlockFlowGroupView {
 
     override def getRelevantUtxos(
         lockupScript: LockupScript.Asset,
-        maxUtxosToRead: Int
+        maxUtxosToRead: Int,
+        errorIfExceedMaxUtxos: Boolean
     ): IOResult[AVector[AssetOutputInfo]] = {
-      super.getRelevantUtxos(lockupScript, maxUtxosToRead).map { utxosInBlocks =>
-        mempool.getRelevantUtxos(lockupScript, utxosInBlocks)
+      super.getRelevantUtxos(lockupScript, maxUtxosToRead, errorIfExceedMaxUtxos).map {
+        utxosInBlocks =>
+          mempool.getRelevantUtxos(lockupScript, utxosInBlocks)
       }
     }
   }

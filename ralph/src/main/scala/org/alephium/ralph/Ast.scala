@@ -520,12 +520,13 @@ object Ast {
   }
   final case class EnumFieldSelector[Ctx <: StatelessContext](enumId: TypeId, field: Ident)
       extends Expr[Ctx] {
+    lazy val fieldIdent = EnumDef.fieldIdent(enumId, field)
+
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] =
-      Seq(state.getVariable(EnumDef.fieldIdent(enumId, field)).tpe)
+      Seq(state.getVariable(fieldIdent).tpe)
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val ident = EnumDef.fieldIdent(enumId, field)
-      state.genLoadCode(ident)
+      state.genLoadCode(fieldIdent)
     }
   }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
@@ -1665,7 +1666,7 @@ object Ast {
         retTypes: Seq[Type]
     ): Unit = {
       if (retTypes.nonEmpty && retTypes != Seq(Type.Panic)) {
-        state.warningUnusedCallReturn(typeId, funcId)
+        state.warningUnusedCallReturn(typeId, funcId, retTypes.length)
       }
     }
   }
@@ -1771,8 +1772,12 @@ object Ast {
       with Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       ifBranches.foreach(_.checkCondition(state))
-      ifBranches.foreach(_.body.foreach(_.check(state)))
-      elseBranchOpt.foreach(_.body.foreach(_.check(state)))
+      ifBranches.foreach { ifBranch =>
+        state.withScope(ifBranch) { ifBranch.body.foreach(_.check(state)) }
+      }
+      elseBranchOpt.foreach { elseBranch =>
+        state.withScope(elseBranch) { elseBranch.body.foreach(_.check(state)) }
+      }
     }
     def reset(): Unit = {
       ifBranches.foreach(_.reset())
@@ -1783,7 +1788,7 @@ object Ast {
       condition: Expr[Ctx],
       body: Seq[Statement[Ctx]]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit = {
+    override def check(state: Compiler.State[Ctx]): Unit = state.withScope(this) {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of conditional expr ${quote(condition)}", sourceIndex)
       }
@@ -1811,7 +1816,7 @@ object Ast {
       update: Statement[Ctx],
       body: Seq[Statement[Ctx]]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit = {
+    override def check(state: Compiler.State[Ctx]): Unit = state.withScope(this) {
       initialize.check(state)
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid condition type: $condition", sourceIndex)
@@ -2355,12 +2360,15 @@ object Ast {
     }
 
     private def checkFields(state: Compiler.State[StatefulContext]): Unit = {
-      fields.foreach { case Argument(fieldId, tpe, isFieldMutable, _) =>
+      fields.foreach { case field @ Argument(fieldId, tpe, isFieldMutable, _) =>
         state.resolveType(tpe) match {
           case Type.Struct(structId) =>
             val isStructImmutable = state.flattenTypeMutability(tpe, isMutable = true).forall(!_)
             if (isFieldMutable && isStructImmutable) {
-              state.warningMutableStructField(ident, fieldId, structId)
+              throw Compiler.Error(
+                s"The struct ${structId.name} is immutable, please remove the `mut` from ${ident.name}.${fieldId.name}",
+                field.sourceIndex
+              )
             }
           case _ => ()
         }

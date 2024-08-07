@@ -32,7 +32,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp}
 trait BlockFlowClient {
   def fetchBalance(
       address: Address.Asset
-  ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount, Option[String])]]
+  ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
       destinations: AVector[Destination],
@@ -106,9 +106,9 @@ object BlockFlowClient {
 
     def fetchBalance(
         address: Address.Asset
-    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount, Option[String])]] =
+    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] =
       requestFromGroup(address.groupIndex, getBalance, (address, Some(true))).map(
-        _.map(res => (res.balance, res.lockedBalance, res.warning))
+        _.map(res => (res.balance, res.lockedBalance))
       )
 
     def prepareTransaction(

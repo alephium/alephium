@@ -39,8 +39,8 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
   }
 
   "GasEstimation.sweepAddress" should "behave the same as GasEstimation.estimateWithP2PKHInputs" in {
-    val inputNumGen  = Gen.choose(0, ALPH.MaxTxInputNum)
-    val outputNumGen = Gen.choose(0, ALPH.MaxTxOutputNum)
+    val inputNumGen  = Gen.choose(1, ALPH.MaxTxInputNum)
+    val outputNumGen = Gen.choose(1, ALPH.MaxTxOutputNum)
 
     forAll(inputNumGen, outputNumGen) { case (inputNum, outputNum) =>
       val sweepAddressGas = GasEstimation.sweepAddress(inputNum, outputNum)

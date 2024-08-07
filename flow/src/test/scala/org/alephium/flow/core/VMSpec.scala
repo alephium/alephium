@@ -1674,12 +1674,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |    transferTokenFromSelf!(@$genesisAddress, tokenId, amount)
          |  }
          |
-         |  @using(assetsInContract = true)
+         |  @using(assetsInContract = true, preapprovedAssets = true)
          |  pub fn func2(tokenId: ByteVec, amount: U256) -> () {
          |    transferTokenToSelf!(@$genesisAddress, tokenId, amount)
          |  }
          |
-         |  @using(assetsInContract = true)
+         |  @using(assetsInContract = true, preapprovedAssets = true)
          |  pub fn func3(from: Address, amount: U256) -> () {
          |    transferTokenToSelf!(from, ALPH, amount)
          |  }
@@ -1716,11 +1716,13 @@ class VMSpec extends AlephiumSpec with Generators {
     callTxScript(script(s"foo.func1(ALPH, 0)"))
     callTxScript(script(s"foo.func1(#$randomTokenId, 0)"))
     fail(script(s"foo.func1(#$randomTokenId, 1)"))
-    callTxScript(script(s"foo.func2(ALPH, 0)"))
-    callTxScript(script(s"foo.func2(#$randomTokenId, 0)"))
-    fail(script(s"foo.func2(#$randomTokenId, 1)"))
-    callTxScript(script(s"foo.func3(@$randomContractAddress, 0)"))
-    fail(script(s"foo.func3(@$randomContractAddress, 1)"))
+    callTxScript(script(s"foo.func2{@$genesisAddress -> ALPH: 0}(ALPH, 0)"))
+    callTxScript(script(s"foo.func2{@$genesisAddress -> #$randomTokenId: 0}(#$randomTokenId, 0)"))
+    fail(script(s"foo.func2{@$genesisAddress -> #$randomTokenId: 0}(#$randomTokenId, 1)"))
+    callTxScript(
+      script(s"foo.func3{@$randomContractAddress -> ALPH: 0}(@$randomContractAddress, 0)")
+    )
+    fail(script(s"foo.func3{@$randomContractAddress -> ALPH: 1}(@$randomContractAddress, 1)"))
 
     intercept[AssertionError](callTxScript(script("foo.func4()"))).getMessage is
       s"Right(TxScriptExeFailed(Pay to contract address $randomContractAddress is not allowed when this contract address is not in the call stack))"
@@ -2139,7 +2141,7 @@ class VMSpec extends AlephiumSpec with Generators {
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
 
       worldState
-        .getAssetOutputs(ByteString.empty, Int.MaxValue, (_, _) => true)
+        .getAssetOutputs(ByteString.empty, Int.MaxValue, false, (_, _) => true)
         .rightValue
         .length is numAssetOutput
       worldState

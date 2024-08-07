@@ -200,7 +200,7 @@ class WalletAppSpec
     getBalance() check { response =>
       response.as[Balances] is Balances.from(
         balanceAmount,
-        AVector(Balances.AddressBalance.from(address, balanceAmount, lockedAmount, None))
+        AVector(Balances.AddressBalance.from(address, balanceAmount, lockedAmount))
       )
       response.code is StatusCode.Ok
     }
