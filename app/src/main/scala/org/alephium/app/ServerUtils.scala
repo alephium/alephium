@@ -534,6 +534,7 @@ class ServerUtils(implicit
 
   def getRawBlock(blockFlow: BlockFlow, hash: BlockHash): Try[RawBlock] =
     for {
+      _ <- checkHashChainIndex(hash)
       blockBytes <- blockFlow
         .getBlockBytes(hash)
         .left
