@@ -468,19 +468,19 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "work with positive/negative operation on I256 expression" in new ContractFixture {
-    val code =
+    def codeWithExpr(expr: String) =
       s"""
          |Contract TestContract(mut x: I256) {
          |  pub fn negativeX() -> () {
-         |    x = -x
+         |    x = -${expr}
          |  }
          |  pub fn positiveX() -> () {
-         |    x = +x
+         |    x = +${expr}
          |  }
          |}
          |""".stripMargin
 
-    def script(contractId: String, negative: Boolean): String = {
+    def scriptWithCode(code: String, contractId: String, negative: Boolean): String = {
       val operation = if (negative) "negative" else "positive"
       s"""
          |TxScript Operate() {
@@ -491,22 +491,52 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
 
-    val contractId = createContract(
-      code,
-      initialMutState = AVector[Val](Val.I256(I256.One))
-    )._1
-
-    def verifyXValue(negative: Boolean, xValue: Int) = {
-      callTxScript(script(contractId.toHexString, negative))
+    def verifyXValue(code: String, contractId: ContractId, negative: Boolean, xValue: Int) = {
+      callTxScript(scriptWithCode(code, contractId.toHexString, negative))
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
       val contractState = worldState.getContractState(contractId).rightValue
       contractState.mutFields(0) is Val.I256(I256.unsafe(xValue))
     }
 
-    verifyXValue(negative = false, xValue = 1)
-    verifyXValue(negative = true, xValue = -1)
-    verifyXValue(negative = true, xValue = 1)
-    verifyXValue(negative = false, xValue = 1)
+    def verify(xExpr: String) = {
+      val code = codeWithExpr(xExpr)
+      val contractId = createContract(
+        code,
+        initialMutState = AVector[Val](Val.I256(I256.One))
+      )._1
+
+      verifyXValue(code, contractId, negative = false, xValue = 1)
+      verifyXValue(code, contractId, negative = true, xValue = -1)
+      verifyXValue(code, contractId, negative = true, xValue = 1)
+      verifyXValue(code, contractId, negative = false, xValue = 1)
+    }
+
+    verify("x")
+    verify("((x + 1i) * 2i / 2i - 1i)")
+  }
+
+  it should "report error with positive/negative operation on non-I256 expressions" in new ContractFixture {
+    def codeWithType(typ: String) =
+      s"""
+         |Contract TestContract(mut x: ${typ}) {
+         |  pub fn negativeX() -> () {
+         |    x = -x
+         |  }
+         |}
+         |""".stripMargin
+
+    def verifyErrorMessage(typ: String) = {
+      val codeWithU256 = codeWithType(typ)
+      Compiler
+        .compileContract(codeWithU256)
+        .leftValue
+        .message is s"Invalid param types List(I256, $typ) for - operator"
+    }
+
+    verifyErrorMessage("U256")
+    verifyErrorMessage("Bool")
+    verifyErrorMessage("ByteVec")
+    verifyErrorMessage("Address")
   }
 
   it should "create contract and transfer tokens from the contract" in new ContractFixture {
