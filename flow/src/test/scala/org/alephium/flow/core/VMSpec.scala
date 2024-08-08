@@ -467,6 +467,48 @@ class VMSpec extends AlephiumSpec with Generators {
     contractAsset.amount is ALPH.alph(2)
   }
 
+  it should "work with positive/negative operation on I256 expression" in new ContractFixture {
+    val code =
+      s"""
+         |Contract TestContract(mut x: I256) {
+         |  pub fn negativeX() -> () {
+         |    x = -x
+         |  }
+         |  pub fn positiveX() -> () {
+         |    x = +x
+         |  }
+         |}
+         |""".stripMargin
+
+    def script(contractId: String, negative: Boolean): String = {
+      val operation = if (negative) "negative" else "positive"
+      s"""
+         |TxScript Operate() {
+         |  TestContract(#$contractId).${operation}X()
+         |}
+         |
+         |$code
+         |""".stripMargin
+    }
+
+    val contractId = createContract(
+      code,
+      initialMutState = AVector[Val](Val.I256(I256.One))
+    )._1
+
+    def verifyXValue(negative: Boolean, xValue: Int) = {
+      callTxScript(script(contractId.toHexString, negative))
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.mutFields(0) is Val.I256(I256.unsafe(xValue))
+    }
+
+    verifyXValue(negative = false, xValue = 1)
+    verifyXValue(negative = true, xValue = -1)
+    verifyXValue(negative = true, xValue = 1)
+    verifyXValue(negative = false, xValue = 1)
+  }
+
   it should "create contract and transfer tokens from the contract" in new ContractFixture {
     val code =
       s"""
