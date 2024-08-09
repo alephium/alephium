@@ -184,9 +184,9 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(loadFieldBySelectors | PP((Lexer.opNot | Lexer.opSub | Lexer.opAdd) ~ loadFieldBySelectors) {
+    P(loadFieldBySelectors | PP((Lexer.opNot | Lexer.opSub) ~ loadFieldBySelectors) {
       case (op, expr) =>
-        if (op == ArithOperator.Sub || op == ArithOperator.Add) {
+        if (op == ArithOperator.Sub) {
           Ast.Binop(op, Ast.Const(Val.I256(I256.Zero)), expr)
         } else {
           Ast.UnaryOp.apply[Ctx](op, expr)
