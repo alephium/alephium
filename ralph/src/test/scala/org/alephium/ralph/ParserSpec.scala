@@ -666,31 +666,6 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     error1.position is invalidAssetsInContract.indexOf("$")
   }
 
-  it should "parser contract initial states" in {
-    val bytes   = Hash.generate
-    val address = Address.p2pkh(PublicKey.generate)
-    val stateRaw =
-      s"[1, 2i, true, @${address.toBase58}, #${bytes.toHexString}, [[1, 2], [1, 2]], [[1, 2]; 2]]"
-    val expected =
-      Seq[Val](
-        Val.U256(U256.One),
-        Val.I256(I256.Two),
-        Val.True,
-        Val.Address(address.lockupScript),
-        Val.ByteVec.from(bytes),
-        Val.U256(U256.One),
-        Val.U256(U256.Two),
-        Val.U256(U256.One),
-        Val.U256(U256.Two),
-        Val.U256(U256.One),
-        Val.U256(U256.Two),
-        Val.U256(U256.One),
-        Val.U256(U256.Two)
-      )
-    fastparse.parse(stateRaw, StatefulParser.state(_)).get.value.map(_.v) is expected
-    Compiler.compileState(stateRaw).rightValue is AVector.from(expected)
-  }
-
   it should "parse bytes and address" in {
     val hash    = Hash.random
     val address = Address.p2pkh(PublicKey.generate)

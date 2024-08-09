@@ -1252,18 +1252,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           .atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
-  def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =
-    P("[" ~ constOrArray.rep(0, ",") ~ "]").map(_.flatten)
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def constOrArray[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] = P(
-    const.map(Seq(_)) |
-      P("[" ~ constOrArray.rep(0, ",").map(_.flatten) ~ "]") |
-      P("[" ~ constOrArray ~ ";" ~ arraySize ~ "]").map { case (consts, size) =>
-        (0 until size).flatMap(_ => consts)
-      }
-  )
-
   def emitEvent[Unknown: P]: P[Ast.EmitEvent[StatefulContext]] =
     P(Index ~ "emit" ~ Lexer.typeId ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
       .map { case (fromIndex, typeId, exprs, endIndex) =>

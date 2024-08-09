@@ -144,17 +144,6 @@ object Compiler {
     }
   }
 
-  def compileState(stateRaw: String): Either[Error, AVector[Val]] = {
-    try {
-      fastparse.parse(stateRaw, new StatefulParser(None).state(_)) match {
-        case Parsed.Success(state, _) => Right(AVector.from(state.map(_.v)))
-        case failure: Parsed.Failure  => Left(Error.parse(failure))
-      }
-    } catch {
-      case e: Error => Left(e)
-    }
-  }
-
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
     def isPublic: Boolean
