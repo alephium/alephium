@@ -526,7 +526,7 @@ class VMSpec extends AlephiumSpec with Generators {
       Compiler
         .compileContract(codeWithU256)
         .leftValue
-        .message is s"Invalid param types List(I256, $typ) for - operator"
+        .message is s"Invalid param types List($typ) for - operator"
     }
 
     verifyErrorMessage("U256")

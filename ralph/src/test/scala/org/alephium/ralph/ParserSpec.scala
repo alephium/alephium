@@ -2356,7 +2356,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("!x", StatelessParser.expr(_)).get.value is
       UnaryOp[StatelessContext](Not, Variable(Ident("x")))
     parse("-x", StatelessParser.expr(_)).get.value is
-      Binop[StatelessContext](ArithOperator.Sub, Const(Val.I256(I256.Zero)), Variable(Ident("x")))
+      UnaryOp[StatelessContext](Negate, Variable(Ident("x")))
   }
 }
 

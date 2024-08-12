@@ -25,7 +25,7 @@ import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.FastParseExtension._
-import org.alephium.util.{AVector, I256}
+import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods file.size.limit
 @SuppressWarnings(
@@ -184,13 +184,8 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(loadFieldBySelectors | PP((Lexer.opNot | Lexer.opSub) ~ loadFieldBySelectors) {
-      case (op, expr) =>
-        if (op == ArithOperator.Sub) {
-          Ast.Binop(op, Ast.Const(Val.I256(I256.Zero)), expr)
-        } else {
-          Ast.UnaryOp.apply[Ctx](op, expr)
-        }
+    P(loadFieldBySelectors | PP((Lexer.opNot | Lexer.opNegate) ~ loadFieldBySelectors) {
+      case (op, expr) => Ast.UnaryOp.apply[Ctx](op, expr)
     })
 
   def loadFieldBySelectors[Unknown: P]: P[Ast.Expr[Ctx]] =
