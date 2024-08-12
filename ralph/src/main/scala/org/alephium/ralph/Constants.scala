@@ -48,9 +48,13 @@ trait Constants[Ctx <: StatelessContext] {
     tpe.size match {
       case Left(size) => size
       case Right(expr) =>
-        val arraySize = calcArraySize(expr)
-        tpe.size = Left(arraySize)
-        arraySize
+        tpe.sizeCalculated match {
+          case Some(size) => size
+          case None =>
+            val arraySize = calcArraySize(expr)
+            tpe.sizeCalculated = Some(arraySize)
+            arraySize
+        }
     }
   }
 

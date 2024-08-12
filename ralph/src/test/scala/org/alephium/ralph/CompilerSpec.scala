@@ -7957,24 +7957,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val project0         = Compiler.compileProject(contract).rightValue
       val compiledContract = project0._1.head
-      val arrayTypes: Seq[Type] = Seq(
+      val arrayTypes: AVector[String] = AVector(
         Type.FixedSizeArray(Type.U256, Left(2)),
         Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, Left(2)), Left(2)),
         Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, Left(2)), Left(3)),
         Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, Left(3)), Left(2))
-      )
-      compiledContract.ast.fields.map(_.tpe) is arrayTypes
-      compiledContract.ast.maps.map(_.tpe.value) is arrayTypes
+      ).map(_.signature)
+      compiledContract.ast.getFieldTypes() is arrayTypes
+      compiledContract.ast.maps.map(_.tpe.value.signature) is Seq.from(arrayTypes)
 
       val funcTable        = compiledContract.ast.funcTable(project0._3)
       val encodeFieldsFunc = funcTable.get(Ast.FuncId("encodeFields", isBuiltIn = true)).value
-      encodeFieldsFunc.argsType is arrayTypes
+      encodeFieldsFunc.argsType.map(_.signature) is Seq.from(arrayTypes)
 
       compiledContract.ast.funcs.length is 2
-      compiledContract.ast.funcs(1).args.map(_.tpe) is Seq(
-        Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Bar")), Left(3))
+      compiledContract.ast.funcs(1).getArgTypeSignatures() is AVector(
+        Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Bar")), Left(3)).signature
       )
-      compiledContract.ast.funcs(1).rtypes is Seq(arrayTypes(2))
+      compiledContract.ast.funcs(1).getReturnSignatures() is AVector(arrayTypes(2))
 
       val script =
         s"""
@@ -7996,17 +7996,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       val project1 = Compiler.compileProject(script).rightValue
-      project1._2.head.ast.templateVars.map(_.tpe) is arrayTypes
-      project1._3.structs is Seq(
-        Ast.Struct(
-          Ast.TypeId("Baz"),
-          Seq(Ast.StructField(Ast.Ident("array"), false, arrayTypes(0)))
-        ),
-        Ast.Struct(
-          Ast.TypeId("Bar"),
-          Seq(Ast.StructField(Ast.Ident("array"), false, arrayTypes(0)))
-        )
-      )
+      project1._2.head.ast.getTemplateVarsTypes() is arrayTypes
+      project1._3.structs.foreach(_.getFieldTypeSignatures() is AVector(arrayTypes(0)))
     }
   }
 

@@ -998,10 +998,11 @@ object Compiler {
     }
 
     @inline def resolveTypes(types: Seq[Type]): Seq[Type] = types.map(resolveType)
-    @inline def flattenTypeLength(types: Seq[Type]): Int  = globalState.flattenTypeLength(types)
+    @inline def flattenTypeLength(types: Seq[Type]): Int =
+      globalState.flattenTypeLength(resolveTypes(types))
 
     @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
-      globalState.flattenTypeMutability(tpe, isMutable)
+      globalState.flattenTypeMutability(resolveType(tpe), isMutable)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def isTypeMutable(tpe: Type): Boolean = {

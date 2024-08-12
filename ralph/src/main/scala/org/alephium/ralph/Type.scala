@@ -72,11 +72,14 @@ object Type {
   case object Address extends Type { def toVal: Val.Type = Val.Address }
   final case class FixedSizeArray(
       baseType: Type,
-      var size: Either[Int, Ast.Expr[_]]
+      size: Either[Int, Ast.Expr[_]]
   ) extends Type {
-    private def getArraySize: Int = size match {
-      case Left(size)  => size
-      case Right(expr) => throw Compiler.Error(s"Unresolved array size", expr.sourceIndex)
+    private[ralph] var sizeCalculated: Option[Int] = None
+
+    def getArraySize: Int = size match {
+      case Left(size) => size
+      case Right(expr) =>
+        sizeCalculated.getOrElse(throw Compiler.Error("Unresolved array size", expr.sourceIndex))
     }
 
     override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, getArraySize)
