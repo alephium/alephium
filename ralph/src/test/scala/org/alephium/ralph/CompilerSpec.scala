@@ -7918,6 +7918,96 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(code, "Invalid array size, expected a constant U256 value")
     }
+
+    {
+      info("Resolve types after compilation")
+      val contract =
+        s"""
+           |const SIZE = 2
+           |struct Bar {
+           |  array: [U256; SIZE]
+           |}
+           |Contract Foo(
+           |  array0: [U256; SIZE],
+           |  array1: [[U256; SIZE]; SIZE],
+           |  mut array2: [[U256; SIZE]; 3],
+           |  array3: [[U256; 3]; SIZE]
+           |) {
+           |  mapping[U256, [U256; SIZE]] map0
+           |  mapping[U256, [[U256; SIZE]; SIZE]] map1
+           |  mapping[U256, [[U256; SIZE]; 3]] map2
+           |  mapping[U256, [[U256; 3]; SIZE]] map3
+           |
+           |  const LOCAL_SIZE = 3
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn insert(from: Address) -> () {
+           |    map0.insert!(from, 0, array0)
+           |    map1.insert!(from, 0, array1)
+           |    map2.insert!(from, 0, array2)
+           |    map3.insert!(from, 0, array3)
+           |  }
+           |
+           |  pub fn updateAndGetArray(bars: [Bar; LOCAL_SIZE]) -> [[U256; SIZE]; LOCAL_SIZE] {
+           |    array2 = [bars[0].array, bars[1].array, bars[2].array]
+           |    return array2
+           |  }
+           |}
+           |""".stripMargin
+
+      val project0         = Compiler.compileProject(contract).rightValue
+      val compiledContract = project0._1.head
+      val arrayTypes: Seq[Type] = Seq(
+        Type.FixedSizeArray[StatefulContext](Type.U256, Left(2)),
+        Type.FixedSizeArray[StatefulContext](Type.FixedSizeArray(Type.U256, Left(2)), Left(2)),
+        Type.FixedSizeArray[StatefulContext](Type.FixedSizeArray(Type.U256, Left(2)), Left(3)),
+        Type.FixedSizeArray[StatefulContext](Type.FixedSizeArray(Type.U256, Left(3)), Left(2))
+      )
+      compiledContract.ast.fields.map(_.tpe) is arrayTypes
+      compiledContract.ast.maps.map(_.tpe.value) is arrayTypes
+
+      val funcTable        = compiledContract.ast.funcTable(project0._3)
+      val encodeFieldsFunc = funcTable.get(Ast.FuncId("encodeFields", isBuiltIn = true)).value
+      encodeFieldsFunc.argsType is arrayTypes
+
+      compiledContract.ast.funcs.length is 2
+      compiledContract.ast.funcs(1).args.map(_.tpe) is Seq(
+        Type.FixedSizeArray[StatefulContext](Type.NamedType(Ast.TypeId("Bar")), Left(3))
+      )
+      compiledContract.ast.funcs(1).rtypes is Seq(arrayTypes(2))
+
+      val script =
+        s"""
+           |struct Baz { array: [U256; SIZE] }
+           |TxScript Main(
+           |  array0: [U256; SIZE],
+           |  array1: [[U256; SIZE]; SIZE],
+           |  array2: [[U256; SIZE]; 3],
+           |  array3: [[U256; 3]; SIZE]
+           |) {
+           |  let (encodedImmFields, encodedMutFields) = Foo.encodeFields!(array0, array1, array2, array3)
+           |  let _ = createContract!{callerAddress!() -> ALPH: minimalContractDeposit!()}(
+           |    #${Hex.toHexString(serialize(compiledContract.code))},
+           |    encodedImmFields,
+           |    encodedMutFields
+           |  )
+           |}
+           |$contract
+           |""".stripMargin
+
+      val project1 = Compiler.compileProject(script).rightValue
+      project1._2.head.ast.templateVars.map(_.tpe) is arrayTypes
+      project1._3.structs is Seq(
+        Ast.Struct(
+          Ast.TypeId("Baz"),
+          Seq(Ast.StructField(Ast.Ident("array"), false, arrayTypes(0)))
+        ),
+        Ast.Struct(
+          Ast.TypeId("Bar"),
+          Seq(Ast.StructField(Ast.Ident("array"), false, arrayTypes(0)))
+        )
+      )
+    }
   }
 
   it should "calculate the correct scope for variables" in {

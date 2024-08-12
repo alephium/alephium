@@ -46,8 +46,6 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   lazy val Lexer: Lexer = new Lexer(fileURI)
 
-  lazy val constants: Constants[Ctx] = Constants.lazyEvaluated[Ctx]
-
   /*
    * PP: Positioned Parser
    * Help adding source index to the result, it works well on easy case, but it fails for
@@ -70,12 +68,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(_.asInstanceOf[Ast.Const[Ctx]])
 
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
-    PP("[" ~ (expr.rep(1, ",")) ~ "]") { elems =>
-      Ast.CreateArrayExpr.apply(elems)
+    PP("[" ~ expr.rep(1, ",") ~ "]") { elems =>
+      Ast.CreateArrayExpr1(elems)
     }
   def createArray2[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
-    PP("[" ~ (expr ~ ";" ~ arraySize) ~ "]") { case ((expr, size)) =>
-      Ast.CreateArrayExpr(Seq.fill(size)(expr))
+    PP("[" ~ (expr ~ ";" ~ expr) ~ "]") { case (element, size) =>
+      Ast.CreateArrayExpr2(element, size)
     }
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
@@ -130,18 +128,6 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.Binop(op, acc, right).atSourceIndex(sourceIndex)
       }
     }
-  }
-
-  def arraySize[Unknown: P]: P[Int] = P(Index ~ expr ~~ Index).map {
-    case (fromIndex, expr, endIndex) =>
-      constants.calcConstant(expr) match {
-        case Val.U256(value) => value.v.intValue()
-        case _ =>
-          throw Compiler.Error(
-            "Invalid array size, expected a constant U256 value",
-            Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-          )
-      }
   }
 
   def indexSelector[Unknown: P]: P[Ast.DataSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
@@ -339,8 +325,11 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ arraySize ~ "]").map { case (tpe, size) =>
-      Type.FixedSizeArray(tpe, size)
+    PP("[" ~ baseType ~ ";" ~ expr ~ "]") { case (tpe, size) =>
+      size match {
+        case Ast.Const(Val.U256(value)) => Type.FixedSizeArray(tpe, Left(value.toBigInt.intValue()))
+        case _                          => Type.FixedSizeArray(tpe, Right(size))
+      }
     }
   }
   def argument[Unknown: P](
@@ -600,9 +589,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
       .map { case (from, ident, expr) =>
         val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
-        val constantDef = Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
-        constants.addConstants(Seq(constantDef))
-        constantDef
+        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
       }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[Ctx]] =
@@ -628,9 +615,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
-        val enumDef = Ast.EnumDef(id, fields)
-        constants.addEnums(Seq(enumDef))
-        enumDef
+        Ast.EnumDef(id, fields)
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }

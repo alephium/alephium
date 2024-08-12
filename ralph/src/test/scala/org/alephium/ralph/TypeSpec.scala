@@ -16,6 +16,7 @@
 
 package org.alephium.ralph
 
+import org.alephium.protocol.vm.StatelessContext
 import org.alephium.util.{AlephiumFixture, AlephiumSpec, AVector}
 
 class TypeSpec extends AlephiumSpec {
@@ -63,12 +64,22 @@ class TypeSpec extends AlephiumSpec {
   }
 
   it should "get the signature of array type" in {
-    Type.FixedSizeArray(Type.U256, 2).signature is "[U256;2]"
-    Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), 2).signature is "[Foo;2]"
-    Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, 3), 2).signature is "[[U256;3];2]"
+    Type.FixedSizeArray[StatelessContext](Type.U256, Left(2)).signature is "[U256;2]"
     Type
-      .FixedSizeArray(Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), 3), 2)
+      .FixedSizeArray[StatelessContext](Type.NamedType(Ast.TypeId("Foo")), Left(2))
+      .signature is "[Foo;2]"
+    Type
+      .FixedSizeArray[StatelessContext](Type.FixedSizeArray(Type.U256, Left(3)), Left(2))
+      .signature is "[[U256;3];2]"
+    Type
+      .FixedSizeArray[StatelessContext](
+        Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), Left(3)),
+        Left(2)
+      )
       .signature is "[[Foo;3];2]"
+    val arrayType =
+      Type.FixedSizeArray[StatelessContext](Type.U256, Right(Ast.Variable(Ast.Ident("SIZE"))))
+    intercept[Compiler.Error](arrayType.signature).message is "Unresolved array size"
   }
 }
 

@@ -16,7 +16,7 @@
 
 package org.alephium.ralph
 
-import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm.{StatelessContext, Val}
 import org.alephium.util.AVector
 
 sealed trait Type extends Ast.Positioned {
@@ -26,15 +26,15 @@ sealed trait Type extends Ast.Positioned {
   def signature: String = toVal.toString
 
   def isPrimitive: Boolean = this match {
-    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
+    case _: Type.FixedSizeArray[_] | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
         _: Type.Map =>
       false
     case _ => true
   }
 
   def isArrayType: Boolean = this match {
-    case _: Type.FixedSizeArray => true
-    case _                      => false
+    case _: Type.FixedSizeArray[_] => true
+    case _                         => false
   }
 
   def isStructType: Boolean = this match {
@@ -59,7 +59,7 @@ object Type {
       case Val.U256                           => U256
       case Val.ByteVec                        => ByteVec
       case Val.Address                        => Address
-      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
+      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), Left(size))
       case Val.Struct(name)                   => Struct(Ast.TypeId(name))
       case Val.Map(key, value)                => Map(fromVal(key), fromVal(value))
     }
@@ -70,16 +70,25 @@ object Type {
   case object U256    extends Type { def toVal: Val.Type = Val.U256    }
   case object ByteVec extends Type { def toVal: Val.Type = Val.ByteVec }
   case object Address extends Type { def toVal: Val.Type = Val.Address }
-  final case class FixedSizeArray(baseType: Type, size: Int) extends Type {
-    override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, size)
+  final case class FixedSizeArray[Ctx <: StatelessContext](
+      baseType: Type,
+      var size: Either[Int, Ast.Expr[Ctx]]
+  ) extends Type {
+    private def getArraySize: Int = size match {
+      case Left(size)  => size
+      case Right(expr) => throw Compiler.Error(s"Unresolved array size", expr.sourceIndex)
+    }
+
+    override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, getArraySize)
 
     @scala.annotation.tailrec
     def elementType: Type = baseType match {
-      case array: FixedSizeArray => array.elementType
-      case tpe                   => tpe
+      case array: FixedSizeArray[Ctx @unchecked] => array.elementType
+      case tpe                                   => tpe
     }
 
-    override def signature: String = s"[${baseType.signature};$size]"
+    override def signature: String = s"[${baseType.signature};$getArraySize]"
+    override def toString: String  = s"FixedSizeArray($baseType,$getArraySize)"
   }
 
   final case class NamedType(id: Ast.TypeId) extends Type {

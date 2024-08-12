@@ -34,7 +34,7 @@ object VarOffset {
       state: Compiler.State[Ctx],
       offset: VarOffset[Ctx],
       index: Ast.Expr[Ctx],
-      arrayType: Type.FixedSizeArray,
+      arrayType: Type.FixedSizeArray[Ctx],
       flattenSize: Int
   ): VarOffset[Ctx] = {
     calcArrayElementOffset(state, index, arrayType) match {
@@ -48,16 +48,17 @@ object VarOffset {
   def calcArrayElementOffset[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       index: Ast.Expr[Ctx],
-      arrayType: Type.FixedSizeArray
+      arrayType: Type.FixedSizeArray[Ctx]
   ): VarOffset[Ctx] = {
+    val arraySize = state.calcArraySize(arrayType)
     Compiler.State.getAndCheckConstantIndex(index) match {
       case Some(idx) =>
-        ArrayRef.checkArrayIndex(idx, arrayType.size, index.sourceIndex)
+        ArrayRef.checkArrayIndex(idx, arraySize, index.sourceIndex)
         ConstantVarOffset(idx)
       case None =>
         val instrs = index.genCode(state) ++ Seq(
           Dup,
-          ConstInstr.u256(Val.U256(U256.unsafe(arrayType.size))),
+          ConstInstr.u256(Val.U256(U256.unsafe(arraySize))),
           U256Lt,
           Assert
         )
@@ -110,7 +111,7 @@ final case class DataRefOffset[Ctx <: StatelessContext](
 
   def calcArrayElementOffset(
       state: Compiler.State[Ctx],
-      tpe: Type.FixedSizeArray,
+      tpe: Type.FixedSizeArray[Ctx],
       index: Ast.Expr[Ctx],
       isMutable: Boolean
   ): DataRefOffset[Ctx] = {
@@ -179,8 +180,9 @@ object VariablesRef {
     }
     val varType = state.resolveType(tpe)
     val ref: VariablesRef[Ctx] = varType match {
-      case arrayType: Type.FixedSizeArray =>
-        (0 until arrayType.size).foreach { idx =>
+      case arrayType: Type.FixedSizeArray[Ctx @unchecked] =>
+        val arraySize = state.calcArraySize(arrayType)
+        (0 until arraySize).foreach { idx =>
           val ident = Ast.Ident(ArrayRef.arrayVarName(baseName, idx))
           state.addVariable(
             ident,
@@ -246,7 +248,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
     val field     = ast.getField(ident)
     val refOffset = calcRefOffset(state, ident)
     state.resolveType(field.tpe) match {
-      case tpe: Type.FixedSizeArray =>
+      case tpe: Type.FixedSizeArray[Ctx @unchecked] =>
         ArrayRef.from(ident, tpe, isLocal, isMutable && field.isMutable, isTemplate, refOffset)
       case tpe: Type.Struct =>
         val struct       = state.getStruct(tpe.id)
@@ -263,7 +265,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
       tpe: Type
   ): Seq[Instr[Ctx]] = {
     tpe match {
-      case _: Type.FixedSizeArray | _: Type.Struct =>
+      case _: Type.FixedSizeArray[Ctx @unchecked] | _: Type.Struct =>
         subRef(state, selector).genStoreCode(state).reverse.flatten
       case _ =>
         val offset = calcDataOffset(state, selector)
@@ -291,7 +293,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
       tpe: Type
   ): Seq[Instr[Ctx]] = {
     tpe match {
-      case _: Type.FixedSizeArray | _: Type.Struct =>
+      case _: Type.FixedSizeArray[Ctx @unchecked] | _: Type.Struct =>
         subRef(state, selector).genLoadCode(state)
       case _ =>
         val field  = ast.getField(selector)
@@ -308,7 +310,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
     ast.fields.foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, field) =>
       state.resolveType(field.tpe) match {
-        case _: Type.Struct | _: Type.FixedSizeArray =>
+        case _: Type.Struct | _: Type.FixedSizeArray[Ctx @unchecked] =>
           acc ++ subRef(state, field.ident).genLoadFieldsCode(state)
         case _ => acc :+ genLoadCode(state, field.ident)
       }
@@ -384,7 +386,7 @@ object StructRef {
 sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   type Selector = Ast.Expr[Ctx]
   def refOffset: VariablesRefOffset[Ctx]
-  def tpe: Type.FixedSizeArray
+  def tpe: Type.FixedSizeArray[Ctx]
 
   def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRefOffset[Ctx]
 
@@ -401,7 +403,7 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
       index: Ast.Expr[Ctx]
   ): Seq[Instr[Ctx]] = {
     tpe.baseType match {
-      case _: Type.FixedSizeArray | _: Type.Struct =>
+      case _: Type.FixedSizeArray[Ctx @unchecked] | _: Type.Struct =>
         subRef(state, index).genLoadCode(state)
       case _ =>
         val offset = refOffset match {
@@ -433,7 +435,8 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   ): Seq[Seq[Instr[Ctx]]] = {
     val index = getIndexSelector(selector).index
     tpe.baseType match {
-      case _: Type.FixedSizeArray | _: Type.Struct => subRef(state, index).genStoreCode(state)
+      case _: Type.FixedSizeArray[Ctx @unchecked] | _: Type.Struct =>
+        subRef(state, index).genStoreCode(state)
       case _ =>
         val offset = refOffset.getStoreOffset
         Seq(
@@ -446,10 +449,11 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   }
 
   def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-    (0 until tpe.size).foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, index) =>
+    val arraySize = state.calcArraySize(tpe)
+    (0 until arraySize).foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, index) =>
       val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
       tpe.baseType match {
-        case _: Type.Struct | _: Type.FixedSizeArray =>
+        case _: Type.Struct | _: Type.FixedSizeArray[Ctx @unchecked] =>
           acc ++ subRef(state, indexExpr).genLoadFieldsCode(state)
         case _ => acc :+ genLoadCode(state, indexExpr)
       }
@@ -463,7 +467,7 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   def subRef(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRef[Ctx] = {
     val newRefOffset = calcRefOffset(state, index)
     tpe.baseType match {
-      case baseType: Type.FixedSizeArray =>
+      case baseType: Type.FixedSizeArray[Ctx @unchecked] =>
         ArrayRef.from(ident, baseType, isLocal, isMutable, isTemplate, newRefOffset)
       case tpe: Type.Struct =>
         val struct = state.getStruct(tpe.id)
@@ -479,7 +483,7 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
 
 final case class FieldArrayRef[Ctx <: StatelessContext](
     ident: Ast.Ident,
-    tpe: Type.FixedSizeArray,
+    tpe: Type.FixedSizeArray[Ctx],
     isLocal: Boolean,
     isMutable: Boolean,
     isTemplate: Boolean,
@@ -601,7 +605,7 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
 
 final case class LocalArrayRef[Ctx <: StatelessContext](
     ident: Ast.Ident,
-    tpe: Type.FixedSizeArray,
+    tpe: Type.FixedSizeArray[Ctx],
     isLocal: Boolean,
     isMutable: Boolean,
     isTemplate: Boolean,
@@ -699,7 +703,7 @@ object ArrayRef {
 
   def from[Ctx <: StatelessContext](
       ident: Ast.Ident,
-      tpe: Type.FixedSizeArray,
+      tpe: Type.FixedSizeArray[Ctx],
       isLocal: Boolean,
       isMutable: Boolean,
       isTemplate: Boolean,

@@ -715,7 +715,7 @@ object Compiler {
       tpe match {
         case tpe: Type.NamedType => // this should never happen
           throw Error(s"Unresolved named type $tpe", ident.sourceIndex)
-        case _: Type.FixedSizeArray | _: Type.Struct =>
+        case _: Type.FixedSizeArray[Ctx @unchecked] | _: Type.Struct =>
           VariablesRef.init(
             this,
             tpe,
@@ -986,9 +986,18 @@ object Compiler {
 
     def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
 
-    def resolveType(ident: Ast.Ident): Type  = globalState.resolveType(getVariable(ident).tpe)
-    @inline def resolveType(tpe: Type): Type = globalState.resolveType(tpe)
-    @inline def resolveTypes(types: Seq[Type]): Seq[Type] = globalState.resolveTypes(types)
+    def resolveType(ident: Ast.Ident): Type = resolveType(getVariable(ident).tpe)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def resolveType(tpe: Type): Type = {
+      tpe match {
+        case t: Type.FixedSizeArray[Ctx @unchecked] =>
+          Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
+        case _ => globalState.resolveType(tpe)
+      }
+    }
+
+    @inline def resolveTypes(types: Seq[Type]): Seq[Type] = types.map(resolveType)
     @inline def flattenTypeLength(types: Seq[Type]): Int  = globalState.flattenTypeLength(types)
 
     @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
@@ -1000,8 +1009,8 @@ object Compiler {
         case t: Type.Struct =>
           val struct = getStruct(t.id)
           struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe))
-        case t: Type.FixedSizeArray => isTypeMutable(t.baseType)
-        case _                      => true
+        case t: Type.FixedSizeArray[Ctx @unchecked] => isTypeMutable(t.baseType)
+        case _                                      => true
       }
     }
 
@@ -1018,7 +1027,7 @@ object Compiler {
           exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
             case ((initCodes, argCodes), expr) =>
               expr.getType(this) match {
-                case Seq(_: Type.FixedSizeArray) | Seq(_: Type.Struct) =>
+                case Seq(_: Type.FixedSizeArray[Ctx @unchecked]) | Seq(_: Type.Struct) =>
                   val (ref, codes) = getOrCreateVariablesRef(expr)
                   (initCodes ++ codes, argCodes ++ ref.genLoadFieldsCode(this))
                 case _ => (initCodes, argCodes :+ expr.genCode(this))

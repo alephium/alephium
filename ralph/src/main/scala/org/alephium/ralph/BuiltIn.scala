@@ -1061,7 +1061,7 @@ object BuiltIn {
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
       inputType match {
-        case Seq(Type.FixedSizeArray(_, size)) => Seq(ConstInstr.u256(Val.U256.unsafe(size)))
+        case Seq(Type.FixedSizeArray(_, Left(size))) => Seq(ConstInstr.u256(Val.U256.unsafe(size)))
         case _ => // dead branch
           throw Compiler.Error(
             s"Expected an array, got ${quoteTypes(inputType)}",
