@@ -683,25 +683,19 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq(
           Argument(
             Ident("a"),
-            Type.FixedSizeArray[StatelessContext](Type.Bool, Left(2)),
+            Type.FixedSizeArray(Type.Bool, Left(2)),
             isMutable = true,
             isUnused = false
           ),
           Argument(
             Ident("b"),
-            Type.FixedSizeArray[StatelessContext](
-              Type.FixedSizeArray(Type.Address, Left(3)),
-              Left(2)
-            ),
+            Type.FixedSizeArray(Type.FixedSizeArray(Type.Address, Left(3)), Left(2)),
             isMutable = false,
             isUnused = false
           ),
           Argument(
             Ident("c"),
-            Type.FixedSizeArray[StatelessContext](
-              Type.NamedType(TypeId("Foo")),
-              Right(Variable(Ident("SIZE")))
-            ),
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), Right(Variable(Ident("SIZE")))),
             isMutable = false,
             isUnused = false
           ),
@@ -962,10 +956,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Participants"),
         Seq(
-          EventField(
-            Ident("addresses"),
-            Type.FixedSizeArray[StatefulContext](Type.Address, Left(3))
-          )
+          EventField(Ident("addresses"), Type.FixedSizeArray(Type.Address, Left(3)))
         )
       )
     }
@@ -1939,10 +1930,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.funcs.length is 1
       parsed.funcs.head.name is "main"
       parsed.funcs.head.usePreapprovedAssets is false
-      parsed.funcs.head.rtypes is Seq(
-        Type.FixedSizeArray[StatefulContext](Type.U256, Left(2)),
-        Type.Bool
-      )
+      parsed.funcs.head.rtypes is Seq(Type.FixedSizeArray(Type.U256, Left(2)), Type.Bool)
     }
 
     {
@@ -2128,7 +2116,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           StructField(
             Ident("accounts"),
             true,
-            Type.FixedSizeArray[StatefulContext](Type.NamedType(TypeId("Foo")), Left(2))
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), Left(2))
           )
         )
       )
@@ -2166,10 +2154,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       Type.Map(Type.U256, Type.NamedType(TypeId("Foo")))
     )
     fastparse.parse("mapping[U256, [U256; 2]] map", StatefulParser.mapDef(_)).get.value is
-      Ast.MapDef(
-        Ident("map"),
-        Type.Map(Type.U256, Type.FixedSizeArray[StatefulContext](Type.U256, Left(2)))
-      )
+      Ast.MapDef(Ident("map"), Type.Map(Type.U256, Type.FixedSizeArray(Type.U256, Left(2))))
     fail(
       s"mapping[$$Foo, Foo] map",
       StatefulParser.mapDef(_),

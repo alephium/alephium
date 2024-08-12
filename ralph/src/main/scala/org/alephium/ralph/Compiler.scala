@@ -715,7 +715,7 @@ object Compiler {
       tpe match {
         case tpe: Type.NamedType => // this should never happen
           throw Error(s"Unresolved named type $tpe", ident.sourceIndex)
-        case _: Type.FixedSizeArray[Ctx @unchecked] | _: Type.Struct =>
+        case _: Type.FixedSizeArray | _: Type.Struct =>
           VariablesRef.init(
             this,
             tpe,
@@ -991,7 +991,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def resolveType(tpe: Type): Type = {
       tpe match {
-        case t: Type.FixedSizeArray[Ctx @unchecked] =>
+        case t: Type.FixedSizeArray =>
           Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
         case _ => globalState.resolveType(tpe)
       }
@@ -1009,8 +1009,8 @@ object Compiler {
         case t: Type.Struct =>
           val struct = getStruct(t.id)
           struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe))
-        case t: Type.FixedSizeArray[Ctx @unchecked] => isTypeMutable(t.baseType)
-        case _                                      => true
+        case t: Type.FixedSizeArray => isTypeMutable(t.baseType)
+        case _                      => true
       }
     }
 
@@ -1027,7 +1027,7 @@ object Compiler {
           exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
             case ((initCodes, argCodes), expr) =>
               expr.getType(this) match {
-                case Seq(_: Type.FixedSizeArray[Ctx @unchecked]) | Seq(_: Type.Struct) =>
+                case Seq(_: Type.FixedSizeArray) | Seq(_: Type.Struct) =>
                   val (ref, codes) = getOrCreateVariablesRef(expr)
                   (initCodes ++ codes, argCodes ++ ref.genLoadFieldsCode(this))
                 case _ => (initCodes, argCodes :+ expr.genCode(this))

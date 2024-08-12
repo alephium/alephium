@@ -44,7 +44,7 @@ trait Constants[Ctx <: StatelessContext] {
     value
   }
 
-  final private[ralph] def calcArraySize(tpe: Type.FixedSizeArray[Ctx]): Int = {
+  final private[ralph] def calcArraySize(tpe: Type.FixedSizeArray): Int = {
     tpe.size match {
       case Left(size) => size
       case Right(expr) =>
@@ -54,8 +54,9 @@ trait Constants[Ctx <: StatelessContext] {
     }
   }
 
-  final private[ralph] def calcArraySize(expr: Ast.Expr[Ctx]): Int = {
-    calcConstant(expr) match {
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  final private[ralph] def calcArraySize(expr: Ast.Expr[_]): Int = {
+    calcConstant(expr.asInstanceOf[Ast.Expr[Ctx]]) match {
       case Val.U256(value) => value.toBigInt.intValue()
       case _ =>
         throw Compiler.Error("Invalid array size, expected a constant U256 value", expr.sourceIndex)

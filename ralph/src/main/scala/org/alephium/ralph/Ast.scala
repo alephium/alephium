@@ -245,7 +245,7 @@ object Ast {
       assume(elements.nonEmpty)
       elements(0)
     }
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray[Ctx]] = {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
       val elementType = getElementType(state)
       if (elements.drop(0).exists(_.getType(state) != Seq(elementType))) {
         throw Compiler.Error(s"Array elements should have same type", sourceIndex)
@@ -267,7 +267,7 @@ object Ast {
   ) extends CreateArrayExpr[Ctx] {
     private var size: Option[Int] = None
 
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray[Ctx]] = {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
       val elementType = getElementType(state)
       val arraySize   = state.calcArraySize(sizeExpr)
       size = Some(arraySize)
@@ -300,10 +300,7 @@ object Ast {
       selectors
         .foldLeft((rootType, sourceIndex)) { case ((tpe, sourceIndex), selector) =>
           (tpe, selector) match {
-            case (
-                  array: Type.FixedSizeArray[Ctx @unchecked],
-                  selector: IndexSelector[Ctx @unchecked]
-                ) =>
+            case (array: Type.FixedSizeArray, selector: IndexSelector[Ctx @unchecked]) =>
               state.checkArrayIndexType(selector.index)
               (array.baseType, selector.sourceIndex)
             case (struct: Type.Struct, IdentSelector(ident)) =>
@@ -371,10 +368,7 @@ object Ast {
     ): (DataRefOffset[StatefulContext], Boolean) = {
       (state.resolveType(tpe), selectors.headOption) match {
         case (_, None) => (dataOffset, isMutable)
-        case (
-              tpe: Type.FixedSizeArray[StatefulContext @unchecked],
-              Some(s: IndexSelector[StatefulContext @unchecked])
-            ) =>
+        case (tpe: Type.FixedSizeArray, Some(s: IndexSelector[StatefulContext @unchecked])) =>
           val newOffset = dataOffset.calcArrayElementOffset(state, tpe, s.index, isMutable)
           calcDataOffset(state, tpe.baseType, selectors.drop(1), isMutable, newOffset)
         case (tpe: Type.Struct, Some(IdentSelector(ident))) =>
@@ -493,7 +487,7 @@ object Ast {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       assume(selectors.nonEmpty)
       base.getType(state) match {
-        case Seq(t: Type.FixedSizeArray[Ctx @unchecked]) =>
+        case Seq(t: Type.FixedSizeArray) =>
           Seq(_getType(state, t, base.sourceIndex))
         case Seq(t: Type.Struct) => Seq(_getType(state, t, base.sourceIndex))
         case Seq(t: Type.Map)    => Seq(_getType(state, t, base.sourceIndex))
@@ -1528,7 +1522,7 @@ object Ast {
         sourceIndex: Option[SourceIndex]
     ): Unit = {
       (rootType, selectors) match {
-        case (array: Type.FixedSizeArray[Ctx @unchecked], Seq(IndexSelector(_))) =>
+        case (array: Type.FixedSizeArray, Seq(IndexSelector(_))) =>
           if (!state.isTypeMutable(array.baseType)) {
             val arraySelector =
               structId.map(id => s"${id.name}.${lastField.name}").getOrElse(lastField.name)
@@ -1537,7 +1531,7 @@ object Ast {
               sourceIndex
             )
           }
-        case (array: Type.FixedSizeArray[Ctx @unchecked], IndexSelector(_) +: tail) =>
+        case (array: Type.FixedSizeArray, IndexSelector(_) +: tail) =>
           checkMutable(state, array.baseType, tail, lastField, structId, sourceIndex)
         case (map: Type.Map, (_: IndexSelector[Ctx @unchecked]) +: tail) =>
           checkMap(state, map, tail, sourceIndex)
@@ -1914,9 +1908,9 @@ object Ast {
 
     @inline private[ralph] def rename(ident: Ident, tpe: Type): Ident = {
       tpe match {
-        case _: Type.FixedSizeArray[_] => Ident(s"_${ident.name}$arraySuffix")
-        case _: Type.Struct            => Ident(s"_${ident.name}$structSuffix")
-        case _                         => ident
+        case _: Type.FixedSizeArray => Ident(s"_${ident.name}$arraySuffix")
+        case _: Type.Struct         => Ident(s"_${ident.name}$structSuffix")
+        case _                      => ident
       }
     }
   }
@@ -1983,7 +1977,7 @@ object Ast {
               struct.fields.map(f => getFlattenSize(f.tpe, accessedTypes :+ id)).sum
             case None => 1
           }
-        case t: Type.FixedSizeArray[Ctx @unchecked] =>
+        case t: Type.FixedSizeArray =>
           calcArraySize(t) * flattenSize(t.baseType, accessedTypes)
         case Type.Struct(id) => flattenSize(Type.NamedType(id), accessedTypes)
         case _               => 1
@@ -2009,7 +2003,7 @@ object Ast {
             case Some(struct) => struct.tpe
             case None         => Type.Contract(t.id)
           }
-        case t: Type.FixedSizeArray[Ctx @unchecked] =>
+        case t: Type.FixedSizeArray =>
           Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
         case Type.Map(key, value) =>
           Type.Map(resolveType(key), resolveType(value))
@@ -2019,7 +2013,7 @@ object Ast {
 
     @inline def resolveType(tpe: Type): Type = {
       tpe match {
-        case _: Type.NamedType | _: Type.FixedSizeArray[_] | _: Type.Map =>
+        case _: Type.NamedType | _: Type.FixedSizeArray | _: Type.Map =>
           typeCache.get(tpe) match {
             case Some(tpe) => tpe
             case None =>
@@ -2036,7 +2030,7 @@ object Ast {
     def flattenTypeLength(types: Seq[Type]): Int = {
       types.foldLeft(0) { case (acc, tpe) =>
         tpe match {
-          case _: Type.FixedSizeArray[_] | _: Type.NamedType | _: Type.Struct =>
+          case _: Type.FixedSizeArray | _: Type.NamedType | _: Type.Struct =>
             acc + getFlattenSize(tpe, Seq.empty)
           case _ => acc + 1
         }
@@ -2048,7 +2042,7 @@ object Ast {
       resolveType(tpe) match {
         case Type.Struct(id) =>
           getStruct(id).fields.flatMap(field => flattenType(field.tpe))
-        case t: Type.FixedSizeArray[Ctx @unchecked] =>
+        case t: Type.FixedSizeArray =>
           val baseTypes = flattenType(t.baseType)
           Seq.fill(calcArraySize(t))(baseTypes).flatten
         case tpe => Seq(tpe)
@@ -2068,7 +2062,7 @@ object Ast {
       val resolvedType = resolveType(tpe)
       if (isMutable) {
         resolvedType match {
-          case t: Type.FixedSizeArray[Ctx @unchecked] =>
+          case t: Type.FixedSizeArray =>
             val array = flattenTypeMutability(t.baseType, isMutable)
             Seq.fill(calcArraySize(t))(array).flatten
           case Type.Struct(id) =>
@@ -2098,8 +2092,8 @@ object Ast {
       globalState.addConstants(globalState.constantVars)
       globalState.addEnums(globalState.enums)
       globalState.structs.foreach(_.fields.foreach(_.tpe match {
-        case t: Type.FixedSizeArray[Ctx @unchecked] => globalState.calcArraySize(t); ()
-        case _                                      => ()
+        case t: Type.FixedSizeArray => globalState.calcArraySize(t); ()
+        case _                      => ()
       }))
       globalState
     }
@@ -2270,7 +2264,7 @@ object Ast {
         case (acc, arg) =>
           val argType = globalState.resolveType(arg.tpe)
           argType match {
-            case _: Type.FixedSizeArray[_] | _: Type.Struct =>
+            case _: Type.FixedSizeArray | _: Type.Struct =>
               acc :+ VarDef(
                 Seq(NamedVar(mutable = false, arg.ident)),
                 Variable(TemplateVar.rename(arg.ident, argType))

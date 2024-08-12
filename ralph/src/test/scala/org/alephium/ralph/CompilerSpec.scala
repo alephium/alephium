@@ -7958,10 +7958,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val project0         = Compiler.compileProject(contract).rightValue
       val compiledContract = project0._1.head
       val arrayTypes: Seq[Type] = Seq(
-        Type.FixedSizeArray[StatefulContext](Type.U256, Left(2)),
-        Type.FixedSizeArray[StatefulContext](Type.FixedSizeArray(Type.U256, Left(2)), Left(2)),
-        Type.FixedSizeArray[StatefulContext](Type.FixedSizeArray(Type.U256, Left(2)), Left(3)),
-        Type.FixedSizeArray[StatefulContext](Type.FixedSizeArray(Type.U256, Left(3)), Left(2))
+        Type.FixedSizeArray(Type.U256, Left(2)),
+        Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, Left(2)), Left(2)),
+        Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, Left(2)), Left(3)),
+        Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, Left(3)), Left(2))
       )
       compiledContract.ast.fields.map(_.tpe) is arrayTypes
       compiledContract.ast.maps.map(_.tpe.value) is arrayTypes
@@ -7972,7 +7972,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       compiledContract.ast.funcs.length is 2
       compiledContract.ast.funcs(1).args.map(_.tpe) is Seq(
-        Type.FixedSizeArray[StatefulContext](Type.NamedType(Ast.TypeId("Bar")), Left(3))
+        Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Bar")), Left(3))
       )
       compiledContract.ast.funcs(1).rtypes is Seq(arrayTypes(2))
 

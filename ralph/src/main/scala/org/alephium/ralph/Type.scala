@@ -16,7 +16,7 @@
 
 package org.alephium.ralph
 
-import org.alephium.protocol.vm.{StatelessContext, Val}
+import org.alephium.protocol.vm.Val
 import org.alephium.util.AVector
 
 sealed trait Type extends Ast.Positioned {
@@ -26,15 +26,15 @@ sealed trait Type extends Ast.Positioned {
   def signature: String = toVal.toString
 
   def isPrimitive: Boolean = this match {
-    case _: Type.FixedSizeArray[_] | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
+    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
         _: Type.Map =>
       false
     case _ => true
   }
 
   def isArrayType: Boolean = this match {
-    case _: Type.FixedSizeArray[_] => true
-    case _                         => false
+    case _: Type.FixedSizeArray => true
+    case _                      => false
   }
 
   def isStructType: Boolean = this match {
@@ -70,9 +70,9 @@ object Type {
   case object U256    extends Type { def toVal: Val.Type = Val.U256    }
   case object ByteVec extends Type { def toVal: Val.Type = Val.ByteVec }
   case object Address extends Type { def toVal: Val.Type = Val.Address }
-  final case class FixedSizeArray[Ctx <: StatelessContext](
+  final case class FixedSizeArray(
       baseType: Type,
-      var size: Either[Int, Ast.Expr[Ctx]]
+      var size: Either[Int, Ast.Expr[_]]
   ) extends Type {
     private def getArraySize: Int = size match {
       case Left(size)  => size
@@ -83,8 +83,8 @@ object Type {
 
     @scala.annotation.tailrec
     def elementType: Type = baseType match {
-      case array: FixedSizeArray[Ctx @unchecked] => array.elementType
-      case tpe                                   => tpe
+      case array: FixedSizeArray => array.elementType
+      case tpe                   => tpe
     }
 
     override def signature: String = s"[${baseType.signature};$getArraySize]"
