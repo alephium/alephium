@@ -1837,30 +1837,6 @@ object ServerUtils {
     } yield unsignedTx
   }
 
-  def buildDeployContractTx(
-      codeRaw: String,
-      address: Address,
-      _immFields: Option[String],
-      _mutFields: Option[String],
-      initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[(TokenId, U256)],
-      tokenIssuraneInfo: Option[(U256, Option[Address.Asset])]
-  ): Try[StatefulScript] = {
-    for {
-      immFields <- parseState(_immFields)
-      mutFields <- parseState(_mutFields)
-      script <- buildDeployContractScriptWithParsedState(
-        codeRaw,
-        address,
-        immFields,
-        mutFields,
-        initialAttoAlphAmount,
-        initialTokenAmounts,
-        tokenIssuraneInfo
-      )
-    } yield script
-  }
-
   def buildDeployContractTxWithParsedState(
       contract: StatefulContract,
       address: Address,
@@ -1943,12 +1919,5 @@ object ServerUtils {
     )
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
-  }
-
-  def parseState(str: Option[String]): Try[AVector[vm.Val]] = {
-    str match {
-      case None        => Right(AVector.empty[vm.Val])
-      case Some(state) => wrapCompilerResult(Compiler.compileState(state))
-    }
   }
 }

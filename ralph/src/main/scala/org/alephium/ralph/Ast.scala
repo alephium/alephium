@@ -226,24 +226,31 @@ object Ast {
       Seq(v.toConstInstr)
     }
   }
-  final case class CreateArrayExpr[Ctx <: StatelessContext](elements: Seq[Expr[Ctx]])
-      extends Expr[Ctx] {
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
-      assume(elements.nonEmpty)
-      val baseType = elements(0).getType(state)
+  sealed trait CreateArrayExpr[Ctx <: StatelessContext] extends Expr[Ctx] {
+    def elementExpr: Expr[Ctx]
+    protected def getElementType(state: Compiler.State[Ctx]): Type = {
+      val baseType = elementExpr.getType(state)
       if (baseType.length != 1) {
         throw Compiler.Error(
-          s"Expected single type for array element, got ${quote(elements)}",
+          s"Expected single type for array element, got ${quote(baseType)}",
           sourceIndex
         )
       }
-      if (elements.drop(0).exists(_.getType(state) != baseType)) {
-        throw Compiler.Error(
-          s"Array elements should have same type, got ${quote(elements)}",
-          sourceIndex
-        )
+      baseType(0)
+    }
+  }
+  final case class CreateArrayExpr1[Ctx <: StatelessContext](elements: Seq[Expr[Ctx]])
+      extends CreateArrayExpr[Ctx] {
+    def elementExpr: Expr[Ctx] = {
+      assume(elements.nonEmpty)
+      elements(0)
+    }
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
+      val elementType = getElementType(state)
+      if (elements.drop(0).exists(_.getType(state) != Seq(elementType))) {
+        throw Compiler.Error(s"Array elements should have same type", sourceIndex)
       }
-      Seq(Type.FixedSizeArray(baseType(0), elements.size))
+      Seq(Type.FixedSizeArray(elementType, Left(elements.size)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -251,6 +258,30 @@ object Ast {
     }
     override def reset(): Unit = {
       elements.foreach(_.reset())
+      super.reset()
+    }
+  }
+  final case class CreateArrayExpr2[Ctx <: StatelessContext](
+      elementExpr: Expr[Ctx],
+      sizeExpr: Expr[Ctx]
+  ) extends CreateArrayExpr[Ctx] {
+    private var size: Option[Int] = None
+
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
+      val elementType = getElementType(state)
+      val arraySize   = state.calcArraySize(sizeExpr)
+      size = Some(arraySize)
+      Seq(Type.FixedSizeArray(elementType, Left(arraySize)))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val arraySize = size.getOrElse(state.calcArraySize(sizeExpr))
+      Seq.fill(arraySize)(elementExpr).flatMap(_.genCode(state))
+    }
+    override def reset(): Unit = {
+      size = None
+      elementExpr.reset()
+      sizeExpr.reset()
       super.reset()
     }
   }
@@ -456,9 +487,10 @@ object Ast {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       assume(selectors.nonEmpty)
       base.getType(state) match {
-        case Seq(t: Type.FixedSizeArray) => Seq(_getType(state, t, base.sourceIndex))
-        case Seq(t: Type.Struct)         => Seq(_getType(state, t, base.sourceIndex))
-        case Seq(t: Type.Map)            => Seq(_getType(state, t, base.sourceIndex))
+        case Seq(t: Type.FixedSizeArray) =>
+          Seq(_getType(state, t, base.sourceIndex))
+        case Seq(t: Type.Struct) => Seq(_getType(state, t, base.sourceIndex))
+        case Seq(t: Type.Map)    => Seq(_getType(state, t, base.sourceIndex))
         case tpe =>
           val tpeStr = quoteTypes(tpe)
           selectors.headOption match {
@@ -1945,8 +1977,8 @@ object Ast {
               struct.fields.map(f => getFlattenSize(f.tpe, accessedTypes :+ id)).sum
             case None => 1
           }
-        case Type.FixedSizeArray(baseType, size) =>
-          size * flattenSize(baseType, accessedTypes)
+        case t: Type.FixedSizeArray =>
+          calcArraySize(t) * flattenSize(t.baseType, accessedTypes)
         case Type.Struct(id) => flattenSize(Type.NamedType(id), accessedTypes)
         case _               => 1
       }
@@ -1971,8 +2003,8 @@ object Ast {
             case Some(struct) => struct.tpe
             case None         => Type.Contract(t.id)
           }
-        case Type.FixedSizeArray(baseType, size) =>
-          Type.FixedSizeArray(resolveType(baseType), size)
+        case t: Type.FixedSizeArray =>
+          Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
         case Type.Map(key, value) =>
           Type.Map(resolveType(key), resolveType(value))
         case _ => tpe
@@ -2010,9 +2042,9 @@ object Ast {
       resolveType(tpe) match {
         case Type.Struct(id) =>
           getStruct(id).fields.flatMap(field => flattenType(field.tpe))
-        case Type.FixedSizeArray(tpe, size) =>
-          val baseTypes = flattenType(tpe)
-          Seq.fill(size)(baseTypes).flatten
+        case t: Type.FixedSizeArray =>
+          val baseTypes = flattenType(t.baseType)
+          Seq.fill(calcArraySize(t))(baseTypes).flatten
         case tpe => Seq(tpe)
       }
     }
@@ -2030,9 +2062,9 @@ object Ast {
       val resolvedType = resolveType(tpe)
       if (isMutable) {
         resolvedType match {
-          case Type.FixedSizeArray(baseType, size) =>
-            val array = flattenTypeMutability(baseType, isMutable)
-            Seq.fill(size)(array).flatten
+          case t: Type.FixedSizeArray =>
+            val array = flattenTypeMutability(t.baseType, isMutable)
+            Seq.fill(calcArraySize(t))(array).flatten
           case Type.Struct(id) =>
             getStruct(id).fields.flatMap(field =>
               flattenTypeMutability(resolveType(field.tpe), field.isMutable && isMutable)
@@ -2059,6 +2091,10 @@ object Ast {
       val globalState = GlobalState[Ctx](structs.toSeq, constantVars.toSeq, enums.toSeq)
       globalState.addConstants(globalState.constantVars)
       globalState.addEnums(globalState.enums)
+      globalState.structs.foreach(_.fields.foreach(_.tpe match {
+        case t: Type.FixedSizeArray => globalState.calcArraySize(t); ()
+        case _                      => ()
+      }))
       globalState
     }
   }
