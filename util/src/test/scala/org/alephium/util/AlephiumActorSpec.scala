@@ -22,7 +22,7 @@ import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
-import akka.testkit.{TestActorRef, TestKit}
+import akka.testkit.{EventFilter, TestActorRef, TestKit}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalactic.Equality
 import org.scalactic.source.Position
@@ -78,6 +78,10 @@ trait AlephiumActorSpec extends AlephiumFutureSpec with BeforeAndAfterEach with 
 
   def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
     akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
+  }
+
+  def expectErrorMsg[T](message: String)(f: => T)(implicit system: ActorSystem): T = {
+    EventFilter.error(pattern = s".*${message}.*", occurrences = 1).intercept(f)(system)
   }
 }
 
