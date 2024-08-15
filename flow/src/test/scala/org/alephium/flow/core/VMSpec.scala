@@ -467,6 +467,74 @@ class VMSpec extends AlephiumSpec with Generators {
     contractAsset.amount is ALPH.alph(2)
   }
 
+  it should "work with negative operation on I256 expression" in new ContractFixture {
+    def codeWithExpr(expr: String) =
+      s"""
+         |Contract TestContract(mut x: I256) {
+         |  pub fn negativeX() -> () {
+         |    x = -${expr}
+         |  }
+         |}
+         |""".stripMargin
+
+    def scriptWithCode(code: String, contractId: String): String = {
+      s"""
+         |TxScript Operate() {
+         |  TestContract(#$contractId).negativeX()
+         |}
+         |
+         |$code
+         |""".stripMargin
+    }
+
+    def verifyXValue(code: String, contractId: ContractId, xValue: Int) = {
+      callTxScript(scriptWithCode(code, contractId.toHexString))
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.mutFields(0) is Val.I256(I256.unsafe(xValue))
+    }
+
+    def verify(xExpr: String) = {
+      val code = codeWithExpr(xExpr)
+      val contractId = createContract(
+        code,
+        initialMutState = AVector[Val](Val.I256(I256.One))
+      )._1
+
+      verifyXValue(code, contractId, xValue = -1)
+      verifyXValue(code, contractId, xValue = 1)
+      verifyXValue(code, contractId, xValue = -1)
+      verifyXValue(code, contractId, xValue = 1)
+    }
+
+    verify("x")
+    verify("((x + 1i) * 2i / 2i - 1i)")
+  }
+
+  it should "report error with negative operation on non-I256 expressions" in new ContractFixture {
+    def codeWithType(typ: String) =
+      s"""
+         |Contract TestContract(mut x: ${typ}) {
+         |  pub fn negativeX() -> () {
+         |    x = -x
+         |  }
+         |}
+         |""".stripMargin
+
+    def verifyErrorMessage(typ: String) = {
+      val codeWithU256 = codeWithType(typ)
+      Compiler
+        .compileContract(codeWithU256)
+        .leftValue
+        .message is s"Invalid param types List($typ) for - operator"
+    }
+
+    verifyErrorMessage("U256")
+    verifyErrorMessage("Bool")
+    verifyErrorMessage("ByteVec")
+    verifyErrorMessage("Address")
+  }
+
   it should "create contract and transfer tokens from the contract" in new ContractFixture {
     val code =
       s"""

@@ -2439,6 +2439,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     bar.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
     bar.enums(1).fields.foreach(_.origin is Some(TypeId("Bar")))
   }
+
+  it should "parse negation on variable" in {
+    parse("!x", StatelessParser.expr(_)).get.value is
+      UnaryOp[StatelessContext](Not, Variable(Ident("x")))
+    parse("-x", StatelessParser.expr(_)).get.value is
+      UnaryOp[StatelessContext](Negate, Variable(Ident("x")))
+  }
 }
 
 class ParseNoFileSpec extends ParserSpec(None)
