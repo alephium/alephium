@@ -185,6 +185,87 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Ast.IdentSelector(Ident("c"))
         )
       )
+    parse("a[0].foo()", StatefulParser.expr(_)).get.value is
+      ContractCallExpr(
+        LoadDataBySelectors(Variable(Ident("a")), Seq(IndexSelector(Const(Val.U256(U256.Zero))))),
+        FuncId("foo", false),
+        Seq.empty,
+        Seq.empty
+      )
+    parse("a[0][0].foo()", StatefulParser.expr(_)).get.value is
+      ContractCallExpr(
+        LoadDataBySelectors(
+          Variable(Ident("a")),
+          Seq.fill(2)(IndexSelector(Const(Val.U256(U256.Zero))))
+        ),
+        FuncId("foo", false),
+        Seq.empty,
+        Seq.empty
+      )
+    parse("a.b[0].c.foo()", StatefulParser.expr(_)).get.value is
+      ContractCallExpr(
+        LoadDataBySelectors(
+          Variable(Ident("a")),
+          Seq(
+            IdentSelector(Ident("b")),
+            IndexSelector(Const(Val.U256(U256.Zero))),
+            IdentSelector(Ident("c"))
+          )
+        ),
+        FuncId("foo", false),
+        Seq.empty,
+        Seq.empty
+      )
+    parse("a.b.foo()[0].bar()", StatefulParser.expr(_)).get.value is
+      ContractCallExpr(
+        LoadDataBySelectors(
+          ContractCallExpr(
+            LoadDataBySelectors(Variable(Ident("a")), Seq(IdentSelector(Ident("b")))),
+            FuncId("foo", false),
+            Seq.empty,
+            Seq.empty
+          ),
+          Seq(IndexSelector(Const(Val.U256(U256.Zero))))
+        ),
+        FuncId("bar", false),
+        Seq.empty,
+        Seq.empty
+      )
+    parse("foo().a.bar().d[0]", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors(
+        ContractCallExpr(
+          LoadDataBySelectors(
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+            Seq(IdentSelector(Ident("a")))
+          ),
+          FuncId("bar", false),
+          Seq.empty,
+          Seq.empty
+        ),
+        Seq(IdentSelector(Ident("d")), IndexSelector(Const(Val.U256(U256.Zero))))
+      )
+    parse("a.b.foo()[0].bar().c.d[0]", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors(
+        ContractCallExpr(
+          LoadDataBySelectors(
+            ContractCallExpr(
+              LoadDataBySelectors(Variable(Ident("a")), Seq(IdentSelector(Ident("b")))),
+              FuncId("foo", false),
+              Seq.empty,
+              Seq.empty
+            ),
+            Seq(IndexSelector(Const(Val.U256(U256.Zero))))
+          ),
+          FuncId("bar", false),
+          Seq.empty,
+          Seq.empty
+        ),
+        Seq(
+          IdentSelector(Ident("c")),
+          IdentSelector(Ident("d")),
+          IndexSelector(Const(Val.U256(U256.Zero)))
+        )
+      )
   }
 
   it should "parse string literals" in {
@@ -275,7 +356,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .isSuccess is true
 
     info("Contract call")
-    parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
+    parse("x.bar(x)", StatefulParser.contractCallOrLoadData(_)).get.value is
       ContractCallExpr(
         Variable(Ident("x")),
         FuncId("bar", false),
@@ -283,7 +364,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         List(Variable(Ident("x")))
       )
     fastparse
-      .parse("Foo(x).bar{ z -> ALPH: 1 }(x)", StatefulParser.contractCallExpr(_))
+      .parse("Foo(x).bar{ z -> ALPH: 1 }(x)", StatefulParser.contractCallOrLoadData(_))
       .get
       .value is
       ContractCallExpr(
@@ -300,7 +381,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
     val emptyAssetsCode = "Foo(x).bar{ z -> }(x)"
     intercept[CompilerError.`Expected non-empty asset(s) for address`](
-      parse(emptyAssetsCode, StatefulParser.contractCallExpr(_))
+      parse(emptyAssetsCode, StatefulParser.contractCallOrLoadData(_))
     ).format(emptyAssetsCode) is
       """-- error (1:17): Syntax error
         |1 |Foo(x).bar{ z -> }(x)
@@ -331,7 +412,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse contract call" in {
-    parse("a.b().c().d()", StatefulParser.contractCallExpr(_)).get.value is
+    parse("a.b().c().d()", StatefulParser.contractCallOrLoadData(_)).get.value is
       ContractCallExpr(
         ContractCallExpr(
           ContractCallExpr(Variable(Ident("a")), FuncId("b", false), List(), List()),
@@ -344,7 +425,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         List()
       )
 
-    parse("a().b().c()", StatefulParser.contractCallExpr(_)).get.value is
+    parse("a().b().c()", StatefulParser.contractCallOrLoadData(_)).get.value is
       ContractCallExpr(
         ContractCallExpr(
           CallExpr(FuncId("a", false), List(), List()),
@@ -428,6 +509,39 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .parse("for (let mut i = 0; i < 10; i = i + 1) { x = x + 1 }", StatelessParser.statement(_))
       .get
       .value is a[Ast.ForLoop[StatelessContext]]
+
+    parse("a.b.foo()[0].bar()", StatefulParser.statement(_)).get.value is
+      ContractCall(
+        LoadDataBySelectors(
+          ContractCallExpr(
+            LoadDataBySelectors(Variable(Ident("a")), Seq(IdentSelector(Ident("b")))),
+            FuncId("foo", false),
+            Seq.empty,
+            Seq.empty
+          ),
+          Seq(IndexSelector(Const(Val.U256(U256.Zero))))
+        ),
+        FuncId("bar", false),
+        Seq.empty,
+        Seq.empty
+      )
+    parse("foo().get().bar[0].set()", StatefulParser.statement(_)).get.value is
+      ContractCall(
+        LoadDataBySelectors(
+          ContractCallExpr(
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+            FuncId("get", false),
+            Seq.empty,
+            Seq.empty
+          ),
+          Seq(IdentSelector(Ident("bar")), IndexSelector(Const(Val.U256(U256.Zero))))
+        ),
+        FuncId("set", false),
+        Seq.empty,
+        Seq.empty
+      )
+    intercept[Compiler.Error](parse("a.b.foo()[0]", StatefulParser.statement(_))).message is
+      "Expected a statement"
   }
 
   it should "parse debug statements" in {

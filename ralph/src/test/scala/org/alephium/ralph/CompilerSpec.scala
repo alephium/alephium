@@ -5139,6 +5139,36 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code(), "Cannot assign to immutable variable x.")
       compileContractFull(code("mut").replace("$", "")).isRight is true
     }
+
+    {
+      info("Chained contract call")
+      val code =
+        s"""
+           |Contract Foo(baz: IBaz) {
+           |  pub fn func0() -> () {
+           |    baz.get().bars[0].set()
+           |    func1().get().bars[1].set()
+           |    let value0 = baz.get().bars[0].get().values[0]
+           |    let value1 = baz.get().bars[1].get().values[1]
+           |    assert!(value0 == value1, 0)
+           |  }
+           |  pub fn func1() -> IBaz {
+           |    return baz
+           |  }
+           |}
+           |struct Bar { values: [U256; 2] }
+           |Interface IBar {
+           |  pub fn set() -> ()
+           |  pub fn get() -> Bar
+           |}
+           |struct Baz { bars: [IBar; 2] }
+           |Interface IBaz {
+           |  pub fn get() -> Baz
+           |}
+           |""".stripMargin
+
+      compileContract(code).isRight is true
+    }
   }
 
   it should "load from array/struct literal" in new Fixture {
