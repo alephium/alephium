@@ -96,8 +96,10 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val probe0      = TestProbe()
     val connection0 = connectToServer(probe0)
 
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = emptyBlock(blockFlow, chainIndex)
+    val chainIndex  = ChainIndex.unsafe(0, 0)
+    val block       = emptyBlock(blockFlow, chainIndex)
+    val parentHash  = block.blockDeps.parentHash(chainIndex)
+    val blockHeight = blockFlow.getHeightUnsafe(parentHash) + 1
 
     val blockFlowTemplate = BlockFlowTemplate(
       chainIndex,
@@ -105,7 +107,8 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       block.header.depStateHash,
       block.target,
       block.timestamp,
-      block.transactions
+      block.transactions,
+      blockHeight
     )
     val headerBlob = Job.from(blockFlowTemplate).headerBlob
   }
@@ -121,7 +124,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   it should "error when the mined block has invalid work" in new SubmissionFixture {
     val newBlock      = block.copy(header = block.header.copy(target = Target.Zero))
     val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
-    val newTemplate   = BlockFlowTemplate.from(newBlock)
+    val newTemplate   = BlockFlowTemplate.from(newBlock, blockHeight)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
     minerApiController.underlyingActor.jobCache
       .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))

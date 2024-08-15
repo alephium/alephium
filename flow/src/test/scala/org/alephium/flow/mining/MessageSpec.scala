@@ -53,7 +53,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
   "ServerMessage" should "serde properly" in {
     val messages = Seq(
-      Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ZERO))),
+      Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ZERO, 1))),
       SubmitResult(0, 1, true),
       SubmitResult(0, 1, false)
     )
@@ -69,11 +69,11 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
   it should "pass explicit hex string serialization examples" in {
     {
-      val message: ServerMessage = Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE)))
+      val message: ServerMessage = Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE, 17)))
       val serializedJobs         = ServerMessage.serialize(message)
       serializedJobs is
         // message.length (4 bytes)
-        hex"0000001c" ++
+        hex"00000020" ++
         // message type (1 byte)
         hex"00" ++
         // jobs.length (4 bytes)
@@ -87,7 +87,9 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
         // txsBlob.length (4 bytes) ++ blob bytes
         hex"00000001" ++ hex"bb" ++
         // target.length (4 bytes) ++ target bytes
-        hex"00000001" ++ hex"01"
+        hex"00000001" ++ hex"01" ++
+        // height (4 bytes)
+        hex"00000011"
     }
 
     {
@@ -110,13 +112,15 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
   "Job" should "use empty transaction list for efficiency" in new FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = emptyBlock(blockFlow, chainIndex)
+    val parentHash = block.blockDeps.parentHash(chainIndex)
     val blockFlowTemplate = BlockFlowTemplate(
       chainIndex,
       block.blockDeps.deps,
       block.header.depStateHash,
       block.target,
       block.timestamp,
-      block.transactions
+      block.transactions,
+      blockFlow.getHeightUnsafe(parentHash) + 1
     )
     Job.fromWithoutTxs(blockFlowTemplate).txsBlob is serialize(AVector.empty[Transaction])
   }

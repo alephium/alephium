@@ -91,7 +91,8 @@ final case class Job(
     toGroup: Int,
     headerBlob: ByteString,
     txsBlob: ByteString,
-    target: BigInteger
+    target: BigInteger,
+    height: Int
 ) {
   def toBlockBlob(nonce: Nonce): ByteString = {
     nonce.value ++ headerBlob ++ txsBlob
@@ -114,9 +115,9 @@ object Job {
         }
       }
     }
-    Serde.forProduct5(
+    Serde.forProduct6(
       Job.apply,
-      t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target)
+      t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target, t.height)
     )
   }
 
@@ -137,7 +138,8 @@ object Job {
       template.index.to.value,
       headerBlob.drop(Nonce.byteLength),
       txsBlob,
-      template.target.value
+      template.target.value,
+      template.height
     )
   }
 }
