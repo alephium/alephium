@@ -6530,6 +6530,69 @@ class VMSpec extends AlephiumSpec with Generators {
       "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
   }
 
+  it should "test chained contract calls" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo(mut value: U256) {
+         |  pub fn set(newValue: U256) -> () {
+         |    value = newValue
+         |  }
+         |  pub fn get() -> U256 {
+         |    return value
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, initialMutState = AVector(Val.U256(U256.Zero)))._1
+
+    val bar =
+      s"""
+         |Contract Bar(foo: Foo) {
+         |  pub fn getFoo() -> Foo {
+         |    return foo
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector(Val.ByteVec(fooId.bytes)))._1
+
+    val baz =
+      s"""
+         |Contract Baz(qux: Qux) {
+         |  pub fn getQux() -> Qux {
+         |    return qux
+         |  }
+         |  fn getBar() -> Bar {
+         |    return qux.bar
+         |  }
+         |}
+         |struct Qux {
+         |  array: [Bar; 2],
+         |  bar: Bar
+         |}
+         |$bar
+         |""".stripMargin
+    val bazId = createContract(baz, AVector.fill(3)(Val.ByteVec(barId.bytes)))._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let baz = Baz(#${bazId.toHexString})
+         |  assert!(baz.getQux().array[0].getFoo().get() == 0, 0)
+         |  assert!(baz.getQux().array[1].getFoo().get() == 0, 0)
+         |  assert!(baz.getQux().bar.getFoo().get() == 0, 0)
+         |
+         |  baz.getQux().bar.getFoo().set(1)
+         |  assert!(baz.getQux().array[0].getFoo().get() == 1, 0)
+         |  assert!(baz.getQux().array[1].getFoo().get() == 1, 0)
+         |  assert!(baz.getQux().bar.getFoo().get() == 1, 0)
+         |}
+         |$baz
+         |""".stripMargin
+
+    testSimpleScript(script)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

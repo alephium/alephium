@@ -46,8 +46,6 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   lazy val Lexer: Lexer = new Lexer(fileURI)
 
-  lazy val constants: Constants[Ctx] = Constants.lazyEvaluated[Ctx]
-
   /*
    * PP: Positioned Parser
    * Help adding source index to the result, it works well on easy case, but it fails for
@@ -70,12 +68,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(_.asInstanceOf[Ast.Const[Ctx]])
 
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
-    PP("[" ~ (expr.rep(1, ",")) ~ "]") { elems =>
-      Ast.CreateArrayExpr.apply(elems)
+    PP("[" ~ expr.rep(1, ",") ~ "]") { elems =>
+      Ast.CreateArrayExpr1(elems)
     }
   def createArray2[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
-    PP("[" ~ (expr ~ ";" ~ arraySize) ~ "]") { case ((expr, size)) =>
-      Ast.CreateArrayExpr(Seq.fill(size)(expr))
+    PP("[" ~ (expr ~ ";" ~ expr) ~ "]") { case (element, size) =>
+      Ast.CreateArrayExpr2(element, size)
     }
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
@@ -104,19 +102,19 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   def approveAssets[Unknown: P]: P[Seq[Ast.ApproveAsset[Ctx]]] =
     P("{" ~ approveAssetPerAddress.rep(1, ";") ~ ";".? ~ "}")
-  def callAbs[Unknown: P]: P[(Ast.FuncId, Seq[Ast.ApproveAsset[Ctx]], Seq[Ast.Expr[Ctx]])] =
-    P(Lexer.funcId ~ approveAssets.? ~ "(" ~ expr.rep(0, ",") ~ ")").map {
+  def callAbs[Unknown: P]: P[Parser.CallAbs[Ctx]] =
+    PP(Lexer.funcId ~ approveAssets.? ~ "(" ~ expr.rep(0, ",") ~ ")") {
       case (funcId, approveAssets, arguments) =>
-        (funcId, approveAssets.getOrElse(Seq.empty), arguments)
+        Parser.CallAbs(funcId, approveAssets.getOrElse(Seq.empty), arguments)
     }
   def callExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    PP((Lexer.typeId ~ ".").? ~ callAbs) { case (contractIdOpt, (funcId, approveAssets, expr)) =>
-      contractIdOpt match {
-        case Some(contractId) =>
-          Ast
-            .ContractStaticCallExpr(contractId, funcId, approveAssets, expr)
-        case None => Ast.CallExpr(funcId, approveAssets, expr)
-      }
+    PP((Lexer.typeId ~ ".").? ~ callAbs) {
+      case (contractIdOpt, Parser.CallAbs(funcId, approveAssets, args)) =>
+        contractIdOpt match {
+          case Some(contractId) =>
+            Ast.ContractStaticCallExpr(contractId, funcId, approveAssets, args)
+          case None => Ast.CallExpr(funcId, approveAssets, args)
+        }
     }
   def contractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
     PP(Lexer.typeId ~ "(" ~ expr ~ ")") { case (typeId, expr) =>
@@ -130,18 +128,6 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.Binop(op, acc, right).atSourceIndex(sourceIndex)
       }
     }
-  }
-
-  def arraySize[Unknown: P]: P[Int] = P(Index ~ expr ~~ Index).map {
-    case (fromIndex, expr, endIndex) =>
-      constants.calcConstant(expr) match {
-        case Val.U256(value) => value.v.intValue()
-        case _ =>
-          throw Compiler.Error(
-            "Invalid array size, expected a constant U256 value",
-            Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-          )
-      }
   }
 
   def indexSelector[Unknown: P]: P[Ast.DataSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
@@ -184,14 +170,10 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(loadFieldBySelectors | PP((Lexer.opNot | Lexer.opNegate) ~ loadFieldBySelectors) {
-      case (op, expr) => Ast.UnaryOp.apply[Ctx](op, expr)
+    P(atom | PP((Lexer.opNot | Lexer.opNegate) ~ atom) { case (op, expr) =>
+      Ast.UnaryOp.apply[Ctx](op, expr)
     })
 
-  def loadFieldBySelectors[Unknown: P]: P[Ast.Expr[Ctx]] =
-    PP(atom ~ dataSelector.rep(0)) { case (expr, selectors) =>
-      if (selectors.isEmpty) expr else Ast.LoadDataBySelectors(expr, selectors)
-    }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 
   def structCtor[Unknown: P]: P[Ast.StructCtor[Ctx]] =
@@ -339,8 +321,11 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ arraySize ~ "]").map { case (tpe, size) =>
-      Type.FixedSizeArray(tpe, size)
+    PP("[" ~ baseType ~ ";" ~ expr ~ "]") { case (tpe, size) =>
+      size match {
+        case Ast.Const(Val.U256(value)) => Type.FixedSizeArray(tpe, Left(value.toBigInt.intValue()))
+        case _                          => Type.FixedSizeArray(tpe, Right(size))
+      }
     }
   }
   def argument[Unknown: P](
@@ -465,7 +450,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def funcCall[Unknown: P]: P[Ast.Statement[Ctx]] =
     (Index ~ (Lexer.typeId ~ ".").? ~ callAbs ~~ Index).map {
-      case (fromIndex, contractIdOpt, (funcId, approveAssets, exprs), endIndex) =>
+      case (fromIndex, contractIdOpt, Parser.CallAbs(funcId, approveAssets, exprs), endIndex) =>
         contractIdOpt match {
           case Some(contractId) =>
             Ast
@@ -600,9 +585,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ expr)
       .map { case (from, ident, expr) =>
         val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
-        val constantDef = Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
-        constants.addConstants(Seq(constantDef))
-        constantDef
+        Ast.ConstantVarDef(ident, expr).atSourceIndex(sourceIndex)
       }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[Ctx]] =
@@ -628,9 +611,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
-        val enumDef = Ast.EnumDef(id, fields)
-        constants.addEnums(Seq(enumDef))
-        enumDef
+        Ast.EnumDef(id, fields)
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }
@@ -651,6 +632,12 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 ) extends Ast.Positioned
 
 object Parser {
+
+  final case class CallAbs[Ctx <: StatelessContext](
+      funcId: Ast.FuncId,
+      approveAssets: Seq[Ast.ApproveAsset[Ctx]],
+      args: Seq[Ast.Expr[Ctx]]
+  ) extends Ast.Positioned
 
   sealed trait RalphAnnotation[T] {
     def id: String
@@ -866,9 +853,18 @@ object Parser {
 class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractConv |
+      const | stringLiteral | alphTokenId | loadData | callExpr | contractConv |
         structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
+
+  private def loadDataBase[Unknown: P] = P(
+    (callExpr | structCtor | variableIdOnly | parenExpr | arrayExpr) ~ dataSelector.rep(1)
+  )
+  def loadData[Unknown: P]: P[Ast.Expr[StatelessContext]] =
+    loadDataBase.map { case (base, selectors) =>
+      val sourceIndex = SourceIndex(base.sourceIndex, selectors.lastOption.flatMap(_.sourceIndex))
+      Ast.LoadDataBySelectors(base, selectors).atSourceIndex(sourceIndex)
+    }
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(
@@ -902,7 +898,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | mapContains | contractCallExpr | contractConv |
+      const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
         enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
@@ -925,15 +921,33 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
-    P(Index ~ (callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1) ~~ Index).map {
-      case (fromIndex, obj, callAbss, endIndex) =>
-        callAbss.foldLeft(obj)((acc, callAbs) => {
-          val (funcId, approveAssets, arguments) = callAbs
-          Ast
-            .ContractCallExpr(acc, funcId, approveAssets, arguments)
-            .atSourceIndex(fromIndex, endIndex, fileURI)
-        })
+  private def contractCallOrLoadData(
+      base: Ast.Expr[StatefulContext],
+      selectorOrCallAbss: Seq[Ast.Positioned]
+  ): Ast.Expr[StatefulContext] =
+    selectorOrCallAbss.foldLeft(base)((acc, selectorOrCallAbs) => {
+      val sourceIndex = SourceIndex(acc.sourceIndex, selectorOrCallAbs.sourceIndex)
+      val expr = selectorOrCallAbs match {
+        case selector: Ast.DataSelector =>
+          acc match {
+            case Ast.LoadDataBySelectors(base, selectors) =>
+              Ast.LoadDataBySelectors(base, selectors :+ selector)
+            case _ => Ast.LoadDataBySelectors(acc, Seq(selector))
+          }
+        case callAbs: Parser.CallAbs[StatefulContext @unchecked] =>
+          Ast.ContractCallExpr(acc, callAbs.funcId, callAbs.approveAssets, callAbs.args)
+      }
+      expr.atSourceIndex(sourceIndex)
+    })
+
+  private def contractCallOrLoadDataBase[Unknown: P] = P(
+    (callExpr | contractConv | structCtor | variableIdOnly | parenExpr | arrayExpr)
+      ~ (("." ~ callAbs) | dataSelector).rep(1)
+  )
+
+  def contractCallOrLoadData[Unknown: P]: P[Ast.Expr[StatefulContext]] =
+    contractCallOrLoadDataBase.map { case (base, selectorOrCallAbss) =>
+      contractCallOrLoadData(base, selectorOrCallAbss)
     }
 
   def mapContains[Unknown: P]: P[Ast.Expr[StatefulContext]] =
@@ -944,23 +958,23 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def contractCall[Unknown: P]: P[Ast.Statement[StatefulContext]] =
-    P(Index ~ (callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1) ~~ Index).map {
-      case (fromIndex, obj, callAbss, endIndex) =>
-        val base = callAbss.init.foldLeft(obj)((acc, callAbs) => {
-          val (funcId, approveAssets, arguments) = callAbs
+    contractCallOrLoadDataBase.map { case (base, selectorOrCallAbss) =>
+      val obj         = contractCallOrLoadData(base, selectorOrCallAbss.init)
+      val last        = selectorOrCallAbss.last
+      val sourceIndex = SourceIndex(obj.sourceIndex, last.sourceIndex)
+      last match {
+        case callAbs: Parser.CallAbs[StatefulContext @unchecked] =>
           Ast
-            .ContractCallExpr(acc, funcId, approveAssets, arguments)
-            .atSourceIndex(fromIndex, endIndex, fileURI)
-        })
-        val (funcId, approveAssets, arguments) = callAbss.last
-        Ast
-          .ContractCall(base, funcId, approveAssets, arguments)
-          .atSourceIndex(fromIndex, endIndex, fileURI)
+            .ContractCall(obj, callAbs.funcId, callAbs.approveAssets, callAbs.args)
+            .atSourceIndex(sourceIndex)
+        case _ =>
+          throw Compiler.Error("Expected a statement", sourceIndex)
+      }
     }
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | structDestruction | assign | debug | funcCall | mapCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
@@ -1251,18 +1265,6 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           )
           .atSourceIndex(fromIndex, endIndex, fileURI)
       }
-
-  def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =
-    P("[" ~ constOrArray.rep(0, ",") ~ "]").map(_.flatten)
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def constOrArray[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] = P(
-    const.map(Seq(_)) |
-      P("[" ~ constOrArray.rep(0, ",").map(_.flatten) ~ "]") |
-      P("[" ~ constOrArray ~ ";" ~ arraySize ~ "]").map { case (consts, size) =>
-        (0 until size).flatMap(_ => consts)
-      }
-  )
 
   def emitEvent[Unknown: P]: P[Ast.EmitEvent[StatefulContext]] =
     P(Index ~ "emit" ~ Lexer.typeId ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)

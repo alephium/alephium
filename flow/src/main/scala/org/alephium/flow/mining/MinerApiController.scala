@@ -169,10 +169,14 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       jobCache.get(headerKey) match {
         case Some((template, txBlob)) =>
           val blockBytes = header ++ txBlob
-          submit(blockHash, blockBytes, template.index)
-          log.info(
-            s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
-          )
+          if (PoW.checkWork(blockHash, template.target)) {
+            submit(blockHash, blockBytes, template.index)
+            log.info(
+              s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
+            )
+          } else {
+            log.error(s"The mined block has invalid work: ${blockHash.toHexString}")
+          }
         case None =>
           log.error(
             s"The job for the block is expired: ${Hex.toHexString(blockBlob)}"

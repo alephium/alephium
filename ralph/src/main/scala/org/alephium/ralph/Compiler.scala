@@ -144,17 +144,6 @@ object Compiler {
     }
   }
 
-  def compileState(stateRaw: String): Either[Error, AVector[Val]] = {
-    try {
-      fastparse.parse(stateRaw, new StatefulParser(None).state(_)) match {
-        case Parsed.Success(state, _) => Right(AVector.from(state.map(_.v)))
-        case failure: Parsed.Failure  => Left(Error.parse(failure))
-      }
-    } catch {
-      case e: Error => Left(e)
-    }
-  }
-
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
     def isPublic: Boolean
@@ -997,13 +986,23 @@ object Compiler {
 
     def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
 
-    def resolveType(ident: Ast.Ident): Type  = globalState.resolveType(getVariable(ident).tpe)
-    @inline def resolveType(tpe: Type): Type = globalState.resolveType(tpe)
-    @inline def resolveTypes(types: Seq[Type]): Seq[Type] = globalState.resolveTypes(types)
-    @inline def flattenTypeLength(types: Seq[Type]): Int  = globalState.flattenTypeLength(types)
+    def resolveType(ident: Ast.Ident): Type = resolveType(getVariable(ident).tpe)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def resolveType(tpe: Type): Type = {
+      tpe match {
+        case t: Type.FixedSizeArray =>
+          Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
+        case _ => globalState.resolveType(tpe)
+      }
+    }
+
+    @inline def resolveTypes(types: Seq[Type]): Seq[Type] = types.map(resolveType)
+    @inline def flattenTypeLength(types: Seq[Type]): Int =
+      globalState.flattenTypeLength(resolveTypes(types))
 
     @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
-      globalState.flattenTypeMutability(tpe, isMutable)
+      globalState.flattenTypeMutability(resolveType(tpe), isMutable)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def isTypeMutable(tpe: Type): Boolean = {
