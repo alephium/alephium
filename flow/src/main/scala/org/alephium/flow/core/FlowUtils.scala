@@ -326,6 +326,7 @@ trait FlowUtils
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
+      parentHeight <- getHeight(loosenDeps.parentHash(chainIndex))
     } yield {
       val coinbaseTx = prepareCoinbase(chainIndex, uncles, fullTxs, target, templateTs, miner)
       BlockFlowTemplate(
@@ -334,7 +335,8 @@ trait FlowUtils
         depStateHash,
         target,
         templateTs,
-        fullTxs :+ coinbaseTx
+        fullTxs :+ coinbaseTx,
+        parentHeight + 1
       )
     }
   }

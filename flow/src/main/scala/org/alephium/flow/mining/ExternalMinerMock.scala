@@ -168,7 +168,7 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
 
   def publishNewBlock(block: Block): Unit = {
     val nodeIndex  = block.chainIndex.from.value % nodes.length
-    val message    = SubmitBlock(serialize(block))
+    val message    = ClientMessage.from(SubmitBlock(serialize(block)))
     val serialized = ClientMessage.serialize(message)
     apiConnections(nodeIndex).foreach(_ ! ConnectionHandler.Send(serialized))
   }
@@ -177,17 +177,19 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
     handleServerMessage(message)
   }
 
-  def handleServerMessage(message: ServerMessage): Unit = message match {
+  def handleServerMessage(message: ServerMessage): Unit = message.payload match {
     case Jobs(jobs) =>
       if (miningStarted) {
         updateAndStartTasks(jobs)
       }
-    case m @ SubmitResult(fromGroup, toGroup, status) =>
+    case m @ SubmitResult(fromGroup, toGroup, blockHash, status) =>
       ChainIndex.from(fromGroup, toGroup) match {
         case Some(index) =>
           setIdle(index)
           if (!status) {
-            log.error(s"Mined an invalid block for chain ($fromGroup, $toGroup)")
+            log.error(
+              s"Mined an invalid block ${blockHash.toHexString} for chain ($fromGroup, $toGroup)"
+            )
           }
         case None => log.error(s"Invalid group info in $m")
       }

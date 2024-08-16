@@ -85,10 +85,10 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     )
     probe0.expectMsgPF() { case Tcp.Received(data) =>
-      ServerMessage.deserialize(data).rightValue.value is a[Jobs]
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
     }
     probe1.expectMsgPF() { case Tcp.Received(data) =>
-      ServerMessage.deserialize(data).rightValue.value is a[Jobs]
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
     }
   }
 
@@ -96,8 +96,10 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val probe0      = TestProbe()
     val connection0 = connectToServer(probe0)
 
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = emptyBlock(blockFlow, chainIndex)
+    val chainIndex  = ChainIndex.unsafe(0, 0)
+    val block       = emptyBlock(blockFlow, chainIndex)
+    val parentHash  = block.blockDeps.parentHash(chainIndex)
+    val blockHeight = blockFlow.getHeightUnsafe(parentHash) + 1
 
     val blockFlowTemplate = BlockFlowTemplate(
       chainIndex,
@@ -105,29 +107,56 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       block.header.depStateHash,
       block.target,
       block.timestamp,
-      block.transactions
+      block.transactions,
+      blockHeight
     )
     val headerBlob = Job.from(blockFlowTemplate).headerBlob
   }
 
   it should "error when the job is not in the cache" in new SubmissionFixture {
-    val blockBlob = serialize(block.copy(transactions = AVector.empty))
+    val newBlock  = block.copy(transactions = AVector.empty)
+    val blockBlob = serialize(newBlock)
 
     expectErrorMsg("The job for the block is expired") {
-      connection0 ! Tcp.Write(ClientMessage.serialize(SubmitBlock(blockBlob)))
+      connection0 ! Tcp.Write(ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob))))
+    }
+
+    probe0.expectMsgPF() { case Tcp.Received(data) =>
+      val chainIndex = newBlock.chainIndex
+      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
+      )
     }
   }
 
   it should "error when the mined block has invalid work" in new SubmissionFixture {
     val newBlock      = block.copy(header = block.header.copy(target = Target.Zero))
     val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
-    val newTemplate   = BlockFlowTemplate.from(newBlock)
+    val newTemplate   = BlockFlowTemplate.from(newBlock, blockHeight)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
     minerApiController.underlyingActor.jobCache
       .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
 
     expectErrorMsg("The mined block has invalid work:") {
-      connection0 ! Tcp.Write(ClientMessage.serialize(SubmitBlock(newBlockBlob)))
+      connection0 ! Tcp.Write(
+        ClientMessage.serialize(ClientMessage.from(SubmitBlock(newBlockBlob)))
+      )
+    }
+
+    probe0.expectMsgPF() { case Tcp.Received(data) =>
+      val chainIndex = newBlock.chainIndex
+      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
+      )
+    }
+  }
+
+  it should "error when the protocol version is invalid" in new SubmissionFixture {
+    val blockBlob = serialize(block)
+
+    expectErrorMsg("Invalid mining protocol version: got 2, expect 1") {
+      val message = ClientMessage(MiningProtocolVersion(2), SubmitBlock(blockBlob))
+      connection0 ! Tcp.Write(ClientMessage.serialize(message))
     }
   }
 
@@ -136,7 +165,9 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       .put(headerBlob, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
 
     val blockBlob = serialize(block.copy(transactions = AVector.empty))
-    connection0 ! Tcp.Write(ClientMessage.serialize(SubmitBlock(blockBlob)))
+    connection0 ! Tcp.Write(
+      ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob)))
+    )
 
     eventually(minerApiController.underlyingActor.submittingBlocks.contains(block.hash))
     allHandlerProbes.blockHandlers(chainIndex).expectMsgType[BlockChainHandler.ValidateMinedBlock]
@@ -149,7 +180,9 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     }
     minerApiController ! feedback
     probe0.expectMsgPF() { case Tcp.Received(data) =>
-      ServerMessage.deserialize(data).rightValue.value is SubmitResult(0, 0, succeeded)
+      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+        SubmitResult(0, 0, block.hash, succeeded)
+      )
     }
   }
 
