@@ -107,7 +107,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           context.watch(connectionHandler.ref)
           connections.addOne(connectionHandler)
           latestJobs.foreach(jobs =>
-            connectionHandler ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs)))
+            connectionHandler ! ConnectionHandler.Send(
+              ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
+            )
           )
         }
       } else {
@@ -151,7 +153,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
         case (acc, templates) =>
           acc ++ AVector.from(templates.view.map(Job.fromWithoutTxs))
       }
-    connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
+    connections.foreach(
+      _ ! ConnectionHandler.Send(ServerMessage.serialize(ServerMessage.from(Jobs(jobs))))
+    )
 
     latestJobs = Some(jobs)
     jobs.foreachWithIndex { case (job, index) =>
@@ -161,7 +165,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     }
   }
 
-  def handleClientMessage(message: ClientMessage): Unit = message match {
+  def handleClientMessage(message: ClientMessage): Unit = message.payload match {
     case SubmitBlock(blockBlob) =>
       val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
       val blockHash = PoW.hash(header)
@@ -175,9 +179,11 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
               s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
             )
           } else {
+            sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
             log.error(s"The mined block has invalid work: ${blockHash.toHexString}")
           }
         case None =>
+          sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
           log.error(
             s"The job for the block is expired: ${Hex.toHexString(blockBlob)}"
           )
@@ -197,10 +203,17 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   }
 
   def handleSubmittedBlock(hash: BlockHash, succeeded: Boolean): Unit = {
-    submittingBlocks.remove(hash).foreach { client =>
-      val chainIndex = ChainIndex.from(hash)
-      val message    = SubmitResult(chainIndex.from.value, chainIndex.to.value, succeeded)
-      client ! ConnectionHandler.Send(ServerMessage.serialize(message))
-    }
+    submittingBlocks.remove(hash).foreach(sendSubmitResult(hash, succeeded, _))
+  }
+
+  private def sendSubmitResult(
+      hash: BlockHash,
+      succeeded: Boolean,
+      client: ActorRefT[ConnectionHandler.Command]
+  ): Unit = {
+    val chainIndex = ChainIndex.from(hash)
+    val payload    = SubmitResult(chainIndex.from.value, chainIndex.to.value, hash, succeeded)
+    val message    = ServerMessage.from(payload)
+    client ! ConnectionHandler.Send(ServerMessage.serialize(message))
   }
 }

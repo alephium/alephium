@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.bootstrap.SimpleSerde
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.Nonce
+import org.alephium.protocol.model.{BlockHash, Nonce}
 import org.alephium.serde.{intSerde => _, _}
 import org.alephium.util.{AVector, Bytes}
 
@@ -58,40 +58,75 @@ object Message {
     }
 }
 
-sealed trait ClientMessage
-final case class SubmitBlock(blockBlob: ByteString) extends ClientMessage
+final case class MiningProtocolVersion(value: Byte) extends AnyVal
+object MiningProtocolVersion {
+  implicit val serde: Serde[MiningProtocolVersion] =
+    Serde.forProduct1(MiningProtocolVersion.apply, _.value)
+
+  val Default: MiningProtocolVersion = MiningProtocolVersion(1)
+
+  def deserialize(input: ByteString): SerdeResult[Staging[MiningProtocolVersion]] = {
+    for {
+      version <- MiningProtocolVersion.serde._deserialize(input)
+      _ <-
+        if (version.value == MiningProtocolVersion.Default) {
+          Right(())
+        } else {
+          Left(
+            SerdeError.Other(
+              s"Invalid mining protocol version: got ${version.value.value}, expect ${MiningProtocolVersion.Default.value}"
+            )
+          )
+        }
+    } yield version
+  }
+}
+
+sealed trait ClientMessagePayload
+final case class SubmitBlock(blockBlob: ByteString) extends ClientMessagePayload
 object SubmitBlock {
   import Message.bytestringSerde
   val serde: Serde[SubmitBlock] = Serde.forProduct1(SubmitBlock(_), t => t.blockBlob)
 }
 
+final case class ClientMessage(version: MiningProtocolVersion, payload: ClientMessagePayload)
 object ClientMessage extends SimpleSerde[ClientMessage] {
+  def from(payload: ClientMessagePayload): ClientMessage = {
+    ClientMessage(MiningProtocolVersion.Default, payload)
+  }
+
   override def serializeBody(message: ClientMessage): ByteString = {
-    message match {
-      case m: SubmitBlock => ByteString(0) ++ SubmitBlock.serde.serialize(m)
+    message.payload match {
+      case m: SubmitBlock =>
+        MiningProtocolVersion.serde.serialize(message.version) ++
+          ByteString(0) ++ SubmitBlock.serde.serialize(m)
     }
   }
 
   override def deserializeBody(input: ByteString)(implicit
       groupConfig: GroupConfig
   ): SerdeResult[ClientMessage] = {
-    byteSerde._deserialize(input).flatMap { case Staging(byte, rest) =>
-      if (byte == 0) {
-        SubmitBlock.serde.deserialize(rest)
-      } else {
-        Left(SerdeError.wrongFormat(s"Invalid client message code: $byte"))
+    for {
+      version <- MiningProtocolVersion.deserialize(input)
+      payload <- byteSerde._deserialize(version.rest).flatMap { case Staging(byte, rest) =>
+        if (byte == 0) {
+          SubmitBlock.serde.deserialize(rest)
+        } else {
+          Left(SerdeError.wrongFormat(s"Invalid client message code: $byte"))
+        }
       }
-    }
+    } yield ClientMessage(version.value, payload)
   }
 }
 
-sealed trait ServerMessage
+sealed trait ServerMessagePayload extends Product with Serializable
 final case class Job(
     fromGroup: Int,
     toGroup: Int,
     headerBlob: ByteString,
     txsBlob: ByteString,
-    target: BigInteger
+    target: BigInteger,
+    height: Int
 ) {
   def toBlockBlob(nonce: Nonce): ByteString = {
     nonce.value ++ headerBlob ++ txsBlob
@@ -114,9 +149,9 @@ object Job {
         }
       }
     }
-    Serde.forProduct5(
+    Serde.forProduct6(
       Job.apply,
-      t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target)
+      t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target, t.height)
     )
   }
 
@@ -137,44 +172,62 @@ object Job {
       template.index.to.value,
       headerBlob.drop(Nonce.byteLength),
       txsBlob,
-      template.target.value
+      template.target.value,
+      template.height
     )
   }
 }
 
-final case class Jobs(jobs: AVector[Job]) extends ServerMessage
+final case class Jobs(jobs: AVector[Job]) extends ServerMessagePayload
 object Jobs {
   implicit private val jobsSerde: Serde[AVector[Job]] = Message.avectorSerde
   val serde: Serde[Jobs]                              = Serde.forProduct1(Jobs.apply, t => t.jobs)
 }
-final case class SubmitResult(fromGroup: Int, toGroup: Int, status: Boolean) extends ServerMessage
+final case class SubmitResult(
+    fromGroup: Int,
+    toGroup: Int,
+    blockHash: BlockHash,
+    status: Boolean
+) extends ServerMessagePayload
 object SubmitResult {
   import Message.simpleIntSerde
   val serde: Serde[SubmitResult] =
-    Serde.forProduct3(SubmitResult.apply, t => (t.fromGroup, t.toGroup, t.status))
+    Serde.forProduct4(
+      SubmitResult.apply,
+      t => (t.fromGroup, t.toGroup, t.blockHash, t.status)
+    )
 }
 
+final case class ServerMessage(version: MiningProtocolVersion, payload: ServerMessagePayload)
 object ServerMessage extends SimpleSerde[ServerMessage] {
+  def from(payload: ServerMessagePayload): ServerMessage = {
+    ServerMessage(MiningProtocolVersion.Default, payload)
+  }
+
   def serializeBody(message: ServerMessage): ByteString = {
-    message match {
+    val payload = message.payload match {
       case job: Jobs =>
         ByteString(0) ++ Jobs.serde.serialize(job)
       case result: SubmitResult =>
         ByteString(1) ++ SubmitResult.serde.serialize(result)
     }
+    MiningProtocolVersion.serde.serialize(message.version) ++ payload
   }
 
   def deserializeBody(input: ByteString)(implicit
       groupConfig: GroupConfig
   ): SerdeResult[ServerMessage] = {
-    byteSerde._deserialize(input).flatMap { case Staging(byte, rest) =>
-      if (byte == 0) {
-        Jobs.serde.deserialize(rest)
-      } else if (byte == 1) {
-        SubmitResult.serde.deserialize(rest)
-      } else {
-        Left(SerdeError.wrongFormat(s"Invalid server message code: $byte"))
+    for {
+      version <- MiningProtocolVersion.deserialize(input)
+      payload <- byteSerde._deserialize(version.rest).flatMap { case Staging(byte, rest) =>
+        if (byte == 0) {
+          Jobs.serde.deserialize(rest)
+        } else if (byte == 1) {
+          SubmitResult.serde.deserialize(rest)
+        } else {
+          Left(SerdeError.wrongFormat(s"Invalid server message code: $byte"))
+        }
       }
-    }
+    } yield ServerMessage(version.value, payload)
   }
 }

@@ -267,7 +267,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
         processInMessageBuffer()
       case Right(None) => ()
       case Left(error) =>
-        log.debug(s"Message deserialization error: $error")
+        log.error(s"Message deserialization error: $error")
         handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
     }
   }
