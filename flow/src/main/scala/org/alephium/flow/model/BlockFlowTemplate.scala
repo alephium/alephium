@@ -26,7 +26,8 @@ final case class BlockFlowTemplate(
     depStateHash: Hash,
     target: Target,
     templateTs: TimeStamp,
-    transactions: AVector[Transaction]
+    transactions: AVector[Transaction],
+    height: Int
 ) {
   lazy val txsHash = Block.calTxsHash(transactions)
 
@@ -42,14 +43,15 @@ final case class BlockFlowTemplate(
 }
 
 object BlockFlowTemplate {
-  def from(block: Block): BlockFlowTemplate = {
+  def from(block: Block, height: Int): BlockFlowTemplate = {
     BlockFlowTemplate(
       block.chainIndex,
       block.blockDeps.deps,
       block.header.depStateHash,
       block.header.target,
       block.timestamp,
-      block.transactions
+      block.transactions,
+      height
     )
   }
 }
