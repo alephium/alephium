@@ -114,10 +114,18 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   }
 
   it should "error when the job is not in the cache" in new SubmissionFixture {
-    val blockBlob = serialize(block.copy(transactions = AVector.empty))
+    val newBlock  = block.copy(transactions = AVector.empty)
+    val blockBlob = serialize(newBlock)
 
     expectErrorMsg("The job for the block is expired") {
       connection0 ! Tcp.Write(ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob))))
+    }
+
+    probe0.expectMsgPF() { case Tcp.Received(data) =>
+      val chainIndex = newBlock.chainIndex
+      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
+      )
     }
   }
 
@@ -132,6 +140,13 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     expectErrorMsg("The mined block has invalid work:") {
       connection0 ! Tcp.Write(
         ClientMessage.serialize(ClientMessage.from(SubmitBlock(newBlockBlob)))
+      )
+    }
+
+    probe0.expectMsgPF() { case Tcp.Received(data) =>
+      val chainIndex = newBlock.chainIndex
+      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
       )
     }
   }
