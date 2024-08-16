@@ -107,7 +107,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           context.watch(connectionHandler.ref)
           connections.addOne(connectionHandler)
           latestJobs.foreach(jobs =>
-            connectionHandler ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs)))
+            connectionHandler ! ConnectionHandler.Send(
+              ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
+            )
           )
         }
       } else {
@@ -151,7 +153,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
         case (acc, templates) =>
           acc ++ AVector.from(templates.view.map(Job.fromWithoutTxs))
       }
-    connections.foreach(_ ! ConnectionHandler.Send(ServerMessage.serialize(Jobs(jobs))))
+    connections.foreach(
+      _ ! ConnectionHandler.Send(ServerMessage.serialize(ServerMessage.from(Jobs(jobs))))
+    )
 
     latestJobs = Some(jobs)
     jobs.foreachWithIndex { case (job, index) =>
@@ -161,7 +165,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     }
   }
 
-  def handleClientMessage(message: ClientMessage): Unit = message match {
+  def handleClientMessage(message: ClientMessage): Unit = message.payload match {
     case SubmitBlock(blockBlob) =>
       val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
       val blockHash = PoW.hash(header)
@@ -199,7 +203,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   def handleSubmittedBlock(hash: BlockHash, succeeded: Boolean): Unit = {
     submittingBlocks.remove(hash).foreach { client =>
       val chainIndex = ChainIndex.from(hash)
-      val message    = SubmitResult(chainIndex.from.value, chainIndex.to.value, hash, succeeded)
+      val payload    = SubmitResult(chainIndex.from.value, chainIndex.to.value, hash, succeeded)
+      val message    = ServerMessage.from(payload)
       client ! ConnectionHandler.Send(ServerMessage.serialize(message))
     }
   }

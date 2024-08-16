@@ -30,21 +30,27 @@ import org.alephium.util.Hex.HexStringSyntax
 
 class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
   "ClientMessage" should "serde properly" in {
-    val message    = SubmitBlock(hex"bbbb")
+    val message    = ClientMessage.from(SubmitBlock(hex"bbbb"))
     val serialized = ClientMessage.serialize(message)
     ClientMessage.tryDeserialize(serialized).rightValue.get is
       Staging(message, ByteString.empty)
     ClientMessage.tryDeserialize(serialized.init).rightValue is None
     ClientMessage.tryDeserialize(serialized ++ serialized.init).rightValue.get is
       Staging(message, serialized.init)
+
+    val invalidMessage = message.copy(version = MiningProtocolVersion(1))
+    ClientMessage.tryDeserialize(ClientMessage.serialize(invalidMessage)).leftValue.getMessage is
+      "Invalid mining protocol version: got 1, expect 0"
   }
 
   it should "pass explicit hex string serialization examples" in {
-    val message    = SubmitBlock(hex"bbbb")
+    val message    = ClientMessage.from(SubmitBlock(hex"bbbb"))
     val serialized = ClientMessage.serialize(message)
     serialized is
       // message.length (4 bytes)
-      hex"00000007" ++
+      hex"00000008" ++
+      // version (1 byte)
+      hex"00" ++
       // message type (1 byte)
       hex"00" ++
       // blockBlob.length (4 bytes) ++ blockBlob
@@ -52,7 +58,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
   }
 
   "ServerMessage" should "serde properly" in {
-    val messages = Seq(
+    val payloads = Seq(
       Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ZERO, 1))),
       SubmitResult(
         0,
@@ -67,6 +73,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
         false
       )
     )
+    val messages    = payloads.map(ServerMessage.from)
     val serializeds = messages.map(ServerMessage.serialize)
     messages.zip(serializeds).foreach { case (message, serialized) =>
       ServerMessage.tryDeserialize(serialized).rightValue.get is
@@ -75,15 +82,24 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
       ServerMessage.tryDeserialize(serialized ++ serialized.init).rightValue.get is
         Staging(message, serialized.init)
     }
+
+    messages.foreach { message =>
+      val invalidMessage = message.copy(version = MiningProtocolVersion(1))
+      ServerMessage.tryDeserialize(ServerMessage.serialize(invalidMessage)).leftValue.getMessage is
+        "Invalid mining protocol version: got 1, expect 0"
+    }
   }
 
   it should "pass explicit hex string serialization examples" in {
     {
-      val message: ServerMessage = Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE, 17)))
-      val serializedJobs         = ServerMessage.serialize(message)
+      val message: ServerMessage =
+        ServerMessage.from(Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE, 17))))
+      val serializedJobs = ServerMessage.serialize(message)
       serializedJobs is
         // message.length (4 bytes)
-        hex"00000020" ++
+        hex"00000021" ++
+        // version (1 byte)
+        hex"00" ++
         // message type (1 byte)
         hex"00" ++
         // jobs.length (4 bytes)
@@ -103,16 +119,20 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
     }
 
     {
-      val message: ServerMessage = SubmitResult(
-        0,
-        1,
-        BlockHash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
-        true
+      val message: ServerMessage = ServerMessage.from(
+        SubmitResult(
+          0,
+          1,
+          BlockHash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
+          true
+        )
       )
       val serialized = ServerMessage.serialize(message)
       serialized is
         // message length (4 bytes)
-        hex"0000002a" ++
+        hex"0000002b" ++
+        // version (1 byte)
+        hex"00" ++
         // message type (1 byte)
         hex"01" ++
         // fromGroup (4 bytes)
