@@ -199,7 +199,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   def handleSubmittedBlock(hash: BlockHash, succeeded: Boolean): Unit = {
     submittingBlocks.remove(hash).foreach { client =>
       val chainIndex = ChainIndex.from(hash)
-      val message    = SubmitResult(chainIndex.from.value, chainIndex.to.value, succeeded)
+      val message    = SubmitResult(chainIndex.from.value, chainIndex.to.value, hash, succeeded)
       client ! ConnectionHandler.Send(ServerMessage.serialize(message))
     }
   }

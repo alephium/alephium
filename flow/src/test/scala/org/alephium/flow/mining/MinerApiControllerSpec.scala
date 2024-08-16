@@ -152,7 +152,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     }
     minerApiController ! feedback
     probe0.expectMsgPF() { case Tcp.Received(data) =>
-      ServerMessage.deserialize(data).rightValue.value is SubmitResult(0, 0, succeeded)
+      ServerMessage.deserialize(data).rightValue.value is SubmitResult(0, 0, block.hash, succeeded)
     }
   }
 

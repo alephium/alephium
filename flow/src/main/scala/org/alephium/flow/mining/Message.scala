@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.bootstrap.SimpleSerde
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.Nonce
+import org.alephium.protocol.model.{BlockHash, Nonce}
 import org.alephium.serde.{intSerde => _, _}
 import org.alephium.util.{AVector, Bytes}
 
@@ -149,11 +149,16 @@ object Jobs {
   implicit private val jobsSerde: Serde[AVector[Job]] = Message.avectorSerde
   val serde: Serde[Jobs]                              = Serde.forProduct1(Jobs.apply, t => t.jobs)
 }
-final case class SubmitResult(fromGroup: Int, toGroup: Int, status: Boolean) extends ServerMessage
+final case class SubmitResult(
+    fromGroup: Int,
+    toGroup: Int,
+    blockHash: BlockHash,
+    status: Boolean
+) extends ServerMessage
 object SubmitResult {
   import Message.simpleIntSerde
   val serde: Serde[SubmitResult] =
-    Serde.forProduct3(SubmitResult.apply, t => (t.fromGroup, t.toGroup, t.status))
+    Serde.forProduct4(SubmitResult.apply, t => (t.fromGroup, t.toGroup, t.blockHash, t.status))
 }
 
 object ServerMessage extends SimpleSerde[ServerMessage] {

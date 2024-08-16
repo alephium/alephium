@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.protocol.config.GroupConfigFixture
-import org.alephium.protocol.model.{ChainIndex, Transaction}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, Transaction}
 import org.alephium.serde.{serialize, Staging}
 import org.alephium.util.{AlephiumSpec, AVector}
 import org.alephium.util.Hex.HexStringSyntax
@@ -54,8 +54,18 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
   "ServerMessage" should "serde properly" in {
     val messages = Seq(
       Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ZERO, 1))),
-      SubmitResult(0, 1, true),
-      SubmitResult(0, 1, false)
+      SubmitResult(
+        0,
+        1,
+        BlockHash.unsafe(hex"109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"),
+        true
+      ),
+      SubmitResult(
+        0,
+        1,
+        BlockHash.unsafe(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"),
+        false
+      )
     )
     val serializeds = messages.map(ServerMessage.serialize)
     messages.zip(serializeds).foreach { case (message, serialized) =>
@@ -93,17 +103,24 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
     }
 
     {
-      val message: ServerMessage = SubmitResult(0, 1, true)
-      val serialized             = ServerMessage.serialize(message)
+      val message: ServerMessage = SubmitResult(
+        0,
+        1,
+        BlockHash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
+        true
+      )
+      val serialized = ServerMessage.serialize(message)
       serialized is
         // message length (4 bytes)
-        hex"0000000a" ++
+        hex"0000002a" ++
         // message type (1 byte)
         hex"01" ++
         // fromGroup (4 bytes)
         hex"00000000" ++
         // toGroup (4 bytes)
         hex"00000001" ++
+        // blockHash (32 bytes)
+        hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5" ++
         // bool type (1 byte) indicating if the block submission succeeded
         hex"01"
     }

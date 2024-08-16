@@ -182,12 +182,14 @@ class ExternalMinerMock(nodes: AVector[InetSocketAddress])(implicit
       if (miningStarted) {
         updateAndStartTasks(jobs)
       }
-    case m @ SubmitResult(fromGroup, toGroup, status) =>
+    case m @ SubmitResult(fromGroup, toGroup, blockHash, status) =>
       ChainIndex.from(fromGroup, toGroup) match {
         case Some(index) =>
           setIdle(index)
           if (!status) {
-            log.error(s"Mined an invalid block for chain ($fromGroup, $toGroup)")
+            log.error(
+              s"Mined an invalid block ${blockHash.toHexString} for chain ($fromGroup, $toGroup)"
+            )
           }
         case None => log.error(s"Invalid group info in $m")
       }
