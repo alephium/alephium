@@ -38,9 +38,9 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
     ClientMessage.tryDeserialize(serialized ++ serialized.init).rightValue.get is
       Staging(message, serialized.init)
 
-    val invalidMessage = message.copy(version = MiningProtocolVersion(1))
+    val invalidMessage = message.copy(version = MiningProtocolVersion(2))
     ClientMessage.tryDeserialize(ClientMessage.serialize(invalidMessage)).leftValue.getMessage is
-      "Invalid mining protocol version: got 1, expect 0"
+      "Invalid mining protocol version: got 2, expect 1"
   }
 
   it should "pass explicit hex string serialization examples" in {
@@ -50,7 +50,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
       // message.length (4 bytes)
       hex"00000008" ++
       // version (1 byte)
-      hex"00" ++
+      hex"01" ++
       // message type (1 byte)
       hex"00" ++
       // blockBlob.length (4 bytes) ++ blockBlob
@@ -84,9 +84,9 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
     }
 
     messages.foreach { message =>
-      val invalidMessage = message.copy(version = MiningProtocolVersion(1))
+      val invalidMessage = message.copy(version = MiningProtocolVersion(2))
       ServerMessage.tryDeserialize(ServerMessage.serialize(invalidMessage)).leftValue.getMessage is
-        "Invalid mining protocol version: got 1, expect 0"
+        "Invalid mining protocol version: got 2, expect 1"
     }
   }
 
@@ -99,7 +99,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
         // message.length (4 bytes)
         hex"00000021" ++
         // version (1 byte)
-        hex"00" ++
+        hex"01" ++
         // message type (1 byte)
         hex"00" ++
         // jobs.length (4 bytes)
@@ -132,7 +132,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
         // message length (4 bytes)
         hex"0000002b" ++
         // version (1 byte)
-        hex"00" ++
+        hex"01" ++
         // message type (1 byte)
         hex"01" ++
         // fromGroup (4 bytes)

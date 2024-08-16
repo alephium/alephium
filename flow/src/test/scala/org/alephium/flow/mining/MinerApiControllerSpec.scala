@@ -154,8 +154,8 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   it should "error when the protocol version is invalid" in new SubmissionFixture {
     val blockBlob = serialize(block)
 
-    expectErrorMsg("Invalid mining protocol version: got 1, expect 0") {
-      val message = ClientMessage(MiningProtocolVersion(1), SubmitBlock(blockBlob))
+    expectErrorMsg("Invalid mining protocol version: got 2, expect 1") {
+      val message = ClientMessage(MiningProtocolVersion(2), SubmitBlock(blockBlob))
       connection0 ! Tcp.Write(ClientMessage.serialize(message))
     }
   }

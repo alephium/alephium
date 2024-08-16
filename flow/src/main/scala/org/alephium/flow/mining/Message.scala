@@ -63,7 +63,7 @@ object MiningProtocolVersion {
   implicit val serde: Serde[MiningProtocolVersion] =
     Serde.forProduct1(MiningProtocolVersion.apply, _.value)
 
-  val Default: MiningProtocolVersion = MiningProtocolVersion(0)
+  val Default: MiningProtocolVersion = MiningProtocolVersion(1)
 
   def deserialize(input: ByteString): SerdeResult[Staging[MiningProtocolVersion]] = {
     for {
