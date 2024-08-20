@@ -3975,7 +3975,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     executeScript(s"${Int.MaxValue - 1}").isRight is true
     executeScript(s"${Int.MaxValue}").isRight is true
     executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
-      "Execution error when estimating gas for tx script or contract: Invalid error code 2147483648, the error code cannot be greater than the int32 max(2147483647)"
+      "Execution error when estimating gas for tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
   }
 
   @scala.annotation.tailrec
