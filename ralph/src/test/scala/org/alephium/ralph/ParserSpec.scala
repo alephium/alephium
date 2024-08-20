@@ -91,6 +91,42 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
         Variable(Ident("z"))
       )
+    parse("(x * if (true) a else b) / y", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
+        Div,
+        ParenExpr(
+          Binop(
+            Mul,
+            Variable(Ident("x")),
+            IfElseExpr(
+              Seq(IfBranchExpr(Const(Val.True), Variable(Ident("a")))),
+              ElseBranchExpr(Variable(Ident("b")))
+            )
+          )
+        ),
+        Variable(Ident("y"))
+      )
+    parse("[if (a) b else c; 2]", StatelessParser.expr(_)).get.value is
+      CreateArrayExpr2[StatelessContext](
+        IfElseExpr(
+          Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
+          ElseBranchExpr(Variable(Ast.Ident("c")))
+        ),
+        Const(Val.U256(U256.Two))
+      )
+    parse("[if (a) b else c, if (a) b else c]", StatelessParser.expr(_)).get.value is
+      CreateArrayExpr1[StatelessContext](
+        Seq(
+          IfElseExpr(
+            Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
+            ElseBranchExpr(Variable(Ast.Ident("c")))
+          ),
+          IfElseExpr(
+            Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
+            ElseBranchExpr(Variable(Ast.Ident("c")))
+          )
+        )
+      )
     parse("foo(ErrorCodes.Error)", StatefulParser.expr(_)).get.value is
       CallExpr[StatefulContext](
         FuncId("foo", false),
