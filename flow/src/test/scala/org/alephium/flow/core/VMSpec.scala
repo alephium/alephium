@@ -467,6 +467,74 @@ class VMSpec extends AlephiumSpec with Generators {
     contractAsset.amount is ALPH.alph(2)
   }
 
+  it should "work with negative operation on I256 expression" in new ContractFixture {
+    def codeWithExpr(expr: String) =
+      s"""
+         |Contract TestContract(mut x: I256) {
+         |  pub fn negativeX() -> () {
+         |    x = -${expr}
+         |  }
+         |}
+         |""".stripMargin
+
+    def scriptWithCode(code: String, contractId: String): String = {
+      s"""
+         |TxScript Operate() {
+         |  TestContract(#$contractId).negativeX()
+         |}
+         |
+         |$code
+         |""".stripMargin
+    }
+
+    def verifyXValue(code: String, contractId: ContractId, xValue: Int) = {
+      callTxScript(scriptWithCode(code, contractId.toHexString))
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.mutFields(0) is Val.I256(I256.unsafe(xValue))
+    }
+
+    def verify(xExpr: String) = {
+      val code = codeWithExpr(xExpr)
+      val contractId = createContract(
+        code,
+        initialMutState = AVector[Val](Val.I256(I256.One))
+      )._1
+
+      verifyXValue(code, contractId, xValue = -1)
+      verifyXValue(code, contractId, xValue = 1)
+      verifyXValue(code, contractId, xValue = -1)
+      verifyXValue(code, contractId, xValue = 1)
+    }
+
+    verify("x")
+    verify("((x + 1i) * 2i / 2i - 1i)")
+  }
+
+  it should "report error with negative operation on non-I256 expressions" in new ContractFixture {
+    def codeWithType(typ: String) =
+      s"""
+         |Contract TestContract(mut x: ${typ}) {
+         |  pub fn negativeX() -> () {
+         |    x = -x
+         |  }
+         |}
+         |""".stripMargin
+
+    def verifyErrorMessage(typ: String) = {
+      val codeWithU256 = codeWithType(typ)
+      Compiler
+        .compileContract(codeWithU256)
+        .leftValue
+        .message is s"Invalid param types List($typ) for - operator"
+    }
+
+    verifyErrorMessage("U256")
+    verifyErrorMessage("Bool")
+    verifyErrorMessage("ByteVec")
+    verifyErrorMessage("Address")
+  }
+
   it should "create contract and transfer tokens from the contract" in new ContractFixture {
     val code =
       s"""
@@ -971,6 +1039,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |    assert!(!true == false, 0)
          |    assert!(!false == true, 0)
+         |    assert!((2 * (if (true) 1 else 2)) / 2 == 1, 0)
          |  }
          |}
          |""".stripMargin
@@ -1390,7 +1459,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     {
-      info("Destroy a contract and and transfer value to itself")
+      info("Destroy a contract and transfer value to itself")
       val script = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, foo, fooAssetRef, true)
@@ -6460,6 +6529,69 @@ class VMSpec extends AlephiumSpec with Generators {
 
     intercept[AssertionError](createContract(code)).getMessage is
       "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
+  }
+
+  it should "test chained contract calls" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo(mut value: U256) {
+         |  pub fn set(newValue: U256) -> () {
+         |    value = newValue
+         |  }
+         |  pub fn get() -> U256 {
+         |    return value
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, initialMutState = AVector(Val.U256(U256.Zero)))._1
+
+    val bar =
+      s"""
+         |Contract Bar(foo: Foo) {
+         |  pub fn getFoo() -> Foo {
+         |    return foo
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector(Val.ByteVec(fooId.bytes)))._1
+
+    val baz =
+      s"""
+         |Contract Baz(qux: Qux) {
+         |  pub fn getQux() -> Qux {
+         |    return qux
+         |  }
+         |  fn getBar() -> Bar {
+         |    return qux.bar
+         |  }
+         |}
+         |struct Qux {
+         |  array: [Bar; 2],
+         |  bar: Bar
+         |}
+         |$bar
+         |""".stripMargin
+    val bazId = createContract(baz, AVector.fill(3)(Val.ByteVec(barId.bytes)))._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let baz = Baz(#${bazId.toHexString})
+         |  assert!(baz.getQux().array[0].getFoo().get() == 0, 0)
+         |  assert!(baz.getQux().array[1].getFoo().get() == 0, 0)
+         |  assert!(baz.getQux().bar.getFoo().get() == 0, 0)
+         |
+         |  baz.getQux().bar.getFoo().set(1)
+         |  assert!(baz.getQux().array[0].getFoo().get() == 1, 0)
+         |  assert!(baz.getQux().array[1].getFoo().get() == 1, 0)
+         |  assert!(baz.getQux().bar.getFoo().get() == 1, 0)
+         |}
+         |$baz
+         |""".stripMargin
+
+    testSimpleScript(script)
   }
 
   private def getEvents(
