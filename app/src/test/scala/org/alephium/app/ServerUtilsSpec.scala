@@ -3953,6 +3953,31 @@ class ServerUtilsSpec extends AlephiumSpec {
       .length is 10
   }
 
+  it should "return an error if the error code is invalid" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val publicKey   = genesisKeys(0)._2
+
+    def executeScript(errorCode: String) = {
+      val code =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(true, $errorCode)
+           |}
+           |""".stripMargin
+      val bytecode = serialize(Compiler.compileTxScript(code).rightValue)
+      serverUtils.buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(fromPublicKey = publicKey.bytes, bytecode = bytecode)
+      )
+    }
+
+    executeScript(s"${Int.MaxValue - 1}").isRight is true
+    executeScript(s"${Int.MaxValue}").isRight is true
+    executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
+      "Execution error when estimating gas for tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
+  }
+
   @scala.annotation.tailrec
   private def randomBlockHash(
       chainIndex: ChainIndex
