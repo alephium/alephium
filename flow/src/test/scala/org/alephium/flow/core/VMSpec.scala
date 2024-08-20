@@ -1459,7 +1459,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     {
-      info("Destroy a contract and and transfer value to itself")
+      info("Destroy a contract and transfer value to itself")
       val script = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, foo, fooAssetRef, true)
