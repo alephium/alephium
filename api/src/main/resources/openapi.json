@@ -5411,7 +5411,7 @@
         "tags": [
           "Blockflow"
         ],
-        "summary": "Get block header",
+        "summary": "Get raw block in hex format",
         "operationId": "getBlockflowRaw-blocksBlock_hash",
         "parameters": [
           {
@@ -6366,7 +6366,7 @@
         "tags": [
           "Transactions"
         ],
-        "summary": "Get raw transaction",
+        "summary": "Get raw transaction in hex format",
         "operationId": "getTransactionsRawTxid",
         "parameters": [
           {
