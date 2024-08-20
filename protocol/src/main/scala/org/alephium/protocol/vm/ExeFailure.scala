@@ -397,7 +397,11 @@ final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) exte
 final case class PartiallyActiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
     extends BreakingInstr
 
-final case class InvalidErrorCode(errorCode: U256) extends ExeFailure
+final case class InvalidErrorCode(errorCode: U256) extends ExeFailure {
+  override def toString: String = {
+    s"Invalid error code $errorCode, the error code cannot be greater than the int32 max(${Int.MaxValue})"
+  }
+}
 final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
     extends ExeFailure {
   override def toString: String = {
