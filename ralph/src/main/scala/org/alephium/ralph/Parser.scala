@@ -191,7 +191,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~/ "(" ~ expr ~ ")" ~ expr).map { case (ifIndex, condition, expr) =>
+    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ expr).map { case (ifIndex, condition, expr) =>
       val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
       Ast.IfBranchExpr(condition, expr).atSourceIndex(sourceIndex)
     }

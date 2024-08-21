@@ -533,6 +533,15 @@ class ServerUtils(implicit
         .map(failedInIO)
     } yield BlockHeaderEntry.from(blockHeader, height)
 
+  def getRawBlock(blockFlow: BlockFlow, hash: BlockHash): Try[RawBlock] =
+    for {
+      _ <- checkHashChainIndex(hash)
+      blockBytes <- blockFlow
+        .getBlockBytes(hash)
+        .left
+        .map(handleBlockError(hash, _))
+    } yield RawBlock(blockBytes)
+
   def getHashesAtHeight(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -567,6 +576,25 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
+    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => model.Transaction.fromProtocol(tx))
+  }
+
+  def getRawTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[model.RawTransaction] = {
+    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => RawTransaction(serialize(tx)))
+  }
+
+  def getTransaction[T](
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex],
+      convert: Transaction => T
+  ): Try[T] = {
     val result = (fromGroup, toGroup) match {
       case (Some(from), Some(to)) =>
         blockFlow.getTransaction(txId, ChainIndex(from, to)).left.map(failed)
@@ -576,8 +604,9 @@ class ServerUtils(implicit
         }
         blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
     }
+
     result.flatMap {
-      case Some(tx) => Right(model.Transaction.fromProtocol(tx))
+      case Some(tx) => Right(convert(tx))
       case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
     }
   }

@@ -1042,6 +1042,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |    assert!(!true == false, 0)
          |    assert!(!false == true, 0)
+         |    assert!((2 * (if (true) 1 else 2)) / 2 == 1, 0)
          |  }
          |}
          |""".stripMargin
@@ -1461,7 +1462,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     {
-      info("Destroy a contract and and transfer value to itself")
+      info("Destroy a contract and transfer value to itself")
       val script = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, foo, fooAssetRef, true)
