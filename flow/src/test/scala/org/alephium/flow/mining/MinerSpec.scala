@@ -101,7 +101,9 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
   it should "mine from both template and data blob" in {
     val chainIndex = ChainIndex.unsafe(0, 1)
     val block      = emptyBlock(blockFlow, chainIndex)
-    val template   = Job.from(BlockFlowTemplate.from(block))
+    val parentHash = block.blockDeps.parentHash(chainIndex)
+    val height     = blockFlow.getHeightUnsafe(parentHash) + 1
+    val template   = Job.from(BlockFlowTemplate.from(block, height))
     val headerBlob = serialize(block.header).drop(Nonce.byteLength)
 
     @tailrec

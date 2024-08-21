@@ -24,7 +24,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.{model => api}
-import org.alephium.api.ApiError
+import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
@@ -70,22 +70,25 @@ class ServerUtilsSpec extends AlephiumSpec {
     def brokerConfig: BrokerConfig
     def serverUtils: ServerUtils
 
-    def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
-      val result = api.Transaction.fromProtocol(tx)
-      serverUtils.getTransaction(
-        blockFlow,
-        tx.id,
-        Some(chainIndex.from),
-        Some(chainIndex.to)
-      ) isE result
-      serverUtils.getTransaction(blockFlow, tx.id, Some(chainIndex.from), None) isE result
-      serverUtils.getTransaction(blockFlow, tx.id, None, Some(chainIndex.to)) isE result
-      serverUtils.getTransaction(blockFlow, tx.id, None, None) isE result
+    def check[T](
+        blockFlow: BlockFlow,
+        tx: Transaction,
+        chainIndex: ChainIndex,
+        getTx: (BlockFlow, TransactionId, Option[GroupIndex], Option[GroupIndex]) => Try[T],
+        result: T
+    ) = {
+      getTx(blockFlow, tx.id, Some(chainIndex.from), Some(chainIndex.to)) isE result
+      getTx(blockFlow, tx.id, Some(chainIndex.from), None) isE result
+      getTx(blockFlow, tx.id, None, Some(chainIndex.to)) isE result
+      getTx(blockFlow, tx.id, None, None) isE result
       val invalidChainIndex = brokerConfig.chainIndexes.filter(_.from != chainIndex.from).head
-      serverUtils
-        .getTransaction(blockFlow, tx.id, Some(invalidChainIndex.from), None)
-        .leftValue
-        .detail is s"Transaction ${tx.id.toHexString} not found"
+      val error             = getTx(blockFlow, tx.id, Some(invalidChainIndex.from), None).leftValue
+      error.detail is s"Transaction ${tx.id.toHexString} not found"
+    }
+
+    def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
+      check(blockFlow, tx, chainIndex, serverUtils.getTransaction, api.Transaction.fromProtocol(tx))
+      check(blockFlow, tx, chainIndex, serverUtils.getRawTransaction, RawTransaction(serialize(tx)))
     }
   }
 
@@ -3654,6 +3657,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
+    serverUtils.getRawBlock(blockFlow, block.hash).rightValue is RawBlock(serialize(block))
+    serverUtils.getRawBlock(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+
     serverUtils.getBlockHeader(blockFlow, block.hash).rightValue is BlockHeaderEntry.from(
       block.header,
       1
@@ -3951,6 +3958,31 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
       .utxos
       .length is 10
+  }
+
+  it should "return an error if the error code is invalid" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val publicKey   = genesisKeys(0)._2
+
+    def executeScript(errorCode: String) = {
+      val code =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(true, $errorCode)
+           |}
+           |""".stripMargin
+      val bytecode = serialize(Compiler.compileTxScript(code).rightValue)
+      serverUtils.buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(fromPublicKey = publicKey.bytes, bytecode = bytecode)
+      )
+    }
+
+    executeScript(s"${Int.MaxValue - 1}").isRight is true
+    executeScript(s"${Int.MaxValue}").isRight is true
+    executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
+      "Execution error when estimating gas for tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
   }
 
   @scala.annotation.tailrec

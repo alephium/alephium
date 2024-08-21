@@ -50,14 +50,15 @@ object VarOffset {
       index: Ast.Expr[Ctx],
       arrayType: Type.FixedSizeArray
   ): VarOffset[Ctx] = {
+    val arraySize = state.calcArraySize(arrayType)
     Compiler.State.getAndCheckConstantIndex(index) match {
       case Some(idx) =>
-        ArrayRef.checkArrayIndex(idx, arrayType.size, index.sourceIndex)
+        ArrayRef.checkArrayIndex(idx, arraySize, index.sourceIndex)
         ConstantVarOffset(idx)
       case None =>
         val instrs = index.genCode(state) ++ Seq(
           Dup,
-          ConstInstr.u256(Val.U256(U256.unsafe(arrayType.size))),
+          ConstInstr.u256(Val.U256(U256.unsafe(arraySize))),
           U256Lt,
           Assert
         )
@@ -180,7 +181,8 @@ object VariablesRef {
     val varType = state.resolveType(tpe)
     val ref: VariablesRef[Ctx] = varType match {
       case arrayType: Type.FixedSizeArray =>
-        (0 until arrayType.size).foreach { idx =>
+        val arraySize = state.calcArraySize(arrayType)
+        (0 until arraySize).foreach { idx =>
           val ident = Ast.Ident(ArrayRef.arrayVarName(baseName, idx))
           state.addVariable(
             ident,
@@ -433,7 +435,8 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   ): Seq[Seq[Instr[Ctx]]] = {
     val index = getIndexSelector(selector).index
     tpe.baseType match {
-      case _: Type.FixedSizeArray | _: Type.Struct => subRef(state, index).genStoreCode(state)
+      case _: Type.FixedSizeArray | _: Type.Struct =>
+        subRef(state, index).genStoreCode(state)
       case _ =>
         val offset = refOffset.getStoreOffset
         Seq(
@@ -446,7 +449,8 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   }
 
   def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-    (0 until tpe.size).foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, index) =>
+    val arraySize = state.calcArraySize(tpe)
+    (0 until arraySize).foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, index) =>
       val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
       tpe.baseType match {
         case _: Type.Struct | _: Type.FixedSizeArray =>

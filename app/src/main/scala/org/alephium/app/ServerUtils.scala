@@ -532,6 +532,15 @@ class ServerUtils(implicit
         .map(failedInIO)
     } yield BlockHeaderEntry.from(blockHeader, height)
 
+  def getRawBlock(blockFlow: BlockFlow, hash: BlockHash): Try[RawBlock] =
+    for {
+      _ <- checkHashChainIndex(hash)
+      blockBytes <- blockFlow
+        .getBlockBytes(hash)
+        .left
+        .map(handleBlockError(hash, _))
+    } yield RawBlock(blockBytes)
+
   def getHashesAtHeight(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -566,6 +575,25 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
+    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => model.Transaction.fromProtocol(tx))
+  }
+
+  def getRawTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[model.RawTransaction] = {
+    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => RawTransaction(serialize(tx)))
+  }
+
+  def getTransaction[T](
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex],
+      convert: Transaction => T
+  ): Try[T] = {
     val result = (fromGroup, toGroup) match {
       case (Some(from), Some(to)) =>
         blockFlow.getTransaction(txId, ChainIndex(from, to)).left.map(failed)
@@ -575,8 +603,9 @@ class ServerUtils(implicit
         }
         blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
     }
+
     result.flatMap {
-      case Some(tx) => Right(model.Transaction.fromProtocol(tx))
+      case Some(tx) => Right(convert(tx))
       case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
     }
   }
@@ -1837,30 +1866,6 @@ object ServerUtils {
     } yield unsignedTx
   }
 
-  def buildDeployContractTx(
-      codeRaw: String,
-      address: Address,
-      _immFields: Option[String],
-      _mutFields: Option[String],
-      initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[(TokenId, U256)],
-      tokenIssuraneInfo: Option[(U256, Option[Address.Asset])]
-  ): Try[StatefulScript] = {
-    for {
-      immFields <- parseState(_immFields)
-      mutFields <- parseState(_mutFields)
-      script <- buildDeployContractScriptWithParsedState(
-        codeRaw,
-        address,
-        immFields,
-        mutFields,
-        initialAttoAlphAmount,
-        initialTokenAmounts,
-        tokenIssuraneInfo
-      )
-    } yield script
-  }
-
   def buildDeployContractTxWithParsedState(
       contract: StatefulContract,
       address: Address,
@@ -1943,12 +1948,5 @@ object ServerUtils {
     )
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
-  }
-
-  def parseState(str: Option[String]): Try[AVector[vm.Val]] = {
-    str match {
-      case None        => Right(AVector.empty[vm.Val])
-      case Some(state) => wrapCompilerResult(Compiler.compileState(state))
-    }
   }
 }

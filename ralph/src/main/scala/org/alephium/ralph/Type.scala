@@ -59,7 +59,7 @@ object Type {
       case Val.U256                           => U256
       case Val.ByteVec                        => ByteVec
       case Val.Address                        => Address
-      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
+      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), Left(size))
       case Val.Struct(name)                   => Struct(Ast.TypeId(name))
       case Val.Map(key, value)                => Map(fromVal(key), fromVal(value))
     }
@@ -70,8 +70,19 @@ object Type {
   case object U256    extends Type { def toVal: Val.Type = Val.U256    }
   case object ByteVec extends Type { def toVal: Val.Type = Val.ByteVec }
   case object Address extends Type { def toVal: Val.Type = Val.Address }
-  final case class FixedSizeArray(baseType: Type, size: Int) extends Type {
-    override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, size)
+  final case class FixedSizeArray(
+      baseType: Type,
+      size: Either[Int, Ast.Expr[_]]
+  ) extends Type {
+    private[ralph] var sizeCalculated: Option[Int] = None
+
+    def getArraySize: Int = size match {
+      case Left(size) => size
+      case Right(expr) =>
+        sizeCalculated.getOrElse(throw Compiler.Error("Unresolved array size", expr.sourceIndex))
+    }
+
+    override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, getArraySize)
 
     @scala.annotation.tailrec
     def elementType: Type = baseType match {
@@ -79,7 +90,8 @@ object Type {
       case tpe                   => tpe
     }
 
-    override def signature: String = s"[${baseType.signature};$size]"
+    override def signature: String = s"[${baseType.signature};$getArraySize]"
+    override def toString: String  = s"FixedSizeArray($baseType,$getArraySize)"
   }
 
   final case class NamedType(id: Ast.TypeId) extends Type {

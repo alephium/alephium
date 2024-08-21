@@ -45,6 +45,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -357,6 +358,7 @@ object ServerFixture {
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
+    override def getBlockBytes(hash: BlockHash): IOResult[ByteString]   = Right(serialize(block))
     override def calWeight(block: Block): IOResult[Weight]              = ???
 
     override def getHeightedIntraBlocks(

@@ -327,7 +327,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
           val delayMs = index * 500
           Future {
             Thread.sleep(delayMs.toLong)
-            val message    = SubmitBlock(serialize(block))
+            val message    = ClientMessage.from(SubmitBlock(serialize(block)))
             val serialized = ClientMessage.serialize(message)
             apiConnections.head.foreach(_ ! ConnectionHandler.Send(serialized))
             allSubmittedBlocks.add(block)

@@ -289,6 +289,30 @@ object LogicalOperator {
     override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(BoolNot)
   }
 
+  case object Negate extends LogicalOperator {
+    def operatorName: String = "-"
+
+    def calc(values: Seq[Val]): Either[String, Val] = {
+      values match {
+        case Seq(left: Val.I256) =>
+          I256.from(left.v.v.negate()).map(Val.I256(_)).toRight(s"Negation error for $left")
+        case _ =>
+          Left(s"Expect a I256 value for $operatorName operator")
+      }
+    }
+
+    override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
+      if (argsType.length != 1 || argsType(0) != Type.I256) {
+        throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
+      } else {
+        Seq(Type.I256)
+      }
+    }
+
+    override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] =
+      Seq(I256Const0, Swap, I256Sub)
+  }
+
   sealed trait BinaryLogicalOperator extends LogicalOperator {
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 2 || argsType(0) != Type.Bool || argsType(1) != Type.Bool) {

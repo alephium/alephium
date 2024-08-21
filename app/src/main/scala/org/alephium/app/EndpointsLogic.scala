@@ -189,6 +189,10 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
 
+  val getRawBlockLogic = serverLogic(getRawBlock) { hash =>
+    Future.successful(serverUtils.getRawBlock(blockFlow, hash))
+  }
+
   val getBalanceLogic = serverLogic(getBalance) { case (address, getMempoolUtxos) =>
     Future.successful(serverUtils.getBalance(blockFlow, address, getMempoolUtxos.getOrElse(true)))
   }
@@ -560,6 +564,15 @@ trait EndpointsLogic extends Endpoints {
   val getTransactionLogic = serverLogicRedirect(getTransaction)(
     { case (txId, fromGroup, toGroup) =>
       Future.successful(serverUtils.getTransaction(blockFlow, txId, fromGroup, toGroup))
+    },
+    { case (_, fromGroup, _) =>
+      getGroupIndex(fromGroup)
+    }
+  )
+
+  val getRawTransactionLogic = serverLogicRedirect(getRawTransaction)(
+    { case (txId, fromGroup, toGroup) =>
+      Future.successful(serverUtils.getRawTransaction(blockFlow, txId, fromGroup, toGroup))
     },
     { case (_, fromGroup, _) =>
       getGroupIndex(fromGroup)

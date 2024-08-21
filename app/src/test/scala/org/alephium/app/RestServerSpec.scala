@@ -136,6 +136,29 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /blockflow/raw-blocks/<hash>" in {
+    servers.foreach { server =>
+      val blockHash = dummyBlockHeader.hash
+      Get(s"/blockflow/raw-blocks/${blockHash.toHexString}", server.port) check { response =>
+        {
+          val chainIndex = ChainIndex.from(blockHash)
+          if (
+            server.brokerConfig
+              .contains(chainIndex.from) || server.brokerConfig.contains(chainIndex.to)
+          ) {
+            response.code is StatusCode.Ok
+            response.as[RawBlock] is RawBlock(serialize(dummyBlock))
+          } else {
+            response.code is StatusCode.BadRequest
+            response.as[ApiError.BadRequest] is ApiError.BadRequest(
+              s"${blockHash.toHexString} belongs to other groups"
+            )
+          }
+        }
+      }
+    }
+  }
+
   it should "call GET /addresses/<address>/balance" in {
     val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
     if (utxosLimit > 0) {
@@ -478,6 +501,49 @@ abstract class RestServerSpec(
       verifyResponseWithNodes(
         s"/transactions/details/$txId",
         s"/transactions/details/$txId?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue is s"""{"resource":"Transaction $txId","detail":"Transaction $txId not found"}"""
+      }
+    }
+  }
+
+  it should "call GET /transactions/raw" in {
+    def verifyResponse(response: Response[Either[String, String]]) = {
+      val tx = response.as[RawTransaction]
+      response.code is StatusCode.Ok
+      tx is RawTransaction(serialize(dummyTx))
+    }
+
+    servers.foreach { server =>
+      val chainIndex = server.brokerConfig.chainIndexes.head
+      verifyResponseWithNodes(
+        s"/transactions/raw/${dummyTx.id.toHexString}",
+        s"/transactions/raw/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        chainIndex,
+        server.port
+      )(verifyResponse)
+
+      verifyResponseWithNodes(
+        s"/transactions/raw/${dummyTx.id.toHexString}?toGroup=${chainIndex.to.value}",
+        s"/transactions/raw/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyResponse)
+
+      verifyResponseWithNodes(
+        s"/transactions/raw/${dummyTx.id.toHexString}",
+        s"/transactions/raw/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyResponse)
+
+      val txId = TransactionId.generate.toHexString
+      verifyResponseWithNodes(
+        s"/transactions/raw/$txId",
+        s"/transactions/raw/$txId?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
         chainIndex,
         server.port
       ) { response =>
