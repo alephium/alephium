@@ -14,20 +14,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.subcontractindex
+package org.alephium.protocol.vm.nodeindexes
 
-import org.alephium.io.{IOResult, StagingKVStorage}
-import org.alephium.protocol.model.ContractId
+import org.alephium.io.{IOResult, MutableKV}
 
-final class StagingSubContractIndexPageCounter(
-    val counter: StagingKVStorage[ContractId, Int],
-    val initialCounts: MutableSubContractIndex.SubContractsPageCounter
-) extends MutableSubContractIndex.SubContractsPageCounter {
-  def getInitialCount(key: ContractId): IOResult[Int] = {
-    initialCounts.getInitialCount(key)
-  }
-
-  def rollback(): Unit = counter.rollback()
-
-  def commit(): Unit = counter.commit()
+trait PageCounter[K] {
+  def counter: MutableKV[K, Int, Unit]
+  def getInitialCount(key: K): IOResult[Int]
 }

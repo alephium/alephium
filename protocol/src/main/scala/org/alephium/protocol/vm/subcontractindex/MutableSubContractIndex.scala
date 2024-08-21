@@ -18,12 +18,13 @@ package org.alephium.protocol.vm.subcontractindex
 
 import org.alephium.io.{IOResult, MutableKV}
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.PageCounter
 import org.alephium.util.AVector
 
 trait MutableSubContractIndex {
   def parentContractIndexState: MutableKV[ContractId, ContractId, Unit]
   def subContractIndexState: MutableKV[SubContractIndexStateId, SubContractIndexState, Unit]
-  def subContractIndexPageCounterState: MutableSubContractIndex.SubContractsPageCounter
+  def subContractIndexPageCounterState: PageCounter[ContractId]
 
   def createSubContractIndexes(
       parentContractId: ContractId,
@@ -51,12 +52,5 @@ trait MutableSubContractIndex {
       }
       _ <- subContractIndexPageCounterState.counter.put(parentContract, initialCount + 1)
     } yield ()
-  }
-}
-
-object MutableSubContractIndex {
-  trait SubContractsPageCounter {
-    def counter: MutableKV[ContractId, Int, Unit]
-    def getInitialCount(key: ContractId): IOResult[Int]
   }
 }

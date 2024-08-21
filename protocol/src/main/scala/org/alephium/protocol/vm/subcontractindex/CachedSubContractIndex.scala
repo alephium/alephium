@@ -17,12 +17,13 @@
 package org.alephium.protocol.vm.subcontractindex
 
 import org.alephium.io.{CachedKVStorage, IOResult}
+import org.alephium.protocol.vm.nodeindexes.CachedPageCounter
 import org.alephium.protocol.model.ContractId
 
 final class CachedSubContractIndex(
     val parentContractIndexState: CachedKVStorage[ContractId, ContractId],
     val subContractIndexStates: CachedKVStorage[SubContractIndexStateId, SubContractIndexState],
-    val subContractIndexCounterState: CachedSubContractIndexPageCounter,
+    val subContractIndexCounterState: CachedPageCounter[ContractId],
     subContractIndexStorage: SubContractIndexStorage
 ) {
   def persist(): IOResult[SubContractIndexStorage] = {
@@ -47,7 +48,7 @@ object CachedSubContractIndex {
     new CachedSubContractIndex(
       CachedKVStorage.from(subContractIndexStorage.parentContractIndexState),
       CachedKVStorage.from(subContractIndexStorage.subContractIndexStates),
-      CachedSubContractIndexPageCounter.from(subContractIndexStorage.subContractIndexCounterState),
+      CachedPageCounter.from(subContractIndexStorage.subContractIndexCounterState),
       subContractIndexStorage
     )
   }

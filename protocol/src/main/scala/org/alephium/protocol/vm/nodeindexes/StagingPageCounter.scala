@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.event
+package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.{IOResult, StagingKVStorage}
+import org.alephium.protocol.vm.nodeindexes.PageCounter
 
-final class StagingLogPageCounter[K](
+final class StagingPageCounter[K](
     val counter: StagingKVStorage[K, Int],
-    val initialCounts: MutableLog.LogPageCounter[K]
-) extends MutableLog.LogPageCounter[K] {
+    val initialCounts: PageCounter[K]
+) extends PageCounter[K] {
   def getInitialCount(key: K): IOResult[Int] = {
     initialCounts.getInitialCount(key)
   }

@@ -17,12 +17,13 @@
 package org.alephium.protocol.vm.subcontractindex
 
 import org.alephium.io.StagingKVStorage
+import org.alephium.protocol.vm.nodeindexes.StagingPageCounter
 import org.alephium.protocol.model.ContractId
 
 final class StagingSubContractIndex(
     val parentContractIndexState: StagingKVStorage[ContractId, ContractId],
     val subContractIndexState: StagingKVStorage[SubContractIndexStateId, SubContractIndexState],
-    val subContractIndexPageCounterState: StagingSubContractIndexPageCounter
+    val subContractIndexPageCounterState: StagingPageCounter[ContractId]
 ) extends MutableSubContractIndex {
   def rollback(): Unit = {
     parentContractIndexState.rollback()

@@ -19,13 +19,14 @@ package org.alephium.protocol.vm.event
 import org.alephium.crypto.Byte32
 import org.alephium.io.{StagingKVStorage, ValueExists}
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.StagingPageCounter
 import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
 final class StagingLog(
     val eventLog: StagingKVStorage[LogStatesId, LogStates],
     val eventLogByHash: StagingKVStorage[Byte32, AVector[LogStateRef]],
-    val eventLogPageCounter: StagingLogPageCounter[ContractId]
+    val eventLogPageCounter: StagingPageCounter[ContractId]
 ) extends MutableLog {
 
   def rollback(): Unit = {

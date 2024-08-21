@@ -14,26 +14,25 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.subcontractindex
+package org.alephium.protocol.vm.nodeindexes
 
 import scala.collection.mutable
 
 import org.alephium.io.{CachedKVStorage, IOResult, KeyValueStorage}
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.PageCounter
 
-final class CachedSubContractIndexPageCounter(
-    val counter: CachedKVStorage[ContractId, Int],
-    val initialCounts: mutable.Map[ContractId, Int]
-) extends MutableSubContractIndex.SubContractsPageCounter {
-
-  def getInitialCount(contractId: ContractId): IOResult[Int] = {
-    initialCounts.get(contractId) match {
-      case Some(count) =>
-        Right(count)
+final class CachedPageCounter[K](
+    val counter: CachedKVStorage[K, Int],
+    val initialCounts: mutable.Map[K, Int]
+) extends PageCounter[K] {
+  def getInitialCount(key: K): IOResult[Int] = {
+    initialCounts.get(key) match {
+      case Some(value) =>
+        Right(value)
       case None =>
-        counter.getOpt(contractId).map { countOpt =>
+        counter.getOpt(key).map { countOpt =>
           val count = countOpt.getOrElse(0)
-          initialCounts.put(contractId, count)
+          initialCounts.put(key, count)
           count
         }
     }
@@ -41,13 +40,13 @@ final class CachedSubContractIndexPageCounter(
 
   def persist(): IOResult[Unit] = counter.persist().map(_ => ())
 
-  def staging(): StagingSubContractIndexPageCounter = {
-    new StagingSubContractIndexPageCounter(this.counter.staging(), this)
+  def staging(): StagingPageCounter[K] = {
+    new StagingPageCounter(this.counter.staging(), this)
   }
 }
 
-object CachedSubContractIndexPageCounter {
-  def from(storage: KeyValueStorage[ContractId, Int]): CachedSubContractIndexPageCounter = {
-    new CachedSubContractIndexPageCounter(CachedKVStorage.from(storage), mutable.HashMap.empty)
+object CachedPageCounter {
+  def from[K](storage: KeyValueStorage[K, Int]): CachedPageCounter[K] = {
+    new CachedPageCounter[K](CachedKVStorage.from(storage), mutable.HashMap.empty)
   }
 }
