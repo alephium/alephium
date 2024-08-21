@@ -1003,9 +1003,11 @@ class BlockFlowSpec extends AlephiumSpec {
       if (enableTxOutputRefIndex) {
         blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
       } else {
-        intercept[RuntimeException](
-          blockFlow.getTxIdFromOutputRef(txOutputRef)
-        ).getMessage is "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
+        blockFlow
+          .getTxIdFromOutputRef(txOutputRef)
+          .leftValue
+          .reason
+          .getMessage is "Please set node.indexes.tx-output-ref-index = true to query transaction id from transaction output reference"
       }
     }
 

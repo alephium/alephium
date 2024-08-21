@@ -52,7 +52,6 @@ class ServerUtils(implicit
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     logConfig: LogConfig,
-    nodeIndexesConfig: NodeIndexesConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
   import ServerUtils._
@@ -1303,7 +1302,6 @@ class ServerUtils(implicit
       contractAddress: Address.Contract
   ): Try[ContractParent] = {
     for {
-      _ <- checkSubcontractIndexConfig()
       result <- wrapResult(
         blockFlow.getParentContractId(contractAddress.contractId).map { contractIdOpt =>
           ContractParent(contractIdOpt.map(Address.contract))
@@ -1319,7 +1317,6 @@ class ServerUtils(implicit
       contractAddress: Address.Contract
   ): Try[SubContracts] = {
     for {
-      _ <- checkSubcontractIndexConfig()
       result <- wrapResult(
         blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
           case (nextStart, contractIds) =>
@@ -1335,7 +1332,6 @@ class ServerUtils(implicit
   ): Try[Int] = {
     val contractId = contractAddress.contractId
     for {
-      _        <- checkSubcontractIndexConfig()
       countOpt <- wrapResult(blockFlow.getSubContractsCurrentCount(contractId))
       count <- countOpt.toRight(
         notFound(s"Current sub-contracts count for contract $contractAddress")
@@ -1348,13 +1344,6 @@ class ServerUtils(implicit
       outputRef: TxOutputRef
   ): Try[TransactionId] = {
     for {
-      _ <- Either.cond(
-        nodeIndexesConfig.txOutputRefIndex,
-        (),
-        preconditionFailed(
-          "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
-        )
-      )
       txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
       txId <- txIdOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
@@ -1898,16 +1887,6 @@ class ServerUtils(implicit
         outputRef,
         output,
         txId
-      )
-    )
-  }
-
-  def checkSubcontractIndexConfig(): Try[Unit] = {
-    Either.cond(
-      nodeIndexesConfig.subcontractIndex,
-      (),
-      preconditionFailed(
-        "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
       )
     )
   }

@@ -3810,7 +3810,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .getTxIdFromOutputRef(blockFlow, txOutputRef)
       .leftValue
-      .detail is "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
+      .detail
+      .contains(
+        "Please set node.indexes.tx-output-ref-index = true to query transaction id from transaction output reference"
+      ) is true
   }
 
   trait SubContractIndexesFixture extends Fixture {
@@ -3880,14 +3883,15 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "return error when node.indexes.subcontract-index is not enabled" in new SubContractIndexesFixture {
     override def subcontractIndexEnabled: Boolean = false
 
-    val errorMsg =
-      "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
-    serverUtils.getParentContract(blockFlow, subContractAddr).leftValue.detail is errorMsg
-    serverUtils
-      .getSubContractsCurrentCount(blockFlow, parentContractAddr)
-      .leftValue
-      .detail is errorMsg
-    serverUtils.getSubContracts(blockFlow, 0, 1, parentContractAddr).leftValue.detail is errorMsg
+    def verifyError[T](result: Try[T]) = {
+      result.leftValue.detail.contains(
+        "Please set node.indexes.subcontract-index = true to query parent contract or subcontracts"
+      ) is true
+    }
+
+    verifyError(serverUtils.getParentContract(blockFlow, subContractAddr))
+    verifyError(serverUtils.getSubContractsCurrentCount(blockFlow, parentContractAddr))
+    verifyError(serverUtils.getSubContracts(blockFlow, 0, 1, parentContractAddr))
   }
 
   trait VerifyTxOutputFixture extends ContractFixture {
@@ -4025,7 +4029,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         networkConfig,
         apiConfig.copy(defaultUtxosLimit = utxosLimit),
         logConfig,
-        nodeIndexesConfig,
         ec
       )
     }

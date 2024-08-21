@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSettings
-import org.alephium.io.{IOResult, KeyValueStorage}
+import org.alephium.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -77,27 +77,31 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ): KeyValueStorage[TxOutputRef.Key, TransactionId] = {
+  ): IOResult[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
     getBlockChainWithState(
       groupIndex
     ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
       case Some(storage) =>
-        storage
+        Right(storage)
       case None =>
-        throw new RuntimeException(
-          "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
+        Left(
+          IOError.configError(
+            "Please set node.indexes.tx-output-ref-index = true to query transaction id from transaction output reference"
+          )
         )
     }
   }
 
-  lazy val subContractIndexStorage: SubContractIndexStorage = {
+  lazy val subContractIndexStorage: IOResult[SubContractIndexStorage] = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
     intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.subContractIndexStorage match {
       case Some(storage) =>
-        storage
+        Right(storage)
       case None =>
-        throw new RuntimeException(
-          "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
+        Left(
+          IOError.configError(
+            "Please set node.indexes.subcontract-index = true to query parent contract or subcontracts"
+          )
         )
     }
   }

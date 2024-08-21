@@ -30,6 +30,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
+import org.alephium.io.IOResult
 import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -6583,18 +6584,15 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "not create subcontract indexes when it is disabled" in new SubContractIndexesFixture {
     override def subcontractIndexEnabled: Boolean = false
 
-    val errorMessage =
-      "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
     val subContractId = createSingleSubContract(1)
-    intercept[RuntimeException](
-      blockFlow.getParentContractId(subContractId)
-    ).getMessage is errorMessage
-    intercept[RuntimeException](
-      blockFlow.getSubContractsCurrentCount(parentContractId)
-    ).getMessage is errorMessage
-    intercept[RuntimeException](
-      blockFlow.getSubContractIds(parentContractId, 0, 1)
-    ).getMessage is errorMessage
+
+    def verifyError[T](result: IOResult[T]) = {
+      result.leftValue.reason.getMessage is "Please set node.indexes.subcontract-index = true to query parent contract or subcontracts"
+    }
+
+    verifyError(blockFlow.getParentContractId(subContractId))
+    verifyError(blockFlow.getSubContractsCurrentCount(parentContractId))
+    verifyError(blockFlow.getSubContractIds(parentContractId, 0, 1))
   }
 
   it should "create subcontract indexes when it is enabled" in new SubContractIndexesFixture {

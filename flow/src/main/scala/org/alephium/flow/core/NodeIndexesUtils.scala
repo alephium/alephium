@@ -29,11 +29,11 @@ trait NodeIndexesUtils { Self: FlowUtils =>
   def getTxIdFromOutputRef(
       outputRef: TxOutputRef
   ): IOResult[Option[TransactionId]] = {
-    txOutputRefIndexStorage(outputRef.hint.groupIndex).getOpt(outputRef.key)
+    txOutputRefIndexStorage(outputRef.hint.groupIndex).flatMap(_.getOpt(outputRef.key))
   }
 
   def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {
-    subContractIndexStorage.parentContractIndexState.getOpt(contractId)
+    subContractIndexStorage.flatMap(_.parentContractIndexState.getOpt(contractId))
   }
 
   def getSubContractIds(
@@ -49,17 +49,23 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     def rec(
         subContractIndexStateId: SubContractIndexStateId
     ): IOResult[Unit] = {
-      subContractIndexStorage.subContractIndexStates.getOpt(subContractIndexStateId) match {
-        case Right(Some(subContractIndexState)) =>
-          allSubContracts ++= subContractIndexState.subContracts
-          nextCount = subContractIndexStateId.counter + 1
-          if (nextCount < end) {
-            rec(SubContractIndexStateId(subContractIndexStateId.contractId, nextCount))
-          } else {
-            Right(())
+      subContractIndexStorage match {
+        case Right(storage) =>
+          storage.subContractIndexStates.getOpt(subContractIndexStateId) match {
+            case Right(Some(subContractIndexState)) =>
+              allSubContracts ++= subContractIndexState.subContracts
+              nextCount = subContractIndexStateId.counter + 1
+              if (nextCount < end) {
+                rec(SubContractIndexStateId(subContractIndexStateId.contractId, nextCount))
+              } else {
+                Right(())
+              }
+            case Right(None) =>
+              Right(())
+            case Left(error) =>
+              Left(error)
+
           }
-        case Right(None) =>
-          Right(())
         case Left(error) =>
           Left(error)
       }
@@ -71,6 +77,6 @@ trait NodeIndexesUtils { Self: FlowUtils =>
   }
 
   def getSubContractsCurrentCount(parentContractId: ContractId): IOResult[Option[Int]] = {
-    subContractIndexStorage.subContractIndexCounterState.getOpt(parentContractId)
+    subContractIndexStorage.flatMap(_.subContractIndexCounterState.getOpt(parentContractId))
   }
 }
