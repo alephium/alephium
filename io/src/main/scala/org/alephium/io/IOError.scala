@@ -38,7 +38,11 @@ object IOError {
   final case class Other(e: Throwable)                extends IOError(e)
 
   def keyNotFound[K](key: K, action: String): KeyNotFound = {
-    KeyNotFound(new AppException(s"Key $key not found in $action"))
+    keyNotFound(s"Key $key not found in $action")
+  }
+
+  def keyNotFound[K](errorMessage: String): KeyNotFound = {
+    KeyNotFound(new AppException(errorMessage))
   }
 
   def configError(errorMessage: String): ConfigError = {

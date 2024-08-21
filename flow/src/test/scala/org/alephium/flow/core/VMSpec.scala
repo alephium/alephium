@@ -6623,6 +6623,12 @@ class VMSpec extends AlephiumSpec with Generators {
     subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
     blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
     blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
+
+    blockFlow
+      .getSubContractIds(parentContractId, 0, 5)
+      .leftValue
+      .reason
+      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
   }
 
   // Inactive instrs check will be enabled in future upgrades
