@@ -19,8 +19,8 @@ package org.alephium.protocol.vm.event
 import org.alephium.crypto.Byte32
 import org.alephium.io.{CachedKVStorage, IOResult}
 import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.nodeindexes.CachedPageCounter
 import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId}
+import org.alephium.protocol.vm.nodeindexes.CachedPageCounter
 import org.alephium.util.AVector
 
 final class CachedLog(

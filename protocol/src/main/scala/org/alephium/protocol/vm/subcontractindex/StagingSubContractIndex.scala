@@ -17,8 +17,8 @@
 package org.alephium.protocol.vm.subcontractindex
 
 import org.alephium.io.StagingKVStorage
-import org.alephium.protocol.vm.nodeindexes.StagingPageCounter
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.StagingPageCounter
 
 final class StagingSubContractIndex(
     val parentContractIndexState: StagingKVStorage[ContractId, ContractId],

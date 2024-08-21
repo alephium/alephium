@@ -17,8 +17,8 @@
 package org.alephium.protocol.vm.subcontractindex
 
 import org.alephium.io.{CachedKVStorage, IOResult}
-import org.alephium.protocol.vm.nodeindexes.CachedPageCounter
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.CachedPageCounter
 
 final class CachedSubContractIndex(
     val parentContractIndexState: CachedKVStorage[ContractId, ContractId],

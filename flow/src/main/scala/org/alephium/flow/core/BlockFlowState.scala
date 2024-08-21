@@ -77,13 +77,29 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ): Option[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
-    getBlockChainWithState(groupIndex).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage
+  ): KeyValueStorage[TxOutputRef.Key, TransactionId] = {
+    getBlockChainWithState(
+      groupIndex
+    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+      case Some(storage) =>
+        storage
+      case None =>
+        throw new RuntimeException(
+          "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
+        )
+    }
   }
 
-  val subContractIndexStorage: Option[SubContractIndexStorage] = {
+  lazy val subContractIndexStorage: SubContractIndexStorage = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
-    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.subContractIndexStorage
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.subContractIndexStorage match {
+      case Some(storage) =>
+        storage
+      case None =>
+        throw new RuntimeException(
+          "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
+        )
+    }
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =

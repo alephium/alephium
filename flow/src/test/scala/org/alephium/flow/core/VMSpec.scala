@@ -6583,10 +6583,18 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "not create subcontract indexes when it is disabled" in new SubContractIndexesFixture {
     override def subcontractIndexEnabled: Boolean = false
 
+    val errorMessage =
+      "Please enable node.indexes.subcontract-index to query parent contract or subcontracts"
     val subContractId = createSingleSubContract(1)
-    blockFlow.getParentContractId(subContractId) isE None
-    blockFlow.getSubContractsCurrentCount(parentContractId) isE None
-    blockFlow.getSubContractIds(parentContractId, 0, 1) isE (0, AVector.empty)
+    intercept[RuntimeException](
+      blockFlow.getParentContractId(subContractId)
+    ).getMessage is errorMessage
+    intercept[RuntimeException](
+      blockFlow.getSubContractsCurrentCount(parentContractId)
+    ).getMessage is errorMessage
+    intercept[RuntimeException](
+      blockFlow.getSubContractIds(parentContractId, 0, 1)
+    ).getMessage is errorMessage
   }
 
   it should "create subcontract indexes when it is enabled" in new SubContractIndexesFixture {

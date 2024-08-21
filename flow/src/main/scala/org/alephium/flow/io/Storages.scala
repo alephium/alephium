@@ -68,29 +68,40 @@ object Storages {
     val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
     val trieImmutableStateStorage =
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
-    lazy val txOutputRefIndexStorage =
-      RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
-    lazy val parentContractIndexStorage =
-      RocksDBKeyValueStorage[ContractId, ContractId](db, ParentContract, writeOptions)
-    lazy val subContractIndexStateStorage =
-      RocksDBKeyValueStorage[SubContractIndexStateId, SubContractIndexState](
-        db,
-        SubContract,
-        writeOptions
-      )
-    lazy val subContractIndexCounterStorage =
-      RocksDBKeyValueStorage[ContractId, Int](db, SubContractCounter, writeOptions)
-    lazy val subContractIndexStorage = SubContractIndexStorage(
-      parentContractIndexStorage,
-      subContractIndexStateStorage,
-      subContractIndexCounterStorage
-    )
 
-    val nodeIndexesStorage = NodeIndexesStorage(
-      logStorage,
-      if (nodeSetting.indexesConfig.txOutputRefIndex) Some(txOutputRefIndexStorage) else None,
-      if (nodeSetting.indexesConfig.subcontractIndex) Some(subContractIndexStorage) else None
-    )
+    val txOutputRefIndexStorageOpt = if (nodeSetting.indexesConfig.txOutputRefIndex) {
+      Some(
+        RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
+      )
+    } else {
+      None
+    }
+
+    val subContractIndexStorageOpt = if (nodeSetting.indexesConfig.subcontractIndex) {
+      val parentContractIndexStorage =
+        RocksDBKeyValueStorage[ContractId, ContractId](db, ParentContract, writeOptions)
+      val subContractIndexStateStorage =
+        RocksDBKeyValueStorage[SubContractIndexStateId, SubContractIndexState](
+          db,
+          SubContract,
+          writeOptions
+        )
+      val subContractIndexCounterStorage =
+        RocksDBKeyValueStorage[ContractId, Int](db, SubContractCounter, writeOptions)
+
+      Some(
+        SubContractIndexStorage(
+          parentContractIndexStorage,
+          subContractIndexStateStorage,
+          subContractIndexCounterStorage
+        )
+      )
+    } else {
+      None
+    }
+
+    val nodeIndexesStorage =
+      NodeIndexesStorage(logStorage, txOutputRefIndexStorageOpt, subContractIndexStorageOpt)
 
     val worldStateStorage =
       WorldStateRockDBStorage(
@@ -122,9 +133,7 @@ object Storages {
       nodeStateStorage,
       pendingTxStorage,
       readyTxStorage,
-      brokerStorage,
-      logStorage,
-      txOutputRefIndexStorage
+      brokerStorage
     )
   }
   // scalastyle:on method.length
@@ -146,9 +155,7 @@ final case class Storages(
     nodeStateStorage: NodeStateStorage,
     pendingTxStorage: PendingTxStorage,
     readyTxStorage: ReadyTxStorage,
-    brokerStorage: BrokerStorage,
-    logStorage: LogStorage,
-    txOutputRefTxIdStorage: KeyValueStorage[TxOutputRef.Key, TransactionId]
+    brokerStorage: BrokerStorage
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 

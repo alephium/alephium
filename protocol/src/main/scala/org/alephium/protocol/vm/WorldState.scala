@@ -676,7 +676,7 @@ object WorldState {
         contractStateNew          <- contractState.persist()
         contractImmutableStateNew <- contractImmutableState.persist()
         codeStateNew              <- codeState.persist()
-        nodeIndexesStateNew            <- nodeIndexesState.persist()
+        nodeIndexesStateNew       <- nodeIndexesState.persist()
       } yield Persisted(
         outputStateNew,
         contractStateNew,

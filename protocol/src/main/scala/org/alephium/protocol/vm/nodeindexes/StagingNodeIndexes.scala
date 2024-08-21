@@ -28,15 +28,15 @@ final case class StagingNodeIndexes(
 ) {
   def rollback(): Unit = {
     logState.rollback()
-    txOutputRefIndexState.map(_.rollback())
-    subContractIndexState.map(_.rollback())
+    txOutputRefIndexState.foreach(_.rollback())
+    subContractIndexState.foreach(_.rollback())
     ()
   }
 
   def commit(): Unit = {
     logState.commit()
-    txOutputRefIndexState.map(_.commit())
-    subContractIndexState.map(_.commit())
+    txOutputRefIndexState.foreach(_.commit())
+    subContractIndexState.foreach(_.commit())
     ()
   }
 }

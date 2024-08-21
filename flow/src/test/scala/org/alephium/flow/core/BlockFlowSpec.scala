@@ -1000,8 +1000,13 @@ class BlockFlowSpec extends AlephiumSpec {
       val utxos = blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue
       utxos.length is 1
       val txOutputRef = utxos.head.ref
-      val txIdResult  = if (enableTxOutputRefIndex) Some(block.nonCoinbase.head.id) else None
-      blockFlow.getTxIdFromOutputRef(txOutputRef) isE txIdResult
+      if (enableTxOutputRefIndex) {
+        blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
+      } else {
+        intercept[RuntimeException](
+          blockFlow.getTxIdFromOutputRef(txOutputRef)
+        ).getMessage is "Please enable node.indexes.tx-output-ref-index to query transaction id from transaction output reference"
+      }
     }
 
     val tokenContract =

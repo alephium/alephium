@@ -17,8 +17,8 @@
 package org.alephium.protocol.vm.event
 
 import org.alephium.io.Inserted
-import org.alephium.protocol.vm.nodeindexes.{CachedPageCounter, StagingPageCounter}
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.{CachedPageCounter, StagingPageCounter}
 import org.alephium.util.AlephiumSpec
 
 class LogPageCounterSpec extends AlephiumSpec with Fixture {

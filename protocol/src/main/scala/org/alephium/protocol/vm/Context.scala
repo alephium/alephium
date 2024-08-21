@@ -579,7 +579,7 @@ object StatefulContext {
   )(implicit
       val networkConfig: NetworkConfig,
       val logConfig: LogConfig,
-      val groupConfig: GroupConfig,
+      val groupConfig: GroupConfig
   ) extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 
