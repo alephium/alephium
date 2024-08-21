@@ -6720,7 +6720,7 @@ class VMSpec extends AlephiumSpec with Generators {
   ): Option[Int] = {
     (for {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      countOpt   <- worldState.logStorage.logCounterState.getOpt(contractId)
+      countOpt   <- worldState.nodeIndexesStorage.logStorage.logCounterState.getOpt(contractId)
     } yield countOpt).rightValue
   }
 }

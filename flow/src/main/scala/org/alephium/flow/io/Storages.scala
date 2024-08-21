@@ -30,6 +30,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.subcontractindex.{
   SubContractIndexState,
   SubContractIndexStateId,
@@ -67,31 +68,35 @@ object Storages {
     val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
     val trieImmutableStateStorage =
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
-    val txOutputRefIndexStorage =
+    lazy val txOutputRefIndexStorage =
       RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
-    val parentContractIndexStorage =
+    lazy val parentContractIndexStorage =
       RocksDBKeyValueStorage[ContractId, ContractId](db, ParentContract, writeOptions)
-    val subContractIndexStateStorage =
+    lazy val subContractIndexStateStorage =
       RocksDBKeyValueStorage[SubContractIndexStateId, SubContractIndexState](
         db,
         SubContract,
         writeOptions
       )
-    val subContractIndexCounterStorage =
+    lazy val subContractIndexCounterStorage =
       RocksDBKeyValueStorage[ContractId, Int](db, SubContractCounter, writeOptions)
-    val subContractIndexStorage = SubContractIndexStorage(
+    lazy val subContractIndexStorage = SubContractIndexStorage(
       parentContractIndexStorage,
       subContractIndexStateStorage,
       subContractIndexCounterStorage
+    )
+
+    val nodeIndexesStorage = NodeIndexesStorage(
+      logStorage,
+      if (nodeSetting.indexesConfig.txOutputRefIndex) Some(txOutputRefIndexStorage) else None,
+      if (nodeSetting.indexesConfig.subcontractIndex) Some(subContractIndexStorage) else None
     )
 
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
         trieImmutableStateStorage,
-        logStorage,
-        txOutputRefIndexStorage,
-        subContractIndexStorage,
+        nodeIndexesStorage,
         db,
         All,
         writeOptions
@@ -100,9 +105,7 @@ object Storages {
       WorldState.emptyPersisted(
         trieStorage,
         trieImmutableStateStorage,
-        logStorage,
-        txOutputRefIndexStorage,
-        subContractIndexStorage
+        nodeIndexesStorage
       )
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)

@@ -169,33 +169,10 @@ object LogConfig {
   }
 }
 
-sealed trait TxOutputRefIndexConfig extends Product with Serializable
-object TxOutputRefIndexConfig {
-  final case class Enabled(txId: TransactionId) extends TxOutputRefIndexConfig
-  case object Disabled                          extends TxOutputRefIndexConfig
-}
-
-object NodeIndexesConfig {
-  def enabled(): NodeIndexesConfig = {
-    NodeIndexesConfig(txOutputRefIndex = true, subcontractIndex = true)
-  }
-
-  def disabled(): NodeIndexesConfig = {
-    NodeIndexesConfig(txOutputRefIndex = false, subcontractIndex = false)
-  }
-}
 final case class NodeIndexesConfig(
     txOutputRefIndex: Boolean,
     subcontractIndex: Boolean
-) {
-  def toTxOutputRefIndexConfig(txId: TransactionId): TxOutputRefIndexConfig = {
-    if (txOutputRefIndex) {
-      TxOutputRefIndexConfig.Enabled(txId)
-    } else {
-      TxOutputRefIndexConfig.Disabled
-    }
-  }
-}
+)
 
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
@@ -305,8 +282,6 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def outputBalances: MutBalances
 
   def logConfig: LogConfig
-
-  def nodeIndexesConfig: NodeIndexesConfig
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
@@ -464,7 +439,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         outputRef,
         contractOutput,
         getHardFork().isLemanEnabled(),
-        nodeIndexesConfig.toTxOutputRefIndexConfig(txId)
+        txId
       )
 
     result match {
@@ -519,7 +494,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
           contractId,
           outputRef,
           output,
-          nodeIndexesConfig.toTxOutputRefIndexConfig(txId)
+          txId
         )
         .left
         .map(e => Left(IOErrorUpdateState(e)))
@@ -553,8 +528,9 @@ trait StatefulContext extends StatelessContext with ContractPool {
       parentContract: Option[ContractId],
       contractId: ContractId
   ): ExeResult[Unit] = {
-    if (parentContract.nonEmpty && nodeIndexesConfig.subcontractIndex) {
-      worldState.subContractIndexState
+    val subContractIndexState = worldState.nodeIndexesState.subContractIndexState
+    if (parentContract.nonEmpty && subContractIndexState.nonEmpty) {
+      subContractIndexState.get
         .createSubContractIndexes(parentContract.get, contractId)
         .left
         .map(e => Left(IOErrorCreateSubContractIndex(e)))
@@ -573,8 +549,7 @@ object StatefulContext {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      groupConfig: GroupConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      groupConfig: GroupConfig
   ): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
@@ -589,8 +564,7 @@ object StatefulContext {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      groupConfig: GroupConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      groupConfig: GroupConfig
   ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
@@ -606,7 +580,6 @@ object StatefulContext {
       val networkConfig: NetworkConfig,
       val logConfig: LogConfig,
       val groupConfig: GroupConfig,
-      val nodeIndexesConfig: NodeIndexesConfig
   ) extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 

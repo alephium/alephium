@@ -231,7 +231,7 @@ class ContextSpec
         AVector.empty,
         outputRef,
         output,
-        TxOutputRefIndexConfig.Disabled
+        context.txId
       )
       context
     }

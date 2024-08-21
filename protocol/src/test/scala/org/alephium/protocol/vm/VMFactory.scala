@@ -21,6 +21,7 @@ import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.subcontractindex._
 import org.alephium.util.AVector
 
@@ -49,12 +50,12 @@ trait VMFactory extends StorageFixture {
       subContractIndexStateStorage,
       subContractIndexCounterStorage
     )
-    WorldState.emptyCached(
-      trieDb,
-      trieImmutableStateStorage,
+    val nodeIndexesStorage = NodeIndexesStorage(
       logStorage,
-      txOutputRefIndexStorage,
-      subContractIndexStorage
+      Some(txOutputRefIndexStorage),
+      Some(subContractIndexStorage)
     )
+
+    WorldState.emptyCached(trieDb, trieImmutableStateStorage, nodeIndexesStorage)
   }
 }

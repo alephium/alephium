@@ -43,7 +43,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
       1000,
       1000,
       vm.LogConfig(false, false, false, None),
-      NodeIndexesConfig.disabled()
+      NodeIndexesConfig(false, false)
     )
 
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {

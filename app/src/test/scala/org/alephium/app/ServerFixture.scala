@@ -497,7 +497,7 @@ object ServerFixture {
             AVector(vm.Val.U256(U256.Zero)),
             ContractOutputRef.unsafe(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.zero)),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector()),
-            TxOutputRefIndexConfig.Disabled
+            dummyTx.id
           )
           .map(_.cached())
       } else {

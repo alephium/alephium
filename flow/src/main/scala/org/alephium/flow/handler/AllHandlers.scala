@@ -24,7 +24,7 @@ import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
+import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, EventBus}
 
 final case class AllHandlers(
@@ -71,8 +71,7 @@ object AllHandlers {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      logConfig: LogConfig
   ): AllHandlers = {
     build(system, blockFlow, eventBus, "", storages)
   }
@@ -91,8 +90,7 @@ object AllHandlers {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      logConfig: LogConfig
   ): AllHandlers = {
     val flowProps = FlowHandler.props(blockFlow)
     val flowHandler =
@@ -115,8 +113,7 @@ object AllHandlers {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting,
       memPoolSetting: MemPoolSetting,
-      logConfig: LogConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      logConfig: LogConfig
   ): AllHandlers = {
     val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
@@ -153,8 +150,7 @@ object AllHandlers {
       brokerConfig: BrokerConfig,
       consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
-      logConfig: LogConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      logConfig: LogConfig
   ): Map[ChainIndex, ActorRefT[BlockChainHandler.Command]] = {
     val handlers = for {
       from <- 0 until brokerConfig.groups

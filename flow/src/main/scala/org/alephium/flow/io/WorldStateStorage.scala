@@ -22,17 +22,14 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, ProdSettings}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{BlockHash, TransactionId, TxOutputRef}
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{ContractStorageImmutableState, WorldState}
-import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
   val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState]
-  val logStorage: LogStorage
-  val txOutputRefIndexStorage: KeyValueStorage[TxOutputRef.Key, TransactionId]
-  val subContractIndexStorage: SubContractIndexStorage
+  val nodeIndexesStorage: NodeIndexesStorage
 
   override def storageKey(key: BlockHash): ByteString =
     key.bytes ++ ByteString(Storages.trieHashPostfix)
@@ -42,9 +39,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
       _.toPersistedWorldState(
         trieStorage,
         trieImmutableStateStorage,
-        logStorage,
-        txOutputRefIndexStorage,
-        subContractIndexStorage
+        nodeIndexesStorage
       )
     )
   }
@@ -58,9 +53,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
       _.toCachedWorldState(
         trieStorage,
         trieImmutableStateStorage,
-        logStorage,
-        txOutputRefIndexStorage,
-        subContractIndexStorage
+        nodeIndexesStorage
       )
     )
   }
@@ -74,9 +67,7 @@ object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
-      logStorage: LogStorage,
-      txOutputRefTxIdStorage: KeyValueStorage[TxOutputRef.Key, TransactionId],
-      subContractIndexStorage: SubContractIndexStorage,
+      nodeIndexesStorage: NodeIndexesStorage,
       storage: RocksDBSource,
       cf: ColumnFamily,
       writeOptions: WriteOptions
@@ -84,9 +75,7 @@ object WorldStateRockDBStorage {
     new WorldStateRockDBStorage(
       trieStorage,
       trieImmutableStateStorage,
-      logStorage,
-      txOutputRefTxIdStorage,
-      subContractIndexStorage,
+      nodeIndexesStorage,
       storage,
       cf,
       writeOptions,
@@ -98,9 +87,7 @@ object WorldStateRockDBStorage {
 class WorldStateRockDBStorage(
     val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
     val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
-    val logStorage: LogStorage,
-    val txOutputRefIndexStorage: KeyValueStorage[TxOutputRef.Key, TransactionId],
-    val subContractIndexStorage: SubContractIndexStorage,
+    val nodeIndexesStorage: NodeIndexesStorage,
     storage: RocksDBSource,
     cf: ColumnFamily,
     writeOptions: WriteOptions,

@@ -1623,7 +1623,7 @@ class ServerUtils(implicit
   }
 
   private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEventByTxId] = {
-    val allLogStates = worldState.logState.getNewLogs()
+    val allLogStates = worldState.nodeIndexesState.logState.getNewLogs()
     allLogStates.flatMap(logStates =>
       logStates.states.flatMap(state =>
         AVector(
@@ -1828,7 +1828,7 @@ class ServerUtils(implicit
       toVmVal(existingContract.immFields),
       toVmVal(existingContract.mutFields),
       existingContract.asset,
-      nodeIndexesConfig.toTxOutputRefIndexConfig(txId)
+      txId
     )
   }
 
@@ -1844,7 +1844,7 @@ class ServerUtils(implicit
       toVmVal(testContract.initialImmFields),
       toVmVal(testContract.initialMutFields),
       testContract.initialAsset,
-      nodeIndexesConfig.toTxOutputRefIndexConfig(testContract.txId)
+      testContract.txId
     )
   }
 
@@ -1855,7 +1855,7 @@ class ServerUtils(implicit
       initialImmState: AVector[vm.Val],
       initialMutState: AVector[vm.Val],
       asset: AssetState,
-      indexConfig: TxOutputRefIndexConfig
+      txId: TransactionId
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
@@ -1868,7 +1868,7 @@ class ServerUtils(implicit
         initialMutState,
         outputRef,
         output,
-        indexConfig
+        txId
       )
     )
   }

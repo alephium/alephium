@@ -37,8 +37,7 @@ object TxScriptGasEstimator {
   )(implicit
       networkConfig: NetworkConfig,
       config: GroupConfig,
-      logConfig: LogConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      logConfig: LogConfig
   ) extends TxScriptGasEstimator {
     def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       assume(inputs.nonEmpty)

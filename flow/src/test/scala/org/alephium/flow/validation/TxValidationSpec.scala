@@ -47,7 +47,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         cachedWorldState.addAsset(
           inputInfo.txInput.outputRef,
           inputInfo.referredOutput,
-          TxOutputRefIndexConfig.Disabled
+          TransactionId.generate
         ) isE ()
       }
     }

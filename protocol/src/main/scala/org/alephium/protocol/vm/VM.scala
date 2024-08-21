@@ -488,8 +488,7 @@ object StatefulVM {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      groupConfig: GroupConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      groupConfig: GroupConfig
   ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScript(context, script)
@@ -517,8 +516,7 @@ object StatefulVM {
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
-      groupConfig: GroupConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      groupConfig: GroupConfig
   ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScriptMockup(context, script)
@@ -628,7 +626,7 @@ object StatefulVM {
   private def maybeShowDebug(context: StatefulContext): Unit = {
     val networkId = context.networkConfig.networkId
     if (networkId.networkType != NetworkId.MainNet) {
-      context.worldState.logState.getNewLogs().foreach { logStates =>
+      context.worldState.nodeIndexesState.logState.getNewLogs().foreach { logStates =>
         logStates.states.foreach { logState =>
           if (logState.index == debugEventIndex.v.v.intValue().toByte) {
             logState.fields.headOption.foreach {

@@ -52,7 +52,6 @@ trait FlowUtils
   implicit def consensusConfigs: ConsensusSettings
   implicit def networkConfig: NetworkConfig
   implicit def logConfig: LogConfig
-  implicit def nodeIndexesConfig: NodeIndexesConfig
 
   val blockFlow = Self
 
@@ -366,8 +365,7 @@ trait FlowUtils
       brokerConfig,
       networkConfig,
       consensusConfigs,
-      logConfig,
-      nodeIndexesConfig
+      logConfig
     )
   @tailrec
   final def validateTemplate(

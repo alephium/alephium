@@ -37,7 +37,6 @@ trait BlockFlowState extends FlowTipsUtil {
 
   implicit def brokerConfig: BrokerConfig
   implicit def networkConfig: NetworkConfig
-  implicit def nodeIndexesConfig: NodeIndexesConfig
 
   def consensusConfigs: ConsensusSettings
   def groups: Int = brokerConfig.groups
@@ -73,18 +72,18 @@ trait BlockFlowState extends FlowTipsUtil {
 
   val logStorage: LogStorage = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
-    intraGroupBlockChains.head.worldStateStorage.logStorage
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.logStorage
   }
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ): KeyValueStorage[TxOutputRef.Key, TransactionId] = {
-    getBlockChainWithState(groupIndex).worldStateStorage.txOutputRefIndexStorage
+  ): Option[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
+    getBlockChainWithState(groupIndex).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage
   }
 
-  val subContractIndexStorage: SubContractIndexStorage = {
+  val subContractIndexStorage: Option[SubContractIndexStorage] = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
-    intraGroupBlockChains.head.worldStateStorage.subContractIndexStorage
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.subContractIndexStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =
@@ -494,8 +493,7 @@ object BlockFlowState {
   }
 
   def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
-      brokerConfig: GroupConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      brokerConfig: GroupConfig
   ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
@@ -523,7 +521,7 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
       _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
@@ -535,7 +533,7 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
       _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
@@ -547,7 +545,7 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     updateStateForOutputs(worldState, tx, targetGroup, blockTs)
   }
 
@@ -561,16 +559,14 @@ object BlockFlowState {
       tx: Transaction,
       targetGroup: GroupIndex,
       blockTs: TimeStamp
-  )(implicit brokerConfig: GroupConfig, nodeIndexesConfig: NodeIndexesConfig): IOResult[Unit] = {
-    val indexConfig = nodeIndexesConfig.toTxOutputRefIndexConfig(tx.id)
-
+  )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, indexConfig)
+        worldState.addAsset(outputRef, outputUpdated, tx.id)
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

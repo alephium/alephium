@@ -63,7 +63,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   }
 
   trait FrameBalanceFixture {
-    def prepareContract() = {
+    def prepareContract(txId: TransactionId) = {
       val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
         generateContract().sample.get
       cachedWorldState.createContractLegacyUnsafe(
@@ -72,7 +72,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         mutFields,
         contractOutputRef,
         contractOutput,
-        TxOutputRefIndexConfig.Disabled
+        txId
       )
       contractId
     }
@@ -121,9 +121,9 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       StatefulContract(0, AVector(Method(true, false, true, true, 0, 0, 0, AVector.empty)))
 
     def test(_frame: => StatefulFrame, contract: StatefulContract, emptyOutput: Boolean) = {
-      val contractId = prepareContract()
-      val method     = contract.methods.head
       val frame      = _frame
+      val contractId = prepareContract(frame.ctx.txId)
+      val method     = contract.methods.head
       frame.balanceStateOpt.get.approved.all.isEmpty is false
 
       val result = frame

@@ -3280,7 +3280,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val code = frame.ctx.worldState.getContractCode(contractState).rightValue
       code.toContract() isE contract
 
-      val event = frame.ctx.worldState.logState.getNewLogs().last.states.last
+      val event = frame.ctx.worldState.nodeIndexesState.logState.getNewLogs().last.states.last
       event.index is createContractEventIndexInt.toByte
       event.fields(0) is Val.Address(Address.contract(contractId).lockupScript)
       if (instr.subContract) {

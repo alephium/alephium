@@ -31,7 +31,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, NetworkId}
-import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig, WorldState}
+import org.alephium.protocol.vm.{LogConfig, WorldState}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, EventBus, EventStream, Hex}
 
@@ -46,8 +46,7 @@ object BlockChainHandler {
       brokerConfig: BrokerConfig,
       consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
-      logConfig: LogConfig,
-      nodeIndexesConfig: NodeIndexesConfig
+      logConfig: LogConfig
   ): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
   // scalastyle:on parameter.number
@@ -103,8 +102,7 @@ class BlockChainHandler(
     brokerConfig: BrokerConfig,
     val consensusConfigs: ConsensusConfigs,
     val networkConfig: NetworkSetting,
-    logConfig: LogConfig,
-    nodeIndexesConfig: NodeIndexesConfig
+    logConfig: LogConfig
 ) extends ChainHandler[Block, InvalidBlockStatus, Option[WorldState.Cached], BlockValidation](
       blockFlow,
       chainIndex,

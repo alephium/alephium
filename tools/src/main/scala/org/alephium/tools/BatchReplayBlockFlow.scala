@@ -67,8 +67,7 @@ object BatchReplayBlockFlow extends App with StrictLogging {
       config.network,
       config.mining,
       config.mempool,
-      config.node.eventLogConfig,
-      config.node.indexesConfig
+      config.node.eventLogConfig
     )
     (blockFlow, storages, allHandlers, flowSystem)
   }

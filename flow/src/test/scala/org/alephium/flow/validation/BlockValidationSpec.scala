@@ -634,14 +634,12 @@ class BlockValidationSpec extends AlephiumSpec {
       genesisNetworkConfig,
       blockFlow.consensusConfigs,
       implicitly,
-      implicitly,
       implicitly
     )
     val blockflowLeman = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
       implicitly,
       lemanNetworkConfig,
       blockFlow.consensusConfigs,
-      implicitly,
       implicitly,
       implicitly
     )

@@ -29,11 +29,17 @@ trait NodeIndexesUtils { Self: FlowUtils =>
   def getTxIdFromOutputRef(
       outputRef: TxOutputRef
   ): IOResult[Option[TransactionId]] = {
-    txOutputRefIndexStorage(outputRef.hint.groupIndex).getOpt(outputRef.key)
+    txOutputRefIndexStorage(outputRef.hint.groupIndex) match {
+      case Some(storage) => storage.getOpt(outputRef.key)
+      case None          => Right(None)
+    }
   }
 
   def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {
-    subContractIndexStorage.parentContractIndexState.getOpt(contractId)
+    subContractIndexStorage match {
+      case Some(storage) => storage.parentContractIndexState.getOpt(contractId)
+      case None          => Right(None)
+    }
   }
 
   def getSubContractIds(
@@ -49,19 +55,24 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     def rec(
         subContractIndexStateId: SubContractIndexStateId
     ): IOResult[Unit] = {
-      subContractIndexStorage.subContractIndexStates.getOpt(subContractIndexStateId) match {
-        case Right(Some(subContractIndexState)) =>
-          allSubContracts ++= subContractIndexState.subContracts
-          nextCount = subContractIndexStateId.counter + 1
-          if (nextCount < end) {
-            rec(SubContractIndexStateId(subContractIndexStateId.contractId, nextCount))
-          } else {
-            Right(())
+      subContractIndexStorage match {
+        case Some(storage) =>
+          storage.subContractIndexStates.getOpt(subContractIndexStateId) match {
+            case Right(Some(subContractIndexState)) =>
+              allSubContracts ++= subContractIndexState.subContracts
+              nextCount = subContractIndexStateId.counter + 1
+              if (nextCount < end) {
+                rec(SubContractIndexStateId(subContractIndexStateId.contractId, nextCount))
+              } else {
+                Right(())
+              }
+            case Right(None) =>
+              Right(())
+            case Left(error) =>
+              Left(error)
           }
-        case Right(None) =>
+        case None =>
           Right(())
-        case Left(error) =>
-          Left(error)
       }
     }
 
@@ -71,6 +82,9 @@ trait NodeIndexesUtils { Self: FlowUtils =>
   }
 
   def getSubContractsCurrentCount(parentContractId: ContractId): IOResult[Option[Int]] = {
-    subContractIndexStorage.subContractIndexCounterState.getOpt(parentContractId)
+    subContractIndexStorage match {
+      case Some(storage) => storage.subContractIndexCounterState.getOpt(parentContractId)
+      case None          => Right(None)
+    }
   }
 }

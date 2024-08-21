@@ -76,7 +76,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       txEnv,
       cachedWorldState.staging(),
       gasLimit
-    )(networkConfig, LogConfig.allEnabled(), groupConfig, NodeIndexesConfig.enabled())
+    )(networkConfig, LogConfig.allEnabled(), groupConfig)
   }
 
   def prepareStatefulScript(
@@ -103,7 +103,8 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val cor = ContractOutputRef.from(TransactionId.generate, co, 0)
       (ci, co, cor)
     }
-    val halfDecoded = contract.toHalfDecoded()
+    val halfDecoded    = contract.toHalfDecoded()
+    val transactionEnv = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
 
     cachedWorldState.createContractUnsafe(
       contractId,
@@ -113,22 +114,22 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       contractOutputRef,
       contractOutput,
       _networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled(),
-      TxOutputRefIndexConfig.Disabled
+      transactionEnv.txId
     ) isE ()
 
     val obj          = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)
     val _groupConfig = groupConfig
     val context = new StatefulContext {
-      val worldState: WorldState.Staging = cachedWorldState.staging()
-      val networkConfig: NetworkConfig   = _networkConfig
-      val groupConfig: GroupConfig       = _groupConfig
-      val outputBalances: MutBalances    = MutBalances.empty
-      def nextOutputIndex: Int           = 0
-      val blockEnv: BlockEnv             = genBlockEnv()
-      val txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
+      val worldState: WorldState.Staging               = cachedWorldState.staging()
+      val networkConfig: NetworkConfig                 = _networkConfig
+      val groupConfig: GroupConfig                     = _groupConfig
+      val outputBalances: MutBalances                  = MutBalances.empty
+      def nextOutputIndex: Int                         = 0
+      val blockEnv: BlockEnv                           = genBlockEnv()
+      val txEnv: TxEnv                                 = transactionEnv
       def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
       def logConfig: LogConfig                         = LogConfig.allEnabled()
-      def nodeIndexesConfig: NodeIndexesConfig         = NodeIndexesConfig.enabled()
+      def nodeIndexesConfig: NodeIndexesConfig         = NodeIndexesConfig(true, true)
       var gasRemaining: GasBox                         = gasLimit
     }
     obj -> context
