@@ -46,6 +46,7 @@ trait FlowUtils
     with LogUtils
     with ContractUtils
     with ConflictedBlocks
+    with NodeIndexesUtils
     with LazyLogging { Self: BlockFlow =>
   implicit def mempoolSetting: MemPoolSetting
   implicit def consensusConfigs: ConsensusSettings
@@ -326,6 +327,7 @@ trait FlowUtils
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
+      parentHeight <- getHeight(loosenDeps.parentHash(chainIndex))
     } yield {
       val coinbaseTx = prepareCoinbase(chainIndex, uncles, fullTxs, target, templateTs, miner)
       BlockFlowTemplate(
@@ -334,7 +336,8 @@ trait FlowUtils
         depStateHash,
         target,
         templateTs,
-        fullTxs :+ coinbaseTx
+        fullTxs :+ coinbaseTx,
+        parentHeight + 1
       )
     }
   }
@@ -358,7 +361,12 @@ trait FlowUtils
   }
 
   lazy val templateValidator =
-    BlockValidation.build(brokerConfig, networkConfig, consensusConfigs, logConfig)
+    BlockValidation.build(
+      brokerConfig,
+      networkConfig,
+      consensusConfigs,
+      logConfig
+    )
   @tailrec
   final def validateTemplate(
       chainIndex: ChainIndex,

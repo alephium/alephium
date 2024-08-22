@@ -19,6 +19,8 @@ package org.alephium.flow.core
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -28,6 +30,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
+import org.alephium.io.IOResult
 import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -205,7 +208,7 @@ class VMSpec extends AlephiumSpec with Generators {
           networkConfig.getHardFork(TimeStamp.now())
         )
     ): (ContractId, ContractOutputRef) = {
-      val (contractId, contractOutputRef) =
+      val (contractId, contractOutputRef, _) =
         createContract(
           input,
           initialImmState,
@@ -467,6 +470,74 @@ class VMSpec extends AlephiumSpec with Generators {
     contractAsset.amount is ALPH.alph(2)
   }
 
+  it should "work with negative operation on I256 expression" in new ContractFixture {
+    def codeWithExpr(expr: String) =
+      s"""
+         |Contract TestContract(mut x: I256) {
+         |  pub fn negativeX() -> () {
+         |    x = -${expr}
+         |  }
+         |}
+         |""".stripMargin
+
+    def scriptWithCode(code: String, contractId: String): String = {
+      s"""
+         |TxScript Operate() {
+         |  TestContract(#$contractId).negativeX()
+         |}
+         |
+         |$code
+         |""".stripMargin
+    }
+
+    def verifyXValue(code: String, contractId: ContractId, xValue: Int) = {
+      callTxScript(scriptWithCode(code, contractId.toHexString))
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.mutFields(0) is Val.I256(I256.unsafe(xValue))
+    }
+
+    def verify(xExpr: String) = {
+      val code = codeWithExpr(xExpr)
+      val contractId = createContract(
+        code,
+        initialMutState = AVector[Val](Val.I256(I256.One))
+      )._1
+
+      verifyXValue(code, contractId, xValue = -1)
+      verifyXValue(code, contractId, xValue = 1)
+      verifyXValue(code, contractId, xValue = -1)
+      verifyXValue(code, contractId, xValue = 1)
+    }
+
+    verify("x")
+    verify("((x + 1i) * 2i / 2i - 1i)")
+  }
+
+  it should "report error with negative operation on non-I256 expressions" in new ContractFixture {
+    def codeWithType(typ: String) =
+      s"""
+         |Contract TestContract(mut x: ${typ}) {
+         |  pub fn negativeX() -> () {
+         |    x = -x
+         |  }
+         |}
+         |""".stripMargin
+
+    def verifyErrorMessage(typ: String) = {
+      val codeWithU256 = codeWithType(typ)
+      Compiler
+        .compileContract(codeWithU256)
+        .leftValue
+        .message is s"Invalid param types List($typ) for - operator"
+    }
+
+    verifyErrorMessage("U256")
+    verifyErrorMessage("Bool")
+    verifyErrorMessage("ByteVec")
+    verifyErrorMessage("Address")
+  }
+
   it should "create contract and transfer tokens from the contract" in new ContractFixture {
     val code =
       s"""
@@ -555,7 +626,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
+    val (barContractId, _, _) =
+      createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
     getContractAsset(barContractId).amount is minimalAlphInContract * 2
 
     val foo =
@@ -568,7 +640,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$bar
          |""".stripMargin
-    val (fooContractId, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
+    val (fooContractId, _, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
     getContractAsset(fooContractId).amount is minimalAlphInContract
 
     val script =
@@ -971,6 +1043,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |    assert!(!true == false, 0)
          |    assert!(!false == true, 0)
+         |    assert!((2 * (if (true) 1 else 2)) / 2 == 1, 0)
          |  }
          |}
          |""".stripMargin
@@ -1390,7 +1463,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     {
-      info("Destroy a contract and and transfer value to itself")
+      info("Destroy a contract and transfer value to itself")
       val script = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, foo, fooAssetRef, true)
@@ -2770,7 +2843,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def success(contract: String) = {
-      val (contractId, contractOutputRef) =
+      val (contractId, contractOutputRef, _) =
         createContract(contract, AVector.empty, AVector(Val.U256(0)))
       val contractIdHex = contractId.toHexString
       checkContractState(contractIdHex, contract, contractOutputRef, true)
@@ -4509,7 +4582,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val (fooId, fooOutputRef) = createContract(foo)
+    val (fooId, fooOutputRef, _) = createContract(foo)
 
     val script =
       s"""
@@ -4573,7 +4646,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val tokenIssuanceInfo = TokenIssuance.Info(Val.U256(U256.unsafe(1024)), Some(genesisLockup))
-    val (fooId, _)        = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
+    val (fooId, _, _)     = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
     val fooAddress        = Address.contract(fooId)
 
     def barCode(assertStmt: String): String = {
@@ -4602,8 +4675,8 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def verifyTransferToken(func: String, assertValue: String) = {
-      val bar        = barCode(s"$func!(foo) == $assertValue")
-      val (barId, _) = createContract(bar)
+      val bar           = barCode(s"$func!(foo) == $assertValue")
+      val (barId, _, _) = createContract(bar)
       val script =
         s"""
            |TxScript Main {
@@ -4829,7 +4902,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$fooV0
          |""".stripMargin
-    val (foo0ContractId, _) = createContract(foo0)
+    val (foo0ContractId, _, _) = createContract(foo0)
 
     val foo =
       s"""
@@ -4853,7 +4926,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$fooV1
          |""".stripMargin
-    val (foo1ContractId, _) = createContract(foo1)
+    val (foo1ContractId, _, _) = createContract(foo1)
     val script =
       s"""
          |TxScript Main {
@@ -6439,6 +6512,125 @@ class VMSpec extends AlephiumSpec with Generators {
     getAlphBalance(blockFlow, receiver) is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
   }
 
+  trait SubContractIndexesFixture extends ContractFixture {
+    def subcontractIndexEnabled: Boolean
+    override val configValues = Map(
+      "alephium.node.indexes.subcontract-index"   -> s"$subcontractIndexEnabled",
+      "alephium.node.indexes.tx-output-ref-index" -> "false"
+    )
+
+    val subContractRaw: String =
+      s"""
+         |Contract SubContract() {
+         |  pub fn call() -> () {}
+         |}
+         |""".stripMargin
+
+    val subContractTemplateId = createContract(subContractRaw)._1.toHexString
+
+    val parentContractRaw: String =
+      s"""
+         |Contract ParentContract() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn createSingleSubContract(index: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index), #$subContractTemplateId, #00, #00)
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  pub fn createMultipleSubContracts(index1: U256, index2: U256, index3: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index1), #$subContractTemplateId, #00, #00)
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index2), #$subContractTemplateId, #00, #00)
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index3), #$subContractTemplateId, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val parentContractId = createContract(parentContractRaw)._1
+
+    def getSubContractId(index: Int): ContractId = {
+      parentContractId.subContractId(ByteString.fromInts(index), chainIndex.from)
+    }
+
+    def createSingleSubContract(index: Int): ContractId = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  ParentContract(#${parentContractId.toHexString}).createSingleSubContract{@$genesisAddress -> ALPH: 1 alph}($index)
+           |}
+           |$parentContractRaw
+           |""".stripMargin
+      )
+
+      getSubContractId(index)
+    }
+
+    def createMultipleSubContracts(
+        index1: Int,
+        index2: Int,
+        index3: Int
+    ): ArrayBuffer[ContractId] = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  ParentContract(#${parentContractId.toHexString}).createMultipleSubContracts{@$genesisAddress -> ALPH: 3 alph}($index1, $index2, $index3)
+           |}
+           |$parentContractRaw
+           |""".stripMargin
+      )
+
+      ArrayBuffer(getSubContractId(index1), getSubContractId(index2), getSubContractId(index3))
+    }
+  }
+
+  it should "not create subcontract indexes when it is disabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = false
+
+    val subContractId = createSingleSubContract(1)
+
+    def verifyError[T](result: IOResult[T]) = {
+      result.leftValue.reason.getMessage is "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
+    }
+
+    verifyError(blockFlow.getParentContractId(subContractId))
+    verifyError(blockFlow.getSubContractsCurrentCount(parentContractId))
+    verifyError(blockFlow.getSubContractIds(parentContractId, 0, 1))
+  }
+
+  it should "create subcontract indexes when it is enabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = true
+
+    val subContracts = ArrayBuffer.empty[ContractId]
+
+    val subContractId1 = createSingleSubContract(1)
+    subContracts += subContractId1
+    blockFlow.getParentContractId(subContractId1) isE Some(parentContractId)
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(1)
+    blockFlow.getSubContractIds(parentContractId, 0, 1) isE (1, AVector.from(subContracts))
+
+    val subContracts234 = createMultipleSubContracts(2, 3, 4)
+    subContracts ++= subContracts234
+    subContracts234.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(2)
+    blockFlow.getSubContractIds(parentContractId, 0, 2) isE (2, AVector.from(subContracts))
+
+    val subContractId5 = createSingleSubContract(5)
+    subContracts += subContractId5
+    blockFlow.getParentContractId(subContractId5) isE Some(parentContractId)
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(3)
+    blockFlow.getSubContractIds(parentContractId, 0, 3) isE (3, AVector.from(subContracts))
+
+    val subContracts678 = createMultipleSubContracts(6, 7, 8)
+    subContracts ++= subContracts678
+    subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
+    blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
+
+    blockFlow
+      .getSubContractIds(parentContractId, 0, 5)
+      .leftValue
+      .reason
+      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
+  }
+
   // Inactive instrs check will be enabled in future upgrades
   ignore should "check inactive instrs when creating contract" in new ContractFixture {
     override val configValues =
@@ -6462,6 +6654,69 @@ class VMSpec extends AlephiumSpec with Generators {
       "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
   }
 
+  it should "test chained contract calls" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo(mut value: U256) {
+         |  pub fn set(newValue: U256) -> () {
+         |    value = newValue
+         |  }
+         |  pub fn get() -> U256 {
+         |    return value
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, initialMutState = AVector(Val.U256(U256.Zero)))._1
+
+    val bar =
+      s"""
+         |Contract Bar(foo: Foo) {
+         |  pub fn getFoo() -> Foo {
+         |    return foo
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector(Val.ByteVec(fooId.bytes)))._1
+
+    val baz =
+      s"""
+         |Contract Baz(qux: Qux) {
+         |  pub fn getQux() -> Qux {
+         |    return qux
+         |  }
+         |  fn getBar() -> Bar {
+         |    return qux.bar
+         |  }
+         |}
+         |struct Qux {
+         |  array: [Bar; 2],
+         |  bar: Bar
+         |}
+         |$bar
+         |""".stripMargin
+    val bazId = createContract(baz, AVector.fill(3)(Val.ByteVec(barId.bytes)))._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let baz = Baz(#${bazId.toHexString})
+         |  assert!(baz.getQux().array[0].getFoo().get() == 0, 0)
+         |  assert!(baz.getQux().array[1].getFoo().get() == 0, 0)
+         |  assert!(baz.getQux().bar.getFoo().get() == 0, 0)
+         |
+         |  baz.getQux().bar.getFoo().set(1)
+         |  assert!(baz.getQux().array[0].getFoo().get() == 1, 0)
+         |  assert!(baz.getQux().array[1].getFoo().get() == 1, 0)
+         |  assert!(baz.getQux().bar.getFoo().get() == 1, 0)
+         |}
+         |$baz
+         |""".stripMargin
+
+    testSimpleScript(script)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
@@ -6478,7 +6733,7 @@ class VMSpec extends AlephiumSpec with Generators {
   ): Option[Int] = {
     (for {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      countOpt   <- worldState.logStorage.logCounterState.getOpt(contractId)
+      countOpt   <- worldState.nodeIndexesStorage.logStorage.logCounterState.getOpt(contractId)
     } yield countOpt).rightValue
   }
 }

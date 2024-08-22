@@ -23,6 +23,8 @@ import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
+import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
@@ -39,6 +41,14 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(dbSource, RocksDBSource.ColumnFamily.Log),
       newDB(dbSource, RocksDBSource.ColumnFamily.Log),
       newDB(dbSource, RocksDBSource.ColumnFamily.LogCounter)
+    )
+  }
+
+  def newSubContractIndexStorage(dbSource: RocksDBSource): SubContractIndexStorage = {
+    SubContractIndexStorage(
+      newDB(dbSource, RocksDBSource.ColumnFamily.ParentContract),
+      newDB(dbSource, RocksDBSource.ColumnFamily.SubContract),
+      newDB(dbSource, RocksDBSource.ColumnFamily.SubContractCounter)
     )
   }
 
@@ -85,7 +95,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.removeAsset(assetOutputRef).isLeft is true
     worldState.removeAsset(contractOutputRef).isLeft is true
 
-    update(worldState.addAsset(assetOutputRef, assetOutput))
+    update(worldState.addAsset(assetOutputRef, assetOutput, TransactionId.generate))
     worldState.getOutput(assetOutputRef) isE assetOutput
 
     update {
@@ -96,7 +106,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         mutFields,
         contractOutputRef,
         contractOutput,
-        isLemanFork
+        isLemanFork,
+        TransactionId.generate
       )
     }
     worldState.getContractObj(contractId) isE contractObj
@@ -117,7 +128,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         newState,
         contractOutputRef1,
         contractOutput1,
-        isLemanFork
+        isLemanFork,
+        TransactionId.generate
       )
     )
     checkCode(worldState, isLemanFork, code, 2)
@@ -152,7 +164,11 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val persisted = WorldState.emptyPersisted(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      newLogStorage(storage)
+      NodeIndexesStorage(
+        newLogStorage(storage),
+        Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)),
+        Some(newSubContractIndexStorage(storage))
+      )
     )
     val cached = persisted.cached()
   }
@@ -181,7 +197,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       code,
       mutFields,
       contractOutputRef,
-      contractOutput
+      contractOutput,
+      TransactionId.generate
     ) isE ()
     val newWorldState = cached.persist().rightValue
     newWorldState.getContractObj(contractId).isRight is true
@@ -205,7 +222,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       AVector.empty,
       mutFields,
       contractOutputRef,
-      contractOutput
+      contractOutput,
+      TransactionId.generate
     ) isE ()
     val oldWorldState = cached.persist().rightValue
     val oldContractState =
@@ -276,7 +294,11 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      newLogStorage(storage)
+      NodeIndexesStorage(
+        newLogStorage(storage),
+        Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)),
+        Some(newSubContractIndexStorage(storage))
+      )
     )
     val staging = worldState.staging()
 
@@ -290,7 +312,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       mutFields,
       contractOutputRef,
       contractOutput,
-      isLemanFork
+      isLemanFork,
+      TransactionId.generate
     ) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true

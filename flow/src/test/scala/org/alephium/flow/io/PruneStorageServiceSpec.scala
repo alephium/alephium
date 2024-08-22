@@ -97,7 +97,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     addOneBlock(chainIndex, blockFlow)
     addOneBlock(chainIndex, blockFlow)
 
-    val (contractId, _) = createContract(
+    val (contractId, _, _) = createContract(
       tokenContract,
       AVector.empty,
       AVector.empty,
@@ -134,7 +134,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
       blockFlow.getMaxHeightByWeight(ci).rightValue is 200
     }
 
-    val (contractId, _) = createContract(
+    val (contractId, _, _) = createContract(
       tokenContract,
       AVector.empty,
       AVector.empty,

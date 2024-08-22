@@ -16,6 +16,7 @@
 
 package org.alephium.app
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
@@ -45,6 +46,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -160,6 +162,20 @@ object ServerFixture {
         .get
     )
   }
+
+  val dummyParentContractId      = ContractId.hash("parent")
+  val dummyParentContractAddress = Address.contract(dummyParentContractId)
+  val dummySubContractId1        = ContractId.hash("sub-contract-1")
+  val dummySubContractAddress1   = Address.contract(dummySubContractId1)
+  val dummySubContractId2        = ContractId.hash("sub-contract-2")
+  val dummySubContractAddress2   = Address.contract(dummySubContractId2)
+  val dummyAssetOutputRef = AssetOutputRef.from(
+    ScriptHint.fromHash(1144047305),
+    TxOutputRef.unsafeKey(
+      Blake2b.unsafe(hex"87f94b3a493059643dcf5cb75147c17090362ae18f25260fab4f9ca9c6e20bbc")
+    )
+  )
+  val dummyTransactionId = TransactionId.random
 
   class DiscoveryServerDummy(neighborPeers: NeighborPeers) extends BaseActor {
     def receive: Receive = { case DiscoveryServer.GetNeighborPeers =>
@@ -360,6 +376,7 @@ object ServerFixture {
     override def getHeight(hash: BlockHash): IOResult[Int]              = Right(1)
     override def getBlockHeader(hash: BlockHash): IOResult[BlockHeader] = Right(block.header)
     override def getBlock(hash: BlockHash): IOResult[Block]             = Right(block)
+    override def getBlockBytes(hash: BlockHash): IOResult[ByteString]   = Right(serialize(block))
     override def calWeight(block: Block): IOResult[Weight]              = ???
 
     override def getHeightedIntraBlocks(
@@ -484,7 +501,8 @@ object ServerFixture {
             dummyContract.toHalfDecoded(),
             AVector(vm.Val.U256(U256.Zero)),
             ContractOutputRef.unsafe(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.zero)),
-            ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector())
+            ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector()),
+            dummyTx.id
           )
           .map(_.cached())
       } else {
@@ -496,5 +514,39 @@ object ServerFixture {
     override def getBestPersistedWorldState(
         groupIndex: GroupIndex
     ): IOResult[WorldState.Persisted] = getBestCachedWorldState(groupIndex).flatMap(_.persist())
+
+    override def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {
+      if (contractId == ContractId.zero) {
+        Right(None)
+      } else {
+        Right(Some(dummyParentContractId))
+      }
+    }
+
+    override def getSubContractIds(
+        @nowarn contractId: ContractId,
+        start: Int,
+        end: Int
+    ): IOResult[(Int, AVector[ContractId])] = {
+      Right((2, AVector(dummySubContractId1, dummySubContractId2)))
+    }
+
+    override def getSubContractsCurrentCount(contractId: ContractId): IOResult[Option[Int]] = {
+      if (contractId == ContractId.zero) {
+        Right(None)
+      } else {
+        Right(Some(10))
+      }
+    }
+
+    override def getTxIdFromOutputRef(
+        outputRef: TxOutputRef
+    ): IOResult[Option[TransactionId]] = {
+      if (outputRef == dummyAssetOutputRef) {
+        Right(Some(dummyTransactionId))
+      } else {
+        Right(None)
+      }
+    }
   }
 }

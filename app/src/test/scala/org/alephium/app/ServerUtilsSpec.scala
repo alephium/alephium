@@ -24,7 +24,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.{model => api}
-import org.alephium.api.ApiError
+import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
@@ -71,22 +71,25 @@ class ServerUtilsSpec extends AlephiumSpec {
     def brokerConfig: BrokerConfig
     def serverUtils: ServerUtils
 
-    def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
-      val result = api.Transaction.fromProtocol(tx)
-      serverUtils.getTransaction(
-        blockFlow,
-        tx.id,
-        Some(chainIndex.from),
-        Some(chainIndex.to)
-      ) isE result
-      serverUtils.getTransaction(blockFlow, tx.id, Some(chainIndex.from), None) isE result
-      serverUtils.getTransaction(blockFlow, tx.id, None, Some(chainIndex.to)) isE result
-      serverUtils.getTransaction(blockFlow, tx.id, None, None) isE result
+    def check[T](
+        blockFlow: BlockFlow,
+        tx: Transaction,
+        chainIndex: ChainIndex,
+        getTx: (BlockFlow, TransactionId, Option[GroupIndex], Option[GroupIndex]) => Try[T],
+        result: T
+    ) = {
+      getTx(blockFlow, tx.id, Some(chainIndex.from), Some(chainIndex.to)) isE result
+      getTx(blockFlow, tx.id, Some(chainIndex.from), None) isE result
+      getTx(blockFlow, tx.id, None, Some(chainIndex.to)) isE result
+      getTx(blockFlow, tx.id, None, None) isE result
       val invalidChainIndex = brokerConfig.chainIndexes.filter(_.from != chainIndex.from).head
-      serverUtils
-        .getTransaction(blockFlow, tx.id, Some(invalidChainIndex.from), None)
-        .leftValue
-        .detail is s"Transaction ${tx.id.toHexString} not found"
+      val error             = getTx(blockFlow, tx.id, Some(invalidChainIndex.from), None).leftValue
+      error.detail is s"Transaction ${tx.id.toHexString} not found"
+    }
+
+    def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
+      check(blockFlow, tx, chainIndex, serverUtils.getTransaction, api.Transaction.fromProtocol(tx))
+      check(blockFlow, tx, chainIndex, serverUtils.getRawTransaction, RawTransaction(serialize(tx)))
     }
   }
 
@@ -4054,6 +4057,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
+    serverUtils.getRawBlock(blockFlow, block.hash).rightValue is RawBlock(serialize(block))
+    serverUtils.getRawBlock(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+
     serverUtils.getBlockHeader(blockFlow, block.hash).rightValue is BlockHeaderEntry.from(
       block.header,
       1
@@ -4221,6 +4228,123 @@ class ServerUtilsSpec extends AlephiumSpec {
     val block1 = submitTx(tx1)
     block1.nonCoinbase.head.scriptExecutionOk is true
     addAndCheck(blockFlow, block1)
+  }
+
+  trait TxOutputRefIndexFixture extends Fixture {
+    def enableTxOutputRefIndex: Boolean = true
+
+    override val configValues = Map(
+      ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex"),
+      ("alephium.node.indexes.subcontract-index", "false")
+    )
+
+    val serverUtils               = new ServerUtils()
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val (_, publicKey)            = chainIndex.from.generateKey
+    val block                     = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(10))
+    addAndCheck(blockFlow, block)
+    val txId = block.nonCoinbase.head.id
+
+    val utxos = blockFlow.getUTXOs(LockupScript.p2pkh(publicKey), Int.MaxValue, true).rightValue
+    utxos.length is 1
+    val txOutputRef = utxos.head.ref.asInstanceOf[AssetOutputRef]
+  }
+
+  it should "find tx id from tx output ref" in new TxOutputRefIndexFixture {
+    serverUtils.getTxIdFromOutputRef(blockFlow, txOutputRef) isE txId
+  }
+
+  it should "return error when node.indexes.tx-output-ref-index is not enabled" in new TxOutputRefIndexFixture {
+    override def enableTxOutputRefIndex: Boolean = false
+    serverUtils
+      .getTxIdFromOutputRef(blockFlow, txOutputRef)
+      .leftValue
+      .detail
+      .contains(
+        "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
+      ) is true
+  }
+
+  trait SubContractIndexesFixture extends Fixture {
+    def subcontractIndexEnabled: Boolean = true
+
+    override val configValues = Map(
+      ("alephium.node.indexes.tx-output-ref-index", "false"),
+      ("alephium.node.indexes.subcontract-index", s"$subcontractIndexEnabled")
+    )
+
+    val serverUtils           = new ServerUtils()
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, genesisPubKey, _) = genesisKeys(0)
+    val genesisAddress        = Address.p2pkh(genesisPubKey)
+    val subContractRaw: String =
+      s"""
+         |Contract SubContract() {
+         |  pub fn call() -> () {}
+         |}
+         |""".stripMargin
+
+    val subContractTemplateId = createContract(subContractRaw)._1.toHexString
+
+    val parentContractRaw: String =
+      s"""
+         |Contract ParentContract() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn createSubContract(index: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index), #$subContractTemplateId, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val subContractIndex   = 0
+    val parentContractId   = createContract(parentContractRaw)._1
+    val parentContractAddr = Address.contract(parentContractId)
+    val subContractId =
+      parentContractId.subContractId(ByteString.fromInts(subContractIndex), chainIndex.from)
+    val subContractAddr = Address.contract(subContractId)
+
+    callTxScript(
+      s"""
+         |TxScript Main {
+         |  ParentContract(#${parentContractId.toHexString}).createSubContract{@$genesisAddress -> ALPH: 1 alph}($subContractIndex)
+         |}
+         |$parentContractRaw
+         |""".stripMargin
+    )
+  }
+
+  it should "return parent contract, subcontracts and subcontract count" in new SubContractIndexesFixture {
+    serverUtils.getParentContract(blockFlow, parentContractAddr) isE ContractParent(None)
+    serverUtils.getParentContract(blockFlow, subContractAddr) isE ContractParent(
+      Some(parentContractAddr)
+    )
+    serverUtils.getSubContractsCurrentCount(blockFlow, parentContractAddr) isE 1
+    serverUtils.getSubContracts(blockFlow, 0, 1, parentContractAddr) isE SubContracts(
+      AVector(subContractAddr),
+      1
+    )
+    serverUtils
+      .getSubContracts(blockFlow, 1, 2, parentContractAddr)
+      .leftValue
+      .detail
+      .contains(
+        s"Can not find sub-contracts for ${parentContractId.toHexString} at count 1"
+      ) is true
+  }
+
+  it should "return error when node.indexes.subcontract-index is not enabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = false
+
+    def verifyError[T](result: Try[T]) = {
+      result.leftValue.detail.contains(
+        "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
+      ) is true
+    }
+
+    verifyError(serverUtils.getParentContract(blockFlow, subContractAddr))
+    verifyError(serverUtils.getSubContractsCurrentCount(blockFlow, parentContractAddr))
+    verifyError(serverUtils.getSubContracts(blockFlow, 0, 1, parentContractAddr))
   }
 
   trait VerifyTxOutputFixture extends ContractFixture {
@@ -4403,6 +4527,31 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
       .utxos
       .length is 10
+  }
+
+  it should "return an error if the error code is invalid" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val publicKey   = genesisKeys(0)._2
+
+    def executeScript(errorCode: String) = {
+      val code =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(true, $errorCode)
+           |}
+           |""".stripMargin
+      val bytecode = serialize(Compiler.compileTxScript(code).rightValue)
+      serverUtils.buildExecuteScriptTx(
+        blockFlow,
+        BuildTransaction.ExecuteScript(fromPublicKey = publicKey.bytes, bytecode = bytecode)
+      )
+    }
+
+    executeScript(s"${Int.MaxValue - 1}").isRight is true
+    executeScript(s"${Int.MaxValue}").isRight is true
+    executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
+      "Execution error when estimating gas for tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
   }
 
   @scala.annotation.tailrec

@@ -424,6 +424,7 @@ final case class StatefulFrame(
         contractCreationEventFields(contractId, parentContractId, immFields),
         systemEvent = true
       )
+      _ <- ctx.writeSubContractIndexes(parentContractId, contractId)
     } yield contractId
   }
 

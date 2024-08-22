@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.4.0"
+    "version": "3.4.1"
   },
   "servers": [
     {
@@ -5557,6 +5557,106 @@
         }
       }
     },
+    "/blockflow/raw-blocks/{block_hash}": {
+      "get": {
+        "tags": [
+          "Blockflow"
+        ],
+        "summary": "Get raw block in hex format",
+        "operationId": "getBlockflowRaw-blocksBlock_hash",
+        "parameters": [
+          {
+            "name": "block_hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "block-hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RawBlock"
+                },
+                "example": {
+                  "value": "49c1050b901993b20000000000000000000000000000000000070000000000004386cda6c69b4d5aff405c10ae023d8311a90d53b337bc429fa00000000000018488701af02c77df4c7657243e3a321164f14b563c6bf6af821a0000000000023202720d0ff5ab292036c749039d90e90190bf2232b6a885a32f000000000002c856ac0bb2d363ffdca661fcb98e513cef3d3fe09f6888874a84000000000001465a437e5861962a8e23650c992429395499bf22a2e9954215d500000000000076e5076d72b10a3be4818e2ad88df4d97e43b50f1549216aa4760000000000033fde0a3e193492c1e9bb51b31718f72eb1fb94458d10369403775c91e90a5c32e6c4abe3216093814444e406f62995c247719a82476f6bc034b9508049bbd8a3f0f1d6862f0f8b218022ae0517394027dd03bf91c508fc565ab800000190edd91dee1b038d320100000080004e20bb9aca000001c4072325d841cdb7f30044dbe03c9b2c4c618d629bdcf6d5a58c596d70b83168d93e32f892774490fefa00000190efa2e16e000b010100000190edd91dee000100000000"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transactions/build-multi-addresses": {
       "post": {
         "tags": [
@@ -6186,6 +6286,129 @@
                       "scriptSignatures": [
                         "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/raw/{txId}": {
+      "get": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Get raw transaction in hex format",
+        "operationId": "getTransactionsRawTxid",
+        "parameters": [
+          {
+            "name": "txId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "32-byte-hash"
+            }
+          },
+          {
+            "name": "fromGroup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "toGroup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RawTransaction"
+                },
+                "examples": {
+                  "Example": {
+                    "summary": "Default",
+                    "value": {
+                      "value": "00000080004e20bb9aca000001c4072325d841cdb7f30044dbe03c9b2c4c618d629bdcf6d5a58c596d70b83168d93e32f892774490fefa00000190efa2e16e000b010100000190edd91dee000100000000"
                     }
                   }
                 }
@@ -13287,6 +13510,32 @@
           },
           "compilerOptions": {
             "$ref": "#/components/schemas/CompilerOptions"
+          }
+        }
+      },
+      "RawBlock": {
+        "title": "RawBlock",
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "hex-string"
+          }
+        }
+      },
+      "RawTransaction": {
+        "title": "RawTransaction",
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "hex-string"
           }
         }
       },

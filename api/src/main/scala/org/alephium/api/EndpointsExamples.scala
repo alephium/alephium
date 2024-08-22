@@ -36,6 +36,7 @@ import org.alephium.protocol.model.{
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
 // scalastyle:off magic.number file.size.limit
@@ -285,6 +286,15 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val getBlockHeaderEntryExample: List[Example[BlockHeaderEntry]] =
     simpleExample(blockHeaderEntry)
 
+  // scalastyle:off line.size.limit
+  implicit val getRawBlockExample: List[Example[RawBlock]] =
+    simpleExample(
+      RawBlock(value =
+        hex"49c1050b901993b20000000000000000000000000000000000070000000000004386cda6c69b4d5aff405c10ae023d8311a90d53b337bc429fa00000000000018488701af02c77df4c7657243e3a321164f14b563c6bf6af821a0000000000023202720d0ff5ab292036c749039d90e90190bf2232b6a885a32f000000000002c856ac0bb2d363ffdca661fcb98e513cef3d3fe09f6888874a84000000000001465a437e5861962a8e23650c992429395499bf22a2e9954215d500000000000076e5076d72b10a3be4818e2ad88df4d97e43b50f1549216aa4760000000000033fde0a3e193492c1e9bb51b31718f72eb1fb94458d10369403775c91e90a5c32e6c4abe3216093814444e406f62995c247719a82476f6bc034b9508049bbd8a3f0f1d6862f0f8b218022ae0517394027dd03bf91c508fc565ab800000190edd91dee1b038d320100000080004e20bb9aca000001c4072325d841cdb7f30044dbe03c9b2c4c618d629bdcf6d5a58c596d70b83168d93e32f892774490fefa00000190efa2e16e000b010100000190edd91dee000100000000"
+      )
+    )
+  // scalastyle:on line.size.limit
+
   implicit val chainParamsExamples: List[Example[ChainParams]] =
     simpleExample(
       ChainParams(
@@ -335,6 +345,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val transactionExamples: List[Example[Transaction]] = List(
     defaultExample(transaction)
   )
+
+  // scalastyle:off line.size.limit
+  implicit val rawTransactionExamples: List[Example[RawTransaction]] = List(
+    defaultExample(
+      RawTransaction(
+        hex"00000080004e20bb9aca000001c4072325d841cdb7f30044dbe03c9b2c4c618d629bdcf6d5a58c596d70b83168d93e32f892774490fefa00000190efa2e16e000b010100000190edd91dee000100000000"
+      )
+    )
+  )
+  // scalastyle:on line.size.limit
 
   implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
     simpleExample(HashRateResponse("100 MH/s"))
@@ -941,5 +961,16 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val eventsVectorExamples: List[Example[AVector[ContractEvents]]] =
     simpleExample(AVector(ContractEvents(events = AVector(event), 3)))
+
+  implicit val contractParentExamples: List[Example[ContractParent]] =
+    simpleExample(ContractParent(Option(contractAddress)))
+
+  implicit val subContractsExamples: List[Example[SubContracts]] =
+    simpleExample(SubContracts(subContracts = AVector(contractAddress), nextStart = 10))
+
+  implicit val outputRefExamples: List[Example[OutputRef]] = simpleExample(outputRef)
+
+  implicit val transactionIdExamples: List[Example[TransactionId]] =
+    simpleExample(transaction.unsigned.txId)
 }
 // scalastyle:on magic.number

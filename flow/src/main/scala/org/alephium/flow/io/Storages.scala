@@ -27,9 +27,15 @@ import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
+import org.alephium.protocol.vm.subcontractindex.{
+  SubContractIndexState,
+  SubContractIndexStateId,
+  SubContractIndexStorage
+}
 import org.alephium.util.AVector
 
 object Storages {
@@ -62,17 +68,56 @@ object Storages {
     val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
     val trieImmutableStateStorage =
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
+
+    val txOutputRefIndexStorageOpt = if (nodeSetting.indexesConfig.txOutputRefIndex) {
+      Some(
+        RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
+      )
+    } else {
+      None
+    }
+
+    val subContractIndexStorageOpt = if (nodeSetting.indexesConfig.subcontractIndex) {
+      val parentContractIndexStorage =
+        RocksDBKeyValueStorage[ContractId, ContractId](db, ParentContract, writeOptions)
+      val subContractIndexStateStorage =
+        RocksDBKeyValueStorage[SubContractIndexStateId, SubContractIndexState](
+          db,
+          SubContract,
+          writeOptions
+        )
+      val subContractIndexCounterStorage =
+        RocksDBKeyValueStorage[ContractId, Int](db, SubContractCounter, writeOptions)
+
+      Some(
+        SubContractIndexStorage(
+          parentContractIndexStorage,
+          subContractIndexStateStorage,
+          subContractIndexCounterStorage
+        )
+      )
+    } else {
+      None
+    }
+
+    val nodeIndexesStorage =
+      NodeIndexesStorage(logStorage, txOutputRefIndexStorageOpt, subContractIndexStorageOpt)
+
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,
         trieImmutableStateStorage,
-        logStorage,
+        nodeIndexesStorage,
         db,
         All,
         writeOptions
       )
     val emptyWorldState =
-      WorldState.emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage)
+      WorldState.emptyPersisted(
+        trieStorage,
+        trieImmutableStateStorage,
+        nodeIndexesStorage
+      )
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)
@@ -88,10 +133,10 @@ object Storages {
       nodeStateStorage,
       pendingTxStorage,
       readyTxStorage,
-      brokerStorage,
-      logStorage
+      brokerStorage
     )
   }
+  // scalastyle:on method.length
 
   def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
     val dbPath = rootPath.resolve(dbFolder)
@@ -110,8 +155,7 @@ final case class Storages(
     nodeStateStorage: NodeStateStorage,
     pendingTxStorage: PendingTxStorage,
     readyTxStorage: ReadyTxStorage,
-    brokerStorage: BrokerStorage,
-    logStorage: LogStorage
+    brokerStorage: BrokerStorage
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 

@@ -626,7 +626,7 @@ object StatefulVM {
   private def maybeShowDebug(context: StatefulContext): Unit = {
     val networkId = context.networkConfig.networkId
     if (networkId.networkType != NetworkId.MainNet) {
-      context.worldState.logState.getNewLogs().foreach { logStates =>
+      context.worldState.nodeIndexesState.logState.getNewLogs().foreach { logStates =>
         logStates.states.foreach { logState =>
           if (logState.index == debugEventIndex.v.v.intValue().toByte) {
             logState.fields.headOption.foreach {

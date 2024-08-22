@@ -30,6 +30,7 @@ object IOError {
   final case class KeyNotFound(e: AppException) extends AppIOError(e)
   final object MaxNodeReadLimitExceeded
       extends AppIOError(new AppException("MaxNodeReadLimitExceeded"))
+  final case class ConfigError(e: AppException) extends AppIOError(e)
 
   final case class JavaIO(e: java.io.IOException)     extends IOError(e)
   final case class JavaSecurity(e: SecurityException) extends IOError(e)
@@ -37,6 +38,14 @@ object IOError {
   final case class Other(e: Throwable)                extends IOError(e)
 
   def keyNotFound[K](key: K, action: String): KeyNotFound = {
-    KeyNotFound(new AppException(s"Key $key not found in $action"))
+    keyNotFound(s"Key $key not found in $action")
+  }
+
+  def keyNotFound[K](errorMessage: String): KeyNotFound = {
+    KeyNotFound(new AppException(errorMessage))
+  }
+
+  def configError(errorMessage: String): ConfigError = {
+    ConfigError(new AppException(errorMessage))
   }
 }

@@ -189,6 +189,10 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
 
+  val getRawBlockLogic = serverLogic(getRawBlock) { hash =>
+    Future.successful(serverUtils.getRawBlock(blockFlow, hash))
+  }
+
   val getBalanceLogic = serverLogic(getBalance) { case (address, getMempoolUtxos) =>
     Future.successful(serverUtils.getBalance(blockFlow, address, getMempoolUtxos.getOrElse(true)))
   }
@@ -567,6 +571,15 @@ trait EndpointsLogic extends Endpoints {
     }
   )
 
+  val getRawTransactionLogic = serverLogicRedirect(getRawTransaction)(
+    { case (txId, fromGroup, toGroup) =>
+      Future.successful(serverUtils.getRawTransaction(blockFlow, txId, fromGroup, toGroup))
+    },
+    { case (_, fromGroup, _) =>
+      getGroupIndex(fromGroup)
+    }
+  )
+
   val minerActionLogic = serverLogic(minerAction) { action =>
     withSyncedClique {
       withMinerAddressSet {
@@ -697,6 +710,56 @@ trait EndpointsLogic extends Endpoints {
   val multipleCallContractLogic = serverLogic(multiCallContract) { params: MultipleCallContract =>
     Future.successful(serverUtils.multipleCallContract(blockFlow, params))
   }
+
+  val parentContractLogic = serverLogic(parentContract) { contractAddress =>
+    val groupIndex = contractAddress.groupIndex
+    requestFromGroupIndex(
+      groupIndex,
+      Future.successful(serverUtils.getParentContract(blockFlow, contractAddress)),
+      parentContract,
+      contractAddress
+    )
+  }
+
+  val subContractsLogic = serverLogicRedirect(subContracts)(
+    { case (contractAddress, counterRange) =>
+      Future.successful {
+        serverUtils.getSubContracts(
+          blockFlow,
+          counterRange.start,
+          counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
+          contractAddress
+        )
+      }
+    },
+    {
+      case (contractAddress, _) => {
+        Right(Some(contractAddress.groupIndex))
+      }
+    }
+  )
+
+  val subContractsCurrentCountLogic = serverLogicRedirect(subContractsCurrentCount)(
+    { case contractAddress =>
+      Future.successful {
+        serverUtils.getSubContractsCurrentCount(blockFlow, contractAddress)
+      }
+    },
+    { case contractAddress =>
+      Right(Some(contractAddress.groupIndex))
+    }
+  )
+
+  val getTxIdFromOutputRefLogic = serverLogicRedirect(getTxIdFromOutputRef)(
+    { case outputRef =>
+      Future.successful {
+        serverUtils.getTxIdFromOutputRef(blockFlow, outputRef.toTxOutputRef())
+      }
+    },
+    { case outputRef =>
+      Right(Some(Hint.unsafe(outputRef.hint).groupIndex))
+    }
+  )
 
   val callTxScriptLogic = serverLogicRedirect(callTxScript)(
     { params: CallTxScript =>

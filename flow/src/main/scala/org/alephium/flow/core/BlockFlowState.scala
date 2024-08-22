@@ -22,12 +22,13 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSettings
-import org.alephium.io.IOResult
+import org.alephium.io.{IOError, IOResult, KeyValueStorage}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -36,6 +37,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   implicit def brokerConfig: BrokerConfig
   implicit def networkConfig: NetworkConfig
+
   def consensusConfigs: ConsensusSettings
   def groups: Int = brokerConfig.groups
   def genesisBlocks: AVector[AVector[Block]]
@@ -70,7 +72,38 @@ trait BlockFlowState extends FlowTipsUtil {
 
   val logStorage: LogStorage = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
-    intraGroupBlockChains.head.worldStateStorage.logStorage
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.logStorage
+  }
+
+  def txOutputRefIndexStorage(
+      groupIndex: GroupIndex
+  ): IOResult[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
+    getBlockChainWithState(
+      groupIndex
+    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+      case Some(storage) =>
+        Right(storage)
+      case None =>
+        Left(
+          IOError.configError(
+            "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
+          )
+        )
+    }
+  }
+
+  lazy val subContractIndexStorage: IOResult[SubContractIndexStorage] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.subContractIndexStorage match {
+      case Some(storage) =>
+        Right(storage)
+      case None =>
+        Left(
+          IOError.configError(
+            "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
+          )
+        )
+    }
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =
@@ -552,7 +585,8 @@ object BlockFlowState {
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
-        worldState.addAsset(outputRef, outputUpdated)
+
+        worldState.addAsset(outputRef, outputUpdated, tx.id)
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

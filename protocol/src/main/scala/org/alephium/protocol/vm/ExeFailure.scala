@@ -397,7 +397,11 @@ final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) exte
 final case class PartiallyActiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
     extends BreakingInstr
 
-final case class InvalidErrorCode(errorCode: U256) extends ExeFailure
+final case class InvalidErrorCode(errorCode: U256) extends ExeFailure {
+  override def toString: String = {
+    s"Invalid error code $errorCode: The error code cannot exceed the maximum value for int32 (${Int.MaxValue})"
+  }
+}
 final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
     extends ExeFailure {
   override def toString: String = {
@@ -415,9 +419,10 @@ sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix
 }
-final case class IOErrorUpdateState(error: IOError)         extends IOFailure
-final case class IOErrorRemoveContract(error: IOError)      extends IOFailure
-final case class IOErrorRemoveContractAsset(error: IOError) extends IOFailure
-final case class IOErrorLoadContract(error: IOError)        extends IOFailure
-final case class IOErrorMigrateContract(error: IOError)     extends IOFailure
-final case class IOErrorWriteLog(error: IOError)            extends IOFailure
+final case class IOErrorUpdateState(error: IOError)            extends IOFailure
+final case class IOErrorRemoveContract(error: IOError)         extends IOFailure
+final case class IOErrorRemoveContractAsset(error: IOError)    extends IOFailure
+final case class IOErrorLoadContract(error: IOError)           extends IOFailure
+final case class IOErrorMigrateContract(error: IOError)        extends IOFailure
+final case class IOErrorWriteLog(error: IOError)               extends IOFailure
+final case class IOErrorCreateSubContractIndex(error: IOError) extends IOFailure

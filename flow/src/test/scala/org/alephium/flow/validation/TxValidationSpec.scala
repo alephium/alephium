@@ -45,7 +45,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val blockFlow = genesisBlockFlow()
     def prepareWorldState(inputInfos: AVector[AssetInputInfo]): Unit = {
       inputInfos.foreach { inputInfo =>
-        cachedWorldState.addAsset(inputInfo.txInput.outputRef, inputInfo.referredOutput) isE ()
+        cachedWorldState.addAsset(
+          inputInfo.txInput.outputRef,
+          inputInfo.referredOutput,
+          TransactionId.generate
+        ) isE ()
       }
     }
 

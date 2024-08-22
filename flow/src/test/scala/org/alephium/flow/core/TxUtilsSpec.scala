@@ -1491,7 +1491,7 @@ class TxUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (contractId, ref) =
+    val (contractId, ref, _) =
       createContract(
         code,
         AVector.empty,
@@ -1757,7 +1757,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val tokenAmount               = 2 * nbOfInputs
 
       val tokens = AVector.fill(nbOfTokens) {
-        val (cId, _) = createContract(
+        val (cId, _, _) = createContract(
           code,
           AVector.empty,
           AVector.empty,

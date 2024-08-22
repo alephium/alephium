@@ -52,7 +52,9 @@ class FlowUtilsSpec extends AlephiumSpec {
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
       assets.foreach { asset =>
-        worldState.addAsset(asset.txInput.outputRef, asset.referredOutput).isRight is true
+        worldState
+          .addAsset(asset.txInput.outputRef, asset.referredOutput, tx.id)
+          .isRight is true
       }
       val firstInput = assets.head.referredOutput
       val firstOutput = firstInput.copy(
@@ -928,5 +930,22 @@ class FlowUtilsSpec extends AlephiumSpec {
     block.transactions.foreach(_.scriptExecutionOk is true)
     block.nonCoinbase.map(_.toTemplate) is txs
     addAndCheck(blockFlow, block)
+  }
+
+  it should "prepare block template with height" in new FlowFixture with Generators {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val chainIndex = chainIndexGen.sample.get
+    val miner      = getGenesisLockupScript(chainIndex.to)
+    val bestTip    = blockFlow.getBlockChain(chainIndex).getBestTipUnsafe()
+    blockFlow.getHeightUnsafe(bestTip) is 0
+
+    (0 until 4).foreach { index =>
+      val template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      template.height is index + 1
+      val block = mineBlockTemplate(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      blockFlow.getHeightUnsafe(block.hash) is template.height
+    }
   }
 }

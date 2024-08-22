@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.event
+package org.alephium.protocol.vm.nodeindexes
 
 import scala.collection.mutable
 
 import org.alephium.io.{CachedKVStorage, IOResult, KeyValueStorage}
+import org.alephium.protocol.vm.nodeindexes.PageCounter
 
-final class CachedLogPageCounter[K](
+final class CachedPageCounter[K](
     val counter: CachedKVStorage[K, Int],
     val initialCounts: mutable.Map[K, Int]
-) extends MutableLog.LogPageCounter[K] {
+) extends PageCounter[K] {
   def getInitialCount(key: K): IOResult[Int] = {
     initialCounts.get(key) match {
       case Some(value) =>
@@ -39,13 +40,13 @@ final class CachedLogPageCounter[K](
 
   def persist(): IOResult[Unit] = counter.persist().map(_ => ())
 
-  def staging(): StagingLogPageCounter[K] = {
-    new StagingLogPageCounter(this.counter.staging(), this)
+  def staging(): StagingPageCounter[K] = {
+    new StagingPageCounter(this.counter.staging(), this)
   }
 }
 
-object CachedLogPageCounter {
-  def from[K](storage: KeyValueStorage[K, Int]): CachedLogPageCounter[K] = {
-    new CachedLogPageCounter[K](CachedKVStorage.from(storage), mutable.HashMap.empty)
+object CachedPageCounter {
+  def from[K](storage: KeyValueStorage[K, Int]): CachedPageCounter[K] = {
+    new CachedPageCounter[K](CachedKVStorage.from(storage), mutable.HashMap.empty)
   }
 }

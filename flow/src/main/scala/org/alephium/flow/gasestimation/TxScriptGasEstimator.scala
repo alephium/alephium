@@ -37,9 +37,11 @@ object TxScriptGasEstimator {
   // scalastyle:off method.length
   final case class Default(
       flow: BlockFlow
-  )(implicit networkConfig: NetworkConfig, config: GroupConfig, logConfig: LogConfig)
-      extends TxScriptGasEstimator {
-
+  )(implicit
+      networkConfig: NetworkConfig,
+      config: GroupConfig,
+      logConfig: LogConfig
+  ) extends TxScriptGasEstimator {
     def estimate(
         inputWithAssets: AVector[TxInputWithAsset],
         script: StatefulScript

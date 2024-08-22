@@ -30,7 +30,7 @@ import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.{avectorReadWriter, inetAddressRW}
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
-import org.alephium.protocol.ALPH
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.util.{AVector, TimeStamp}
@@ -68,6 +68,13 @@ trait Endpoints
       .and(query[GroupIndex]("toGroup"))
       .map { case (from, to) => ChainIndex(from, to) }(chainIndex =>
         (chainIndex.from, chainIndex.to)
+      )
+
+  private val outputRefQuery: EndpointInput[OutputRef] =
+    query[Int]("hint")
+      .and(query[Hash]("key"))
+      .map { case (hint, key) => OutputRef(hint, key) }(outputRef =>
+        (outputRef.hint, outputRef.key)
       )
 
   private val infosEndpoint: BaseEndpoint[Unit, Unit] =
@@ -411,6 +418,13 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status, only from the local broker")
 
+  lazy val getTxIdFromOutputRef: BaseEndpoint[OutputRef, TransactionId] =
+    baseEndpoint.get
+      .in("tx-id-from-outputref")
+      .in(outputRefQuery)
+      .out(jsonBody[TransactionId])
+      .summary("Get transaction id from transaction output ref")
+
   val decodeUnsignedTransaction: BaseEndpoint[DecodeUnsignedTx, DecodeUnsignedTxResult] =
     transactionsEndpoint.post
       .in("decode-unsigned-tx")
@@ -427,6 +441,16 @@ trait Endpoints
       .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[Transaction])
       .summary("Get transaction details")
+
+  lazy val getRawTransaction
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), RawTransaction] =
+    transactionsEndpoint.get
+      .in("raw")
+      .in(path[TransactionId]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[RawTransaction])
+      .summary("Get raw transaction in hex format")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post
@@ -528,6 +552,29 @@ trait Endpoints
       .out(jsonBody[MultipleCallContractResult])
       .summary("Multiple call contract")
 
+  lazy val parentContract: BaseEndpoint[Address.Contract, ContractParent] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("parent")
+      .out(jsonBody[ContractParent])
+      .summary("Get parent contract address")
+
+  lazy val subContracts: BaseEndpoint[(Address.Contract, CounterRange), SubContracts] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("sub-contracts")
+      .in(counterQuery)
+      .out(jsonBody[SubContracts])
+      .summary("Get sub-contract addresses")
+
+  val subContractsCurrentCount: BaseEndpoint[Address.Contract, Int] =
+    contractsEndpoint.get
+      .in(path[Address.Contract]("address"))
+      .in("sub-contracts")
+      .in("current-count")
+      .out(jsonBody[Int])
+      .summary("Get current value of the sub-contracts counter for a contract")
+
   lazy val callTxScript: BaseEndpoint[CallTxScript, CallTxScriptResult] =
     contractsEndpoint.post
       .in("call-tx-script")
@@ -553,6 +600,13 @@ trait Endpoints
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockHeaderEntry])
       .summary("Get block header")
+
+  val getRawBlock: BaseEndpoint[BlockHash, RawBlock] =
+    blockflowEndpoint.get
+      .in("raw-blocks")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[RawBlock])
+      .summary("Get raw block in hex format")
 
   val verifySignature: BaseEndpoint[VerifySignature, Boolean] =
     utilsEndpoint.post

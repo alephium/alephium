@@ -230,7 +230,8 @@ class ContextSpec
         StatefulContract.forSMT,
         AVector.empty,
         outputRef,
-        output
+        output,
+        context.txId
       )
       context
     }

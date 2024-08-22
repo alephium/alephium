@@ -136,6 +136,29 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /blockflow/raw-blocks/<hash>" in {
+    servers.foreach { server =>
+      val blockHash = dummyBlockHeader.hash
+      Get(s"/blockflow/raw-blocks/${blockHash.toHexString}", server.port) check { response =>
+        {
+          val chainIndex = ChainIndex.from(blockHash)
+          if (
+            server.brokerConfig
+              .contains(chainIndex.from) || server.brokerConfig.contains(chainIndex.to)
+          ) {
+            response.code is StatusCode.Ok
+            response.as[RawBlock] is RawBlock(serialize(dummyBlock))
+          } else {
+            response.code is StatusCode.BadRequest
+            response.as[ApiError.BadRequest] is ApiError.BadRequest(
+              s"${blockHash.toHexString} belongs to other groups"
+            )
+          }
+        }
+      }
+    }
+  }
+
   it should "call GET /addresses/<address>/balance" in {
     val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
     if (utxosLimit > 0) {
@@ -487,6 +510,49 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /transactions/raw" in {
+    def verifyResponse(response: Response[Either[String, String]]) = {
+      val tx = response.as[RawTransaction]
+      response.code is StatusCode.Ok
+      tx is RawTransaction(serialize(dummyTx))
+    }
+
+    servers.foreach { server =>
+      val chainIndex = server.brokerConfig.chainIndexes.head
+      verifyResponseWithNodes(
+        s"/transactions/raw/${dummyTx.id.toHexString}",
+        s"/transactions/raw/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        chainIndex,
+        server.port
+      )(verifyResponse)
+
+      verifyResponseWithNodes(
+        s"/transactions/raw/${dummyTx.id.toHexString}?toGroup=${chainIndex.to.value}",
+        s"/transactions/raw/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyResponse)
+
+      verifyResponseWithNodes(
+        s"/transactions/raw/${dummyTx.id.toHexString}",
+        s"/transactions/raw/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyResponse)
+
+      val txId = TransactionId.generate.toHexString
+      verifyResponseWithNodes(
+        s"/transactions/raw/$txId",
+        s"/transactions/raw/$txId?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue is s"""{"resource":"Transaction $txId","detail":"Transaction $txId not found"}"""
+      }
+    }
+  }
+
   it should "call POST /multisig/address" in {
     lazy val (_, dummyKey2, _) = addressStringGen(
       GroupIndex.unsafe(1)
@@ -824,6 +890,78 @@ abstract class RestServerSpec(
     Get(s"/contracts/${dummyContractAddress.toBase58}/state") check { response =>
       response.code is StatusCode.Ok
       response.as[ContractState].address is dummyContractAddress
+    }
+  }
+
+  it should "call GET /contracts/<address>/parent with parent" in {
+    val contractId      = ContractId.from(TransactionId.random, 0, GroupIndex.unsafe(0))
+    val contractAddress = Address.contract(contractId)
+    Get(s"/contracts/${contractAddress.toBase58}/parent") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractParent] is ContractParent(Some(ServerFixture.dummyParentContractAddress))
+    }
+  }
+
+  it should "call GET /contracts/<address>/sub-contracts" in {
+    val contractWithoutParent = Address.contract(ContractId.zero)
+    val contractWithParent    = dummyContractAddress
+    Get(s"/contracts/${contractWithParent.toBase58}/sub-contracts?start=0&limit=2") check {
+      response =>
+        response.code is StatusCode.Ok
+        response.as[SubContracts] is SubContracts(
+          AVector(
+            ServerFixture.dummySubContractAddress1,
+            ServerFixture.dummySubContractAddress2
+          ),
+          2
+        )
+    }
+
+    Get(s"/contracts/${contractWithoutParent.toBase58}/parent") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractParent] is ContractParent(None)
+    }
+  }
+
+  it should "call GET /contracts/<address>/sub-contracts/current-count" in {
+    val contractWithCount =
+      Address.contract(ContractId.from(TransactionId.random, 0, GroupIndex.unsafe(0)))
+    val contractWithoutCount = dummyContractAddress
+    Get(s"/contracts/${contractWithCount.toBase58}/sub-contracts/current-count") check { response =>
+      response.code is StatusCode.Ok
+      response.as[Int] is 10
+    }
+
+    Get(s"/contracts/${contractWithoutCount.toBase58}/sub-contracts/current-count") check {
+      _.code is StatusCode.NotFound
+    }
+  }
+
+  it should "call GET /tx-id-from-outputref" in {
+    val assetOutputRefWithTxId    = ServerFixture.dummyAssetOutputRef
+    val assetOutputRefWithoutTxId = assetOutputRefGen(GroupIndex.unsafe(0)).sample.value
+    val contractOutputRef         = contractOutputRefGen(GroupIndex.unsafe(0)).sample.value
+    def toQuery(outputRef: TxOutputRef) = {
+      s"?hint=${outputRef.hint.value}&key=${outputRef.key.value.toHexString}"
+    }
+
+    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithTxId)}") check { response =>
+      response.code is StatusCode.Ok
+      response.as[TransactionId] is ServerFixture.dummyTransactionId
+    }
+
+    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithoutTxId)}") check { response =>
+      response.code is StatusCode.NotFound
+      response
+        .as[ApiError.NotFound]
+        .resource is s"Transaction id for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
+    }
+
+    Get(s"/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
+      response.code is StatusCode.NotFound
+      response
+        .as[ApiError.NotFound]
+        .resource is s"Transaction id for output ref ${contractOutputRef.key.value.toHexString}"
     }
   }
 
@@ -1340,7 +1478,9 @@ trait RestServerFixture
     Map[String, Any](
       ("alephium.broker.broker-num", nbOfNodes),
       ("alephium.api.api-key-enabled", apiKeyEnabled),
-      ("alephium.api.default-utxos-limit", utxosLimit)
+      ("alephium.api.default-utxos-limit", utxosLimit),
+      ("alephium.node.indexes.tx-output-ref-index", true),
+      ("alephium.node.indexes.subcontract-index", true)
     ) ++ apiKey
       .map(key => Map(("alephium.api.api-key", key.value)))
       .getOrElse(Map.empty)

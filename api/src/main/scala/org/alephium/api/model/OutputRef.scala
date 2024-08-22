@@ -26,6 +26,14 @@ final case class OutputRef(hint: Int, key: Hash) {
   def unsafeToContractOutputRef(): ContractOutputRef = {
     ContractOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
   }
+
+  def toTxOutputRef(): TxOutputRef = {
+    if (Hint.unsafe(hint).isAssetType) {
+      unsafeToAssetOutputRef()
+    } else {
+      unsafeToContractOutputRef()
+    }
+  }
 }
 
 object OutputRef {

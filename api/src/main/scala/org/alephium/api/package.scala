@@ -33,6 +33,8 @@ package object api {
 
   def notFound(error: String): ApiError[_ <: StatusCode]   = ApiError.NotFound(error)
   def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
+  def preconditionFailed(error: String): ApiError[_ <: StatusCode] =
+    ApiError.PreconditionFailed(error)
   def failed(error: String): ApiError[_ <: StatusCode] =
     ApiError.InternalServerError(error)
   def failedInIO(error: IOError): ApiError[_ <: StatusCode] =
