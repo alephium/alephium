@@ -6587,7 +6587,7 @@ class VMSpec extends AlephiumSpec with Generators {
     val subContractId = createSingleSubContract(1)
 
     def verifyError[T](result: IOResult[T]) = {
-      result.leftValue.reason.getMessage is "Please set node.indexes.subcontract-index = true to query parent contract or subcontracts"
+      result.leftValue.reason.getMessage is "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
     }
 
     verifyError(blockFlow.getParentContractId(subContractId))

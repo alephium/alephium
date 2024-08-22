@@ -3812,7 +3812,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .leftValue
       .detail
       .contains(
-        "Please set node.indexes.tx-output-ref-index = true to query transaction id from transaction output reference"
+        "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
       ) is true
   }
 
@@ -3874,9 +3874,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(subContractAddr),
       1
     )
-    serverUtils.getSubContracts(blockFlow, 1, 2, parentContractAddr).leftValue.detail.contains(
-      s"Can not find sub-contracts for ${parentContractId.toHexString} at count 1"
-    ) is true
+    serverUtils
+      .getSubContracts(blockFlow, 1, 2, parentContractAddr)
+      .leftValue
+      .detail
+      .contains(
+        s"Can not find sub-contracts for ${parentContractId.toHexString} at count 1"
+      ) is true
   }
 
   it should "return error when node.indexes.subcontract-index is not enabled" in new SubContractIndexesFixture {
@@ -3884,7 +3888,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def verifyError[T](result: Try[T]) = {
       result.leftValue.detail.contains(
-        "Please set node.indexes.subcontract-index = true to query parent contract or subcontracts"
+        "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
       ) is true
     }
 

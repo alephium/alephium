@@ -86,7 +86,7 @@ trait BlockFlowState extends FlowTipsUtil {
       case None =>
         Left(
           IOError.configError(
-            "Please set node.indexes.tx-output-ref-index = true to query transaction id from transaction output reference"
+            "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
           )
         )
     }
@@ -100,7 +100,7 @@ trait BlockFlowState extends FlowTipsUtil {
       case None =>
         Left(
           IOError.configError(
-            "Please set node.indexes.subcontract-index = true to query parent contract or subcontracts"
+            "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
           )
         )
     }

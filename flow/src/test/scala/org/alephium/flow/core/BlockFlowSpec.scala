@@ -1007,7 +1007,7 @@ class BlockFlowSpec extends AlephiumSpec {
           .getTxIdFromOutputRef(txOutputRef)
           .leftValue
           .reason
-          .getMessage is "Please set node.indexes.tx-output-ref-index = true to query transaction id from transaction output reference"
+          .getMessage is "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
       }
     }
 
