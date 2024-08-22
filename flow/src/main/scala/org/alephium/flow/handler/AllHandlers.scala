@@ -140,7 +140,6 @@ object AllHandlers {
       headerHandlers
     )
   }
-  // scalastyle:on parameter.number
 
   private def buildBlockHandlers(
       system: ActorSystem,
@@ -168,6 +167,7 @@ object AllHandlers {
     }
     handlers.toMap
   }
+  // scalastyle:on parameter.number
 
   private def buildHeaderHandlers(
       system: ActorSystem,

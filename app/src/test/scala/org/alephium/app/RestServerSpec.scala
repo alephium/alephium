@@ -893,6 +893,78 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call GET /contracts/<address>/parent with parent" in {
+    val contractId      = ContractId.from(TransactionId.random, 0, GroupIndex.unsafe(0))
+    val contractAddress = Address.contract(contractId)
+    Get(s"/contracts/${contractAddress.toBase58}/parent") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractParent] is ContractParent(Some(ServerFixture.dummyParentContractAddress))
+    }
+  }
+
+  it should "call GET /contracts/<address>/sub-contracts" in {
+    val contractWithoutParent = Address.contract(ContractId.zero)
+    val contractWithParent    = dummyContractAddress
+    Get(s"/contracts/${contractWithParent.toBase58}/sub-contracts?start=0&limit=2") check {
+      response =>
+        response.code is StatusCode.Ok
+        response.as[SubContracts] is SubContracts(
+          AVector(
+            ServerFixture.dummySubContractAddress1,
+            ServerFixture.dummySubContractAddress2
+          ),
+          2
+        )
+    }
+
+    Get(s"/contracts/${contractWithoutParent.toBase58}/parent") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractParent] is ContractParent(None)
+    }
+  }
+
+  it should "call GET /contracts/<address>/sub-contracts/current-count" in {
+    val contractWithCount =
+      Address.contract(ContractId.from(TransactionId.random, 0, GroupIndex.unsafe(0)))
+    val contractWithoutCount = dummyContractAddress
+    Get(s"/contracts/${contractWithCount.toBase58}/sub-contracts/current-count") check { response =>
+      response.code is StatusCode.Ok
+      response.as[Int] is 10
+    }
+
+    Get(s"/contracts/${contractWithoutCount.toBase58}/sub-contracts/current-count") check {
+      _.code is StatusCode.NotFound
+    }
+  }
+
+  it should "call GET /tx-id-from-outputref" in {
+    val assetOutputRefWithTxId    = ServerFixture.dummyAssetOutputRef
+    val assetOutputRefWithoutTxId = assetOutputRefGen(GroupIndex.unsafe(0)).sample.value
+    val contractOutputRef         = contractOutputRefGen(GroupIndex.unsafe(0)).sample.value
+    def toQuery(outputRef: TxOutputRef) = {
+      s"?hint=${outputRef.hint.value}&key=${outputRef.key.value.toHexString}"
+    }
+
+    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithTxId)}") check { response =>
+      response.code is StatusCode.Ok
+      response.as[TransactionId] is ServerFixture.dummyTransactionId
+    }
+
+    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithoutTxId)}") check { response =>
+      response.code is StatusCode.NotFound
+      response
+        .as[ApiError.NotFound]
+        .resource is s"Transaction id for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
+    }
+
+    Get(s"/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
+      response.code is StatusCode.NotFound
+      response
+        .as[ApiError.NotFound]
+        .resource is s"Transaction id for output ref ${contractOutputRef.key.value.toHexString}"
+    }
+  }
+
   it should "call GET /docs" in {
     Get(s"/docs") check { response =>
       response.code is StatusCode.Ok
@@ -1406,7 +1478,9 @@ trait RestServerFixture
     Map[String, Any](
       ("alephium.broker.broker-num", nbOfNodes),
       ("alephium.api.api-key-enabled", apiKeyEnabled),
-      ("alephium.api.default-utxos-limit", utxosLimit)
+      ("alephium.api.default-utxos-limit", utxosLimit),
+      ("alephium.node.indexes.tx-output-ref-index", true),
+      ("alephium.node.indexes.subcontract-index", true)
     ) ++ apiKey
       .map(key => Map(("alephium.api.api-key", key.value)))
       .getOrElse(Map.empty)

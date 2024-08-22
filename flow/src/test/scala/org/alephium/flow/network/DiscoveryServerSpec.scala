@@ -31,13 +31,20 @@ import org.alephium.flow.setting.{NodeSetting, Platform}
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.NodeIndexesConfig
 import org.alephium.util._
 
 class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
   import DiscoveryServerSpec._
 
   implicit val nodeSetting: NodeSetting =
-    NodeSetting(true, 1000, 1000, vm.LogConfig(false, false, false, None))
+    NodeSetting(
+      true,
+      1000,
+      1000,
+      vm.LogConfig(false, false, false, None),
+      NodeIndexesConfig(false, false)
+    )
 
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {
     ActorRefT.build(

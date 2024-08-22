@@ -14,19 +14,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.event
+package org.alephium.protocol.vm.subcontractindex
 
-import org.alephium.io.{IOResult, StagingKVStorage}
+import org.alephium.protocol.model.ContractId
+import org.alephium.serde.Serde
+import org.alephium.util.AVector
 
-final class StagingLogPageCounter[K](
-    val counter: StagingKVStorage[K, Int],
-    val initialCounts: MutableLog.LogPageCounter[K]
-) extends MutableLog.LogPageCounter[K] {
-  def getInitialCount(key: K): IOResult[Int] = {
-    initialCounts.getInitialCount(key)
-  }
+final case class SubContractIndexStateId(contractId: ContractId, counter: Int)
 
-  def rollback(): Unit = counter.rollback()
+object SubContractIndexStateId {
+  implicit val serde: Serde[SubContractIndexStateId] =
+    Serde.forProduct2(SubContractIndexStateId.apply, id => (id.contractId, id.counter))
+}
 
-  def commit(): Unit = counter.commit()
+final case class SubContractIndexState(
+    subContracts: AVector[ContractId]
+)
+
+object SubContractIndexState {
+  implicit val serde: Serde[SubContractIndexState] =
+    Serde.forProduct1(SubContractIndexState.apply, _.subContracts)
 }

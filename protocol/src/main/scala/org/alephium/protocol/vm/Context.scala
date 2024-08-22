@@ -169,6 +169,11 @@ object LogConfig {
   }
 }
 
+final case class NodeIndexesConfig(
+    txOutputRefIndex: Boolean,
+    subcontractIndex: Boolean
+)
+
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def groupConfig: GroupConfig
@@ -433,7 +438,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         initialMutFields,
         outputRef,
         contractOutput,
-        getHardFork().isLemanEnabled()
+        getHardFork().isLemanEnabled(),
+        txId
       )
 
     result match {
@@ -484,7 +490,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
     for {
       _ <- markAssetFlushed(contractId)
       _ <- worldState
-        .updateContract(contractId, outputRef, output)
+        .updateContract(
+          contractId,
+          outputRef,
+          output,
+          txId
+        )
         .left
         .map(e => Left(IOErrorUpdateState(e)))
     } yield ()
@@ -511,6 +522,22 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
     result.left.map(e => Left(IOErrorWriteLog(e)))
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def writeSubContractIndexes(
+      parentContract: Option[ContractId],
+      contractId: ContractId
+  ): ExeResult[Unit] = {
+    val subContractIndexState = worldState.nodeIndexesState.subContractIndexState
+    if (parentContract.nonEmpty && subContractIndexState.nonEmpty) {
+      subContractIndexState.get
+        .createSubContractIndexes(parentContract.get, contractId)
+        .left
+        .map(e => Left(IOErrorCreateSubContractIndex(e)))
+    } else {
+      Right(())
+    }
+  }
 }
 
 object StatefulContext {
@@ -527,6 +554,7 @@ object StatefulContext {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
+  // scalastyle:off parameter.number
   def apply(
       blockEnv: BlockEnv,
       tx: TransactionAbstract,
@@ -541,6 +569,7 @@ object StatefulContext {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
+  // scalastyle:on parameter.number
 
   final class Impl(
       val blockEnv: BlockEnv,

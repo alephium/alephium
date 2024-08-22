@@ -18,11 +18,12 @@ package org.alephium.protocol.vm.event
 
 import org.alephium.io.Inserted
 import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.nodeindexes.{CachedPageCounter, StagingPageCounter}
 import org.alephium.util.AlephiumSpec
 
 class LogPageCounterSpec extends AlephiumSpec with Fixture {
   it should "cache initial counters" in {
-    val cachedCounter: CachedLogPageCounter[ContractId] =
+    val cachedCounter: CachedPageCounter[ContractId] =
       newCachedLog(newDBStorage()).eventLogPageCounter
     val key0 = ContractId.random
     val key1 = ContractId.random
@@ -37,9 +38,9 @@ class LogPageCounterSpec extends AlephiumSpec with Fixture {
   }
 
   it should "reuse initial counters for StagingLogPageCounter" in {
-    val cachedCounter: CachedLogPageCounter[ContractId] =
+    val cachedCounter: CachedPageCounter[ContractId] =
       newCachedLog(newDBStorage()).eventLogPageCounter
-    val stagingCounter: StagingLogPageCounter[ContractId] = cachedCounter.staging()
+    val stagingCounter: StagingPageCounter[ContractId] = cachedCounter.staging()
 
     val key0 = ContractId.random
     val key1 = ContractId.random

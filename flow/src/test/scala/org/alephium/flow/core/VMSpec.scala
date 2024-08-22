@@ -19,6 +19,8 @@ package org.alephium.flow.core
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -28,6 +30,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
+import org.alephium.io.IOResult
 import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -205,7 +208,7 @@ class VMSpec extends AlephiumSpec with Generators {
           networkConfig.getHardFork(TimeStamp.now())
         )
     ): (ContractId, ContractOutputRef) = {
-      val (contractId, contractOutputRef) =
+      val (contractId, contractOutputRef, _) =
         createContract(
           input,
           initialImmState,
@@ -623,7 +626,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
+    val (barContractId, _, _) =
+      createContract(bar, initialAttoAlphAmount = minimalAlphInContract * 2)
     getContractAsset(barContractId).amount is minimalAlphInContract * 2
 
     val foo =
@@ -636,7 +640,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$bar
          |""".stripMargin
-    val (fooContractId, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
+    val (fooContractId, _, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
     getContractAsset(fooContractId).amount is minimalAlphInContract
 
     val script =
@@ -2839,7 +2843,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def success(contract: String) = {
-      val (contractId, contractOutputRef) =
+      val (contractId, contractOutputRef, _) =
         createContract(contract, AVector.empty, AVector(Val.U256(0)))
       val contractIdHex = contractId.toHexString
       checkContractState(contractIdHex, contract, contractOutputRef, true)
@@ -4578,7 +4582,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val (fooId, fooOutputRef) = createContract(foo)
+    val (fooId, fooOutputRef, _) = createContract(foo)
 
     val script =
       s"""
@@ -4642,7 +4646,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val tokenIssuanceInfo = TokenIssuance.Info(Val.U256(U256.unsafe(1024)), Some(genesisLockup))
-    val (fooId, _)        = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
+    val (fooId, _, _)     = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
     val fooAddress        = Address.contract(fooId)
 
     def barCode(assertStmt: String): String = {
@@ -4671,8 +4675,8 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def verifyTransferToken(func: String, assertValue: String) = {
-      val bar        = barCode(s"$func!(foo) == $assertValue")
-      val (barId, _) = createContract(bar)
+      val bar           = barCode(s"$func!(foo) == $assertValue")
+      val (barId, _, _) = createContract(bar)
       val script =
         s"""
            |TxScript Main {
@@ -4898,7 +4902,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$fooV0
          |""".stripMargin
-    val (foo0ContractId, _) = createContract(foo0)
+    val (foo0ContractId, _, _) = createContract(foo0)
 
     val foo =
       s"""
@@ -4922,7 +4926,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$fooV1
          |""".stripMargin
-    val (foo1ContractId, _) = createContract(foo1)
+    val (foo1ContractId, _, _) = createContract(foo1)
     val script =
       s"""
          |TxScript Main {
@@ -6508,6 +6512,125 @@ class VMSpec extends AlephiumSpec with Generators {
     getAlphBalance(blockFlow, receiver) is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
   }
 
+  trait SubContractIndexesFixture extends ContractFixture {
+    def subcontractIndexEnabled: Boolean
+    override val configValues = Map(
+      "alephium.node.indexes.subcontract-index"   -> s"$subcontractIndexEnabled",
+      "alephium.node.indexes.tx-output-ref-index" -> "false"
+    )
+
+    val subContractRaw: String =
+      s"""
+         |Contract SubContract() {
+         |  pub fn call() -> () {}
+         |}
+         |""".stripMargin
+
+    val subContractTemplateId = createContract(subContractRaw)._1.toHexString
+
+    val parentContractRaw: String =
+      s"""
+         |Contract ParentContract() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn createSingleSubContract(index: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index), #$subContractTemplateId, #00, #00)
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  pub fn createMultipleSubContracts(index1: U256, index2: U256, index3: U256) -> () {
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index1), #$subContractTemplateId, #00, #00)
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index2), #$subContractTemplateId, #00, #00)
+         |    copyCreateSubContract!{callerAddress!() -> ALPH: 1 alph}(toByteVec!(index3), #$subContractTemplateId, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val parentContractId = createContract(parentContractRaw)._1
+
+    def getSubContractId(index: Int): ContractId = {
+      parentContractId.subContractId(ByteString.fromInts(index), chainIndex.from)
+    }
+
+    def createSingleSubContract(index: Int): ContractId = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  ParentContract(#${parentContractId.toHexString}).createSingleSubContract{@$genesisAddress -> ALPH: 1 alph}($index)
+           |}
+           |$parentContractRaw
+           |""".stripMargin
+      )
+
+      getSubContractId(index)
+    }
+
+    def createMultipleSubContracts(
+        index1: Int,
+        index2: Int,
+        index3: Int
+    ): ArrayBuffer[ContractId] = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  ParentContract(#${parentContractId.toHexString}).createMultipleSubContracts{@$genesisAddress -> ALPH: 3 alph}($index1, $index2, $index3)
+           |}
+           |$parentContractRaw
+           |""".stripMargin
+      )
+
+      ArrayBuffer(getSubContractId(index1), getSubContractId(index2), getSubContractId(index3))
+    }
+  }
+
+  it should "not create subcontract indexes when it is disabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = false
+
+    val subContractId = createSingleSubContract(1)
+
+    def verifyError[T](result: IOResult[T]) = {
+      result.leftValue.reason.getMessage is "Please set `alephium.node.indexes.subcontract-index = true` to query parent contract or subcontracts"
+    }
+
+    verifyError(blockFlow.getParentContractId(subContractId))
+    verifyError(blockFlow.getSubContractsCurrentCount(parentContractId))
+    verifyError(blockFlow.getSubContractIds(parentContractId, 0, 1))
+  }
+
+  it should "create subcontract indexes when it is enabled" in new SubContractIndexesFixture {
+    override def subcontractIndexEnabled: Boolean = true
+
+    val subContracts = ArrayBuffer.empty[ContractId]
+
+    val subContractId1 = createSingleSubContract(1)
+    subContracts += subContractId1
+    blockFlow.getParentContractId(subContractId1) isE Some(parentContractId)
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(1)
+    blockFlow.getSubContractIds(parentContractId, 0, 1) isE (1, AVector.from(subContracts))
+
+    val subContracts234 = createMultipleSubContracts(2, 3, 4)
+    subContracts ++= subContracts234
+    subContracts234.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(2)
+    blockFlow.getSubContractIds(parentContractId, 0, 2) isE (2, AVector.from(subContracts))
+
+    val subContractId5 = createSingleSubContract(5)
+    subContracts += subContractId5
+    blockFlow.getParentContractId(subContractId5) isE Some(parentContractId)
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(3)
+    blockFlow.getSubContractIds(parentContractId, 0, 3) isE (3, AVector.from(subContracts))
+
+    val subContracts678 = createMultipleSubContracts(6, 7, 8)
+    subContracts ++= subContracts678
+    subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
+    blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
+    blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
+
+    blockFlow
+      .getSubContractIds(parentContractId, 0, 5)
+      .leftValue
+      .reason
+      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
+  }
+
   // Inactive instrs check will be enabled in future upgrades
   ignore should "check inactive instrs when creating contract" in new ContractFixture {
     override val configValues =
@@ -6610,7 +6733,7 @@ class VMSpec extends AlephiumSpec with Generators {
   ): Option[Int] = {
     (for {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      countOpt   <- worldState.logStorage.logCounterState.getOpt(contractId)
+      countOpt   <- worldState.nodeIndexesStorage.logStorage.logCounterState.getOpt(contractId)
     } yield countOpt).rightValue
   }
 }

@@ -24,18 +24,24 @@ import org.alephium.io.RocksDBSource.{ColumnFamily, ProdSettings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{ContractStorageImmutableState, WorldState}
-import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
   val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState]
-  val logStorage: LogStorage
+  val nodeIndexesStorage: NodeIndexesStorage
 
   override def storageKey(key: BlockHash): ByteString =
     key.bytes ++ ByteString(Storages.trieHashPostfix)
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
-    get(hash).map(_.toPersistedWorldState(trieStorage, trieImmutableStateStorage, logStorage))
+    get(hash).map(
+      _.toPersistedWorldState(
+        trieStorage,
+        trieImmutableStateStorage,
+        nodeIndexesStorage
+      )
+    )
   }
 
   def getWorldStateHash(hash: BlockHash): IOResult[Hash] = {
@@ -43,7 +49,13 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   }
 
   def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
-    get(hash).map(_.toCachedWorldState(trieStorage, trieImmutableStateStorage, logStorage))
+    get(hash).map(
+      _.toCachedWorldState(
+        trieStorage,
+        trieImmutableStateStorage,
+        nodeIndexesStorage
+      )
+    )
   }
 
   def putTrie(hash: BlockHash, worldState: WorldState.Persisted): IOResult[Unit] = {
@@ -55,7 +67,7 @@ object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
       trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
-      logStorage: LogStorage,
+      nodeIndexesStorage: NodeIndexesStorage,
       storage: RocksDBSource,
       cf: ColumnFamily,
       writeOptions: WriteOptions
@@ -63,7 +75,7 @@ object WorldStateRockDBStorage {
     new WorldStateRockDBStorage(
       trieStorage,
       trieImmutableStateStorage,
-      logStorage,
+      nodeIndexesStorage,
       storage,
       cf,
       writeOptions,
@@ -75,7 +87,7 @@ object WorldStateRockDBStorage {
 class WorldStateRockDBStorage(
     val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
     val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
-    val logStorage: LogStorage,
+    val nodeIndexesStorage: NodeIndexesStorage,
     storage: RocksDBSource,
     cf: ColumnFamily,
     writeOptions: WriteOptions,

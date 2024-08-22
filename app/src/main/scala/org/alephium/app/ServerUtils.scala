@@ -1297,6 +1297,60 @@ class ServerUtils(implicit
     } yield state
   }
 
+  def getParentContract(
+      blockFlow: BlockFlow,
+      contractAddress: Address.Contract
+  ): Try[ContractParent] = {
+    for {
+      result <- wrapResult(
+        blockFlow.getParentContractId(contractAddress.contractId).map { contractIdOpt =>
+          ContractParent(contractIdOpt.map(Address.contract))
+        }
+      )
+    } yield result
+  }
+
+  def getSubContracts(
+      blockFlow: BlockFlow,
+      start: Int,
+      limit: Int,
+      contractAddress: Address.Contract
+  ): Try[SubContracts] = {
+    for {
+      result <- wrapResult(
+        blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
+          case (nextStart, contractIds) =>
+            SubContracts(contractIds.map(Address.contract), nextStart)
+        }
+      )
+    } yield result
+  }
+
+  def getSubContractsCurrentCount(
+      blockFlow: BlockFlow,
+      contractAddress: Address.Contract
+  ): Try[Int] = {
+    val contractId = contractAddress.contractId
+    for {
+      countOpt <- wrapResult(blockFlow.getSubContractsCurrentCount(contractId))
+      count <- countOpt.toRight(
+        notFound(s"Current sub-contracts count for contract $contractAddress")
+      )
+    } yield count
+  }
+
+  def getTxIdFromOutputRef(
+      blockFlow: BlockFlow,
+      outputRef: TxOutputRef
+  ): Try[TransactionId] = {
+    for {
+      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      txId <- txIdOpt.toRight(
+        notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
+      )
+    } yield txId
+  }
+
   private def call[P <: CallBase](
       blockFlow: BlockFlow,
       params: P,
@@ -1474,9 +1528,9 @@ class ServerUtils(implicit
     for {
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _          <- testContract.existingContracts.foreachE(createContract(worldState, _))
-      _          <- createContract(worldState, contractId, testContract)
-      method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, testContract.txId))
+      _ <- createContract(worldState, contractId, testContract)
+      method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       executionResultPair <- executeContractMethod(
         worldState,
         groupIndex,
@@ -1587,7 +1641,7 @@ class ServerUtils(implicit
   }
 
   private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEventByTxId] = {
-    val allLogStates = worldState.logState.getNewLogs()
+    val allLogStates = worldState.nodeIndexesState.logState.getNewLogs()
     allLogStates.flatMap(logStates =>
       logStates.states.flatMap(state =>
         AVector(
@@ -1782,7 +1836,8 @@ class ServerUtils(implicit
 
   def createContract(
       worldState: WorldState.Staging,
-      existingContract: ContractState
+      existingContract: ContractState,
+      txId: TransactionId
   ): Try[Unit] = {
     createContract(
       worldState,
@@ -1790,7 +1845,8 @@ class ServerUtils(implicit
       existingContract.bytecode,
       toVmVal(existingContract.immFields),
       toVmVal(existingContract.mutFields),
-      existingContract.asset
+      existingContract.asset,
+      txId
     )
   }
 
@@ -1805,7 +1861,8 @@ class ServerUtils(implicit
       testContract.code,
       toVmVal(testContract.initialImmFields),
       toVmVal(testContract.initialMutFields),
-      testContract.initialAsset
+      testContract.initialAsset,
+      testContract.txId
     )
   }
 
@@ -1815,10 +1872,12 @@ class ServerUtils(implicit
       code: StatefulContract,
       initialImmState: AVector[vm.Val],
       initialMutState: AVector[vm.Val],
-      asset: AssetState
+      asset: AssetState,
+      txId: TransactionId
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
+
     wrapResult(
       worldState.createContractLemanUnsafe(
         contractId,
@@ -1826,7 +1885,8 @@ class ServerUtils(implicit
         initialImmState,
         initialMutState,
         outputRef,
-        output
+        output,
+        txId
       )
     )
   }

@@ -41,7 +41,7 @@ import org.alephium.protocol.model.{
   HardFork,
   NetworkId
 }
-import org.alephium.protocol.vm.LogConfig
+import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
 class AlephiumConfigSpec extends AlephiumSpec {
@@ -301,6 +301,57 @@ class AlephiumConfigSpec extends AlephiumSpec {
         .parseString(configs)
         .as[LogConfig]("event-log")(ValueReader[LogConfig]) is logConfig
     }
+  }
+
+  it should "load NodeIndexesConfig" in {
+    val configs =
+      s"""
+         |{
+         |  indexes {
+         |    tx-output-ref-index = true
+         |    subcontract-index = true
+         |  }
+         |}
+         |""".stripMargin
+
+    ConfigFactory
+      .parseString(configs)
+      .as[NodeIndexesConfig]("indexes")(ValueReader[NodeIndexesConfig]) is NodeIndexesConfig(
+      txOutputRefIndex = true,
+      subcontractIndex = true
+    )
+  }
+
+  it should "load NodeSetting" in {
+    val configs =
+      s"""
+         |{
+         |  node {
+         |    db-sync-write = false
+         |    asset-trie-cache-max-byte-size = 200000000
+         |    contract-trie-cache-max-byte-size = 20000000
+         |    event-log {
+         |      enabled = true
+         |      index-by-tx-id = true
+         |      index-by-block-hash = true
+         |    }
+         |    indexes {
+         |      tx-output-ref-index = true
+         |      subcontract-index = false
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    ConfigFactory
+      .parseString(configs)
+      .as[NodeSetting]("node")(ValueReader[NodeSetting]) is NodeSetting(
+      dbSyncWrite = false,
+      assetTrieCacheMaxByteSize = 200000000,
+      contractTrieCacheMaxByteSize = 20000000,
+      LogConfig.allEnabled(),
+      NodeIndexesConfig(txOutputRefIndex = true, subcontractIndex = false)
+    )
   }
 
   it should "adjust diff for height gaps across chains" in new AlephiumConfigFixture {

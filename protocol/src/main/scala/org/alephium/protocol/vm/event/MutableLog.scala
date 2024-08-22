@@ -20,12 +20,13 @@ import org.alephium.crypto.Byte32
 import org.alephium.io.{IOResult, MutableKV}
 import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId, Val}
+import org.alephium.protocol.vm.nodeindexes.PageCounter
 import org.alephium.util.AVector
 
 trait MutableLog {
   def eventLog: MutableKV[LogStatesId, LogStates, Unit]
   def eventLogByHash: MutableKV[Byte32, AVector[LogStateRef], Unit]
-  def eventLogPageCounter: MutableLog.LogPageCounter[ContractId]
+  def eventLogPageCounter: PageCounter[ContractId]
 
   def putLog(
       blockHash: BlockHash,
@@ -105,11 +106,6 @@ trait MutableLog {
 }
 
 object MutableLog {
-  trait LogPageCounter[K] {
-    def counter: MutableKV[K, Int, Unit]
-    def getInitialCount(key: K): IOResult[Int]
-  }
-
   @inline private[event] def getEventIndex(fields: AVector[Val]): Option[Byte] = {
     fields.headOption.flatMap {
       case Val.I256(i) => i.toByte

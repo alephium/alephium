@@ -36,6 +36,7 @@ import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{ActorRefT, EventBus, EventStream, Hex}
 
 object BlockChainHandler {
+  // scalastyle:off parameter.number
   def props(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -48,6 +49,7 @@ object BlockChainHandler {
       logConfig: LogConfig
   ): Props =
     Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
+  // scalastyle:on parameter.number
 
   sealed trait Command
   final case class Validate(

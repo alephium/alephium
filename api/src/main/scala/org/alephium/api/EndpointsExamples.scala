@@ -906,5 +906,16 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val eventsVectorExamples: List[Example[AVector[ContractEvents]]] =
     simpleExample(AVector(ContractEvents(events = AVector(event), 3)))
+
+  implicit val contractParentExamples: List[Example[ContractParent]] =
+    simpleExample(ContractParent(Option(contractAddress)))
+
+  implicit val subContractsExamples: List[Example[SubContracts]] =
+    simpleExample(SubContracts(subContracts = AVector(contractAddress), nextStart = 10))
+
+  implicit val outputRefExamples: List[Example[OutputRef]] = simpleExample(outputRef)
+
+  implicit val transactionIdExamples: List[Example[TransactionId]] =
+    simpleExample(transaction.unsigned.txId)
 }
 // scalastyle:on magic.number

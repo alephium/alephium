@@ -706,6 +706,56 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.multipleCallContract(blockFlow, params))
   }
 
+  val parentContractLogic = serverLogic(parentContract) { contractAddress =>
+    val groupIndex = contractAddress.groupIndex
+    requestFromGroupIndex(
+      groupIndex,
+      Future.successful(serverUtils.getParentContract(blockFlow, contractAddress)),
+      parentContract,
+      contractAddress
+    )
+  }
+
+  val subContractsLogic = serverLogicRedirect(subContracts)(
+    { case (contractAddress, counterRange) =>
+      Future.successful {
+        serverUtils.getSubContracts(
+          blockFlow,
+          counterRange.start,
+          counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
+          contractAddress
+        )
+      }
+    },
+    {
+      case (contractAddress, _) => {
+        Right(Some(contractAddress.groupIndex))
+      }
+    }
+  )
+
+  val subContractsCurrentCountLogic = serverLogicRedirect(subContractsCurrentCount)(
+    { case contractAddress =>
+      Future.successful {
+        serverUtils.getSubContractsCurrentCount(blockFlow, contractAddress)
+      }
+    },
+    { case contractAddress =>
+      Right(Some(contractAddress.groupIndex))
+    }
+  )
+
+  val getTxIdFromOutputRefLogic = serverLogicRedirect(getTxIdFromOutputRef)(
+    { case outputRef =>
+      Future.successful {
+        serverUtils.getTxIdFromOutputRef(blockFlow, outputRef.toTxOutputRef())
+      }
+    },
+    { case outputRef =>
+      Right(Some(Hint.unsafe(outputRef.hint).groupIndex))
+    }
+  )
+
   val callTxScriptLogic = serverLogicRedirect(callTxScript)(
     { params: CallTxScript =>
       Future.successful(serverUtils.callTxScript(blockFlow, params))

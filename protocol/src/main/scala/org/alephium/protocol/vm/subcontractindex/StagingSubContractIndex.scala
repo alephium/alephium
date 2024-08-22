@@ -14,37 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.event
+package org.alephium.protocol.vm.subcontractindex
 
-import org.alephium.crypto.Byte32
-import org.alephium.io.{StagingKVStorage, ValueExists}
+import org.alephium.io.StagingKVStorage
 import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId}
 import org.alephium.protocol.vm.nodeindexes.StagingPageCounter
-import org.alephium.util.AVector
 
-final class StagingLog(
-    val eventLog: StagingKVStorage[LogStatesId, LogStates],
-    val eventLogByHash: StagingKVStorage[Byte32, AVector[LogStateRef]],
-    val eventLogPageCounter: StagingPageCounter[ContractId]
-) extends MutableLog {
-
+final class StagingSubContractIndex(
+    val parentContractIndexState: StagingKVStorage[ContractId, ContractId],
+    val subContractIndexState: StagingKVStorage[SubContractIndexStateId, SubContractIndexState],
+    val subContractIndexPageCounterState: StagingPageCounter[ContractId]
+) extends MutableSubContractIndex {
   def rollback(): Unit = {
-    eventLog.rollback()
-    eventLogByHash.rollback()
-    eventLogPageCounter.rollback()
+    parentContractIndexState.rollback()
+    subContractIndexState.rollback()
+    subContractIndexPageCounterState.rollback()
   }
 
   def commit(): Unit = {
-    eventLog.commit()
-    eventLogByHash.commit()
-    eventLogPageCounter.commit()
-  }
-
-  def getNewLogs(): AVector[LogStates] = {
-    eventLog.caches.foldLeft(AVector.empty[LogStates]) {
-      case (acc, (_, updated: ValueExists[LogStates] @unchecked)) => acc :+ updated.value
-      case (acc, _)                                               => acc
-    }
+    parentContractIndexState.commit()
+    subContractIndexState.commit()
+    subContractIndexPageCounterState.commit()
   }
 }

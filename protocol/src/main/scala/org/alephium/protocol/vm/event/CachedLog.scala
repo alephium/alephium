@@ -20,12 +20,13 @@ import org.alephium.crypto.Byte32
 import org.alephium.io.{CachedKVStorage, IOResult}
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId}
+import org.alephium.protocol.vm.nodeindexes.CachedPageCounter
 import org.alephium.util.AVector
 
 final class CachedLog(
     val eventLog: CachedKVStorage[LogStatesId, LogStates],
     val eventLogByHash: CachedKVStorage[Byte32, AVector[LogStateRef]],
-    val eventLogPageCounter: CachedLogPageCounter[ContractId],
+    val eventLogPageCounter: CachedPageCounter[ContractId],
     logStorage: LogStorage
 ) extends MutableLog {
   def persist(): IOResult[LogStorage] = {
@@ -50,7 +51,7 @@ object CachedLog {
     new CachedLog(
       CachedKVStorage.from(logStorage.logState),
       CachedKVStorage.from(logStorage.logRefState),
-      CachedLogPageCounter.from(logStorage.logCounterState),
+      CachedPageCounter.from(logStorage.logCounterState),
       logStorage
     )
   }

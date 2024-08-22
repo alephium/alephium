@@ -16,27 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{AssetOutputRef, ContractOutputRef, Hint, TxOutputRef}
+import org.alephium.protocol.model.Address
 
-final case class OutputRef(hint: Int, key: Hash) {
-  def unsafeToAssetOutputRef(): AssetOutputRef = {
-    AssetOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
-  }
-  def unsafeToContractOutputRef(): ContractOutputRef = {
-    ContractOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
-  }
-
-  def toTxOutputRef(): TxOutputRef = {
-    if (Hint.unsafe(hint).isAssetType) {
-      unsafeToAssetOutputRef()
-    } else {
-      unsafeToContractOutputRef()
-    }
-  }
-}
-
-object OutputRef {
-  def from(outputRef: TxOutputRef): OutputRef =
-    OutputRef(outputRef.hint.value, outputRef.key.value)
-}
+final case class ContractParent(parent: Option[Address]) extends AnyVal
