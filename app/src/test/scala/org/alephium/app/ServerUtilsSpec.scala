@@ -3874,10 +3874,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(subContractAddr),
       1
     )
-    serverUtils.getSubContracts(blockFlow, 1, 2, parentContractAddr) isE SubContracts(
-      AVector.empty,
-      1
-    )
+    serverUtils.getSubContracts(blockFlow, 1, 2, parentContractAddr).leftValue.detail.contains(
+      s"Can not find sub-contracts for ${parentContractId.toHexString} at count 1"
+    ) is true
   }
 
   it should "return error when node.indexes.subcontract-index is not enabled" in new SubContractIndexesFixture {
