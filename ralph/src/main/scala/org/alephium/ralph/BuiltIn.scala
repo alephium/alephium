@@ -1553,6 +1553,7 @@ object BuiltIn {
       retComment = "the contract id of the caller"
     )
 
+  // scalastyle:off line.size.limit
   val callerAddress: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contract(
       "callerAddress",
@@ -1562,12 +1563,9 @@ object BuiltIn {
       argsName = Seq(),
       retComment = "the address of the caller",
       doc =
-        s"""1. When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same.
-           |   If not all input addresses are the same, `callAddress!()` function fails.
-           |2. When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)
-           |3. When used in a contract function called from another contract, returns the address of the calling contract.
-      """.stripMargin
+        "<ol><li>When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same. If not all input addresses are the same, `callAddress!()` function fails.</li><li>When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)</li><li>When used in a contract function called from another contract, returns the address of the calling contract.</li></ol>"
     )
+  // scalastyle:on line.size.limit
 
   val isCalledFromTxScript: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contract(
