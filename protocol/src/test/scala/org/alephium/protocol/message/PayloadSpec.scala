@@ -200,6 +200,28 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
+  it should "serialize/deserialize the ChainState payload" in {
+    import Hex._
+
+    val tips = AVector.fill(2)(
+      ChainTip(
+        blockHashGen.sample.get,
+        Gen.choose[Int](0, Int.MaxValue).sample.get,
+        Weight(nextU256(U256.Zero, U256.MaxValue).toBigInt)
+      )
+    )
+    verifySerde(ChainState(tips)) {
+      // code id
+      hex"10" ++
+        // number of tips
+        hex"02" ++
+        // tip 1
+        serialize(tips(0)) ++
+        // tip 2
+        serialize(tips(1))
+    }
+  }
+
   it should "serialize/deserialize the InvRequest/InvResponse payload" in {
     import Hex._
 

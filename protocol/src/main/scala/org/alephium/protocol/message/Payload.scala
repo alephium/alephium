@@ -54,6 +54,7 @@ object Payload {
       case x: NewTxHashes     => (NewTxHashes, NewTxHashes.serialize(x))
       case x: TxsRequest      => (TxsRequest, TxsRequest.serialize(x))
       case x: TxsResponse     => (TxsResponse, TxsResponse.serialize(x))
+      case x: ChainState      => (ChainState, ChainState.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -84,6 +85,7 @@ object Payload {
         case NewTxHashes     => NewTxHashes._deserialize(rest)
         case TxsRequest      => TxsRequest._deserialize(rest)
         case TxsResponse     => TxsResponse._deserialize(rest)
+        case ChainState      => ChainState._deserialize(rest)
       }
     }
   }
@@ -149,7 +151,8 @@ object Payload {
         NewBlockHash,
         NewTxHashes,
         TxsRequest,
-        TxsResponse
+        TxsResponse,
+        ChainState
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -470,4 +473,12 @@ final case class TxsResponse(id: RequestId, txs: AVector[TransactionTemplate])
 object TxsResponse extends Payload.Serding[TxsResponse] with Payload.Code {
   implicit val serde: Serde[TxsResponse] =
     Serde.forProduct2(apply, p => (p.id, p.txs))
+}
+
+final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited {
+  def measure(): Unit = ChainState.payloadLabeled.inc()
+}
+
+object ChainState extends Payload.Serding[ChainState] with Payload.Code {
+  implicit val serde: Serde[ChainState] = Serde.forProduct1(ChainState.apply, c => c.tips)
 }
