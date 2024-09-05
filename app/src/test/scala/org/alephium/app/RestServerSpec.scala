@@ -937,7 +937,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call GET /tx-id-from-outputref" in {
+  it should "call GET /transactions/tx-id-from-outputref" in {
     val assetOutputRefWithTxId    = ServerFixture.dummyAssetOutputRef
     val assetOutputRefWithoutTxId = assetOutputRefGen(GroupIndex.unsafe(0)).sample.value
     val contractOutputRef         = contractOutputRefGen(GroupIndex.unsafe(0)).sample.value
@@ -945,19 +945,20 @@ abstract class RestServerSpec(
       s"?hint=${outputRef.hint.value}&key=${outputRef.key.value.toHexString}"
     }
 
-    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithTxId)}") check { response =>
+    Get(s"/transactions/tx-id-from-outputref${toQuery(assetOutputRefWithTxId)}") check { response =>
       response.code is StatusCode.Ok
       response.as[TransactionId] is ServerFixture.dummyTransactionId
     }
 
-    Get(s"/tx-id-from-outputref${toQuery(assetOutputRefWithoutTxId)}") check { response =>
-      response.code is StatusCode.NotFound
-      response
-        .as[ApiError.NotFound]
-        .resource is s"Transaction id for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
+    Get(s"/transactions/tx-id-from-outputref${toQuery(assetOutputRefWithoutTxId)}") check {
+      response =>
+        response.code is StatusCode.NotFound
+        response
+          .as[ApiError.NotFound]
+          .resource is s"Transaction id for output ref ${assetOutputRefWithoutTxId.key.value.toHexString}"
     }
 
-    Get(s"/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
+    Get(s"/transactions/tx-id-from-outputref${toQuery(contractOutputRef)}") check { response =>
       response.code is StatusCode.NotFound
       response
         .as[ApiError.NotFound]
