@@ -16,8 +16,6 @@
 
 package org.alephium.flow.network.sync
 
-import java.net.InetSocketAddress
-
 import scala.collection.mutable
 import scala.util.Random
 
@@ -25,20 +23,6 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util.{ActorRefT, AVector}
-
-object BrokerStatusTracker {
-  final case class Status(lastSeenHeights: AVector[Int])
-
-  final case class ConnectingBroker(
-      remoteAddress: InetSocketAddress,
-      localAddress: InetSocketAddress,
-      handler: ActorRefT[BrokerHandler.Command]
-  )
-  final case class HandShakedBroker(brokerInfo: BrokerInfo)
-
-  type ConnectingBrokers = mutable.HashMap[ActorRefT[BrokerHandler.Command], ConnectingBroker]
-  type HandShakedBrokers = mutable.HashSet[HandShakedBroker]
-}
 
 trait BrokerStatusTracker {
   def networkSetting: NetworkSetting
