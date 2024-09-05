@@ -100,4 +100,10 @@ class ReleaseVersionSpec extends AlephiumSpec {
       ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
     }
   }
+
+  it should "if it is using protocol v2" in {
+    ReleaseVersion(3, 6, Int.MaxValue).usingProtocolV2() is false
+    ReleaseVersion(3, 7, 0).usingProtocolV2() is true
+    ReleaseVersion(3, 7, 1).usingProtocolV2() is true
+  }
 }

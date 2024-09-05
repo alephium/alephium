@@ -42,7 +42,9 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
   }
 
-  override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
+  override def exchangingV1: Receive = exchangingCommon orElse syncing orElse flowEvents
+
+  def exchangingV2: Receive = exchangingV1
 
   def syncing: Receive = {
     schedule(self, BrokerHandler.IntraSync, Duration.zero, Duration.ofMinutesUnsafe(1))

@@ -70,7 +70,8 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  var remoteBrokerInfo: BrokerInfo = _
+  var remoteBrokerInfo: BrokerInfo               = _
+  protected var protocolVersion: ProtocolVersion = ProtocolV1
 
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
@@ -81,12 +82,19 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   override def receive: Receive = handShaking
 
   def onHandshakeCompleted(hello: Hello): Unit = {
-    if (!ReleaseVersion.checkClientId(hello.clientId)) {
+    val clientVersion = ReleaseVersion.fromClientId(hello.clientId)
+    if (!ReleaseVersion.checkClientVersion(clientVersion)) {
       log.warning(s"Unknown client id from ${remoteAddress}: ${hello.clientId}")
       stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
     } else {
       handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
-      context become (exchanging orElse pingPong)
+      if (clientVersion.exists(_.usingProtocolV2())) {
+        protocolVersion = ProtocolV2
+        context become (exchangingV2 orElse pingPong)
+      } else {
+        protocolVersion = ProtocolV1
+        context become (exchangingV1 orElse pingPong)
+      }
     }
   }
 
@@ -99,7 +107,9 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
         log.error(s"IO error in $action: $error")
     }
 
-  def exchanging: Receive
+  def exchangingV1: Receive
+
+  def exchangingV2: Receive
 
   def handleNewBlock(block: Block): Unit =
     handleFlowData(AVector(block), dataOrigin, isBlock = true)

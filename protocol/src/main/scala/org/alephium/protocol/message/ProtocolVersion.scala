@@ -16,20 +16,7 @@
 
 package org.alephium.protocol.message
 
-import org.alephium.protocol.WireVersion
-import org.alephium.serde.Serde
+sealed trait ProtocolVersion
 
-final case class Header(version: WireVersion)
-
-object Header {
-  implicit val serde: Serde[Header] = WireVersion.serde
-    .validate(_version =>
-      // Fix this in the next hardfork
-      if (_version == WireVersion.currentWireVersion) {
-        Right(())
-      } else {
-        Left(s"Invalid version: got ${_version}, expect: ${WireVersion.currentWireVersion.value}")
-      }
-    )
-    .xmap(apply, _.version)
-}
+case object ProtocolV1 extends ProtocolVersion
+case object ProtocolV2 extends ProtocolVersion

@@ -18,6 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.BuildInfo
 import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.model.ReleaseVersion.protocolV2Version
 import org.alephium.serde.Serde
 import org.alephium.util.TimeStamp
 
@@ -50,6 +51,8 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
       true
     }
   }
+
+  def usingProtocolV2(): Boolean = this >= protocolV2Version
 }
 
 object ReleaseVersion {
@@ -59,10 +62,18 @@ object ReleaseVersion {
     )
   )
 
+  val protocolV2Version: ReleaseVersion = ReleaseVersion(3, 7, 0)
+
   val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
 
-  def checkClientId(clientId: String)(implicit networkConfig: NetworkConfig): Boolean = {
-    ReleaseVersion.fromClientId(clientId).exists(_.checkRhoneUpgrade())
+  @inline def checkClientId(clientId: String)(implicit networkConfig: NetworkConfig): Boolean = {
+    checkClientVersion(fromClientId(clientId))
+  }
+
+  @inline def checkClientVersion(
+      version: Option[ReleaseVersion]
+  )(implicit networkConfig: NetworkConfig): Boolean = {
+    version.exists(_.checkRhoneUpgrade())
   }
 
   def fromClientId(clientId: String): Option[ReleaseVersion] = {

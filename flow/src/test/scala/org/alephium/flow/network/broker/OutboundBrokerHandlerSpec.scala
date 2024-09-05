@@ -83,7 +83,8 @@ class TestOutboundBrokerHandler(
     extends OutboundBrokerHandler {
   override def selfCliqueInfo: CliqueInfo =
     Generators.cliqueInfoGen(1).sample.get
-  override def exchanging: Receive                                             = exchangingCommon
+  override def exchangingV1: Receive                                           = exchangingCommon
+  override def exchangingV2: Receive                                           = exchangingV1
   override def dataOrigin: DataOrigin                                          = ???
   override def allHandlers: AllHandlers                                        = ???
   override def blockflow: BlockFlow                                            = ???

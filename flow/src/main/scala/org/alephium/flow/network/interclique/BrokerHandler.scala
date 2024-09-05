@@ -66,7 +66,9 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
   }
 
-  override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
+  override def exchangingV1: Receive = exchangingCommon orElse syncing orElse flowEvents
+
+  def exchangingV2: Receive = ???
 
   def syncing: Receive = {
     case BaseBrokerHandler.SyncLocators(locators) =>

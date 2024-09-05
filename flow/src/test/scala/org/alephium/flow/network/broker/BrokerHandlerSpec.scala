@@ -270,7 +270,8 @@ class TestBrokerHandler(
 
   override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
 
-  override def exchanging: Receive = exchangingCommon orElse flowEvents
+  override def exchangingV1: Receive = exchangingCommon orElse flowEvents
+  override def exchangingV2: Receive = exchangingV1
 
   override def dataOrigin: DataOrigin = DataOrigin.Local
 

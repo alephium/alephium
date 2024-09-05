@@ -192,5 +192,5 @@ class TestBrokerHandler(
     with BrokerHandler {
   context.watch(brokerConnectionHandler.ref)
 
-  override def receive: Receive = exchanging
+  override def receive: Receive = exchangingV1
 }
