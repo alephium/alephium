@@ -78,7 +78,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       scheduleSync()
     case flowLocators: FlowHandler.SyncLocators =>
       samplePeers().foreach { case (actor, brokerInfo) =>
-        actor ! BrokerHandler.SyncLocators(flowLocators.filerFor(brokerInfo))
+        actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(brokerInfo))
       }
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)

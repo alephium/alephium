@@ -52,11 +52,11 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec with NoIndexModelGeneratorsL
       ChainIndex.unsafe(k / 6 * 2 + 1, k % 6)(brokerGroupInfo0) ->
         AVector.fill(k)(BlockHash.generate)
     }
-    val flowEvent = FlowHandler.SyncLocators(brokerGroupInfo0, locatorsWithIndex)
+    val flowEvent = FlowHandler.SyncLocators(locatorsWithIndex)
     val locators  = locatorsWithIndex.map(_._2)
-    flowEvent.filerFor(brokerGroupInfo0) is locators
-    flowEvent.filerFor(brokerGroupInfo1) is locators.takeRight(groupNum)
-    flowEvent.filerFor(brokerGroupInfo2) is locators.take(groupNum)
-    flowEvent.filerFor(brokerGroupInfo3) is locators.drop(groupNum).take(groupNum)
+    flowEvent.filterFor(brokerGroupInfo0) is locators
+    flowEvent.filterFor(brokerGroupInfo1) is locators.takeRight(groupNum)
+    flowEvent.filterFor(brokerGroupInfo2) is locators.take(groupNum)
+    flowEvent.filterFor(brokerGroupInfo3) is locators.drop(groupNum).take(groupNum)
   }
 }

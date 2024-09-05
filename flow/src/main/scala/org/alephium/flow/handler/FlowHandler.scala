@@ -19,14 +19,12 @@ package org.alephium.flow.handler
 import akka.actor.{Props, Stash}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.RequestId
 import org.alephium.protocol.model._
 import org.alephium.util._
 
 object FlowHandler {
-  def props(blockFlow: BlockFlow)(implicit brokerConfig: BrokerConfig): Props =
-    Props(new FlowHandler(blockFlow))
+  def props(blockFlow: BlockFlow): Props = Props(new FlowHandler(blockFlow))
 
   sealed trait Command
   case object GetSyncLocators extends Command
@@ -42,10 +40,9 @@ object FlowHandler {
   final case class SyncInventories(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
       extends Event
   final case class SyncLocators(
-      selfBrokerInfo: BrokerConfig,
       hashes: AVector[(ChainIndex, AVector[BlockHash])]
   ) extends Command {
-    def filerFor(another: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
+    def filterFor(another: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
       hashes
         .filter { case (chainIndex, _) => another.contains(chainIndex.from) }
         .map { case (_, locators) => locators }
@@ -55,10 +52,7 @@ object FlowHandler {
 }
 
 // Queue all the work related to miner, rpc server, etc. in this actor
-class FlowHandler(blockFlow: BlockFlow)(implicit
-    brokerConfig: BrokerConfig
-) extends IOBaseActor
-    with Stash {
+class FlowHandler(blockFlow: BlockFlow) extends IOBaseActor with Stash {
   import FlowHandler._
 
   override def receive: Receive = handleSync
@@ -66,7 +60,7 @@ class FlowHandler(blockFlow: BlockFlow)(implicit
   def handleSync: Receive = {
     case GetSyncLocators =>
       escapeIOError(blockFlow.getSyncLocators()) { locators =>
-        sender() ! SyncLocators(brokerConfig, locators)
+        sender() ! SyncLocators(locators)
       }
     case GetSyncInventories(requestId, locators, peerBrokerInfo) =>
       escapeIOError(blockFlow.getSyncInventories(locators, peerBrokerInfo)) { inventories =>
