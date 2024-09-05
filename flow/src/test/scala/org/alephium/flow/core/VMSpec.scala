@@ -593,7 +593,7 @@ class VMSpec extends AlephiumSpec with Generators {
     intercept[AssertionError](callTxScript(script(tokenId.toHexString, address1.toBase58, 50)))
       .getMessage() is "Right(InvalidOutputGroupIndex)"
 
-    info("transfer some ALPH to adress in group 0")
+    info("transfer some ALPH to address in group 0")
     val genesisPrivateKey = genesisKeys(chainIndex.from.value)._1
     val block = transfer(
       blockFlow,
