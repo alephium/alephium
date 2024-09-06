@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.message
 
+import scala.reflect.ClassTag
+
 import akka.util.ByteString
 import io.prometheus.client.Counter
 
@@ -55,6 +57,10 @@ object Payload {
       case x: TxsRequest      => (TxsRequest, TxsRequest.serialize(x))
       case x: TxsResponse     => (TxsResponse, TxsResponse.serialize(x))
       case x: ChainState      => (ChainState, ChainState.serialize(x))
+      case x: HeadersByHeightsRequest =>
+        (HeadersByHeightsRequest, HeadersByHeightsRequest.serialize(x))
+      case x: HeadersByHeightsResponse =>
+        (HeadersByHeightsResponse, HeadersByHeightsResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -69,23 +75,25 @@ object Payload {
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
     deserializerCode._deserialize(input).flatMap { case Staging(code, rest) =>
       code match {
-        case Hello           => Hello._deserialize(rest)
-        case Ping            => Ping._deserialize(rest)
-        case Pong            => Pong._deserialize(rest)
-        case BlocksRequest   => BlocksRequest._deserialize(rest)
-        case BlocksResponse  => BlocksResponse._deserialize(rest)
-        case HeadersRequest  => HeadersRequest._deserialize(rest)
-        case HeadersResponse => HeadersResponse._deserialize(rest)
-        case InvRequest      => InvRequest._deserialize(rest)
-        case InvResponse     => InvResponse._deserialize(rest)
-        case NewBlock        => NewBlock._deserialize(rest)
-        case NewHeader       => NewHeader._deserialize(rest)
-        case NewInv          => NewInv._deserialize(rest)
-        case NewBlockHash    => NewBlockHash._deserialize(rest)
-        case NewTxHashes     => NewTxHashes._deserialize(rest)
-        case TxsRequest      => TxsRequest._deserialize(rest)
-        case TxsResponse     => TxsResponse._deserialize(rest)
-        case ChainState      => ChainState._deserialize(rest)
+        case Hello                    => Hello._deserialize(rest)
+        case Ping                     => Ping._deserialize(rest)
+        case Pong                     => Pong._deserialize(rest)
+        case BlocksRequest            => BlocksRequest._deserialize(rest)
+        case BlocksResponse           => BlocksResponse._deserialize(rest)
+        case HeadersRequest           => HeadersRequest._deserialize(rest)
+        case HeadersResponse          => HeadersResponse._deserialize(rest)
+        case InvRequest               => InvRequest._deserialize(rest)
+        case InvResponse              => InvResponse._deserialize(rest)
+        case NewBlock                 => NewBlock._deserialize(rest)
+        case NewHeader                => NewHeader._deserialize(rest)
+        case NewInv                   => NewInv._deserialize(rest)
+        case NewBlockHash             => NewBlockHash._deserialize(rest)
+        case NewTxHashes              => NewTxHashes._deserialize(rest)
+        case TxsRequest               => TxsRequest._deserialize(rest)
+        case TxsResponse              => TxsResponse._deserialize(rest)
+        case ChainState               => ChainState._deserialize(rest)
+        case HeadersByHeightsRequest  => HeadersByHeightsRequest._deserialize(rest)
+        case HeadersByHeightsResponse => HeadersByHeightsResponse._deserialize(rest)
       }
     }
   }
@@ -152,7 +160,9 @@ object Payload {
         NewTxHashes,
         TxsRequest,
         TxsResponse,
-        ChainState
+        ChainState,
+        HeadersByHeightsRequest,
+        HeadersByHeightsResponse
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -409,28 +419,33 @@ object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
   implicit val serde: Serde[NewBlockHash] = Serde.forProduct1(apply, _.hash)
 }
 
-trait IndexedHashes {
-  def hashes: AVector[(ChainIndex, AVector[TransactionId])]
+trait IndexedPayload[T] {
+  def data: AVector[(ChainIndex, AVector[T])]
 }
 
-sealed trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
-  override def validate(input: T)(implicit config: GroupConfig): Either[String, Unit] = {
-    if (input.hashes.forall(p => IndexedSerding.check(p._1))) {
+sealed trait IndexedSerding[T, P <: IndexedPayload[T] with Payload]
+    extends Payload.ValidatedSerding[P] {
+  def name: String
+
+  def checkDataPerChain(values: AVector[T]): Boolean
+
+  override def validate(input: P)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (input.data.forall(p => IndexedSerding.check(p._1) && checkDataPerChain(p._2))) {
       Right(())
     } else {
-      Left("Invalid ChainIndex in Tx payload")
+      Left(s"Invalid ChainIndex or data in $name payload")
     }
   }
 }
 
 object IndexedSerding {
-  implicit private[message] val txSerde: Serde[(ChainIndex, AVector[TransactionId])] = {
+  implicit private[message] def dataSerde[T: Serde: ClassTag]: Serde[(ChainIndex, AVector[T])] = {
     implicit val indexSerde: Serde[ChainIndex] =
       Serde.forProduct2[Int, Int, ChainIndex](
         (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
         chainIndex => (chainIndex.from.value, chainIndex.to.value)
       )
-    Serde.tuple2[ChainIndex, AVector[TransactionId]]
+    Serde.tuple2[ChainIndex, AVector[T]]
   }
 
   @inline private def check(
@@ -442,23 +457,33 @@ object IndexedSerding {
 
 final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.UnSolicited
-    with IndexedHashes {
-  override def measure(): Unit = NewTxHashes.payloadLabeled.inc()
+    with IndexedPayload[TransactionId] {
+  def data: AVector[(ChainIndex, AVector[TransactionId])] = hashes
+  override def measure(): Unit                            = NewTxHashes.payloadLabeled.inc()
 }
 
-object NewTxHashes extends IndexedSerding[NewTxHashes] with Payload.Code {
-  import IndexedSerding.txSerde
+object NewTxHashes extends IndexedSerding[TransactionId, NewTxHashes] with Payload.Code {
+  def name: String = "NewTxHashes"
+
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+
+  import IndexedSerding.dataSerde
   implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
 }
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.Solicited
-    with IndexedHashes {
-  override def measure(): Unit = TxsRequest.payloadLabeled.inc()
+    with IndexedPayload[TransactionId] {
+  def data: AVector[(ChainIndex, AVector[TransactionId])] = hashes
+  override def measure(): Unit                            = TxsRequest.payloadLabeled.inc()
 }
 
-object TxsRequest extends IndexedSerding[TxsRequest] with Payload.Code {
-  import IndexedSerding.txSerde
+object TxsRequest extends IndexedSerding[TransactionId, TxsRequest] with Payload.Code {
+  def name: String = "TxsRequest"
+
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+
+  import IndexedSerding.dataSerde
   implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
 
   def apply(hashes: AVector[(ChainIndex, AVector[TransactionId])]): TxsRequest =
@@ -481,4 +506,38 @@ final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited
 
 object ChainState extends Payload.Serding[ChainState] with Payload.Code {
   implicit val serde: Serde[ChainState] = Serde.forProduct1(ChainState.apply, c => c.tips)
+}
+
+final case class HeadersByHeightsRequest(
+    id: RequestId,
+    data: AVector[(ChainIndex, AVector[Int])]
+) extends Payload.Solicited
+    with IndexedPayload[Int] {
+  def measure(): Unit = HeadersByHeightsRequest.payloadLabeled.inc()
+}
+
+object HeadersByHeightsRequest
+    extends IndexedSerding[Int, HeadersByHeightsRequest]
+    with Payload.Code {
+  import IndexedSerding.dataSerde
+  def name: String = "HeadersByHeightsRequest"
+  implicit val serde: Serde[HeadersByHeightsRequest] =
+    Serde.forProduct2(apply, v => (v.id, v.data))
+
+  def checkDataPerChain(values: AVector[Int]): Boolean = values.forall(_ >= 0)
+
+  def apply(data: AVector[(ChainIndex, AVector[Int])]): HeadersByHeightsRequest =
+    HeadersByHeightsRequest(RequestId.random(), data)
+}
+
+final case class HeadersByHeightsResponse(id: RequestId, headers: AVector[AVector[BlockHeader]])
+    extends Payload.Solicited {
+  def measure(): Unit = HeadersByHeightsResponse.payloadLabeled.inc()
+}
+
+object HeadersByHeightsResponse
+    extends Payload.Serding[HeadersByHeightsResponse]
+    with Payload.Code {
+  implicit val serde: Serde[HeadersByHeightsResponse] =
+    Serde.forProduct2(apply, v => (v.id, v.headers))
 }

@@ -222,6 +222,86 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
+  it should "serialize/deserialize the HeadersByHeightsRequest/HeadersByHeightsResponse payload" in {
+    import Hex._
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val requestId  = RequestId.unsafe(1)
+    val request    = HeadersByHeightsRequest(requestId, AVector((chainIndex, AVector(1, 2))))
+    verifySerde(request) {
+      // code id
+      hex"11" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // chain index
+        hex"0000" ++
+        // number of heights
+        hex"02" ++
+        // height0
+        serialize(1) ++
+        // height1
+        serialize(2)
+    }
+
+    val header0  = blockGen.sample.get.header
+    val header1  = blockGen.sample.get.header
+    val response = HeadersByHeightsResponse(requestId, AVector(AVector(header0, header1)))
+    verifySerde(response) {
+      // code id
+      hex"12" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // number of headers
+        hex"02" ++
+        // header0
+        serialize(header0) ++
+        // header1
+        serialize(header1)
+    }
+
+    Payload
+      .deserialize(
+        // code id
+        hex"11" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // invalid chain index
+          hex"0500" ++
+          // number of heights
+          hex"01" ++
+          // height
+          serialize(1)
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
+    )
+
+    Payload
+      .deserialize(
+        // code id
+        hex"11" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // chain index
+          hex"0000" ++
+          // number of heights
+          hex"01" ++
+          // invalid height
+          serialize(-1)
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
+    )
+  }
+
   it should "serialize/deserialize the InvRequest/InvResponse payload" in {
     import Hex._
 
@@ -379,7 +459,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           // tx2 hash
           serialize(txTemplate2.id)
       )
-      .leftValue is SerdeError.validation("Invalid ChainIndex in Tx payload")
+      .leftValue is SerdeError.validation("Invalid ChainIndex or data in NewTxHashes payload")
   }
 
   it should "seder the snapshots properly" in new BlockSnapshotsFixture {
