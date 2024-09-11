@@ -452,6 +452,93 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def buildMultiGroupTransactions(
+      fromLockupScript: LockupScript.Asset, // Self address for receiving change outputs
+      fromUnlockScript: UnlockScript,
+      remainingInputs: AVector[AssetOutputInfo],
+      outputGroups: AVector[AVector[TxOutputInfo]],
+      gasPrice: GasPrice,
+      acc: AVector[UnsignedTransaction]
+  )(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, AVector[UnsignedTransaction]] = {
+    if (outputGroups.isEmpty) {
+      if (acc.isEmpty) {
+        Left("Outputs cannot be empty")
+      } else {
+        Right(acc)
+      }
+    } else if (remainingInputs.isEmpty) {
+      Left("Not enough inputs to build multi-group transaction")
+    } else {
+      val currentOutputs = outputGroups.head
+      for {
+        _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
+        _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
+        amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
+        selected <- UtxoSelectionAlgo
+          .Build(ProvidedGas(None, gasPrice, None))
+          .select(
+            AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
+            fromUnlockScript,
+            remainingInputs,
+            amountTokensOutputCount._3,
+            txScriptOpt = None,
+            AssetScriptGasEstimator.Default(Self.blockFlow),
+            TxScriptGasEstimator.NotImplemented
+          )
+        txWithChange <- UnsignedTransaction
+          .buildTransferTxAndReturnChange(
+            fromLockupScript,
+            fromUnlockScript,
+            selected.assets.map(a => a.ref -> a.output),
+            currentOutputs,
+            selected.gas,
+            gasPrice
+          )
+        selectedAssetSet = selected.assets.map(_.ref).toSet
+        reusableInputs = txWithChange._2.map { case (oRef, output) =>
+          AssetOutputInfo(oRef, output, MemPoolOutput)
+        }
+        newRemainingInputs = remainingInputs.filterNot(out =>
+          selectedAssetSet.contains(out.ref)
+        ) ++ reusableInputs
+        txs <- buildMultiGroupTransactions(
+          fromLockupScript,
+          fromUnlockScript,
+          remainingInputs = newRemainingInputs,
+          outputGroups.tail,
+          gasPrice,
+          acc :+ txWithChange._1
+        )
+      } yield txs
+    }
+  }
+
+  def getUtxoSelectionOrArbitrary(
+      targetBlockHashOpt: Option[BlockHash],
+      fromLockupScript: LockupScript.Asset,
+      inputSelection: AVector[AssetOutputRef],
+      utxosLimit: Int
+  ): Either[String, AVector[AssetOutputInfo]] = {
+    for {
+      _ <- checkUTXOsInSameGroup(inputSelection)
+      utxos <- getUsableUtxos(
+        targetBlockHashOpt,
+        fromLockupScript,
+        maxUtxosToRead = utxosLimit
+      ).left.map(_.getMessage)
+      allInputsSet    = inputSelection.toSet
+      existingUtxoSet = utxos.map(_.ref).toSet
+      _ <- Either.cond(
+        allInputsSet.subsetOf(existingUtxoSet),
+        (),
+        s"Selected input UTXOs are not available: ${allInputsSet.diff(existingUtxoSet).map(_.key.value.toHexString).mkString(", ")}"
+      )
+    } yield if (allInputsSet.isEmpty) utxos else utxos.filter(out => allInputsSet.contains(out.ref))
+  }
+
   def transferMultiInputs(
       inputs: AVector[InputData],
       outputInfos: AVector[TxOutputInfo],

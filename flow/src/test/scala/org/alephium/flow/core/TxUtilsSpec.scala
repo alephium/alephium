@@ -551,7 +551,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .leftValue is s"Not enough balance for token $tokenId2"
   }
 
-  it should "fail when outputs doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
+  it should "fail when outputs have too small amount of Alph" in new UnsignedTransactionFixture {
     {
       info("with tokens")
       val tokenId1 = TokenId.hash("tokenId1")
@@ -578,7 +578,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
-        .leftValue is "Not enough ALPH for transaction output"
+        .leftValue is "Tx output value is too small, avoid spreading dust"
     }
 
     {
@@ -603,7 +603,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
-        .leftValue is "Not enough ALPH for transaction output"
+        .leftValue is "Tx output value is too small, avoid spreading dust"
     }
   }
 
@@ -996,9 +996,9 @@ class TxUtilsSpec extends AlephiumSpec {
       .startsWith("The specified gas amount is not enough") is true
   }
 
-  it should "return an error if the sweep of ALPH fails" in new SweepAlphFixture {
+  it should "return an error if the sweep of ALPH fails due to too small output amount" in new SweepAlphFixture {
     getAlphOutputs(2, dustUtxoAmount)
-    sweep().leftValue is "Not enough ALPH for transaction output"
+    sweep().leftValue is "Tx output value is too small, avoid spreading dust"
   }
 
   trait SweepTokenFixture extends SweepAlphFixture {
@@ -1250,6 +1250,95 @@ class TxUtilsSpec extends AlephiumSpec {
     sweep().leftValue is "Not enough ALPH for gas fee in sweeping"
   }
 
+  trait MultiGroupTransactions extends FlowFixture with UnsignedTxFixture {
+    implicit override lazy val blockFlow   = isolatedBlockFlow()
+    override val configValues              = Map(("alephium.broker.broker-num", 1))
+    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
+    val lockupScript                       = LockupScript.p2pkh(fromPublicKey)
+    val unlockScript                       = UnlockScript.p2pkh(fromPublicKey)
+
+    val lockupScriptsByGroup = Map(
+      GroupIndex.unsafe(0) -> lockupScript,
+      GroupIndex.unsafe(1) -> Address.p2pkh(GroupIndex.unsafe(1).generateKey._2).lockupScript,
+      GroupIndex.unsafe(2) -> Address.p2pkh(GroupIndex.unsafe(2).generateKey._2).lockupScript
+    )
+
+    val validation = TxValidation.build
+
+    def splitGenesisUtxo: AVector[AssetOutputInfo] = {
+      val block =
+        transfer(
+          blockFlow,
+          fromPrivateKey,
+          amount = genesisBalance.divUnsafe(U256.Two),
+          to = fromPublicKey
+        )
+      addAndCheck(blockFlow, block)
+      val utxos = blockFlow
+        .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+        .rightValue
+        .asUnsafe[AssetOutputInfo]
+      assume(utxos.length == 2)
+      utxos
+    }
+
+    def genesisUtxos: AVector[AssetOutputInfo] =
+      blockFlow
+        .getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true)
+        .rightValue
+        .asUnsafe[AssetOutputInfo]
+
+    def buildOutputs(chainIndexes: AVector[ChainIndex]): AVector[AVector[TxOutputInfo]] = {
+      AVector.from(
+        chainIndexes
+          .groupBy(identity)
+          .view
+          .mapValues { chainIndexes =>
+            chainIndexes.map { chainIndex =>
+              TxOutputInfo(
+                lockupScriptsByGroup(chainIndex.to),
+                ALPH.oneAlph,
+                AVector.empty,
+                None
+              )
+            }
+          }
+          .values
+      )
+    }
+
+    def testMultiGroupTxsBuilding(
+        allRemainingInputs: AVector[AssetOutputInfo],
+        outputGroups: AVector[AVector[TxOutputInfo]]
+    ): Either[String, Unit] = {
+      blockFlow
+        .buildMultiGroupTransactions(
+          lockupScript,
+          unlockScript,
+          allRemainingInputs,
+          outputGroups,
+          nonCoinbaseMinGasPrice,
+          AVector.empty
+        )
+        .map { unsignedTxs =>
+          unsignedTxs
+            .map { unsignedTx =>
+              testUnsignedTx(unsignedTx, fromPrivateKey)
+              val tx = Transaction.from(unsignedTx, fromPrivateKey)
+              validation.validateTxOnlyForTest(tx, blockFlow, None)
+              tx
+            }
+            .groupBy(tx => ChainIndex(tx.fromGroup, tx.toGroup))
+            .foreach { case (chainIndex, txs) =>
+              val block =
+                mine(blockFlow, chainIndex, txs, lockupScriptsByGroup(chainIndex.to), None)
+              addAndCheck(blockFlow, block)
+            }
+        }
+    }
+
+  }
+
   trait LargeUtxos extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)
@@ -1402,6 +1491,75 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
       unsignedTxs.length is 0
     }
+  }
+
+  it should "build multi group transactions from just single genesis box" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+
+    testMultiGroupTxsBuilding(genesisUtxos, outputs) isE ()
+  }
+
+  it should "fail when building multi group txs with no inputs" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+
+    testMultiGroupTxsBuilding(
+      AVector.empty,
+      outputs
+    ).leftValue is "Not enough inputs to build multi-group transaction"
+  }
+
+  it should "build multi group transactions from multiple boxes" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+    val utxos   = splitGenesisUtxo
+    testMultiGroupTxsBuilding(utxos, outputs) isE ()
+  }
+
+  it should "build multi group transactions intra group" in new MultiGroupTransactions {
+    val intraGroupOutputs = buildOutputs(
+      AVector(ChainIndex.unsafe(0, 0))
+    )
+    testMultiGroupTxsBuilding(genesisUtxos, intraGroupOutputs) isE ()
+  }
+
+  it should "get utxo selection if non-empty or arbitrary utxos" in new MultiGroupTransactions {
+    blockFlow.getUtxoSelectionOrArbitrary(
+      None,
+      lockupScript,
+      genesisUtxos.map(_.ref),
+      100
+    ) isE genesisUtxos
+
+    blockFlow.getUtxoSelectionOrArbitrary(
+      None,
+      lockupScript,
+      AVector.empty,
+      100
+    ) isE genesisUtxos
+
+  }
+
+  it should "fail if any of the input utxos does not exist" in new MultiGroupTransactions {
+    val nonExistingHash = Hash.hash("0")
+    val nonExistingUtxo =
+      AssetOutputRef.from(new ScriptHint(2), TxOutputRef.unsafeKey(nonExistingHash))
+
+    blockFlow
+      .getUtxoSelectionOrArbitrary(
+        None,
+        lockupScript,
+        AVector(nonExistingUtxo),
+        100
+      )
+      .leftValue is s"Selected input UTXOs are not available: ${nonExistingHash.toHexString}"
+
+    blockFlow
+      .getUtxoSelectionOrArbitrary(
+        None,
+        lockupScript,
+        AVector(nonExistingUtxo) ++ genesisUtxos.map(_.ref),
+        100
+      )
+      .leftValue is s"Selected input UTXOs are not available: ${nonExistingHash.toHexString}"
   }
 
   it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {

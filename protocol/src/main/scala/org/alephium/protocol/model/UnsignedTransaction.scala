@@ -252,6 +252,43 @@ object UnsignedTransaction {
     }
   }
 
+  def buildTransferTxAndReturnChange(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputInfos: AVector[TxOutputInfo],
+      gas: GasBox,
+      gasPrice: GasPrice
+  )(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, (UnsignedTransaction, AVector[(AssetOutputRef, AssetOutput)])] = {
+    for {
+      gasFee <- preCheckBuildTx(inputs, gas, gasPrice)
+      _      <- checkMinimalAlphPerOutput(outputInfos)
+      _      <- checkTokenValuesNonZero(outputInfos)
+      txOutputs = buildOutputs(outputInfos)
+      changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
+    } yield {
+      val outputs = txOutputs ++ changeOutputs
+      val tx =
+        UnsignedTransaction(
+          None,
+          gas,
+          gasPrice,
+          buildInputs(fromUnlockScript, inputs),
+          outputs
+        )
+      val changeOutputsRefs =
+        changeOutputs.map { changeOutput =>
+          AssetOutputRef.from(
+            changeOutput,
+            TxOutputRef.key(tx.id, outputs.indexWhere(_ == changeOutput))
+          ) -> changeOutput
+        }
+      tx -> changeOutputsRefs
+    }
+  }
+
   def buildOutputs(outputInfos: AVector[TxOutputInfo]): AVector[AssetOutput] = {
     outputInfos.flatMap(buildOutputs)
   }
@@ -442,7 +479,7 @@ object UnsignedTransaction {
       failCondition = outputs.exists { output =>
         output.attoAlphAmount < dustUtxoAmount
       },
-      "Not enough ALPH for transaction output"
+      "Tx output value is too small, avoid spreading dust"
     )
   }
 

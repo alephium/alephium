@@ -319,6 +319,15 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
+  val buildMultiGroupTransactions: BaseEndpoint[BuildTransaction, AVector[BuildTransactionResult]] =
+    transactionsEndpoint.post
+      .in("build-multi-group")
+      .in(jsonBodyWithAlph[BuildTransaction])
+      .out(jsonBody[AVector[BuildTransactionResult]])
+      .summary(
+        "Build as many unsigned transactions as many unique groups is among given destinations"
+      )
+
   val buildMultiAddressesTransaction
       : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransactionResult] =
     transactionsEndpoint.post

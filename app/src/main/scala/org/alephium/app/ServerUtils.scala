@@ -29,6 +29,7 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
@@ -211,6 +212,54 @@ class ServerUtils(implicit
     }
     Right(result)
   }
+
+  def buildMultiGroupTransactions(
+      blockFlow: BlockFlow,
+      query: BuildTransaction
+  ): Try[AVector[BuildTransactionResult]] =
+    for {
+      _ <- Either.cond(query.gasAmount.isEmpty, (), badRequest("Explicit Gas Amount not allowed"))
+      assetOutputRefs <- query.utxos match {
+        case Some(outputRefs) => prepareOutputRefs(outputRefs).left.map(badRequest)
+        case None             => Right(AVector.empty[AssetOutputRef])
+      }
+      lockPair <- query.getLockPair()
+      _ <- Either.cond(
+        brokerConfig.contains(lockPair._1.groupIndex),
+        (),
+        badRequest(s"This node cannot serve request for Group ${lockPair._1.groupIndex}")
+      )
+      inputSelection <- blockFlow
+        .getUtxoSelectionOrArbitrary(
+          query.targetBlockHash,
+          lockPair._1,
+          assetOutputRefs,
+          apiConfig.defaultUtxosLimit
+        )
+        .left
+        .map(badRequest)
+      outputInfos = prepareOutputInfos(query.destinations)
+      gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      _ <- getPositiveRemaindersOrFail(
+        blockFlow,
+        lockPair._2,
+        inputSelection,
+        outputInfos,
+        gasPrice
+      ).left.map(badRequest)
+      unsignedTxs <- blockFlow
+        .buildMultiGroupTransactions(
+          lockPair._1,
+          lockPair._2,
+          inputSelection,
+          outputGroups = AVector.from(outputInfos.groupBy(_.lockupScript.groupIndex).values),
+          gasPrice,
+          AVector.empty[UnsignedTransaction]
+        )
+        .left
+        .map(failed)
+      txs <- unsignedTxs.mapE(validateUnsignedTransaction)
+    } yield txs.map(BuildTransactionResult.from)
 
   def buildTransaction(
       blockFlow: BlockFlow,
@@ -1914,6 +1963,57 @@ object ServerUtils {
       Right(())
     } else {
       Left(ApiError.BadRequest(s"Too much gas fee, cap at ${apiConfig.gasFeeCap}, got $gasFee"))
+    }
+  }
+
+  def getPositiveRemaindersOrFail(
+      blockFlow: BlockFlow,
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  )(implicit
+      networkConfig: NetworkConfig,
+      groupConfig: GroupConfig
+  ): Either[String, (U256, AVector[(TokenId, U256)])] = {
+    if (inputs.isEmpty || outputs.isEmpty) {
+      Left("Both inputs and outputs must be specified")
+    } else {
+      val inputAmounts = inputs.map(_.output.amount)
+      val totalInputValue =
+        EitherF.foldTry(inputAmounts, U256.Zero) { case (acc, n) =>
+          acc.add(n).toRight(s"Invalid total input value $acc + $n")
+        }
+      val outputAmounts = outputs.map(_.attoAlphAmount)
+      val totalOutputValue =
+        EitherF.foldTry(outputAmounts, U256.Zero) { case (acc, n) =>
+          acc.add(n).toRight(s"Invalid total output value $acc + $n")
+        }
+
+      (totalInputValue, totalOutputValue) match {
+        case (Right(iv), Right(ov)) if iv > ov =>
+          for {
+            gasBox <- GasEstimation.estimateWithInputScript(
+              fromUnlockScript,
+              inputs.length,
+              outputs.length + 1, // + 1 is for change utxo
+              AssetScriptGasEstimator.Default(blockFlow)
+            )
+            alphRemainder <- UnsignedTransaction.calculateAlphRemainder(
+              inputAmounts,
+              outputAmounts,
+              gasPrice * gasBox
+            )
+            tokenRemainder <- UnsignedTransaction.calculateTokensRemainder(
+              inputs.flatMap(_.output.tokens),
+              outputs.flatMap(_.tokens)
+            )
+          } yield (alphRemainder, tokenRemainder)
+        case (Right(iv), Right(ov)) =>
+          Left(s"Total input value $iv is not enough for output value $ov and a minimal gas fee")
+        case (Left(err), _) => Left(err)
+        case (_, Left(err)) => Left(err)
+      }
     }
   }
 
