@@ -473,14 +473,13 @@ trait TxUtils { Self: FlowUtils =>
     )
   }
 
-  def amountsValid( // TODO more robust
-      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])],
-      allRemainingInputs: AVector[AssetOutputInfo]
+  def inputValueIsHigherThanOutputValue(
+      allRemainingInputs: AVector[AssetOutputInfo],
+      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])]
   ): Boolean = {
-    outputGroups.flatMap(_._1.map(_.attoAlphAmount)).iterator.foldLeft(Option(U256.Zero)) {
-      case (acc, n) =>
-        acc.flatMap(_.add(n))
-    } > allRemainingInputs.map(_.output.amount).iterator.foldLeft(Option(U256.Zero)) {
+    allRemainingInputs.map(_.output.amount).iterator.foldLeft(Option(U256.Zero)) { case (acc, n) =>
+      acc.flatMap(_.add(n))
+    } > outputGroups.flatMap(_._1.map(_.attoAlphAmount)).iterator.foldLeft(Option(U256.Zero)) {
       case (acc, n) =>
         acc.flatMap(_.add(n))
     }
@@ -527,7 +526,7 @@ trait TxUtils { Self: FlowUtils =>
         GasEstimation.estimateWithInputScript(
           fromUnlockScript,
           inputs.length,
-          breakDownUtxos.length + 1,
+          breakDownUtxos.length + 1,             // + 1 is for change utxo
           AssetScriptGasEstimator.NotImplemented // Not P2SH
         )
       tx <- UnsignedTransaction
@@ -560,8 +559,8 @@ trait TxUtils { Self: FlowUtils =>
       Right(acc)
     else if (allRemainingInputs.isEmpty)
       Left("Not enough utxos")
-    else if (amountsValid(outputGroups, allRemainingInputs))
-      Left("Not enough value")
+    else if (inputValueIsHigherThanOutputValue(allRemainingInputs, outputGroups))
+      Left("Input utxo value is not higher than output value")
     else if (allRemainingOutputsCount > allRemainingInputs.length) {
       for {
         txWithRemainingInputs <- buildChangeTxAndGetRemainingInputs(
@@ -633,7 +632,7 @@ trait TxUtils { Self: FlowUtils =>
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      outputRefsOpt: Option[AVector[AssetOutputRef]],
+      inputsOpt: Option[AVector[AssetOutputRef]],
       outputs: AVector[TxOutputInfo],
       totalGasOpt: Option[GasBox],
       gasPrice: GasPrice,
@@ -643,19 +642,19 @@ trait TxUtils { Self: FlowUtils =>
     assume(brokerConfig.contains(groupIndex))
     val outputsWithGasLimit = partitionOutputs(outputs, totalGasOpt)
     val results =
-      outputRefsOpt match {
-        case Some(allOutputRefs) if allOutputRefs.isEmpty =>
+      inputsOpt match {
+        case Some(allInputs) if allInputs.isEmpty =>
           Left("Provided Output Refs cannot be empty")
-        case Some(allOutputRefs) =>
+        case Some(allInputs) =>
           for {
-            _ <- checkUTXOsInSameGroup(allOutputRefs)
+            _ <- checkUTXOsInSameGroup(allInputs)
             view <- getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt).left
               .map(
                 _.getMessage
               )
             utxos <- view.getRelevantUtxos(fromLockupScript, 10000, true).left.map(_.getMessage)
-            allOutputRefsSet = allOutputRefs.toSet
-            relevantInputs   = utxos.filter(out => allOutputRefsSet.contains(out.ref))
+            allInputsSet   = allInputs.toSet
+            relevantInputs = utxos.filter(out => allInputsSet.contains(out.ref))
             txs <- buildTransactionsRecursively(
               fromLockupScript,
               fromUnlockScript,
