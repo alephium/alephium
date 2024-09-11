@@ -500,65 +500,83 @@ trait TxUtils { Self: FlowUtils =>
       }
   }
 
+  def buildChangeTxAndGetRemainingInputs(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      allRemainingInputs: AVector[AssetOutputInfo],
+      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])],
+      gasPrice: GasPrice
+  ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
+    val highestValueUtxo         = allRemainingInputs.maxBy(_.output.amount)
+    val allRemainingOutputsCount = outputGroups.map(_._1.length).sum
+    val missingUtxoCount         = allRemainingOutputsCount - allRemainingInputs.length
+    val changeUtxoAmount =
+      highestValueUtxo.output.amount.divUnsafe(U256.unsafe(missingUtxoCount + 1))
+    val breakDownUtxos = AVector.fill(missingUtxoCount)(
+      TxOutputInfo(
+        fromLockupScript,
+        changeUtxoAmount,
+        AVector.empty,
+        None
+      )
+    )
+    val inputs = AVector(highestValueUtxo.ref -> highestValueUtxo.output)
+
+    for {
+      gasNeeded <-
+        GasEstimation.estimateWithInputScript(
+          fromUnlockScript,
+          inputs.length,
+          breakDownUtxos.length + 1,
+          AssetScriptGasEstimator.NotImplemented // Not P2SH
+        )
+      tx <- UnsignedTransaction
+        .buildTransferTx(
+          fromLockupScript,
+          fromUnlockScript,
+          inputs,
+          breakDownUtxos,
+          gasNeeded,
+          gasPrice
+        )
+      changeUtxos = extractChangeFromTx(fromLockupScript, tx)
+    } yield (tx, allRemainingInputs.filterNot(_ == highestValueUtxo) ++ changeUtxos)
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def buildTransactionsRecursively(
       fromLockupScript: LockupScript.Asset, // Self address for receiving change outputs
       fromUnlockScript: UnlockScript,
-      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])],
       allRemainingInputs: AVector[AssetOutputInfo],
+      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])],
       gasPrice: GasPrice,
       acc: AVector[UnsignedTransaction]
   )(implicit
       groupConfig: GroupConfig,
       networkConfig: NetworkConfig
   ): Either[String, AVector[UnsignedTransaction]] = {
+    val allRemainingOutputsCount = outputGroups.map(_._1.length).sum
     if (outputGroups.isEmpty)
       Right(acc)
     else if (allRemainingInputs.isEmpty)
       Left("Not enough utxos")
     else if (amountsValid(outputGroups, allRemainingInputs))
       Left("Not enough value")
-    else if (outputGroups.tail.map(_._1.length).sum > allRemainingInputs.length) {
-
-      // More address groups than remaining UTXOs: break down UTXO
-      val highestValueUtxo =
-        allRemainingInputs.maxBy(_.output.amount) // Find the highest-value UTXO
-
-      // Break down the highest-value UTXO to create the missing UTXOs
-      val missingUtxoCount = outputGroups.tail.map(_._1.length).sum - allRemainingInputs.length
-
+    else if (allRemainingOutputsCount > allRemainingInputs.length) {
       for {
-        gasNeeded <-
-          GasEstimation.estimateWithInputScript(
-            fromUnlockScript,
-            1,
-            missingUtxoCount + 1,                  // for fromLockupScript
-            AssetScriptGasEstimator.NotImplemented // Not P2SH
-          )
-        tx <- UnsignedTransaction
-          .buildTransferTx(
-            fromLockupScript,
-            fromUnlockScript,
-            AVector(highestValueUtxo.ref -> highestValueUtxo.output),
-            AVector.fill(missingUtxoCount)(
-              TxOutputInfo(
-                fromLockupScript,
-                U256.unsafe(1),
-                AVector.empty,
-                None
-              ) // TODO calculate amounts
-            ),
-            gasNeeded,
-            gasPrice
-          )
-        change              = extractChangeFromTx(fromLockupScript, tx)
-        newRemainingOutputs = allRemainingInputs.filterNot(_ == highestValueUtxo) ++ change
-        accumulatedTxs      = acc :+ tx
+        txWithRemainingInputs <- buildChangeTxAndGetRemainingInputs(
+          fromLockupScript,
+          fromUnlockScript,
+          allRemainingInputs,
+          outputGroups,
+          gasPrice
+        )
+        accumulatedTxs = acc :+ txWithRemainingInputs._1
         txs <- buildTransactionsRecursively(
           fromLockupScript,
           fromUnlockScript,
+          txWithRemainingInputs._2,
           outputGroups,
-          newRemainingOutputs,
           gasPrice,
           accumulatedTxs
         )
@@ -587,7 +605,7 @@ trait TxUtils { Self: FlowUtils =>
           )(networkConfig)
         _ <- checkEstimatedGasAmount(selected.gas)
         selectedAssets = selected.assets.map(a => a.ref -> a.output).toSet
-        remainingAssets = AVector.from(
+        remainingInputs = AVector.from(
           allRemainingInputs.filterNot(out => selectedAssets.exists(p => p._1 == out.ref))
         )
         tx <- UnsignedTransaction
@@ -602,8 +620,8 @@ trait TxUtils { Self: FlowUtils =>
         txs <- buildTransactionsRecursively(
           fromLockupScript,
           fromUnlockScript,
+          remainingInputs,
           outputGroups.tail,
-          remainingAssets,
           gasPrice,
           acc :+ tx
         )
@@ -623,7 +641,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, AVector[UnsignedTransaction]] = {
     val groupIndex = fromLockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
-    val destinationsWithGasLimit = partitionOutputs(outputs, totalGasOpt)
+    val outputsWithGasLimit = partitionOutputs(outputs, totalGasOpt)
     val results =
       outputRefsOpt match {
         case Some(allOutputRefs) if allOutputRefs.isEmpty =>
@@ -637,18 +655,18 @@ trait TxUtils { Self: FlowUtils =>
               )
             utxos <- view.getRelevantUtxos(fromLockupScript, 10000, true).left.map(_.getMessage)
             allOutputRefsSet = allOutputRefs.toSet
-            relevantUtxos    = utxos.filter(out => allOutputRefsSet.contains(out.ref))
+            relevantInputs   = utxos.filter(out => allOutputRefsSet.contains(out.ref))
             txs <- buildTransactionsRecursively(
               fromLockupScript,
               fromUnlockScript,
-              destinationsWithGasLimit,
-              relevantUtxos,
+              relevantInputs,
+              outputsWithGasLimit,
               gasPrice,
               AVector.empty[UnsignedTransaction]
             )
           } yield txs
         case None =>
-          destinationsWithGasLimit
+          outputsWithGasLimit
             .map { case (groupOutputs, gasOpt) =>
               transfer(
                 targetBlockHashOpt,
