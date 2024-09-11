@@ -212,6 +212,25 @@ class ServerUtils(implicit
     Right(result)
   }
 
+  def buildMultiTransaction(
+      blockFlow: BlockFlow,
+      query: BuildTransaction
+  ): Try[AVector[BuildTransactionResult]] = {
+    for {
+      lockPair <- query.getLockPair()
+      unsignedTxs <- prepareUnsignedMultiTransactions(
+        blockFlow,
+        lockPair._1,
+        lockPair._2,
+        query.utxos,
+        query.destinations,
+        query.gasAmount,
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+        query.targetBlockHash
+      )
+    } yield unsignedTxs.map(BuildTransactionResult.from)
+  }
+
   def buildTransaction(
       blockFlow: BlockFlow,
       query: BuildTransaction
@@ -858,6 +877,52 @@ class ServerUtils(implicit
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
+    }
+  }
+
+  def prepareUnsignedMultiTransactions(
+      blockFlow: BlockFlow,
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      outputRefsOpt: Option[AVector[OutputRef]],
+      destinations: AVector[Destination],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
+  ): Try[AVector[UnsignedTransaction]] = {
+    val outputInfos = prepareOutputInfos(destinations)
+    val assetOutputRefsE: Either[String, Option[AVector[AssetOutputRef]]] =
+      outputRefsOpt match {
+        case Some(outputRefs) => prepareOutputRefs(outputRefs).map(Option(_))
+        case None             => Right(None)
+      }
+
+    val transferResult =
+      for {
+        assetOutputRefs <- assetOutputRefsE
+        result <- blockFlow.multiTransfer(
+          targetBlockHashOpt,
+          fromLockupScript,
+          fromUnlockScript,
+          assetOutputRefs,
+          outputInfos,
+          gasOpt,
+          gasPrice,
+          apiConfig.defaultUtxosLimit
+        )
+      } yield result
+
+    transferResult match {
+      case Right(unsignedTransactions) =>
+        unsignedTransactions
+          .map(validateUnsignedTransaction)
+          .iterator
+          .foldLeft[Try[AVector[UnsignedTransaction]]](Right(AVector.empty[UnsignedTransaction])) {
+            case (Right(acc), Right(value)) => Right(acc :+ value)
+            case (_, Left(err))             => Left(err)
+            case (acc, _)                   => acc
+          }
+      case Left(error) => Left(failed(error))
     }
   }
 

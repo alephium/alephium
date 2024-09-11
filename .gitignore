@@ -5,6 +5,8 @@ hs_err_*
 
 .bloop
 .metals
+.idea
+.bsp
 project/.bloop
 project/project
 project/metals.sbt

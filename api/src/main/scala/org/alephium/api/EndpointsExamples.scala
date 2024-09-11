@@ -490,6 +490,20 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val buildTransactionResultsExamples: List[Example[AVector[BuildTransactionResult]]] =
+    simpleExample(
+      AVector(
+        BuildTransactionResult(
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId,
+          fromGroup = 2,
+          toGroup = 1
+        )
+      )
+    )
+
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
