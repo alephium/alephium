@@ -452,22 +452,23 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def partitionDestinations(
-      destinations: AVector[TxOutputInfo],
+  def partitionOutputs(
+      outputs: AVector[TxOutputInfo],
       totalGasOpt: Option[GasBox]
   )(implicit
       groupConfig: GroupConfig
   ): AVector[(AVector[TxOutputInfo], Option[GasBox])] = {
-    val destinationsByGroup = destinations.groupBy(_.lockupScript.groupIndex(groupConfig))
-    val gasPerDestinationOpt = totalGasOpt.map { gas =>
-      val totalDestinations = destinationsByGroup.view.mapValues(_.length).values.sum
+    val outputsByGroup = outputs.groupBy(_.lockupScript.groupIndex(groupConfig))
+    val gasPerOutputOpt = totalGasOpt.map { gas =>
+      val totalDestinations = outputsByGroup.view.mapValues(_.length).values.sum
       Math.round(gas.value.toFloat / totalDestinations) // primitive rounding
     }
     AVector.from(
-      destinationsByGroup.values
-        .map { dest =>
-          val gasPerGroup = gasPerDestinationOpt.map(f => GasBox.unsafe(f * dest.length))
-          dest -> gasPerGroup
+      outputsByGroup.values
+        .map { outputs =>
+          val gasPerGroup =
+            gasPerOutputOpt.map(gasPerOutput => GasBox.unsafe(gasPerOutput * outputs.length))
+          outputs -> gasPerGroup
         }
     )
   }
@@ -483,6 +484,20 @@ trait TxUtils { Self: FlowUtils =>
       case (acc, n) =>
         acc.flatMap(_.add(n))
     }
+  }
+
+  def extractChangeFromTx(
+      fromLockupScript: LockupScript.Asset,
+      tx: UnsignedTransaction
+  ): AVector[AssetOutputInfo] = {
+    tx.fixedOutputs
+      .mapWithIndex { case (output, outputIndex) =>
+        AssetOutputRef.from(output, TxOutputRef.key(tx.id, outputIndex)) -> output
+      }
+      .collect {
+        case (ref, output) if output.lockupScript == fromLockupScript =>
+          AssetOutputInfo(ref, output, MemPoolOutput)
+      }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -520,8 +535,8 @@ trait TxUtils { Self: FlowUtils =>
             missingUtxoCount + 1,                  // for fromLockupScript
             AssetScriptGasEstimator.NotImplemented // Not P2SH
           )
-        changeAndTx <- UnsignedTransaction
-          .buildTransferTxWithChange(
+        tx <- UnsignedTransaction
+          .buildTransferTx(
             fromLockupScript,
             fromUnlockScript,
             AVector(highestValueUtxo.ref -> highestValueUtxo.output),
@@ -536,17 +551,16 @@ trait TxUtils { Self: FlowUtils =>
             gasNeeded,
             gasPrice
           )
+        change              = extractChangeFromTx(fromLockupScript, tx)
+        newRemainingOutputs = allRemainingInputs.filterNot(_ == highestValueUtxo) ++ change
+        accumulatedTxs      = acc :+ tx
         txs <- buildTransactionsRecursively(
           fromLockupScript,
           fromUnlockScript,
           outputGroups,
-          allRemainingInputs.filterNot(
-            _ == highestValueUtxo
-          ) ++ changeAndTx._1.map { case (ref, out) =>
-            AssetOutputInfo(ref, out, MemPoolOutput)
-          }, // Remove the broken-down UTXO and add new UTXOs
+          newRemainingOutputs,
           gasPrice,
-          acc :+ changeAndTx._2 // Add the breakdown transaction to the accumulated list
+          accumulatedTxs
         )
       } yield txs
 
@@ -576,8 +590,8 @@ trait TxUtils { Self: FlowUtils =>
         remainingAssets = AVector.from(
           allRemainingInputs.filterNot(out => selectedAssets.exists(p => p._1 == out.ref))
         )
-        changeAndTransaction <- UnsignedTransaction
-          .buildTransferTxWithChange(
+        tx <- UnsignedTransaction
+          .buildTransferTx(
             fromLockupScript,
             fromUnlockScript,
             selected.assets.map(a => a.ref -> a.output),
@@ -591,7 +605,7 @@ trait TxUtils { Self: FlowUtils =>
           outputGroups.tail,
           remainingAssets,
           gasPrice,
-          acc :+ changeAndTransaction._2
+          acc :+ tx
         )
       } yield txs
     }
@@ -609,7 +623,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, AVector[UnsignedTransaction]] = {
     val groupIndex = fromLockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
-    val destinationsWithGasLimit = partitionDestinations(outputs, totalGasOpt)
+    val destinationsWithGasLimit = partitionOutputs(outputs, totalGasOpt)
     val results =
       outputRefsOpt match {
         case Some(allOutputRefs) if allOutputRefs.isEmpty =>

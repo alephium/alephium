@@ -890,7 +890,6 @@ class ServerUtils(implicit
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
   ): Try[AVector[UnsignedTransaction]] = {
-    val outputInfos = prepareOutputInfos(destinations)
     val assetOutputRefsE: Either[String, Option[AVector[AssetOutputRef]]] =
       outputRefsOpt match {
         case Some(outputRefs) => prepareOutputRefs(outputRefs).map(Option(_))
@@ -900,6 +899,7 @@ class ServerUtils(implicit
     val transferResult =
       for {
         assetOutputRefs <- assetOutputRefsE
+        outputInfos = prepareOutputInfos(destinations)
         result <- blockFlow.multiTransfer(
           targetBlockHashOpt,
           fromLockupScript,

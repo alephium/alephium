@@ -252,38 +252,6 @@ object UnsignedTransaction {
     }
   }
 
-  def buildTransferTxWithChange(
-      fromLockupScript: LockupScript.Asset,
-      fromUnlockScript: UnlockScript,
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
-      outputInfos: AVector[TxOutputInfo],
-      gas: GasBox,
-      gasPrice: GasPrice
-  )(implicit
-      networkConfig: NetworkConfig
-  ): Either[String, (AVector[(AssetOutputRef, AssetOutput)], UnsignedTransaction)] = {
-    for {
-      gasFee <- preCheckBuildTx(inputs, gas, gasPrice)
-      _      <- checkMinimalAlphPerOutput(outputInfos)
-      _      <- checkTokenValuesNonZero(outputInfos)
-      txOutputs = buildOutputs(outputInfos)
-      changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
-    } yield {
-      val tx = UnsignedTransaction(
-        None,
-        gas,
-        gasPrice,
-        buildInputs(fromUnlockScript, inputs),
-        txOutputs ++ changeOutputs
-      )
-      val change =
-        changeOutputs.map(ao =>
-          tx.fixedOutputRefs(tx.fixedOutputs.indexWhere(_ == ao)) -> ao
-        ) // TODO improve
-      change -> tx
-    }
-  }
-
   def buildOutputs(outputInfos: AVector[TxOutputInfo]): AVector[AssetOutput] = {
     outputInfos.flatMap(buildOutputs)
   }
