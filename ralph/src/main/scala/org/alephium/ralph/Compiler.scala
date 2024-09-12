@@ -879,7 +879,7 @@ object Compiler {
       val unusedFields         = mutable.ArrayBuffer.empty[String]
       unusedVars.foreach {
         case (name, c: VarInfo.Constant[_]) =>
-          if (c.constantDef.origin.contains(typeId)) {
+          if (c.constantDef.definedIn(typeId)) {
             unusedLocalConstants.addOne(name)
           }
         case (name, varInfo) if !varInfo.isLocal => unusedFields.addOne(name)

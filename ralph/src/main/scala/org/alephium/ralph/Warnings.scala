@@ -78,9 +78,9 @@ trait Warnings {
     }
   }
 
-  def warnUnusedPrivateFunction(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+  def warnUnusedPrivateFunction(typeId: Ast.TypeId, funcIds: Seq[String]): Unit = {
     if (!compilerOptions.ignoreUnusedPrivateFunctionsWarnings) {
-      warnings += s"Private function ${Ast.funcName(typeId, funcId)} is not used"
+      warnings += Warnings.unusedPrivateFunctions(typeId, funcIds)
     }
   }
 
@@ -123,5 +123,9 @@ object Warnings {
 
   def unusedLocalConstants(typeId: Ast.TypeId, unusedConstants: collection.Seq[String]): String = {
     s"Found unused constants in ${typeId.name}: ${unusedConstants.sorted.mkString(", ")}"
+  }
+
+  def unusedPrivateFunctions(typeId: Ast.TypeId, unusedFuncs: collection.Seq[String]): String = {
+    s"Found unused private functions in ${typeId.name}: ${unusedFuncs.sorted.mkString(", ")}"
   }
 }

@@ -64,10 +64,13 @@ object StaticAnalysis {
       ast: Ast.ContractT[Ctx],
       state: Compiler.State[Ctx]
   ): Unit = {
-    ast.funcs.foreach { func =>
-      if (func.isPrivate && !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)) {
-        state.warnUnusedPrivateFunction(ast.ident, func.id)
-      }
+    val unusedFuncs = ast.funcs.filter { func =>
+      func.isPrivate &&
+      func.definedIn(ast.ident) &&
+      !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)
+    }
+    if (unusedFuncs.nonEmpty) {
+      state.warnUnusedPrivateFunction(ast.ident, unusedFuncs.map(_.name))
     }
   }
 

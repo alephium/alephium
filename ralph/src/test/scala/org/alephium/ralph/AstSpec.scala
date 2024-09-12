@@ -682,48 +682,6 @@ class AstSpec extends AlephiumSpec {
       AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
   }
 
-  behavior of "Private function usage"
-
-  it should "check if private functions are used" in {
-    val code0 =
-      s"""
-         |Contract Foo() {
-         |  fn private0() -> () {}
-         |  fn private1() -> () {}
-         |
-         |  @using(checkExternalCaller = false)
-         |  pub fn public() -> () {
-         |    private0()
-         |  }
-         |}
-         |""".stripMargin
-    val warnings0 = Compiler.compileContractFull(code0, 0).rightValue.warnings
-    warnings0 is AVector(s"""Private function "Foo.private1" is not used""")
-
-    val code1 =
-      s"""
-         |Abstract Contract Foo() {
-         |  fn foo0() -> U256 {
-         |    return 0
-         |  }
-         |  fn foo1() -> () {
-         |    let _ = foo0()
-         |  }
-         |}
-         |Contract Bar() extends Foo() {
-         |  @using(checkExternalCaller = false)
-         |  pub fn bar() -> () { foo1() }
-         |}
-         |Contract Baz() extends Foo() {
-         |  @using(checkExternalCaller = false)
-         |  pub fn baz() -> () { foo1() }
-         |}
-         |""".stripMargin
-    val contracts = Compiler.compileProject(code1).rightValue._1
-    contracts.length is 2
-    contracts.foreach(_.warnings.isEmpty is true)
-  }
-
   behavior of "Compiler"
 
   it should "check unique TxScript/Contract/Interface name" in {

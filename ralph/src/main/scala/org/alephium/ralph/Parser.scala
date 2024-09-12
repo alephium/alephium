@@ -882,7 +882,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     ).map { case (defs, assetIndex, typeId, templateVars, funcs, endIndex) =>
       val globalState = Ast.GlobalState.from[StatelessContext](defs)
       val assetScript = Ast
-        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
+        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs.map(_.withOrigin(typeId)))
         .atSourceIndex(assetIndex.index, endIndex, fileURI)
       (assetScript, globalState)
     }
@@ -1057,9 +1057,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
                 mainFuncOpt.flatMap(_.id.sourceIndex)
               )
             }
-            val restFuncs = funcs.filter(_.name != "main")
+            val allFuncs = (mainFunc +: funcs.filter(_.name != "main")).map(_.withOrigin(typeId))
             Ast
-              .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: restFuncs)
+              .TxScript(typeId, templateVars.getOrElse(Seq.empty), allFuncs)
               .atSourceIndex(scriptIndex.index, endIndex, fileURI)
           }
       }
@@ -1158,7 +1158,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             typeId,
             Seq.empty,
             fields,
-            funcs.toSeq,
+            funcs.map(_.withOrigin(typeId)).toSeq,
             maps.toSeq,
             events.toSeq,
             constantVars.toSeq,
@@ -1238,7 +1238,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
           stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),
           usingFields.methodSelector,
           typeId,
-          funcs,
+          funcs.map(_.withOrigin(typeId)),
           events,
           inheritances.map(_._2).getOrElse(Seq.empty)
         )

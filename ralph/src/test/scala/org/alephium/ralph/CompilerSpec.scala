@@ -7667,24 +7667,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "report the correct warnings for unused constants" in {
-    def check(
-        code: String,
-        contractWarnings: AVector[(String, AVector[String])],
-        globalWarnings: AVector[String]
-    ) = {
-      val result = Compiler.compileProject(code).rightValue
-      result._4 is globalWarnings
-      result._1.zipWithIndex.foreach { case (contract, index) =>
+  def checkWarnings(
+      code: String,
+      contractWarnings: AVector[(String, AVector[String])],
+      globalWarnings: AVector[String]
+  ) = {
+    val result0 = Compiler.compileProject(code).rightValue
+    result0._4 is globalWarnings
+    result0._1.zipWithIndex.foreach { case (contract, index) =>
+      if (!contract.ast.isAbstract) {
         val value = contractWarnings(index)
         contract.ast.ident.name is value._1
         contract.warnings is value._2
       }
-      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
-      val contracts       = Compiler.compileProject(code, compilerOptions).rightValue._1
-      contracts.foreach(_.warnings.isEmpty is true)
     }
+    val compilerOptions = CompilerOptions.Default.copy(
+      ignoreUnusedConstantsWarnings = true,
+      ignoreUnusedPrivateFunctionsWarnings = true
+    )
+    val result1 = Compiler.compileProject(code, compilerOptions).rightValue
+    result1._1.forall(_.warnings.isEmpty) is true
+    result1._4.isEmpty is true
+  }
 
+  it should "report the correct warnings for unused constants" in {
     {
       info("unused parent constants")
       val code =
@@ -7706,7 +7712,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
         AVector("Found unused constants in Foo: Foo2")
@@ -7736,7 +7742,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(
           ("Bar", AVector.empty[String]),
@@ -7774,7 +7780,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(
           ("Bar", AVector.empty[String]),
@@ -7810,7 +7816,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(
           ("Bar", AVector.empty[String]),
@@ -7857,11 +7863,115 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
         AVector.empty[String]
       )
+    }
+  }
+
+  it should "report the correct warnings for private functions" in {
+    {
+      info("unused private functions in contract")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  fn bar() -> () {}
+           |  fn baz() -> () {}
+           |  fn qux() -> () {}
+           |}
+           |""".stripMargin
+      checkWarnings(
+        code,
+        AVector(("Foo", AVector("Found unused private functions in Foo: baz, qux"))),
+        AVector.empty
+      )
+    }
+
+    {
+      info("unused private functions in script")
+      val code =
+        s"""
+           |TxScript Main {
+           |  foo()
+           |
+           |  fn foo() -> () {}
+           |  fn bar() -> () {}
+           |  fn qux() -> () {}
+           |}
+           |""".stripMargin
+      val script = Compiler.compileProject(code).rightValue._2.head
+      script.warnings is AVector("Found unused private functions in Main: bar, qux")
+    }
+
+    {
+      info("unused private functions in abstract contract")
+      val code =
+        s"""
+           |Contract Foo() extends Bar() {
+           |  pub fn foo0() -> () {
+           |    bar0()
+           |  }
+           |  fn foo1() -> () {}
+           |}
+           |Abstract Contract Bar() {
+           |  fn bar0() -> () {}
+           |  fn bar1() -> () {}
+           |}
+           |""".stripMargin
+      checkWarnings(
+        code,
+        AVector(("Foo", AVector("Found unused private functions in Foo: foo1"))),
+        AVector("Found unused private functions in Bar: bar1")
+      )
+    }
+
+    {
+      info("no warnings if the private function used by child contracts")
+      val code =
+        s"""
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> () { foo1() }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> () { foo1() }
+           |}
+           |Abstract Contract Foo() {
+           |  fn foo0() -> U256 {
+           |    return 0
+           |  }
+           |  fn foo1() -> () {
+           |    let _ = foo0()
+           |  }
+           |}
+           |""".stripMargin
+      checkWarnings(code, AVector(("Bar", AVector.empty), ("Baz", AVector.empty)), AVector.empty)
+    }
+
+    {
+      info("no warnings if the private function used by different child contracts")
+      val code =
+        s"""
+           |Contract Foo() extends Baz() {
+           |  pub fn foo() -> () {
+           |    baz0()
+           |  }
+           |}
+           |Contract Bar() extends Baz() {
+           |  pub fn bar() -> () {
+           |    baz1()
+           |  }
+           |}
+           |Abstract Contract Baz() {
+           |  fn baz0() -> () {}
+           |  fn baz1() -> () {}
+           |}
+           |""".stripMargin
+      checkWarnings(code, AVector(("Foo", AVector.empty), ("Bar", AVector.empty)), AVector.empty)
     }
   }
 

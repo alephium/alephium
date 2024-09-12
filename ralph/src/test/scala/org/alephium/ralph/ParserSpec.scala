@@ -1452,6 +1452,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val tokenImpl      = extended.contracts(1).asInstanceOf[Contract]
       tokenInterface.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
       tokenImpl.stdInterfaceId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+
+      tokenInterface.funcs.forall(_.definedIn(tokenInterface.ident)) is true
+      tokenImpl.funcs.forall(_.definedIn(tokenImpl.ident)) is true
     }
 
     {
@@ -2007,6 +2010,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     )
+    result._1.funcs.forall(_.definedIn(TypeId("Main"))) is true
   }
 
   // scalastyle:off no.equal
@@ -2023,11 +2027,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
                     |}
                     |""".stripMargin
 
-    parse(script, StatefulParser.txScript(_)).get.value is TxScript(
-      ident,
-      templateVars,
-      funcs
-    )
+    val parsed = parse(script, StatefulParser.txScript(_)).get.value
+    parsed is TxScript(ident, templateVars, funcs)
+    parsed.funcs.forall(_.definedIn(parsed.ident)) is true
   }
   // scalastyle:on no.equal
 
@@ -2435,7 +2437,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
   }
 
-  it should "set the origin contract id for constants" in {
+  it should "set the origin contract id for constants and functions" in {
     val code =
       s"""
          |const G0 = 0
@@ -2444,11 +2446,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
          |  const Foo0 = 0
          |  enum Foo1 { V = 1 }
          |  pub fn foo() -> () {}
+         |  fn baz() -> ()
          |}
          |Contract Bar() extends Foo() {
          |  const Bar0 = 0
          |  enum Bar1 { V = 1 }
          |  pub fn bar() -> () {}
+         |  fn baz() -> () {}
          |}
          |""".stripMargin
 
@@ -2464,6 +2468,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     foo.constantVars(0).origin is Some(TypeId("Foo"))
     foo.enums.length is 1
     foo.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
+    foo.funcs.forall(_.definedIn(foo.ident)) is true
 
     val bar = multiContract.get(1).asInstanceOf[Contract]
     bar.isAbstract is false
@@ -2474,6 +2479,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     bar.enums.length is 2
     bar.enums(0).fields.foreach(_.origin is Some(TypeId("Foo")))
     bar.enums(1).fields.foreach(_.origin is Some(TypeId("Bar")))
+    bar.getFuncUnsafe(FuncId("foo", false)).definedIn(foo.ident) is true
+    bar.getFuncUnsafe(FuncId("bar", false)).definedIn(bar.ident) is true
+    bar.getFuncUnsafe(FuncId("baz", false)).definedIn(bar.ident) is true
   }
 
   it should "parse negation on variable" in {
