@@ -473,16 +473,26 @@ trait TxUtils { Self: FlowUtils =>
     )
   }
 
-  def inputValueIsHigherThanOutputValue(
+  def getPositiveAlphRemainderOrFail(
       allRemainingInputs: AVector[AssetOutputInfo],
       outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])]
-  ): Boolean = {
-    allRemainingInputs.map(_.output.amount).iterator.foldLeft(Option(U256.Zero)) { case (acc, n) =>
-      acc.flatMap(_.add(n))
-    } > outputGroups.flatMap(_._1.map(_.attoAlphAmount)).iterator.foldLeft(Option(U256.Zero)) {
-      case (acc, n) =>
-        acc.flatMap(_.add(n))
+  ): Either[String, U256] = {
+    val inputValue =
+      allRemainingInputs.map(_.output.amount).iterator.foldLeft(Option(U256.Zero)) {
+        case (acc, n) =>
+          acc.flatMap(_.add(n))
+      }
+    val outputValue =
+      outputGroups.flatMap(_._1.map(_.attoAlphAmount)).iterator.foldLeft(Option(U256.Zero)) {
+        case (acc, n) =>
+          acc.flatMap(_.add(n))
+      }
+    (inputValue, outputValue) match {
+      case (Some(iv), Some(ov)) if iv > ov => Right(iv.subUnsafe(ov))
+      case (_, _) =>
+        Left(s"Total input value $inputValue is not enough for output value $outputValue")
     }
+
   }
 
   def extractChangeFromTx(
@@ -551,17 +561,11 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice,
       acc: AVector[UnsignedTransaction]
   )(implicit
-      groupConfig: GroupConfig,
       networkConfig: NetworkConfig
   ): Either[String, AVector[UnsignedTransaction]] = {
-    val allRemainingOutputsCount = outputGroups.map(_._1.length).sum
     if (outputGroups.isEmpty)
       Right(acc)
-    else if (allRemainingInputs.isEmpty)
-      Left("Not enough utxos")
-    else if (inputValueIsHigherThanOutputValue(allRemainingInputs, outputGroups))
-      Left("Input utxo value is not higher than output value")
-    else if (allRemainingOutputsCount > allRemainingInputs.length) {
+    else if (outputGroups.map(_._1.length).sum > allRemainingInputs.length) {
       for {
         txWithRemainingInputs <- buildChangeTxAndGetRemainingInputs(
           fromLockupScript,
@@ -582,38 +586,31 @@ trait TxUtils { Self: FlowUtils =>
       } yield txs
 
     } else {
-      // Normal transaction building: Select UTXOs for the current group
+      val (currentOutputs, currentGas) = outputGroups.head
       for {
-        _ <- checkOutputInfos(fromLockupScript.groupIndex(groupConfig), outputGroups.head._1)
-        _ <- checkProvidedGas(outputGroups.head._2, gasPrice)
-        _ <- checkTotalAttoAlphAmount(outputGroups.head._1.map(_.attoAlphAmount))
-        _ <- UnsignedTransaction.calculateTotalAmountPerToken(
-          outputGroups.head._1.flatMap(_.tokens)
-        )
-        calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputGroups.head._1)
+        _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
+        _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
+        amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
         selected <- UtxoSelectionAlgo
-          .Build(ProvidedGas(outputGroups.head._2, gasPrice, None))
+          .Build(ProvidedGas(currentGas, gasPrice, None))
           .select(
-            AssetAmounts(calculateResult._1, calculateResult._2),
+            AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
             fromUnlockScript,
             allRemainingInputs,
-            calculateResult._3,
+            amountTokensOutputCount._3,
             txScriptOpt = None,
-            AssetScriptGasEstimator.Default(Self.blockFlow)(networkConfig, groupConfig),
+            AssetScriptGasEstimator.Default(Self.blockFlow),
             TxScriptGasEstimator.NotImplemented
-          )(networkConfig)
-        _ <- checkEstimatedGasAmount(selected.gas)
-        selectedAssets = selected.assets.map(a => a.ref -> a.output).toSet
-        remainingInputs = AVector.from(
-          allRemainingInputs.filterNot(out => selectedAssets.exists(p => p._1 == out.ref))
-        )
+          )
+        selectedAssetSet = selected.assets.map(_.ref).toSet
+        remainingInputs  = allRemainingInputs.filterNot(out => selectedAssetSet.contains(out.ref))
         tx <- UnsignedTransaction
           .buildTransferTx(
             fromLockupScript,
             fromUnlockScript,
             selected.assets.map(a => a.ref -> a.output),
-            outputGroups.head._1,
-            selected.gas, // no do we use Selection Gas or Gas fraction provided by user ???
+            currentOutputs,
+            selected.gas,
             gasPrice
           )
         txs <- buildTransactionsRecursively(
@@ -655,6 +652,7 @@ trait TxUtils { Self: FlowUtils =>
             utxos <- view.getRelevantUtxos(fromLockupScript, 10000, true).left.map(_.getMessage)
             allInputsSet   = allInputs.toSet
             relevantInputs = utxos.filter(out => allInputsSet.contains(out.ref))
+            _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputsWithGasLimit)
             txs <- buildTransactionsRecursively(
               fromLockupScript,
               fromUnlockScript,
