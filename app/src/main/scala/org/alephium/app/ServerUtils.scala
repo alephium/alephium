@@ -17,32 +17,30 @@
 package org.alephium.app
 
 import java.math.BigInteger
-
-import scala.concurrent._
-
+import scala.concurrent.*
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
-
-import org.alephium.api._
+import org.alephium.api.*
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{AssetOutput as _, Transaction as _, TransactionTemplate as _, *}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
-import org.alephium.flow.core.UtxoSelectionAlgo._
-import org.alephium.flow.gasestimation._
+import org.alephium.flow.core.UtxoSelectionAlgo.*
+import org.alephium.flow.gasestimation.*
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.config._
-import org.alephium.protocol.model._
+import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema, vm}
+import org.alephium.protocol.config.*
+import org.alephium.protocol.model.*
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
+import org.alephium.protocol.vm.{ContractState as _, Val as _, failed as _, *}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
-import org.alephium.util._
+import org.alephium.util.*
+import sttp.model.StatusCode
 
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit number.of.types
@@ -218,13 +216,17 @@ class ServerUtils(implicit
   ): Try[AVector[BuildTransactionResult]] = {
     for {
       lockPair <- query.getLockPair()
+      _ <- Either.cond(
+        query.gasAmount.isEmpty,
+        (),
+        ApiError.BadRequest("Explicit Gas Amount is not allowed")
+      )
       unsignedTxs <- prepareUnsignedMultiTransactions(
         blockFlow,
         lockPair._1,
         lockPair._2,
         query.utxos,
         query.destinations,
-        query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash
       )
@@ -886,7 +888,6 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
-      gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
   ): Try[AVector[UnsignedTransaction]] = {
@@ -906,7 +907,6 @@ class ServerUtils(implicit
           fromUnlockScript,
           assetOutputRefs,
           outputInfos,
-          gasOpt,
           gasPrice,
           apiConfig.defaultUtxosLimit
         )

@@ -452,63 +452,20 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  /** Partition outputs by Group together with gas proportionally
-    * @param outputs
-    *   from possibly more groups to be partitioned proportionally with gas
-    * @param totalGasOpt
-    *   to proportionally partition for given outputs in a group
-    * @return
-    *   groups of outputs and amount of gas proportional to their number
-    */
-  def partitionOutputs(
-      outputs: AVector[TxOutputInfo],
-      totalGasOpt: Option[GasBox]
-  ): AVector[(AVector[TxOutputInfo], Option[GasBox])] = {
-    val outputsByGroup = outputs.groupBy(_.lockupScript.groupIndex)
-    val gasPerOutputAndRemainderOpt = totalGasOpt.map { gas =>
-      val totalOutputs = outputsByGroup.view.mapValues(_.length).values.sum
-      val gasPerOutput = gas.value / totalOutputs
-      val remainder    = gas.value % totalOutputs
-      gasPerOutput -> remainder
-    }
-    AVector.from(
-      outputsByGroup.values.zipWithIndex
-        .map { case (outputs, index) =>
-          val gasPerGroup =
-            gasPerOutputAndRemainderOpt.map { case (gasPerOutput, remainderGas) =>
-              val totalGas = gasPerOutput * outputs.length
-              val extraGas = if (index < remainderGas) 1 else 0
-              GasBox.unsafe(totalGas + extraGas)
-            }
-          outputs -> gasPerGroup
-        }
-    )
-  }
-
   def getPositiveAlphRemainderOrFail(
       inputs: AVector[AssetOutputInfo],
-      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])]
+      outputs: AVector[TxOutputInfo]
   ): Either[String, U256] = {
     val totalInputValue =
       inputs.map(_.output.amount).fold(Option(U256.Zero)) { case (acc, n) =>
         acc.flatMap(_.add(n))
       }
-    val totalOutputValueWithGas =
-      outputGroups.fold(Option(U256.Zero)) { case (outerAccOpt, (outs, gasOpt)) =>
-        val outputValueOpt =
-          outs.map(_.attoAlphAmount).fold(Option(U256.Zero)) { case (innerAcc, n) =>
-            innerAcc.flatMap(_.add(n))
-          }
-        val outputValueWithGasOpt =
-          outputValueOpt.map(v => gasOpt.fold(v)(gas => gas.toU256.addUnsafe(v)))
-
-        for {
-          outerAcc           <- outerAccOpt
-          outputValueWithGas <- outputValueWithGasOpt
-          result             <- outerAcc.add(outputValueWithGas)
-        } yield result
+    val totalOutputValue =
+      outputs.map(_.attoAlphAmount).fold(Option(U256.Zero)) { case (acc, n) =>
+        acc.flatMap(_.add(n))
       }
-    (totalInputValue, totalOutputValueWithGas) match {
+
+    (totalInputValue, totalOutputValue) match {
       case (Some(iv), Some(ov)) if iv > ov => Right(iv.subUnsafe(ov))
       case (None, Some(_)) =>
         Left(s"Invalid total input value")
@@ -540,11 +497,11 @@ trait TxUtils { Self: FlowUtils =>
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       allRemainingInputs: AVector[AssetOutputInfo],
-      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])],
+      outputGroups: AVector[AVector[TxOutputInfo]],
       gasPrice: GasPrice
   ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
     val highestValueUtxo         = allRemainingInputs.maxBy(_.output.amount)
-    val allRemainingOutputsCount = outputGroups.map(_._1.length).sum
+    val allRemainingOutputsCount = outputGroups.map(_.length).sum
     val missingUtxoCount         = allRemainingOutputsCount - allRemainingInputs.length
     val changeUtxoAmount =
       highestValueUtxo.output.amount.divUnsafe(U256.unsafe(missingUtxoCount + 1))
@@ -584,7 +541,7 @@ trait TxUtils { Self: FlowUtils =>
       fromLockupScript: LockupScript.Asset, // Self address for receiving change outputs
       fromUnlockScript: UnlockScript,
       allRemainingInputs: AVector[AssetOutputInfo],
-      outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])],
+      outputGroups: AVector[AVector[TxOutputInfo]],
       gasPrice: GasPrice,
       acc: AVector[UnsignedTransaction]
   )(implicit
@@ -592,7 +549,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, AVector[UnsignedTransaction]] = {
     if (outputGroups.isEmpty)
       Right(acc)
-    else if (outputGroups.map(_._1.length).sum > allRemainingInputs.length) {
+    else if (outputGroups.map(_.length).sum > allRemainingInputs.length) {
       for {
         txWithRemainingInputs <- buildChangeTxAndGetRemainingInputs(
           fromLockupScript,
@@ -613,13 +570,13 @@ trait TxUtils { Self: FlowUtils =>
       } yield txs
 
     } else {
-      val (currentOutputs, currentGas) = outputGroups.head
+      val currentOutputs = outputGroups.head
       for {
         _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
         _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
         amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
         selected <- UtxoSelectionAlgo
-          .Build(ProvidedGas(currentGas, gasPrice, None))
+          .Build(ProvidedGas(None, gasPrice, None))
           .select(
             AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
             fromUnlockScript,
@@ -658,13 +615,12 @@ trait TxUtils { Self: FlowUtils =>
       fromUnlockScript: UnlockScript,
       inputsOpt: Option[AVector[AssetOutputRef]],
       outputs: AVector[TxOutputInfo],
-      totalGasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int
   ): Either[String, AVector[UnsignedTransaction]] = {
     val groupIndex = fromLockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
-    val outputsWithGasLimit = partitionOutputs(outputs, totalGasOpt)
+    val groupedOutputs = AVector.from(outputs.groupBy(_.lockupScript.groupIndex).values)
     val results =
       inputsOpt match {
         case Some(allInputs) if allInputs.isEmpty =>
@@ -679,25 +635,25 @@ trait TxUtils { Self: FlowUtils =>
             utxos <- view.getRelevantUtxos(fromLockupScript, 10000, true).left.map(_.getMessage)
             allInputsSet   = allInputs.toSet
             relevantInputs = utxos.filter(out => allInputsSet.contains(out.ref))
-            _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputsWithGasLimit)
+            _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputs)
             txs <- buildTransactionsRecursively(
               fromLockupScript,
               fromUnlockScript,
               relevantInputs,
-              outputsWithGasLimit,
+              groupedOutputs,
               gasPrice,
               AVector.empty[UnsignedTransaction]
             )
           } yield txs
         case None =>
-          outputsWithGasLimit
-            .map { case (groupOutputs, gasOpt) =>
+          groupedOutputs
+            .map { groupOutputs =>
               transfer(
                 targetBlockHashOpt,
                 fromLockupScript,
                 fromUnlockScript,
                 groupOutputs,
-                gasOpt,
+                gasOpt = None,
                 gasPrice,
                 utxosLimit
               )
