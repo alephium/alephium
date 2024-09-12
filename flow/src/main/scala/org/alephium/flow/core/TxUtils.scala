@@ -452,6 +452,14 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  /** Partition outputs by Group together with gas proportionally
+    * @param outputs
+    *   from possibly more groups to be partitioned proportionally with gas
+    * @param totalGasOpt
+    *   to proportionally partition for given outputs in a group
+    * @return
+    *   groups of outputs and amount of gas proportional to their number
+    */
   def partitionOutputs(
       outputs: AVector[TxOutputInfo],
       totalGasOpt: Option[GasBox]
@@ -478,23 +486,38 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getPositiveAlphRemainderOrFail(
-      allRemainingInputs: AVector[AssetOutputInfo],
+      inputs: AVector[AssetOutputInfo],
       outputGroups: AVector[(AVector[TxOutputInfo], Option[GasBox])]
   ): Either[String, U256] = {
-    val inputValue =
-      allRemainingInputs.map(_.output.amount).iterator.foldLeft(Option(U256.Zero)) {
-        case (acc, n) =>
-          acc.flatMap(_.add(n))
+    val totalInputValue =
+      inputs.map(_.output.amount).fold(Option(U256.Zero)) { case (acc, n) =>
+        acc.flatMap(_.add(n))
       }
-    val outputValue =
-      outputGroups.flatMap(_._1.map(_.attoAlphAmount)).iterator.foldLeft(Option(U256.Zero)) {
-        case (acc, n) =>
-          acc.flatMap(_.add(n))
+    val totalOutputValueWithGas =
+      outputGroups.fold(Option(U256.Zero)) { case (outerAccOpt, (outs, gasOpt)) =>
+        val outputValueOpt =
+          outs.map(_.attoAlphAmount).fold(Option(U256.Zero)) { case (innerAcc, n) =>
+            innerAcc.flatMap(_.add(n))
+          }
+        val outputValueWithGasOpt =
+          outputValueOpt.map(v => gasOpt.fold(v)(gas => gas.toU256.addUnsafe(v)))
+
+        for {
+          outerAcc           <- outerAccOpt
+          outputValueWithGas <- outputValueWithGasOpt
+          result             <- outerAcc.add(outputValueWithGas)
+        } yield result
       }
-    (inputValue, outputValue) match {
+    (totalInputValue, totalOutputValueWithGas) match {
       case (Some(iv), Some(ov)) if iv > ov => Right(iv.subUnsafe(ov))
-      case (_, _) =>
-        Left(s"Total input value $inputValue is not enough for output value $outputValue")
+      case (None, Some(_)) =>
+        Left(s"Invalid total input value")
+      case (Some(_), None) =>
+        Left(s"Invalid total output value")
+      case (None, None) =>
+        Left(s"Invalid total input and output value")
+      case (Some(iv), Some(ov)) =>
+        Left(s"Total input value $iv is not enough for output value $ov")
     }
 
   }
