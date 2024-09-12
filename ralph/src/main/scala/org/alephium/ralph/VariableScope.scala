@@ -24,8 +24,12 @@ sealed trait VariableScope {
 case object FunctionRoot extends VariableScope {
   def include(childScope: VariableScope): Boolean = true
 }
-final case class ChildScope(parent: VariableScope, scopeRef: AnyRef, depth: Int)
-    extends VariableScope {
+final case class ChildScope(
+    parent: VariableScope,
+    scopeRef: AnyRef,
+    sourceIndex: Option[SourceIndex],
+    depth: Int
+) extends VariableScope {
   @tailrec
   def include(another: VariableScope): Boolean = {
     another match {
@@ -45,15 +49,15 @@ final case class ChildScope(parent: VariableScope, scopeRef: AnyRef, depth: Int)
 trait VariableScoped {
   var variableScope: VariableScope = FunctionRoot
 
-  def enterScope(scopeRef: AnyRef): Unit = {
+  def enterScope(scopeRef: Ast.Positioned): Unit = {
     val childScope = variableScope match {
-      case FunctionRoot      => ChildScope(FunctionRoot, scopeRef, 1)
-      case scope: ChildScope => ChildScope(scope, scopeRef, scope.depth + 1)
+      case FunctionRoot      => ChildScope(FunctionRoot, scopeRef, scopeRef.sourceIndex, 1)
+      case scope: ChildScope => ChildScope(scope, scopeRef, scopeRef.sourceIndex, scope.depth + 1)
     }
     variableScope = childScope
   }
 
-  def exitScope(scopeRef: AnyRef): Unit = {
+  def exitScope(scopeRef: Ast.Positioned): Unit = {
     val parentScope = variableScope match {
       case FunctionRoot => throw Compiler.Error("Invalid variable scope calcuation", None)
       case scope: ChildScope =>
@@ -63,9 +67,10 @@ trait VariableScoped {
     variableScope = parentScope
   }
 
-  def withScope(scopeRef: AnyRef)(f: => Unit): Unit = {
+  def withScope[T](scopeRef: Ast.Positioned)(f: => T): T = {
     enterScope(scopeRef)
-    f
+    val result = f
     exitScope(scopeRef)
+    result
   }
 }

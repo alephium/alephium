@@ -743,7 +743,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      "Variable foo.j does not exist or is used before declaration"
+      "Variable foo.j is not defined in the current scope or is used before being defined"
     )
     testContractError(
       s"""
@@ -755,7 +755,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      "Variable foo.b does not exist or is used before declaration"
+      "Variable foo.b is not defined in the current scope or is used before being defined"
     )
   }
 
@@ -3209,7 +3209,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code,
-        "Variable foo.ErrorCodes.Error1 does not exist or is used before declaration"
+        "Variable foo.ErrorCodes.Error1 is not defined in the current scope or is used before being defined"
       )
     }
     {
@@ -5049,7 +5049,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Variable func.x does not exist or is used before declaration")
+      testContractError(
+        code,
+        "Variable func.x is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -6186,11 +6189,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("invalid const expressions")
-      testContractError(code(s"$$G$$"), "Variable G does not exist or is used before declaration")
-      testContractError(code(s"$$H$$"), "Variable H does not exist or is used before declaration")
+      testContractError(
+        code(s"$$G$$"),
+        "Variable G is not defined in the current scope or is used before being defined"
+      )
+      testContractError(
+        code(s"$$H$$"),
+        "Variable H is not defined in the current scope or is used before being defined"
+      )
       testContractError(
         code(s"A + $$I$$"),
-        "Variable I does not exist or is used before declaration"
+        "Variable I is not defined in the current scope or is used before being defined"
       )
       testContractError(
         code(s"A + $$b$$"),
@@ -8141,7 +8150,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "calculate the correct scope for variables" in {
+  it should "calculate the correct scope for variables" in new Fixture {
     {
       info("If statement")
       val code =
@@ -8156,7 +8165,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8174,7 +8186,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8195,7 +8210,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8212,7 +8230,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8229,7 +8250,149 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.i is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.i is not defined in the current scope or is used before being defined"
+      )
+    }
+
+    {
+      info("Define variables with the same name in different for-loop statements")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> (U256, U256) {
+           |    let mut a = 0
+           |    let mut b = 0
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      let j = a
+           |      a = j + 1
+           |      b = b + 1
+           |    }
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      let j = a
+           |      a = j - 1
+           |      b = b + 1
+           |    }
+           |    return a, b
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector.empty, AVector(Val.U256(0), Val.U256(4)))
+    }
+
+    {
+      info("Define variables with the same name in different while-loop statements")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let mut flag0 = true
+           |    let mut flag1 = true
+           |    let mut a = 0
+           |    while (flag0) {
+           |      let j = a
+           |      a = j + 1
+           |      if (a >= 2) {
+           |        flag0 = false
+           |      }
+           |    }
+           |    while (flag1) {
+           |      let j = a
+           |      a = j - 1
+           |      if (a == 0) {
+           |        flag1 = false
+           |      }
+           |    }
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector.empty, AVector(Val.U256(0)))
+    }
+
+    {
+      info("Define variables with the same name in if-else statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(cond: Bool) -> (U256, U256) {
+           |    let mut a = 0
+           |    let mut b = 0
+           |    if (cond) {
+           |      let array = [0, 2]
+           |      a = array[0]
+           |      b = array[1]
+           |    } else {
+           |      let array = [1, 3]
+           |      a = array[0]
+           |      b = array[1]
+           |    }
+           |    return a, b
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector(Val.True), AVector(Val.U256(0), Val.U256(2)))
+      test(code, AVector(Val.False), AVector(Val.U256(1), Val.U256(3)))
+    }
+
+    {
+      info("Cannot shadow variables in the parent scope within a for-loop statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let i = 0
+           |    for (let mut $$i$$ = 0; i < 2; i = i + 1) {
+           |      i = i + 1
+           |    }
+           |    return i
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Local variables have the same name: i")
+    }
+
+    {
+      info("Cannot shadow variables in the parent scope within a while-loop statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(cond: Bool) -> U256 {
+           |    let i = 0
+           |    while (cond) {
+           |      let $$i$$ = 1
+           |    }
+           |    return i
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Local variables have the same name: i")
+    }
+
+    {
+      info("Cannot shadow variables in the parent scope within a if-else statement")
+      def code(name0: String, name1: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(cond: Bool) -> U256 {
+           |    let i = 0
+           |    if (cond) {
+           |      let $name0 = 1
+           |    } else {
+           |      let $name1 = 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code("$i$", "j"), "Local variables have the same name: i")
+      testContractError(code("j", "$i$"), "Local variables have the same name: i")
     }
   }
 }

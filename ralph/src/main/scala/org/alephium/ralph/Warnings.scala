@@ -26,11 +26,8 @@ trait Warnings {
 
   def getWarnings: AVector[String] = AVector.from(warnings)
 
-  def warnUnusedVariables(
-      typeId: Ast.TypeId,
-      unusedVariables: mutable.HashMap[String, Compiler.VarInfo]
-  ): Unit = {
-    val unusedVarsString = unusedVariables.keys.toArray.sorted.mkString(", ")
+  def warnUnusedVariables(typeId: Ast.TypeId, unusedVariables: Seq[String]): Unit = {
+    val unusedVarsString = unusedVariables.sorted.mkString(", ")
     warnUnusedVariables(typeId, unusedVarsString)
   }
   def warnUnusedVariables(typeId: Ast.TypeId, unusedVariables: String): Unit = {
