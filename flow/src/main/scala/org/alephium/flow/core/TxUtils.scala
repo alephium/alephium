@@ -28,7 +28,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, PublicKey}
-import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.{TxOutputInfo, UnlockScriptWithAssets}
@@ -455,19 +455,23 @@ trait TxUtils { Self: FlowUtils =>
   def partitionOutputs(
       outputs: AVector[TxOutputInfo],
       totalGasOpt: Option[GasBox]
-  )(implicit
-      groupConfig: GroupConfig
   ): AVector[(AVector[TxOutputInfo], Option[GasBox])] = {
-    val outputsByGroup = outputs.groupBy(_.lockupScript.groupIndex(groupConfig))
-    val gasPerOutputOpt = totalGasOpt.map { gas =>
-      val totalDestinations = outputsByGroup.view.mapValues(_.length).values.sum
-      Math.round(gas.value.toFloat / totalDestinations) // primitive rounding
+    val outputsByGroup = outputs.groupBy(_.lockupScript.groupIndex)
+    val gasPerOutputAndRemainderOpt = totalGasOpt.map { gas =>
+      val totalOutputs = outputsByGroup.view.mapValues(_.length).values.sum
+      val gasPerOutput = gas.value / totalOutputs
+      val remainder    = gas.value % totalOutputs
+      gasPerOutput -> remainder
     }
     AVector.from(
-      outputsByGroup.values
-        .map { outputs =>
+      outputsByGroup.values.zipWithIndex
+        .map { case (outputs, index) =>
           val gasPerGroup =
-            gasPerOutputOpt.map(gasPerOutput => GasBox.unsafe(gasPerOutput * outputs.length))
+            gasPerOutputAndRemainderOpt.map { case (gasPerOutput, remainderGas) =>
+              val totalGas = gasPerOutput * outputs.length
+              val extraGas = if (index < remainderGas) 1 else 0
+              GasBox.unsafe(totalGas + extraGas)
+            }
           outputs -> gasPerGroup
         }
     )
