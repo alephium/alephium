@@ -40,7 +40,6 @@ import org.alephium.protocol.vm.{ContractState as _, Val as _, failed as _, *}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.*
-import sttp.model.StatusCode
 
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit number.of.types
@@ -210,7 +209,7 @@ class ServerUtils(implicit
     Right(result)
   }
 
-  def buildMultiTransaction(
+  def buildMultiGroupTransactions(
       blockFlow: BlockFlow,
       query: BuildTransaction
   ): Try[AVector[BuildTransactionResult]] = {
@@ -221,7 +220,7 @@ class ServerUtils(implicit
         (),
         ApiError.BadRequest("Explicit Gas Amount is not allowed")
       )
-      unsignedTxs <- prepareUnsignedMultiTransactions(
+      unsignedTxs <- prepareUnsignedMultiGroupTransactions(
         blockFlow,
         lockPair._1,
         lockPair._2,
@@ -882,7 +881,7 @@ class ServerUtils(implicit
     }
   }
 
-  def prepareUnsignedMultiTransactions(
+  def prepareUnsignedMultiGroupTransactions(
       blockFlow: BlockFlow,
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
@@ -901,7 +900,7 @@ class ServerUtils(implicit
       for {
         assetOutputRefs <- assetOutputRefsE
         outputInfos = prepareOutputInfos(destinations)
-        result <- blockFlow.multiTransfer(
+        result <- blockFlow.multiGroupTransfer(
           targetBlockHashOpt,
           fromLockupScript,
           fromUnlockScript,

@@ -609,7 +609,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def multiTransfer(
+  def multiGroupTransfer(
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
@@ -658,8 +658,7 @@ trait TxUtils { Self: FlowUtils =>
                 utxosLimit
               )
             }
-            .iterator
-            .foldLeft[Either[String, AVector[UnsignedTransaction]]](
+            .fold[Either[String, AVector[UnsignedTransaction]]](
               Right(AVector.empty)
             ) {
               case (Right(acc), Right(Right(value))) => Right(acc :+ value)
