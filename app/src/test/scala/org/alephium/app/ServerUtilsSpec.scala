@@ -238,7 +238,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check status for inter group txs from single transfer with inputs provided" in new FlowFixtureWithApi
+  it should "test inter group txs from single transfer with inputs provided" in new FlowFixtureWithApi
     with GetTxFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
@@ -272,7 +272,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    buildTransactions.length shouldBe 3
+    buildTransactions.length is 3
 
     val BuildTransactionResult(unsignedChangeTx, _, _, changeTxId, chFromGroup, chToGroup) =
       buildTransactions.head
@@ -285,7 +285,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       changeTxChainIndex,
       fromPrivateKey
     )
-    changeTxTemplate.outputsLength shouldBe 2
+    changeTxTemplate.outputsLength is 2
 
     val block0 = mineFromMemPool(blockFlow, changeTxChainIndex)
     addAndCheck(blockFlow, block0)
@@ -307,7 +307,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           txChainIndex,
           fromPrivateKey
         )
-        txTemplate.outputsLength shouldBe 2
+        txTemplate.outputsLength is 2
 
         val destination             = destinationsByChainIndex(txChainIndex)
         val newSenderBalanceWithGas = senderBalanceWithGas - destination.attoAlphAmount.value

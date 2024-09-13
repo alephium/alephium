@@ -547,9 +547,9 @@ trait TxUtils { Self: FlowUtils =>
   )(implicit
       networkConfig: NetworkConfig
   ): Either[String, AVector[UnsignedTransaction]] = {
-    if (outputGroups.isEmpty)
+    if (outputGroups.isEmpty) {
       Right(acc)
-    else if (outputGroups.map(_.length).sum > allRemainingInputs.length) {
+    } else if (outputGroups.map(_.length).sum > allRemainingInputs.length) {
       for {
         txWithRemainingInputs <- buildChangeTxAndGetRemainingInputs(
           fromLockupScript,
@@ -632,7 +632,14 @@ trait TxUtils { Self: FlowUtils =>
               .map(
                 _.getMessage
               )
-            utxos <- view.getRelevantUtxos(fromLockupScript, 10000, true).left.map(_.getMessage)
+            utxos <- view
+              .getRelevantUtxos(
+                fromLockupScript,
+                maxUtxosToRead = 10_000,
+                errorIfExceedMaxUtxos = true
+              )
+              .left
+              .map(_.getMessage)
             allInputsSet   = allInputs.toSet
             relevantInputs = utxos.filter(out => allInputsSet.contains(out.ref))
             _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputs)
