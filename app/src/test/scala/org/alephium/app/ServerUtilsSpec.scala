@@ -366,6 +366,110 @@ class ServerUtilsSpec extends AlephiumSpec {
       }
   }
 
+  it should "test inter group txs from single transfer with inputs auto-selected" in new FlowFixtureWithApi
+    with GetTxFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    implicit override lazy val blockFlow   = isolatedBlockFlow()
+    val chainIndex1                        = ChainIndex.unsafe(0, 1)
+    val chainIndex2                        = ChainIndex.unsafe(0, 2)
+    val fromGroup                          = chainIndex1.from
+    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
+    val fromAddress                        = Address.p2pkh(fromPublicKey)
+    val destinationsByChainIndex = Map(
+      chainIndex1 -> generateDestination(chainIndex1),
+      chainIndex2 -> generateDestination(chainIndex2)
+    )
+
+    val destinations =
+      AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
+    val buildTransactions = serverUtils
+      .buildMultiGroupTransactions(
+        blockFlow,
+        BuildTransaction(
+          fromPublicKey.bytes,
+          None,
+          destinations,
+          None
+        )
+      )
+      .rightValue
+
+    buildTransactions.length is 2
+
+    var afterChangeTxBalance = genesisBalance
+
+    val txsWithBlock =
+      buildTransactions.tail
+        .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
+          val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+          val txTemplate = signAndAddToMemPool(
+            txId,
+            unsignedTx,
+            txChainIndex,
+            fromPrivateKey
+          )
+          txTemplate.outputsLength is 2
+
+          val destination             = destinationsByChainIndex(txChainIndex)
+          val newSenderBalanceWithGas = afterChangeTxBalance - destination.attoAlphAmount.value
+          checkAddressBalance(
+            fromAddress,
+            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe
+          )
+          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+
+          val block0 = mineFromMemPool(blockFlow, txChainIndex)
+          addAndCheck(blockFlow, block0)
+          serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
+            Confirmed(block0.hash, 0, 1, 0, 0)
+          checkAddressBalance(
+            fromAddress,
+            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe
+          )
+          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+
+          checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
+
+          checkDestinationBalance(destination)
+          afterChangeTxBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
+          block0 -> tx
+        }
+
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block1)
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    addAndCheck(blockFlow, block2)
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
+    addAndCheck(blockFlow, block3)
+
+    txsWithBlock
+      .foreach { case (blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)) =>
+        serverUtils.getTransactionStatus(
+          blockFlow,
+          txId,
+          ChainIndex.unsafe(fromGroup, toGroup)
+        ) isE
+          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
+
+        serverUtils.getTransactionStatus(
+          blockFlow,
+          txId,
+          ChainIndex.unsafe(fromGroup, toGroup)
+        ) isE
+          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
+
+        serverUtils.getTransactionStatus(
+          blockFlow,
+          txId,
+          ChainIndex.unsafe(fromGroup, toGroup)
+        ) isE
+          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
+      }
+  }
+
   it should "support Schnorr address" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
