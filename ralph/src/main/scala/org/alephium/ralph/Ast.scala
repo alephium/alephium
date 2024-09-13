@@ -856,18 +856,26 @@ object Ast {
     def ifBranches: Seq[IfBranch[Ctx]]
     def elseBranchOpt: Option[ElseBranch[Ctx]]
 
+    private def genElseBodyIRs(state: Compiler.State[Ctx]) = {
+      elseBranchOpt
+        .map { branch =>
+          state.withScope(branch)(branch.genCode(state))
+        }
+        .getOrElse(Seq.empty)
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val ifBranchesIRs = Array.ofDim[Seq[Instr[Ctx]]](ifBranches.length + 1)
       val elseOffsets   = Array.ofDim[Int](ifBranches.length + 1)
-      val elseBodyIRs   = elseBranchOpt.map(_.genCode(state)).getOrElse(Seq.empty)
+      val elseBodyIRs   = genElseBodyIRs(state)
       ifBranchesIRs(ifBranches.length) = elseBodyIRs
       elseOffsets(ifBranches.length) = elseBodyIRs.length
       ifBranches.zipWithIndex.view.reverse.foreach { case (ifBranch, index) =>
         val initialOffset    = elseOffsets(index + 1)
         val notTheLastBranch = index < ifBranches.length - 1 || elseBranchOpt.nonEmpty
 
-        val bodyIRsWithoutOffset = ifBranch.genCode(state)
+        val bodyIRsWithoutOffset = state.withScope(ifBranch) { ifBranch.genCode(state) }
         val bodyOffsetIR = if (notTheLastBranch) {
           Seq(Jump(initialOffset))
         } else {
@@ -1831,7 +1839,7 @@ object Ast {
       body.foreach(_.check(state))
     }
 
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = state.withScope(this) {
       val bodyIR   = body.flatMap(_.genCode(state))
       val condIR   = Statement.getCondIR(condition, state, bodyIR.length + 1)
       val whileLen = condIR.length + bodyIR.length + 1
@@ -1861,7 +1869,7 @@ object Ast {
       body.foreach(_.check(state))
     }
 
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = state.withScope(this) {
       val initializeIR   = initialize.genCode(state)
       val bodyIR         = body.flatMap(_.genCode(state))
       val updateIR       = update.genCode(state)

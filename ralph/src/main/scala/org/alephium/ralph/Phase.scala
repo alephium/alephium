@@ -28,7 +28,7 @@ object Phase {
 
 trait PhaseLike { self: Compiler.State[_] =>
   var phase: Phase         = Phase.Initial
-  val genCodePhaseNewVars  = mutable.Set.empty[String]
+  val genCodePhaseNewVars  = mutable.Set.empty[Compiler.VarKey]
   val checkPhaseVarIndexes = mutable.Map.empty[Ast.FuncId, Int]
 
   def setCheckPhase(): Unit = {
@@ -68,9 +68,9 @@ trait PhaseLike { self: Compiler.State[_] =>
     }
   }
 
-  def trackGenCodePhaseNewVars(name: String): Unit = {
+  def trackGenCodePhaseNewVars(varKey: Compiler.VarKey): Unit = {
     if (phase == Phase.GenCode) {
-      genCodePhaseNewVars += name
+      genCodePhaseNewVars += varKey
     }
   }
 }
