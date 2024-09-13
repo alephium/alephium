@@ -29,6 +29,7 @@ import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
+import org.alephium.flow.core.FlowUtils.OutputInfo
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
@@ -65,6 +66,123 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
+
+  trait MultiGroupFixture extends FlowFixtureWithApi with GetTxFixture {
+
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    implicit override lazy val blockFlow = isolatedBlockFlow()
+
+    private def testDependencies(txsWithBlock: AVector[(Block, BuildTransactionResult)]) = {
+      val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+      addAndCheck(blockFlow, block1)
+      val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      addAndCheck(blockFlow, block2)
+      val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
+      addAndCheck(blockFlow, block3)
+
+      txsWithBlock
+        .foreach { case (blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)) =>
+          serverUtils.getTransactionStatus(
+            blockFlow,
+            txId,
+            ChainIndex.unsafe(fromGroup, toGroup)
+          ) isE
+            Confirmed(blockWithTx.hash, 0, 1, 1, 1)
+
+          serverUtils.getTransactionStatus(
+            blockFlow,
+            txId,
+            ChainIndex.unsafe(fromGroup, toGroup)
+          ) isE
+            Confirmed(blockWithTx.hash, 0, 1, 1, 1)
+
+          serverUtils.getTransactionStatus(
+            blockFlow,
+            txId,
+            ChainIndex.unsafe(fromGroup, toGroup)
+          ) isE
+            Confirmed(blockWithTx.hash, 0, 1, 1, 1)
+        }
+    }
+
+    // scalastyle:off method.length
+    def testMultiTransferToTwoGroupsWithProvidedInputs(
+        provideInputs: AVector[OutputInfo] => Option[AVector[OutputInfo]]
+    )(testFn: (AVector[BuildTransactionResult]) => (U256, Int)): Unit = {
+
+      val chainIndex1                        = ChainIndex.unsafe(0, 1)
+      val chainIndex2                        = ChainIndex.unsafe(0, 2)
+      val fromGroup                          = chainIndex1.from
+      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
+      val fromAddress                        = Address.p2pkh(fromPublicKey)
+      val destinationsByChainIndex = Map(
+        chainIndex1 -> generateDestination(chainIndex1),
+        chainIndex2 -> generateDestination(chainIndex2)
+      )
+      val genesisUtxos =
+        blockFlow.getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true).rightValue
+      val destinations =
+        AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
+      val buildTransactions = serverUtils
+        .buildMultiGroupTransactions(
+          blockFlow,
+          BuildTransaction(
+            fromPublicKey.bytes,
+            None,
+            destinations,
+            provideInputs(genesisUtxos).map(_.map(output => OutputRef.from(output.ref)))
+          )
+        )
+        .rightValue
+
+      var (initialBalance, utxoNum) = testFn(buildTransactions)
+
+      val txsWithBlock =
+        buildTransactions.tail
+          .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
+            val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+            val txTemplate = signAndAddToMemPool(
+              txId,
+              unsignedTx,
+              txChainIndex,
+              fromPrivateKey
+            )
+            txTemplate.outputsLength is 2
+
+            val destination             = destinationsByChainIndex(txChainIndex)
+            val newSenderBalanceWithGas = initialBalance - destination.attoAlphAmount.value
+            checkAddressBalance(
+              fromAddress,
+              newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
+              utxoNum
+            )
+            checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+
+            val block0 = mineFromMemPool(blockFlow, txChainIndex)
+            addAndCheck(blockFlow, block0)
+            serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
+              Confirmed(block0.hash, 0, 1, 0, 0)
+            checkAddressBalance(
+              fromAddress,
+              newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
+              utxoNum
+            )
+            checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+
+            checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
+
+            checkDestinationBalance(destination)
+            initialBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
+            block0 -> tx
+          }
+      testDependencies(txsWithBlock)
+    }
+
+  }
+  // scalastyle:on method.length
 
   trait GetTxFixture {
     def brokerConfig: BrokerConfig
@@ -238,236 +356,71 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "test inter group txs from single transfer with inputs provided" in new FlowFixtureWithApi
-    with GetTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
-
-    implicit val serverUtils = new ServerUtils
-
-    implicit override lazy val blockFlow   = isolatedBlockFlow()
-    val chainIndex1                        = ChainIndex.unsafe(0, 1)
-    val chainIndex2                        = ChainIndex.unsafe(0, 2)
-    val fromGroup                          = chainIndex1.from
-    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-    val fromAddress                        = Address.p2pkh(fromPublicKey)
-    val destinationsByChainIndex = Map(
-      chainIndex1 -> generateDestination(chainIndex1),
-      chainIndex2 -> generateDestination(chainIndex2)
-    )
-    val utxos =
-      blockFlow.getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true).rightValue
-    utxos.length is 1
-
-    val destinations =
-      AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
-    val buildTransactions = serverUtils
-      .buildMultiGroupTransactions(
-        blockFlow,
-        BuildTransaction(
-          fromPublicKey.bytes,
-          None,
-          destinations,
-          Some(AVector(OutputRef.from(utxos.head.ref)))
-        )
-      )
-      .rightValue
-
-    buildTransactions.length is 3
-
-    val BuildTransactionResult(unsignedChangeTx, _, _, changeTxId, chFromGroup, chToGroup) =
-      buildTransactions.head
-
-    val changeTxChainIndex =
-      ChainIndex.unsafe(chFromGroup, chToGroup)
-    val changeTxTemplate = signAndAddToMemPool(
-      changeTxId,
-      unsignedChangeTx,
-      changeTxChainIndex,
-      fromPrivateKey
-    )
-    changeTxTemplate.outputsLength is 2
-
-    val block0 = mineFromMemPool(blockFlow, changeTxChainIndex)
-    addAndCheck(blockFlow, block0)
-    serverUtils.getTransactionStatus(blockFlow, changeTxTemplate.id, changeTxChainIndex) isE
-      Confirmed(block0.hash, 0, 1, 1, 1)
-    checkAddressBalance(fromAddress, genesisBalance - changeTxTemplate.gasFeeUnsafe, utxoNum = 2)
-
-    var afterChangeTxBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
-
-    val txsWithBlock =
-      buildTransactions.tail
-        .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
-          val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-          val txTemplate = signAndAddToMemPool(
-            txId,
-            unsignedTx,
-            txChainIndex,
-            fromPrivateKey
-          )
-          txTemplate.outputsLength is 2
-
-          val destination             = destinationsByChainIndex(txChainIndex)
-          val newSenderBalanceWithGas = afterChangeTxBalance - destination.attoAlphAmount.value
-          checkAddressBalance(
-            fromAddress,
-            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
-            utxoNum = 2
-          )
-          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
-
-          val block0 = mineFromMemPool(blockFlow, txChainIndex)
-          addAndCheck(blockFlow, block0)
-          serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
-            Confirmed(block0.hash, 0, 1, 0, 0)
-          checkAddressBalance(
-            fromAddress,
-            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
-            utxoNum = 2
-          )
-          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
-
-          checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
-
-          checkDestinationBalance(destination)
-          afterChangeTxBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
-          block0 -> tx
-        }
-
-    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    addAndCheck(blockFlow, block1)
-    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
-    addAndCheck(blockFlow, block2)
-    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
-    addAndCheck(blockFlow, block3)
-
-    txsWithBlock
-      .foreach { case (blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)) =>
-        serverUtils.getTransactionStatus(
-          blockFlow,
-          txId,
-          ChainIndex.unsafe(fromGroup, toGroup)
-        ) isE
-          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-
-        serverUtils.getTransactionStatus(
-          blockFlow,
-          txId,
-          ChainIndex.unsafe(fromGroup, toGroup)
-        ) isE
-          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-
-        serverUtils.getTransactionStatus(
-          blockFlow,
-          txId,
-          ChainIndex.unsafe(fromGroup, toGroup)
-        ) isE
-          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-      }
+  it should "test inter group txs from single transfer with inputs auto-selected" in new MultiGroupFixture {
+    testMultiTransferToTwoGroupsWithProvidedInputs(_ => None) { resultingTxs =>
+      resultingTxs.length is 2
+      val remainingBalance            = genesisBalance
+      val expectedUtxosPerDestination = 1
+      remainingBalance -> expectedUtxosPerDestination
+    }
   }
 
-  it should "test inter group txs from single transfer with inputs auto-selected" in new FlowFixtureWithApi
-    with GetTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+  it should "test inter group txs from single transfer with inputs provided and change not needed" in new MultiGroupFixture {
+    testMultiTransferToTwoGroupsWithProvidedInputs { _ =>
+      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
+      val block =
+        transfer(blockFlow, fromPrivateKey, amount = genesisBalance / 2, to = fromPublicKey)
+      addAndCheck(blockFlow, block)
+      val utxos = blockFlow
+        .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+        .rightValue
+      utxos.length is 2
+      Some(utxos)
+    } { resultingTxs =>
+      resultingTxs.length is 2
+      val defaultGas                  = U256.unsafe(2 * Number.quadrillion)
+      val remainingBalance            = genesisBalance - defaultGas
+      val expectedUtxosPerDestination = 2
+      remainingBalance -> expectedUtxosPerDestination
+    }
+  }
 
-    implicit val serverUtils = new ServerUtils
+  it should "test inter group txs from single transfer with inputs provided and change needed" in new MultiGroupFixture {
+    testMultiTransferToTwoGroupsWithProvidedInputs { genesisUtxos =>
+      genesisUtxos.headOption.map(AVector(_))
+    } { resultingTxs =>
+      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
+      resultingTxs.length is 3
 
-    implicit override lazy val blockFlow   = isolatedBlockFlow()
-    val chainIndex1                        = ChainIndex.unsafe(0, 1)
-    val chainIndex2                        = ChainIndex.unsafe(0, 2)
-    val fromGroup                          = chainIndex1.from
-    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-    val fromAddress                        = Address.p2pkh(fromPublicKey)
-    val destinationsByChainIndex = Map(
-      chainIndex1 -> generateDestination(chainIndex1),
-      chainIndex2 -> generateDestination(chainIndex2)
-    )
+      val fromAddress                 = Address.p2pkh(fromPublicKey)
+      val expectedUtxosPerDestination = 2
 
-    val destinations =
-      AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
-    val buildTransactions = serverUtils
-      .buildMultiGroupTransactions(
-        blockFlow,
-        BuildTransaction(
-          fromPublicKey.bytes,
-          None,
-          destinations,
-          None
-        )
+      val BuildTransactionResult(changeTx, _, _, changeTxId, chFromGroup, chToGroup) =
+        resultingTxs.head
+
+      val changeTxChainIndex = ChainIndex.unsafe(chFromGroup, chToGroup)
+      val changeTxTemplate = signAndAddToMemPool(
+        changeTxId,
+        changeTx,
+        changeTxChainIndex,
+        fromPrivateKey
       )
-      .rightValue
+      changeTxTemplate.outputsLength is 2
 
-    buildTransactions.length is 2
+      val block0 = mineFromMemPool(blockFlow, changeTxChainIndex)
+      addAndCheck(blockFlow, block0)
+      serverUtils.getTransactionStatus(blockFlow, changeTxTemplate.id, changeTxChainIndex) isE
+        Confirmed(block0.hash, 0, 1, 1, 1)
+      checkAddressBalance(
+        fromAddress,
+        genesisBalance - changeTxTemplate.gasFeeUnsafe,
+        expectedUtxosPerDestination
+      )
 
-    var afterChangeTxBalance = genesisBalance
+      val remainingBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
+      remainingBalance -> expectedUtxosPerDestination
+    }
 
-    val txsWithBlock =
-      buildTransactions.tail
-        .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
-          val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-          val txTemplate = signAndAddToMemPool(
-            txId,
-            unsignedTx,
-            txChainIndex,
-            fromPrivateKey
-          )
-          txTemplate.outputsLength is 2
-
-          val destination             = destinationsByChainIndex(txChainIndex)
-          val newSenderBalanceWithGas = afterChangeTxBalance - destination.attoAlphAmount.value
-          checkAddressBalance(
-            fromAddress,
-            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe
-          )
-          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
-
-          val block0 = mineFromMemPool(blockFlow, txChainIndex)
-          addAndCheck(blockFlow, block0)
-          serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
-            Confirmed(block0.hash, 0, 1, 0, 0)
-          checkAddressBalance(
-            fromAddress,
-            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe
-          )
-          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
-
-          checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
-
-          checkDestinationBalance(destination)
-          afterChangeTxBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
-          block0 -> tx
-        }
-
-    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    addAndCheck(blockFlow, block1)
-    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
-    addAndCheck(blockFlow, block2)
-    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
-    addAndCheck(blockFlow, block3)
-
-    txsWithBlock
-      .foreach { case (blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)) =>
-        serverUtils.getTransactionStatus(
-          blockFlow,
-          txId,
-          ChainIndex.unsafe(fromGroup, toGroup)
-        ) isE
-          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-
-        serverUtils.getTransactionStatus(
-          blockFlow,
-          txId,
-          ChainIndex.unsafe(fromGroup, toGroup)
-        ) isE
-          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-
-        serverUtils.getTransactionStatus(
-          blockFlow,
-          txId,
-          ChainIndex.unsafe(fromGroup, toGroup)
-        ) isE
-          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-      }
   }
 
   it should "support Schnorr address" in new Fixture {
