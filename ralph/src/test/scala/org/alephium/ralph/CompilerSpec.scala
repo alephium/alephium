@@ -8394,5 +8394,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code("$i$", "j"), "Local variables have the same name: i")
       testContractError(code("j", "$i$"), "Local variables have the same name: i")
     }
+
+    {
+      info("Redefine the variable in the parent scope")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(pred: Bool) -> U256 {
+           |    if (pred) {
+           |      let i = 0
+           |      return i
+           |    }
+           |    let i = 1
+           |    return i
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector(Val.True), AVector(Val.U256(0)))
+      test(code, AVector(Val.False), AVector(Val.U256(1)))
+    }
   }
 }
