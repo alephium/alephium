@@ -278,7 +278,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       buildTransactions.head
 
     val changeTxChainIndex =
-      ChainIndex(GroupIndex.unsafe(chFromGroup), GroupIndex.unsafe(chToGroup))
+      ChainIndex.unsafe(chFromGroup, chToGroup)
     val changeTxTemplate = signAndAddToMemPool(
       changeTxId,
       unsignedChangeTx,
@@ -293,14 +293,11 @@ class ServerUtilsSpec extends AlephiumSpec {
       Confirmed(block0.hash, 0, 1, 1, 1)
     checkAddressBalance(fromAddress, genesisBalance - changeTxTemplate.gasFeeUnsafe, utxoNum = 2)
 
-    val afterChangeTxBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
+    var afterChangeTxBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
 
-    buildTransactions.tail.fold(afterChangeTxBalance) {
-      case (
-            senderBalanceWithGas,
-            BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup)
-          ) =>
-        val txChainIndex = ChainIndex(GroupIndex.unsafe(fromGroup), GroupIndex.unsafe(toGroup))
+    buildTransactions.tail
+      .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
+        val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
         val txTemplate = signAndAddToMemPool(
           txId,
           unsignedTx,
@@ -310,7 +307,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         txTemplate.outputsLength is 2
 
         val destination             = destinationsByChainIndex(txChainIndex)
-        val newSenderBalanceWithGas = senderBalanceWithGas - destination.attoAlphAmount.value
+        val newSenderBalanceWithGas = afterChangeTxBalance - destination.attoAlphAmount.value
         checkAddressBalance(
           fromAddress,
           newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
@@ -332,9 +329,39 @@ class ServerUtilsSpec extends AlephiumSpec {
         checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
 
         checkDestinationBalance(destination)
-        newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
-    }
+        afterChangeTxBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
+        block0 -> tx
+      }
+      .zipWithIndex
+      .foreach {
+        case ((blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)), index) =>
+          val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+          addAndCheck(blockFlow, block1)
+          serverUtils.getTransactionStatus(
+            blockFlow,
+            txId,
+            ChainIndex.unsafe(fromGroup, toGroup)
+          ) isE
+            Confirmed(blockWithTx.hash, 0, 1, 1 + index, 0 + index)
 
+          val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
+          addAndCheck(blockFlow, block2)
+          serverUtils.getTransactionStatus(
+            blockFlow,
+            txId,
+            ChainIndex.unsafe(fromGroup, toGroup)
+          ) isE
+            Confirmed(blockWithTx.hash, 0, 1, 1 + index, 1)
+
+          val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
+          addAndCheck(blockFlow, block3)
+          serverUtils.getTransactionStatus(
+            blockFlow,
+            txId,
+            ChainIndex.unsafe(fromGroup, toGroup)
+          ) isE
+            Confirmed(blockWithTx.hash, 0, 1, 1 + index, 1 + index)
+      }
   }
 
   it should "support Schnorr address" in new Fixture {
