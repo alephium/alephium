@@ -295,72 +295,74 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     var afterChangeTxBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
 
-    buildTransactions.tail
-      .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
-        val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-        val txTemplate = signAndAddToMemPool(
+    val txsWithBlock =
+      buildTransactions.tail
+        .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
+          val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
+          val txTemplate = signAndAddToMemPool(
+            txId,
+            unsignedTx,
+            txChainIndex,
+            fromPrivateKey
+          )
+          txTemplate.outputsLength is 2
+
+          val destination             = destinationsByChainIndex(txChainIndex)
+          val newSenderBalanceWithGas = afterChangeTxBalance - destination.attoAlphAmount.value
+          checkAddressBalance(
+            fromAddress,
+            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
+            utxoNum = 2
+          )
+          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+
+          val block0 = mineFromMemPool(blockFlow, txChainIndex)
+          addAndCheck(blockFlow, block0)
+          serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
+            Confirmed(block0.hash, 0, 1, 0, 0)
+          checkAddressBalance(
+            fromAddress,
+            newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
+            utxoNum = 2
+          )
+          checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+
+          checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
+
+          checkDestinationBalance(destination)
+          afterChangeTxBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
+          block0 -> tx
+        }
+
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block1)
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    addAndCheck(blockFlow, block2)
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
+    addAndCheck(blockFlow, block3)
+
+    txsWithBlock
+      .foreach { case (blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)) =>
+        serverUtils.getTransactionStatus(
+          blockFlow,
           txId,
-          unsignedTx,
-          txChainIndex,
-          fromPrivateKey
-        )
-        txTemplate.outputsLength is 2
+          ChainIndex.unsafe(fromGroup, toGroup)
+        ) isE
+          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
 
-        val destination             = destinationsByChainIndex(txChainIndex)
-        val newSenderBalanceWithGas = afterChangeTxBalance - destination.attoAlphAmount.value
-        checkAddressBalance(
-          fromAddress,
-          newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
-          utxoNum = 2
-        )
-        checkAddressBalance(destination.address, ALPH.oneAlph, 1)
+        serverUtils.getTransactionStatus(
+          blockFlow,
+          txId,
+          ChainIndex.unsafe(fromGroup, toGroup)
+        ) isE
+          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
 
-        val block0 = mineFromMemPool(blockFlow, txChainIndex)
-        addAndCheck(blockFlow, block0)
-        serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
-          Confirmed(block0.hash, 0, 1, 0, 0)
-        checkAddressBalance(
-          fromAddress,
-          newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
-          utxoNum = 2
-        )
-        checkAddressBalance(destination.address, ALPH.oneAlph, 1)
-
-        checkTx(blockFlow, block0.nonCoinbase.head, txChainIndex)
-
-        checkDestinationBalance(destination)
-        afterChangeTxBalance = newSenderBalanceWithGas - block0.transactions.head.gasFeeUnsafe
-        block0 -> tx
-      }
-      .zipWithIndex
-      .foreach {
-        case ((blockWithTx, BuildTransactionResult(_, _, _, txId, fromGroup, toGroup)), index) =>
-          val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-          addAndCheck(blockFlow, block1)
-          serverUtils.getTransactionStatus(
-            blockFlow,
-            txId,
-            ChainIndex.unsafe(fromGroup, toGroup)
-          ) isE
-            Confirmed(blockWithTx.hash, 0, 1, 1 + index, 0 + index)
-
-          val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
-          addAndCheck(blockFlow, block2)
-          serverUtils.getTransactionStatus(
-            blockFlow,
-            txId,
-            ChainIndex.unsafe(fromGroup, toGroup)
-          ) isE
-            Confirmed(blockWithTx.hash, 0, 1, 1 + index, 1)
-
-          val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
-          addAndCheck(blockFlow, block3)
-          serverUtils.getTransactionStatus(
-            blockFlow,
-            txId,
-            ChainIndex.unsafe(fromGroup, toGroup)
-          ) isE
-            Confirmed(blockWithTx.hash, 0, 1, 1 + index, 1 + index)
+        serverUtils.getTransactionStatus(
+          blockFlow,
+          txId,
+          ChainIndex.unsafe(fromGroup, toGroup)
+        ) isE
+          Confirmed(blockWithTx.hash, 0, 1, 1, 1)
       }
   }
 
