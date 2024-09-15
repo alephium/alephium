@@ -2756,7 +2756,10 @@ object Ast {
         states: Map[TypeId, (Contract, Compiler.State[StatefulContext])]
     ): AVector[String] = {
       val defsInParentContract = (contract: Contract) => {
-        contract.funcs.collect { case func if func.isPrivate => (contract.ident, func.name) }
+        contract.funcs.collect {
+          case func if func.isPrivate && func.definedIn(contract.ident) =>
+            (contract.ident, func.name)
+        }
       }
       val usedDefsInContract = (contract: Contract, state: Compiler.State[StatefulContext]) => {
         val usedPrivateFuncs = mutable.ArrayBuffer.empty[(TypeId, String)]

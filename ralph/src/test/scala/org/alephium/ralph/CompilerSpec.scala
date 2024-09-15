@@ -7982,6 +7982,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       checkWarnings(code, AVector(("Foo", AVector.empty), ("Bar", AVector.empty)), AVector.empty)
     }
+
+    {
+      info("no warnings if the private function used by abstract contract")
+      val code =
+        s"""
+           |Contract Baz() extends Bar() {
+           |  pub fn baz() -> () {}
+           |}
+           |Abstract Contract Foo() {
+           |  fn foo() -> () {}
+           |}
+           |Abstract Contract Bar() extends Foo() {
+           |  pub fn bar() -> () { foo() }
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.forall(_.warnings.isEmpty) is true
+      result._4.isEmpty is true
+    }
   }
 
   it should "use constants as array size" in new Fixture {
