@@ -245,6 +245,13 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
+  lazy val getRichBlock: BaseEndpoint[BlockHash, RichBlockEntry] =
+    blockflowEndpoint.get
+      .in("rich-blocks")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[RichBlockEntry])
+      .summary("Get a rich block with hash")
+
   lazy val getMainChainBlockByGhostUncle: BaseEndpoint[BlockHash, BlockEntry] =
     blockflowEndpoint.get
       .in("main-chain-block-by-ghost-uncle")

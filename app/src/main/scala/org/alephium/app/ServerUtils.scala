@@ -474,6 +474,88 @@ class ServerUtils(implicit
       blockEntry <- BlockEntry.from(block, height).left.map(failed)
     } yield blockEntry
 
+  def getRichBlock(blockFlow: BlockFlow, hash: BlockHash): Try[RichBlockEntry] =
+    for {
+      _ <- checkHashChainIndex(hash)
+      block <- blockFlow
+        .getBlock(hash)
+        .left
+        .map(handleBlockError(hash, _))
+      height <- blockFlow
+        .getHeight(block.header)
+        .left
+        .map(failedInIO)
+      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
+      blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+    } yield blockEntry
+
+  private[app] def getRichTransaction(
+      blockFlow: BlockFlow,
+      transaction: Transaction
+  ): Try[RichTransaction] = {
+    for {
+      assetInputs    <- getRichAssetInputs(blockFlow, transaction)
+      contractInputs <- getRichContractInputs(blockFlow, transaction)
+    } yield {
+      val inputs = assetInputs.as[RichInput] ++ contractInputs.as[RichInput]
+      RichTransaction.from(transaction, inputs)
+    }
+  }
+
+  private[app] def getRichContractInputs(
+      blockFlow: BlockFlow,
+      transaction: Transaction
+  ): Try[AVector[RichContractInput]] = {
+    transaction.contractInputs.mapE { contractOutputRef =>
+      for {
+        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef)
+        richInput <- txOutputOpt match {
+          case Some(txOutput) =>
+            Right(RichInput.from(contractOutputRef, txOutput))
+          case None =>
+            Left(notFound(s"Transaction output for contract output reference ${contractOutputRef}"))
+        }
+      } yield richInput
+    }
+  }
+
+  private[app] def getRichAssetInputs(
+      blockFlow: BlockFlow,
+      transaction: Transaction
+  ): Try[AVector[RichAssetInput]] = {
+    transaction.unsigned.inputs.mapE { assetInput =>
+      for {
+        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef)
+        richInput <- txOutputOpt match {
+          case Some(txOutput) =>
+            Right(RichInput.from(assetInput, txOutput))
+          case None =>
+            Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
+        }
+      } yield richInput
+    }
+  }
+
+  private[app] def getTxOutput(blockFlow: BlockFlow, outputRef: TxOutputRef): Try[Option[TxOutput]] = {
+    for {
+      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      txOutputOpt <- txIdOpt match {
+        case Some(txId) =>
+          getTransaction(
+            blockFlow,
+            txId,
+            None,
+            None,
+            transaction => transaction.getOutput(outputRef)
+          )
+        case None =>
+          Right(None)
+      }
+    } yield {
+      txOutputOpt
+    }
+  }
+
   def getMainChainBlockByGhostUncle(
       blockFlow: BlockFlow,
       ghostUncleHash: BlockHash

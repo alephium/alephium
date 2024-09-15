@@ -211,6 +211,12 @@ trait ApiModelCodec {
 
   implicit val transactionRW: RW[Transaction] = macroRW
 
+  implicit val richAssetInputRW: RW[RichAssetInput]       = macroRW
+  implicit val richContractInputRW: RW[RichContractInput] = macroRW
+  implicit val richInputRW: RW[RichInput]                 = macroRW
+
+  implicit val richTransactionRW: RW[RichTransaction] = macroRW
+
   implicit val rawTransactionRW: RW[RawTransaction] = macroRW
 
   implicit val exportFileRW: RW[ExportFile] = macroRW
@@ -218,6 +224,8 @@ trait ApiModelCodec {
   implicit val ghostUncleBlockEntryRW: RW[GhostUncleBlockEntry] = macroRW
 
   implicit val blockEntryRW: RW[BlockEntry] = macroRW
+
+  implicit val richBlockEntryRW: RW[RichBlockEntry] = macroRW
 
   implicit val blockAndEventsRW: RW[BlockAndEvents] = macroRW
 

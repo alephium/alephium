@@ -184,6 +184,45 @@ trait EndpointsExamples extends ErrorExamples {
     AVector(ghostUncleBlockEntry)
   )
 
+  private lazy val richTransaction = RichTransaction(
+    txId = unsignedTx.txId,
+    version = unsignedTx.version,
+    networkId = unsignedTx.networkId,
+    scriptOpt = transaction.unsigned.scriptOpt,
+    gasAmount = unsignedTx.gasAmount,
+    gasPrice = unsignedTx.gasPrice,
+    inputs = AVector(
+      RichAssetInput(
+        hint = outputRef.hint,
+        key = outputRef.key,
+        unlockScript = Some(unlockupScriptBytes),
+        attoAlphAmount = Amount(ALPH.oneAlph),
+        address = Address.from(lockupScript),
+        tokens
+      )
+    ),
+    outputs = AVector(outputAsset.upCast(), outputContract),
+    scriptExecutionOk = true,
+    AVector(signature.bytes),
+    AVector(signature.bytes)
+  )
+
+  private lazy val richBlockEntry = RichBlockEntry(
+    hash = blockHash,
+    timestamp = ts,
+    chainFrom = 1,
+    chainTo = 2,
+    height,
+    deps = AVector(blockHash, blockHash),
+    transactions = AVector(richTransaction),
+    hash.bytes,
+    1.toByte,
+    hash,
+    hash,
+    hash.bytes,
+    AVector(ghostUncleBlockEntry)
+  )
+
   private val eventByBlockHash = ContractEventByBlockHash(
     txId,
     Address.contract(contractId),
@@ -374,6 +413,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
+
+  implicit val richBlockEntryExamples: List[Example[RichBlockEntry]] =
+    simpleExample(richBlockEntry)
 
   implicit val blockAndEventsExamples: List[Example[BlockAndEvents]] =
     simpleExample(blockAndEvents)

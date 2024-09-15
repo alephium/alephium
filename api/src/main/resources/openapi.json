@@ -4145,6 +4145,199 @@
         }
       }
     },
+    "/blockflow/rich-blocks/{block_hash}": {
+      "get": {
+        "tags": [
+          "Blockflow"
+        ],
+        "summary": "Get a rich block with hash",
+        "operationId": "getBlockflowRich-blocksBlock_hash",
+        "parameters": [
+          {
+            "name": "block_hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "block-hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RichBlockEntry"
+                },
+                "example": {
+                  "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                  "timestamp": 1611041396892,
+                  "chainFrom": 1,
+                  "chainTo": 2,
+                  "height": 42,
+                  "deps": [
+                    "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                    "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                  ],
+                  "transactions": [
+                    {
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "version": 1,
+                      "networkId": 1,
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "inputs": [
+                        {
+                          "type": "AssetInput",
+                          "hint": 23412,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                          "attoAlphAmount": "1000000000000000000",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "outputs": [
+                        {
+                          "type": "AssetOutput",
+                          "hint": 1,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "attoAlphAmount": "2000000000000000000",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ],
+                          "lockTime": 1611041396892,
+                          "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        },
+                        {
+                          "type": "ContractOutput",
+                          "hint": 1,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "attoAlphAmount": "2000000000000000000",
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "scriptExecutionOk": true,
+                      "inputSignatures": [
+                        "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                      ],
+                      "scriptSignatures": [
+                        "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                      ]
+                    }
+                  ],
+                  "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "version": 1,
+                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "ghostUncles": [
+                    {
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/blockflow/main-chain-block-by-ghost-uncle/{ghost_uncle_hash}": {
       "get": {
         "tags": [
@@ -13664,6 +13857,254 @@
         "properties": {
           "mnemonic": {
             "type": "string"
+          }
+        }
+      },
+      "RichAssetInput": {
+        "title": "RichAssetInput",
+        "type": "object",
+        "required": [
+          "hint",
+          "key",
+          "attoAlphAmount",
+          "address",
+          "tokens",
+          "type"
+        ],
+        "properties": {
+          "hint": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "key": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "unlockScript": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "attoAlphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "RichBlockEntry": {
+        "title": "RichBlockEntry",
+        "type": "object",
+        "required": [
+          "hash",
+          "timestamp",
+          "chainFrom",
+          "chainTo",
+          "height",
+          "deps",
+          "transactions",
+          "nonce",
+          "version",
+          "depStateHash",
+          "txsHash",
+          "target",
+          "ghostUncles"
+        ],
+        "properties": {
+          "hash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "chainFrom": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainTo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "block-hash"
+            }
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichTransaction"
+            }
+          },
+          "nonce": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "depStateHash": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "txsHash": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "target": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "ghostUncles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GhostUncleBlockEntry"
+            }
+          }
+        }
+      },
+      "RichContractInput": {
+        "title": "RichContractInput",
+        "type": "object",
+        "required": [
+          "hint",
+          "key",
+          "attoAlphAmount",
+          "address",
+          "tokens",
+          "type"
+        ],
+        "properties": {
+          "hint": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "key": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "attoAlphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "RichInput": {
+        "title": "RichInput",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RichAssetInput"
+          },
+          {
+            "$ref": "#/components/schemas/RichContractInput"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "RichAssetInput": "#/components/schemas/RichAssetInput",
+            "RichContractInput": "#/components/schemas/RichContractInput"
+          }
+        }
+      },
+      "RichTransaction": {
+        "title": "RichTransaction",
+        "type": "object",
+        "required": [
+          "txId",
+          "version",
+          "networkId",
+          "gasAmount",
+          "gasPrice",
+          "inputs",
+          "outputs",
+          "scriptExecutionOk",
+          "inputSignatures",
+          "scriptSignatures"
+        ],
+        "properties": {
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "networkId": {
+            "type": "integer"
+          },
+          "scriptOpt": {
+            "type": "string",
+            "format": "script"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichInput"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Output"
+            }
+          },
+          "scriptExecutionOk": {
+            "type": "boolean"
+          },
+          "inputSignatures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hex-string"
+            }
+          },
+          "scriptSignatures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hex-string"
+            }
           }
         }
       },
