@@ -444,7 +444,7 @@ object BuiltIn {
       Seq(Type.U256),
       BlockTimeStamp,
       Seq(),
-      retComment = "the block timestamp"
+      retComment = "the block timestamp in milliseconds"
     )
   val blockTarget: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
@@ -517,7 +517,8 @@ object BuiltIn {
       VerifyAbsoluteLocktime,
       argsName = Seq("lockUntil" -> "the timestamp until which the lock is valid"),
       retComment = "",
-      doc = "Verifies that the absolute locktime is before the block timestamp, otherwise it fails."
+      doc =
+        "Verifies that the absolute locktime is before the block timestamp (milliseconds), otherwise it fails."
     )
   val verifyRelativeLocktime: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chain(
@@ -531,7 +532,7 @@ object BuiltIn {
       ),
       retComment = "",
       doc =
-        "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails."
+        "Verifies that the input's creation timestamp + lock duration is before the block timestamp (milliseconds), otherwise it fails."
     )
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
