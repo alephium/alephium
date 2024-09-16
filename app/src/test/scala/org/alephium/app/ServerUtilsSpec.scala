@@ -3647,7 +3647,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"The block ${block.hash.toHexString} is not a ghost uncle block, you should use a ghost uncle block hash to call this endpoint"
   }
 
-  it should "return error if the block does not exist" in new Fixture {
+  it should "return block information" in new Fixture {
     val chainIndex       = ChainIndex.unsafe(0, 0)
     val serverUtils      = new ServerUtils()
     val invalidBlockHash = randomBlockHash(chainIndex)
@@ -3655,6 +3655,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
     serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry.from(block, 1).rightValue
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
+      s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+
+    val transactions =
+      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
+    serverUtils.getRichBlock(blockFlow, block.hash).rightValue is RichBlockEntry
+      .from(block, 1, transactions)
+      .rightValue
+    serverUtils.getRichBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
     serverUtils.getRawBlock(blockFlow, block.hash).rightValue is RawBlock(serialize(block))
@@ -3805,10 +3813,31 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getTxIdFromOutputRef(blockFlow, txOutputRef) isE txId
   }
 
-  it should "return error when node.indexes.tx-output-ref-index is not enabled" in new TxOutputRefIndexFixture {
+  it should "fail to find tx id from tx output ref when node.indexes.tx-output-ref-index is not enabled" in new TxOutputRefIndexFixture {
     override def enableTxOutputRefIndex: Boolean = false
+
     serverUtils
       .getTxIdFromOutputRef(blockFlow, txOutputRef)
+      .leftValue
+      .detail
+      .contains(
+        "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
+      ) is true
+  }
+
+  it should "find rich block when node.indexes.tx-output-ref-index is enabled" in new TxOutputRefIndexFixture {
+    val transactions =
+      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
+    serverUtils
+      .getRichBlock(blockFlow, block.hash)
+      .rightValue is RichBlockEntry.from(block, 1, transactions).rightValue
+  }
+
+  it should "fail to find rich block when node.indexes.tx-output-ref-index is not enabled" in new TxOutputRefIndexFixture {
+    override def enableTxOutputRefIndex: Boolean = false
+
+    serverUtils
+      .getRichBlock(blockFlow, block.hash)
       .leftValue
       .detail
       .contains(

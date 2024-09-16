@@ -536,7 +536,10 @@ class ServerUtils(implicit
     }
   }
 
-  private[app] def getTxOutput(blockFlow: BlockFlow, outputRef: TxOutputRef): Try[Option[TxOutput]] = {
+  private[app] def getTxOutput(
+      blockFlow: BlockFlow,
+      outputRef: TxOutputRef
+  ): Try[Option[TxOutput]] = {
     for {
       txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
       txOutputOpt <- txIdOpt match {
