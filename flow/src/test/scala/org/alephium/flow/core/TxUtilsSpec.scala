@@ -1250,6 +1250,98 @@ class TxUtilsSpec extends AlephiumSpec {
     sweep().leftValue is "Not enough ALPH for gas fee in sweeping"
   }
 
+  trait MultiGroupTransactions extends FlowFixture with UnsignedTxFixture {
+    implicit override lazy val blockFlow   = isolatedBlockFlow()
+    override val configValues              = Map(("alephium.broker.broker-num", 1))
+    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
+    val lockupScript                       = LockupScript.p2pkh(fromPublicKey)
+    val unlockScript                       = UnlockScript.p2pkh(fromPublicKey)
+
+    val lockupScriptsByGroup = Map(
+      GroupIndex.unsafe(0) -> lockupScript,
+      GroupIndex.unsafe(1) -> Address.p2pkh(GroupIndex.unsafe(1).generateKey._2).lockupScript,
+      GroupIndex.unsafe(2) -> Address.p2pkh(GroupIndex.unsafe(2).generateKey._2).lockupScript
+    )
+
+    val validation = TxValidation.build
+
+    def genesisUtxos: AVector[AssetOutputInfo] =
+      blockFlow
+        .getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true)
+        .rightValue
+        .asUnsafe[AssetOutputInfo]
+
+    def buildOutputs(chainIndexes: AVector[ChainIndex]): AVector[AVector[TxOutputInfo]] = {
+      AVector.from(
+        chainIndexes
+          .groupBy(identity)
+          .view
+          .mapValues { chainIndexes =>
+            chainIndexes.map { chainIndex =>
+              TxOutputInfo(
+                lockupScriptsByGroup(chainIndex.to),
+                ALPH.oneAlph,
+                AVector.empty,
+                None
+              )
+            }
+          }
+          .values
+      )
+    }
+
+    def testMultiGroupTxsBuilding(
+        allRemainingInputs: AVector[AssetOutputInfo],
+        outputGroups: AVector[AVector[TxOutputInfo]]
+    ) = {
+      blockFlow
+        .buildMultiGroupTransactions(
+          lockupScript,
+          unlockScript,
+          allRemainingInputs,
+          outputGroups,
+          nonCoinbaseMinGasPrice,
+          AVector.empty
+        ) match {
+        case Right(unsignedTxs) =>
+          unsignedTxs
+            .map { unsignedTx =>
+              testUnsignedTx(unsignedTx, fromPrivateKey)
+              val tx = Transaction.from(unsignedTx, fromPrivateKey)
+              validation.validateTxOnlyForTest(tx, blockFlow, None)
+              tx
+            }
+            .groupBy(tx => ChainIndex(tx.fromGroup, tx.toGroup))
+            .foreach { case (chainIndex, txs) =>
+              val block =
+                mine(blockFlow, chainIndex, txs, lockupScriptsByGroup(chainIndex.to), None)
+              addAndCheck(blockFlow, block)
+            }
+
+        case Left(err) =>
+          fail(err)
+      }
+    }
+
+    def testChangeTxAndReturnRemainingInputs(
+        outputs: AVector[AVector[TxOutputInfo]]
+    ): AVector[AssetOutputInfo] = {
+      val (tx, remainingInputs) = blockFlow
+        .buildChangeTxAndGetAvailableInputs(
+          lockupScript,
+          unlockScript,
+          genesisUtxos,
+          outputs,
+          nonCoinbaseMinGasPrice
+        )
+        .rightValue
+
+      validation.validateTxOnlyForTest(Transaction.from(tx, fromPrivateKey), blockFlow, None)
+      tx.fixedOutputs.length is outputs.length
+      remainingInputs
+    }
+  }
+
   trait LargeUtxos extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)
@@ -1402,6 +1494,53 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
       unsignedTxs.length is 0
     }
+  }
+
+  it should "build multi group transactions from just single genesis box" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+
+    testMultiGroupTxsBuilding(genesisUtxos, outputs)
+  }
+
+  it should "build multi group transactions even intra group" in new MultiGroupTransactions {
+    val intraGroupOutputs = buildOutputs(
+      AVector(ChainIndex.unsafe(0, 0))
+    )
+    testMultiGroupTxsBuilding(genesisUtxos, intraGroupOutputs)
+  }
+
+  it should "build change and return remaining inputs" in new MultiGroupTransactions {
+    val twoOutputs = buildOutputs(
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2))
+    )
+
+    testChangeTxAndReturnRemainingInputs(
+      twoOutputs
+    ).length is 2 // now we have 2 inputs for 2 outputs
+
+    val threeOutputs = buildOutputs(
+      AVector(ChainIndex.unsafe(0, 0), ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2))
+    )
+
+    testChangeTxAndReturnRemainingInputs(
+      threeOutputs
+    ).length is 3 // now we have 3 inputs for 3 outputs
+  }
+
+  it should "fail change when there is enough inputs" in new MultiGroupTransactions {
+    val singleOutput = buildOutputs(
+      AVector(ChainIndex.unsafe(0, 0))
+    )
+
+    blockFlow
+      .buildChangeTxAndGetAvailableInputs(
+        lockupScript,
+        unlockScript,
+        genesisUtxos,
+        singleOutput,
+        nonCoinbaseMinGasPrice
+      )
+      .leftValue is "Change transaction is not needed as there is enough inputs"
   }
 
   it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {

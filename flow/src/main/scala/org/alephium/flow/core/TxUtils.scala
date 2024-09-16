@@ -452,7 +452,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getPositiveAlphRemainderOrFail(
+  private def getPositiveAlphRemainderOrFail(
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo]
   ): Either[String, U256] = {
@@ -479,68 +479,67 @@ trait TxUtils { Self: FlowUtils =>
 
   }
 
-  def extractChangeFromTx(
-      fromLockupScript: LockupScript.Asset,
-      tx: UnsignedTransaction
-  ): AVector[AssetOutputInfo] = {
-    tx.fixedOutputs
-      .mapWithIndex { case (output, outputIndex) =>
-        AssetOutputRef.from(output, TxOutputRef.key(tx.id, outputIndex)) -> output
-      }
-      .collect {
-        case (ref, output) if output.lockupScript == fromLockupScript =>
-          AssetOutputInfo(ref, output, MemPoolOutput)
-      }
-  }
-
-  def buildChangeTxAndGetRemainingInputs(
+  protected[core] def buildChangeTxAndGetAvailableInputs(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      allRemainingInputs: AVector[AssetOutputInfo],
+      availableInputs: AVector[AssetOutputInfo],
       outputGroups: AVector[AVector[TxOutputInfo]],
       gasPrice: GasPrice
   ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
-    val highestValueUtxo         = allRemainingInputs.maxBy(_.output.amount)
-    val allRemainingOutputsCount = outputGroups.map(_.length).sum
-    val missingUtxoCount         = allRemainingOutputsCount - allRemainingInputs.length
-    val changeUtxoAmount =
-      highestValueUtxo.output.amount.divUnsafe(U256.unsafe(missingUtxoCount + 1))
-    val breakDownUtxos = AVector.fill(missingUtxoCount)(
-      TxOutputInfo(
-        fromLockupScript,
-        changeUtxoAmount,
-        AVector.empty,
-        None
-      )
-    )
-    val inputs = AVector(highestValueUtxo.ref -> highestValueUtxo.output)
-
-    for {
-      gasNeeded <-
-        GasEstimation.estimateWithInputScript(
-          fromUnlockScript,
-          inputs.length,
-          breakDownUtxos.length + 1,             // + 1 is for change utxo
-          AssetScriptGasEstimator.NotImplemented // Not P2SH
-        )
-      tx <- UnsignedTransaction
-        .buildTransferTx(
+    val totalOutputsCount = outputGroups.map(_.length).sum
+    if (totalOutputsCount <= availableInputs.length) {
+      Left("Change transaction is not needed as there is enough inputs")
+    } else {
+      val highestValueUtxoToBreakDown = availableInputs.maxBy(_.output.amount)
+      val missingUtxoCount            = totalOutputsCount - availableInputs.length
+      val changeUtxoAmount =
+        highestValueUtxoToBreakDown.output.amount.divUnsafe(U256.unsafe(missingUtxoCount + 1))
+      val breakDownUtxos = AVector.fill(missingUtxoCount)(
+        TxOutputInfo(
           fromLockupScript,
-          fromUnlockScript,
-          inputs,
-          breakDownUtxos,
-          gasNeeded,
-          gasPrice
+          changeUtxoAmount,
+          AVector.empty,
+          None
         )
-      changeUtxos = extractChangeFromTx(fromLockupScript, tx)
-    } yield (tx, allRemainingInputs.filterNot(_ == highestValueUtxo) ++ changeUtxos)
+      )
+      val inputs = AVector(highestValueUtxoToBreakDown.ref -> highestValueUtxoToBreakDown.output)
+
+      for {
+        gasNeeded <-
+          GasEstimation.estimateWithInputScript(
+            fromUnlockScript,
+            inputs.length,
+            breakDownUtxos.length + 1,             // + 1 is for change utxo
+            AssetScriptGasEstimator.NotImplemented // Not P2SH
+          )
+        tx <- UnsignedTransaction
+          .buildTransferTx(
+            fromLockupScript,
+            fromUnlockScript,
+            inputs,
+            breakDownUtxos,
+            gasNeeded,
+            gasPrice
+          )
+      } yield {
+        val changeUtxos = tx.fixedOutputs
+          .mapWithIndex { case (output, outputIndex) =>
+            AssetOutputRef.from(output, TxOutputRef.key(tx.id, outputIndex)) -> output
+          }
+          .collect {
+            case (ref, output) if output.lockupScript == fromLockupScript =>
+              AssetOutputInfo(ref, output, MemPoolOutput)
+          }
+        (tx, availableInputs.filterNot(_ == highestValueUtxoToBreakDown) ++ changeUtxos)
+      }
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def buildTransactionsRecursively(
+  def buildMultiGroupTransactions(
       fromLockupScript: LockupScript.Asset, // Self address for receiving change outputs
       fromUnlockScript: UnlockScript,
-      allRemainingInputs: AVector[AssetOutputInfo],
+      remainingInputs: AVector[AssetOutputInfo],
       outputGroups: AVector[AVector[TxOutputInfo]],
       gasPrice: GasPrice,
       acc: AVector[UnsignedTransaction]
@@ -549,20 +548,20 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, AVector[UnsignedTransaction]] = {
     if (outputGroups.isEmpty) {
       Right(acc)
-    } else if (outputGroups.map(_.length).sum > allRemainingInputs.length) {
+    } else if (outputGroups.map(_.length).sum > remainingInputs.length) {
       for {
-        txWithRemainingInputs <- buildChangeTxAndGetRemainingInputs(
+        txWithAvailableInputs <- buildChangeTxAndGetAvailableInputs(
           fromLockupScript,
           fromUnlockScript,
-          allRemainingInputs,
+          remainingInputs,
           outputGroups,
           gasPrice
         )
-        accumulatedTxs = acc :+ txWithRemainingInputs._1
-        txs <- buildTransactionsRecursively(
+        accumulatedTxs = acc :+ txWithAvailableInputs._1
+        txs <- buildMultiGroupTransactions(
           fromLockupScript,
           fromUnlockScript,
-          txWithRemainingInputs._2,
+          txWithAvailableInputs._2,
           outputGroups,
           gasPrice,
           accumulatedTxs
@@ -580,14 +579,12 @@ trait TxUtils { Self: FlowUtils =>
           .select(
             AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
             fromUnlockScript,
-            allRemainingInputs,
+            remainingInputs,
             amountTokensOutputCount._3,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
             TxScriptGasEstimator.NotImplemented
           )
-        selectedAssetSet = selected.assets.map(_.ref).toSet
-        remainingInputs  = allRemainingInputs.filterNot(out => selectedAssetSet.contains(out.ref))
         tx <- UnsignedTransaction
           .buildTransferTx(
             fromLockupScript,
@@ -597,10 +594,11 @@ trait TxUtils { Self: FlowUtils =>
             selected.gas,
             gasPrice
           )
-        txs <- buildTransactionsRecursively(
+        selectedAssetSet = selected.assets.map(_.ref).toSet
+        txs <- buildMultiGroupTransactions(
           fromLockupScript,
           fromUnlockScript,
-          remainingInputs,
+          remainingInputs = remainingInputs.filterNot(out => selectedAssetSet.contains(out.ref)),
           outputGroups.tail,
           gasPrice,
           acc :+ tx
@@ -628,22 +626,15 @@ trait TxUtils { Self: FlowUtils =>
         case Some(allInputs) =>
           for {
             _ <- checkUTXOsInSameGroup(allInputs)
-            view <- getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt).left
-              .map(
-                _.getMessage
-              )
-            utxos <- view
-              .getRelevantUtxos(
-                fromLockupScript,
-                maxUtxosToRead = 10_000,
-                errorIfExceedMaxUtxos = true
-              )
-              .left
-              .map(_.getMessage)
+            utxos <- getUsableUtxosOnce(
+              targetBlockHashOpt,
+              fromLockupScript,
+              maxUtxosToRead = 10_000
+            ).left.map(_.getMessage)
             allInputsSet   = allInputs.toSet
             relevantInputs = utxos.filter(out => allInputsSet.contains(out.ref))
             _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputs)
-            txs <- buildTransactionsRecursively(
+            txs <- buildMultiGroupTransactions(
               fromLockupScript,
               fromUnlockScript,
               relevantInputs,
