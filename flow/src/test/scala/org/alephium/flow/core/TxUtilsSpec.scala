@@ -1265,6 +1265,18 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val validation = TxValidation.build
 
+    def splitGenesisUtxosBy(n: Int): AVector[AssetOutputInfo] = {
+      val block =
+        transfer(blockFlow, fromPrivateKey, amount = genesisBalance / n, to = fromPublicKey)
+      addAndCheck(blockFlow, block)
+      val utxos = blockFlow
+        .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+        .rightValue
+        .asUnsafe[AssetOutputInfo]
+      utxos.length is 2
+      utxos
+    }
+
     def genesisUtxos: AVector[AssetOutputInfo] =
       blockFlow
         .getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true)
@@ -1510,16 +1522,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "build multi group transactions from multiple boxes" in new MultiGroupTransactions {
     val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
-
-    val block =
-      transfer(blockFlow, fromPrivateKey, amount = genesisBalance / 2, to = fromPublicKey)
-    addAndCheck(blockFlow, block)
-    val utxos = blockFlow
-      .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
-      .rightValue
-      .asUnsafe[AssetOutputInfo]
-    utxos.length is 2
-
+    val utxos   = splitGenesisUtxosBy(2)
     testMultiGroupTxsBuilding(utxos, outputs) isE ()
   }
 
@@ -1549,9 +1552,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail change when there is enough inputs" in new MultiGroupTransactions {
-    val singleOutput = buildOutputs(
-      AVector(ChainIndex.unsafe(0, 0))
-    )
+    val singleOutput = buildOutputs(AVector(ChainIndex.unsafe(0, 0)))
 
     blockFlow
       .buildChangeTxAndGetAvailableInputs(
@@ -1562,6 +1563,36 @@ class TxUtilsSpec extends AlephiumSpec {
         nonCoinbaseMinGasPrice
       )
       .leftValue is "Change transaction is not needed as there is enough inputs"
+  }
+
+  it should "get positive alph remainder or fail" in new MultiGroupTransactions {
+    val utxos            = splitGenesisUtxosBy(2)
+    val halfGenesisInput = utxos.head
+    def outputOfAmount(amount: U256): TxOutputInfo =
+      TxOutputInfo(
+        lockupScript,
+        amount,
+        AVector.empty,
+        None
+      )
+
+    blockFlow
+      .getPositiveAlphRemainderOrFail(
+        unlockScript,
+        AVector(halfGenesisInput),
+        AVector(outputOfAmount(genesisBalance)),
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
+
+    blockFlow
+      .getPositiveAlphRemainderOrFail(
+        unlockScript,
+        AVector(halfGenesisInput),
+        AVector(outputOfAmount(genesisBalance / 4)),
+        nonCoinbaseMinGasPrice
+      )
+      .isRight is true
   }
 
   it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {

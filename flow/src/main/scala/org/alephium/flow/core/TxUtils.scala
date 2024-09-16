@@ -452,21 +452,38 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  private def getPositiveAlphRemainderOrFail(
+  protected[core] def getPositiveAlphRemainderOrFail(
+      fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
-      outputs: AVector[TxOutputInfo]
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
   ): Either[String, U256] = {
+    val inputAmounts = inputs.map(_.output.amount)
     val totalInputValue =
-      inputs.map(_.output.amount).fold(Option(U256.Zero)) { case (acc, n) =>
+      inputAmounts.fold(Option(U256.Zero)) { case (acc, n) =>
         acc.flatMap(_.add(n))
       }
+    val outputAmounts = outputs.map(_.attoAlphAmount)
     val totalOutputValue =
-      outputs.map(_.attoAlphAmount).fold(Option(U256.Zero)) { case (acc, n) =>
+      outputAmounts.fold(Option(U256.Zero)) { case (acc, n) =>
         acc.flatMap(_.add(n))
       }
 
     (totalInputValue, totalOutputValue) match {
-      case (Some(iv), Some(ov)) if iv > ov => Right(iv.subUnsafe(ov))
+      case (Some(iv), Some(ov)) if iv > ov =>
+        for {
+          gasBox <- GasEstimation.estimateWithInputScript(
+            fromUnlockScript,
+            inputs.length,
+            outputs.length + 1,                    // + 1 is for change utxo
+            AssetScriptGasEstimator.NotImplemented // Not P2SH
+          )
+          remainder <- UnsignedTransaction.calculateAlphRemainder(
+            inputAmounts,
+            outputAmounts,
+            gasPrice * gasBox
+          )
+        } yield remainder
       case (None, Some(_)) =>
         Left(s"Invalid total input value")
       case (Some(_), None) =>
@@ -474,7 +491,7 @@ trait TxUtils { Self: FlowUtils =>
       case (None, None) =>
         Left(s"Invalid total input and output value")
       case (Some(iv), Some(ov)) =>
-        Left(s"Total input value $iv is not enough for output value $ov")
+        Left(s"Total input value $iv is not enough for output value $ov and a gas fee")
     }
 
   }
@@ -626,7 +643,7 @@ trait TxUtils { Self: FlowUtils =>
       ).left.map(_.getMessage)
       allInputsSet   = inputs.toSet
       relevantInputs = utxos.filter(out => allInputsSet.isEmpty || allInputsSet.contains(out.ref))
-      _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputs)
+      _ <- getPositiveAlphRemainderOrFail(fromUnlockScript, relevantInputs, outputs, gasPrice)
       txs <- buildMultiGroupTransactions(
         fromLockupScript,
         fromUnlockScript,

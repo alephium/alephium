@@ -426,6 +426,26 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   }
 
+  it should "fail in case gas amount is passed by user" in new MultiGroupFixture {
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    serverUtils
+      .buildMultiGroupTransactions(
+        blockFlow,
+        BuildTransaction(
+          fromPublicKey.bytes,
+          None,
+          AVector(
+            generateDestination(ChainIndex.unsafe(0, 0))
+          ),
+          None,
+          Some(GasBox.unsafe(1)),
+          Some(GasPrice(1))
+        )
+      )
+      .leftValue
+      .detail is "Explicit Gas Amount is not allowed"
+  }
+
   it should "support Schnorr address" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 

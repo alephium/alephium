@@ -385,7 +385,7 @@ trait EndpointsLogic extends Endpoints {
     bt => bt.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
-  val buildMultiTransactionLogic = serverLogicRedirect(buildMultiGroupTransactions)(
+  val buildMultiGroupTransactionsLogic = serverLogicRedirect(buildMultiGroupTransactions)(
     buildMultiTransaction =>
       withSyncedClique {
         Future.successful(
