@@ -893,12 +893,12 @@ class ServerUtils(implicit
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
   ): Try[AVector[UnsignedTransaction]] = {
-
+    assume(brokerConfig.contains(fromLockupScript.groupIndex))
     val transferResult =
       for {
         assetOutputRefs <- outputRefsOpt match {
-          case Some(outputRefs) => prepareOutputRefs(outputRefs).map(Option(_))
-          case None             => Right(None)
+          case Some(outputRefs) => prepareOutputRefs(outputRefs)
+          case None             => Right(AVector.empty[AssetOutputRef])
         }
         outputInfos = prepareOutputInfos(destinations)
         result <- blockFlow.multiGroupTransfer(

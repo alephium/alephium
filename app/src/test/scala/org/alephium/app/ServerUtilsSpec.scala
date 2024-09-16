@@ -108,10 +108,41 @@ class ServerUtilsSpec extends AlephiumSpec {
         }
     }
 
+    def testChangeTx(txr: BuildTransactionResult) = {
+      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
+      val fromAddress                        = Address.p2pkh(fromPublicKey)
+      val expectedUtxosPerDestination        = 2
+
+      val BuildTransactionResult(changeTx, _, _, changeTxId, chFromGroup, chToGroup) = txr
+
+      val changeTxChainIndex = ChainIndex.unsafe(chFromGroup, chToGroup)
+      val changeTxTemplate = signAndAddToMemPool(
+        changeTxId,
+        changeTx,
+        changeTxChainIndex,
+        fromPrivateKey
+      )
+      changeTxTemplate.outputsLength is 2
+
+      val block0 = mineFromMemPool(blockFlow, changeTxChainIndex)
+      addAndCheck(blockFlow, block0)
+      serverUtils.getTransactionStatus(blockFlow, changeTxTemplate.id, changeTxChainIndex) isE
+        Confirmed(block0.hash, 0, 1, 1, 1)
+      checkAddressBalance(
+        fromAddress,
+        genesisBalance - changeTxTemplate.gasFeeUnsafe,
+        expectedUtxosPerDestination
+      )
+      val remainingBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
+      remainingBalance
+    }
+
     // scalastyle:off method.length
     def testMultiTransferToTwoGroupsWithProvidedInputs(
         provideInputs: AVector[OutputInfo] => Option[AVector[OutputInfo]]
-    )(testFn: (AVector[BuildTransactionResult]) => (U256, Int)): Unit = {
+    )(
+        testFn: (AVector[BuildTransactionResult]) => (U256, Int, AVector[BuildTransactionResult])
+    ): Unit = {
 
       val chainIndex1                        = ChainIndex.unsafe(0, 1)
       val chainIndex2                        = ChainIndex.unsafe(0, 2)
@@ -138,10 +169,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
         .rightValue
 
-      var (initialBalance, utxoNum) = testFn(buildTransactions)
+      var (initialBalance, utxoNum, txToTest) = testFn(buildTransactions)
 
       val txsWithBlock =
-        buildTransactions.tail
+        txToTest
           .map { case tx @ BuildTransactionResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
             val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
             val txTemplate = signAndAddToMemPool(
@@ -358,10 +389,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test inter group txs from single transfer with inputs auto-selected" in new MultiGroupFixture {
     testMultiTransferToTwoGroupsWithProvidedInputs(_ => None) { resultingTxs =>
-      resultingTxs.length is 2
-      val remainingBalance            = genesisBalance
-      val expectedUtxosPerDestination = 1
-      remainingBalance -> expectedUtxosPerDestination
+      resultingTxs.length is 3
+      val remainingBalance = testChangeTx(resultingTxs.head)
+      (remainingBalance, 2, resultingTxs.tail)
     }
   }
 
@@ -381,7 +411,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val defaultGas                  = U256.unsafe(2 * Number.quadrillion)
       val remainingBalance            = genesisBalance - defaultGas
       val expectedUtxosPerDestination = 2
-      remainingBalance -> expectedUtxosPerDestination
+      (remainingBalance, expectedUtxosPerDestination, resultingTxs)
     }
   }
 
@@ -389,36 +419,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     testMultiTransferToTwoGroupsWithProvidedInputs { genesisUtxos =>
       genesisUtxos.headOption.map(AVector(_))
     } { resultingTxs =>
-      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
       resultingTxs.length is 3
-
-      val fromAddress                 = Address.p2pkh(fromPublicKey)
-      val expectedUtxosPerDestination = 2
-
-      val BuildTransactionResult(changeTx, _, _, changeTxId, chFromGroup, chToGroup) =
-        resultingTxs.head
-
-      val changeTxChainIndex = ChainIndex.unsafe(chFromGroup, chToGroup)
-      val changeTxTemplate = signAndAddToMemPool(
-        changeTxId,
-        changeTx,
-        changeTxChainIndex,
-        fromPrivateKey
-      )
-      changeTxTemplate.outputsLength is 2
-
-      val block0 = mineFromMemPool(blockFlow, changeTxChainIndex)
-      addAndCheck(blockFlow, block0)
-      serverUtils.getTransactionStatus(blockFlow, changeTxTemplate.id, changeTxChainIndex) isE
-        Confirmed(block0.hash, 0, 1, 1, 1)
-      checkAddressBalance(
-        fromAddress,
-        genesisBalance - changeTxTemplate.gasFeeUnsafe,
-        expectedUtxosPerDestination
-      )
-
-      val remainingBalance = genesisBalance - changeTxTemplate.gasFeeUnsafe
-      remainingBalance -> expectedUtxosPerDestination
+      val remainingBalance = testChangeTx(resultingTxs.head)
+      (remainingBalance, 2, resultingTxs.tail)
     }
 
   }

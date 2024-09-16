@@ -1293,7 +1293,7 @@ class TxUtilsSpec extends AlephiumSpec {
     def testMultiGroupTxsBuilding(
         allRemainingInputs: AVector[AssetOutputInfo],
         outputGroups: AVector[AVector[TxOutputInfo]]
-    ) = {
+    ): Either[String, Unit] = {
       blockFlow
         .buildMultiGroupTransactions(
           lockupScript,
@@ -1302,8 +1302,8 @@ class TxUtilsSpec extends AlephiumSpec {
           outputGroups,
           nonCoinbaseMinGasPrice,
           AVector.empty
-        ) match {
-        case Right(unsignedTxs) =>
+        )
+        .map { unsignedTxs =>
           unsignedTxs
             .map { unsignedTx =>
               testUnsignedTx(unsignedTx, fromPrivateKey)
@@ -1317,10 +1317,7 @@ class TxUtilsSpec extends AlephiumSpec {
                 mine(blockFlow, chainIndex, txs, lockupScriptsByGroup(chainIndex.to), None)
               addAndCheck(blockFlow, block)
             }
-
-        case Left(err) =>
-          fail(err)
-      }
+        }
     }
 
     def testChangeTxAndReturnRemainingInputs(
@@ -1499,14 +1496,38 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "build multi group transactions from just single genesis box" in new MultiGroupTransactions {
     val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
 
-    testMultiGroupTxsBuilding(genesisUtxos, outputs)
+    testMultiGroupTxsBuilding(genesisUtxos, outputs) isE ()
   }
 
-  it should "build multi group transactions even intra group" in new MultiGroupTransactions {
+  it should "fail when building multi group txs with no inputs" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+
+    testMultiGroupTxsBuilding(
+      AVector.empty,
+      outputs
+    ).leftValue is "Not enough inputs to build multi-group transaction"
+  }
+
+  it should "build multi group transactions from multiple boxes" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+
+    val block =
+      transfer(blockFlow, fromPrivateKey, amount = genesisBalance / 2, to = fromPublicKey)
+    addAndCheck(blockFlow, block)
+    val utxos = blockFlow
+      .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+      .rightValue
+      .asUnsafe[AssetOutputInfo]
+    utxos.length is 2
+
+    testMultiGroupTxsBuilding(utxos, outputs) isE ()
+  }
+
+  it should "build multi group transactions intra group" in new MultiGroupTransactions {
     val intraGroupOutputs = buildOutputs(
       AVector(ChainIndex.unsafe(0, 0))
     )
-    testMultiGroupTxsBuilding(genesisUtxos, intraGroupOutputs)
+    testMultiGroupTxsBuilding(genesisUtxos, intraGroupOutputs) isE ()
   }
 
   it should "build change and return remaining inputs" in new MultiGroupTransactions {

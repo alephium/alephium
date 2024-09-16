@@ -548,6 +548,8 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, AVector[UnsignedTransaction]] = {
     if (outputGroups.isEmpty) {
       Right(acc)
+    } else if (remainingInputs.isEmpty) {
+      Left("Not enough inputs to build multi-group transaction")
     } else if (outputGroups.map(_.length).sum > remainingInputs.length) {
       for {
         txWithAvailableInputs <- buildChangeTxAndGetAvailableInputs(
@@ -567,7 +569,6 @@ trait TxUtils { Self: FlowUtils =>
           accumulatedTxs
         )
       } yield txs
-
     } else {
       val currentOutputs = outputGroups.head
       for {
@@ -611,62 +612,30 @@ trait TxUtils { Self: FlowUtils =>
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      inputsOpt: Option[AVector[AssetOutputRef]],
+      inputs: AVector[AssetOutputRef],
       outputs: AVector[TxOutputInfo],
       gasPrice: GasPrice,
       utxosLimit: Int
-  ): Either[String, AVector[UnsignedTransaction]] = {
-    val groupIndex = fromLockupScript.groupIndex
-    assume(brokerConfig.contains(groupIndex))
-    val groupedOutputs = AVector.from(outputs.groupBy(_.lockupScript.groupIndex).values)
-    val results =
-      inputsOpt match {
-        case Some(allInputs) if allInputs.isEmpty =>
-          Left("Provided Output Refs cannot be empty")
-        case Some(allInputs) =>
-          for {
-            _ <- checkUTXOsInSameGroup(allInputs)
-            utxos <- getUsableUtxosOnce(
-              targetBlockHashOpt,
-              fromLockupScript,
-              maxUtxosToRead = 10_000
-            ).left.map(_.getMessage)
-            allInputsSet   = allInputs.toSet
-            relevantInputs = utxos.filter(out => allInputsSet.contains(out.ref))
-            _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputs)
-            txs <- buildMultiGroupTransactions(
-              fromLockupScript,
-              fromUnlockScript,
-              relevantInputs,
-              groupedOutputs,
-              gasPrice,
-              AVector.empty[UnsignedTransaction]
-            )
-          } yield txs
-        case None =>
-          groupedOutputs
-            .map { groupOutputs =>
-              transfer(
-                targetBlockHashOpt,
-                fromLockupScript,
-                fromUnlockScript,
-                groupOutputs,
-                gasOpt = None,
-                gasPrice,
-                utxosLimit
-              )
-            }
-            .fold[Either[String, AVector[UnsignedTransaction]]](
-              Right(AVector.empty)
-            ) {
-              case (Right(acc), Right(Right(value))) => Right(acc :+ value)
-              case (_, Right(Left(err)))             => Left(err)
-              case (_, Left(err))                    => Left(err.getMessage)
-              case (acc, _)                          => acc
-            }
-      }
-    results
-  }
+  ): Either[String, AVector[UnsignedTransaction]] =
+    for {
+      _ <- checkUTXOsInSameGroup(inputs)
+      utxos <- getUsableUtxosOnce(
+        targetBlockHashOpt,
+        fromLockupScript,
+        maxUtxosToRead = utxosLimit
+      ).left.map(_.getMessage)
+      allInputsSet   = inputs.toSet
+      relevantInputs = utxos.filter(out => allInputsSet.isEmpty || allInputsSet.contains(out.ref))
+      _ <- getPositiveAlphRemainderOrFail(relevantInputs, outputs)
+      txs <- buildMultiGroupTransactions(
+        fromLockupScript,
+        fromUnlockScript,
+        relevantInputs,
+        outputGroups = AVector.from(outputs.groupBy(_.lockupScript.groupIndex).values),
+        gasPrice,
+        AVector.empty[UnsignedTransaction]
+      )
+    } yield txs
 
   def transferMultiInputs(
       inputs: AVector[InputData],
