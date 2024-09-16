@@ -490,7 +490,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildTransactionResultsExamples: List[Example[AVector[BuildTransactionResult]]] =
+  implicit val buildMultiGroupTransactionsResultsExamples
+      : List[Example[AVector[BuildTransactionResult]]] =
     simpleExample(
       AVector(
         BuildTransactionResult(
