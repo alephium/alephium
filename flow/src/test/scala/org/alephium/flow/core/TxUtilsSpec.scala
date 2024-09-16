@@ -1283,6 +1283,24 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .asUnsafe[AssetOutputInfo]
 
+    def outputOfAmount(amount: U256): TxOutputInfo =
+      TxOutputInfo(
+        lockupScript,
+        amount,
+        AVector.empty,
+        None
+      )
+
+    def testAlphRemainderCheck(inputs: AVector[AssetOutputInfo], outputs: AVector[TxOutputInfo]) = {
+      blockFlow
+        .getPositiveAlphRemainderOrFail(
+          unlockScript,
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice
+        )
+    }
+
     def buildOutputs(chainIndexes: AVector[ChainIndex]): AVector[AVector[TxOutputInfo]] = {
       AVector.from(
         chainIndexes
@@ -1566,33 +1584,50 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get positive alph remainder or fail" in new MultiGroupTransactions {
-    val utxos            = splitGenesisUtxosBy(2)
-    val halfGenesisInput = utxos.head
-    def outputOfAmount(amount: U256): TxOutputInfo =
-      TxOutputInfo(
-        lockupScript,
-        amount,
-        AVector.empty,
-        None
-      )
+    val halfGenesisInput = splitGenesisUtxosBy(2).head
 
-    blockFlow
-      .getPositiveAlphRemainderOrFail(
-        unlockScript,
-        AVector(halfGenesisInput),
-        AVector(outputOfAmount(genesisBalance)),
-        nonCoinbaseMinGasPrice
-      )
-      .isLeft is true
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector(outputOfAmount(genesisBalance / 4))
+    ).isRight is true
 
-    blockFlow
-      .getPositiveAlphRemainderOrFail(
-        unlockScript,
-        AVector(halfGenesisInput),
-        AVector(outputOfAmount(genesisBalance / 4)),
-        nonCoinbaseMinGasPrice
-      )
-      .isRight is true
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector(outputOfAmount(genesisBalance))
+    ).isLeft is true
+
+    val overflowValueOutputs = AVector.fill(2)(outputOfAmount(U256.MaxValue))
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      overflowValueOutputs
+    ).isLeft is true
+
+    val overflowValueInputs =
+      AVector.fill(2) {
+        AssetOutputInfo(
+          AssetOutputRef.unsafe(
+            Hint.unsafe(0),
+            TxOutputRef.unsafeKey(Hash.generate)
+          ),
+          AssetOutput(
+            U256.MaxValue,
+            lockupScript,
+            TimeStamp.now(),
+            AVector.empty,
+            ByteString.empty
+          ),
+          FlowUtils.PersistedOutput
+        )
+      }
+    testAlphRemainderCheck(
+      overflowValueInputs,
+      AVector(outputOfAmount(genesisBalance / 4))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      overflowValueInputs,
+      overflowValueOutputs
+    ).isLeft is true
   }
 
   it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {
