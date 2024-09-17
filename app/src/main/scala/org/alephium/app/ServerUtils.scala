@@ -228,7 +228,7 @@ class ServerUtils(implicit
         case None             => Right(AVector.empty[AssetOutputRef])
       }
       _ <- Either.cond(
-        assetOutputRefs.map(_.hint.groupIndex).toSet.size == 1,
+        assetOutputRefs.map(_.hint.groupIndex).toSet.size <= 1,
         (),
         badRequest("Selected UTXOs are not from the same group")
       )
