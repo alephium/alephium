@@ -164,6 +164,14 @@ trait Generators extends NumericHelpers {
     Gen.choose[java.math.BigInteger](I256.MinValue.v, I256.MaxValue.v).map(I256.unsafe)
   val u256Gen: Gen[U256] =
     Gen.choose[java.math.BigInteger](U256.MinValue.v, U256.MaxValue.v).map(U256.unsafe)
+
+  def chainTipGen: Gen[ChainTip] = {
+    for {
+      blockHash <- blockHashGen
+      height    <- Gen.choose(0, Int.MaxValue)
+      weight    <- u256Gen.map(v => Weight(v.toBigInt))
+    } yield ChainTip(blockHash, height, weight)
+  }
 }
 
 trait DefaultGenerators extends Generators {

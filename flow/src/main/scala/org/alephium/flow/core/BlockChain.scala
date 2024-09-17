@@ -400,6 +400,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   override def checkCompletenessUnsafe(hash: BlockHash): Boolean = {
     checkCompletenessHelper(hash, blockStorage.existsUnsafe, super.checkCompletenessUnsafe)
   }
+
+  def getBlocksByHeights(heights: AVector[Int]): IOResult[AVector[Block]] = {
+    IOUtils.tryExecute(getBlocksByHeightsUnsafe(heights))
+  }
+
+  def getBlocksByHeightsUnsafe(heights: AVector[Int]): AVector[Block] = {
+    heights.flatMap(height => getHashesUnsafe(height).map(getBlockUnsafe))
+  }
 }
 
 object BlockChain {

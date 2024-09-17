@@ -61,6 +61,10 @@ object Payload {
         (HeadersByHeightsRequest, HeadersByHeightsRequest.serialize(x))
       case x: HeadersByHeightsResponse =>
         (HeadersByHeightsResponse, HeadersByHeightsResponse.serialize(x))
+      case x: BlocksByHeightsRequest =>
+        (BlocksByHeightsRequest, BlocksByHeightsRequest.serialize(x))
+      case x: BlocksByHeightsResponse =>
+        (BlocksByHeightsResponse, BlocksByHeightsResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -94,6 +98,8 @@ object Payload {
         case ChainState               => ChainState._deserialize(rest)
         case HeadersByHeightsRequest  => HeadersByHeightsRequest._deserialize(rest)
         case HeadersByHeightsResponse => HeadersByHeightsResponse._deserialize(rest)
+        case BlocksByHeightsRequest   => BlocksByHeightsRequest._deserialize(rest)
+        case BlocksByHeightsResponse  => BlocksByHeightsResponse._deserialize(rest)
       }
     }
   }
@@ -162,7 +168,9 @@ object Payload {
         TxsResponse,
         ChainState,
         HeadersByHeightsRequest,
-        HeadersByHeightsResponse
+        HeadersByHeightsResponse,
+        BlocksByHeightsRequest,
+        BlocksByHeightsResponse
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -540,4 +548,35 @@ object HeadersByHeightsResponse
     with Payload.Code {
   implicit val serde: Serde[HeadersByHeightsResponse] =
     Serde.forProduct2(apply, v => (v.id, v.headers))
+}
+
+final case class BlocksByHeightsRequest(
+    id: RequestId,
+    data: AVector[(ChainIndex, AVector[Int])]
+) extends Payload.Solicited
+    with IndexedPayload[Int] {
+  def measure(): Unit = BlocksByHeightsRequest.payloadLabeled.inc()
+}
+
+object BlocksByHeightsRequest
+    extends IndexedSerding[Int, BlocksByHeightsRequest]
+    with Payload.Code {
+  import IndexedSerding.dataSerde
+  def name: String = "BlocksByHeightsRequest"
+  implicit val serde: Serde[BlocksByHeightsRequest] =
+    Serde.forProduct2(apply, v => (v.id, v.data))
+  def checkDataPerChain(values: AVector[Int]): Boolean = values.forall(_ >= 0)
+
+  def apply(data: AVector[(ChainIndex, AVector[Int])]): BlocksByHeightsRequest =
+    BlocksByHeightsRequest(RequestId.random(), data)
+}
+
+final case class BlocksByHeightsResponse(id: RequestId, blocks: AVector[AVector[Block]])
+    extends Payload.Solicited {
+  def measure(): Unit = BlocksByHeightsResponse.payloadLabeled.inc()
+}
+
+object BlocksByHeightsResponse extends Payload.Serding[BlocksByHeightsResponse] with Payload.Code {
+  implicit val serde: Serde[BlocksByHeightsResponse] =
+    Serde.forProduct2(apply, v => (v.id, v.blocks))
 }

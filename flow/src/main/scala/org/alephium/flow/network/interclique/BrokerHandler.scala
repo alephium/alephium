@@ -31,6 +31,7 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, Cache, Duration, TimeStamp}
 
+// scalastyle:off file.size.limit
 trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   val maxBlockCapacity: Int              = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
   val maxTxsCapacity: Int                = maxBlockCapacity * 32
@@ -299,6 +300,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   private[interclique] var states: Option[AVector[StatePerChain]] = None
   private[interclique] val pendingRequests = mutable.Map.empty[RequestId, RequestInfo]
 
+  // scalastyle:off method.length
   def syncingV2: Receive = {
     schedule(self, BaseBrokerHandler.CheckPendingRequest, RequestTimeout)
 
@@ -321,16 +323,57 @@ trait SyncV2Handler { _: BrokerHandler =>
         }
 
       case BaseBrokerHandler.GetAncestors(chains) =>
+        // When we receive the `GetAncestors` message, we want to restart the sync workflow,
+        // so we need to clear `pendingRequests` to ignore stale requests, especially the skeleton responses.
+        log.debug(s"Remove pending requests: ${pendingRequests.keys.mkString("[", ",", "]")}")
+        pendingRequests.clear()
         handleGetAncestors(chains)
+
+      case BaseBrokerHandler.GetSkeletons(chains) =>
+        assume(chains.nonEmpty)
+        val request = HeadersByHeightsRequest(chains)
+        log.debug(
+          s"Sending HeadersByHeightsRequest to $remoteAddress: " +
+            s"${BrokerHandler.showIndexedHeights(chains)}, id: ${request.id.value.v}"
+        )
+        sendRequest(request, None)
+
       case BaseBrokerHandler.Received(HeadersByHeightsRequest(id, heights)) =>
+        log.debug(
+          s"Received HeadersByHeightsRequest from $remoteAddress: " +
+            s"${BrokerHandler.showIndexedHeights(heights)}, id: ${id.value.v}"
+        )
         handleHeadersRequest(id, heights)
+
       case BaseBrokerHandler.Received(HeadersByHeightsResponse(id, headerss)) =>
+        log.debug(
+          s"Received HeadersByHeightsResponse from $remoteAddress: " +
+            s"${BrokerHandler.showFlowData(headerss)}, id: ${id.value.v}"
+        )
         handleHeadersResponse(id, headerss)
-      case BaseBrokerHandler.CheckPendingRequest =>
-        checkPendingRequest()
+
+      case cmd: BaseBrokerHandler.DownloadBlockTasks =>
+        handleDownloadBlocksRequest(cmd)
+
+      case BaseBrokerHandler.Received(BlocksByHeightsRequest(id, chains)) =>
+        log.debug(
+          s"Received BlocksByHeightsRequest from $remoteAddress: " +
+            s"${BrokerHandler.showIndexedHeights(chains)}, id: ${id.value.v}"
+        )
+        handleBlocksRequest(id, chains)
+
+      case BaseBrokerHandler.Received(BlocksByHeightsResponse(id, blockss)) =>
+        log.debug(
+          s"Received BlocksByHeightsResponse from $remoteAddress: " +
+            s"${BrokerHandler.showFlowData(blockss)}, id: ${id.value.v}"
+        )
+        handleBlocksResponse(id, blockss)
+
+      case BaseBrokerHandler.CheckPendingRequest => checkPendingRequest()
     }
     receive
   }
+  // scalastyle:on method.length
 
   private def checkChainState(tips: AVector[ChainTip]): Boolean = {
     val groupRange = brokerConfig.calIntersection(remoteBrokerInfo)
@@ -347,6 +390,92 @@ trait SyncV2Handler { _: BrokerHandler =>
     }
   }
 
+  private def handleDownloadBlocksRequest(cmd: BaseBrokerHandler.DownloadBlockTasks): Unit = {
+    val heights = cmd.tasks.map(task => (task.chainIndex, task.heights))
+    val request = BlocksByHeightsRequest(heights)
+    log.debug(
+      s"Sending BlocksByHeightsRequest to $remoteAddress: " +
+        s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value.v}"
+    )
+    sendRequest(request, Some(cmd))
+  }
+
+  private def handleBlocksResponse(id: RequestId, blockss: AVector[AVector[Block]]): Unit = {
+    pendingRequests.remove(id) match {
+      case Some(info) =>
+        info.command match {
+          case Some(BaseBrokerHandler.DownloadBlockTasks(tasks)) =>
+            val isValid =
+              tasks.length == blockss.length &&
+                tasks.forallWithIndex { case (task, index) =>
+                  val blocks = blockss(index)
+                  blocks.nonEmpty && blocks.length >= task.size &&
+                  blocks.forall(b => checkWork(b.hash) && b.chainIndex == task.chainIndex)
+                }
+            if (isValid) {
+              val result = tasks.mapWithIndex { case (task, index) =>
+                val blocks  = blockss(index)
+                val isValid = SyncV2Handler.validateBlocks(blocks, task.size, task.toHeader)
+                (task, blocks, isValid)
+              }
+              blockFlowSynchronizer ! BlockFlowSynchronizer.BlockDownloaded(result)
+            } else {
+              log.error(
+                s"Received invalid BlocksByHeightsResponse from $remoteAddress: ${BrokerHandler.showFlowData(blockss)}"
+              )
+              stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+            }
+          case command => // this should never happen
+            log.error(s"Internal error, expected a blocks request, but got $command")
+            context.stop(self)
+        }
+      case None =>
+        log.warning(s"Ignore unknown BlocksByHeightsRespons from $remoteAddress, request id: $id")
+    }
+  }
+
+  private def handleFlowDataRequest[T <: FlowData](
+      id: RequestId,
+      heights: AVector[(ChainIndex, AVector[Int])],
+      func: (ChainIndex, AVector[Int]) => IOResult[AVector[T]],
+      responseCtor: (RequestId, AVector[AVector[T]]) => Payload.Solicited,
+      name: String
+  ): Unit = {
+    if (heights.exists(c => !brokerConfig.contains(c._1.from))) {
+      log.error(
+        s"Received invalid ${name}Request from $remoteAddress: " +
+          s"${BrokerHandler.showIndexedHeights(heights)}, id: ${id.value.v}"
+      )
+      stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+    } else {
+      val flowData = mutable.ArrayBuffer.empty[AVector[T]]
+      heights.foreach { case (chainIndex, heightsPerChain) =>
+        escapeIOError(func(chainIndex, heightsPerChain), "Get flow data by heights")(
+          flowData.addOne
+        )
+      }
+      val result = AVector.from(flowData)
+      log.debug(
+        s"Sending ${name}Response to $remoteAddress: " +
+          s"${BrokerHandler.showFlowData(result)}, id: ${id.value.v}"
+      )
+      send(responseCtor(id, result))
+    }
+  }
+
+  private def handleBlocksRequest(
+      id: RequestId,
+      chains: AVector[(ChainIndex, AVector[Int])]
+  ): Unit = {
+    handleFlowDataRequest(
+      id,
+      chains,
+      (chainIndex, heights) => blockflow.getBlockChain(chainIndex).getBlocksByHeights(heights),
+      BlocksByHeightsResponse.apply,
+      "BlocksByHeights"
+    )
+  }
+
   private def handleGetAncestors(chains: AVector[(ChainIndex, ChainTip, ChainTip)]): Unit = {
     assume(chains.nonEmpty)
     val states = mutable.ArrayBuffer.empty[StatePerChain]
@@ -359,30 +488,22 @@ trait SyncV2Handler { _: BrokerHandler =>
     val request = HeadersByHeightsRequest(heights)
     log.debug(
       s"Sending HeadersByHeightsRequest to $remoteAddress: " +
-        s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value}"
+        s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value.v}"
     )
-    sendRequest(request)
+    sendRequest(request, None)
   }
 
   private def handleHeadersRequest(
       id: RequestId,
       heights: AVector[(ChainIndex, AVector[Int])]
   ): Unit = {
-    if (heights.exists(c => !brokerConfig.contains(c._1.from))) {
-      log.error(
-        s"Received invalid HeadersByHeightsRequest: ${BrokerHandler.showIndexedHeights(heights)}"
-      )
-      stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
-    } else {
-      val results = mutable.ArrayBuffer.empty[AVector[BlockHeader]]
-      heights.foreach { case (chainIndex, heightsPerChain) =>
-        escapeIOError(
-          blockflow.getHeaderChain(chainIndex).getHeadersByHeights(heightsPerChain),
-          "Get flow data by heights"
-        )(results.addOne)
-      }
-      send(HeadersByHeightsResponse(id, AVector.from(results)))
-    }
+    handleFlowDataRequest(
+      id,
+      heights,
+      (chainIndex, heights) => blockflow.getHeaderChain(chainIndex).getHeadersByHeights(heights),
+      HeadersByHeightsResponse.apply,
+      "HeadersByHeights"
+    )
   }
 
   private def handleHeadersResponse(
@@ -402,13 +523,14 @@ trait SyncV2Handler { _: BrokerHandler =>
                   )
                 }
             if (isValid) {
-              log.debug(
-                s"Received valid HeadersByHeightsResponse: ${BrokerHandler.showFlowData(headerss)}"
-              )
-              handleAncestorResponse(headerss)
+              if (this.states.isEmpty) {
+                handleSkeletonResponse(chains, headerss)
+              } else {
+                handleAncestorResponse(headerss)
+              }
             } else {
               log.error(
-                s"Received invalid HeadersByHeightsResponse: ${BrokerHandler.showFlowData(headerss)}"
+                s"Received invalid HeadersByHeightsResponse from $remoteAddress: ${BrokerHandler.showFlowData(headerss)}"
               )
               stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
             }
@@ -419,7 +541,7 @@ trait SyncV2Handler { _: BrokerHandler =>
             context.stop(self)
         }
       case None =>
-        log.warning(s"Ignore unknown HeadersByHeightsResponse, request id: $id")
+        log.warning(s"Ignore unknown HeadersByHeightsResponse from $remoteAddress, request id: $id")
     }
   }
 
@@ -437,9 +559,9 @@ trait SyncV2Handler { _: BrokerHandler =>
           val request = HeadersByHeightsRequest(heights)
           log.debug(
             s"Sending HeadersByHeightsRequest to $remoteAddress: " +
-              s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value}"
+              s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value.v}"
           )
-          sendRequest(request)
+          sendRequest(request, None)
         } else if (isAncestorFound) {
           states.foreach { states =>
             val ancestors =
@@ -452,7 +574,7 @@ trait SyncV2Handler { _: BrokerHandler =>
               }
             escapeIOError(ancestors, "Get ancestor height") { ancestors =>
               log.info(
-                s"Found ancestors between self and the peer: ${BrokerHandler.showAncestors(ancestors)}"
+                s"Found ancestors between self and the peer $remoteAddress: ${BrokerHandler.showAncestors(ancestors)}"
               )
               blockFlowSynchronizer ! BlockFlowSynchronizer.Ancestors(ancestors)
             }
@@ -461,6 +583,23 @@ trait SyncV2Handler { _: BrokerHandler =>
         }
       case Left(MisbehaviorT(misbehavior)) => stopOnError(misbehavior)
       case Left(IOErrorT(error)) => escapeIOError[Unit](Left(error), "Get ancestors")(_ => ())
+    }
+  }
+
+  private def handleSkeletonResponse(
+      requests: AVector[(ChainIndex, AVector[Int])],
+      response: AVector[AVector[BlockHeader]]
+  ): Unit = {
+    val isValid = requests.forallWithIndex { case ((_, heights), index) =>
+      response(index).length == heights.length
+    }
+    if (isValid) {
+      blockFlowSynchronizer ! BlockFlowSynchronizer.Skeletons(requests, response)
+    } else {
+      log.error(
+        s"Received invalid skeleton from $remoteAddress: ${BrokerHandler.showFlowData(response)}"
+      )
+      stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
     }
   }
 
@@ -510,14 +649,19 @@ trait SyncV2Handler { _: BrokerHandler =>
     val now = TimeStamp.now()
     pendingRequests.find(_._2.expiry < now) match {
       case Some((id, _)) =>
-        log.error(s"The request ${id.value} sent to $remoteAddress timed out, stop the broker now")
+        log.error(
+          s"The request ${id.value.v} sent to $remoteAddress timed out, stop the broker now"
+        )
         stopOnError(MisbehaviorManager.RequestTimeout(remoteAddress))
       case None => ()
     }
   }
 
-  private def sendRequest(request: Payload.Solicited): Unit = {
-    pendingRequests.addOne(request.id -> RequestInfo(request))
+  private def sendRequest(
+      request: Payload.Solicited,
+      command: Option[BaseBrokerHandler.Command]
+  ): Unit = {
+    pendingRequests.addOne(request.id -> RequestInfo(request, command))
     send(request)
   }
 
@@ -548,10 +692,14 @@ object SyncV2Handler {
   def from[T](value: => IOResult[T]): ResultT[T] = value.left.map(ErrorT.apply)
 
   val RequestTimeout: Duration = Duration.ofMinutesUnsafe(1)
-  final case class RequestInfo(payload: Payload, expiry: TimeStamp)
+  final case class RequestInfo(
+      payload: Payload,
+      command: Option[BaseBrokerHandler.Command],
+      expiry: TimeStamp
+  )
   object RequestInfo {
-    def apply(payload: Payload.Solicited): RequestInfo =
-      RequestInfo(payload, TimeStamp.now().plusUnsafe(RequestTimeout))
+    def apply(payload: Payload.Solicited, command: Option[BaseBrokerHandler.Command]): RequestInfo =
+      RequestInfo(payload, command, TimeStamp.now().plusUnsafe(RequestTimeout))
   }
 
   final class StatePerChain(
@@ -610,5 +758,22 @@ object SyncV2Handler {
     val count         = calcInRange(1 + totalSpan / span, 2, maxCount)
     val from          = math.max(requestHead - (count - 1) * span, ALPH.GenesisHeight)
     AVector.from(from.to(from + (count - 1) * span, span))
+  }
+
+  def validateBlocks(
+      blocks: AVector[Block],
+      mainChainBlockSize: Int,
+      toHeader: Option[BlockHeader]
+  ): Boolean = {
+    assume(blocks.nonEmpty)
+    var lastMainChainBlock = blocks.head
+    var size               = 1
+    blocks.tail.foreach { block =>
+      if (block.parentHash == lastMainChainBlock.hash) {
+        lastMainChainBlock = block
+        size += 1
+      }
+    }
+    size == mainChainBlockSize && toHeader.forall(_ == lastMainChainBlock.header)
   }
 }

@@ -302,6 +302,86 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     )
   }
 
+  it should "serialize/deserialize the BlocksByHeightsRequest/BlocksByHeightsResponse payload" in {
+    import Hex._
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val requestId  = RequestId.unsafe(1)
+    val request    = BlocksByHeightsRequest(requestId, AVector((chainIndex, AVector(1, 2))))
+    verifySerde(request) {
+      // code id
+      hex"13" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // chain index
+        hex"0000" ++
+        // number of heights
+        hex"02" ++
+        // height0
+        serialize(1) ++
+        // height1
+        serialize(2)
+    }
+
+    val block0   = blockGen.sample.get
+    val block1   = blockGen.sample.get
+    val response = BlocksByHeightsResponse(requestId, AVector(AVector(block0, block1)))
+    verifySerde(response) {
+      // code id
+      hex"14" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // number of headers
+        hex"02" ++
+        // block0
+        serialize(block0) ++
+        // block1
+        serialize(block1)
+    }
+
+    Payload
+      .deserialize(
+        // code id
+        hex"13" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // invalid chain index
+          hex"0500" ++
+          // number of heights
+          hex"01" ++
+          // height
+          serialize(1)
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in BlocksByHeightsRequest payload"
+    )
+
+    Payload
+      .deserialize(
+        // code id
+        hex"13" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // chain index
+          hex"0000" ++
+          // number of heights
+          hex"01" ++
+          // invalid height
+          serialize(-1)
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in BlocksByHeightsRequest payload"
+    )
+  }
+
   it should "serialize/deserialize the InvRequest/InvResponse payload" in {
     import Hex._
 

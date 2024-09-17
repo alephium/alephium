@@ -948,4 +948,16 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getHeadersByHeights(AVector.from(ALPH.GenesisHeight to (to + 1))) isE headers
     }
   }
+
+  it should "get blocks by heights" in new Fixture {
+    val chain           = buildBlockChain()
+    val mainChainBlocks = chainGenOf(5, genesis).sample.get
+    val forkChainBlocks = chainGenOf(4, genesis).sample.get
+    addBlocks(chain, mainChainBlocks)
+    addBlocks(chain, forkChainBlocks)
+    val blocks = chain.getBlocksByHeightsUnsafe(AVector(1, 2, 3, 4, 5))
+    blocks is AVector
+      .from(0 until 4)
+      .flatMap(i => AVector(mainChainBlocks(i), forkChainBlocks(i))) :+ mainChainBlocks.last
+  }
 }

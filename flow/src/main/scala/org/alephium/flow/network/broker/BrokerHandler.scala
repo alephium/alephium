@@ -26,6 +26,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.flow.network.sync.SyncState.BlockDownloadTask
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderStatus, InvalidTestnetMiner, Validation}
 import org.alephium.io.IOResult
@@ -49,7 +50,9 @@ object BrokerHandler {
       extends Command
   final case class ChainState(tips: AVector[ChainTip])                             extends Command
   final case class GetAncestors(chains: AVector[(ChainIndex, ChainTip, ChainTip)]) extends Command
+  final case class GetSkeletons(chains: AVector[(ChainIndex, AVector[Int])])       extends Command
   final case object CheckPendingRequest                                            extends Command
+  final case class DownloadBlockTasks(tasks: AVector[BlockDownloadTask])           extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
