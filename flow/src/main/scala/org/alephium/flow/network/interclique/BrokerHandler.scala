@@ -16,12 +16,15 @@
 
 package org.alephium.flow.network.interclique
 
+import scala.collection.mutable
+
 import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.message._
 import org.alephium.protocol.mining.PoW
@@ -274,27 +277,59 @@ object BrokerHandler {
       .map(t => s"(${t.hash.shortHex}, ${t.height}, ${t.weight.value})")
       .mkString("[", ",", "]")
   }
+
+  def showIndexedHeights(heights: AVector[(ChainIndex, AVector[Int])]): String = {
+    heights
+      .map(p => s"${p._1} -> ${if (p._2.isEmpty) "[]" else s"[${p._2.head} .. ${p._2.last}]"}")
+      .mkString(", ")
+  }
+
+  def showFlowData[T <: FlowData](data: AVector[AVector[T]]): String = {
+    Utils.showFlow(data.map(_.map(_.hash)))
+  }
+
+  def showAncestors(heights: AVector[(ChainIndex, Int)]): String = {
+    heights.map(p => s"${p._1} -> ${p._2}").mkString(", ")
+  }
 }
 
 trait SyncV2Handler { _: BrokerHandler =>
+  import SyncV2Handler._
+
+  private[interclique] var states: Option[AVector[StatePerChain]] = None
+  private[interclique] val pendingRequests = mutable.Map.empty[RequestId, RequestInfo]
 
   def syncingV2: Receive = {
-    case BaseBrokerHandler.ChainState(tips) =>
-      log.debug(s"Send chain state to $remoteAddress: ${BrokerHandler.showChainState(tips)}")
-      send(ChainState(tips))
+    schedule(self, BaseBrokerHandler.CheckPendingRequest, RequestTimeout)
 
-    case BaseBrokerHandler.Received(ChainState(tips)) =>
-      if (checkChainState(tips)) {
-        log.debug(
-          s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
-        )
-        blockFlowSynchronizer ! BlockFlowSynchronizer.ChainState(tips)
-      } else {
-        log.warning(
-          s"Invalid chain state ${BrokerHandler.showChainState(tips)} from $remoteAddress"
-        )
-        handleMisbehavior(MisbehaviorManager.InvalidChainState(remoteAddress))
-      }
+    val receive: Receive = {
+      case BaseBrokerHandler.ChainState(tips) =>
+        log.debug(s"Send chain state to $remoteAddress: ${BrokerHandler.showChainState(tips)}")
+        send(ChainState(tips))
+
+      case BaseBrokerHandler.Received(ChainState(tips)) =>
+        if (checkChainState(tips)) {
+          log.debug(
+            s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
+          )
+          blockFlowSynchronizer ! BlockFlowSynchronizer.ChainState(tips)
+        } else {
+          log.warning(
+            s"Invalid chain state ${BrokerHandler.showChainState(tips)} from $remoteAddress"
+          )
+          handleMisbehavior(MisbehaviorManager.InvalidChainState(remoteAddress))
+        }
+
+      case BaseBrokerHandler.GetAncestors(chains) =>
+        handleGetAncestors(chains)
+      case BaseBrokerHandler.Received(HeadersByHeightsRequest(id, heights)) =>
+        handleHeadersRequest(id, heights)
+      case BaseBrokerHandler.Received(HeadersByHeightsResponse(id, headerss)) =>
+        handleHeadersResponse(id, headerss)
+      case BaseBrokerHandler.CheckPendingRequest =>
+        checkPendingRequest()
+    }
+    receive
   }
 
   private def checkChainState(tips: AVector[ChainTip]): Boolean = {
@@ -310,5 +345,270 @@ trait SyncV2Handler { _: BrokerHandler =>
         (tip.height == ALPH.GenesisHeight && tip.weight == ALPH.GenesisWeight)
       }
     }
+  }
+
+  private def handleGetAncestors(chains: AVector[(ChainIndex, ChainTip, ChainTip)]): Unit = {
+    assume(chains.nonEmpty)
+    val states = mutable.ArrayBuffer.empty[StatePerChain]
+    val heights = chains.map { case (chainIndex, bestTip, selfTip) =>
+      val heightsPerChain = SyncV2Handler.calculateRequestSpan(bestTip.height, selfTip.height)
+      states.addOne(StatePerChain(chainIndex, bestTip))
+      (chainIndex, heightsPerChain)
+    }
+    this.states = Some(AVector.from(states))
+    val request = HeadersByHeightsRequest(heights)
+    log.debug(
+      s"Sending HeadersByHeightsRequest to $remoteAddress: " +
+        s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value}"
+    )
+    sendRequest(request)
+  }
+
+  private def handleHeadersRequest(
+      id: RequestId,
+      heights: AVector[(ChainIndex, AVector[Int])]
+  ): Unit = {
+    if (heights.exists(c => !brokerConfig.contains(c._1.from))) {
+      log.error(
+        s"Received invalid HeadersByHeightsRequest: ${BrokerHandler.showIndexedHeights(heights)}"
+      )
+      stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+    } else {
+      val results = mutable.ArrayBuffer.empty[AVector[BlockHeader]]
+      heights.foreach { case (chainIndex, heightsPerChain) =>
+        escapeIOError(
+          blockflow.getHeaderChain(chainIndex).getHeadersByHeights(heightsPerChain),
+          "Get flow data by heights"
+        )(results.addOne)
+      }
+      send(HeadersByHeightsResponse(id, AVector.from(results)))
+    }
+  }
+
+  private def handleHeadersResponse(
+      id: RequestId,
+      headerss: AVector[AVector[BlockHeader]]
+  ): Unit = {
+    pendingRequests.remove(id) match {
+      case Some(info) =>
+        info.payload match {
+          case HeadersByHeightsRequest(_, chains) =>
+            val isValid =
+              headerss.length == chains.length &&
+                headerss.forallWithIndex { case (headers, index) =>
+                  val chainIndex = chains(index)._1
+                  headers.nonEmpty && headers.forall(h =>
+                    (checkWork(h.hash) && h.chainIndex == chainIndex) || h.isGenesis
+                  )
+                }
+            if (isValid) {
+              log.debug(
+                s"Received valid HeadersByHeightsResponse: ${BrokerHandler.showFlowData(headerss)}"
+              )
+              handleAncestorResponse(headerss)
+            } else {
+              log.error(
+                s"Received invalid HeadersByHeightsResponse: ${BrokerHandler.showFlowData(headerss)}"
+              )
+              stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+            }
+          case _ => // this should never happen
+            log.error(
+              s"Internal error, expected a HeadersByHeightsRequest, but got ${info.payload}"
+            )
+            context.stop(self)
+        }
+      case None =>
+        log.warning(s"Ignore unknown HeadersByHeightsResponse, request id: $id")
+    }
+  }
+
+  private def handleAncestorResponse(headerss: AVector[AVector[BlockHeader]]): Unit = {
+    val heights = headerss.foldE(AVector.empty[(ChainIndex, AVector[Int])]) { case (acc, headers) =>
+      val chainIndex = headers.head.chainIndex
+      getChainState(chainIndex) match {
+        case Some(state) => handleAncestorResponse(state, headers, acc)
+        case None        => Right(acc)
+      }
+    }
+    heights match {
+      case Right(heights) =>
+        if (heights.nonEmpty) {
+          val request = HeadersByHeightsRequest(heights)
+          log.debug(
+            s"Sending HeadersByHeightsRequest to $remoteAddress: " +
+              s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value}"
+          )
+          sendRequest(request)
+        } else if (isAncestorFound) {
+          states.foreach { states =>
+            val ancestors =
+              AVector.from(states).foldE(AVector.empty[(ChainIndex, Int)]) { case (acc, state) =>
+                state.ancestor match {
+                  case Some(header) =>
+                    blockflow.getHeight(header).map(height => acc :+ (header.chainIndex -> height))
+                  case None => Right(acc) // dead branch
+                }
+              }
+            escapeIOError(ancestors, "Get ancestor height") { ancestors =>
+              log.info(
+                s"Found ancestors between self and the peer: ${BrokerHandler.showAncestors(ancestors)}"
+              )
+              blockFlowSynchronizer ! BlockFlowSynchronizer.Ancestors(ancestors)
+            }
+          }
+          states = None
+        }
+      case Left(MisbehaviorT(misbehavior)) => stopOnError(misbehavior)
+      case Left(IOErrorT(error)) => escapeIOError[Unit](Left(error), "Get ancestors")(_ => ())
+    }
+  }
+
+  private def handleAncestorResponse(
+      state: StatePerChain,
+      headers: AVector[BlockHeader],
+      requestsAcc: AVector[(ChainIndex, AVector[Int])]
+  ): ResultT[AVector[(ChainIndex, AVector[Int])]] = {
+    state.binarySearch match {
+      case None =>
+        from(headers.reverse.findE(blockflow.contains)).map {
+          case Some(ancestor) =>
+            log.debug(
+              s"Found the ancestor between self and the peer $remoteAddress, chain index: ${state.chainIndex}, hash: ${ancestor.hash}"
+            )
+            state.setAncestor(ancestor)
+            requestsAcc
+          case None =>
+            log.debug(
+              s"Fallback to binary search to find the ancestor between self and the peer $remoteAddress"
+            )
+            requestsAcc :+ (state.chainIndex, AVector(state.startBinarySearch()))
+        }
+      case Some((start, end)) =>
+        if (headers.length == 1) { // we have checked that the headers are not empty
+          from(blockflow.contains(headers.head)).flatMap { exists =>
+            val ancestor = if (exists) Some(headers.head) else None
+            state.handleBinarySearch(start, end, ancestor) match {
+              case Some(height) => Right(requestsAcc :+ (state.chainIndex, AVector(height)))
+              case None =>
+                if (!state.isAncestorFound) {
+                  val chain = blockflow.getBlockChain(state.chainIndex)
+                  escapeIOError(chain.getBlockHeader(chain.genesisHash), "Get genesis header") {
+                    state.setAncestor
+                  }
+                }
+                Right(requestsAcc)
+            }
+          }
+        } else {
+          Left(ErrorT(MisbehaviorManager.InvalidFlowData(remoteAddress)))
+        }
+    }
+  }
+
+  private def checkPendingRequest(): Unit = {
+    val now = TimeStamp.now()
+    pendingRequests.find(_._2.expiry < now) match {
+      case Some((id, _)) =>
+        log.error(s"The request ${id.value} sent to $remoteAddress timed out, stop the broker now")
+        stopOnError(MisbehaviorManager.RequestTimeout(remoteAddress))
+      case None => ()
+    }
+  }
+
+  private def sendRequest(request: Payload.Solicited): Unit = {
+    pendingRequests.addOne(request.id -> RequestInfo(request))
+    send(request)
+  }
+
+  private def stopOnError(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
+    publishEvent(misbehavior)
+    context.stop(self)
+  }
+
+  private def getChainState(chainIndex: ChainIndex): Option[StatePerChain] = {
+    states.flatMap(_.find(s => s.chainIndex == chainIndex))
+  }
+
+  private def isAncestorFound: Boolean =
+    states.isDefined && states.forall(_.forall(_.isAncestorFound))
+}
+
+object SyncV2Handler {
+  sealed trait ErrorT
+  final case class MisbehaviorT(value: MisbehaviorManager.Misbehavior) extends ErrorT
+  final case class IOErrorT(value: IOError)                            extends ErrorT
+  object ErrorT {
+    def apply(value: MisbehaviorManager.Misbehavior): ErrorT = MisbehaviorT(value)
+    def apply(value: IOError): ErrorT                        = IOErrorT(value)
+  }
+
+  type ResultT[T] = Either[ErrorT, T]
+
+  def from[T](value: => IOResult[T]): ResultT[T] = value.left.map(ErrorT.apply)
+
+  val RequestTimeout: Duration = Duration.ofMinutesUnsafe(1)
+  final case class RequestInfo(payload: Payload, expiry: TimeStamp)
+  object RequestInfo {
+    def apply(payload: Payload.Solicited): RequestInfo =
+      RequestInfo(payload, TimeStamp.now().plusUnsafe(RequestTimeout))
+  }
+
+  final class StatePerChain(
+      val chainIndex: ChainIndex,
+      val bestTip: ChainTip,
+      var binarySearch: Option[(Int, Int)],
+      var ancestor: Option[BlockHeader]
+  ) {
+    def startBinarySearch(): Int = {
+      assume(binarySearch.isEmpty)
+      binarySearch = Some((ALPH.GenesisHeight, bestTip.height))
+      (ALPH.GenesisHeight + bestTip.height) / 2
+    }
+
+    def handleBinarySearch(
+        start: Int,
+        end: Int,
+        ancestor: Option[BlockHeader]
+    ): Option[Int] = {
+      assume(binarySearch.isDefined)
+      if (ancestor.isDefined) {
+        this.ancestor = ancestor
+      }
+      val lastHeight = (start + end) / 2
+      val (newStart, newEnd) = ancestor match {
+        case Some(_) => (lastHeight, end)
+        case None    => (start, lastHeight)
+      }
+      binarySearch = Some((newStart, newEnd))
+      Option.when(newStart + 1 < newEnd)((newStart + newEnd) / 2)
+    }
+
+    @inline def setAncestor(blockHeader: BlockHeader): Unit = {
+      assume(ancestor.isEmpty)
+      ancestor = Some(blockHeader)
+    }
+
+    def isAncestorFound: Boolean = ancestor.isDefined
+  }
+
+  object StatePerChain {
+    def apply(chainIndex: ChainIndex, bestTip: ChainTip): StatePerChain =
+      new StatePerChain(chainIndex, bestTip, None, None)
+  }
+
+  @inline private def calcInRange(value: Int, min: Int, max: Int): Int = {
+    if (value < min) min else if (value > max) max else value
+  }
+
+  def calculateRequestSpan(remoteHeight: Int, localHeight: Int): AVector[Int] = {
+    val maxCount      = 12
+    val requestHead   = math.max(remoteHeight - 1, ALPH.GenesisHeight)
+    val requestBottom = math.max(localHeight - 1, ALPH.GenesisHeight)
+    val totalSpan     = requestHead - requestBottom
+    val span          = calcInRange(1 + totalSpan / maxCount, 2, 16)
+    val count         = calcInRange(1 + totalSpan / span, 2, maxCount)
+    val from          = math.max(requestHead - (count - 1) * span, ALPH.GenesisHeight)
+    AVector.from(from.to(from + (count - 1) * span, span))
   }
 }

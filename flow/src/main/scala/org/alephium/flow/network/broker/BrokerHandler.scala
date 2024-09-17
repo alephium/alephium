@@ -47,7 +47,9 @@ object BrokerHandler {
   final case class RelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]) extends Command
   final case class DownloadTxs(hashes: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
-  final case class ChainState(tips: AVector[ChainTip]) extends Command
+  final case class ChainState(tips: AVector[ChainTip])                             extends Command
+  final case class GetAncestors(chains: AVector[(ChainIndex, ChainTip, ChainTip)]) extends Command
+  final case object CheckPendingRequest                                            extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }

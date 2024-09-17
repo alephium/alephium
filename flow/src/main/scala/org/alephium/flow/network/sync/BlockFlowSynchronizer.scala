@@ -46,6 +46,7 @@ object BlockFlowSynchronizer {
   case object CleanDownloading                                          extends Command
   final case class BlockAnnouncement(hash: BlockHash)                   extends Command
   final case class ChainState(tips: AVector[ChainTip])                  extends Command
+  final case class Ancestors(chains: AVector[(ChainIndex, Int)])        extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
