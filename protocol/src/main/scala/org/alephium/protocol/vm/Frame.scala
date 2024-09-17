@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
-import org.alephium.serde.deserialize
+import org.alephium.serde.{avectorSerde, deserialize}
 import org.alephium.util.{AVector, Bytes}
 
 // scalastyle:off number.of.methods
@@ -555,8 +555,12 @@ final case class StatefulFrame(
   ): ExeResult[Frame[StatefulContext]] = {
     for {
       method <- contractObj.getMethod(index)
-      _ <- checkLength(method.returnLength, InvalidReturnLength, InvalidExternalMethodReturnLength)
-      _ <- checkLength(method.argsLength, InvalidArgLength, InvalidExternalMethodArgLength)
+      _ <- checkLength(
+        method.returnLength,
+        InvalidReturnLength,
+        InvalidExternalMethodReturnLength.apply
+      )
+      _ <- checkLength(method.argsLength, InvalidArgLength, InvalidExternalMethodArgLength.apply)
       _ <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method, index)
       frame <-

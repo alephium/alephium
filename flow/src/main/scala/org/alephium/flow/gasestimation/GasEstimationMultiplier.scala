@@ -16,8 +16,11 @@
 
 package org.alephium.flow.gasestimation
 
+import scala.annotation.nowarn
+
 import org.alephium.protocol.vm.GasBox
 
+@nowarn
 final case class GasEstimationMultiplier private (value: Double) extends AnyVal {
   def *(gas: GasBox): GasBox = {
     val numerator = (value * GasEstimationMultiplier.Denominator).toInt

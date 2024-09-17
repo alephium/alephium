@@ -16,11 +16,14 @@
 
 package org.alephium.protocol.model
 
+import scala.annotation.nowarn
+
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 import org.alephium.util.Bytes
 
 // No substypes for the sake of performance
+@nowarn
 final case class Hint private (value: Int) extends AnyVal {
   def isAssetType: Boolean = (value & 1) == 1
 

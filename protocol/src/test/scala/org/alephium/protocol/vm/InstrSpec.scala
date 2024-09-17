@@ -32,7 +32,7 @@ import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
 import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
-import org.alephium.serde.{deserialize, serialize, RandomBytes}
+import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off file.size.limit no.equal number.of.methods number.of.types
@@ -506,9 +506,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(1)) isE ()
     LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(Val.U256(0xff)) isE ()
-    LoadLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
+    LoadLocalByIndex.popIndex(frame, InvalidVarIndex.apply) isE 0xff
     stack.push(Val.U256(0xff + 1)) isE ()
-    LoadLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1, 0xff)
+    LoadLocalByIndex.popIndex(frame, InvalidVarIndex.apply).leftValue isE InvalidVarIndex(
+      0xff + 1,
+      0xff
+    )
   }
 
   it should "StoreLocalByIndex" in new StatelessInstrFixture {
@@ -525,10 +528,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(bool)
     stack.push(Val.U256(0xff))
-    StoreLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
+    StoreLocalByIndex.popIndex(frame, InvalidVarIndex.apply) isE 0xff
     stack.push(bool)
     stack.push(Val.U256(0xff + 1))
-    StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1, 0xff)
+    StoreLocalByIndex.popIndex(frame, InvalidVarIndex.apply).leftValue isE InvalidVarIndex(
+      0xff + 1,
+      0xff
+    )
   }
 
   it should "Pop" in new StatelessInstrFixture {
@@ -1773,9 +1779,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "TxInputAddressAt" in new TxEnvFixture {
-    override lazy val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
-      .asInstanceOf[StatefulFrame]
-      .copy(obj = script)
+    override lazy val frame: Frame[StatefulContext] =
+      prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
 
     val index      = prevOutputs0.length - 1
     val initialGas = context.gasRemaining
@@ -1790,9 +1797,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "TxInputsSize" in new TxEnvFixture {
-    override lazy val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
-      .asInstanceOf[StatefulFrame]
-      .copy(obj = script)
+    override lazy val frame: Frame[StatefulContext] =
+      prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
 
     val initialGas = context.gasRemaining
     TxInputsSize.runWith(frame) isE ()
@@ -2156,9 +2164,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(1))
     LoadImmFieldByIndex.runWith(frame).leftValue isE InvalidImmFieldIndex(1, 1)
     stack.push(Val.U256(0xff))
-    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
+    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex.apply) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
+    LoadImmFieldByIndex
+      .popIndex(frame, InvalidMutFieldIndex.apply)
+      .leftValue isE InvalidMutFieldIndex(
       0xff + 1,
       0xff
     )
@@ -2173,9 +2183,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(1))
     LoadMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.U256(0xff))
-    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
+    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex.apply) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
+    LoadMutFieldByIndex
+      .popIndex(frame, InvalidMutFieldIndex.apply)
+      .leftValue isE InvalidMutFieldIndex(
       0xff + 1,
       0xff
     )
@@ -2193,10 +2205,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     StoreMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.False)
     stack.push(Val.U256(0xff))
-    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
+    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex.apply) isE 0xff
     stack.push(Val.False)
     stack.push(Val.U256(0xff + 1))
-    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
+    StoreMutFieldByIndex
+      .popIndex(frame, InvalidMutFieldIndex.apply)
+      .leftValue isE InvalidMutFieldIndex(
       0xff + 1,
       0xff
     )
@@ -3115,10 +3129,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "TransferToken" in new TransferTokenFixture {
-    val instr             = TransferToken
-    val from              = lockupScriptGen.sample.get
-    val to                = assetLockupScriptGen.sample.get
-    val contractOutputOpt = None
+    val instr: Instr[StatefulContext] with GasSimple = TransferToken
+    val from                                         = lockupScriptGen.sample.get
+    val to: LockupScript                             = assetLockupScriptGen.sample.get
+    val contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None
 
     def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit] = {
       frame.opStack.push(Val.Address(from))
@@ -3150,10 +3164,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "TransferTokenFromSelf" in new TransferTokenFixture {
-    val instr             = TransferTokenFromSelf
-    val from              = LockupScript.P2C(contractId)
-    val to                = assetLockupScriptGen.sample.get
-    val contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
+    val instr: Instr[StatefulContext] with GasSimple = TransferTokenFromSelf
+    val from: LockupScript                           = LockupScript.P2C(contractId)
+    val to: LockupScript                             = assetLockupScriptGen.sample.get
+    val contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] =
+      Some((contractId, contractOutput, contractOutputRef))
 
     def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit] = {
       frame.opStack.push(Val.Address(to))
@@ -3173,10 +3188,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "TransferTokenToSelf" in new TransferTokenFixture {
-    val instr             = TransferTokenToSelf
-    val from              = lockupScriptGen.sample.get
-    val to                = LockupScript.P2C(contractId)
-    val contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
+    val instr: Instr[StatefulContext] with GasSimple = TransferTokenToSelf
+    val from: LockupScript                           = lockupScriptGen.sample.get
+    val to: LockupScript                             = LockupScript.P2C(contractId)
+    val contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] =
+      Some((contractId, contractOutput, contractOutputRef))
 
     def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit] = {
       frame.opStack.push(Val.Address(from))

@@ -16,7 +16,7 @@
 
 package org.alephium.ralph
 
-import fastparse.Parsed
+import fastparse.{EagerOps, Parsed}
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
@@ -249,7 +249,7 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
     {
       info("succeed mut declarations when mutability is allowed")
-      forAll { right: String =>
+      forAll { (right: String) =>
         // when mut has an identifier.
         fastparse
           .parse(s"mut $right", Lexer.mutMaybe(allowMutable = true)(_))
@@ -266,7 +266,7 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
     {
       info("succeed for immutable declarations")
-      forAll { right: String =>
+      forAll { (right: String) =>
         // immutable declarations should always be allowed.
         fastparse
           .parse(s"$right", Lexer.mutMaybe(allowMutable = true)(_))

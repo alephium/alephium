@@ -16,10 +16,13 @@
 
 package org.alephium.protocol.vm
 
+import scala.annotation.nowarn
+
 import org.alephium.protocol.model.{getMaximalGasPerTx, minimalGas, HardFork}
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.U256
 
+@nowarn
 final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox] {
   def use(amount: GasBox): ExeResult[GasBox] = {
     if (this >= amount) {

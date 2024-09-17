@@ -18,7 +18,7 @@ package org.alephium.flow.model
 
 import java.net.InetSocketAddress
 
-import org.alephium.serde.Serde
+import org.alephium.serde.{inetSocketAddressSerde, intSerde, Serde}
 
 final case class BrokerDiscoveryState(address: InetSocketAddress, brokerNum: Int)
 

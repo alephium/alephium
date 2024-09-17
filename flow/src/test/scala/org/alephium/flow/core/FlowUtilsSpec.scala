@@ -77,7 +77,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "check hash order" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val newBlocks = for {
       i <- 0 to 1
@@ -135,7 +135,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "detect tx conflicts using bestDeps for pre-rhone hardfork" in new TxConflictsFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(
         ("alephium.consensus.mainnet.uncle-dependency-gap-time", "10 seconds"),
         ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
@@ -146,7 +146,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "detect tx conflicts using bestDeps for rhone hardfork" in new TxConflictsFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(
         ("alephium.consensus.rhone.uncle-dependency-gap-time", "10 seconds"),
         ("alephium.broker.broker-num", 1)
@@ -235,7 +235,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "prepare block with correct coinbase reward for pre-rhone hardfork" in new CoinbaseRewardFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
@@ -317,7 +317,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "prepare block template when txs are inter-dependent: pre-rhone" in new FlowFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
@@ -350,7 +350,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "reorg" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val mainGroup = GroupIndex.unsafe(0)
     val deps0     = blockFlow.getBestDeps(mainGroup)
@@ -499,7 +499,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   trait PrepareBlockFlowFixture extends FlowFixture {
     def rhoneHardForkTimestamp: TimeStamp
 
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.network.rhone-hard-fork-timestamp", rhoneHardForkTimestamp.millis)
     )
@@ -796,7 +796,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "collect random transfer txs" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     val keys = (0 until 4).map { _ =>
@@ -836,7 +836,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "not collect sequential txs if the input of the source tx from other chains" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val chainIndex0               = ChainIndex.unsafe(0, 0)
     val (privateKey0, publicKey0) = chainIndex0.from.generateKey
@@ -931,7 +931,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "prepare block template with height" in new FlowFixture with Generators {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val chainIndex = chainIndexGen.sample.get
     val miner      = getGenesisLockupScript(chainIndex.to)

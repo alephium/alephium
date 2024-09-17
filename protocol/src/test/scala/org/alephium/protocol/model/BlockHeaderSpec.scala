@@ -105,7 +105,7 @@ class BlockHeaderSpec
   }
 
   it should "serde the snapshots properly" in new ModelSnapshots {
-    implicit val basePath = "src/test/resources/models/blockheader"
+    implicit val basePath: String = "src/test/resources/models/blockheader"
 
     import Hex._
 

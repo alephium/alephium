@@ -30,7 +30,7 @@ trait StagingKV[K, V] extends CachedKV[K, V, Modified[V]] {
   }
 
   def commit(): Unit = {
-    caches.foreach {
+    caches.foreachEntry {
       case (key, updated: Updated[V]) =>
         underlying.caches.get(key) match {
           case Some(_: Inserted[V]) => underlying.caches += key -> Inserted(updated.value)

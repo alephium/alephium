@@ -64,7 +64,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
           walletRestore.walletName,
           walletRestore.mnemonicPassphrase
         )
-        .map(model.WalletRestoreResult)
+        .map(model.WalletRestoreResult.apply)
         .left
         .map(toApiError)
     )

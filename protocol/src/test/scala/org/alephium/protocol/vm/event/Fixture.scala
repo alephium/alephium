@@ -20,6 +20,7 @@ import org.alephium.crypto.Byte32
 import org.alephium.io.{RocksDBSource, StorageFixture}
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId}
+import org.alephium.serde.{avectorSerde, intSerde}
 import org.alephium.util.AVector
 
 trait Fixture extends StorageFixture {

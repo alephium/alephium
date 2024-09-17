@@ -19,6 +19,7 @@ package org.alephium.wallet.service
 import java.io.File
 import java.nio.file.Paths
 
+import scala.concurrent.ExecutionContext
 import scala.util.Random
 
 import akka.actor.ActorSystem
@@ -282,8 +283,8 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val mnemonicSize = Mnemonic.Size(12).get
     implicit val system: ActorSystem =
       ActorSystem(s"wallet-service-spec-${Random.nextInt()}")
-    implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
-    lazy val endpointSender       = new EndpointSender(config.blockflow.apiKey)
+    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
+    lazy val endpointSender                         = new EndpointSender(config.blockflow.apiKey)
 
     lazy val blockFlowClient =
       BlockFlowClient.apply(

@@ -27,7 +27,7 @@ import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.model.{ChainIndex, Target}
-import org.alephium.serde.serialize
+import org.alephium.serde.{avectorSerde, serialize}
 import org.alephium.util.{AVector, SocketUtil}
 
 class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {

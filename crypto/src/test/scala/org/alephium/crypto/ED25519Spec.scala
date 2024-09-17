@@ -16,11 +16,12 @@
 
 package org.alephium.crypto
 
+import org.alephium.serde.byteAVectorSerde
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class ED25519Spec extends AlephiumSpec {
   "ED25519" should "sign correctly" in {
-    forAll { _message: IndexedSeq[Byte] =>
+    forAll { (_message: IndexedSeq[Byte]) =>
       val message  = AVector.from(_message)
       val (sk, pk) = ED25519.secureGeneratePriPub()
       val sign     = ED25519.sign(message, sk)

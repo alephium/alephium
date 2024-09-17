@@ -392,7 +392,7 @@ trait DownloadTxsHandler extends TxHandlerUtils {
             downloads(announcement.brokerHandler) = chainIndexedHashes
         }
       }
-      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
+      downloads.foreachEntry { case (brokerHandler, chainIndexedHashes) =>
         val txHashes = chainIndexedTxsToAVector(chainIndexedHashes)
         log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
         brokerHandler ! BrokerHandler.DownloadTxs(txHashes)

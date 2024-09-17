@@ -38,7 +38,7 @@ import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.Compiler
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit number.of.methods
@@ -95,7 +95,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
 
   it should "send message with tx" in new Fixture {
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     val (_, fromPublicKey, _) = genesisKeys(0)
     val message               = Hex.unsafe("FFFF")
@@ -114,9 +114,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "check tx status for intra group txs" in new Fixture with GetTxFixture {
 
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     for {
       targetGroup <- 0 until groups0
@@ -171,9 +171,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "check tx status for inter group txs" in new FlowFixtureWithApi with GetTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     for {
       from <- 0 until groups0
@@ -239,7 +239,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "support Schnorr address" in new Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
@@ -260,8 +260,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     val confirmBlock = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, confirmBlock)
 
-    implicit val serverUtils = new ServerUtils
-    val destination          = Destination(Address.p2pkh(genesisPubKey), Amount(ALPH.oneAlph))
+    implicit val serverUtils: ServerUtils = new ServerUtils
+    val destination = Destination(Address.p2pkh(genesisPubKey), Amount(ALPH.oneAlph))
     val buildTransaction = serverUtils
       .buildTransaction(
         blockFlow,
@@ -290,9 +290,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "check sweep address tx status for intra group txs" in new Fixture with GetTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     for {
       targetGroup <- 0 until groups0
@@ -366,9 +366,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "check sweep all tx status for inter group txs" in new FlowFixtureWithApi
     with GetTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     for {
       from <- 0 until groups0
@@ -463,9 +463,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "sweep only small UTXOs" in new FlowFixtureWithApi with GetTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     val (_, fromPublicKey, _) = genesisKeys(0)
     val (_, toPublicKey)      = GroupIndex.unsafe(0).generateKey
@@ -583,9 +583,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait MultipleUtxos extends FlowFixtureWithApi {
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
-    implicit val bf                        = blockFlow
+    implicit val bf: BlockFlow             = blockFlow
     val chainIndex                         = ChainIndex.unsafe(0, 0)
     val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
     val fromAddress                        = Address.p2pkh(fromPublicKey)
@@ -962,9 +962,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "return mempool statuses" in new Fixture with Generators {
 
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils()
+    implicit val serverUtils: ServerUtils = new ServerUtils()
 
     val emptyMempool = serverUtils.listMempoolTransactions(blockFlow).rightValue
     emptyMempool is AVector.empty[MempoolTransactions]
@@ -1247,7 +1247,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val lockupScript = getGenesisLockupScript(chainIndex)
@@ -2856,9 +2856,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait ScriptTxFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (testPriKey, testPubKey)          = chainIndex.from.generateKey
@@ -2912,8 +2912,8 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait DustAmountFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
-    implicit val serverUtils  = new ServerUtils
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    implicit val serverUtils: ServerUtils       = new ServerUtils
 
     val chainIndex      = ChainIndex.unsafe(0, 0)
     val (_, testPubKey) = chainIndex.from.generateKey
@@ -2959,9 +2959,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait GasFeeFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    implicit val serverUtils = new ServerUtils
+    implicit val serverUtils: ServerUtils = new ServerUtils
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (testPriKey, testPubKey)          = chainIndex.from.generateKey
@@ -3493,7 +3493,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val contract = Compiler.compileContract(code).rightValue
 
-    implicit val serverUtils = new ServerUtils()
+    implicit val serverUtils: ServerUtils = new ServerUtils()
     def buildDeployContractTx(query: BuildDeployContractTx): BuildDeployContractTxResult = {
       val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
@@ -3783,7 +3783,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait TxOutputRefIndexFixture extends Fixture {
     def enableTxOutputRefIndex: Boolean = true
 
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex"),
       ("alephium.node.indexes.subcontract-index", "false")
     )
@@ -3819,7 +3819,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait SubContractIndexesFixture extends Fixture {
     def subcontractIndexEnabled: Boolean = true
 
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "false"),
       ("alephium.node.indexes.subcontract-index", s"$subcontractIndexEnabled")
     )

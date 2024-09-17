@@ -46,10 +46,10 @@ class Lexer(fileURI: Option[java.net.URI]) {
     P(Index ~ (prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_))).map {
       case (fromIndex, i) => func(i).atSourceIndex(fromIndex, fromIndex + i.length, fileURI)
     }
-  def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
+  def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident.apply)
   def constantIdent[Unknown: P]: P[Ast.Ident] =
-    id(uppercase.opaque("constant variables must start with an uppercase letter"), Ast.Ident)
-  def typeId[Unknown: P]: P[Ast.TypeId] = id(uppercase, Ast.TypeId)
+    id(uppercase.opaque("constant variables must start with an uppercase letter"), Ast.Ident.apply)
+  def typeId[Unknown: P]: P[Ast.TypeId] = id(uppercase, Ast.TypeId.apply)
   def funcId[Unknown: P]: P[Ast.FuncId] =
     P(ident ~ "!".?.!).map { case (id, postfix) =>
       Ast

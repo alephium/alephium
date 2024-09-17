@@ -435,7 +435,7 @@ sealed trait VarIndexInstr[Ctx <: StatelessContext]
 case object LoadLocalByIndex extends VarIndexInstr[StatelessContext] with StatelessInstrCompanion0 {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidVarIndex)
+      index <- popIndex(frame, InvalidVarIndex.apply)
       v     <- frame.getLocalVal(index)
       _     <- frame.pushOpStack(v)
     } yield ()
@@ -447,7 +447,7 @@ case object StoreLocalByIndex
     with StatelessInstrCompanion0 {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidVarIndex)
+      index <- popIndex(frame, InvalidVarIndex.apply)
       v     <- frame.popOpStack()
       _     <- frame.setLocalVal(index, v)
     } yield ()
@@ -503,7 +503,7 @@ case object LoadImmFieldByIndex
     with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidMutFieldIndex)
+      index <- popIndex(frame, InvalidMutFieldIndex.apply)
       v     <- frame.getImmField(index)
       _     <- frame.pushOpStack(v)
     } yield ()
@@ -515,7 +515,7 @@ case object LoadMutFieldByIndex
     with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidMutFieldIndex)
+      index <- popIndex(frame, InvalidMutFieldIndex.apply)
       v     <- frame.getMutField(index)
       _     <- frame.pushOpStack(v)
     } yield ()
@@ -527,7 +527,7 @@ case object StoreMutFieldByIndex
     with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidMutFieldIndex)
+      index <- popIndex(frame, InvalidMutFieldIndex.apply)
       v     <- frame.popOpStack()
       _     <- frame.setMutField(index, v)
     } yield ()

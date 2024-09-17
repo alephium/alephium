@@ -2723,10 +2723,10 @@ object Ast {
         genWarning: (TypeId, collection.Seq[String]) => String
     ): AVector[String] = {
       val allDefs = mutable.Set.empty[(TypeId, String)]
-      states.foreach { case (_, (contract, _)) =>
+      states.foreachEntry { case (_, (contract, _)) =>
         if (contract.isAbstract) allDefs.addAll(defsInParentContract(contract))
       }
-      states.foreach { case (_, (contract, state)) =>
+      states.foreachEntry { case (_, (contract, state)) =>
         if (!contract.isAbstract) allDefs.subtractAll(usedDefsInContract(contract, state))
       }
       if (allDefs.nonEmpty) {

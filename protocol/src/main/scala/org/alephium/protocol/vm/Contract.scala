@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import java.math.BigInteger
 
-import scala.annotation.switch
+import scala.annotation.{nowarn, switch}
 import scala.collection.mutable
 
 import akka.util.ByteString
@@ -260,7 +260,7 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
 }
 
 @HashSerde
-final case class StatelessScript private (methods: AVector[Method[StatelessContext]])
+final case class StatelessScript(methods: AVector[Method[StatelessContext]])
     extends Script[StatelessContext] {
   override def toObject: ScriptObj[StatelessContext] = {
     StatelessScriptObject(this)
@@ -291,7 +291,7 @@ object StatelessScript {
 }
 
 @HashSerde
-final case class StatefulScript private (methods: AVector[Method[StatefulContext]])
+final case class StatefulScript(methods: AVector[Method[StatefulContext]])
     extends Script[StatefulContext] {
   def entryMethod: Method[StatefulContext] = methods.head
 
@@ -590,6 +590,7 @@ final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[
 
 final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[StatefulContext]
 
+@nowarn
 final case class StatefulContractObject private (
     codeHash: Hash,
     code: StatefulContract.HalfDecoded,

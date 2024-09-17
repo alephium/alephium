@@ -18,6 +18,8 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
+import scala.annotation.nowarn
+
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde._
@@ -53,6 +55,7 @@ trait BrokerGroupInfo {
   }
 }
 
+@nowarn
 final case class BrokerInfo private (
     cliqueId: CliqueId,
     brokerId: Int,
@@ -112,6 +115,7 @@ object BrokerInfo extends SafeSerdeImpl[BrokerInfo, GroupConfig] { self =>
   }
 }
 
+@nowarn
 final case class InterBrokerInfo private (
     cliqueId: CliqueId,
     brokerId: Int,

@@ -31,8 +31,9 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, TcpController}
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.flow.setting.{AlephiumConfig, Configs}
+import org.alephium.flow.setting._
 import org.alephium.io.RocksDBSource.ProdSettings
+import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, Env, EventBus, Service}
 
 trait Node extends Service {
@@ -68,14 +69,14 @@ object Node {
       with StrictLogging {
     override def serviceName: String = "Node"
 
-    implicit override def system: ActorSystem = flowSystem
-    implicit private val brokerConfig         = config.broker
-    implicit private val consensusConfig      = config.consensus
-    implicit private val networkSetting       = config.network
-    implicit private val discoveryConfig      = config.discovery
-    implicit private val miningSetting        = config.mining
-    implicit private val memPoolSetting       = config.mempool
-    implicit private val logConfig            = config.node.eventLogConfig
+    implicit override def system: ActorSystem               = flowSystem
+    implicit private val brokerConfig: BrokerSetting        = config.broker
+    implicit private val consensusConfig: ConsensusSettings = config.consensus
+    implicit private val networkSetting: NetworkSetting     = config.network
+    implicit private val discoveryConfig: DiscoverySetting  = config.discovery
+    implicit private val miningSetting: MiningSetting       = config.mining
+    implicit private val memPoolSetting: MemPoolSetting     = config.mempool
+    implicit private val logConfig: LogConfig               = config.node.eventLogConfig
 
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 

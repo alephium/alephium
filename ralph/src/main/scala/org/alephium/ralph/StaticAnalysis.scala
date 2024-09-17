@@ -240,7 +240,7 @@ object StaticAnalysis {
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) =>
         val state = states(index)
-        state.internalCalls.foreach { case (caller, callees) =>
+        state.internalCalls.foreachEntry { case (caller, callees) =>
           val key = contract.ident -> caller
           if (
             !nonSimpleViewFuncSet.contains(key) &&
@@ -249,7 +249,7 @@ object StaticAnalysis {
             nonSimpleViewFuncSet.addOne(key)
           }
         }
-        state.externalCalls.foreach { case (caller, callees) =>
+        state.externalCalls.foreachEntry { case (caller, callees) =>
           val key = contract.ident -> caller
           if (
             !nonSimpleViewFuncSet.contains(key) &&

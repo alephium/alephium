@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import scala.annotation.nowarn
+
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
@@ -70,6 +72,7 @@ sealed trait ContractState {
   def updateOutputRef(ref: ContractOutputRef): ContractStorageState
 }
 
+@nowarn
 final case class ContractLegacyState private (
     codeHash: Hash,
     initialStateHash: Hash,
@@ -134,6 +137,7 @@ object ContractNewState {
   }
 }
 
+@nowarn
 final case class ContractMutableState private[vm] (
     mutFields: AVector[Val],
     contractOutputRef: ContractOutputRef,

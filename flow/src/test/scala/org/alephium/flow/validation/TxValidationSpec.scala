@@ -36,7 +36,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
-  override val configValues = Map(("alephium.broker.broker-num", 1))
+  override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
   type TxValidator[T] = Transaction => TxValidationResult[T]
 
@@ -309,7 +309,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   behavior of "Stateless Validation"
 
   it should "check tx version" in new Fixture {
-    implicit val validator = nestedValidator(checkVersion)
+    implicit val validator: TxValidator[Unit] = nestedValidator(checkVersion)
 
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     val block      = transfer(blockFlow, chainIndex)
@@ -323,7 +323,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check network Id" in new Fixture {
-    implicit val validator = nestedValidator(checkVersion)
+    implicit val validator: TxValidator[Unit] = nestedValidator(checkVersion)
 
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     val block      = transfer(blockFlow, chainIndex)
@@ -348,7 +348,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       tx.copy(contractInputs = AVector.fill(ALPH.MaxTxInputNum + 1)(contractOutputRef))
 
     {
-      implicit val validator = checkInputNum(_, isIntraGroup = false)
+      implicit val validator: TxValidator[Unit] = checkInputNum(_, isIntraGroup = false)
 
       modified0.pass()
       modified1.fail(TooManyInputs)
@@ -432,7 +432,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val (isCoinbase, hardfork) =
       AVector(true -> HardFork.Mainnet, true -> HardFork.Leman, false -> HardFork.Mainnet).sample()
 
-    implicit val validator = checkGasBound(_, isCoinbase, hardfork)
+    implicit val validator: (TransactionAbstract) => TxValidationResult[Unit] =
+      checkGasBound(_, isCoinbase, hardfork)
 
     val tx = transactionGen(2, 1).sample.value
     tx.pass()
@@ -452,7 +453,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check gas bounds for non-coinbase" in new Fixture {
-    implicit val validator = checkGasBound(_, isCoinbase = false, HardFork.Leman)
+    implicit val validator: (TransactionAbstract) => TxValidationResult[Unit] =
+      checkGasBound(_, isCoinbase = false, HardFork.Leman)
 
     val tx = transactionGen(2, 1).sample.value
     tx.pass()
@@ -473,7 +475,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check gas bounds for rhone-hardfork" in new Fixture {
-    implicit val validator = checkGasBound(_, isCoinbase = Random.nextBoolean(), HardFork.Rhone)
+    implicit val validator: (TransactionAbstract) => TxValidationResult[Unit] =
+      checkGasBound(_, isCoinbase = Random.nextBoolean(), HardFork.Rhone)
 
     val tx = transactionGen(2, 1).sample.value
     tx.pass()
@@ -1017,9 +1020,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "compress p2pkh unlock scripts" in new CompressUnlockScriptsFixture {
-    val (priKey, pubKey) = keypairGen.sample.get
-    val lockup           = LockupScript.p2pkh(pubKey)
-    val unlock           = UnlockScript.p2pkh(pubKey)
+    val (priKey, pubKey)           = keypairGen.sample.get
+    val lockup: LockupScript.Asset = LockupScript.p2pkh(pubKey)
+    val unlock: UnlockScript       = UnlockScript.p2pkh(pubKey)
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
       Transaction.from(unsignedTx, priKey)
@@ -1032,8 +1035,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val (priKey0, pubKey0) = keypairGen.sample.value
     val (priKey1, pubKey1) = keypairGen.sample.value
     val (_, pubKey2)       = keypairGen.sample.value
-    val lockup             = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
-    val unlock             = UnlockScript.p2mpkh(AVector.from(Seq(pubKey0 -> 0, pubKey1 -> 1)))
+    val lockup: LockupScript.Asset =
+      LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
+    val unlock: UnlockScript = UnlockScript.p2mpkh(AVector.from(Seq(pubKey0 -> 0, pubKey1 -> 1)))
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
       sign(unsignedTx, priKey0, priKey1)
@@ -1050,9 +1054,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |}
          |""".stripMargin
 
-    val script = Compiler.compileAssetScript(assetScript).rightValue._1
-    val lockup = LockupScript.p2sh(script)
-    val unlock = UnlockScript.p2sh(script, AVector.empty)
+    val script                     = Compiler.compileAssetScript(assetScript).rightValue._1
+    val lockup: LockupScript.Asset = LockupScript.p2sh(script)
+    val unlock: UnlockScript       = UnlockScript.p2sh(script, AVector.empty)
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
       Transaction.from(unsignedTx, AVector.empty[Signature])
@@ -1094,7 +1098,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   behavior of "lockup script"
 
   it should "validate p2pkh" in new Fixture {
-    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
+    implicit val validator: (Transaction) => TxValidationResult[Unit] =
+      validateTxOnlyForTest(_, blockFlow, None)
 
     forAll(keypairGen) { case (priKey, pubKey) =>
       val lockup   = LockupScript.p2pkh(pubKey)
@@ -1120,7 +1125,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       sign(unsigned, priKey0, priKey1)
     }
 
-    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
+    implicit val validator: (Transaction) => TxValidationResult[Unit] =
+      validateTxOnlyForTest(_, blockFlow, None)
 
     tx(pubKey0 -> 0).fail(InvalidNumberOfPublicKey)
     tx(pubKey0 -> 0, pubKey1 -> 1, pubKey2 -> 2).fail(InvalidNumberOfPublicKey)
@@ -1151,7 +1157,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
     val unsigned = prepareOutput(lockup, unlock)
 
-    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
+    implicit val validator: (Transaction) => TxValidationResult[Unit] =
+      validateTxOnlyForTest(_, blockFlow, None)
 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     tx0.pass()
@@ -1165,7 +1172,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "validate polw" in new Fixture {
-    implicit val validator = (tx: Transaction) => {
+    implicit val validator: (Transaction) => TxValidationResult[Unit] = (tx: Transaction) => {
       val chainIndex = getChainIndex(tx).rightValue
       val bestDeps   = blockFlow.getBestDeps(chainIndex.from)
       val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
@@ -1203,7 +1210,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "invalidate polw" in new Fixture {
-    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
+    implicit val validator: (Transaction) => TxValidationResult[Unit] =
+      validateTxOnlyForTest(_, blockFlow, None)
 
     val (priKey, pubKey) = keypairGen.sample.value
     val lockup           = LockupScript.p2pkh(pubKey)
@@ -1314,7 +1322,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |}
          |""".stripMargin
 
-    implicit val validator = (tx: Transaction) => {
+    implicit val validator: (Transaction) => TxValidationResult[GasBox] = (tx: Transaction) => {
       checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
     }
 
@@ -1339,7 +1347,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |}
          |""".stripMargin
 
-    implicit val validator = (tx: Transaction) => {
+    implicit val validator: (Transaction) => TxValidationResult[GasBox] = (tx: Transaction) => {
       checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
     }
 
@@ -1375,7 +1383,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |}
          |""".stripMargin
 
-    implicit val validator = (tx: Transaction) => {
+    implicit val validator: (Transaction) => TxValidationResult[GasBox] = (tx: Transaction) => {
       checkTxScript(ChainIndex.unsafe(0, 1), tx, initialGas, worldState, prevOutputs, blockEnv)
     }
 

@@ -37,7 +37,7 @@ trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
 
-  implicit val groupConfig = new GroupConfig {
+  implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = config.blockflow.groups
   }
 

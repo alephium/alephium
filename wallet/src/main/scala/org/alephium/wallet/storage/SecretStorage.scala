@@ -29,7 +29,7 @@ import org.alephium.crypto.{AES, Sha256}
 import org.alephium.crypto.wallet.{BIP32, Mnemonic}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.json.Json._
-import org.alephium.serde.{deserialize, serialize, Serde}
+import org.alephium.serde._
 import org.alephium.util.AVector
 import org.alephium.wallet.Constants
 

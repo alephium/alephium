@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import java.math.BigInteger
 
-import org.alephium.serde.Serde
+import org.alephium.serde.{bigIntegerSerde, Serde}
 
 final case class Weight(value: BigInteger) extends AnyVal with Ordered[Weight] {
   def +(that: Weight): Weight = Weight(this.value.add(that.value))

@@ -16,11 +16,14 @@
 
 package org.alephium.protocol.model
 
+import scala.annotation.nowarn
+
 import akka.util.ByteString
 
 import org.alephium.serde.Serde
 import org.alephium.util.{SecureAndSlowRandom, UnsecureRandom}
 
+@nowarn
 final case class Nonce private (value: ByteString) extends AnyVal
 
 object Nonce {

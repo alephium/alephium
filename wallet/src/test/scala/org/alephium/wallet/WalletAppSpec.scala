@@ -63,8 +63,8 @@ class WalletAppSpec
   val walletApp: WalletApp =
     new WalletApp(config)
 
-  override val port: Int   = config.port.get
-  override val maybeApiKey = None
+  override val port: Int                   = config.port.get
+  override val maybeApiKey: Option[String] = None
 
   walletApp.start().futureValue is ()
 

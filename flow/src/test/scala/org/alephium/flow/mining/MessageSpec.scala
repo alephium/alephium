@@ -24,7 +24,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Transaction}
-import org.alephium.serde.{serialize, Staging}
+import org.alephium.serde.{avectorSerde, serialize, Staging}
 import org.alephium.util.{AlephiumSpec, AVector}
 import org.alephium.util.Hex.HexStringSyntax
 

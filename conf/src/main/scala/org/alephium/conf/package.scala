@@ -137,7 +137,7 @@ package object conf {
       case Array(empty) if empty == "" => ArraySeq.empty[InetSocketAddress]
       case inputs =>
         val result = inputs.flatMap(parseHostAndPort)
-        if (result.size == inputs.size) {
+        if (result.length == inputs.length) {
           ArraySeq.from(result)
         } else {
           throw new ConfigException.BadValue("ArraySeq[InetSocketAddress]", "oops")

@@ -19,7 +19,7 @@ package org.alephium.crypto.wallet
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
-import scala.annotation.tailrec
+import scala.annotation.{nowarn, tailrec}
 
 import akka.util.ByteString
 import org.bouncycastle.crypto.digests.SHA512Digest
@@ -72,6 +72,7 @@ object BIP32 {
     }
   }
 
+  @nowarn
   final case class ExtendedPrivateKey protected[wallet] (
       privateKey: SecP256K1PrivateKey,
       chainCode: ByteString,
@@ -122,6 +123,7 @@ object BIP32 {
     lazy val derivationPath: String = showDerivationPath(path)
   }
 
+  @nowarn
   final case class ExtendedPublicKey protected[wallet] (
       publicKey: SecP256K1PublicKey,
       chainCode: ByteString,

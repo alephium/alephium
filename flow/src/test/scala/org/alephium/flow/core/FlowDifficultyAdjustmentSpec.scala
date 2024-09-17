@@ -209,7 +209,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   it should "use diff penalty for leman fork" in new FlowFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
       ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis),
@@ -217,7 +217,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
     )
     config.network.networkId is NetworkId.AlephiumDevNet
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
-    implicit val consensusConfig = consensusConfigs.mainnet
+    implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
     consensusConfig.numZerosAtLeastInHash is 3
 
     val chainIndex = ChainIndex.unsafe(0, 0)
@@ -241,14 +241,14 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   trait PreLemanDifficultyFixture extends FlowFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis),
       ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
     )
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is false
 
-    val chainIndex               = ChainIndex.unsafe(0, 1)
-    implicit val consensusConfig = consensusConfigs.mainnet
+    val chainIndex                                 = ChainIndex.unsafe(0, 1)
+    implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
 
     def prepareBlocks(scale: Int): Unit = {
       (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
@@ -272,7 +272,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   trait LemanDifficultyFixture extends FlowFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
     )

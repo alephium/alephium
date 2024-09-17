@@ -456,7 +456,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion             := "2.13.10",
+  scalaVersion             := "2.13.14",
   Test / parallelExecution := false,
   scalacOptions ++= Seq(
     "-Xsource:3",
@@ -530,7 +530,9 @@ val wartsCompileExcludes = Seq(
   Wart.StringPlusAny,
   Wart.While,
   Wart.SizeIs,
-  Wart.ScalaApp
+  Wart.ScalaApp,
+  Wart.SeqApply,
+  Wart.TripleQuestionMark
 )
 
 val wartsTestExcludes = wartsCompileExcludes ++ Seq(

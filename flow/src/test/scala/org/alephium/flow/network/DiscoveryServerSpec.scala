@@ -273,7 +273,7 @@ class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
     self =>
     val groups = 4
 
-    implicit val groupConfig = new GroupConfig {
+    implicit val groupConfig: GroupConfig = new GroupConfig {
       def groups: Int = self.groups
     }
     val cliqueNum = 16

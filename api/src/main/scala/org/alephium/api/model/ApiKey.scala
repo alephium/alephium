@@ -16,7 +16,10 @@
 
 package org.alephium.api.model
 
-final case class ApiKey private (val value: String)
+import scala.annotation.nowarn
+
+@nowarn
+final case class ApiKey private (value: String)
 
 object ApiKey {
   def unsafe(raw: String): ApiKey = new ApiKey(raw)

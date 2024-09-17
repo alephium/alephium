@@ -18,6 +18,9 @@ package org.alephium.protocol.model
 
 import java.math.BigInteger
 
+import scala.annotation.nowarn
+
+@nowarn
 final case class Difficulty private (value: BigInteger) extends AnyVal {
   // WARN: use it with caution because this conversion might lose precision
   // i.e. `diff.getTarget().getDifficulty()` might not be equal to `diff`
@@ -37,7 +40,7 @@ final case class Difficulty private (value: BigInteger) extends AnyVal {
 }
 
 object Difficulty {
-  def unsafe(value: BigInteger): Difficulty = new Difficulty(value)
+  def unsafe(value: BigInteger): Difficulty = Difficulty(value)
 
-  val zero: Difficulty = Difficulty(BigInteger.valueOf(0))
+  val zero: Difficulty = new Difficulty(BigInteger.valueOf(0))
 }

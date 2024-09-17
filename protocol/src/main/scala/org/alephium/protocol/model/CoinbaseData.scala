@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.model
 
+import scala.annotation.nowarn
+
 import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
@@ -23,6 +25,7 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
 import org.alephium.util.{AVector, TimeStamp}
 
+@nowarn
 final case class CoinbaseDataPrefix private (fromGroup: Byte, toGroup: Byte, blockTs: TimeStamp)
 
 object CoinbaseDataPrefix {

@@ -18,12 +18,15 @@ package org.alephium.flow.network.bootstrap
 
 import java.net.InetSocketAddress
 
+import scala.annotation.nowarn
+
 import org.alephium.flow.setting.{Configs, NetworkSetting}
 import org.alephium.protocol.SafeSerdeImpl
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.serde._
 
+@nowarn
 final case class PeerInfo private (
     id: Int,
     groupNumPerBroker: Int,

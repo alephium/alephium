@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.message
 
-import org.alephium.serde.Serde
+import org.alephium.serde.{u32Serde, Serde}
 import org.alephium.util.SecureAndSlowRandom
 import org.alephium.util.U32
 

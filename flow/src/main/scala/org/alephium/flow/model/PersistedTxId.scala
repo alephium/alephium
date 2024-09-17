@@ -17,7 +17,7 @@
 package org.alephium.flow.model
 
 import org.alephium.protocol.model.TransactionId
-import org.alephium.serde.Serde
+import org.alephium.serde.{serdeTS, Serde}
 import org.alephium.util.TimeStamp
 
 final case class PersistedTxId(timestamp: TimeStamp, txId: TransactionId)

@@ -37,7 +37,7 @@ trait WalletExamples extends EndpointsExamples {
       )
       .get
 
-  implicit private val groupConfig =
+  implicit private val groupConfig: GroupConfig =
     new GroupConfig {
       override def groups: Int = 4
     }

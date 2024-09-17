@@ -18,10 +18,12 @@ package org.alephium.protocol.vm
 
 import java.math.BigInteger
 
+import scala.annotation.nowarn
 import scala.collection.mutable
 
 import org.alephium.util.AVector
 
+@nowarn
 final case class VarVector[T] private (
     underlying: mutable.ArraySeq[T],
     start: Int,

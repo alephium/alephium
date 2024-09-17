@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.message
 
+import scala.annotation.nowarn
+
 import akka.util.ByteString
 import io.prometheus.client.Counter
 
@@ -234,6 +236,7 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
   }
 }
 
+@nowarn
 final case class Hello private (
     clientId: String,
     timestamp: TimeStamp,
