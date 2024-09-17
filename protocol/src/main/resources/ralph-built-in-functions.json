@@ -127,9 +127,9 @@
     "name": "callerAddress",
     "category": "Contract",
     "signature": "fn callerAddress!() -> (Address)",
-    "doc": "Returns the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails.",
+    "doc": "<ol><li>When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same. If not all input addresses are the same, `callAddress!()` function fails.</li><li>When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)</li><li>When used in a contract function called from another contract, returns the address of the calling contract.</li></ol>",
     "params": [],
-    "returns": "@returns the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails"
+    "returns": "@returns the address of the caller"
   },
   {
     "name": "contractInitialStateHash",
@@ -606,9 +606,9 @@
     "name": "blockTimeStamp",
     "category": "Chain",
     "signature": "fn blockTimeStamp!() -> (U256)",
-    "doc": "Returns the block timestamp.",
+    "doc": "Returns the block timestamp in milliseconds.",
     "params": [],
-    "returns": "@returns the block timestamp"
+    "returns": "@returns the block timestamp in milliseconds"
   },
   {
     "name": "blockTarget",
@@ -672,7 +672,7 @@
     "name": "verifyAbsoluteLocktime",
     "category": "Chain",
     "signature": "fn verifyAbsoluteLocktime!(lockUntil:U256) -> ()",
-    "doc": "Verifies that the absolute locktime is before the block timestamp, otherwise it fails.",
+    "doc": "Verifies that the absolute locktime is before the block timestamp (milliseconds), otherwise it fails.",
     "params": [
       "@param lockUntil the timestamp until which the lock is valid"
     ],
@@ -682,7 +682,7 @@
     "name": "verifyRelativeLocktime",
     "category": "Chain",
     "signature": "fn verifyRelativeLocktime!(txInputIndex:U256, lockDuration:U256) -> ()",
-    "doc": "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails.",
+    "doc": "Verifies that the input's creation timestamp + lock duration is before the block timestamp (milliseconds), otherwise it fails.",
     "params": [
       "@param txInputIndex the index of the transaction input",
       "@param lockDuration the duration that the input is locked for"

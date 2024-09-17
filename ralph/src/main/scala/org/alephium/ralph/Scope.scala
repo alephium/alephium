@@ -39,11 +39,9 @@ trait Scope { self: Compiler.State[_] =>
   var mutFieldsIndex: Int           = 0
   var templateVarIndex: Int         = 0
   val currentScopeAccessedVars      = mutable.Set.empty[Compiler.AccessVariable]
-  val variableScopeChecked          = mutable.Set.empty[(String, Option[SourceIndex])]
 
   def setFuncScope(funcId: Ast.FuncId): Unit = {
     currentScopeAccessedVars.clear()
-    variableScopeChecked.clear()
     scopes.get(funcId) match {
       case Some(scopeState) =>
         currentScope = funcId

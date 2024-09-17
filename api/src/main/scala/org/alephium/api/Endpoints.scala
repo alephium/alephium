@@ -419,7 +419,7 @@ trait Endpoints
       .summary("Get tx status, only from the local broker")
 
   lazy val getTxIdFromOutputRef: BaseEndpoint[OutputRef, TransactionId] =
-    baseEndpoint.get
+    transactionsEndpoint.get
       .in("tx-id-from-outputref")
       .in(outputRefQuery)
       .out(jsonBody[TransactionId])

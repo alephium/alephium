@@ -444,7 +444,7 @@ object BuiltIn {
       Seq(Type.U256),
       BlockTimeStamp,
       Seq(),
-      retComment = "the block timestamp"
+      retComment = "the block timestamp in milliseconds"
     )
   val blockTarget: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
@@ -517,7 +517,8 @@ object BuiltIn {
       VerifyAbsoluteLocktime,
       argsName = Seq("lockUntil" -> "the timestamp until which the lock is valid"),
       retComment = "",
-      doc = "Verifies that the absolute locktime is before the block timestamp, otherwise it fails."
+      doc =
+        "Verifies that the absolute locktime is before the block timestamp (milliseconds), otherwise it fails."
     )
   val verifyRelativeLocktime: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chain(
@@ -531,7 +532,7 @@ object BuiltIn {
       ),
       retComment = "",
       doc =
-        "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails."
+        "Verifies that the input's creation timestamp + lock duration is before the block timestamp (milliseconds), otherwise it fails."
     )
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
@@ -1553,16 +1554,19 @@ object BuiltIn {
       retComment = "the contract id of the caller"
     )
 
+  // scalastyle:off line.size.limit
   val callerAddress: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.contractSimple(
+    SimpleBuiltIn.contract(
       "callerAddress",
       Seq.empty,
       Seq(Type.Address),
       CallerAddress,
       argsName = Seq(),
-      retComment =
-        "the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails"
+      retComment = "the address of the caller",
+      doc =
+        "<ol><li>When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same. If not all input addresses are the same, `callAddress!()` function fails.</li><li>When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)</li><li>When used in a contract function called from another contract, returns the address of the calling contract.</li></ol>"
     )
+  // scalastyle:on line.size.limit
 
   val isCalledFromTxScript: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contract(
