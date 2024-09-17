@@ -24,9 +24,9 @@ class VariableScopeSpec extends AlephiumSpec {
     val ref1 = Ast.Ident("1")
     val ref2 = Ast.Ident("2")
 
-    val scope0    = ChildScope(FunctionRoot, ref0, 1)
-    val scope1    = ChildScope(scope0, ref1, 2)
-    val scope2    = ChildScope(scope0, ref2, 2)
+    val scope0    = ChildScope(FunctionRoot, ref0, None, 1)
+    val scope1    = ChildScope(scope0, ref1, None, 2)
+    val scope2    = ChildScope(scope0, ref2, None, 2)
     val allScopes = Seq(FunctionRoot, scope0, scope1, scope2)
 
     allScopes.foreach { scope =>

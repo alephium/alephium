@@ -743,7 +743,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      "Variable foo.j does not exist or is used before declaration"
+      "Variable foo.j is not defined in the current scope or is used before being defined"
     )
     testContractError(
       s"""
@@ -755,7 +755,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      "Variable foo.b does not exist or is used before declaration"
+      "Variable foo.b is not defined in the current scope or is used before being defined"
     )
   }
 
@@ -3209,7 +3209,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code,
-        "Variable foo.ErrorCodes.Error1 does not exist or is used before declaration"
+        "Variable foo.ErrorCodes.Error1 is not defined in the current scope or is used before being defined"
       )
     }
     {
@@ -5049,7 +5049,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Variable func.x does not exist or is used before declaration")
+      testContractError(
+        code,
+        "Variable func.x is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -6186,11 +6189,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("invalid const expressions")
-      testContractError(code(s"$$G$$"), "Variable G does not exist or is used before declaration")
-      testContractError(code(s"$$H$$"), "Variable H does not exist or is used before declaration")
+      testContractError(
+        code(s"$$G$$"),
+        "Variable G is not defined in the current scope or is used before being defined"
+      )
+      testContractError(
+        code(s"$$H$$"),
+        "Variable H is not defined in the current scope or is used before being defined"
+      )
       testContractError(
         code(s"A + $$I$$"),
-        "Variable I does not exist or is used before declaration"
+        "Variable I is not defined in the current scope or is used before being defined"
       )
       testContractError(
         code(s"A + $$b$$"),
@@ -7667,24 +7676,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "report the correct warnings for unused constants" in {
-    def check(
-        code: String,
-        contractWarnings: AVector[(String, AVector[String])],
-        globalWarnings: AVector[String]
-    ) = {
-      val result = Compiler.compileProject(code).rightValue
-      result._4 is globalWarnings
-      result._1.zipWithIndex.foreach { case (contract, index) =>
+  def checkWarnings(
+      code: String,
+      contractWarnings: AVector[(String, AVector[String])],
+      globalWarnings: AVector[String]
+  ) = {
+    val result0 = Compiler.compileProject(code).rightValue
+    result0._4 is globalWarnings
+    result0._1.zipWithIndex.foreach { case (contract, index) =>
+      if (!contract.ast.isAbstract) {
         val value = contractWarnings(index)
         contract.ast.ident.name is value._1
         contract.warnings is value._2
       }
-      val compilerOptions = CompilerOptions.Default.copy(ignoreUnusedConstantsWarnings = true)
-      val contracts       = Compiler.compileProject(code, compilerOptions).rightValue._1
-      contracts.foreach(_.warnings.isEmpty is true)
     }
+    val compilerOptions = CompilerOptions.Default.copy(
+      ignoreUnusedConstantsWarnings = true,
+      ignoreUnusedPrivateFunctionsWarnings = true
+    )
+    val result1 = Compiler.compileProject(code, compilerOptions).rightValue
+    result1._1.forall(_.warnings.isEmpty) is true
+    result1._4.isEmpty is true
+  }
 
+  it should "report the correct warnings for unused constants" in {
     {
       info("unused parent constants")
       val code =
@@ -7706,7 +7721,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
         AVector("Found unused constants in Foo: Foo2")
@@ -7736,7 +7751,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(
           ("Bar", AVector.empty[String]),
@@ -7774,7 +7789,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(
           ("Bar", AVector.empty[String]),
@@ -7810,7 +7825,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(
           ("Bar", AVector.empty[String]),
@@ -7857,11 +7872,135 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      check(
+      checkWarnings(
         code,
         AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
         AVector.empty[String]
       )
+    }
+  }
+
+  it should "report the correct warnings for private functions" in {
+    {
+      info("unused private functions in contract")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  fn bar() -> () {}
+           |  fn baz() -> () {}
+           |  fn qux() -> () {}
+           |}
+           |""".stripMargin
+      checkWarnings(
+        code,
+        AVector(("Foo", AVector("Found unused private functions in Foo: baz, qux"))),
+        AVector.empty
+      )
+    }
+
+    {
+      info("unused private functions in script")
+      val code =
+        s"""
+           |TxScript Main {
+           |  foo()
+           |
+           |  fn foo() -> () {}
+           |  fn bar() -> () {}
+           |  fn qux() -> () {}
+           |}
+           |""".stripMargin
+      val script = Compiler.compileProject(code).rightValue._2.head
+      script.warnings is AVector("Found unused private functions in Main: bar, qux")
+    }
+
+    {
+      info("unused private functions in abstract contract")
+      val code =
+        s"""
+           |Contract Foo() extends Bar() {
+           |  pub fn foo0() -> () {
+           |    bar0()
+           |  }
+           |  fn foo1() -> () {}
+           |}
+           |Abstract Contract Bar() {
+           |  fn bar0() -> () {}
+           |  fn bar1() -> () {}
+           |}
+           |""".stripMargin
+      checkWarnings(
+        code,
+        AVector(("Foo", AVector("Found unused private functions in Foo: foo1"))),
+        AVector("Found unused private functions in Bar: bar1")
+      )
+    }
+
+    {
+      info("no warnings if the private function used by child contracts")
+      val code =
+        s"""
+           |Contract Bar() extends Foo() {
+           |  pub fn bar() -> () { foo1() }
+           |}
+           |Contract Baz() extends Foo() {
+           |  pub fn baz() -> () { foo1() }
+           |}
+           |Abstract Contract Foo() {
+           |  fn foo0() -> U256 {
+           |    return 0
+           |  }
+           |  fn foo1() -> () {
+           |    let _ = foo0()
+           |  }
+           |}
+           |""".stripMargin
+      checkWarnings(code, AVector(("Bar", AVector.empty), ("Baz", AVector.empty)), AVector.empty)
+    }
+
+    {
+      info("no warnings if the private function used by different child contracts")
+      val code =
+        s"""
+           |Contract Foo() extends Baz() {
+           |  pub fn foo() -> () {
+           |    baz0()
+           |  }
+           |}
+           |Contract Bar() extends Baz() {
+           |  pub fn bar() -> () {
+           |    baz1()
+           |  }
+           |}
+           |Abstract Contract Baz() {
+           |  fn baz0() -> () {}
+           |  fn baz1() -> () {}
+           |}
+           |""".stripMargin
+      checkWarnings(code, AVector(("Foo", AVector.empty), ("Bar", AVector.empty)), AVector.empty)
+    }
+
+    {
+      info("no warnings if the private function used by abstract contract")
+      val code =
+        s"""
+           |Contract Baz() extends Bar() {
+           |  pub fn baz() -> () {}
+           |}
+           |Abstract Contract Foo() {
+           |  fn foo() -> () {}
+           |}
+           |Abstract Contract Bar() extends Foo() {
+           |  pub fn bar() -> () { foo() }
+           |}
+           |""".stripMargin
+
+      val result = Compiler.compileProject(code).rightValue
+      result._1.forall(_.warnings.isEmpty) is true
+      result._4.isEmpty is true
     }
   }
 
@@ -8031,7 +8170,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "calculate the correct scope for variables" in {
+  it should "calculate the correct scope for variables" in new Fixture {
     {
       info("If statement")
       val code =
@@ -8046,7 +8185,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8064,7 +8206,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8085,7 +8230,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8102,7 +8250,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.a is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.a is not defined in the current scope or is used before being defined"
+      )
     }
 
     {
@@ -8119,7 +8270,169 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Variable foo.i is not defined in the current scope")
+      testContractError(
+        code,
+        "Variable foo.i is not defined in the current scope or is used before being defined"
+      )
+    }
+
+    {
+      info("Define variables with the same name in different for-loop statements")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> (U256, U256) {
+           |    let mut a = 0
+           |    let mut b = 0
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      let j = a
+           |      a = j + 1
+           |      b = b + 1
+           |    }
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      let j = a
+           |      a = j - 1
+           |      b = b + 1
+           |    }
+           |    return a, b
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector.empty, AVector(Val.U256(0), Val.U256(4)))
+    }
+
+    {
+      info("Define variables with the same name in different while-loop statements")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let mut flag0 = true
+           |    let mut flag1 = true
+           |    let mut a = 0
+           |    while (flag0) {
+           |      let j = a
+           |      a = j + 1
+           |      if (a >= 2) {
+           |        flag0 = false
+           |      }
+           |    }
+           |    while (flag1) {
+           |      let j = a
+           |      a = j - 1
+           |      if (a == 0) {
+           |        flag1 = false
+           |      }
+           |    }
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector.empty, AVector(Val.U256(0)))
+    }
+
+    {
+      info("Define variables with the same name in if-else statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(cond: Bool) -> (U256, U256) {
+           |    let mut a = 0
+           |    let mut b = 0
+           |    if (cond) {
+           |      let array = [0, 2]
+           |      a = array[0]
+           |      b = array[1]
+           |    } else {
+           |      let array = [1, 3]
+           |      a = array[0]
+           |      b = array[1]
+           |    }
+           |    return a, b
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector(Val.True), AVector(Val.U256(0), Val.U256(2)))
+      test(code, AVector(Val.False), AVector(Val.U256(1), Val.U256(3)))
+    }
+
+    {
+      info("Cannot shadow variables in the parent scope within a for-loop statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let i = 0
+           |    for (let mut $$i$$ = 0; i < 2; i = i + 1) {
+           |      i = i + 1
+           |    }
+           |    return i
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Local variables have the same name: i")
+    }
+
+    {
+      info("Cannot shadow variables in the parent scope within a while-loop statement")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(cond: Bool) -> U256 {
+           |    let i = 0
+           |    while (cond) {
+           |      let $$i$$ = 1
+           |    }
+           |    return i
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Local variables have the same name: i")
+    }
+
+    {
+      info("Cannot shadow variables in the parent scope within a if-else statement")
+      def code(name0: String, name1: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(cond: Bool) -> U256 {
+           |    let i = 0
+           |    if (cond) {
+           |      let $name0 = 1
+           |    } else {
+           |      let $name1 = 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code("$i$", "j"), "Local variables have the same name: i")
+      testContractError(code("j", "$i$"), "Local variables have the same name: i")
+    }
+
+    {
+      info("Redefine the variable in the parent scope")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(pred: Bool) -> U256 {
+           |    if (pred) {
+           |      let i = 0
+           |      return i
+           |    }
+           |    let i = 1
+           |    return i
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, AVector(Val.True), AVector(Val.U256(0)))
+      test(code, AVector(Val.False), AVector(Val.U256(1)))
     }
   }
 }
