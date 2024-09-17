@@ -22,19 +22,13 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.message._
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{
-  Block,
-  BlockHash,
-  BrokerInfo,
-  ChainIndex,
-  TransactionId,
-  TransactionTemplate
-}
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, Cache, Duration, TimeStamp}
 
-trait BrokerHandler extends BaseBrokerHandler {
+trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   val maxBlockCapacity: Int              = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
   val maxTxsCapacity: Int                = maxBlockCapacity * 32
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
@@ -66,11 +60,10 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
   }
 
-  override def exchangingV1: Receive = exchangingCommon orElse syncing orElse flowEvents
+  def exchangingV1: Receive = exchangingCommon orElse syncingV1 orElse flowEvents
+  def exchangingV2: Receive = exchangingV1 orElse syncingV2
 
-  def exchangingV2: Receive = ???
-
-  def syncing: Receive = {
+  def syncingV1: Receive = {
     case BaseBrokerHandler.SyncLocators(locators) =>
       val showLocators = Utils.showFlow(locators)
       log.debug(s"Send sync locators to $remoteAddress: $showLocators")
@@ -237,8 +230,12 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   override def dataOrigin: DataOrigin = DataOrigin.InterClique(remoteBrokerInfo)
 
+  @inline final protected def checkWork(hash: BlockHash): Boolean = {
+    PoW.checkWork(hash, blockflow.consensusConfigs.maxAllowedMiningTarget)
+  }
+
   def validateBlockHash(hash: BlockHash): Boolean = {
-    if (!PoW.checkWork(hash, blockflow.consensusConfigs.maxAllowedMiningTarget)) {
+    if (!checkWork(hash)) {
       handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
       false
     } else {
@@ -271,4 +268,47 @@ trait BrokerHandler extends BaseBrokerHandler {
 
 object BrokerHandler {
   val seenTxExpiryDuration: Duration = Duration.ofMinutesUnsafe(5)
+
+  def showChainState(tips: AVector[ChainTip]): String = {
+    tips
+      .map(t => s"(${t.hash.shortHex}, ${t.height}, ${t.weight.value})")
+      .mkString("[", ",", "]")
+  }
+}
+
+trait SyncV2Handler { _: BrokerHandler =>
+
+  def syncingV2: Receive = {
+    case BaseBrokerHandler.ChainState(tips) =>
+      log.debug(s"Send chain state to $remoteAddress: ${BrokerHandler.showChainState(tips)}")
+      send(ChainState(tips))
+
+    case BaseBrokerHandler.Received(ChainState(tips)) =>
+      if (checkChainState(tips)) {
+        log.debug(
+          s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
+        )
+        blockFlowSynchronizer ! BlockFlowSynchronizer.ChainState(tips)
+      } else {
+        log.warning(
+          s"Invalid chain state ${BrokerHandler.showChainState(tips)} from $remoteAddress"
+        )
+        handleMisbehavior(MisbehaviorManager.InvalidChainState(remoteAddress))
+      }
+  }
+
+  private def checkChainState(tips: AVector[ChainTip]): Boolean = {
+    val groupRange = brokerConfig.calIntersection(remoteBrokerInfo)
+    tips.length == groupRange.length * brokerConfig.groups &&
+    groupRange.indices.forall { index =>
+      val fromGroup = groupRange(index)
+      (0 until brokerConfig.groups).forall { toGroup =>
+        val tip        = tips(index * brokerConfig.groups + toGroup)
+        val chainIndex = tip.chainIndex
+        (checkWork(tip.hash)
+          && chainIndex.from.value == fromGroup && chainIndex.to.value == toGroup) ||
+        (tip.height == ALPH.GenesisHeight && tip.weight == ALPH.GenesisWeight)
+      }
+    }
+  }
 }

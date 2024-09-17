@@ -31,15 +31,7 @@ import org.alephium.flow.validation.{InvalidHeaderStatus, InvalidTestnetMiner, V
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{
-  Block,
-  BlockHash,
-  BrokerInfo,
-  ChainIndex,
-  FlowData,
-  ReleaseVersion,
-  TransactionId
-}
+import org.alephium.protocol.model._
 import org.alephium.util._
 
 object BrokerHandler {
@@ -55,6 +47,7 @@ object BrokerHandler {
   final case class RelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]) extends Command
   final case class DownloadTxs(hashes: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
+  final case class ChainState(tips: AVector[ChainTip]) extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }

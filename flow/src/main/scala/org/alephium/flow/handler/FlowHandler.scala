@@ -19,6 +19,7 @@ package org.alephium.flow.handler
 import akka.actor.{Props, Stash}
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.RequestId
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -34,6 +35,7 @@ object FlowHandler {
       peerBrokerInfo: BrokerGroupInfo
   ) extends Command
   case object GetIntraSyncInventories extends Command
+  case object GetChainState           extends Command
 
   sealed trait Event
   final case class BlocksLocated(blocks: AVector[Block]) extends Event
@@ -46,6 +48,13 @@ object FlowHandler {
       hashes
         .filter { case (chainIndex, _) => another.contains(chainIndex.from) }
         .map { case (_, locators) => locators }
+    }
+  }
+  final case class ChainState(tips: AVector[ChainTip]) extends Command {
+    def filterFor(
+        another: BrokerGroupInfo
+    )(implicit groupConfig: GroupConfig): AVector[ChainTip] = {
+      tips.filter(tip => another.contains(tip.chainIndex.from))
     }
   }
   final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
@@ -70,5 +79,7 @@ class FlowHandler(blockFlow: BlockFlow) extends IOBaseActor with Stash {
       escapeIOError(blockFlow.getIntraSyncInventories()) { inventories =>
         sender() ! SyncInventories(None, inventories)
       }
+    case GetChainState =>
+      escapeIOError(blockFlow.getChainState()) { tips => sender() ! ChainState(tips) }
   }
 }

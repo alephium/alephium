@@ -32,7 +32,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
 
     def addNewBroker(): ActorRef = {
       val broker = TestProbe().ref
-      brokerInfos += ActorRefT(broker) -> brokerInfo
+      brokers += ActorRefT(broker) -> BrokerStatusTracker.BrokerStatus(brokerInfo)
       broker
     }
   }

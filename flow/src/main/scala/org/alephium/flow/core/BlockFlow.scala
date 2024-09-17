@@ -95,6 +95,14 @@ trait BlockFlow
     }
   }
 
+  def getChainStateUnsafe(): AVector[ChainTip] = {
+    brokerConfig.chainIndexes.map { chainIndex =>
+      val chain    = getBlockChain(chainIndex)
+      val tipState = chain.maxWeightTipStateUnsafe
+      ChainTip(tipState._1, tipState._2, tipState._3)
+    }
+  }
+
   override protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]] = {
     AVector.tabulate(brokerConfig.groupNumPerBroker * brokerConfig.groups) { index =>
       val fromGroup = brokerConfig.groupRange(index / brokerConfig.groups)

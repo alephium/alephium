@@ -384,6 +384,46 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash3) is true)
   }
 
+  it should "send chain state to peer" in new Fixture {
+    val tips = genChainTips()
+    brokerHandler ! BaseBrokerHandler.ChainState(tips)
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      Message
+        .deserialize(message)
+        .rightValue
+        .payload
+        .asInstanceOf[ChainState]
+        .tips is tips
+    }
+  }
+
+  it should "receive valid chain state from peer" in new Fixture {
+    setRemoteBrokerInfo()
+    val tips = genChainTips()
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(tips))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.ChainState(tips))
+  }
+
+  it should "stop handler and publish misbehavior if the tip size is invalid" in new Fixture {
+    val invalidTips = genChainTips().drop(1)
+    checkInvalidTips(invalidTips)
+  }
+
+  it should "stop handler and publish misbehavior if the tip hash is invalid" in new Fixture {
+    override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+    val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
+    val invalidTip   = ChainTip(invalidBlock.hash, 1, invalidBlock.weight)
+    val invalidTips  = genChainTips().replace(0, invalidTip)
+    checkInvalidTips(invalidTips)
+  }
+
+  it should "stop handler and publish misbehavior if the tip chain index is invalid" in new Fixture {
+    val tips        = genChainTips()
+    val invalidTips = tips.replace(1, tips(0))
+    checkInvalidTips(invalidTips)
+  }
+
   trait Fixture extends FlowFixture {
     val cliqueManager         = TestProbe()
     val connectionHandler     = TestProbe()
@@ -426,6 +466,34 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       }
     }
 
+    def setRemoteBrokerInfo() = {
+      brokerHandler.underlyingActor.remoteBrokerInfo = BrokerInfo.unsafe(
+        CliqueId.generate,
+        brokerConfig.brokerId,
+        brokerConfig.brokerNum,
+        brokerHandlerActor.remoteAddress
+      )
+    }
+
+    def genChainTips() = {
+      brokerConfig.chainIndexes.map { chainIndex =>
+        val block = emptyBlock(blockFlow, chainIndex)
+        ChainTip(block.hash, 1, block.weight)
+      }
+    }
+
+    def checkInvalidTips(invalidTips: AVector[ChainTip]) = {
+      setRemoteBrokerInfo()
+
+      val listener = TestProbe()
+      system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+      watch(brokerHandler)
+
+      brokerHandler ! BaseBrokerHandler.Received(ChainState(invalidTips))
+      blockFlowSynchronizer.expectNoMessage()
+      listener.expectMsg(MisbehaviorManager.InvalidChainState(brokerHandlerActor.remoteAddress))
+      expectTerminated(brokerHandler.ref)
+    }
   }
 }
 
@@ -472,5 +540,5 @@ class TestBrokerHandler(
     with BrokerHandler {
   context.watch(brokerConnectionHandler.ref)
 
-  override def receive: Receive = exchangingV1
+  override def receive: Receive = exchangingV2
 }

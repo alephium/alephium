@@ -111,17 +111,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     IOUtils.tryExecute(maxHeightByWeightUnsafe)
   }
 
-  def maxHeightByWeightUnsafe: Int = {
-    val (maxHeight, _) =
-      tips.keys().foldLeft((ALPH.GenesisHeight, ALPH.GenesisWeight)) {
-        case ((height, weight), tip) =>
-          getStateUnsafe(tip) match {
-            case BlockState(tipHeight, tipWeight) =>
-              if (tipWeight > weight) (tipHeight, tipWeight) else (height, weight)
-          }
-      }
+  def maxHeightByWeightUnsafe: Int = maxWeightTipStateUnsafe._2
 
-    maxHeight
+  def maxWeightTipStateUnsafe: (BlockHash, Int, Weight) = {
+    tips.keys().foldLeft((genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)) {
+      case ((_, height, weight), tip) =>
+        getStateUnsafe(tip) match {
+          case BlockState(tipHeight, tipWeight) =>
+            if (tipWeight > weight) (tip, tipHeight, tipWeight) else (tip, height, weight)
+        }
+    }
   }
 
   def maxHeight: IOResult[Int] = {

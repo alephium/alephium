@@ -36,7 +36,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "add/remove brokers" in new Fixture {
-    blockFlowSynchronizerActor.brokerInfos.isEmpty is true
+    blockFlowSynchronizerActor.brokers.isEmpty is true
 
     val probe  = TestProbe()
     val broker = brokerInfoGen.sample.get
@@ -44,10 +44,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       blockFlowSynchronizer,
       InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "")
     )
-    eventually(blockFlowSynchronizerActor.brokerInfos.toMap.contains(probe.ref) is true)
+    eventually(blockFlowSynchronizerActor.brokers.toMap.contains(probe.ref) is true)
 
     system.stop(probe.ref)
-    eventually(blockFlowSynchronizerActor.brokerInfos.isEmpty is true)
+    eventually(blockFlowSynchronizerActor.brokers.isEmpty is true)
   }
 
   it should "handle block announcement" in new Fixture {
@@ -59,7 +59,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       blockFlowSynchronizer,
       InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "")
     )
-    eventually(blockFlowSynchronizerActor.brokerInfos.toMap.contains(broker.ref) is true)
+    eventually(blockFlowSynchronizerActor.brokers.toMap.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
     eventually(blockFlowSynchronizerActor.fetching.states.contains(blockHash) is true)

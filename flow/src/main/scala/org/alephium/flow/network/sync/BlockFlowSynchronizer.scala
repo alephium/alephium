@@ -18,6 +18,8 @@ package org.alephium.flow.network.sync
 
 import java.net.InetSocketAddress
 
+import scala.collection.mutable
+
 import akka.actor.{Props, Terminated}
 
 import org.alephium.flow.core.BlockFlow
@@ -26,7 +28,7 @@ import org.alephium.flow.network._
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.model.{BlockHash, ChainIndex, ChainTip}
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
 
@@ -43,6 +45,7 @@ object BlockFlowSynchronizer {
   final case class BlockFinalized(hash: BlockHash)                      extends Command
   case object CleanDownloading                                          extends Command
   final case class BlockAnnouncement(hash: BlockHash)                   extends Command
+  final case class ChainState(tips: AVector[ChainTip])                  extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -55,6 +58,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     with BrokerStatusTracker
     with InterCliqueManager.NodeSyncStatus {
   import BlockFlowSynchronizer._
+  import BrokerStatusTracker.BrokerStatus
 
   override def preStart(): Unit = {
     super.preStart()
@@ -69,16 +73,16 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _) =>
       log.debug(s"HandShaked with ${remoteBrokerInfo.address}")
       context.watch(broker.ref)
-      brokerInfos += broker -> remoteBrokerInfo
+      brokers += broker -> BrokerStatus(remoteBrokerInfo)
     case Sync =>
-      if (brokerInfos.nonEmpty) {
+      if (brokers.nonEmpty) {
         log.debug(s"Send sync requests to the network")
         allHandlers.flowHandler ! FlowHandler.GetSyncLocators
       }
       scheduleSync()
     case flowLocators: FlowHandler.SyncLocators =>
-      samplePeers().foreach { case (actor, brokerInfo) =>
-        actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(brokerInfo))
+      samplePeers().foreach { case (actor, broker) =>
+        actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
       }
     case SyncInventories(hashes) => download(hashes)
     case BlockFinalized(hash)    => finalized(hash)
@@ -87,17 +91,56 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case Terminated(actor) =>
       val broker = ActorRefT[BrokerHandler.Command](actor)
       log.debug(s"Connection to ${remoteAddress(broker)} is closing")
-      brokerInfos.filterInPlace(_._1 != broker)
+      brokers.filterInPlace(_._1 != broker)
   }
 
   private def remoteAddress(broker: ActorRefT[BrokerHandler.Command]): InetSocketAddress = {
-    val brokerIndex = brokerInfos.indexWhere(_._1 == broker)
-    brokerInfos(brokerIndex)._2.address
+    val brokerIndex = brokers.indexWhere(_._1 == broker)
+    brokers(brokerIndex)._2.info.address
   }
 
   def scheduleSync(): Unit = {
     val frequency =
       if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
     scheduleOnce(self, Sync, frequency)
+  }
+}
+
+trait BlockFlowSynchronizerV2 { _: BlockFlowSynchronizer =>
+  import BrokerStatusTracker.BrokerActor
+
+  private val bestChainTips = mutable.HashMap.empty[ChainIndex, (BrokerActor, ChainTip)]
+
+  def handleV2: Receive = {
+    case BlockFlowSynchronizer.Sync =>
+      if (brokers.nonEmpty) {
+        log.debug(s"Send chain state to the network")
+        allHandlers.flowHandler ! FlowHandler.GetChainState
+      }
+      scheduleSync()
+
+    case chainState: FlowHandler.ChainState =>
+      // TODO: select all peers that using protocol v2
+      brokers.foreach { case (actor, broker) =>
+        actor ! BrokerHandler.ChainState(chainState.filterFor(broker.info))
+      }
+
+    case BlockFlowSynchronizer.ChainState(tips) =>
+      handlePeerChainState(tips)
+  }
+
+  private def handlePeerChainState(tips: AVector[ChainTip]): Unit = {
+    val brokerActor: BrokerActor = ActorRefT(sender())
+    brokers.find(_._1 == brokerActor).foreach(_._2.updateTips(tips))
+    tips.foreach { chainTip =>
+      val chainIndex = chainTip.chainIndex
+      bestChainTips.get(chainIndex) match {
+        case Some((_, current)) =>
+          if (chainTip.weight > current.weight) {
+            bestChainTips(chainIndex) = (brokerActor, chainTip)
+          }
+        case None => bestChainTips(chainIndex) = (brokerActor, chainTip)
+      }
+    }
   }
 }

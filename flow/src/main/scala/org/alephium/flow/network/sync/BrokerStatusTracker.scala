@@ -21,25 +21,40 @@ import scala.util.Random
 
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.model.{BrokerInfo, ChainTip}
 import org.alephium.util.{ActorRefT, AVector}
 
+object BrokerStatusTracker {
+  type BrokerActor = ActorRefT[BrokerHandler.Command]
+
+  final class BrokerStatus(val info: BrokerInfo) {
+    private var tips: Option[AVector[ChainTip]] = None
+
+    def updateTips(newTips: AVector[ChainTip]): Unit = tips = Some(newTips)
+  }
+
+  object BrokerStatus {
+    def apply(info: BrokerInfo): BrokerStatus = new BrokerStatus(info)
+  }
+}
+
 trait BrokerStatusTracker {
+  import BrokerStatusTracker._
   def networkSetting: NetworkSetting
 
-  val brokerInfos: mutable.ArrayBuffer[(ActorRefT[BrokerHandler.Command], BrokerInfo)] =
+  val brokers: mutable.ArrayBuffer[(BrokerActor, BrokerStatus)] =
     mutable.ArrayBuffer.empty
 
   def samplePeersSize(): Int = {
-    val peerSize = Math.sqrt(brokerInfos.size.toDouble).toInt
+    val peerSize = Math.sqrt(brokers.size.toDouble).toInt
     Math.min(peerSize, networkSetting.syncPeerSampleSize)
   }
 
-  def samplePeers(): AVector[(ActorRefT[BrokerHandler.Command], BrokerInfo)] = {
+  def samplePeers(): AVector[(BrokerActor, BrokerStatus)] = {
     val peerSize   = samplePeersSize()
-    val startIndex = Random.nextInt(brokerInfos.size)
+    val startIndex = Random.nextInt(brokers.size)
     AVector.tabulate(peerSize) { k =>
-      brokerInfos((startIndex + k) % brokerInfos.size)
+      brokers((startIndex + k) % brokers.size)
     }
   }
 }

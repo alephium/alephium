@@ -16,9 +16,22 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.Serde
 
-final case class ChainTip(hash: BlockHash, height: Int, weight: Weight)
+final case class ChainTip(hash: BlockHash, height: Int, weight: Weight) {
+  private var _chainIndex: Option[ChainIndex] = None
+
+  def chainIndex(implicit config: GroupConfig): ChainIndex = {
+    _chainIndex match {
+      case Some(index) => index
+      case None =>
+        val index = ChainIndex.from(hash)
+        _chainIndex = Some(index)
+        index
+    }
+  }
+}
 
 object ChainTip {
   implicit val serde: Serde[ChainTip] =
