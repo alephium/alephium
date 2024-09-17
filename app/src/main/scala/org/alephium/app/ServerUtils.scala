@@ -29,6 +29,7 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
@@ -215,25 +216,54 @@ class ServerUtils(implicit
   def buildMultiGroupTransactions(
       blockFlow: BlockFlow,
       query: BuildTransaction
-  ): Try[AVector[BuildTransactionResult]] = {
+  ): Try[AVector[BuildTransactionResult]] =
     for {
-      lockPair <- query.getLockPair()
       _ <- Either.cond(
         query.gasAmount.isEmpty,
         (),
-        ApiError.BadRequest("Explicit Gas Amount is not allowed")
+        badRequest("Explicit Gas Amount is not allowed")
       )
-      unsignedTxs <- prepareUnsignedMultiGroupTransactions(
-        blockFlow,
-        lockPair._1,
-        lockPair._2,
-        query.utxos,
-        query.destinations,
-        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash
+      assetOutputRefs <- query.utxos match {
+        case Some(outputRefs) => prepareOutputRefs(outputRefs).left.map(badRequest)
+        case None             => Right(AVector.empty[AssetOutputRef])
+      }
+      _ <- Either.cond(
+        assetOutputRefs.map(_.hint.groupIndex).toSet.size == 1,
+        (),
+        badRequest("Selected UTXOs are not from the same group")
       )
-    } yield unsignedTxs.map(BuildTransactionResult.from)
-  }
+      lockPair <- query.getLockPair()
+      _ <- Either.cond(
+        brokerConfig.contains(lockPair._1.groupIndex),
+        (),
+        badRequest(s"This node cannot serve request for Group ${lockPair._1.groupIndex}")
+      )
+      inputSelection <- blockFlow
+        .getUtxoSelectionOrArbitrary(
+          query.targetBlockHash,
+          lockPair._1,
+          assetOutputRefs,
+          apiConfig.defaultUtxosLimit
+        )
+        .left
+        .map(badRequest)
+      outputInfos = prepareOutputInfos(query.destinations)
+      gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      _ <- getPositiveAlphRemainderOrFail(lockPair._2, inputSelection, outputInfos, gasPrice).left
+        .map(badRequest)
+      unsignedTxs <- blockFlow
+        .buildMultiGroupTransactions(
+          lockPair._1,
+          lockPair._2,
+          inputSelection,
+          outputGroups = AVector.from(outputInfos.groupBy(_.lockupScript.groupIndex).values),
+          gasPrice,
+          AVector.empty[UnsignedTransaction]
+        )
+        .left
+        .map(failed)
+      txs <- validateUnsignedTransactions(unsignedTxs)
+    } yield txs.map(BuildTransactionResult.from)
 
   def buildTransaction(
       blockFlow: BlockFlow,
@@ -881,48 +911,6 @@ class ServerUtils(implicit
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
       case Left(error)                       => failed(error)
-    }
-  }
-
-  def prepareUnsignedMultiGroupTransactions(
-      blockFlow: BlockFlow,
-      fromLockupScript: LockupScript.Asset,
-      fromUnlockScript: UnlockScript,
-      outputRefsOpt: Option[AVector[OutputRef]],
-      destinations: AVector[Destination],
-      gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash]
-  ): Try[AVector[UnsignedTransaction]] = {
-    assume(brokerConfig.contains(fromLockupScript.groupIndex))
-    val transferResult =
-      for {
-        assetOutputRefs <- outputRefsOpt match {
-          case Some(outputRefs) => prepareOutputRefs(outputRefs)
-          case None             => Right(AVector.empty[AssetOutputRef])
-        }
-        outputInfos = prepareOutputInfos(destinations)
-        result <- blockFlow.multiGroupTransfer(
-          targetBlockHashOpt,
-          fromLockupScript,
-          fromUnlockScript,
-          assetOutputRefs,
-          outputInfos,
-          gasPrice,
-          apiConfig.defaultUtxosLimit
-        )
-      } yield result
-
-    transferResult match {
-      case Right(unsignedTransactions) =>
-        unsignedTransactions
-          .map(validateUnsignedTransaction)
-          .iterator
-          .foldLeft[Try[AVector[UnsignedTransaction]]](Right(AVector.empty[UnsignedTransaction])) {
-            case (Right(acc), Right(value)) => Right(acc :+ value)
-            case (_, Left(err))             => Left(err)
-            case (acc, _)                   => acc
-          }
-      case Left(error) => Left(failed(error))
     }
   }
 
@@ -1982,6 +1970,53 @@ object ServerUtils {
     }
   }
 
+  def getPositiveAlphRemainderOrFail(
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  ): Either[String, U256] = {
+    if (inputs.isEmpty || outputs.isEmpty) {
+      Left("Both inputs and outputs must be specified")
+    } else {
+      val inputAmounts = inputs.map(_.output.amount)
+      val totalInputValue =
+        inputAmounts.fold(Option(U256.Zero)) { case (acc, n) =>
+          acc.flatMap(_.add(n))
+        }
+      val outputAmounts = outputs.map(_.attoAlphAmount)
+      val totalOutputValue =
+        outputAmounts.fold(Option(U256.Zero)) { case (acc, n) =>
+          acc.flatMap(_.add(n))
+        }
+
+      (totalInputValue, totalOutputValue) match {
+        case (Some(iv), Some(ov)) if iv > ov =>
+          for {
+            gasBox <- GasEstimation.estimateWithInputScript(
+              fromUnlockScript,
+              inputs.length,
+              outputs.length + 1,                    // + 1 is for change utxo
+              AssetScriptGasEstimator.NotImplemented // Not P2SH
+            )
+            remainder <- UnsignedTransaction.calculateAlphRemainder(
+              inputAmounts,
+              outputAmounts,
+              gasPrice * gasBox
+            )
+          } yield remainder
+        case (None, Some(_)) =>
+          Left(s"Invalid total input value")
+        case (Some(_), None) =>
+          Left(s"Invalid total output value")
+        case (None, None) =>
+          Left(s"Invalid total input and output value")
+        case (Some(iv), Some(ov)) =>
+          Left(s"Total input value $iv is not enough for output value $ov and a gas fee")
+      }
+    }
+  }
+
   def validateUnsignedTransaction(
       unsignedTx: UnsignedTransaction
   )(implicit apiConfig: ApiConfig): Try[UnsignedTransaction] = {
@@ -1989,6 +2024,19 @@ object ServerUtils {
       _ <- validateUtxInputs(unsignedTx)
       _ <- validateUtxGasFee(unsignedTx)
     } yield unsignedTx
+  }
+
+  def validateUnsignedTransactions(
+      transactions: AVector[UnsignedTransaction]
+  )(implicit apiConfig: ApiConfig): Try[AVector[UnsignedTransaction]] = {
+    transactions
+      .map(validateUnsignedTransaction)
+      .iterator
+      .foldLeft[Try[AVector[UnsignedTransaction]]](Right(AVector.empty[UnsignedTransaction])) {
+        case (Right(acc), Right(value)) => Right(acc :+ value)
+        case (_, Left(err))             => Left(err)
+        case (acc, _)                   => acc
+      }
   }
 
   def buildDeployContractTxWithParsedState(

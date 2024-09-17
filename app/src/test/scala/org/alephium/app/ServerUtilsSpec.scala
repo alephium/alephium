@@ -28,8 +28,8 @@ import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{AMMContract, BlockFlow}
-import org.alephium.flow.core.FlowUtils.OutputInfo
+import org.alephium.flow.core.{AMMContract, BlockFlow, FlowUtils}
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, OutputInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
@@ -37,6 +37,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -75,6 +76,40 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit override lazy val blockFlow = isolatedBlockFlow()
 
+    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
+    val lockupScript                       = LockupScript.p2pkh(fromPublicKey)
+    val unlockScript                       = UnlockScript.p2pkh(fromPublicKey)
+
+    def outputOfAmount(amount: U256): TxOutputInfo =
+      TxOutputInfo(
+        lockupScript,
+        amount,
+        AVector.empty,
+        None
+      )
+
+    def splitGenesisUtxosBy(n: Int): AVector[AssetOutputInfo] = {
+      val block =
+        transfer(blockFlow, fromPrivateKey, amount = genesisBalance / n, to = fromPublicKey)
+      addAndCheck(blockFlow, block)
+      val utxos = blockFlow
+        .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+        .rightValue
+        .asUnsafe[AssetOutputInfo]
+      assume(utxos.length == n)
+      utxos
+    }
+
+    def testAlphRemainderCheck(inputs: AVector[AssetOutputInfo], outputs: AVector[TxOutputInfo]) = {
+      ServerUtils
+        .getPositiveAlphRemainderOrFail(
+          UnlockScript.p2pkh(fromPublicKey),
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice
+        )
+    }
+
     private def testDependencies(txsWithBlock: AVector[(Block, BuildTransactionResult)]) = {
       val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
       addAndCheck(blockFlow, block1)
@@ -109,9 +144,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     def testChangeTx(txr: BuildTransactionResult) = {
-      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
-      val fromAddress                        = Address.p2pkh(fromPublicKey)
-      val expectedUtxosPerDestination        = 2
+      val fromAddress                 = Address.p2pkh(fromPublicKey)
+      val expectedUtxosPerDestination = 2
 
       val BuildTransactionResult(changeTx, _, _, changeTxId, chFromGroup, chToGroup) = txr
 
@@ -386,6 +420,67 @@ class ServerUtilsSpec extends AlephiumSpec {
       checkDestinationBalance(destination2)
     }
   }
+  it should "get positive alph remainder or fail" in new MultiGroupFixture {
+    val halfGenesisInput = splitGenesisUtxosBy(2).head
+
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector(outputOfAmount(genesisBalance / 4))
+    ).isRight is true
+
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector(outputOfAmount(genesisBalance))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      AVector.empty,
+      AVector(outputOfAmount(genesisBalance))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      AVector.empty,
+      AVector.empty
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector.empty
+    ).isLeft is true
+
+    val overflowValueOutputs = AVector.fill(2)(outputOfAmount(U256.MaxValue))
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      overflowValueOutputs
+    ).isLeft is true
+
+    val overflowValueInputs =
+      AVector.fill(2) {
+        AssetOutputInfo(
+          AssetOutputRef.unsafe(
+            Hint.unsafe(0),
+            TxOutputRef.unsafeKey(Hash.generate)
+          ),
+          org.alephium.protocol.model.AssetOutput(
+            U256.MaxValue,
+            lockupScript,
+            TimeStamp.now(),
+            AVector.empty,
+            ByteString.empty
+          ),
+          FlowUtils.PersistedOutput
+        )
+      }
+    testAlphRemainderCheck(
+      overflowValueInputs,
+      AVector(outputOfAmount(genesisBalance / 4))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      overflowValueInputs,
+      overflowValueOutputs
+    ).isLeft is true
+  }
 
   it should "test inter group txs from single transfer with inputs auto-selected" in new MultiGroupFixture {
     testMultiTransferToTwoGroupsWithProvidedInputs(_ => None) { resultingTxs =>
@@ -427,7 +522,6 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail in case gas amount is passed by user" in new MultiGroupFixture {
-    val (_, fromPublicKey, _) = genesisKeys(0)
     serverUtils
       .buildMultiGroupTransactions(
         blockFlow,
@@ -878,7 +972,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  it should "validate unsigned transaction" in new Fixture with TxInputGenerators {
+  it should "validate unsigned transactions" in new Fixture with TxInputGenerators {
 
     val tooMuchGasFee = UnsignedTransaction(
       DefaultTxVersion,
@@ -907,6 +1001,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     ServerUtils.validateUnsignedTransaction(noInputs) is Left(
+      ApiError.BadRequest(
+        "Invalid transaction: empty inputs"
+      )
+    )
+
+    ServerUtils.validateUnsignedTransactions(AVector(tooMuchGasFee, noInputs)) is Left(
       ApiError.BadRequest(
         "Invalid transaction: empty inputs"
       )
