@@ -300,6 +300,9 @@ trait SyncV2Handler { _: BrokerHandler =>
   private[interclique] var states: Option[AVector[StatePerChain]] = None
   private[interclique] val pendingRequests = mutable.Map.empty[RequestId, RequestInfo]
 
+  private var selfChainTips: Option[AVector[ChainTip]]   = None
+  private var remoteChainTips: Option[AVector[ChainTip]] = None
+
   // scalastyle:off method.length
   def syncingV2: Receive = {
     schedule(self, BaseBrokerHandler.CheckPendingRequest, RequestTimeout)
@@ -308,6 +311,8 @@ trait SyncV2Handler { _: BrokerHandler =>
       case BaseBrokerHandler.ChainState(tips) =>
         log.debug(s"Send chain state to $remoteAddress: ${BrokerHandler.showChainState(tips)}")
         send(ChainState(tips))
+        selfChainTips = Some(tips)
+        remoteChainTips.foreach(checkSyncedByChainState(tips, _))
 
       case BaseBrokerHandler.Received(ChainState(tips)) =>
         if (checkChainState(tips)) {
@@ -315,6 +320,8 @@ trait SyncV2Handler { _: BrokerHandler =>
             s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
           )
           blockFlowSynchronizer ! BlockFlowSynchronizer.ChainState(tips)
+          selfChainTips.foreach(checkSyncedByChainState(_, tips))
+          remoteChainTips = Some(tips)
         } else {
           log.warning(
             s"Invalid chain state ${BrokerHandler.showChainState(tips)} from $remoteAddress"
@@ -374,6 +381,25 @@ trait SyncV2Handler { _: BrokerHandler =>
     receive
   }
   // scalastyle:on method.length
+
+  private def checkSyncedByChainState(
+      selfTips: AVector[ChainTip],
+      remoteTips: AVector[ChainTip]
+  ): Unit = {
+    assume(selfTips.length == remoteTips.length)
+    if (!selfSynced) {
+      val synced = selfTips.forallWithIndex { case (selfTip, index) =>
+        selfTip.weight >= remoteTips(index).weight
+      }
+      if (synced) setSelfSynced()
+    }
+    if (!remoteSynced) {
+      val synced = remoteTips.forallWithIndex { case (remoteTip, index) =>
+        remoteTip.weight >= selfTips(index).weight
+      }
+      if (synced) setRemoteSynced()
+    }
+  }
 
   private def checkChainState(tips: AVector[ChainTip]): Boolean = {
     val groupRange = brokerConfig.calIntersection(remoteBrokerInfo)
