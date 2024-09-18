@@ -28,8 +28,8 @@ class AstSpec extends AlephiumSpec {
 
   behavior of "Check external caller"
 
-  def checkExternalCallerWarnings(warnings: AVector[String]): AVector[String] = {
-    warnings.filter(_.startsWith("No external caller check"))
+  def checkExternalCallerWarnings(warnings: AVector[Warning]): AVector[Warning] = {
+    warnings.filter(_.message.startsWith("No external caller check"))
   }
 
   it should "detect direct check external caller" in {
@@ -280,7 +280,7 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
-      checkExternalCallerWarnings(warnings).toSet is Set(
+      checkExternalCallerWarnings(warnings).toSet.map(_.message) is Set(
         Warnings.noCheckExternalCallerMsg("Foo", "x"),
         Warnings.noCheckExternalCallerMsg("Foo", "a"),
         Warnings.noCheckExternalCallerMsg("Foo", "b")
@@ -324,7 +324,7 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
-      checkExternalCallerWarnings(warnings).toSet is Set(
+      checkExternalCallerWarnings(warnings).toSet.map(_.message) is Set(
         Warnings.noCheckExternalCallerMsg("Foo", "a"),
         Warnings.noCheckExternalCallerMsg("Bar", "a")
       )
@@ -381,7 +381,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -424,7 +424,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -440,7 +440,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -455,7 +455,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -471,7 +471,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -500,7 +500,7 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
     }
 
@@ -527,7 +527,7 @@ class AstSpec extends AlephiumSpec {
            |$code
            |""".stripMargin
 
-      val warnings0 = Compiler.compileContractFull(foo0, 0).rightValue.warnings
+      val warnings0 = Compiler.compileContractFull(foo0, 0).rightValue.warnings.map(_.message)
       warnings0 is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
 
       val foo1 =
@@ -553,7 +553,7 @@ class AstSpec extends AlephiumSpec {
            |$code
            |""".stripMargin
 
-      val warnings2 = Compiler.compileContractFull(foo2, 0).rightValue.warnings
+      val warnings2 = Compiler.compileContractFull(foo2, 0).rightValue.warnings.map(_.message)
       warnings2 is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
 
       val foo3 =
@@ -584,7 +584,7 @@ class AstSpec extends AlephiumSpec {
            |$code
            |""".stripMargin
 
-      val warnings4 = Compiler.compileContractFull(foo4, 0).rightValue.warnings
+      val warnings4 = Compiler.compileContractFull(foo4, 0).rightValue.warnings.map(_.message)
       warnings4 is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
     }
 
@@ -633,13 +633,15 @@ class AstSpec extends AlephiumSpec {
     Compiler
       .compileContractFull(code("@using(checkExternalCaller = true)"), 0)
       .rightValue
-      .warnings is AVector(
+      .warnings
+      .map(_.message) is AVector(
       """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
     )
     Compiler
       .compileContractFull(code("@using(checkExternalCaller = false)"), 0)
       .rightValue
-      .warnings is AVector(
+      .warnings
+      .map(_.message) is AVector(
       """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
     )
     Compiler
@@ -663,7 +665,7 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContractFull(code0).rightValue.warnings is
+    Compiler.compileContractFull(code0).rightValue.warnings.map(_.message) is
       AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
 
     val code1 =
@@ -678,7 +680,7 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContractFull(code1).rightValue.warnings is
+    Compiler.compileContractFull(code1).rightValue.warnings.map(_.message) is
       AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
   }
 

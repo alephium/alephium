@@ -2489,8 +2489,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"0201$methodLength" + bytecode
     }
     result.warnings is AVector(
-      "Found unused variables in Foo: foo.a",
-      "Found unused fields in Foo: x"
+      "Found unused variable in Foo: foo.a",
+      "Found unused field in Foo: x"
     )
 
     info("Turn off warnings")
@@ -2543,7 +2543,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val constant = globalState.getCalculatedConstants()(0)
     result.constants is Some(AVector(CompileResult.Constant.from(constant._1, constant._2)))
 
-    globalWarnings is AVector("Found unused global constants: A, Error.Err0")
+    globalWarnings.map(_.message) is AVector(
+      "Found unused global constant: A",
+      "Found unused global constant: Error.Err0"
+    )
   }
 
   it should "compile script" in new Fixture {
@@ -2594,8 +2597,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
       result.warnings is AVector(
-        "Found unused variables in Main: main.c",
-        "Found unused fields in Main: b"
+        "Found unused variable in Main: main.c",
+        "Found unused field in Main: b"
       )
 
       info("Turn off warnings")

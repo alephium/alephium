@@ -1144,10 +1144,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    }
          |  ],
          |  "warnings": [
-         |    "Found unused variables in Foo: bar.a",
-         |    "Found unused maps in Foo: map",
-         |    "Found unused constants in Foo: A,Color.Blue,Color.Red",
-         |    "Found unused fields in Foo: cc, ff"
+         |    "Found unused variable in Foo: bar.a",
+         |    "Found unused map in Foo: map",
+         |    "Found unused constant in Foo: A",
+         |    "Found unused constant in Foo: Color.Blue",
+         |    "Found unused constant in Foo: Color.Red",
+         |    "Found unused field in Foo: cc",
+         |    "Found unused field in Foo: ff"
          |  ],
          |  "maps": { "names": ["map"], "types": ["Map[U256,U256]"] }
          |}
@@ -1193,8 +1196,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    }
          |  ],
          |  "warnings": [
-         |    "Found unused variables in Foo: bar.a",
-         |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
+         |    "Found unused variable in Foo: bar.a",
+         |    "Found unused field in Foo: aa",
+         |    "Found unused field in Foo: bb",
+         |    "Found unused field in Foo: cc",
+         |    "Found unused field in Foo: dd",
+         |    "Found unused field in Foo: ee"
          |  ]
          |}
          |""".stripMargin
