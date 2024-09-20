@@ -280,10 +280,19 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
-      checkExternalCallerWarnings(warnings).toSet.map(_.message) is Set(
-        Warnings.noCheckExternalCallerMsg("Foo", "x"),
-        Warnings.noCheckExternalCallerMsg("Foo", "a"),
-        Warnings.noCheckExternalCallerMsg("Foo", "b")
+      checkExternalCallerWarnings(warnings).toSet is Set(
+        Warning(
+          Warnings.noCheckExternalCallerMsg("Foo", "b"),
+          Some(SourceIndex(146, 1, None))
+        ),
+        Warning(
+          Warnings.noCheckExternalCallerMsg("Foo", "a"),
+          Some(SourceIndex(102, 1, None))
+        ),
+        Warning(
+          Warnings.noCheckExternalCallerMsg("Foo", "x"),
+          Some(SourceIndex(38, 1, None))
+        )
       )
     }
 
@@ -665,8 +674,13 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContractFull(code0).rightValue.warnings.map(_.message) is
-      AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+    Compiler.compileContractFull(code0).rightValue.warnings is
+      AVector(
+        Warning(
+          Warnings.noCheckExternalCallerMsg("Foo", "foo"),
+          Some(SourceIndex(73, 3, None))
+        )
+      )
 
     val code1 =
       s"""
