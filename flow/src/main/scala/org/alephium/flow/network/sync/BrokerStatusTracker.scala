@@ -24,6 +24,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.SyncState.{BlockDownloadTask, TaskId}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -32,7 +33,7 @@ object BrokerStatusTracker {
 
   val MaxRequestNum: Int = maxSyncBlocksPerChain * 16
 
-  final class BrokerStatus(val info: BrokerInfo) {
+  final class BrokerStatus(val info: BrokerInfo, val version: ProtocolVersion) {
     private[sync] var tips: Option[AVector[ChainTip]] = None
     private[sync] var requestNum                      = 0
     private[sync] val pendingTasks                    = mutable.Set.empty[BlockDownloadTask]
@@ -91,7 +92,8 @@ object BrokerStatusTracker {
   }
 
   object BrokerStatus {
-    def apply(info: BrokerInfo): BrokerStatus = new BrokerStatus(info)
+    def apply(info: BrokerInfo, version: ProtocolVersion): BrokerStatus =
+      new BrokerStatus(info, version)
   }
 }
 
@@ -105,16 +107,20 @@ trait BrokerStatusTracker {
   def getBrokerStatus(broker: BrokerActor): Option[BrokerStatus] =
     brokers.find(_._1 == broker).map(_._2)
 
-  def samplePeersSize(): Int = {
-    val peerSize = Math.sqrt(brokers.size.toDouble).toInt
+  def samplePeersSize(brokerSize: Int): Int = {
+    val peerSize = Math.sqrt(brokerSize.toDouble).toInt
     Math.min(peerSize, networkSetting.syncPeerSampleSize)
   }
 
-  def samplePeers(): AVector[(BrokerActor, BrokerStatus)] = {
-    val peerSize   = samplePeersSize()
-    val startIndex = Random.nextInt(brokers.size)
+  def samplePeers(version: ProtocolVersion): AVector[(BrokerActor, BrokerStatus)] = {
+    val filtered = version match {
+      case ProtocolV2 => brokers.filter(_._2.version == ProtocolV2)
+      case ProtocolV1 => brokers
+    }
+    val peerSize   = samplePeersSize(filtered.size)
+    val startIndex = Random.nextInt(filtered.size)
     AVector.tabulate(peerSize) { k =>
-      brokers((startIndex + k) % brokers.size)
+      filtered((startIndex + k) % filtered.size)
     }
   }
 }

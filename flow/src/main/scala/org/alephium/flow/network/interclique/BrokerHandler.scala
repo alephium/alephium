@@ -44,13 +44,18 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
 
   def allHandlers: AllHandlers
 
-  override def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  override def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
     val event = InterCliqueManager.HandShaked(
       ActorRefT[BaseBrokerHandler.Command](self),
       _remoteBrokerInfo,
       connectionType,
-      clientInfo
+      clientInfo,
+      protocolVersion
     )
     publishEvent(event)
   }

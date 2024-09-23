@@ -30,6 +30,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.ProtocolVersion
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
@@ -91,7 +92,11 @@ class TestOutboundBrokerHandler(
   override def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] = ???
   override def cliqueManager: ActorRefT[CliqueManager.Command]                 = ???
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 }

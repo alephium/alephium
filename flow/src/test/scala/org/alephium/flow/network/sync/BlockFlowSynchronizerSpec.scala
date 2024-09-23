@@ -25,6 +25,7 @@ import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection}
 import org.alephium.protocol.Generators
+import org.alephium.protocol.message.ProtocolV1
 import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, ChainIndex}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
@@ -44,7 +45,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val broker = brokerInfoGen.sample.get
     probe.send(
       blockFlowSynchronizer,
-      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "")
+      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "", ProtocolV1)
     )
     eventually(blockFlowSynchronizerActor.brokers.toMap.contains(probe.ref) is true)
 
@@ -59,7 +60,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     broker.send(
       blockFlowSynchronizer,
-      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "")
+      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "", ProtocolV1)
     )
     eventually(blockFlowSynchronizerActor.brokers.toMap.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))

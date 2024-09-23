@@ -275,7 +275,11 @@ class TestBrokerHandler(
 
   override def dataOrigin: DataOrigin = DataOrigin.Local
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 }

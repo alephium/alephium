@@ -24,6 +24,7 @@ import org.alephium.flow.network.sync.BrokerStatusTracker.BrokerStatus
 import org.alephium.flow.network.sync.SyncState.{BlockDownloadTask, TaskId}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
+import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -33,9 +34,9 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   trait Fixture extends BrokerStatusTracker {
     def networkSetting: NetworkSetting = config.network
 
-    def addNewBroker(): ActorRef = {
+    def addNewBroker(version: ProtocolVersion): ActorRef = {
       val broker = TestProbe().ref
-      brokers += ActorRefT(broker) -> BrokerStatus(brokerInfo)
+      brokers += ActorRefT(broker) -> BrokerStatus(brokerInfo, version)
       broker
     }
   }
@@ -43,22 +44,28 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   it should "sample the right size" in new Fixture {
     networkSetting.syncPeerSampleSize is 3
 
-    (1 until 4).foreach(_ => addNewBroker())
-    samplePeersSize() is 1
-    samplePeers().toSeq.toMap.size is 1
-    (4 until 9).foreach(_ => addNewBroker())
-    samplePeersSize() is 2
-    samplePeers().toSeq.toMap.size is 2
-    (9 until 1024).foreach(_ => addNewBroker())
-    samplePeersSize() is 3
-    samplePeers().toSeq.toMap.size is 3
+    (1 until 4).foreach(_ => addNewBroker(ProtocolV1))
+    samplePeersSize(brokers.size) is 1
+    samplePeers(ProtocolV1).toSeq.toMap.size is 1
+    (4 until 9).foreach(_ => addNewBroker(ProtocolV2))
+    samplePeersSize(brokers.size) is 2
+    samplePeers(ProtocolV1).toSeq.toMap.size is 2
+    (9 until 1024).foreach(_ => addNewBroker(ProtocolV1))
+    samplePeersSize(brokers.size) is 3
+    samplePeers(ProtocolV1).toSeq.toMap.size is 3
+
+    samplePeers(ProtocolV2).toSeq.toMap.size is 2
+    (1 until 4).foreach(_ => addNewBroker(ProtocolV2))
+    samplePeers(ProtocolV2).toSeq.toMap.size is 2
+    (9 until 1024).foreach(_ => addNewBroker(ProtocolV2))
+    samplePeers(ProtocolV2).toSeq.toMap.size is 3
   }
 
   behavior of "BrokerStatus"
 
   trait BrokerStatusFixture {
     val info   = BrokerInfo.unsafe(brokerInfo.cliqueId, 0, brokerConfig.groups, brokerInfo.address)
-    val status = BrokerStatus(info)
+    val status = BrokerStatus(info, ProtocolV2)
     val groupRange = AVector.from(brokerConfig.calIntersection(status.info))
     groupRange is AVector(0)
 

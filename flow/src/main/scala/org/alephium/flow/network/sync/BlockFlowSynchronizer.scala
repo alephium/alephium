@@ -30,6 +30,7 @@ import org.alephium.flow.network._
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
@@ -82,17 +83,21 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
   override def receive: Receive = common orElse handleV2 orElse updateNodeSyncStatus
 
   def common: Receive = {
-    case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _) =>
-      addBroker(broker, remoteBrokerInfo)
+    case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, protocolVersion) =>
+      addBroker(broker, remoteBrokerInfo, protocolVersion)
     case BlockFinalized(hash)    => finalized(hash)
     case CleanDownloading        => cleanupSyncing(networkSetting.syncExpiryPeriod)
     case BlockAnnouncement(hash) => handleBlockAnnouncement(hash)
   }
 
-  def addBroker(broker: BrokerActor, brokerInfo: BrokerInfo): Unit = {
+  def addBroker(
+      broker: BrokerActor,
+      brokerInfo: BrokerInfo,
+      protocolVersion: ProtocolVersion
+  ): Unit = {
     log.debug(s"HandShaked with ${brokerInfo.address}")
     context.watch(broker.ref)
-    brokers += broker -> BrokerStatus(brokerInfo)
+    brokers += broker -> BrokerStatus(brokerInfo, protocolVersion)
   }
 
   def removeBroker(broker: BrokerActor): Unit = {
@@ -123,7 +128,7 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
       }
       scheduleSync()
     case flowLocators: FlowHandler.SyncLocators =>
-      samplePeers().foreach { case (actor, broker) =>
+      samplePeers(ProtocolV1).foreach { case (actor, broker) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
       }
     case SyncInventories(hashes) => download(hashes)
@@ -141,8 +146,7 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
       scheduleSync()
 
     case chainState: FlowHandler.ChainState =>
-      // TODO: select all peers that using protocol v2
-      brokers.foreach { case (actor, broker) =>
+      samplePeers(ProtocolV2).foreach { case (actor, broker) =>
         actor ! BrokerHandler.ChainState(chainState.filterFor(broker.info))
       }
       handleSelfChainState(chainState.tips)

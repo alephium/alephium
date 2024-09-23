@@ -68,8 +68,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  var remoteBrokerInfo: BrokerInfo               = _
-  protected var protocolVersion: ProtocolVersion = ProtocolV1
+  var remoteBrokerInfo: BrokerInfo = _
 
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
@@ -79,24 +78,38 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
 
   override def receive: Receive = handShaking
 
+  private def handleInvalidClientId(clientId: String): Unit = {
+    log.warning(s"Unknown client id from ${remoteAddress}: ${clientId}")
+    stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
+  }
+
   def onHandshakeCompleted(hello: Hello): Unit = {
-    val clientVersion = ReleaseVersion.fromClientId(hello.clientId)
-    if (!ReleaseVersion.checkClientVersion(clientVersion)) {
-      log.warning(s"Unknown client id from ${remoteAddress}: ${hello.clientId}")
-      stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
-    } else {
-      handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
-      if (clientVersion.exists(_.usingProtocolV2())) {
-        protocolVersion = ProtocolV2
-        context become (exchangingV2 orElse pingPong)
-      } else {
-        protocolVersion = ProtocolV1
-        context become (exchangingV1 orElse pingPong)
-      }
+    ReleaseVersion.fromClientId(hello.clientId) match {
+      case Some(clientVersion) =>
+        if (!ReleaseVersion.checkClientVersion(clientVersion)) {
+          handleInvalidClientId(hello.clientId)
+        } else {
+          val protocolVersion = clientVersion.protocolVersion
+          handleHandshakeInfo(
+            BrokerInfo.from(remoteAddress, hello.brokerInfo),
+            hello.clientId,
+            protocolVersion
+          )
+          protocolVersion match {
+            case ProtocolV1 => context become (exchangingV1 orElse pingPong)
+            case ProtocolV2 => context become (exchangingV2 orElse pingPong)
+          }
+        }
+      case None =>
+        handleInvalidClientId(hello.clientId)
     }
   }
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit
 
   @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit =
     f match {
