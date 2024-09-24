@@ -156,12 +156,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     res
   }
 
-  def transferGeneric(
+  def transferChained(
       inputs: AVector[BuildMultiAddressesTransaction.Source],
       privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
-    val buildTx          = buildGenericTransaction(inputs)
+    val buildTx          = buildChainedTransaction(inputs)
     val unsignedTx       = request[BuildTransactionResult.Transfer](buildTx, restPort)
     val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
     val res              = request[SubmitTxResult](submitMultisigTx, restPort)
@@ -446,7 +446,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def buildGenericTransaction(
+  def buildChainedTransaction(
       inputs: AVector[BuildMultiAddressesTransaction.Source]
   ): Int => HttpRequest = {
     val p = s"""

@@ -1235,7 +1235,7 @@ class ServerUtils(implicit
     } yield BuildTransactionResult.DeployContract.from(utx)
   }
 
-  def buildGenericTransactions(
+  def buildChainedTransactions(
       blockFlow: BlockFlow,
       buildTransactionRequests: AVector[BuildTransaction]
   ): Try[AVector[BuildTransactionResult]] = {
@@ -1247,7 +1247,7 @@ class ServerUtils(implicit
         (newUtxosForThisLockupScript, restOfUtxos) = extraUtxosInfo.newUtxos.partition(
           _.output.lockupScript == keyPair._1
         )
-        buildResult <- buildGenericTransaction(
+        buildResult <- buildChainedTransaction(
           blockFlow,
           buildTransactionRequest,
           extraUtxosInfo.copy(newUtxos = newUtxosForThisLockupScript)
@@ -1262,7 +1262,7 @@ class ServerUtils(implicit
     buildResults.map(_._1)
   }
 
-  def buildGenericTransaction(
+  def buildChainedTransaction(
       blockFlow: BlockFlow,
       buildTransaction: BuildTransaction,
       extraUtxosInfo: ExtraUtxosInfo

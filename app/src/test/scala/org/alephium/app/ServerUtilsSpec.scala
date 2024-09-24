@@ -3631,7 +3631,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  trait GenericTransactionsFixture extends ExecuteScriptFixture {
+  trait ChainedTransactionsFixture extends ExecuteScriptFixture {
     override val configValues =
       Map(("alephium.broker.groups", 4), ("alephium.broker.broker-num", 1))
 
@@ -3686,23 +3686,23 @@ class ServerUtilsSpec extends AlephiumSpec {
         .detail is errorDetails
     }
 
-    def buildGenericTransactions(
+    def buildChainedTransactions(
         buildTransactions: BuildTransaction*
     ): AVector[BuildTransactionResult] = {
       serverUtils
-        .buildGenericTransactions(
+        .buildChainedTransactions(
           blockFlow,
           AVector.from(buildTransactions)
         )
         .rightValue
     }
 
-    def failedGenericTransactions(
+    def failedChainedTransactions(
         buildTransactions: AVector[BuildTransaction],
         errorDetails: String
     ) = {
       serverUtils
-        .buildGenericTransactions(
+        .buildChainedTransactions(
           blockFlow,
           buildTransactions
         )
@@ -3756,14 +3756,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAlphBalance(groupInfo0.address.lockupScript, address0InitBalance)
   }
 
-  it should "build multiple transfers transactions" in new GenericTransactionsFixture {
+  it should "build multiple transfers transactions" in new ChainedTransactionsFixture {
     failedBuildTransfer(
       BuildTransaction
         .Transfer(groupInfo1.publicKey.bytes, None, AVector(groupInfo2.destination(ALPH.oneAlph))),
       errorDetails = "Not enough balance: got 0, expected 1001000000000000000"
     )
 
-    failedGenericTransactions(
+    failedChainedTransactions(
       AVector(
         BuildTransaction
           .Transfer(
@@ -3777,7 +3777,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
     )
 
-    failedGenericTransactions(
+    failedChainedTransactions(
       AVector(
         BuildTransaction
           .Transfer(
@@ -3797,7 +3797,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
     )
 
-    val buildTransactions = buildGenericTransactions(
+    val buildTransactions = buildChainedTransactions(
       BuildTransaction
         .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo1.destination(ALPH.alph(2)))),
       BuildTransaction
@@ -3842,7 +3842,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAlphBalance(groupInfo3.address.lockupScript, ALPH.alph(1) - nonCoinbaseMinGasFee * 3)
   }
 
-  it should "build a transfer transaction followed by an execute script transactions" in new GenericTransactionsFixture {
+  it should "build a transfer transaction followed by an execute script transactions" in new ChainedTransactionsFixture {
     def buildExecuteScript(publicKey: PublicKey, attoAlphAmount: Option[Amount] = None) =
       BuildTransaction.ExecuteScript(
         fromPublicKey = publicKey.bytes,
@@ -3857,7 +3857,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       errorDetails = "Not enough balance: got 0, expected 5000000000000000"
     )
 
-    failedGenericTransactions(
+    failedChainedTransactions(
       AVector(
         BuildTransaction
           .Transfer(
@@ -3870,7 +3870,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       errorDetails = "Not enough balance: got 2000000000000000, expected 5000000000000000"
     )
 
-    failedGenericTransactions(
+    failedChainedTransactions(
       AVector(
         BuildTransaction
           .Transfer(
@@ -3884,7 +3884,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       errorDetails = "Not enough balance: got 998000000000000000, expected 1005000000000000000"
     )
 
-    val buildTransactions = buildGenericTransactions(
+    val buildTransactions = buildChainedTransactions(
       BuildTransaction
         .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo1.destination(ALPH.alph(2)))),
       buildExecuteScript(groupInfo1.publicKey),
@@ -3918,7 +3918,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  it should "build a transfer transaction followed by a deploy contract transactions" in new GenericTransactionsFixture {
+  it should "build a transfer transaction followed by a deploy contract transactions" in new ChainedTransactionsFixture {
     def buildDeployContract(publicKey: PublicKey, initialAttoAlphAmount: Option[Amount] = None) =
       BuildTransaction.DeployContract(
         fromPublicKey = publicKey.bytes,
@@ -3928,7 +3928,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     failedDeployContract(buildDeployContract(groupInfo1.publicKey), errorDetails = "Insufficient funds for gas")
 
-    failedGenericTransactions(
+    failedChainedTransactions(
       AVector(
         BuildTransaction
           .Transfer(
@@ -3942,7 +3942,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"Execution error when estimating gas for tx script or contract: Not enough approved balance for address ${groupInfo0.address.toBase58}, tokenId: ALPH, expected: 100000000000000000, got: 16000000000000000"
     )
 
-    failedGenericTransactions(
+    failedChainedTransactions(
       AVector(
         BuildTransaction
           .Transfer(
@@ -3960,7 +3960,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"Execution error when estimating gas for tx script or contract: Not enough approved balance for address ${groupInfo0.address.toBase58}, tokenId: ALPH, expected: 1000000000000000000, got: 996000000000000000"
     )
 
-    val buildTransactions = buildGenericTransactions(
+    val buildTransactions = buildChainedTransactions(
       BuildTransaction
         .Transfer(groupInfo0.publicKey.bytes, None, AVector(groupInfo1.destination(ALPH.alph(2)))),
       buildDeployContract(groupInfo1.publicKey),

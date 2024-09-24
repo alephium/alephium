@@ -649,8 +649,8 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.buildDeployContractTx(blockFlow, query, ExtraUtxosInfo.empty))
   }
 
-  val buildGenericTransactionsLogic = serverLogic(buildGenericTransactions) { query =>
-    Future.successful(serverUtils.buildGenericTransactions(blockFlow, query))
+  val buildChainedTransactionsLogic = serverLogic(buildChainedTransactions) { query =>
+    Future.successful(serverUtils.buildChainedTransactions(blockFlow, query))
   }
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>

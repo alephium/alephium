@@ -742,7 +742,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildGenericTransactionsExamples: List[Example[AVector[BuildTransaction]]] = List(
+  implicit val buildChainedTransactionsExamples: List[Example[AVector[BuildTransaction]]] = List(
     defaultExample(
       AVector(
         BuildTransaction.Transfer(publicKey.bytes, None, defaultDestinations),
@@ -799,7 +799,7 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildGenericTransactionsResultExamples
+  implicit val buildChainedTransactionsResultExamples
       : List[Example[AVector[BuildTransactionResult]]] =
     simpleExample(
       AVector(

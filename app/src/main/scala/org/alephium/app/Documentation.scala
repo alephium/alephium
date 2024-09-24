@@ -73,7 +73,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     compileContract,
     compileProject,
     buildDeployContractTx,
-    buildGenericTransactions,
+    buildChainedTransactions,
     contractState,
     testContract,
     callContract,

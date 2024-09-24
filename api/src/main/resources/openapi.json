@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.5.2"
+    "version": "3.6.4"
   },
   "servers": [
     {
@@ -8099,13 +8099,13 @@
         }
       }
     },
-    "/transactions/build-generic": {
+    "/transactions/build-chained": {
       "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Build a sequence of generic transactions",
-        "operationId": "postTransactionsBuild-generic",
+        "summary": "Build a chain of transactions",
+        "operationId": "postTransactionsBuild-chained",
         "requestBody": {
           "content": {
             "application/json": {

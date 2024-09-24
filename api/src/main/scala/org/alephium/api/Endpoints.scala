@@ -516,13 +516,13 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult.DeployContract])
       .summary("Build an unsigned contract")
 
-  val buildGenericTransactions
+  val buildChainedTransactions
       : BaseEndpoint[AVector[BuildTransaction], AVector[BuildTransactionResult]] =
     transactionsEndpoint.post
-      .in("build-generic")
+      .in("build-chained")
       .in(jsonBody[AVector[BuildTransaction]])
       .out(jsonBody[AVector[BuildTransactionResult]])
-      .summary("Build a sequence of generic transactions")
+      .summary("Build a chain of transactions")
 
   lazy val contractState: BaseEndpoint[Address.Contract, ContractState] =
     contractsEndpoint.get
