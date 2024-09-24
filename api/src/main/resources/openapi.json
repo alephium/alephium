@@ -13866,6 +13866,7 @@
         "required": [
           "hint",
           "key",
+          "unlockScript",
           "attoAlphAmount",
           "address",
           "tokens",

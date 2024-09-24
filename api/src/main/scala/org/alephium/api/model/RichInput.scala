@@ -26,7 +26,6 @@ import org.alephium.util.AVector
 sealed trait RichInput {
   def hint: Int
   def key: Hash
-  def unlockScript: Option[ByteString]
   def attoAlphAmount: Amount
   def address: Address
   def tokens: AVector[Token]
@@ -36,7 +35,7 @@ sealed trait RichInput {
 final case class RichAssetInput(
     hint: Int,
     key: Hash,
-    unlockScript: Option[ByteString],
+    unlockScript: ByteString,
     attoAlphAmount: Amount,
     address: Address,
     tokens: AVector[Token]
@@ -49,16 +48,14 @@ final case class RichContractInput(
     attoAlphAmount: Amount,
     address: Address,
     tokens: AVector[Token]
-) extends RichInput {
-  def unlockScript: Option[ByteString] = None
-}
+) extends RichInput
 
 object RichInput {
   def from(assetInput: TxInput, txOutput: TxOutput): RichAssetInput = {
     RichAssetInput(
       hint = assetInput.outputRef.hint.value,
       key = assetInput.outputRef.key.value,
-      unlockScript = Some(serialize(assetInput.unlockScript)),
+      unlockScript = serialize(assetInput.unlockScript),
       attoAlphAmount = Amount(txOutput.amount),
       address = Address.from(txOutput.lockupScript),
       tokens = txOutput.tokens.map(Token.tupled.apply)

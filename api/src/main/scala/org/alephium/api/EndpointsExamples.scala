@@ -195,7 +195,7 @@ trait EndpointsExamples extends ErrorExamples {
       RichAssetInput(
         hint = outputRef.hint,
         key = outputRef.key,
-        unlockScript = Some(unlockupScriptBytes),
+        unlockScript = unlockupScriptBytes,
         attoAlphAmount = Amount(ALPH.oneAlph),
         address = Address.from(lockupScript),
         tokens
