@@ -43,8 +43,7 @@ object OpenApiUpdate extends App {
         override def groups: Int = 4
       }
 
-    private val json =
-      openApiJson(openAPI, dropAuth = maybeApiKey.isEmpty)
+    private val json = openApiJson(openAPI, dropAuth = maybeApiKey.isEmpty)
 
     import java.io.PrintWriter
     new PrintWriter("../api/src/main/resources/openapi.json") { write(json); close() }
