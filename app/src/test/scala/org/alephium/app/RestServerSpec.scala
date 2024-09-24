@@ -30,7 +30,7 @@ import org.scalatest.compatible.Assertion
 import sttp.client3.Response
 import sttp.model.StatusCode
 
-import org.alephium.api.{ApiError, ApiModel}
+import org.alephium.api.{ApiError, ApiModel, OpenAPIWriters}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
@@ -978,7 +978,14 @@ abstract class RestServerSpec(
       val expectedOpenapi =
         read[ujson.Value](
           Using(Source.fromFile(openapiPath.getPath, "UTF-8")) { source =>
-            source.getLines().mkString("\n").replaceFirst("12973", s"$port")
+            source
+              .getLines()
+              .mkString("\n")
+              .replaceFirst("12973", s"$port")
+              .replaceAll(
+                OpenAPIWriters.address.toBase58.dropRight(2),
+                OpenAPIWriters.address.toBase58
+              )
           }.get
         )
 

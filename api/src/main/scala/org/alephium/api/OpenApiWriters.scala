@@ -25,7 +25,6 @@ import sttp.apispec.openapi._
 import upickle.core.LinkedHashMap
 
 import org.alephium.json.Json._
-import org.alephium.protocol.model.NetworkId
 
 object OpenAPIWriters extends EndpointsExamples {
 
@@ -33,7 +32,7 @@ object OpenAPIWriters extends EndpointsExamples {
   def openApiJson(
       openAPI: OpenAPI,
       dropAuth: Boolean,
-      networkId: NetworkId = NetworkId.AlephiumMainNet
+      truncateAddresses: Boolean // users could accidentally spend their own tokens
   ): String = {
     val newOpenAPI = if (dropAuth) {
       dropSecurityFields(openAPI)
@@ -45,14 +44,14 @@ object OpenAPIWriters extends EndpointsExamples {
         dropNullValues(writeJs(newOpenAPI)),
         indent = 2
       )
-    if (networkId == NetworkId.AlephiumMainNet) {
-      truncateAddresses(openApiJson)
+    if (truncateAddresses) {
+      truncateAddressesFromOpenApi(openApiJson)
     } else {
       openApiJson
     }
   }
 
-  private def truncateAddresses(openAPI: String): String = {
+  private def truncateAddressesFromOpenApi(openAPI: String): String = {
     openAPI.replaceAll(address.toBase58, address.toBase58.dropRight(2))
   }
 
