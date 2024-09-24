@@ -60,7 +60,9 @@ class RestServer(
 
   val endpointSender: EndpointSender = new EndpointSender(maybeApiKey)
 
-  private val swaggerUiRoute = SwaggerUI(openApiJson(openAPI, maybeApiKey.isEmpty)).map(route(_))
+  private val swaggerUiRoute = SwaggerUI(
+    openApiJson(openAPI, maybeApiKey.isEmpty, node.config.network.networkId)
+  ).map(route(_))
 
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(

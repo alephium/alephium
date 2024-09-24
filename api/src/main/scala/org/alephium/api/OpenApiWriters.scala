@@ -25,28 +25,38 @@ import sttp.apispec.openapi._
 import upickle.core.LinkedHashMap
 
 import org.alephium.json.Json._
+import org.alephium.protocol.model.NetworkId
 
 object OpenAPIWriters extends EndpointsExamples {
 
-  def openApiJson(openAPI: OpenAPI, dropAuth: Boolean): String = {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def openApiJson(
+      openAPI: OpenAPI,
+      dropAuth: Boolean,
+      networkId: NetworkId = NetworkId.AlephiumMainNet
+  ): String = {
     val newOpenAPI = if (dropAuth) {
       dropSecurityFields(openAPI)
     } else {
       openAPI
     }
-    cleanOpenAPIResult(
+    val openApiJson =
       write(
         dropNullValues(writeJs(newOpenAPI)),
         indent = 2
       )
-    )
+    if (networkId == NetworkId.AlephiumMainNet) {
+      truncateAddresses(openApiJson)
+    } else {
+      openApiJson
+    }
   }
 
-  private def cleanOpenAPIResult(openAPI: String): String = {
+  private def truncateAddresses(openAPI: String): String = {
     openAPI.replaceAll(address.toBase58, address.toBase58.dropRight(2))
   }
 
-  def dropSecurityFields(openAPI: OpenAPI): OpenAPI = {
+  private def dropSecurityFields(openAPI: OpenAPI): OpenAPI = {
     val components: Option[Components] =
       openAPI.components.map(_.copy(securitySchemes = ListMap.empty))
     val paths: Paths = openAPI.paths.copy(pathItems = openAPI.paths.pathItems.map {

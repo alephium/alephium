@@ -66,7 +66,9 @@ class WalletServer(
     getWalletLogic
   ).map(route(_))
 
-  lazy val docsRoute = SwaggerUI(openApiJson(walletOpenAPI, maybeApiKey.isEmpty)).map(route(_))
+  lazy val docsRoute = SwaggerUI(
+    openApiJson(walletOpenAPI, maybeApiKey.isEmpty)
+  ).map(route(_))
 }
 
 object WalletServer {
