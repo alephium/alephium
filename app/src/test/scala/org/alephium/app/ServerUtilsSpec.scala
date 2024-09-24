@@ -26,6 +26,7 @@ import org.scalacheck.Gen
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
@@ -1285,7 +1286,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           blockFlow,
           BuildDeployContractTx(
             Hex.unsafe(keyPair._2.toHexString),
-            bytecode = serialize(code) ++ ByteString(0, 0),
+            bytecode = serialize(Code(code, AVector.empty, AVector.empty)),
             initialAttoAlphAmount = Some(initialAttoAlphAmount)
           )
         )
@@ -2934,7 +2935,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         blockFlow,
         BuildDeployContractTx(
           Hex.unsafe(testPubKey.toHexString),
-          bytecode = serialize(code) ++ ByteString(0, 0),
+          bytecode = serialize(Code(code, AVector.empty, AVector.empty)),
           initialAttoAlphAmount = Some(Amount(ALPH.oneAlph))
         )
       )
@@ -3538,7 +3539,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
-      bytecode = serialize(contract) ++ ByteString(0, 0),
+      bytecode = serialize(Code(contract, AVector.empty, AVector.empty)),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       initialTokenAmounts = Some(AVector(Token(tokenId, U256.unsafe(4))))
     )
@@ -3556,7 +3557,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "deploy contract with token issuance" in new ContractDeploymentFixture {
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
-      bytecode = serialize(contract) ++ ByteString(0, 0),
+      bytecode = serialize(Code(contract, AVector.empty, AVector.empty)),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       issueTokenAmount = Some(Amount(U256.unsafe(10))),
       issueTokenTo = Some(Address.p2pkh(toPublicKey))
@@ -3583,7 +3584,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "fail when `issueTokenTo` is specified but `issueTokenAmount` is not" in new ContractDeploymentFixture {
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
-      bytecode = serialize(contract) ++ ByteString(0, 0),
+      bytecode = serialize(Code(contract, AVector.empty, AVector.empty)),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       issueTokenAmount = None,
       issueTokenTo = Some(Address.p2pkh(publicKey))

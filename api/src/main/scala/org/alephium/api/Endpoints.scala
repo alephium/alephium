@@ -250,7 +250,9 @@ trait Endpoints
       .in("rich-blocks")
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[RichBlockEntry])
-      .summary("Get a rich block with hash")
+      .summary(
+        "Get a block containing transactions with enriched input information, such as attoAlphAmount, tokens and address, when node indexes are enabled"
+      )
 
   lazy val getMainChainBlockByGhostUncle: BaseEndpoint[BlockHash, BlockEntry] =
     blockflowEndpoint.get
