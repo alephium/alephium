@@ -3659,10 +3659,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val transactions =
       block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
-    serverUtils.getRichBlock(blockFlow, block.hash).rightValue is RichBlockEntry
-      .from(block, 1, transactions)
-      .rightValue
-    serverUtils.getRichBlock(blockFlow, invalidBlockHash).leftValue.detail is
+    serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
+      RichBlockEntry
+        .from(block, 1, transactions)
+        .rightValue,
+      AVector.empty
+    )
+    serverUtils.getRichBlockAndEvents(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
     serverUtils.getRawBlock(blockFlow, block.hash).rightValue is RawBlock(serialize(block))
@@ -3829,15 +3832,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     val transactions =
       block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
     serverUtils
-      .getRichBlock(blockFlow, block.hash)
-      .rightValue is RichBlockEntry.from(block, 1, transactions).rightValue
+      .getRichBlockAndEvents(blockFlow, block.hash)
+      .rightValue is RichBlockAndEvents(
+      RichBlockEntry.from(block, 1, transactions).rightValue,
+      AVector.empty
+    )
   }
 
   it should "fail to find rich block when node.indexes.tx-output-ref-index is not enabled" in new TxOutputRefIndexFixture {
     override def enableTxOutputRefIndex: Boolean = false
 
     serverUtils
-      .getRichBlock(blockFlow, block.hash)
+      .getRichBlockAndEvents(blockFlow, block.hash)
       .leftValue
       .detail
       .contains(
@@ -3890,8 +3896,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooContract: String =
       s"""
          |Contract Foo() {
+         |  event Foo()
+         |
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
+         |    emit Foo()
          |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
          |  }
          |}
@@ -3942,6 +3951,17 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(richAssetInput),
       AVector(richContractInput)
     )
+
+    val richBlockAndEvents = {
+      val richTxs = scriptBlock.transactions
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx))
+        .rightValue
+      RichBlockAndEvents(
+        RichBlockEntry.from(scriptBlock, 3, richTxs).rightValue,
+        AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
+      )
+    }
+    serverUtils.getRichBlockAndEvents(blockFlow, scriptBlock.hash).rightValue is richBlockAndEvents
   }
 
   trait SubContractIndexesFixture extends Fixture {

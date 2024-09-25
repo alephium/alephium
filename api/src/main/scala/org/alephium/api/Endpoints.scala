@@ -245,13 +245,13 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
-  lazy val getRichBlock: BaseEndpoint[BlockHash, RichBlockEntry] =
+  lazy val getRichBlock: BaseEndpoint[BlockHash, RichBlockAndEvents] =
     blockflowEndpoint.get
       .in("rich-blocks")
       .in(path[BlockHash]("block_hash"))
-      .out(jsonBody[RichBlockEntry])
+      .out(jsonBody[RichBlockAndEvents])
       .summary(
-        "Get a block containing transactions with enriched input information, such as attoAlphAmount, tokens and address, when node indexes are enabled"
+        "Get a block containing transactions with enriched input information when node indexes are enabled, as well as the contract events."
       )
 
   lazy val getMainChainBlockByGhostUncle: BaseEndpoint[BlockHash, BlockEntry] =

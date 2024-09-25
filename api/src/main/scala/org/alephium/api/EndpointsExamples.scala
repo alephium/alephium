@@ -234,7 +234,8 @@ trait EndpointsExamples extends ErrorExamples {
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
-  private val blockAndEvents = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
+  private val blockAndEvents     = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
+  private val richBlockAndEvents = RichBlockAndEvents(richBlockEntry, AVector(eventByBlockHash))
 
   private val blockCandidate = BlockCandidate(
     fromGroup = 1,
@@ -420,6 +421,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val richBlockEntryExamples: List[Example[RichBlockEntry]] =
     simpleExample(richBlockEntry)
+
+  implicit val richBlockAndEventsExamples: List[Example[RichBlockAndEvents]] =
+    simpleExample(richBlockAndEvents)
 
   implicit val blockAndEventsExamples: List[Example[BlockAndEvents]] =
     simpleExample(blockAndEvents)

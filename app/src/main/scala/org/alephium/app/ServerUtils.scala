@@ -474,7 +474,7 @@ class ServerUtils(implicit
       blockEntry <- BlockEntry.from(block, height).left.map(failed)
     } yield blockEntry
 
-  def getRichBlock(blockFlow: BlockFlow, hash: BlockHash): Try[RichBlockEntry] =
+  def getRichBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[RichBlockAndEvents] =
     for {
       _ <- checkHashChainIndex(hash)
       block <- blockFlow
@@ -485,9 +485,10 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
-      blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
-    } yield blockEntry
+      transactions              <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
+      blockEntry                <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+      contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
+    } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
 
   private[app] def getRichTransaction(
       blockFlow: BlockFlow,

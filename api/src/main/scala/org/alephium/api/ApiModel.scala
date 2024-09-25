@@ -228,7 +228,8 @@ trait ApiModelCodec {
 
   implicit val richBlockEntryRW: RW[RichBlockEntry] = macroRW
 
-  implicit val blockAndEventsRW: RW[BlockAndEvents] = macroRW
+  implicit val blockAndEventsRW: RW[BlockAndEvents]         = macroRW
+  implicit val richBlockAndEventsRW: RW[RichBlockAndEvents] = macroRW
 
   implicit val blockHeaderEntryRW: RW[BlockHeaderEntry] = macroRW
 
