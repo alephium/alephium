@@ -32,6 +32,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
 import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
 
@@ -60,7 +61,10 @@ class RestServer(
 
   val endpointSender: EndpointSender = new EndpointSender(maybeApiKey)
 
-  private val swaggerUiRoute = SwaggerUI(openApiJson(openAPI, maybeApiKey.isEmpty)).map(route(_))
+  private val truncateAddresses = node.config.network.networkId == NetworkId.AlephiumMainNet
+  private val swaggerUiRoute = SwaggerUI(
+    openApiJson(openAPI, maybeApiKey.isEmpty, truncateAddresses)
+  ).map(route(_))
 
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(
