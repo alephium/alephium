@@ -18,41 +18,34 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.{Transaction, TransactionId}
+import org.alephium.protocol.model.Transaction
 import org.alephium.serde._
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.AVector
 
 final case class RichTransaction(
-    txId: TransactionId,
-    version: Byte,
-    networkId: Byte,
-    scriptOpt: Option[Script],
-    gasAmount: Int,
-    gasPrice: U256,
-    inputs: AVector[RichInput],
-    outputs: AVector[Output],
+    unsigned: RichUnsignedTx,
     scriptExecutionOk: Boolean,
+    contractInputs: AVector[RichContractInput],
+    generatedOutputs: AVector[Output],
     inputSignatures: AVector[ByteString],
     scriptSignatures: AVector[ByteString]
 )
 
 object RichTransaction {
-  def from(transaction: Transaction, inputs: AVector[RichInput]): RichTransaction = {
-    val txId = transaction.unsigned.id
-    val outputs = transaction.allOutputs.zipWithIndex.map { case (out, index) =>
-      Output.from(out, txId, index)
-    }
+  def from(
+      transaction: Transaction,
+      assetInputs: AVector[RichAssetInput],
+      contractInputs: AVector[RichContractInput]
+  ): RichTransaction = {
+    val richUnsigned = RichUnsignedTx.fromProtocol(transaction.unsigned, assetInputs)
 
     RichTransaction(
-      txId = transaction.id,
-      version = transaction.unsigned.version,
-      networkId = transaction.unsigned.networkId.id,
-      scriptOpt = transaction.unsigned.scriptOpt.map(Script.fromProtocol),
-      gasAmount = transaction.unsigned.gasAmount.value,
-      gasPrice = transaction.unsigned.gasPrice.value,
-      inputs = inputs,
-      outputs = outputs,
+      unsigned = richUnsigned,
       scriptExecutionOk = transaction.scriptExecutionOk,
+      contractInputs = contractInputs,
+      transaction.generatedOutputs.zipWithIndex.map { case (out, index) =>
+        Output.from(out, transaction.unsigned.id, index + transaction.unsigned.fixedOutputs.length)
+      },
       inputSignatures = transaction.inputSignatures.map(sig => serialize(sig)),
       scriptSignatures = transaction.scriptSignatures.map(sig => serialize(sig))
     )

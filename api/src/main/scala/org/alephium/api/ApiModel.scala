@@ -215,6 +215,7 @@ trait ApiModelCodec {
   implicit val richContractInputRW: RW[RichContractInput] = macroRW
   implicit val richInputRW: RW[RichInput]                 = macroRW
 
+  implicit val richUnsignedTxRW: RW[RichUnsignedTx]   = macroRW
   implicit val richTransactionRW: RW[RichTransaction] = macroRW
 
   implicit val rawTransactionRW: RW[RawTransaction] = macroRW

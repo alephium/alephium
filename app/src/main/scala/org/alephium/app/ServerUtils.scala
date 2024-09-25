@@ -497,8 +497,7 @@ class ServerUtils(implicit
       assetInputs    <- getRichAssetInputs(blockFlow, transaction)
       contractInputs <- getRichContractInputs(blockFlow, transaction)
     } yield {
-      val inputs = assetInputs.as[RichInput] ++ contractInputs.as[RichInput]
-      RichTransaction.from(transaction, inputs)
+      RichTransaction.from(transaction, assetInputs, contractInputs)
     }
   }
 

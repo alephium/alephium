@@ -185,24 +185,28 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   private lazy val richTransaction = RichTransaction(
-    txId = unsignedTx.txId,
-    version = unsignedTx.version,
-    networkId = unsignedTx.networkId,
-    scriptOpt = transaction.unsigned.scriptOpt,
-    gasAmount = unsignedTx.gasAmount,
-    gasPrice = unsignedTx.gasPrice,
-    inputs = AVector(
-      RichAssetInput(
-        hint = outputRef.hint,
-        key = outputRef.key,
-        unlockScript = unlockupScriptBytes,
-        attoAlphAmount = Amount(ALPH.oneAlph),
-        address = Address.from(lockupScript),
-        tokens
-      )
+    unsigned = RichUnsignedTx(
+      txId = unsignedTx.txId,
+      version = unsignedTx.version,
+      networkId = unsignedTx.networkId,
+      scriptOpt = transaction.unsigned.scriptOpt,
+      gasAmount = unsignedTx.gasAmount,
+      gasPrice = unsignedTx.gasPrice,
+      inputs = AVector(
+        RichAssetInput(
+          hint = outputRef.hint,
+          key = outputRef.key,
+          unlockScript = unlockupScriptBytes,
+          attoAlphAmount = Amount(ALPH.oneAlph),
+          address = Address.from(lockupScript),
+          tokens
+        )
+      ),
+      fixedOutputs = AVector(outputAsset)
     ),
-    outputs = AVector(outputAsset.upCast(), outputContract),
     scriptExecutionOk = true,
+    contractInputs = AVector.empty,
+    generatedOutputs = AVector(outputContract),
     AVector(signature.bytes),
     AVector(signature.bytes)
   )

@@ -3876,7 +3876,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getRichTransaction(blockFlow, transaction).rightValue is RichTransaction.from(
       transaction,
-      AVector(richInput)
+      AVector(richInput),
+      AVector.empty
     )
   }
 
@@ -3938,7 +3939,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getRichTransaction(blockFlow, scriptTransaction).rightValue is RichTransaction.from(
       scriptTransaction,
-      AVector(richAssetInput, richContractInput)
+      AVector(richAssetInput),
+      AVector(richContractInput)
     )
   }
 
