@@ -183,6 +183,8 @@ trait ApiModelCodec {
   implicit val blocksPerTimeStampRangeRW: RW[BlocksPerTimeStampRange] = macroRW
 
   implicit val blocksAndEventsPerTimeStampRangeRW: RW[BlocksAndEventsPerTimeStampRange] = macroRW
+  implicit val richBlocksAndEventsPerTimeStampRangeRW: RW[RichBlocksAndEventsPerTimeStampRange] =
+    macroRW
 
   implicit val mempoolTransactionsRW: RW[MempoolTransactions] = macroRW
 

@@ -413,6 +413,10 @@ trait EndpointsExamples extends ErrorExamples {
       : List[Example[BlocksAndEventsPerTimeStampRange]] =
     simpleExample(BlocksAndEventsPerTimeStampRange(AVector(AVector(blockAndEvents))))
 
+  implicit val richBlocksAndEventsPerTimeStampRangeExamples
+      : List[Example[RichBlocksAndEventsPerTimeStampRange]] =
+    simpleExample(RichBlocksAndEventsPerTimeStampRange(AVector(AVector(richBlockAndEvents))))
+
   implicit val mempoolTransactionsExamples: List[Example[AVector[MempoolTransactions]]] =
     simpleExample(AVector(MempoolTransactions(0, 1, AVector(transactionTemplate))))
 

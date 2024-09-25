@@ -95,6 +95,26 @@ class ServerUtils(implicit
     }
   }
 
+  def getRichBlocksAndEvents(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval
+  ): Try[RichBlocksAndEventsPerTimeStampRange] = {
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          for {
+            transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
+            blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+            events       <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+          } yield {
+            RichBlockAndEvents(blockEntry, events.events)
+          }
+
+        })
+        .map(RichBlocksAndEventsPerTimeStampRange)
+    }
+  }
+
   def averageHashRate(blockFlow: BlockFlow, timeInterval: TimeInterval)(implicit
       groupConfig: GroupConfig
   ): Try[HashRateResponse] = {
