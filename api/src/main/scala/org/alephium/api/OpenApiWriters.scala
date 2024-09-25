@@ -32,7 +32,7 @@ object OpenAPIWriters extends EndpointsExamples {
   def openApiJson(
       openAPI: OpenAPI,
       dropAuth: Boolean,
-      truncateAddresses: Boolean // users could accidentally spend their own tokens
+      truncateAddresses: Boolean // users could accidentally spend their mainnet tokens
   ): String = {
     val newOpenAPI = if (dropAuth) {
       dropSecurityFields(openAPI)
