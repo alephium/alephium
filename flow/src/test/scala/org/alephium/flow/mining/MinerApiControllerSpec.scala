@@ -26,8 +26,8 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
-import org.alephium.protocol.model.{ChainIndex, Target}
-import org.alephium.serde.serialize
+import org.alephium.protocol.model.{Block, ChainIndex, Target}
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AVector, SocketUtil}
 
 class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
@@ -129,10 +129,13 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     }
   }
   it should "error when the mined block has invalid chain index" in new SubmissionFixture {
-    val newBlock     = block.copy(header = block.header.copy(target = Target.Zero))
-    val newBlockBlob = serialize(newBlock.copy(transactions = AVector.empty))
+    val newBlock      = block.copy(header = block.header.copy(target = Target.Zero))
+    val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
+    val newChainIndex = deserialize[Block](newBlockBlob).rightValue.chainIndex
+    val invalidChainIndex =
+      ChainIndex.unsafe((newChainIndex.flattenIndex + 1) % brokerConfig.chainNum)
     val newTemplate =
-      BlockFlowTemplate.from(newBlock, blockHeight).copy(index = ChainIndex.unsafe(1, 1))
+      BlockFlowTemplate.from(newBlock, blockHeight).copy(index = invalidChainIndex)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
     minerApiController.underlyingActor.jobCache
       .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
