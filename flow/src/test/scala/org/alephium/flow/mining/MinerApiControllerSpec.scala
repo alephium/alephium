@@ -128,6 +128,28 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       )
     }
   }
+  it should "error when the mined block has invalid chain index" in new SubmissionFixture {
+    val newBlock     = block.copy(header = block.header.copy(target = Target.Zero))
+    val newBlockBlob = serialize(newBlock.copy(transactions = AVector.empty))
+    val newTemplate =
+      BlockFlowTemplate.from(newBlock, blockHeight).copy(index = ChainIndex.unsafe(1, 1))
+    val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
+    minerApiController.underlyingActor.jobCache
+      .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
+
+    expectErrorMsg("The mined block has invalid chainindex:") {
+      connection0 ! Tcp.Write(
+        ClientMessage.serialize(ClientMessage.from(SubmitBlock(newBlockBlob)))
+      )
+    }
+
+    probe0.expectMsgPF() { case Tcp.Received(data) =>
+      val chainIndex = newBlock.chainIndex
+      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
+      )
+    }
+  }
 
   it should "error when the mined block has invalid work" in new SubmissionFixture {
     val newBlock      = block.copy(header = block.header.copy(target = Target.Zero))
