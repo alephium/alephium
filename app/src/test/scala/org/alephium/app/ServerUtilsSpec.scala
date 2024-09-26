@@ -3877,7 +3877,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val richInput = {
       transaction.unsigned.inputs.length is 1
       val input = transaction.unsigned.inputs.head
-      RichInput.from(input, outputToBeSpent)
+      RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput])
     }
 
     serverUtils.getRichTransaction(blockFlow, transaction).rightValue is RichTransaction.from(
@@ -3938,12 +3938,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     val richAssetInput = {
       scriptTransaction.unsigned.inputs.length is 1
       val input = scriptTransaction.unsigned.inputs.head
-      RichInput.from(input, assetOutputToBeSpent)
+      RichInput.from(input, assetOutputToBeSpent.asInstanceOf[model.AssetOutput])
     }
     val richContractInput = {
       scriptTransaction.contractInputs.length is 1
       val input = scriptTransaction.contractInputs.head
-      RichInput.from(input, contractOutputToBeSpent)
+      RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput])
     }
 
     serverUtils.getRichTransaction(blockFlow, scriptTransaction).rightValue is RichTransaction.from(

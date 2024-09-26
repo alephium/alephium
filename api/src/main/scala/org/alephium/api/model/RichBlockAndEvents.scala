@@ -19,6 +19,6 @@ package org.alephium.api.model
 import org.alephium.util.AVector
 
 final case class RichBlockAndEvents(
-  block: RichBlockEntry,
-  events: AVector[ContractEventByBlockHash]
+    block: RichBlockEntry,
+    events: AVector[ContractEventByBlockHash]
 )

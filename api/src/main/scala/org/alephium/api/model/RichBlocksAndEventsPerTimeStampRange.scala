@@ -19,5 +19,5 @@ package org.alephium.api.model
 import org.alephium.util.AVector
 
 final case class RichBlocksAndEventsPerTimeStampRange(
-  blocksAndEvents: AVector[AVector[RichBlockAndEvents]]
+    blocksAndEvents: AVector[AVector[RichBlockAndEvents]]
 )

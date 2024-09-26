@@ -19,7 +19,7 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, TxInput, TxOutput, TxOutputRef}
+import org.alephium.protocol.model.{Address, AssetOutput, ContractOutput, TxInput, TxOutputRef}
 import org.alephium.serde.serialize
 import org.alephium.util.AVector
 
@@ -37,7 +37,7 @@ final case class RichAssetInput(
     key: Hash,
     unlockScript: ByteString,
     attoAlphAmount: Amount,
-    address: Address,
+    address: Address.Asset,
     tokens: AVector[Token]
 ) extends RichInput
 
@@ -46,28 +46,28 @@ final case class RichContractInput(
     hint: Int,
     key: Hash,
     attoAlphAmount: Amount,
-    address: Address,
+    address: Address.Contract,
     tokens: AVector[Token]
 ) extends RichInput
 
 object RichInput {
-  def from(assetInput: TxInput, txOutput: TxOutput): RichAssetInput = {
+  def from(assetInput: TxInput, txOutput: AssetOutput): RichAssetInput = {
     RichAssetInput(
       hint = assetInput.outputRef.hint.value,
       key = assetInput.outputRef.key.value,
       unlockScript = serialize(assetInput.unlockScript),
       attoAlphAmount = Amount(txOutput.amount),
-      address = Address.from(txOutput.lockupScript),
+      address = Address.Asset(txOutput.lockupScript),
       tokens = txOutput.tokens.map(Token.tupled.apply)
     )
   }
 
-  def from(contractOutputRef: TxOutputRef, txOutput: TxOutput): RichContractInput = {
+  def from(contractOutputRef: TxOutputRef, txOutput: ContractOutput): RichContractInput = {
     RichContractInput(
       hint = contractOutputRef.hint.value,
       key = contractOutputRef.key.value,
       attoAlphAmount = Amount(txOutput.amount),
-      address = Address.from(txOutput.lockupScript),
+      address = Address.Contract(txOutput.lockupScript),
       tokens = txOutput.tokens.map(Token.tupled.apply)
     )
   }

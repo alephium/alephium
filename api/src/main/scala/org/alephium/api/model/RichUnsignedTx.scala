@@ -38,7 +38,7 @@ final case class RichUnsignedTx(
       scriptOpt,
       gasAmount,
       gasPrice,
-      inputs.map(input => (AssetInput(OutputRef(input.hint, input.key), input.unlockScript))),
+      inputs.map(input => AssetInput(OutputRef(input.hint, input.key), input.unlockScript)),
       fixedOutputs
     )
     unsignedTx.toProtocol()
@@ -47,8 +47,8 @@ final case class RichUnsignedTx(
 
 object RichUnsignedTx {
   def fromProtocol(
-    unsignedTx: UnsignedTransaction,
-    inputs: AVector[RichAssetInput]
+      unsignedTx: UnsignedTransaction,
+      inputs: AVector[RichAssetInput]
   ): RichUnsignedTx = {
     RichUnsignedTx(
       unsignedTx.id,

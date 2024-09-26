@@ -198,7 +198,7 @@ trait EndpointsExamples extends ErrorExamples {
           key = outputRef.key,
           unlockScript = unlockupScriptBytes,
           attoAlphAmount = Amount(ALPH.oneAlph),
-          address = Address.from(lockupScript),
+          address = Address.Asset(lockupScript),
           tokens
         )
       ),

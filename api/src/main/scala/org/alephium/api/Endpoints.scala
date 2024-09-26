@@ -245,7 +245,8 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
-  lazy val getRichBlocksAndEvents: BaseEndpoint[TimeInterval, RichBlocksAndEventsPerTimeStampRange] =
+  lazy val getRichBlocksAndEvents
+      : BaseEndpoint[TimeInterval, RichBlocksAndEventsPerTimeStampRange] =
     blockflowEndpoint.get
       .in("rich-blocks-with-events")
       .in(timeIntervalQuery)

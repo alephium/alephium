@@ -37,7 +37,7 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.ralph.Compiler
@@ -522,6 +522,7 @@ class ServerUtils(implicit
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[app] def getRichContractInputs(
       blockFlow: BlockFlow,
       transaction: Transaction
@@ -531,7 +532,7 @@ class ServerUtils(implicit
         txOutputOpt <- getTxOutput(blockFlow, contractOutputRef)
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
-            Right(RichInput.from(contractOutputRef, txOutput))
+            Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
           case None =>
             Left(notFound(s"Transaction output for contract output reference ${contractOutputRef}"))
         }
@@ -539,6 +540,7 @@ class ServerUtils(implicit
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[app] def getRichAssetInputs(
       blockFlow: BlockFlow,
       transaction: Transaction
@@ -548,7 +550,7 @@ class ServerUtils(implicit
         txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef)
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
-            Right(RichInput.from(assetInput, txOutput))
+            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
           case None =>
             Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
         }
