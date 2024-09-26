@@ -29,6 +29,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network._
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
@@ -529,7 +530,7 @@ object SyncState {
       val chainIndex: ChainIndex,
       val bestTip: ChainTip
   ) extends LazyLogging {
-    private[sync] var nextFromHeight                        = 0
+    private[sync] var nextFromHeight                        = ALPH.GenesisHeight
     private[sync] var skeletonHeights: Option[AVector[Int]] = None
     private[sync] val taskIds                               = mutable.SortedSet.empty[TaskId]
     private[sync] val taskQueue                             = mutable.Queue.empty[BlockDownloadTask]
@@ -632,6 +633,7 @@ object SyncState {
     def tryMoveOn(): Option[AVector[Int]] = {
       val queueSize = bufferedBlocks.size * BatchSize
       if (
+        nextFromHeight > ALPH.GenesisHeight && // We don't know the common ancestor height yet
         nextFromHeight <= bestTip.height &&
         skeletonHeights.isEmpty &&
         taskQueue.isEmpty &&

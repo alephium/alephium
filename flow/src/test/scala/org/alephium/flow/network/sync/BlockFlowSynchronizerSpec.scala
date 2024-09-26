@@ -256,6 +256,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import SyncState._
 
     val state = newState(100)
+    state.tryMoveOn() is None
+
     state.nextFromHeight = state.bestTip.height + 1
     state.tryMoveOn() is None
     state.nextFromHeight = 1
