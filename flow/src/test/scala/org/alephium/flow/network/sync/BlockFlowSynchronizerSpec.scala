@@ -26,7 +26,7 @@ import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.message.ProtocolV1
-import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, ChainIndex}
+import org.alephium.protocol.model.{BlockGenerators, BlockHash, ChainIndex}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
 class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
@@ -174,20 +174,29 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle downloaded blocks" in new SyncStatePerChainFixture {
     import SyncState._
 
-    val state  = newState()
-    val taskId = TaskId(1, 4)
-    val blocks = AVector.fill(4)(emptyBlock(blockFlow, chainIndex))
+    val state      = newState()
+    val taskId0    = TaskId(1, 4)
+    val taskId1    = TaskId(5, 8)
+    val blocks0    = AVector.fill(4)(emptyBlock(blockFlow, chainIndex))
+    val blocks1    = AVector.fill(4)(emptyBlock(blockFlow, chainIndex))
+    val fromBroker = (state.originBroker, brokerInfo)
     state.taskIds.isEmpty is true
 
-    state.bufferedBlocks.isEmpty is true
-    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId, blocks)
-    state.bufferedBlocks.isEmpty is true
+    state.downloadedBlocks.isEmpty is true
+    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId0, blocks0)
+    state.downloadedBlocks.isEmpty is true
 
-    state.taskIds.addOne(taskId)
-    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId, blocks)
-    state.bufferedBlocks.toSeq is Seq(
-      (taskId, DownloadedBlocks(state.originBroker, brokerInfo, blocks))
-    )
+    state.taskIds.addAll(Seq(taskId0, taskId1))
+    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId1, blocks1)
+    state.taskIds.size is 2
+    state.downloadedBlocks.size is 1
+    state.blockQueue.isEmpty is true
+
+    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId0, blocks0)
+    state.taskIds.isEmpty is true
+    state.downloadedBlocks.isEmpty is true
+    val downloadedBlocks = (blocks0 ++ blocks1).map(b => (b.hash, DownloadedBlock(b, fromBroker)))
+    state.blockQueue.toSeq is Seq.from(downloadedBlocks)
   }
 
   it should "put back tasks to the queue" in new SyncStatePerChainFixture {
@@ -206,53 +215,72 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     AVector.from(state.taskQueue) is AVector(tasks(2), tasks(0))
   }
 
-  it should "handle buffered blocks" in new SyncStatePerChainFixture {
-    import BrokerStatusTracker.BrokerActor
+  it should "try to validate more blocks" in new SyncStatePerChainFixture with BlockGenerators {
     import SyncState._
 
     val state = newState()
-    val acc   = mutable.HashMap.empty[(BrokerActor, BrokerInfo), mutable.ArrayBuffer[Block]]
+    val acc   = mutable.ArrayBuffer.empty[DownloadedBlock]
 
-    def addBlocks(taskId: TaskId, downloadedBlocks: DownloadedBlocks): Unit = {
-      state.bufferedBlocks.clear()
-      state.bufferedBlocks(taskId) = downloadedBlocks
-      state.taskIds.clear()
-      state.taskIds.addOne(taskId)
-    }
-
-    state.bufferedBlocks.isEmpty is true
-    state.handleBufferedBlocks(70, acc)
+    state.downloadedBlocks.isEmpty is true
+    state.blockQueue.isEmpty is true
+    state.tryValidateMoreBlocks(acc)
     acc.isEmpty is true
 
-    val taskId0          = TaskId(51, 100)
-    val taskId1          = TaskId(101, 150)
-    val blocks           = AVector.fill(2)(emptyBlock(blockFlow, chainIndex))
-    val downloadedBlocks = DownloadedBlocks(originBroker, brokerInfo, blocks)
-    state.bufferedBlocks(taskId1) = downloadedBlocks
-    state.taskIds.addOne(taskId0)
-    state.handleBufferedBlocks(70, acc)
-    acc.isEmpty is true
-    state.bufferedBlocks.clear()
+    val taskId0           = TaskId(51, 100)
+    val taskId1           = TaskId(101, 140)
+    val blocks0           = AVector.fill(50)(blockGen(chainIndex).sample.get)
+    val blocks1           = AVector.fill(40)(blockGen(chainIndex).sample.get)
+    val fromBroker        = (state.originBroker, brokerInfo)
+    val downloadedBlocks0 = blocks0.map(b => DownloadedBlock(b, fromBroker))
+    val downloadedBlocks1 = blocks1.map(b => DownloadedBlock(b, fromBroker))
+    state.taskIds.addAll(Seq(taskId0, taskId1))
 
-    AVector(26, 50, 70, 120).foreach { tipHeight =>
-      addBlocks(taskId0, downloadedBlocks)
-      state.handleBufferedBlocks(tipHeight, acc)
-      acc((originBroker, brokerInfo)) is mutable.ArrayBuffer.from(blocks)
-      state.taskIds.isEmpty is true
-      state.bufferedBlocks.isEmpty is true
-      acc.clear()
-    }
+    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId0, blocks0)
+    state.tryValidateMoreBlocks(acc)
+    acc.toSeq is Seq.from(downloadedBlocks0)
+    state.validating.size is acc.length
 
-    AVector(1, 25).foreach { tipHeight =>
-      addBlocks(taskId0, downloadedBlocks)
-      state.handleBufferedBlocks(tipHeight, acc)
-      acc.isEmpty is true
-      state.taskIds.isEmpty is false
-      state.bufferedBlocks.isEmpty is false
-    }
+    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId1, blocks1)
+    state.tryValidateMoreBlocks(acc)
+    acc.toSeq is Seq.from(downloadedBlocks0)
+    state.validating.size is acc.length
+
+    blocks0.foreach(b => state.handleFinalizedBlock(b.hash))
+    state.tryValidateMoreBlocks(acc)
+    acc.toSeq is Seq.from(downloadedBlocks0 ++ downloadedBlocks1)
+    state.validating.size is blocks1.length
   }
 
-  it should "try move on" in new SyncStatePerChainFixture {
+  it should "remove finalized blocks" in new SyncStatePerChainFixture {
+    import SyncState._
+
+    val state            = newState()
+    val taskId           = TaskId(51, 100)
+    val blocks           = AVector.fill(2)(emptyBlock(blockFlow, chainIndex))
+    val fromBroker       = (state.originBroker, brokerInfo)
+    val downloadedBlocks = blocks.map(b => DownloadedBlock(b, fromBroker))
+    state.taskIds.addOne(taskId)
+
+    state.onBlockDownloaded(state.originBroker, brokerInfo, taskId, blocks)
+    state.blockQueue.size is downloadedBlocks.length
+
+    state.tryValidateMoreBlocks(mutable.ArrayBuffer.empty)
+    state.validating.size is downloadedBlocks.length
+    state.blockQueue.size is downloadedBlocks.length
+
+    blocks.foreach { block =>
+      state.validating.contains(block.hash) is true
+      state.blockQueue.contains(block.hash) is true
+      state.handleFinalizedBlock(block.hash)
+      state.validating.contains(block.hash) is false
+      state.blockQueue.contains(block.hash) is false
+    }
+
+    state.validating.isEmpty is true
+    state.blockQueue.isEmpty is true
+  }
+
+  it should "try move on" in new SyncStatePerChainFixture with BlockGenerators {
     import SyncState._
 
     val state = newState(100)
@@ -270,23 +298,23 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     state.tryMoveOn() is None
     state.nextTask(_ => true)
 
-    val taskIds = (0 to SkeletonSize / 2).map { index =>
-      val taskId     = TaskId(index * BatchSize + 1, index * (BatchSize + 1))
-      val downloaded = DownloadedBlocks(originBroker, brokerInfo, AVector.empty)
-      state.bufferedBlocks.addOne((taskId, downloaded))
-      taskId
+    val fromBroker = (state.originBroker, brokerInfo)
+    (0 to MaxQueueSize / 2).foreach { _ =>
+      val block = blockGen(chainIndex).sample.get
+      state.blockQueue.addOne((block.hash, DownloadedBlock(block, fromBroker)))
     }
     state.tryMoveOn() is None
-    state.bufferedBlocks.remove(taskIds.last)
+    state.blockQueue.remove(state.blockQueue.head._1)
     state.tryMoveOn() is Some(AVector(50, 100))
     state.nextFromHeight is 101
     state.skeletonHeights is Some(AVector(50, 100))
 
     state.nextFromHeight = 1
     state.skeletonHeights = None
-    state.taskIds.addAll(taskIds)
+    val taskId = TaskId(50, 100)
+    state.taskIds.addOne(taskId)
     state.tryMoveOn() is None
-    state.taskIds.remove(taskIds.last)
+    state.downloadedBlocks.addOne((taskId, AVector.empty))
     state.tryMoveOn() is Some(AVector(50, 100))
     state.nextFromHeight is 101
     state.skeletonHeights is Some(AVector(50, 100))

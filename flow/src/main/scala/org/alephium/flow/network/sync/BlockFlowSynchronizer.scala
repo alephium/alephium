@@ -86,7 +86,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
   def common: Receive = {
     case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, protocolVersion) =>
       addBroker(broker, remoteBrokerInfo, protocolVersion)
-    case BlockFinalized(hash)    => finalized(hash)
+    case BlockFinalized(hash) =>
+      finalized(hash)
+      onBlockFinalized(hash)
     case CleanDownloading        => cleanupSyncing(networkSetting.syncExpiryPeriod)
     case BlockAnnouncement(hash) => handleBlockAnnouncement(hash)
   }
@@ -182,7 +184,19 @@ trait SyncState { _: BlockFlowSynchronizer =>
   ): Unit = {
     val broker: BrokerActor = ActorRefT(sender())
     getBrokerStatus(broker).foreach(handleBlockDownloaded(broker, _, result))
+    tryValidateMoreBlocks()
     downloadBlocks()
+  }
+
+  private def tryValidateMoreBlocks(): Unit = {
+    val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
+    syncingChains.foreach(_._2.tryValidateMoreBlocks(acc))
+    acc.groupBy(_.from).foreach { case (from, blocks) =>
+      val dataOrigin = DataOrigin.InterClique(from._2)
+      val addFlowData =
+        DependencyHandler.AddFlowData(AVector.from(blocks.map(_.block)), dataOrigin)
+      allHandlers.dependencyHandler.tell(addFlowData, from._1.ref)
+    }
   }
 
   private def clearMissedBlocks(chainIndex: ChainIndex): Unit = {
@@ -258,20 +272,15 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   def handleSelfChainState(selfChainTips: AVector[ChainTip]): Unit = {
     this.selfChainTips = Some(selfChainTips)
-    if (!isSyncing) {
-      tryStartSync()
-    } else {
-      val blocks = mutable.HashMap.empty[(BrokerActor, BrokerInfo), mutable.ArrayBuffer[Block]]
-      syncingChains.foreach { case (chainIndex, state) =>
-        val selfTip = getSelfTip(chainIndex)
-        state.handleBufferedBlocks(selfTip.height, blocks)
-      }
-      // TODO: send all blocks in one message
-      blocks.foreach { case ((broker, info), blocksPerBroker) =>
-        val dataOrigin  = DataOrigin.InterClique(info)
-        val addFlowData = DependencyHandler.AddFlowData(AVector.from(blocksPerBroker), dataOrigin)
-        allHandlers.dependencyHandler.tell(addFlowData, broker.ref)
-      }
+    if (!isSyncing) tryStartSync()
+  }
+
+  // TODO: what should we do if the block is invalid?
+  def onBlockFinalized(hash: BlockHash): Unit = {
+    if (isSyncing) {
+      val chainIndex = ChainIndex.from(hash)
+      syncingChains.get(chainIndex).foreach(_.handleFinalizedBlock(hash))
+      tryValidateMoreBlocks()
       if (isSynced) {
         resync()
       } else {
@@ -439,7 +448,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  // TODO: When a node is banned due to sending invalid flow data, we also need to resync
   def onBrokerTerminated(broker: BrokerActor): Unit = {
     val status = getBrokerStatus(broker)
     removeBroker(broker)
@@ -521,9 +529,7 @@ object SyncState {
     tasks.mkString(", ")
   }
 
-  final case class DownloadedBlocks(from: BrokerActor, info: BrokerInfo, blocks: AVector[Block]) {
-    def length: Int = blocks.length
-  }
+  final case class DownloadedBlock(block: Block, from: (BrokerActor, BrokerInfo))
 
   final class SyncStatePerChain(
       val originBroker: BrokerActor,
@@ -534,7 +540,13 @@ object SyncState {
     private[sync] var skeletonHeights: Option[AVector[Int]] = None
     private[sync] val taskIds                               = mutable.SortedSet.empty[TaskId]
     private[sync] val taskQueue                             = mutable.Queue.empty[BlockDownloadTask]
-    private[sync] val bufferedBlocks = mutable.SortedMap.empty[TaskId, DownloadedBlocks]
+
+    // Although we download blocks in order of height, the blocks we receive
+    // may not be sorted by height. `downloadedBlocks` is used to sort the
+    // downloaded blocks by height and place them into the `blockQueue`
+    private[sync] val downloadedBlocks = mutable.SortedMap.empty[TaskId, AVector[DownloadedBlock]]
+    private[sync] val blockQueue       = mutable.LinkedHashMap.empty[BlockHash, DownloadedBlock]
+    private[sync] var validating       = mutable.Set.empty[BlockHash]
 
     private def addNewTask(task: BlockDownloadTask): Unit = {
       taskIds.addOne(task.id)
@@ -598,40 +610,49 @@ object SyncState {
     ): Unit = {
       if (taskIds.contains(taskId)) {
         logger.debug(s"Add the downloaded blocks $taskId to the buffer, chain index: $chainIndex")
-        bufferedBlocks.addOne((taskId, DownloadedBlocks(from, info, blocks)))
+        val fromBroker = (from, info)
+        downloadedBlocks.addOne((taskId, blocks.map(b => DownloadedBlock(b, fromBroker))))
+        moveToBlockQueue()
       }
     }
 
-    def isSkeletonFilled: Boolean = taskIds.forall(bufferedBlocks.contains)
-
-    def handleBufferedBlocks(
-        selfTipHeight: Int,
-        acc: mutable.HashMap[(BrokerActor, BrokerInfo), mutable.ArrayBuffer[Block]]
-    ): Unit = {
-      bufferedBlocks.headOption.foreach { case (id, buffered) =>
-        logger.debug(
-          s"Tip height: $selfTipHeight, downloaded blocks: $id, chain index: $chainIndex"
-        )
-        val sendBlocks = taskIds.headOption.contains(id) && {
-          // When the node is on a fork chain, the tip height may be greater than the latest downloaded height
-          val isOnForkChain  = selfTipHeight >= id.from
-          val isClosedEnough = selfTipHeight < id.from && (selfTipHeight + BatchSize / 2) >= id.from
-          isOnForkChain || isClosedEnough
-        }
-        if (sendBlocks) {
-          logger.debug(
-            s"Trying to add blocks $id to the blockflow, block size: ${buffered.length}, chain index: $chainIndex"
-          )
-          addToMap(acc, (buffered.from, buffered.info), buffered.blocks.toIterable)
-          bufferedBlocks.remove(id)
-          taskIds.remove(id)
-          ()
-        }
+    @scala.annotation.tailrec
+    private def moveToBlockQueue(): Unit = {
+      downloadedBlocks.headOption match {
+        case Some((taskId, blocks)) if taskIds.headOption.contains(taskId) =>
+          blockQueue.addAll(blocks.map(b => (b.block.hash, b)))
+          taskIds.remove(taskId)
+          downloadedBlocks.remove(taskId)
+          moveToBlockQueue()
+        case _ => ()
       }
+    }
+
+    def tryValidateMoreBlocks(acc: mutable.ArrayBuffer[DownloadedBlock]): Unit = {
+      if (validating.size < BatchSize && blockQueue.nonEmpty) {
+        val selected = blockQueue.view
+          .filterNot(v => validating.contains(v._1))
+          .take(BatchSize)
+          .map(_._2)
+          .toSeq
+        logger.debug(
+          s"Sending more blocks for validation: ${selected.size}, chain index: $chainIndex"
+        )
+        validating.addAll(selected.map(_.block.hash))
+        acc.addAll(selected)
+      }
+    }
+
+    def isSkeletonFilled: Boolean = taskIds.forall(downloadedBlocks.contains)
+
+    def handleFinalizedBlock(hash: BlockHash): Unit = {
+      blockQueue.remove(hash)
+      validating.remove(hash)
+      ()
     }
 
     def tryMoveOn(): Option[AVector[Int]] = {
-      val queueSize = bufferedBlocks.size * BatchSize
+      val queueSize = blockQueue.size
       if (
         nextFromHeight > ALPH.GenesisHeight && // We don't know the common ancestor height yet
         nextFromHeight <= bestTip.height &&
