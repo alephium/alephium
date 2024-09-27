@@ -248,7 +248,7 @@ trait Endpoints
   lazy val getRichBlocksAndEvents
       : BaseEndpoint[TimeInterval, RichBlocksAndEventsPerTimeStampRange] =
     blockflowEndpoint.get
-      .in("rich-blocks-with-events")
+      .in("rich-blocks")
       .in(timeIntervalQuery)
       .out(jsonBody[RichBlocksAndEventsPerTimeStampRange])
       .summary(
@@ -257,7 +257,7 @@ trait Endpoints
 
   lazy val getRichBlockAndEvents: BaseEndpoint[BlockHash, RichBlockAndEvents] =
     blockflowEndpoint.get
-      .in("rich-blocks-with-events")
+      .in("rich-blocks")
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[RichBlockAndEvents])
       .summary(

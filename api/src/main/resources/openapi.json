@@ -3935,13 +3935,13 @@
         }
       }
     },
-    "/blockflow/rich-blocks-with-events": {
+    "/blockflow/rich-blocks": {
       "get": {
         "tags": [
           "Blockflow"
         ],
         "summary": "Given a time interval, list blocks containing events and transactions with enriched input information when node indexes are enabled.",
-        "operationId": "getBlockflowRich-blocks-with-events",
+        "operationId": "getBlockflowRich-blocks",
         "parameters": [
           {
             "name": "fromTs",
@@ -4817,13 +4817,13 @@
         }
       }
     },
-    "/blockflow/rich-blocks-with-events/{block_hash}": {
+    "/blockflow/rich-blocks/{block_hash}": {
       "get": {
         "tags": [
           "Blockflow"
         ],
         "summary": "Get a block containing events and transactions with enriched input information when node indexes are enabled.",
-        "operationId": "getBlockflowRich-blocks-with-eventsBlock_hash",
+        "operationId": "getBlockflowRich-blocksBlock_hash",
         "parameters": [
           {
             "name": "block_hash",
