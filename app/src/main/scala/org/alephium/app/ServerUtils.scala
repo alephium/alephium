@@ -37,7 +37,7 @@ import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
 import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.ralph.Compiler
@@ -92,6 +92,26 @@ class ServerUtils(implicit
 
         })
         .map(BlocksAndEventsPerTimeStampRange)
+    }
+  }
+
+  def getRichBlocksAndEvents(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval
+  ): Try[RichBlocksAndEventsPerTimeStampRange] = {
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          for {
+            transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
+            blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+            events       <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+          } yield {
+            RichBlockAndEvents(blockEntry, events.events)
+          }
+
+        })
+        .map(RichBlocksAndEventsPerTimeStampRange)
     }
   }
 
@@ -473,6 +493,93 @@ class ServerUtils(implicit
         .map(failedInIO)
       blockEntry <- BlockEntry.from(block, height).left.map(failed)
     } yield blockEntry
+
+  def getRichBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[RichBlockAndEvents] =
+    for {
+      _ <- checkHashChainIndex(hash)
+      block <- blockFlow
+        .getBlock(hash)
+        .left
+        .map(handleBlockError(hash, _))
+      height <- blockFlow
+        .getHeight(block.header)
+        .left
+        .map(failedInIO)
+      transactions              <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
+      blockEntry                <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+      contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
+    } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
+
+  private[app] def getRichTransaction(
+      blockFlow: BlockFlow,
+      transaction: Transaction
+  ): Try[RichTransaction] = {
+    for {
+      assetInputs    <- getRichAssetInputs(blockFlow, transaction)
+      contractInputs <- getRichContractInputs(blockFlow, transaction)
+    } yield {
+      RichTransaction.from(transaction, assetInputs, contractInputs)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private[app] def getRichContractInputs(
+      blockFlow: BlockFlow,
+      transaction: Transaction
+  ): Try[AVector[RichContractInput]] = {
+    transaction.contractInputs.mapE { contractOutputRef =>
+      for {
+        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef)
+        richInput <- txOutputOpt match {
+          case Some(txOutput) =>
+            Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
+          case None =>
+            Left(notFound(s"Transaction output for contract output reference ${contractOutputRef}"))
+        }
+      } yield richInput
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private[app] def getRichAssetInputs(
+      blockFlow: BlockFlow,
+      transaction: Transaction
+  ): Try[AVector[RichAssetInput]] = {
+    transaction.unsigned.inputs.mapE { assetInput =>
+      for {
+        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef)
+        richInput <- txOutputOpt match {
+          case Some(txOutput) =>
+            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
+          case None =>
+            Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
+        }
+      } yield richInput
+    }
+  }
+
+  private[app] def getTxOutput(
+      blockFlow: BlockFlow,
+      outputRef: TxOutputRef
+  ): Try[Option[TxOutput]] = {
+    for {
+      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      txOutputOpt <- txIdOpt match {
+        case Some(txId) =>
+          getTransaction(
+            blockFlow,
+            txId,
+            None,
+            None,
+            transaction => transaction.getOutput(outputRef)
+          )
+        case None =>
+          Right(None)
+      }
+    } yield {
+      txOutputOpt
+    }
+  }
 
   def getMainChainBlockByGhostUncle(
       blockFlow: BlockFlow,
