@@ -3378,8 +3378,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileAssetScript(code).rightValue._2 is
-        AVector("Found unused variables in Foo: foo.a, foo.b")
+      Compiler.compileAssetScript(code).rightValue._2.map(_.message) is
+        AVector(
+          "Found unused variable in Foo: foo.a",
+          "Found unused variable in Foo: foo.b"
+        )
     }
 
     {
@@ -3394,8 +3397,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileTxScriptFull(code).rightValue.warnings is
-        AVector("Found unused variables in Foo: main.b")
+      Compiler.compileTxScriptFull(code).rightValue.warnings.map(_.message) is
+        AVector("Found unused variable in Foo: main.b")
     }
 
     {
@@ -3410,8 +3413,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileTxScriptFull(code).rightValue.warnings is
-        AVector("Found unused fields in Foo: b")
+      Compiler.compileTxScriptFull(code).rightValue.warnings.map(_.message) is
+        AVector("Found unused field in Foo: b")
     }
 
     {
@@ -3426,8 +3429,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
-        AVector("Found unused variables in Foo: foo.a, foo.b")
+      compileContractFull(code).rightValue.warnings.map(_.message) is
+        AVector(
+          "Found unused variable in Foo: foo.a",
+          "Found unused variable in Foo: foo.b"
+        )
     }
 
     {
@@ -3440,8 +3446,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
-        AVector("Found unused fields in Foo: a, c")
+      compileContractFull(code).rightValue.warnings.map(_.message) is
+        AVector(
+          "Found unused field in Foo: a",
+          "Found unused field in Foo: c"
+        )
     }
 
     {
@@ -3458,8 +3467,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
-        AVector("Found unused fields in Foo: b, c")
+      compileContractFull(code).rightValue.warnings.map(_.message) is
+        AVector(
+          "Found unused field in Foo: b",
+          "Found unused field in Foo: c"
+        )
     }
 
     {
@@ -3490,7 +3502,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       val result = Compiler.compileProject(code).rightValue
-      result._1.flatMap(_.warnings) is AVector.empty[String]
+      result._1.flatMap(_.warnings).map(_.message) is AVector.empty[String]
     }
 
     {
@@ -3504,9 +3516,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Baz() extends Foo() {}
            |""".stripMargin
       val result = Compiler.compileProject(code).rightValue
-      result._1.flatMap(_.warnings) is AVector(
-        "Found unused variables in Bar: foo.x",
-        "Found unused variables in Baz: foo.x"
+      result._1.flatMap(_.warnings).map(_.message) is AVector(
+        "Found unused variable in Bar: foo.x",
+        "Found unused variable in Baz: foo.x"
       )
     }
 
@@ -3522,8 +3534,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
-        AVector("Found unused constants in Foo: C0")
+      compileContractFull(code).rightValue.warnings.map(_.message) is
+        AVector("Found unused constant in Foo: C0")
     }
 
     {
@@ -3547,8 +3559,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
-        AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
+      compileContractFull(code).rightValue.warnings.map(_.message) is
+        AVector(
+          "Found unused constant in Foo: Language.Solidity",
+          "Found unused constant in Foo: Chain.Eth"
+        )
     }
 
     {
@@ -3700,9 +3715,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     {
       info("Fields and variables are unused")
       val warnings = compileContractFull(code("")).rightValue.warnings
-      warnings.toSet is Set(
-        "Found unused variables in Foo: foo.x, foo.y",
-        "Found unused fields in Foo: a, b"
+      warnings.toSet.map(_.message) is Set(
+        "Found unused variable in Foo: foo.x",
+        "Found unused variable in Foo: foo.y",
+        "Found unused field in Foo: a",
+        "Found unused field in Foo: b"
       )
     }
 
@@ -3748,7 +3765,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings.map(_.message) is
         AVector(
           s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function."""
         )
@@ -3794,7 +3811,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is
+      compileContractFull(code).rightValue.warnings.map(_.message) is
         AVector(
           s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function."""
         )
@@ -3848,7 +3865,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      compileContractFull(code, 0).rightValue.warnings is AVector.empty[String]
+      compileContractFull(code, 0).rightValue.warnings.map(_.message) is AVector.empty[String]
     }
 
     {
@@ -3917,7 +3934,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      val warnings = compileContractFull(code, 0).rightValue.warnings
+      val warnings = compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(
         s"""Function "Foo.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
       )
@@ -4671,7 +4688,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn bar1() -> () {}
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is warnings
+      compileContractFull(code).rightValue.warnings.map(_.message) is warnings
     }
 
     test("f2()", AVector.empty)
@@ -6041,8 +6058,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
-      compileContractFull(code).rightValue.warnings is AVector(
-        "Found unused maps in Foo: map"
+      compileContractFull(code).rightValue.warnings.map(_.message) is AVector(
+        "Found unused map in Foo: map"
       )
     }
 
@@ -6065,14 +6082,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       updateStatements.foreach { statement =>
         compileContractFull(
           code(statement, "@using(preapprovedAssets = true)")
-        ).rightValue.warnings is warnings
+        ).rightValue.warnings.map(_.message) is warnings
         compileContractFull(
           code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
-        ).rightValue.warnings is AVector.empty[String]
+        ).rightValue.warnings.map(_.message) is AVector.empty[String]
       }
-      compileContractFull(code("let _ = map[0]")).rightValue.warnings is
+      compileContractFull(code("let _ = map[0]")).rightValue.warnings.map(_.message) is
         AVector.empty[String]
-      compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings is
+      compileContractFull(code("let _ = map.contains!(0)")).rightValue.warnings.map(_.message) is
         AVector.empty[String]
     }
 
@@ -7492,8 +7509,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val warnings = Compiler.compileProject(code).rightValue._4
-      warnings is AVector("Found unused global constants: A")
+      val warnings = Compiler.compileProject(code).rightValue._4.map(_.message)
+      warnings is AVector("Found unused global constant: A")
     }
 
     {
@@ -7583,8 +7600,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val warnings = Compiler.compileProject(code).rightValue._4
-      warnings is AVector("Found unused global constants: Color.Blue")
+      val warnings = Compiler.compileProject(code).rightValue._4.map(_.message)
+      warnings is AVector("Found unused global constant: Color.Blue")
     }
 
     {
@@ -7628,8 +7645,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val warnings = Compiler.compileProject(code).rightValue._4
-      warnings is AVector("Found unused global constants: Color.Blue")
+      val warnings = Compiler.compileProject(code).rightValue._4.map(_.message)
+      warnings is AVector("Found unused global constant: Color.Blue")
     }
 
     {
@@ -7649,8 +7666,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val warnings = Compiler.compileProject(code).rightValue._4
-      warnings is AVector("Found unused global constants: A, Color.Blue, Color.Green")
+      val warnings = Compiler.compileProject(code).rightValue._4.map(_.message)
+      warnings is AVector(
+        "Found unused global constant: A",
+        "Found unused global constant: Color.Blue",
+        "Found unused global constant: Color.Green"
+      )
     }
 
     {
@@ -7682,12 +7703,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       globalWarnings: AVector[String]
   ) = {
     val result0 = Compiler.compileProject(code).rightValue
-    result0._4 is globalWarnings
+    result0._4.map(_.message) is globalWarnings
     result0._1.zipWithIndex.foreach { case (contract, index) =>
       if (!contract.ast.isAbstract) {
         val value = contractWarnings(index)
         contract.ast.ident.name is value._1
-        contract.warnings is value._2
+        contract.warnings.map(_.message) is value._2
       }
     }
     val compilerOptions = CompilerOptions.Default.copy(
@@ -7724,7 +7745,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       checkWarnings(
         code,
         AVector(("Bar", AVector.empty[String]), ("Baz", AVector.empty[String])),
-        AVector("Found unused constants in Foo: Foo2")
+        AVector("Found unused constant in Foo: Foo2")
       )
     }
 
@@ -7758,11 +7779,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           (
             "Baz",
             AVector(
-              "Found unused constants in Baz: Baz0"
+              "Found unused constant in Baz: Baz0"
             )
           )
         ),
-        AVector("Found unused constants in Foo: Foo2")
+        AVector("Found unused constant in Foo: Foo2")
       )
     }
 
@@ -7795,7 +7816,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           ("Bar", AVector.empty[String]),
           ("Baz", AVector.empty[String])
         ),
-        AVector("Found unused constants in Foo: ErrorCode.Err2")
+        AVector("Found unused constant in Foo: ErrorCode.Err2")
       )
     }
 
@@ -7832,11 +7853,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           (
             "Baz",
             AVector(
-              "Found unused constants in Baz: ErrorCode.Err3"
+              "Found unused constant in Baz: ErrorCode.Err3"
             )
           )
         ),
-        AVector("Found unused constants in Foo: ErrorCode.Err2")
+        AVector("Found unused constant in Foo: ErrorCode.Err2")
       )
     }
 
@@ -7896,7 +7917,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       checkWarnings(
         code,
-        AVector(("Foo", AVector("Found unused private functions in Foo: baz, qux"))),
+        AVector(
+          (
+            "Foo",
+            AVector(
+              "Found unused private function in Foo: baz",
+              "Found unused private function in Foo: qux"
+            )
+          )
+        ),
         AVector.empty
       )
     }
@@ -7914,7 +7943,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       val script = Compiler.compileProject(code).rightValue._2.head
-      script.warnings is AVector("Found unused private functions in Main: bar, qux")
+      script.warnings.map(_.message) is AVector(
+        "Found unused private function in Main: bar",
+        "Found unused private function in Main: qux"
+      )
     }
 
     {
@@ -7934,8 +7966,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       checkWarnings(
         code,
-        AVector(("Foo", AVector("Found unused private functions in Foo: foo1"))),
-        AVector("Found unused private functions in Bar: bar1")
+        AVector(("Foo", AVector("Found unused private function in Foo: foo1"))),
+        AVector("Found unused private function in Bar: bar1")
       )
     }
 

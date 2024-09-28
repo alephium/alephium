@@ -38,7 +38,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
-import org.alephium.ralph.Compiler
+import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
@@ -46,6 +46,10 @@ import org.alephium.util._
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
+
+  def warningString(code: String, sourceIndex: Option[SourceIndex]) = {
+    code.substring(sourceIndex.get.index, sourceIndex.get.endIndex)
+  }
 
   trait ApiConfigFixture extends SocketUtil {
     val peerPort             = generatePort()
@@ -2543,8 +2547,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"0201$methodLength" + bytecode
     }
     result.warnings is AVector(
-      "Found unused variables in Foo: foo.a",
-      "Found unused fields in Foo: x"
+      "Found unused variable in Foo: foo.a",
+      "Found unused field in Foo: x"
     )
 
     info("Turn off warnings")
@@ -2597,7 +2601,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     val constant = globalState.getCalculatedConstants()(0)
     result.constants is Some(AVector(CompileResult.Constant.from(constant._1, constant._2)))
 
-    globalWarnings is AVector("Found unused global constants: A, Error.Err0")
+    globalWarnings.length is 2
+    globalWarnings(0).message is "Found unused global constant: A"
+    warningString(rawCode, globalWarnings(0).sourceIndex) is "const A = 0"
+    globalWarnings(1).message is "Found unused global constant: Error.Err0"
+    warningString(rawCode, globalWarnings(1).sourceIndex) is "Err0"
   }
 
   it should "compile script" in new Fixture {
@@ -2648,8 +2656,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
       result.warnings is AVector(
-        "Found unused variables in Main: main.c",
-        "Found unused fields in Main: b"
+        "Found unused variable in Main: main.c",
+        "Found unused field in Main: b"
       )
 
       info("Turn off warnings")
