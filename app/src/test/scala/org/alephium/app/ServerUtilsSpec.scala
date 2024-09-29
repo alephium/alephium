@@ -1257,9 +1257,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       ("alephium.node.indexes.tx-output-ref-index", "true")
     )
 
-    val chainIndex           = ChainIndex.unsafe(0, 0)
-    val lockupScript         = getGenesisLockupScript(chainIndex)
-    implicit val serverUtils = new ServerUtils()
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val lockupScript                      = getGenesisLockupScript(chainIndex)
+    implicit val serverUtils: ServerUtils = new ServerUtils()
 
     def executeScript(
         script: vm.StatefulScript,
@@ -3859,7 +3859,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "get rich transaction that spends asset output" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")
     )
 

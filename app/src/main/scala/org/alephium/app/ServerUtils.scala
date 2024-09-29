@@ -111,7 +111,7 @@ class ServerUtils(implicit
           }
 
         })
-        .map(RichBlocksAndEventsPerTimeStampRange)
+        .map(RichBlocksAndEventsPerTimeStampRange.apply)
     }
   }
 
