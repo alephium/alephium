@@ -173,14 +173,21 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       jobCache.get(headerKey) match {
         case Some((template, txBlob)) =>
           val blockBytes = header ++ txBlob
-          if (PoW.checkWork(blockHash, template.target)) {
+          if (ChainIndex.from(blockHash) != template.index) {
+            handleSubmissionFailure(
+              blockHash,
+              s"The mined block has invalid chainindex: ${blockHash.toHexString}, expected chainindex: ${template.index}"
+            )
+          } else if (!PoW.checkWork(blockHash, template.target)) {
+            handleSubmissionFailure(
+              blockHash,
+              s"The mined block has invalid work: ${blockHash.toHexString}"
+            )
+          } else {
             submit(blockHash, blockBytes, template.index)
             log.info(
               s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
             )
-          } else {
-            sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
-            log.error(s"The mined block has invalid work: ${blockHash.toHexString}")
           }
         case None =>
           sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
@@ -215,5 +222,10 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     val payload    = SubmitResult(chainIndex.from.value, chainIndex.to.value, hash, succeeded)
     val message    = ServerMessage.from(payload)
     client ! ConnectionHandler.Send(ServerMessage.serialize(message))
+  }
+
+  private def handleSubmissionFailure(blockHash: BlockHash, message: String): Unit = {
+    sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
+    log.error(message)
   }
 }

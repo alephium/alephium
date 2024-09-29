@@ -1944,18 +1944,18 @@ object Ast {
       constants.get(ident)
     }
 
-    def getUnusedGlobalConstantsWarning(): Option[String] = {
-      val unused = mutable.ArrayBuffer.empty[String]
+    def getUnusedGlobalConstantsWarning(): AVector[Warning] = {
+      val unused = mutable.ArrayBuffer.empty[(String, Positioned)]
       constantVars.foreach { c =>
-        if (!usedConstants.contains(c.ident)) unused.addOne(c.name)
+        if (!usedConstants.contains(c.ident)) unused.addOne((c.name, c))
       }
       enums.foreach(e =>
         e.fields.foreach { field =>
           val fieldIdent = EnumDef.fieldIdent(e.id, field.ident)
-          if (!usedConstants.contains(fieldIdent)) unused.addOne(fieldIdent.name)
+          if (!usedConstants.contains(fieldIdent)) unused.addOne((fieldIdent.name, fieldIdent))
         }
       )
-      if (unused.isEmpty) None else Some(Warnings.unusedGlobalConstants(unused.toSeq))
+      Warnings.unusedGlobalConstants(unused)
     }
 
     def getConstant(ident: Ident): Compiler.VarInfo.Constant[Ctx] = {
@@ -2715,34 +2715,47 @@ object Ast {
 
     private def checkUnusedDefsInParentContract(
         states: Map[TypeId, (Contract, Compiler.State[StatefulContext])],
-        defsInParentContract: Contract => Iterable[(TypeId, String)],
+        defsInParentContract: Contract => Iterable[(TypeId, (String, Option[SourceIndex]))],
         usedDefsInContract: (
             Contract,
             Compiler.State[StatefulContext]
-        ) => Iterable[(TypeId, String)],
-        genWarning: (TypeId, collection.Seq[String]) => String
-    ): AVector[String] = {
-      val allDefs = mutable.Set.empty[(TypeId, String)]
-      states.foreachEntry { case (_, (contract, _)) =>
-        if (contract.isAbstract) allDefs.addAll(defsInParentContract(contract))
+        ) => Iterable[(TypeId, (String, Option[SourceIndex]))],
+        genWarning: (TypeId, collection.Seq[(String, Option[SourceIndex])]) => AVector[Warning]
+    ): AVector[Warning] = {
+      val allDefs = mutable.Map.empty[(TypeId, String), Option[SourceIndex]]
+      states.foreach { case (_, (contract, _)) =>
+        if (contract.isAbstract) {
+          defsInParentContract(contract).map { case (typeId, (name, sourceIndex)) =>
+            allDefs.addOne((typeId, name) -> sourceIndex)
+          }
+        }
       }
-      states.foreachEntry { case (_, (contract, state)) =>
-        if (!contract.isAbstract) allDefs.subtractAll(usedDefsInContract(contract, state))
+
+      states.foreach { case (_, (contract, state)) =>
+        if (!contract.isAbstract) {
+          usedDefsInContract(contract, state).foreach { case (typeId, (name, _)) =>
+            allDefs.remove((typeId, name))
+          }
+        }
       }
+
       if (allDefs.nonEmpty) {
-        AVector.from(allDefs.groupBy(_._1).map { case (parentId, defs) =>
-          genWarning(parentId, defs.map(_._2).toSeq)
+        AVector.from(allDefs.groupBy(_._1._1).flatMap { case (parentId, defs0) =>
+          val defs = defs0.map { case ((_, name), sourceIndex) => (name, sourceIndex) }
+          genWarning(parentId, defs.toSeq)
         })
       } else {
-        AVector.empty[String]
+        AVector.empty[Warning]
       }
     }
 
     private def checkUnusedLocalConstants(
         states: Map[TypeId, (Contract, Compiler.State[StatefulContext])]
-    ): AVector[String] = {
+    ): AVector[Warning] = {
       val defsInParentContract = (contract: Contract) => {
-        contract.selfDefinedConstants.map(ident => (contract.ident, ident.name))
+        contract.selfDefinedConstants.map(ident =>
+          (contract.ident, (ident.name, ident.sourceIndex))
+        )
       }
       checkUnusedDefsInParentContract(
         states,
@@ -2754,19 +2767,21 @@ object Ast {
 
     private def checkUnusedPrivateFunctions(
         states: Map[TypeId, (Contract, Compiler.State[StatefulContext])]
-    ): AVector[String] = {
+    ): AVector[Warning] = {
       val defsInParentContract = (contract: Contract) => {
         contract.funcs.collect {
           case func if func.isPrivate && func.definedIn(contract.ident) =>
-            (contract.ident, func.name)
+            (contract.ident, (func.name, func.sourceIndex))
         }
       }
       val usedDefsInContract = (contract: Contract, state: Compiler.State[StatefulContext]) => {
-        val usedPrivateFuncs = mutable.ArrayBuffer.empty[(TypeId, String)]
+        val usedPrivateFuncs = mutable.ArrayBuffer.empty[(TypeId, (String, Option[SourceIndex]))]
         state.internalCallsReversed.keys.foreach { funcId =>
           contract.funcs.find(f => f.id == funcId && f.isPrivate).foreach { func =>
             func.origin.foreach { originId =>
-              if (originId != contract.ident) usedPrivateFuncs.addOne((originId, func.name))
+              if (originId != contract.ident) {
+                usedPrivateFuncs.addOne((originId, (func.name, func.sourceIndex)))
+              }
             }
           }
         }
@@ -2782,11 +2797,11 @@ object Ast {
 
     private def checkUnusedDefsInParentContract(
         states: AVector[Compiler.State[StatefulContext]]
-    )(implicit compilerOptions: CompilerOptions): AVector[String] = {
+    )(implicit compilerOptions: CompilerOptions): AVector[Warning] = {
       if (
         compilerOptions.ignoreUnusedConstantsWarnings && compilerOptions.ignoreUnusedPrivateFunctionsWarnings
       ) {
-        AVector.empty[String]
+        AVector.empty[Warning]
       } else {
         val contractAndStates = contracts.view.zipWithIndex.collect {
           case (contract: Contract, index) => (contract.ident, (contract, states(index)))
@@ -2794,13 +2809,13 @@ object Ast {
         val unusedConstantsWarnings = if (!compilerOptions.ignoreUnusedConstantsWarnings) {
           checkUnusedLocalConstants(contractAndStates)
         } else {
-          AVector.empty[String]
+          AVector.empty[Warning]
         }
         val unusedPrivateFuncsWarnings =
           if (!compilerOptions.ignoreUnusedPrivateFunctionsWarnings) {
             checkUnusedPrivateFunctions(contractAndStates)
           } else {
-            AVector.empty[String]
+            AVector.empty[Warning]
           }
         unusedConstantsWarnings ++ unusedPrivateFuncsWarnings
       }
@@ -2808,7 +2823,7 @@ object Ast {
 
     def genStatefulContracts()(implicit
         compilerOptions: CompilerOptions
-    ): (AVector[String], AVector[(CompiledContract, Int)]) = {
+    ): (AVector[Warning], AVector[(CompiledContract, Int)]) = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>

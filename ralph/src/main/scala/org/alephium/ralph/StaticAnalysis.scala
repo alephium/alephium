@@ -70,7 +70,7 @@ object StaticAnalysis {
       !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)
     }
     if (unusedFuncs.nonEmpty) {
-      state.warnUnusedPrivateFunction(ast.ident, unusedFuncs.map(_.name))
+      state.warnUnusedPrivateFunction(ast.ident, unusedFuncs.map(_.id))
     }
   }
 

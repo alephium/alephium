@@ -30,7 +30,7 @@ import org.scalatest.compatible.Assertion
 import sttp.client3.Response
 import sttp.model.StatusCode
 
-import org.alephium.api.{ApiError, ApiModel}
+import org.alephium.api.{ApiError, ApiModel, OpenAPIWriters}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
@@ -978,7 +978,8 @@ abstract class RestServerSpec(
       val expectedOpenapi =
         read[ujson.Value](
           Using(Source.fromFile(openapiPath.getPath, "UTF-8")) { source =>
-            source.getLines().mkString("\n").replaceFirst("12973", s"$port")
+            val openApiJson = source.getLines().mkString("\n")
+            reverseAddressTruncation(openApiJson).replaceFirst("12973", s"$port")
           }.get
         )
 
@@ -1625,6 +1626,13 @@ trait RestServerFixture
 
   def getPort(group: GroupIndex): Int =
     servers.find(_.node.config.broker.contains(group)).get.port
+
+  def reverseAddressTruncation(openApiJson: String): String = {
+    openApiJson.replaceAll(
+      OpenAPIWriters.address.toBase58.dropRight(2),
+      OpenAPIWriters.address.toBase58
+    )
+  }
 
   // scalastyle:off no.equal
   def removeField(name: String, json: ujson.Value): ujson.Value = {

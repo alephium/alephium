@@ -33,13 +33,13 @@ import org.alephium.util.{AVector, U256}
 final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
-    warnings: AVector[String],
+    warnings: AVector[Warning],
     debugCode: StatefulContract
 )
 final case class CompiledScript(
     code: StatefulScript,
     ast: Ast.TxScript,
-    warnings: AVector[String],
+    warnings: AVector[Warning],
     debugCode: StatefulScript
 )
 
@@ -51,7 +51,7 @@ object Compiler {
   def compileAssetScript(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (StatelessScript, AVector[String])] =
+  ): Either[Error, (StatelessScript, AVector[Warning])] =
     try {
       fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
         case Parsed.Success((script, globalState), _) =>
@@ -104,7 +104,7 @@ object Compiler {
       AVector[CompiledContract],
       AVector[CompiledScript],
       Ast.GlobalState[StatefulContext],
-      AVector[String]
+      AVector[Warning]
   )
 
   def compileProject(
@@ -119,10 +119,10 @@ object Compiler {
         val unusedGlobalConstantWarning = if (compilerOptions.ignoreUnusedConstantsWarnings) {
           None
         } else {
-          multiContract.globalState.getUnusedGlobalConstantsWarning()
+          Some(multiContract.globalState.getUnusedGlobalConstantsWarning())
         }
         val warnings1 = unusedGlobalConstantWarning match {
-          case Some(warning) => warnings0 :+ warning
+          case Some(warning) => warnings0 ++ warning
           case None          => warnings0
         }
         (statefulContracts, statefulScripts, multiContract.globalState, warnings1)
@@ -842,8 +842,12 @@ object Compiler {
         !accessedVars.contains(ReadVariable(varKey))
       }
       if (unusedVars.nonEmpty) {
-        warnUnusedVariables(typeId, unusedVars.keys.map(_.name).toSeq)
+        val unusedVarsInfo = unusedVars.map { case (varKey, varInfo) =>
+          (varKey.name, varInfo.tpe)
+        }.toSeq
+        warnUnusedVariables(typeId, unusedVarsInfo)
       }
+
       accessedVars.filterInPlace {
         case ReadVariable(varKey) => !varKey.name.startsWith(prefix)
         case _                    => true
@@ -876,12 +880,16 @@ object Compiler {
     }
 
     def checkUnusedMaps(): Unit = {
-      val unusedMaps = varTable.filter { case (name, varInfo) =>
-        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(name)) && !accessedVars
-          .contains(WriteVariable(name))
+      val unusedMaps = varTable.filter { case (varKey, varInfo) =>
+        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(varKey)) && !accessedVars
+          .contains(WriteVariable(varKey))
       }
+
       if (unusedMaps.nonEmpty) {
-        warnUnusedMaps(typeId, unusedMaps.keys.map(_.name).toSeq)
+        val unusedMapsInfo = unusedMaps.map { case (varKey, varInfo) =>
+          (varKey.name, varInfo.tpe)
+        }.toSeq
+        warnUnusedMaps(typeId, unusedMapsInfo)
       }
     }
 
@@ -892,15 +900,16 @@ object Compiler {
         !accessedVars.contains(ReadVariable(varKey)) &&
         !varInfo.tpe.isMapType
       }
-      val unusedLocalConstants = mutable.ArrayBuffer.empty[String]
-      val unusedFields         = mutable.ArrayBuffer.empty[String]
+      val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Type)]
+      val unusedFields         = mutable.ArrayBuffer.empty[(String, Type)]
       unusedVars.foreach {
         case (varKey, c: VarInfo.Constant[_]) =>
           if (c.constantDef.definedIn(typeId)) {
-            unusedLocalConstants.addOne(varKey.name)
+            unusedLocalConstants.addOne((varKey.name, c.tpe))
           }
-        case (varKey, varInfo) if !varInfo.isLocal => unusedFields.addOne(varKey.name)
-        case _                                     => ()
+        case (varKey, varInfo) if !varInfo.isLocal =>
+          unusedFields.addOne((varKey.name, varInfo.tpe))
+        case _ => ()
       }
       if (unusedLocalConstants.nonEmpty) {
         warnUnusedLocalConstants(typeId, unusedLocalConstants)
@@ -910,14 +919,15 @@ object Compiler {
       }
     }
 
-    private[ralph] def getUsedParentConstants(): Iterable[(Ast.TypeId, String)] = {
-      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, String)]
+    private[ralph] def getUsedParentConstants()
+        : Iterable[(Ast.TypeId, (String, Option[SourceIndex]))] = {
+      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, (String, Option[SourceIndex]))]
       varTable.foreach {
         case (varKey, c: VarInfo.Constant[_]) =>
           if (accessedVars.contains(ReadVariable(varKey))) {
             c.constantDef.origin match {
               case Some(originContractId) if originContractId != typeId =>
-                used.addOne((originContractId, varKey.name))
+                used.addOne((originContractId, (varKey.name, c.tpe.sourceIndex)))
               case _ => ()
             }
           }
