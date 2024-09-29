@@ -557,6 +557,183 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
+  it should "encode/decode BuildTransaction" in {
+    val fromPublicKey = PublicKey.generate
+    val toKey         = PublicKey.generate
+    val toAddress     = Address.p2pkh(toKey)
+
+    val transfer = BuildTransaction.Transfer(
+      BuildTransferTx(
+        fromPublicKey.bytes,
+        None,
+        AVector(Destination(toAddress, Amount(1)))
+      )
+    )
+    val transferJson = s"""
+                          |{
+                          |  "type": "Transfer",
+                          |  "value": {
+                          |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                          |    "destinations": [
+                          |      {
+                          |        "address": "${toAddress.toBase58}",
+                          |        "attoAlphAmount": "1"
+                          |      }
+                          |    ]
+                          |  }
+                          |}
+        """.stripMargin
+
+    checkData(transfer, transferJson)
+
+    val deploy = BuildTransaction.DeployContract(
+      BuildDeployContractTx(
+        fromPublicKey = fromPublicKey.bytes,
+        bytecode = ByteString(0, 0),
+        issueTokenAmount = Some(Amount(1)),
+        gasAmount = Some(GasBox.unsafe(1)),
+        gasPrice = Some(GasPrice(1))
+      )
+    )
+    val deployJson = s"""
+                        |{
+                        |  "type": "DeployContract",
+                        |  "value": {
+                        |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                        |    "bytecode": "0000",
+                        |    "issueTokenAmount": "1",
+                        |    "gasAmount": 1,
+                        |    "gasPrice": "1"
+                        |  }
+                        |}
+                        |""".stripMargin
+
+    checkData(deploy, deployJson)
+
+    val execute = BuildTransaction.ExecuteScript(
+      BuildExecuteScriptTx(
+        fromPublicKey = fromPublicKey.bytes,
+        bytecode = ByteString(0, 0),
+        gasAmount = Some(GasBox.unsafe(1)),
+        gasPrice = Some(GasPrice(1))
+      )
+    )
+    val executeJson = s"""
+                         |{
+                         |  "type": "ExecuteScript",
+                         |  "value": {
+                         |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                         |    "bytecode": "0000",
+                         |    "gasAmount": 1,
+                         |    "gasPrice": "1"
+                         |  }
+                         |}
+                         |""".stripMargin
+
+    checkData(execute, executeJson)
+
+    val allBuildTxs = AVector[BuildTransaction](transfer, deploy, execute)
+    val allBuildTxsJson = s"""
+                             |[
+                             |  $transferJson,
+                             |  $deployJson,
+                             |  $executeJson
+                             |]
+                             |""".stripMargin
+    checkData(allBuildTxs, allBuildTxsJson)
+  }
+
+  it should "encode/decode BuildTransactionResult" in {
+    val txId       = TransactionId.generate
+    val gas        = GasBox.unsafe(1)
+    val gasPrice   = GasPrice(1)
+    val contractId = ContractId.generate
+
+    val transfer = BuildTransactionResult.Transfer(
+      BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+    )
+    val transferJson = s"""
+                          |{
+                          |  "type": "Transfer",
+                          |  "value": {
+                          |    "unsignedTx":"tx",
+                          |    "gasAmount": 1,
+                          |    "gasPrice": "1",
+                          |    "txId":"${txId.toHexString}",
+                          |    "fromGroup":1,
+                          |    "toGroup":2
+                          |  }
+                          |}""".stripMargin
+
+    checkData(transfer, transferJson)
+
+    val deploy = BuildTransactionResult.DeployContract(
+      BuildDeployContractTxResult(
+        fromGroup = 2,
+        toGroup = 2,
+        unsignedTx = "0000",
+        gasAmount = GasBox.unsafe(1),
+        gasPrice = GasPrice(1),
+        txId = txId,
+        contractAddress = Address.contract(contractId)
+      )
+    )
+    val deployJson =
+      s"""
+         |{
+         |  "type": "DeployContract",
+         |  "value": {
+         |    "fromGroup": 2,
+         |    "toGroup": 2,
+         |    "unsignedTx": "0000",
+         |    "gasAmount":1,
+         |    "gasPrice":"1",
+         |    "txId": "${txId.toHexString}",
+         |    "contractAddress": "${Address.contract(contractId).toBase58}"
+         |  }
+         |}
+         |""".stripMargin
+
+    checkData(deploy, deployJson)
+
+    val execute = BuildTransactionResult.ExecuteScript(
+      BuildExecuteScriptTxResult(
+        fromGroup = 1,
+        toGroup = 1,
+        unsignedTx = "0000",
+        gasAmount = GasBox.unsafe(1),
+        gasPrice = GasPrice(1),
+        txId = txId
+      )
+    )
+    val executeJson =
+      s"""
+         |{
+         |  "type": "ExecuteScript",
+         |  "value": {
+         |    "fromGroup": 1,
+         |    "toGroup": 1,
+         |    "unsignedTx": "0000",
+         |    "gasAmount":1,
+         |    "gasPrice":"1",
+         |    "txId": "${txId.toHexString}"
+         |  }
+         |}
+         |""".stripMargin
+
+    checkData(execute, executeJson)
+
+    val allBuildTxResults = AVector[BuildTransactionResult](transfer, deploy, execute)
+    val allBuildTxResultsJson = s"""
+                                   |[
+                                   |  $transferJson,
+                                   |  $deployJson,
+                                   |  $executeJson
+                                   |]
+                                   |""".stripMargin
+    checkData(allBuildTxResults, allBuildTxResultsJson)
+  }
+
   it should "encode/decode BuildMultiAddressesTransaction" in {
     forAll(Gen.option(Gen.const(GasPrice(1))), Gen.option(Gen.const(BlockHash.generate))) {
       case (gasPrice, targetBlockHash) =>

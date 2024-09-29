@@ -20,7 +20,12 @@ sealed trait BuildTransaction {
 }
 
 object BuildTransaction {
-  final case class Transfer(value: BuildTransferTx)             extends BuildTransaction
+  @upickle.implicits.key("Transfer")
+  final case class Transfer(value: BuildTransferTx) extends BuildTransaction
+
+  @upickle.implicits.key("DeployContract")
   final case class DeployContract(value: BuildDeployContractTx) extends BuildTransaction
-  final case class ExecuteScript(value: BuildExecuteScriptTx)   extends BuildTransaction
+
+  @upickle.implicits.key("ExecuteScript")
+  final case class ExecuteScript(value: BuildExecuteScriptTx) extends BuildTransaction
 }
