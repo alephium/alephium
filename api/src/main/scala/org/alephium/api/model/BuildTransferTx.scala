@@ -15,12 +15,20 @@
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 package org.alephium.api.model
 
-sealed trait BuildTransaction {
-  val value: BuildTxCommon with BuildTxCommon.FromPublicKey
-}
+import akka.util.ByteString
 
-object BuildTransaction {
-  final case class Transfer(value: BuildTransferTx)             extends BuildTransaction
-  final case class DeployContract(value: BuildDeployContractTx) extends BuildTransaction
-  final case class ExecuteScript(value: BuildExecuteScriptTx)   extends BuildTransaction
-}
+import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.AVector
+
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildTransferTx(
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
+    destinations: AVector[Destination],
+    utxos: Option[AVector[OutputRef]] = None,
+    gasAmount: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None,
+    targetBlockHash: Option[BlockHash] = None
+) extends BuildTxCommon
+    with BuildTxCommon.FromPublicKey

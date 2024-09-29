@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.api.{badRequest, Try}
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId}
+import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.{AVector, Hex, U256}
 
@@ -119,4 +119,10 @@ trait GasInfo {
   def gasPrice: GasPrice
 
   def gasFee: U256 = gasPrice * gasAmount
+}
+
+trait TransactionInfo {
+  def txId: TransactionId
+
+  def unsignedTx: String
 }

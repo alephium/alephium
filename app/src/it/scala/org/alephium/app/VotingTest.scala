@@ -353,7 +353,7 @@ trait WalletFixture extends CliqueFixture {
       issueTokenAmount: Option[U256]
   ): ContractRef = {
     val compileResult = request[CompileContractResult](compileContract(code), restPort)
-    val buildResult = request[BuildTransactionResult.DeployContract](
+    val buildResult = request[BuildDeployContractTxResult](
       buildDeployContractTx(
         fromPublicKey = wallet.publicKey.toHexString,
         code = compileResult.bytecode,
@@ -385,7 +385,7 @@ trait WalletFixture extends CliqueFixture {
       tokens: Option[(TokenId, U256)] = None
   ) = {
     val compileResult = request[CompileScriptResult](compileScript(code), restPort)
-    val buildResult = request[BuildTransactionResult.ExecuteScript](
+    val buildResult = request[BuildExecuteScriptTxResult](
       buildExecuteScriptTx(
         fromPublicKey = publicKey,
         code = compileResult.bytecodeTemplate,

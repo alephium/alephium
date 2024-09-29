@@ -13,92 +13,14 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.api.model
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ContractId, TransactionId, UnsignedTransaction}
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.serde.serialize
-import org.alephium.util.Hex
-
-sealed trait BuildTransactionResult extends GasInfo with ChainIndexInfo {
-  def txId: TransactionId
-  def unsignedTx: String
+sealed trait BuildTransactionResult {
+  val value: GasInfo with ChainIndexInfo with TransactionInfo
 }
 
 object BuildTransactionResult {
-  final case class Transfer(
-      unsignedTx: String,
-      gasAmount: GasBox,
-      gasPrice: GasPrice,
-      txId: TransactionId,
-      fromGroup: Int,
-      toGroup: Int
-  ) extends BuildTransactionResult
-
-  object Transfer {
-    def from(
-        unsignedTx: UnsignedTransaction
-    )(implicit groupConfig: GroupConfig): Transfer =
-      Transfer(
-        Hex.toHexString(serialize(unsignedTx)),
-        unsignedTx.gasAmount,
-        unsignedTx.gasPrice,
-        unsignedTx.id,
-        unsignedTx.fromGroup.value,
-        unsignedTx.toGroup.value
-      )
-  }
-
-  final case class ExecuteScript(
-      fromGroup: Int,
-      toGroup: Int,
-      unsignedTx: String,
-      gasAmount: GasBox,
-      gasPrice: GasPrice,
-      txId: TransactionId
-  ) extends BuildTransactionResult
-
-  object ExecuteScript {
-    def from(
-        unsignedTx: UnsignedTransaction
-    )(implicit groupConfig: GroupConfig): ExecuteScript =
-      ExecuteScript(
-        unsignedTx.fromGroup.value,
-        unsignedTx.toGroup.value,
-        Hex.toHexString(serialize(unsignedTx)),
-        unsignedTx.gasAmount,
-        unsignedTx.gasPrice,
-        unsignedTx.id
-      )
-  }
-
-  final case class DeployContract(
-      fromGroup: Int,
-      toGroup: Int,
-      unsignedTx: String,
-      gasAmount: GasBox,
-      gasPrice: GasPrice,
-      txId: TransactionId,
-      contractAddress: Address.Contract
-  ) extends BuildTransactionResult
-
-  object DeployContract {
-    def from(
-        unsignedTx: UnsignedTransaction
-    )(implicit groupConfig: GroupConfig): BuildTransactionResult.DeployContract = {
-      val contractId =
-        ContractId.from(unsignedTx.id, unsignedTx.fixedOutputs.length, unsignedTx.fromGroup)
-      BuildTransactionResult.DeployContract(
-        unsignedTx.fromGroup.value,
-        unsignedTx.toGroup.value,
-        Hex.toHexString(serialize(unsignedTx)),
-        unsignedTx.gasAmount,
-        unsignedTx.gasPrice,
-        unsignedTx.id,
-        Address.contract(contractId)
-      )
-    }
-  }
+  final case class Transfer(value: BuildTransferTxResult)             extends BuildTransactionResult
+  final case class DeployContract(value: BuildDeployContractTxResult) extends BuildTransactionResult
+  final case class ExecuteScript(value: BuildExecuteScriptTxResult)   extends BuildTransactionResult
 }

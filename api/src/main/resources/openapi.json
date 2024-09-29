@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.6.4"
+    "version": "3.7.0"
   },
   "servers": [
     {
@@ -5867,7 +5867,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Transfer1"
+                "$ref": "#/components/schemas/BuildTransferTx"
               },
               "examples": {
                 "Example0": {
@@ -5924,7 +5924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Transfer2"
+                  "$ref": "#/components/schemas/BuildTransferTxResult"
                 },
                 "example": {
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -6147,7 +6147,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Transfer2"
+                  "$ref": "#/components/schemas/BuildTransferTxResult"
                 },
                 "example": {
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -7744,7 +7744,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExecuteScript"
+                "$ref": "#/components/schemas/BuildExecuteScriptTx"
               },
               "examples": {
                 "Example0": {
@@ -7785,7 +7785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExecuteScript1"
+                  "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
                 },
                 "example": {
                   "fromGroup": 2,
@@ -8422,7 +8422,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeployContract"
+                "$ref": "#/components/schemas/BuildDeployContractTx"
               },
               "examples": {
                 "Example0": {
@@ -8465,7 +8465,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeployContract1"
+                  "$ref": "#/components/schemas/BuildDeployContractTxResult"
                 },
                 "example": {
                   "fromGroup": 2,
@@ -8569,19 +8569,23 @@
                   "summary": "Default",
                   "value": [
                     {
-                      "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                      "destinations": [
-                        {
-                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                          "attoAlphAmount": "2000000000000000000"
-                        }
-                      ],
-                      "type": "Transfer"
+                      "type": "org.alephium.api.model.BuildTransaction.Transfer",
+                      "value": {
+                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "destinations": [
+                          {
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "attoAlphAmount": "2000000000000000000"
+                          }
+                        ]
+                      }
                     },
                     {
-                      "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                      "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                      "type": "ExecuteScript"
+                      "type": "org.alephium.api.model.BuildTransaction.ExecuteScript",
+                      "value": {
+                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
+                      }
                     }
                   ]
                 },
@@ -8589,53 +8593,57 @@
                   "summary": "More settings",
                   "value": [
                     {
-                      "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                      "fromPublicKeyType": "bip340-schnorr",
-                      "destinations": [
-                        {
-                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                          "attoAlphAmount": "2000000000000000000",
-                          "tokens": [
-                            {
-                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                              "amount": "42000000000000000000"
-                            },
-                            {
-                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                              "amount": "1000000000000000000000"
-                            }
-                          ],
-                          "lockTime": 1611041396892
-                        }
-                      ],
-                      "utxos": [
-                        {
-                          "hint": 23412,
-                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                        }
-                      ],
-                      "gasAmount": 20000,
-                      "gasPrice": "100000000000",
-                      "type": "Transfer"
+                      "type": "org.alephium.api.model.BuildTransaction.Transfer",
+                      "value": {
+                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "fromPublicKeyType": "bip340-schnorr",
+                        "destinations": [
+                          {
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "attoAlphAmount": "2000000000000000000",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "42000000000000000000"
+                              },
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "1000000000000000000000"
+                              }
+                            ],
+                            "lockTime": 1611041396892
+                          }
+                        ],
+                        "utxos": [
+                          {
+                            "hint": 23412,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          }
+                        ],
+                        "gasAmount": 20000,
+                        "gasPrice": "100000000000"
+                      }
                     },
                     {
-                      "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                      "fromPublicKeyType": "default",
-                      "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                      "attoAlphAmount": "1000000000000000",
-                      "tokens": [
-                        {
-                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                          "amount": "42000000000000000000"
-                        },
-                        {
-                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                          "amount": "1000000000000000000000"
-                        }
-                      ],
-                      "gasAmount": 20000,
-                      "gasPrice": "100000000000",
-                      "type": "ExecuteScript"
+                      "type": "org.alephium.api.model.BuildTransaction.ExecuteScript",
+                      "value": {
+                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "fromPublicKeyType": "default",
+                        "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                        "attoAlphAmount": "1000000000000000",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42000000000000000000"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000000000000000000000"
+                          }
+                        ],
+                        "gasAmount": 20000,
+                        "gasPrice": "100000000000"
+                      }
                     }
                   ]
                 }
@@ -8656,22 +8664,26 @@
                 },
                 "example": [
                   {
-                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                    "fromGroup": 1,
-                    "toGroup": 2,
-                    "type": "Transfer"
+                    "type": "org.alephium.api.model.BuildTransactionResult.Transfer",
+                    "value": {
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 1,
+                      "toGroup": 2
+                    }
                   },
                   {
-                    "fromGroup": 2,
-                    "toGroup": 2,
-                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                    "type": "ExecuteScript"
+                    "type": "org.alephium.api.model.BuildTransactionResult.ExecuteScript",
+                    "value": {
+                      "fromGroup": 2,
+                      "toGroup": 2,
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+                    }
                   }
                 ]
               }
@@ -10216,7 +10228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Transfer2"
+                  "$ref": "#/components/schemas/BuildTransferTxResult"
                 },
                 "example": {
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -12213,6 +12225,185 @@
           }
         }
       },
+      "BuildDeployContractTx": {
+        "title": "BuildDeployContractTx",
+        "type": "object",
+        "required": [
+          "fromPublicKey",
+          "bytecode"
+        ],
+        "properties": {
+          "fromPublicKey": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "fromPublicKeyType": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "bytecode": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "initialAttoAlphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "initialTokenAmounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "issueTokenAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "issueTokenTo": {
+            "type": "string",
+            "format": "address"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
+          }
+        }
+      },
+      "BuildDeployContractTxResult": {
+        "title": "BuildDeployContractTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          }
+        }
+      },
+      "BuildExecuteScriptTx": {
+        "title": "BuildExecuteScriptTx",
+        "type": "object",
+        "required": [
+          "fromPublicKey",
+          "bytecode"
+        ],
+        "properties": {
+          "fromPublicKey": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "fromPublicKeyType": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "bytecode": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "attoAlphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "gasEstimationMultiplier": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "BuildExecuteScriptTxResult": {
+        "title": "BuildExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          }
+        }
+      },
       "BuildInfo": {
         "title": "BuildInfo",
         "type": "object",
@@ -12439,21 +12630,21 @@
         "title": "BuildTransaction",
         "oneOf": [
           {
-            "$ref": "#/components/schemas/DeployContract2"
+            "$ref": "#/components/schemas/DeployContract"
           },
           {
-            "$ref": "#/components/schemas/ExecuteScript2"
+            "$ref": "#/components/schemas/ExecuteScript"
           },
           {
-            "$ref": "#/components/schemas/Transfer3"
+            "$ref": "#/components/schemas/Transfer1"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "DeployContract": "#/components/schemas/DeployContract2",
-            "ExecuteScript": "#/components/schemas/ExecuteScript2",
-            "Transfer": "#/components/schemas/Transfer3"
+            "DeployContract": "#/components/schemas/DeployContract",
+            "ExecuteScript": "#/components/schemas/ExecuteScript",
+            "Transfer": "#/components/schemas/Transfer1"
           }
         }
       },
@@ -12461,21 +12652,100 @@
         "title": "BuildTransactionResult",
         "oneOf": [
           {
-            "$ref": "#/components/schemas/DeployContract3"
+            "$ref": "#/components/schemas/DeployContract1"
           },
           {
-            "$ref": "#/components/schemas/ExecuteScript3"
+            "$ref": "#/components/schemas/ExecuteScript1"
           },
           {
-            "$ref": "#/components/schemas/Transfer4"
+            "$ref": "#/components/schemas/Transfer2"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "DeployContract": "#/components/schemas/DeployContract3",
-            "ExecuteScript": "#/components/schemas/ExecuteScript3",
-            "Transfer": "#/components/schemas/Transfer4"
+            "DeployContract": "#/components/schemas/DeployContract1",
+            "ExecuteScript": "#/components/schemas/ExecuteScript1",
+            "Transfer": "#/components/schemas/Transfer2"
+          }
+        }
+      },
+      "BuildTransferTx": {
+        "title": "BuildTransferTx",
+        "type": "object",
+        "required": [
+          "fromPublicKey",
+          "destinations"
+        ],
+        "properties": {
+          "fromPublicKey": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "fromPublicKeyType": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
+          },
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRef"
+            }
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
+          }
+        }
+      },
+      "BuildTransferTxResult": {
+        "title": "BuildTransferTxResult",
+        "type": "object",
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -13333,51 +13603,15 @@
         "title": "DeployContract",
         "type": "object",
         "required": [
-          "fromPublicKey",
-          "bytecode"
+          "value",
+          "type"
         ],
         "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "hex-string"
+          "value": {
+            "$ref": "#/components/schemas/BuildDeployContractTx"
           },
-          "fromPublicKeyType": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "bytecode": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "initialAttoAlphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "initialTokenAmounts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "issueTokenAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "issueTokenTo": {
-            "type": "string",
-            "format": "address"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "targetBlockHash": {
-            "type": "string",
-            "format": "block-hash"
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -13385,140 +13619,12 @@
         "title": "DeployContract",
         "type": "object",
         "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "contractAddress"
-        ],
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "contractAddress": {
-            "type": "string",
-            "format": "address"
-          }
-        }
-      },
-      "DeployContract2": {
-        "title": "DeployContract",
-        "type": "object",
-        "required": [
-          "fromPublicKey",
-          "bytecode",
+          "value",
           "type"
         ],
         "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "fromPublicKeyType": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "bytecode": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "initialAttoAlphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "initialTokenAmounts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "issueTokenAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "issueTokenTo": {
-            "type": "string",
-            "format": "address"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "targetBlockHash": {
-            "type": "string",
-            "format": "block-hash"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "DeployContract3": {
-        "title": "DeployContract",
-        "type": "object",
-        "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "contractAddress",
-          "type"
-        ],
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "contractAddress": {
-            "type": "string",
-            "format": "address"
+          "value": {
+            "$ref": "#/components/schemas/BuildDeployContractTxResult"
           },
           "type": {
             "type": "string"
@@ -13640,47 +13746,15 @@
         "title": "ExecuteScript",
         "type": "object",
         "required": [
-          "fromPublicKey",
-          "bytecode"
+          "value",
+          "type"
         ],
         "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "hex-string"
+          "value": {
+            "$ref": "#/components/schemas/BuildExecuteScriptTx"
           },
-          "fromPublicKeyType": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "bytecode": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "attoAlphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "targetBlockHash": {
-            "type": "string",
-            "format": "block-hash"
-          },
-          "gasEstimationMultiplier": {
-            "type": "number",
-            "format": "double"
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -13688,126 +13762,12 @@
         "title": "ExecuteScript",
         "type": "object",
         "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId"
-        ],
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          }
-        }
-      },
-      "ExecuteScript2": {
-        "title": "ExecuteScript",
-        "type": "object",
-        "required": [
-          "fromPublicKey",
-          "bytecode",
+          "value",
           "type"
         ],
         "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "fromPublicKeyType": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "bytecode": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "attoAlphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "targetBlockHash": {
-            "type": "string",
-            "format": "block-hash"
-          },
-          "gasEstimationMultiplier": {
-            "type": "number",
-            "format": "double"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "ExecuteScript3": {
-        "title": "ExecuteScript",
-        "type": "object",
-        "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "type"
-        ],
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+          "value": {
+            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
           },
           "type": {
             "type": "string"
@@ -15342,41 +15302,15 @@
         "title": "Transfer",
         "type": "object",
         "required": [
-          "fromPublicKey",
-          "destinations"
+          "value",
+          "type"
         ],
         "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "hex-string"
+          "value": {
+            "$ref": "#/components/schemas/BuildTransferTx"
           },
-          "fromPublicKeyType": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "destinations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Destination"
-            }
-          },
-          "utxos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OutputRef"
-            }
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "targetBlockHash": {
-            "type": "string",
-            "format": "block-hash"
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -15384,120 +15318,12 @@
         "title": "Transfer",
         "type": "object",
         "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "Transfer3": {
-        "title": "Transfer",
-        "type": "object",
-        "required": [
-          "fromPublicKey",
-          "destinations",
+          "value",
           "type"
         ],
         "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "fromPublicKeyType": {
-            "type": "string",
-            "format": "hex-string"
-          },
-          "destinations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Destination"
-            }
-          },
-          "utxos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OutputRef"
-            }
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "targetBlockHash": {
-            "type": "string",
-            "format": "block-hash"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "Transfer4": {
-        "title": "Transfer",
-        "type": "object",
-        "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "fromGroup",
-          "toGroup",
-          "type"
-        ],
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
+          "value": {
+            "$ref": "#/components/schemas/BuildTransferTxResult"
           },
           "type": {
             "type": "string"

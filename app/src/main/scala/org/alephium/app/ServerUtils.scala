@@ -235,7 +235,7 @@ class ServerUtils(implicit
 
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
-      query: BuildTransaction.Transfer,
+      query: BuildTransferTx,
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
@@ -257,31 +257,31 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def buildTransferTransaction(
       blockFlow: BlockFlow,
-      query: BuildTransaction.Transfer,
+      query: BuildTransferTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[BuildTransactionResult.Transfer] = {
+  ): Try[BuildTransferTxResult] = {
     for {
       unsignedTx <- buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
-    } yield BuildTransactionResult.Transfer.from(unsignedTx)
+    } yield BuildTransferTxResult.from(unsignedTx)
   }
 
   def buildMultiInputsTransaction(
       blockFlow: BlockFlow,
       query: BuildMultiAddressesTransaction
-  ): Try[BuildTransactionResult.Transfer] = {
+  ): Try[BuildTransferTxResult] = {
     for {
       unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
         blockFlow,
         query
       )
     } yield {
-      BuildTransactionResult.Transfer.from(unsignedTx)
+      BuildTransferTxResult.from(unsignedTx)
     }
   }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
-  ): Try[BuildTransactionResult.Transfer] = {
+  ): Try[BuildTransferTxResult] = {
     for {
       _ <- checkGroup(query.fromAddress.lockupScript)
       unlockScript <- buildMultisigUnlockScript(
@@ -299,7 +299,7 @@ class ServerUtils(implicit
         ExtraUtxosInfo.empty
       )
     } yield {
-      BuildTransactionResult.Transfer.from(unsignedTx)
+      BuildTransferTxResult.from(unsignedTx)
     }
   }
 
@@ -1288,7 +1288,7 @@ class ServerUtils(implicit
 
   def buildDeployContractUnsignedTx(
       blockFlow: BlockFlow,
-      query: BuildTransaction.DeployContract,
+      query: BuildDeployContractTx,
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     val hardfork = blockFlow.networkConfig.getHardFork(TimeStamp.now())
@@ -1334,12 +1334,12 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def buildDeployContractTx(
       blockFlow: BlockFlow,
-      query: BuildTransaction.DeployContract,
+      query: BuildDeployContractTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[BuildTransactionResult.DeployContract] = {
+  ): Try[BuildDeployContractTxResult] = {
     for {
       utx <- buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildTransactionResult.DeployContract.from(utx)
+    } yield BuildDeployContractTxResult.from(utx)
   }
 
   def buildChainedTransactions(
@@ -1350,7 +1350,7 @@ class ServerUtils(implicit
       (AVector.empty[BuildTransactionResult], ExtraUtxosInfo.empty)
     ) { case ((buildTransactionResults, extraUtxosInfo), buildTransactionRequest) =>
       for {
-        keyPair <- buildTransactionRequest.getLockPair()
+        keyPair <- buildTransactionRequest.value.getLockPair()
         (newUtxosForThisLockupScript, restOfUtxos) = extraUtxosInfo.newUtxos.partition(
           _.output.lockupScript == keyPair._1
         )
@@ -1377,27 +1377,35 @@ class ServerUtils(implicit
     buildTransaction match {
       case buildTransfer: BuildTransaction.Transfer =>
         for {
-          unsignedTx <- buildTransferUnsignedTransaction(blockFlow, buildTransfer, extraUtxosInfo)
+          unsignedTx <- buildTransferUnsignedTransaction(
+            blockFlow,
+            buildTransfer.value,
+            extraUtxosInfo
+          )
         } yield (
-          BuildTransactionResult.Transfer.from(unsignedTx),
+          BuildTransactionResult.Transfer(BuildTransferTxResult.from(unsignedTx)),
           updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
       case buildExecuteScript: BuildTransaction.ExecuteScript =>
         for {
-          unsignedTx <- buildExecuteScriptUnsignedTx(blockFlow, buildExecuteScript, extraUtxosInfo)
+          unsignedTx <- buildExecuteScriptUnsignedTx(
+            blockFlow,
+            buildExecuteScript.value,
+            extraUtxosInfo
+          )
         } yield (
-          BuildTransactionResult.ExecuteScript.from(unsignedTx),
+          BuildTransactionResult.ExecuteScript(BuildExecuteScriptTxResult.from(unsignedTx)),
           updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
       case buildDeployContract: BuildTransaction.DeployContract =>
         for {
           unsignedTx <- buildDeployContractUnsignedTx(
             blockFlow,
-            buildDeployContract,
+            buildDeployContract.value,
             extraUtxosInfo
           )
         } yield (
-          BuildTransactionResult.DeployContract.from(unsignedTx),
+          BuildTransactionResult.DeployContract(BuildDeployContractTxResult.from(unsignedTx)),
           updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
     }
@@ -1456,7 +1464,7 @@ class ServerUtils(implicit
 
   def buildExecuteScriptUnsignedTx(
       blockFlow: BlockFlow,
-      query: BuildTransaction.ExecuteScript,
+      query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
@@ -1488,12 +1496,12 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def buildExecuteScriptTx(
       blockFlow: BlockFlow,
-      query: BuildTransaction.ExecuteScript,
+      query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[BuildTransactionResult.ExecuteScript] = {
+  ): Try[BuildExecuteScriptTxResult] = {
     for {
       utx <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildTransactionResult.ExecuteScript.from(utx)
+    } yield BuildExecuteScriptTxResult.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

@@ -39,7 +39,7 @@ trait BlockFlowClient {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult.Transfer]]
+  ): Future[Either[ApiError[_ <: StatusCode], BuildTransferTxResult]]
   def prepareSweepActiveAddressTransaction(
       fromPublicKey: PublicKey,
       address: Address.Asset,
@@ -117,12 +117,12 @@ object BlockFlowClient {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[ApiError[_ <: StatusCode], BuildTransactionResult.Transfer]] = {
+    ): Future[Either[ApiError[_ <: StatusCode], BuildTransferTxResult]] = {
       val lockupScript = LockupScript.p2pkh(fromPublicKey)
       requestFromGroup(
         lockupScript.groupIndex,
         buildTransferTransaction,
-        BuildTransaction.Transfer(
+        BuildTransferTx(
           fromPublicKey.bytes,
           None,
           destinations,
