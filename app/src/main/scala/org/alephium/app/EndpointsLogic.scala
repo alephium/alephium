@@ -168,8 +168,16 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBlocksAndEvents(blockFlow, timeInterval))
   }
 
+  val getRichBlocksAndEventsLogic = serverLogic(getRichBlocksAndEvents) { timeInterval =>
+    Future.successful(serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval))
+  }
+
   val getBlockLogic = serverLogic(getBlock) { hash =>
     Future.successful(serverUtils.getBlock(blockFlow, hash))
+  }
+
+  val getRichBlockAndEventsLogic = serverLogic(getRichBlockAndEvents) { hash =>
+    Future.successful(serverUtils.getRichBlockAndEvents(blockFlow, hash))
   }
 
   val getMainChainBlockByGhostUncleLogic = serverLogic(getMainChainBlockByGhostUncle) {

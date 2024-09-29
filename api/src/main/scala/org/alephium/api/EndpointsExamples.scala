@@ -184,6 +184,49 @@ trait EndpointsExamples extends ErrorExamples {
     AVector(ghostUncleBlockEntry)
   )
 
+  private lazy val richTransaction = RichTransaction(
+    unsigned = RichUnsignedTx(
+      txId = unsignedTx.txId,
+      version = unsignedTx.version,
+      networkId = unsignedTx.networkId,
+      scriptOpt = transaction.unsigned.scriptOpt,
+      gasAmount = unsignedTx.gasAmount,
+      gasPrice = unsignedTx.gasPrice,
+      inputs = AVector(
+        RichAssetInput(
+          hint = outputRef.hint,
+          key = outputRef.key,
+          unlockScript = unlockupScriptBytes,
+          attoAlphAmount = Amount(ALPH.oneAlph),
+          address = Address.Asset(lockupScript),
+          tokens
+        )
+      ),
+      fixedOutputs = AVector(outputAsset)
+    ),
+    scriptExecutionOk = true,
+    contractInputs = AVector.empty,
+    generatedOutputs = AVector(outputContract),
+    AVector(signature.bytes),
+    AVector(signature.bytes)
+  )
+
+  private lazy val richBlockEntry = RichBlockEntry(
+    hash = blockHash,
+    timestamp = ts,
+    chainFrom = 1,
+    chainTo = 2,
+    height,
+    deps = AVector(blockHash, blockHash),
+    transactions = AVector(richTransaction),
+    hash.bytes,
+    1.toByte,
+    hash,
+    hash,
+    hash.bytes,
+    AVector(ghostUncleBlockEntry)
+  )
+
   private val eventByBlockHash = ContractEventByBlockHash(
     txId,
     Address.contract(contractId),
@@ -191,7 +234,8 @@ trait EndpointsExamples extends ErrorExamples {
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
-  private val blockAndEvents = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
+  private val blockAndEvents     = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
+  private val richBlockAndEvents = RichBlockAndEvents(richBlockEntry, AVector(eventByBlockHash))
 
   private val blockCandidate = BlockCandidate(
     fromGroup = 1,
@@ -369,11 +413,21 @@ trait EndpointsExamples extends ErrorExamples {
       : List[Example[BlocksAndEventsPerTimeStampRange]] =
     simpleExample(BlocksAndEventsPerTimeStampRange(AVector(AVector(blockAndEvents))))
 
+  implicit val richBlocksAndEventsPerTimeStampRangeExamples
+      : List[Example[RichBlocksAndEventsPerTimeStampRange]] =
+    simpleExample(RichBlocksAndEventsPerTimeStampRange(AVector(AVector(richBlockAndEvents))))
+
   implicit val mempoolTransactionsExamples: List[Example[AVector[MempoolTransactions]]] =
     simpleExample(AVector(MempoolTransactions(0, 1, AVector(transactionTemplate))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
+
+  implicit val richBlockEntryExamples: List[Example[RichBlockEntry]] =
+    simpleExample(richBlockEntry)
+
+  implicit val richBlockAndEventsExamples: List[Example[RichBlockAndEvents]] =
+    simpleExample(richBlockAndEvents)
 
   implicit val blockAndEventsExamples: List[Example[BlockAndEvents]] =
     simpleExample(blockAndEvents)
