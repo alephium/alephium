@@ -30,7 +30,6 @@ import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
@@ -4167,56 +4166,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.isBlockInMainChain(blockFlow, block.hash).rightValue is true
     serverUtils.isBlockInMainChain(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
-  }
-
-  "ServerUtils.updateExtraUtxosInfoWithUnsignedTx" should "update UTXO info" in new Fixture
-    with TxGenerators {
-
-    val chainIndex  = ChainIndex.unsafe(0, 0)
-    val serverUtils = new ServerUtils()
-
-    {
-      info("Empty extraUtxosInfo")
-
-      val assetInfos = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
-      val unsignedTx = unsignedTxGen(chainIndex)(assetInfos).sample.value
-
-      val extraUtxosInfo = ExtraUtxosInfo.empty
-      val updatedExtraUtxosInfo =
-        serverUtils.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
-      updatedExtraUtxosInfo.newUtxos.map(_.output) is unsignedTx.fixedOutputs
-      updatedExtraUtxosInfo.spentUtxos is unsignedTx.inputs.map(_.outputRef)
-    }
-
-    {
-      info("Non-empty extraUtxosInfo")
-
-      val assetInfos   = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
-      val unsignedTx   = unsignedTxGen(chainIndex)(assetInfos).sample.value
-      val assetOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
-
-      val utxoRefToBeSpent = unsignedTx.inputs(0).outputRef
-      val utxoToBeSpent    = AssetOutputInfo(utxoRefToBeSpent, assetOutputs(0), MemPoolOutput)
-      val restOfUtxos = assetOutputs.tail.map { assetOutput =>
-        val txInputRef = assetOutputRefGen(chainIndex.from).sample.value
-        AssetOutputInfo(txInputRef, assetOutput, MemPoolOutput)
-      }
-
-      val alreadySpentUtxos =
-        AVector.from(Gen.nonEmptyListOf(assetOutputRefGen(chainIndex.from)).sample.value)
-
-      val extraUtxosInfo = ExtraUtxosInfo(
-        newUtxos = utxoToBeSpent +: restOfUtxos,
-        spentUtxos = alreadySpentUtxos
-      )
-
-      val updatedExtraUtxosInfo =
-        serverUtils.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
-      updatedExtraUtxosInfo.newUtxos
-        .filterNot(_.ref == utxoToBeSpent)
-        .map(_.output) is restOfUtxos.map(_.output) ++ unsignedTx.fixedOutputs
-      updatedExtraUtxosInfo.spentUtxos is alreadySpentUtxos ++ unsignedTx.inputs.map(_.outputRef)
-    }
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {

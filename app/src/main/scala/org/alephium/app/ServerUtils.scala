@@ -29,7 +29,6 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
@@ -1384,7 +1383,7 @@ class ServerUtils(implicit
           )
         } yield (
           BuildTransactionResult.Transfer(BuildTransferTxResult.from(unsignedTx)),
-          updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+          ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
       case buildExecuteScript: BuildTransaction.ExecuteScript =>
         for {
@@ -1395,7 +1394,7 @@ class ServerUtils(implicit
           )
         } yield (
           BuildTransactionResult.ExecuteScript(BuildExecuteScriptTxResult.from(unsignedTx)),
-          updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+          ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
       case buildDeployContract: BuildTransaction.DeployContract =>
         for {
@@ -1406,27 +1405,9 @@ class ServerUtils(implicit
           )
         } yield (
           BuildTransactionResult.DeployContract(BuildDeployContractTxResult.from(unsignedTx)),
-          updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+          ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
         )
     }
-  }
-
-  def updateExtraUtxosInfoWithUnsignedTx(
-      extraUtxosInfo: ExtraUtxosInfo,
-      unsignedTx: UnsignedTransaction
-  ): ExtraUtxosInfo = {
-    val remainingNewUtxos = extraUtxosInfo.newUtxos.filterNot { utxo =>
-      unsignedTx.inputs.exists(_.outputRef == utxo.ref)
-    }
-    val newUtxosFromTx = unsignedTx.fixedOutputs.mapWithIndex { (txOutput, index) =>
-      val txOutputRef = AssetOutputRef.from(txOutput, TxOutputRef.key(unsignedTx.id, index))
-      AssetOutputInfo(txOutputRef, txOutput, MemPoolOutput)
-    }
-
-    extraUtxosInfo.copy(
-      newUtxos = remainingNewUtxos ++ newUtxosFromTx,
-      spentUtxos = extraUtxosInfo.spentUtxos ++ unsignedTx.inputs.map(_.outputRef)
-    )
   }
 
   def getInitialAttoAlphAmount(amountOption: Option[U256], hardfork: HardFork): Try[U256] = {

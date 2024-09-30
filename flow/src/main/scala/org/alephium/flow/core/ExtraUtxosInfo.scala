@@ -16,8 +16,8 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.core.FlowUtils.AssetOutputInfo
-import org.alephium.protocol.model.AssetOutputRef
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
+import org.alephium.protocol.model.{AssetOutputRef, TxOutputRef, UnsignedTransaction}
 import org.alephium.util.AVector
 
 final case class ExtraUtxosInfo(
@@ -25,7 +25,7 @@ final case class ExtraUtxosInfo(
     spentUtxos: AVector[AssetOutputRef]
 ) {
   def merge(utxos: AVector[AssetOutputInfo]): AVector[AssetOutputInfo] = {
-    utxos.filterNot(utxo => spentUtxos.contains(utxo.ref)) ++ newUtxos
+    newUtxos ++ utxos.filterNot(utxo => spentUtxos.contains(utxo.ref))
   }
 }
 
@@ -34,4 +34,22 @@ object ExtraUtxosInfo {
     newUtxos = AVector.empty,
     spentUtxos = AVector.empty
   )
+
+  def updateExtraUtxosInfoWithUnsignedTx(
+      extraUtxosInfo: ExtraUtxosInfo,
+      unsignedTx: UnsignedTransaction
+  ): ExtraUtxosInfo = {
+    val remainingNewUtxos = extraUtxosInfo.newUtxos.filterNot { utxo =>
+      unsignedTx.inputs.exists(_.outputRef == utxo.ref)
+    }
+    val newUtxosFromTx = unsignedTx.fixedOutputs.mapWithIndex { (txOutput, index) =>
+      val txOutputRef = AssetOutputRef.from(txOutput, TxOutputRef.key(unsignedTx.id, index))
+      AssetOutputInfo(txOutputRef, txOutput, MemPoolOutput)
+    }
+
+    extraUtxosInfo.copy(
+      newUtxos = remainingNewUtxos ++ newUtxosFromTx,
+      spentUtxos = extraUtxosInfo.spentUtxos ++ unsignedTx.inputs.map(_.outputRef)
+    )
+  }
 }

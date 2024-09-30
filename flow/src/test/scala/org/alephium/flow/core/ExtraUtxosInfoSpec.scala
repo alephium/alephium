@@ -20,30 +20,86 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
-import org.alephium.protocol.model.{ChainIndex, ModelGenerators}
-import org.alephium.util.AlephiumSpec
-import org.alephium.util.AVector
+import org.alephium.protocol.model.{ChainIndex, ModelGenerators, TxGenerators}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class ExtraUtxosInfoSpec extends AlephiumSpec {
 
-  "ExtraUtxosInfoSpec.merge" should "merge UTXOs" in new FlowFixture with ModelGenerators {
+  "ExtraUtxosInfo.merge" should "merge UTXOs" in new FlowFixture with ModelGenerators {
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val spentUtxos = AVector.from(Gen.listOf(assetOutputRefGen(chainIndex.from)).sample.value)
+    val spentUtxoRefs =
+      AVector.from(Gen.nonEmptyListOf(assetOutputRefGen(chainIndex.from)).sample.value)
 
     def genUtxos(): AVector[AssetOutputInfo] = {
-      val assetOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
+      val assetOutputs =
+        AVector.from(Gen.listOfN(spentUtxoRefs.length, assetOutputGen).sample.value)
       assetOutputs.map { assetOutput =>
         val txInputRef = assetOutputRefGen(chainIndex.from).sample.value
         AssetOutputInfo(txInputRef, assetOutput, MemPoolOutput)
       }
     }
     val newUtxos       = genUtxos()
-    val extraUtxosInfo = ExtraUtxosInfo(newUtxos, spentUtxos)
+    val extraUtxosInfo = ExtraUtxosInfo(newUtxos, spentUtxoRefs)
 
     val utxos = genUtxos()
+
+    extraUtxosInfo.merge(utxos) is newUtxos ++ utxos
+
     extraUtxosInfo.merge(
-      utxos.replace(0, utxos(0).copy(ref = spentUtxos(0)))
-    ) is utxos.tail ++ newUtxos
-    extraUtxosInfo.merge(utxos) is utxos ++ newUtxos
+      utxos.replace(0, utxos(0).copy(ref = spentUtxoRefs(0)))
+    ) is newUtxos ++ utxos.tail
+
+    val spentUtxos = utxos.zipWithIndex.map { case (utxo, index) =>
+      utxo.copy(ref = spentUtxoRefs(index))
+    }
+    extraUtxosInfo.merge(spentUtxos) is newUtxos
+  }
+
+  "ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx" should "update UTXO info" in new FlowFixture
+    with TxGenerators {
+    val chainIndex = chainIndexGen.sample.value
+
+    {
+      info("Empty extraUtxosInfo")
+
+      val assetInfos = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+      val unsignedTx = unsignedTxGen(chainIndex)(assetInfos).sample.value
+
+      val extraUtxosInfo = ExtraUtxosInfo.empty
+      val updatedExtraUtxosInfo =
+        ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+      updatedExtraUtxosInfo.newUtxos.map(_.output) is unsignedTx.fixedOutputs
+      updatedExtraUtxosInfo.spentUtxos is unsignedTx.inputs.map(_.outputRef)
+    }
+
+    {
+      info("Non-empty extraUtxosInfo")
+
+      val assetInfos   = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+      val unsignedTx   = unsignedTxGen(chainIndex)(assetInfos).sample.value
+      val assetOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
+
+      val utxoRefToBeSpent = unsignedTx.inputs(0).outputRef
+      val utxoToBeSpent    = AssetOutputInfo(utxoRefToBeSpent, assetOutputs(0), MemPoolOutput)
+      val restOfUtxos = assetOutputs.tail.map { assetOutput =>
+        val txInputRef = assetOutputRefGen(chainIndex.from).sample.value
+        AssetOutputInfo(txInputRef, assetOutput, MemPoolOutput)
+      }
+
+      val alreadySpentUtxos =
+        AVector.from(Gen.nonEmptyListOf(assetOutputRefGen(chainIndex.from)).sample.value)
+
+      val extraUtxosInfo = ExtraUtxosInfo(
+        newUtxos = utxoToBeSpent +: restOfUtxos,
+        spentUtxos = alreadySpentUtxos
+      )
+
+      val updatedExtraUtxosInfo =
+        ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+      updatedExtraUtxosInfo.newUtxos
+        .filterNot(_.ref == utxoToBeSpent)
+        .map(_.output) is restOfUtxos.map(_.output) ++ unsignedTx.fixedOutputs
+      updatedExtraUtxosInfo.spentUtxos is alreadySpentUtxos ++ unsignedTx.inputs.map(_.outputRef)
+    }
   }
 }
