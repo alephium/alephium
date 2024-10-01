@@ -58,7 +58,7 @@ import org.alephium.wallet.config.WalletConfig
 //scalastyle:off file.size.limit
 abstract class RestServerSpec(
     val nbOfNodes: Int,
-    val apiKey: Option[ApiKey] = None,
+    val apiKeys: AVector[ApiKey] = AVector.empty,
     val apiKeyEnabled: Boolean = false,
     val utxosLimit: Int = Int.MaxValue
 ) extends RestServerFixture {
@@ -994,10 +994,11 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "correctly use the api-key" in {
-    val newApiKey = apiKey match {
-      case Some(_) => None
-      case None    => Some(Hash.random.toHexString)
+  it should "check the use of api-key is incorrect" in {
+    val newApiKey = if (apiKeys.nonEmpty) {
+      None
+    } else {
+      Some(Hash.random.toHexString)
     }
 
     Get(blockflowFromTo(0, 1), apiKey = newApiKey) check { response =>
@@ -1013,10 +1014,10 @@ abstract class RestServerSpec(
   }
 
   it should "validate the api-key" in {
-    val newApiKey = apiKey.map(_ => Hash.random.toHexString)
+    val newApiKey = apiKeys.headOption.map(_ => Hash.random.toHexString)
 
     Get(blockflowFromTo(0, 1), apiKey = newApiKey) check { response =>
-      if (apiKey.isDefined) {
+      if (apiKeys.headOption.isDefined) {
         response.code is StatusCode.Unauthorized
         response.as[ApiError.Unauthorized] is ApiError.Unauthorized("Wrong api key")
       } else {
@@ -1430,7 +1431,7 @@ abstract class RestServerSpec(
 }
 
 abstract class RestServerApiKeyDisableSpec(
-    val apiKey: Option[ApiKey],
+    val apiKeys: AVector[ApiKey],
     val nbOfNodes: Int = 1,
     val apiKeyEnabled: Boolean = false,
     val utxosLimit: Int = Int.MaxValue
@@ -1469,7 +1470,7 @@ trait RestServerFixture
   }
 
   val nbOfNodes: Int
-  val apiKey: Option[ApiKey]
+  val apiKeys: AVector[ApiKey]
   val apiKeyEnabled: Boolean
   val utxosLimit: Int
 
@@ -1483,7 +1484,7 @@ trait RestServerFixture
       ("alephium.api.default-utxos-limit", utxosLimit),
       ("alephium.node.indexes.tx-output-ref-index", true),
       ("alephium.node.indexes.subcontract-index", true)
-    ) ++ apiKey
+    ) ++ apiKeys.headOption
       .map(key => Map(("alephium.api.api-key", key.value)))
       .getOrElse(Map.empty)
   }
@@ -1538,7 +1539,7 @@ trait RestServerFixture
     (new java.io.File("")).toPath,
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
-    WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey)
+    WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey.headOption)
   )
 
   lazy val walletApp = new WalletApp(walletConfig)
@@ -1622,7 +1623,7 @@ trait RestServerFixture
   lazy val servers = buildServers(nbOfNodes)
 
   override lazy val port        = servers.sample().port
-  override lazy val maybeApiKey = apiKey.map(_.value)
+  override lazy val maybeApiKey = apiKeys.headOption.map(_.value)
 
   def getPort(group: GroupIndex): Int =
     servers.find(_.node.config.broker.contains(group)).get.port
@@ -1667,8 +1668,12 @@ class RestServerSpec3Nodes extends RestServerSpec(3)
 class RestServerSpecApiKey
     extends RestServerSpec(
       3,
-      Some(ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377")),
+      AVector(
+        ApiKey.unsafe("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"),
+        ApiKey.unsafe("88a1ef596e7b67727763f3c220ea27349047cc6fa858b32c6837774beb7e209"),
+        ApiKey.unsafe("f5988a1e6e7b63c227727763f0ea2734904837774beb7e2097cc6fa858b32c6")
+      ),
       true
     )
-class RestServerSpecApiKeyDisableWithoutApiKey extends RestServerApiKeyDisableSpec(None)
+class RestServerSpecApiKeyDisableWithoutApiKey extends RestServerApiKeyDisableSpec(AVector.empty)
 class RestServerWithZeroUtxosLimit             extends RestServerSpec(nbOfNodes = 1, utxosLimit = 0)

@@ -59,7 +59,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       networkInterface = address.getAddress,
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
-      None,
+      AVector.empty,
       ALPH.oneAlph,
       defaultUtxosLimit
     )

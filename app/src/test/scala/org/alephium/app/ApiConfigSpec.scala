@@ -50,28 +50,28 @@ class ApiConfigSpec extends AlephiumSpec {
     override val apiKeyEnabled = true
     override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.headOption.get.value is apiKey
   }
 
   it should "use defined api key even if key is not enabled" in new ApiKeyConfigFixture {
     override val apiKeyEnabled = false
     override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.headOption.get.value is apiKey
   }
 
   it should "not ask for api key even if key is enabled" in new ApiKeyConfigFixture {
     override def apiKeyEnabled: Boolean = true
     override def apiKey: String         = null
 
-    apiConfig.apiKey is None
+    apiConfig.apiKey.headOption is None
   }
 
   it should "not ask for api key even if key is not enabled" in new ApiKeyConfigFixture {
     override def apiKeyEnabled: Boolean = false
     override def apiKey: String         = null
 
-    apiConfig.apiKey is None
+    apiConfig.apiKey.headOption is None
   }
 
   behavior of "Api interface is not 127.0.0.1"
@@ -81,7 +81,7 @@ class ApiConfigSpec extends AlephiumSpec {
     override val apiKeyEnabled = true
     override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.headOption.get.value is apiKey
   }
 
   it should "use defined api key key is not enabled" in new ApiKeyConfigFixture {
@@ -89,7 +89,7 @@ class ApiConfigSpec extends AlephiumSpec {
     override val apiKeyEnabled = false
     override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.headOption.get.value is apiKey
   }
 
   it should "ask for api key if key is enabled" in new ApiKeyConfigFixture {
@@ -107,7 +107,7 @@ class ApiConfigSpec extends AlephiumSpec {
     override def apiKeyEnabled: Boolean = false
     override def apiKey: String         = null
 
-    apiConfig.apiKey is None
+    apiConfig.apiKey.headOption is None
   }
 
   trait ApiKeyConfigFixture {

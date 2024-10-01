@@ -54,7 +54,7 @@ trait Server extends Service {
           config.network.restPort,
           config.broker.groups,
           apiConfig.blockflowFetchMaxAge,
-          apiConfig.apiKey
+          apiConfig.apiKey.headOption
         )
       )
 

@@ -43,8 +43,8 @@ class WalletConfigSpec() extends AlephiumSpec {
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
 
-    config.apiKey.value is ApiKey.unsafe(walletApiKey)
-    config.blockflow.apiKey.value is ApiKey.unsafe(blockflowApiKey)
+    config.apiKey.headOption.value is ApiKey.unsafe(walletApiKey)
+    config.blockflow.apiKey.headOption.value is ApiKey.unsafe(blockflowApiKey)
   }
 
   it should "load without api-key" in new Fixture {
@@ -54,8 +54,8 @@ class WalletConfigSpec() extends AlephiumSpec {
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
 
-    config.apiKey is None
-    config.blockflow.apiKey is None
+    config.apiKey.headOption is None
+    config.blockflow.apiKey.headOption is None
   }
 
   it should "fail to load invalid api-key" in new Fixture {

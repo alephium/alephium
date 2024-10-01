@@ -27,6 +27,7 @@ import sttp.tapir.server._
 
 import org.alephium.api.{TapirCodecs, TapirSchemasLike}
 import org.alephium.api.model.ApiKey
+import org.alephium.util.AVector
 
 trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike with StrictLogging {
   import Endpoints._
@@ -35,7 +36,7 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
   implicit val customConfiguration: Configuration =
     Configuration.default.withDiscriminator("type")
 
-  def maybeApiKey: Option[ApiKey]
+  def apiKeys: AVector[ApiKey]
 
   type BaseEndpointWithoutApi[I, O] =
     Endpoint[Unit, I, ApiError[_ <: StatusCode], O, Any]
@@ -60,18 +61,26 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
 
   private def checkApiKey(
       maybeToCheck: Option[ApiKey]
-  ): Either[ApiError[_ <: StatusCode], Unit] =
-    (maybeApiKey, maybeToCheck) match {
-      case (None, None)    => Right(())
-      case (None, Some(_)) => Left(ApiError.Unauthorized("Api key not configured in server"))
-      case (Some(_), None) => Left(ApiError.Unauthorized("Missing api key"))
-      case (Some(apiKey), Some(toCheck)) =>
-        if (apiKey.value == toCheck.value) {
+  ): Either[ApiError[_ <: StatusCode], Unit] = {
+    if (apiKeys.isEmpty) {
+      maybeToCheck match {
+        case None =>
           Right(())
-        } else {
-          Left(ApiError.Unauthorized("Wrong api key"))
-        }
+        case Some(_) =>
+          Left(ApiError.Unauthorized("Api key not configured in server"))
+      }
+    } else {
+      maybeToCheck match {
+        case None => Left(ApiError.Unauthorized("Missing api key"))
+        case Some(toCheck) =>
+          if (apiKeys.map(_.value).contains(toCheck.value)) {
+            Right(())
+          } else {
+            Left(ApiError.Unauthorized("Wrong api key"))
+          }
+      }
     }
+  }
 
   def serverLogic[I, O](endpoint: BaseEndpoint[I, O])(
       logic: I => Future[Either[ApiError[_ <: StatusCode], O]]
