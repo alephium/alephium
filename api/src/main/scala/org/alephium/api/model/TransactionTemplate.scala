@@ -29,7 +29,7 @@ final case class TransactionTemplate(
     unsigned: UnsignedTx,
     inputSignatures: AVector[ByteString],
     scriptSignatures: AVector[ByteString],
-    timestamp: TimeStamp
+    seenAt: TimeStamp
 ) {
   def toProtocol()(implicit
       networkConfig: NetworkConfig
@@ -51,13 +51,13 @@ final case class TransactionTemplate(
 object TransactionTemplate {
   def fromProtocol(
       template: protocol.TransactionTemplate,
-      timestamp: TimeStamp
+      seenAt: TimeStamp
   ): TransactionTemplate = {
     TransactionTemplate(
       UnsignedTx.fromProtocol(template.unsigned),
       template.inputSignatures.map(sig => serialize(sig)),
       template.scriptSignatures.map(sig => serialize(sig)),
-      timestamp
+      seenAt
     )
   }
 }

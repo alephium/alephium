@@ -986,13 +986,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    val mempoolTimeStamp = TimeStamp.now()
+    val txSeenAt = TimeStamp.now()
     val txTemplate = signAndAddToMemPool(
       buildTransaction.txId,
       buildTransaction.unsignedTx,
       chainIndex,
       fromPrivateKey,
-      mempoolTimeStamp
+      txSeenAt
     )
 
     val txs = serverUtils.listMempoolTransactions(blockFlow).rightValue
@@ -1001,7 +1001,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       MempoolTransactions(
         chainIndex.from.value,
         chainIndex.to.value,
-        AVector(api.TransactionTemplate.fromProtocol(txTemplate, mempoolTimeStamp))
+        AVector(api.TransactionTemplate.fromProtocol(txTemplate, txSeenAt))
       )
     )
   }
@@ -4291,7 +4291,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       unsignedTx: String,
       chainIndex: ChainIndex,
       fromPrivateKey: PrivateKey,
-      mempoolTimeStamp: TimeStamp = TimeStamp.now()
+      txSeenAt: TimeStamp = TimeStamp.now()
   )(implicit
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
@@ -4304,7 +4304,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound()
 
-    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), mempoolTimeStamp)
+    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), txSeenAt)
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled()
 
     txTemplate

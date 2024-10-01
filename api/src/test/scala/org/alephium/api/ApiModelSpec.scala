@@ -1361,7 +1361,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                      |  "unsigned": ${write(tx.unsigned)},
                      |  "inputSignatures": ${write(tx.inputSignatures)},
                      |  "scriptSignatures": ${write(tx.scriptSignatures)},
-                     |  "timestamp": ${now.millis}
+                     |  "seenAt": ${now.millis}
                      |}""".stripMargin
 
     checkData(tx, jsonRaw)

@@ -95,16 +95,19 @@ class MemPoolSpec
     val tx0    = transactionGen().retryUntil(_.chainIndex equals index0).sample.get.toTemplate
     val tx1    = transactionGen().retryUntil(_.chainIndex equals index1).sample.get.toTemplate
     val ts0    = TimeStamp.now()
-    val ts1    = TimeStamp.now()
+    val ts1    = ts0.plusUnsafe(Duration.ofSecondsUnsafe(1))
     pool.add(index0, tx0, ts0)
     pool.add(index1, tx1, ts1)
   }
 
   it should "list transactions for a specific group" in new Fixture {
     pool.getAll().map(_.id).toSet is AVector(tx0, tx1).map(_.id).toSet
-    pool.getAllWithTimestamp().map { case (template, ts) =>
-      (template.id, ts)
-    }.toSet is Set((tx0.id, ts0), (tx1.id, ts1))
+    pool
+      .getAllWithTimestamp()
+      .map { case (template, ts) =>
+        (template.id, ts)
+      }
+      .toSet is Set((tx0.id, ts0), (tx1.id, ts1))
   }
 
   it should "work for utxos" in new Fixture {
