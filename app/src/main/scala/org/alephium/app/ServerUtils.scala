@@ -1383,7 +1383,7 @@ class ServerUtils(implicit
           )
         } yield (
           BuildTransactionResult.Transfer(BuildTransferTxResult.from(unsignedTx)),
-          ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+          extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
       case buildExecuteScript: BuildTransaction.ExecuteScript =>
         for {
@@ -1394,7 +1394,7 @@ class ServerUtils(implicit
           )
         } yield (
           BuildTransactionResult.ExecuteScript(BuildExecuteScriptTxResult.from(unsignedTx)),
-          ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+          extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
       case buildDeployContract: BuildTransaction.DeployContract =>
         for {
@@ -1405,7 +1405,7 @@ class ServerUtils(implicit
           )
         } yield (
           BuildTransactionResult.DeployContract(BuildDeployContractTxResult.from(unsignedTx)),
-          ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+          extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
     }
   }

@@ -55,7 +55,7 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
     extraUtxosInfo.merge(spentUtxos) is newUtxos
   }
 
-  "ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx" should "update UTXO info" in new FlowFixture
+  "ExtraUtxosInfo.updateWithUnsignedTx" should "update UTXO info" in new FlowFixture
     with TxGenerators {
     val chainIndex = chainIndexGen.sample.value
 
@@ -65,9 +65,8 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
       val assetInfos = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
       val unsignedTx = unsignedTxGen(chainIndex)(assetInfos).sample.value
 
-      val extraUtxosInfo = ExtraUtxosInfo.empty
-      val updatedExtraUtxosInfo =
-        ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+      val extraUtxosInfo        = ExtraUtxosInfo.empty
+      val updatedExtraUtxosInfo = extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
       updatedExtraUtxosInfo.newUtxos.map(_.output) is unsignedTx.fixedOutputs
       updatedExtraUtxosInfo.spentUtxos is unsignedTx.inputs.map(_.outputRef)
     }
@@ -94,8 +93,7 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
         spentUtxos = alreadySpentUtxos
       )
 
-      val updatedExtraUtxosInfo =
-        ExtraUtxosInfo.updateExtraUtxosInfoWithUnsignedTx(extraUtxosInfo, unsignedTx)
+      val updatedExtraUtxosInfo = extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
       updatedExtraUtxosInfo.newUtxos
         .filterNot(_.ref == utxoToBeSpent)
         .map(_.output) is restOfUtxos.map(_.output) ++ unsignedTx.fixedOutputs

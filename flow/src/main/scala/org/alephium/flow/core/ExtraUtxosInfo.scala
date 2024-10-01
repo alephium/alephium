@@ -27,19 +27,11 @@ final case class ExtraUtxosInfo(
   def merge(utxos: AVector[AssetOutputInfo]): AVector[AssetOutputInfo] = {
     newUtxos ++ utxos.filterNot(utxo => spentUtxos.contains(utxo.ref))
   }
-}
 
-object ExtraUtxosInfo {
-  def empty: ExtraUtxosInfo = ExtraUtxosInfo(
-    newUtxos = AVector.empty,
-    spentUtxos = AVector.empty
-  )
-
-  def updateExtraUtxosInfoWithUnsignedTx(
-      extraUtxosInfo: ExtraUtxosInfo,
+  def updateWithUnsignedTx(
       unsignedTx: UnsignedTransaction
   ): ExtraUtxosInfo = {
-    val remainingNewUtxos = extraUtxosInfo.newUtxos.filterNot { utxo =>
+    val remainingNewUtxos = newUtxos.filterNot { utxo =>
       unsignedTx.inputs.exists(_.outputRef == utxo.ref)
     }
     val newUtxosFromTx = unsignedTx.fixedOutputs.mapWithIndex { (txOutput, index) =>
@@ -47,9 +39,16 @@ object ExtraUtxosInfo {
       AssetOutputInfo(txOutputRef, txOutput, MemPoolOutput)
     }
 
-    extraUtxosInfo.copy(
+    ExtraUtxosInfo(
       newUtxos = remainingNewUtxos ++ newUtxosFromTx,
-      spentUtxos = extraUtxosInfo.spentUtxos ++ unsignedTx.inputs.map(_.outputRef)
+      spentUtxos = spentUtxos ++ unsignedTx.inputs.map(_.outputRef)
     )
   }
+}
+
+object ExtraUtxosInfo {
+  def empty: ExtraUtxosInfo = ExtraUtxosInfo(
+    newUtxos = AVector.empty,
+    spentUtxos = AVector.empty
+  )
 }
