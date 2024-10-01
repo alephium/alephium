@@ -1586,4 +1586,17 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
       .leftValue is s"Token $tokenId amount overflow"
   }
+
+  it should "get alph and token amounts while ignoring tokens with zero amounts" in {
+    val tokenId0 = TokenId.generate
+    val tokenId1 = TokenId.generate
+    val tokenId2 = TokenId.generate
+
+    BuildTxCommon.getAlphAndTokenAmounts(
+      None,
+      Some(
+        AVector(Token(tokenId0, U256.Zero), Token(tokenId1, U256.Zero), Token(tokenId2, U256.One))
+      )
+    ) isE (None, AVector(tokenId2 -> U256.One))
+  }
 }
