@@ -83,10 +83,11 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   }
 
   it should "convert TransactionTemplate" in new Fixture {
-    checkData[TransactionTemplate, protocol.TransactionTemplate](
-      transactionTemplate,
-      TransactionTemplate.fromProtocol,
-      _.toProtocol().rightValue
+    val timestamp = TimeStamp.now()
+    checkData[TransactionTemplate, (protocol.TransactionTemplate, TimeStamp)](
+      (transactionTemplate, timestamp),
+      { case (template, ts) => TransactionTemplate.fromProtocol(template, ts) },
+      template => (template.toProtocol().rightValue, template.timestamp)
     )
   }
 

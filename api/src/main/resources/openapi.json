@@ -7244,7 +7244,8 @@
                         ],
                         "scriptSignatures": [
                           "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
-                        ]
+                        ],
+                        "timestamp": 1611041396892
                       }
                     ]
                   }
@@ -14931,7 +14932,8 @@
         "required": [
           "unsigned",
           "inputSignatures",
-          "scriptSignatures"
+          "scriptSignatures",
+          "timestamp"
         ],
         "properties": {
           "unsigned": {
@@ -14950,6 +14952,10 @@
               "type": "string",
               "format": "hex-string"
             }
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

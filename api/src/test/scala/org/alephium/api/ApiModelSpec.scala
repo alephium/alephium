@@ -1354,12 +1354,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TransactionTemplate" in {
-    val tx = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val now = TimeStamp.now()
+    val tx  = api.TransactionTemplate.fromProtocol(transactionTemplate, now)
     val jsonRaw = s"""
                      |{
                      |  "unsigned": ${write(tx.unsigned)},
                      |  "inputSignatures": ${write(tx.inputSignatures)},
-                     |  "scriptSignatures": ${write(tx.scriptSignatures)}
+                     |  "scriptSignatures": ${write(tx.scriptSignatures)},
+                     |  "timestamp": ${now.millis}
                      |}""".stripMargin
 
     checkData(tx, jsonRaw)
