@@ -305,8 +305,20 @@ final case class InvalidTokenNumForContractOutput(address: Address, tokenNum: In
     s"Invalid token number for contract ${address.toBase58}: $tokenNum, max token number is $maxTokenPerContractUtxo"
 }
 
-case object InvalidTokenId                              extends ExeFailure
-case object InvalidContractId                           extends ExeFailure
+final case class InvalidTokenId(bytes: ByteString) extends ExeFailure {
+  override def toString: String =
+    s"Invalid token ID: expected 32 bytes, received ${Hex.toHexString(bytes)}"
+}
+object InvalidTokenId {
+  def from(value: Val.ByteVec): InvalidTokenId = InvalidTokenId(value.bytes)
+}
+final case class InvalidContractId(bytes: ByteString) extends ExeFailure {
+  override def toString: String =
+    s"Invalid contract ID: expected 32 bytes, received ${Hex.toHexString(bytes)}"
+}
+object InvalidContractId {
+  def from(value: Val.ByteVec): InvalidContractId = InvalidContractId(value.bytes)
+}
 case object ExpectAContract                             extends ExeFailure
 case object OutOfGas                                    extends ExeFailure
 case object GasOverflow                                 extends ExeFailure

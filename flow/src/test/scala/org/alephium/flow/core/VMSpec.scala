@@ -1276,8 +1276,10 @@ class VMSpec extends AlephiumSpec with Generators {
 
     testSimpleScript(success())
 
-    def failure(length: Int): String = {
-      val bs         = ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
+    def genBytes(length: Int): ByteString = {
+      ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
+    }
+    def failure(bs: ByteString): String = {
       val contractId = new Blake2b(bs)
       s"""
          |@using(preapprovedAssets = false)
@@ -1287,8 +1289,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
 
-    failSimpleScript(failure(31), InvalidContractId)
-    failSimpleScript(failure(33), InvalidContractId)
+    val bytes31 = genBytes(31)
+    failSimpleScript(failure(bytes31), InvalidContractId(bytes31))
+    val bytes33 = genBytes(33)
+    failSimpleScript(failure(bytes33), InvalidContractId(bytes33))
   }
 
   it should "test addressToContractId builtin" in new ContractFixture with LockupScriptGenerators {

@@ -93,7 +93,7 @@ object BuildTxCommon {
               Right((alphOpt, tokenList + (tokenId -> tokenAmount)))
             }
         }
-        amounts.map(v => (v._1, AVector.from(v._2)))
+        amounts.map(v => (v._1, AVector.from(v._2.view.filter(_._2.nonZero))))
     }
   }
 
