@@ -308,90 +308,16 @@ trait ApiModelCodec {
   implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
   implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult]   = macroRW
 
-  implicit val buildTransactionTransferRW: ReadWriter[BuildTransaction.Transfer] = {
-    readwriter[ujson.Value].bimap[BuildTransaction.Transfer](
-      transfer => writeJs(transfer.value).obj += ("type" -> ujson.Str("Transfer")),
-      json => BuildTransaction.Transfer(read[BuildTransferTx](json))
-    )
-  }
-
-  implicit val buildTransactionDeployContractTxRW: ReadWriter[BuildTransaction.DeployContract] = {
-    readwriter[ujson.Value].bimap[BuildTransaction.DeployContract](
-      deployContract =>
-        writeJs(deployContract.value).obj += ("type" -> ujson.Str("DeployContract")),
-      json => BuildTransaction.DeployContract(read[BuildDeployContractTx](json))
-    )
-  }
-
-  implicit val buildTransactionExecuteScriptTxRW: RW[BuildTransaction.ExecuteScript] = {
-    readwriter[ujson.Value].bimap[BuildTransaction.ExecuteScript](
-      executeScript => writeJs(executeScript.value).obj += ("type" -> ujson.Str("ExecuteScript")),
-      json => BuildTransaction.ExecuteScript(read[BuildExecuteScriptTx](json))
-    )
-  }
-
-  implicit val buildTransactionRW: ReadWriter[BuildTransaction] = {
-    readwriter[ujson.Value].bimap[BuildTransaction](
-      {
-        case transfer: BuildTransaction.Transfer =>
-          writeJs(transfer).obj
-        case executeScript: BuildTransaction.ExecuteScript =>
-          writeJs(executeScript).obj
-        case deployContract: BuildTransaction.DeployContract =>
-          writeJs(deployContract).obj
-      },
-      json =>
-        json("type").str match {
-          case "Transfer"       => read[BuildTransaction.Transfer](json)
-          case "ExecuteScript"  => read[BuildTransaction.ExecuteScript](json)
-          case "DeployContract" => read[BuildTransaction.DeployContract](json)
-          case typeStr          => throw Abort(s"Invalid transaction type $typeStr")
-        }
-    )
-  }
-
-  implicit val buildTransactionTransferResultRW: RW[BuildTransactionResult.Transfer] = {
-    readwriter[ujson.Value].bimap[BuildTransactionResult.Transfer](
-      transfer => writeJs(transfer.value).obj += ("type" -> ujson.Str("Transfer")),
-      json => BuildTransactionResult.Transfer(read[BuildTransferTxResult](json))
-    )
-  }
-
-  implicit val buildTransactionResultDeployContractTxRW
-      : RW[BuildTransactionResult.DeployContract] = {
-    readwriter[ujson.Value].bimap[BuildTransactionResult.DeployContract](
-      deployContract =>
-        writeJs(deployContract.value).obj += ("type" -> ujson.Str("DeployContract")),
-      json => BuildTransactionResult.DeployContract(read[BuildDeployContractTxResult](json))
-    )
-  }
-
-  implicit val buildTransactionResultExecuteScriptRW: RW[BuildTransactionResult.ExecuteScript] = {
-    readwriter[ujson.Value].bimap[BuildTransactionResult.ExecuteScript](
-      executeScript => writeJs(executeScript.value).obj += ("type" -> ujson.Str("ExecuteScript")),
-      json => BuildTransactionResult.ExecuteScript(read[BuildExecuteScriptTxResult](json))
-    )
-  }
-
-  implicit val buildTransactionResultRW: ReadWriter[BuildTransactionResult] = {
-    readwriter[ujson.Value].bimap[BuildTransactionResult](
-      {
-        case transfer: BuildTransactionResult.Transfer =>
-          writeJs(transfer).obj
-        case executeScript: BuildTransactionResult.ExecuteScript =>
-          writeJs(executeScript).obj
-        case deployContract: BuildTransactionResult.DeployContract =>
-          writeJs(deployContract).obj
-      },
-      json =>
-        json("type").str match {
-          case "Transfer"       => read[BuildTransactionResult.Transfer](json)
-          case "ExecuteScript"  => read[BuildTransactionResult.ExecuteScript](json)
-          case "DeployContract" => read[BuildTransactionResult.DeployContract](json)
-          case typeStr          => throw Abort(s"Invalid transaction type $typeStr")
-        }
-    )
-  }
+  implicit val buildTransactionTransferRW: RW[BuildTransaction.Transfer]             = macroRW
+  implicit val buildTransactionDeployContractRW: RW[BuildTransaction.DeployContract] = macroRW
+  implicit val buildTransactionExecuteScriptRW: RW[BuildTransaction.ExecuteScript]   = macroRW
+  implicit val buildTransactionRW: RW[BuildTransaction]                              = macroRW
+  implicit val buildTransactionTransferResultRW: RW[BuildTransactionResult.Transfer] = macroRW
+  implicit val buildTransactionDeployContractResultRW: RW[BuildTransactionResult.DeployContract] =
+    macroRW
+  implicit val buildTransactionExecuteScriptResultRW: RW[BuildTransactionResult.ExecuteScript] =
+    macroRW
+  implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 

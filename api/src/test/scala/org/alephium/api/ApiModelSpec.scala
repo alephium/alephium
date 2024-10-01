@@ -571,14 +571,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     )
     val transferJson = s"""
                           |{
-                          |  "fromPublicKey": "${fromPublicKey.toHexString}",
-                          |  "destinations": [
-                          |    {
-                          |      "address": "${toAddress.toBase58}",
-                          |      "attoAlphAmount": "1"
-                          |    }
-                          |  ],
-                          |  "type": "Transfer"
+                          |  "type": "Transfer",
+                          |  "value": {
+                          |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                          |    "destinations": [
+                          |      {
+                          |        "address": "${toAddress.toBase58}",
+                          |        "attoAlphAmount": "1"
+                          |      }
+                          |    ]
+                          |  }
                           |}
         """.stripMargin
 
@@ -595,12 +597,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     )
     val deployJson = s"""
                         |{
-                        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-                        |  "bytecode": "0000",
-                        |  "issueTokenAmount": "1",
-                        |  "gasAmount": 1,
-                        |  "gasPrice": "1",
-                        |  "type": "DeployContract"
+                        |  "type": "DeployContract",
+                        |  "value": {
+                        |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                        |    "bytecode": "0000",
+                        |    "issueTokenAmount": "1",
+                        |    "gasAmount": 1,
+                        |    "gasPrice": "1"
+                        |  }
                         |}
                         |""".stripMargin
 
@@ -616,11 +620,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     )
     val executeJson = s"""
                          |{
-                         |  "fromPublicKey": "${fromPublicKey.toHexString}",
-                         |  "bytecode": "0000",
-                         |  "gasAmount": 1,
-                         |  "gasPrice": "1",
-                         |  "type": "ExecuteScript"
+                         |  "type": "ExecuteScript",
+                         |  "value": {
+                         |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                         |    "bytecode": "0000",
+                         |    "gasAmount": 1,
+                         |    "gasPrice": "1"
+                         |  }
                          |}
                          |""".stripMargin
 
@@ -648,13 +654,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     )
     val transferJson = s"""
                           |{
-                          |  "unsignedTx":"tx",
-                          |  "gasAmount": 1,
-                          |  "gasPrice": "1",
-                          |  "txId":"${txId.toHexString}",
-                          |  "fromGroup":1,
-                          |  "toGroup":2,
-                          |  "type": "Transfer"
+                          |  "type": "Transfer",
+                          |  "value": {
+                          |    "unsignedTx":"tx",
+                          |    "gasAmount": 1,
+                          |    "gasPrice": "1",
+                          |    "txId":"${txId.toHexString}",
+                          |    "fromGroup":1,
+                          |    "toGroup":2
+                          |  }
                           |}""".stripMargin
 
     checkData(transfer, transferJson)
@@ -673,14 +681,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val deployJson =
       s"""
          |{
-         |  "fromGroup": 2,
-         |  "toGroup": 2,
-         |  "unsignedTx": "0000",
-         |  "gasAmount":1,
-         |  "gasPrice":"1",
-         |  "txId": "${txId.toHexString}",
-         |  "contractAddress": "${Address.contract(contractId).toBase58}",
-         |  "type": "DeployContract"
+         |  "type": "DeployContract",
+         |  "value": {
+         |    "fromGroup": 2,
+         |    "toGroup": 2,
+         |    "unsignedTx": "0000",
+         |    "gasAmount":1,
+         |    "gasPrice":"1",
+         |    "txId": "${txId.toHexString}",
+         |    "contractAddress": "${Address.contract(contractId).toBase58}"
+         |  }
          |}
          |""".stripMargin
 
@@ -699,13 +709,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val executeJson =
       s"""
          |{
-         |  "fromGroup": 1,
-         |  "toGroup": 1,
-         |  "unsignedTx": "0000",
-         |  "gasAmount":1,
-         |  "gasPrice":"1",
-         |  "txId": "${txId.toHexString}",
-         |  "type": "ExecuteScript"
+         |  "type": "ExecuteScript",
+         |  "value": {
+         |    "fromGroup": 1,
+         |    "toGroup": 1,
+         |    "unsignedTx": "0000",
+         |    "gasAmount":1,
+         |    "gasPrice":"1",
+         |    "txId": "${txId.toHexString}"
+         |  }
          |}
          |""".stripMargin
 
