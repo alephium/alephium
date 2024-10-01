@@ -230,7 +230,6 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def checkAllAssetsFlushed(): ExeResult[Unit] = {
     assetStatus.find(_._2 != ContractAssetFlushed) match {
       case None =>
