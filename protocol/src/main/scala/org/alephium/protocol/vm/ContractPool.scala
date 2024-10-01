@@ -230,11 +230,13 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def checkAllAssetsFlushed(): ExeResult[Unit] = {
-    if (assetStatus.forall(_._2 == ContractAssetFlushed)) {
-      okay
-    } else {
-      failed(EmptyContractAsset)
+    assetStatus.find(_._2 != ContractAssetFlushed) match {
+      case None =>
+        okay
+      case Some((contractId, _)) =>
+        failed(EmptyContractAsset(Address.contract(contractId)))
     }
   }
 }
