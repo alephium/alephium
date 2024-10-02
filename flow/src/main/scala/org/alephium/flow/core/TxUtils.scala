@@ -125,7 +125,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox]
   ): IOResult[Either[String, AssetOutputInfoWithGas]] = {
     getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
-      .flatMap(_.getPrevAssetOutputs(utxoRefs))
+      .flatMap(_.getPreAssetOutputInfos(utxoRefs))
       .map { utxosOpt =>
         val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
         for {

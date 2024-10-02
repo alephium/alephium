@@ -84,15 +84,12 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def getPrevAssetOutputs(
+  def getPreAssetOutputInfos(
       inputs: AVector[AssetOutputRef]
   ): IOResult[Option[AVector[AssetOutputInfo]]] = {
     inputs.foldE(Option(AVector.ofCapacity[AssetOutputInfo](inputs.length))) {
       case (Some(outputs), input) =>
-        getPreAssetOutputInfo(input).map(_.map { assetOutputInfo =>
-          outputs :+ assetOutputInfo
-        })
+        getPreAssetOutputInfo(input).map(_.map(outputs :+ _))
       case (None, _) => Right(None)
     }
   }
