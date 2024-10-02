@@ -155,7 +155,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val transactionTemplate = TransactionTemplate(
     unsignedTx,
     AVector(signature.bytes),
-    AVector(signature.bytes)
+    AVector(signature.bytes),
+    ts
   )
 
   private val utxo = UTXO.from(
