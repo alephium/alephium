@@ -3913,7 +3913,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils
       .getRichTransaction(blockFlow, transaction.id, GroupIndex.from(2), GroupIndex.from(3))
-      .leftValue.detail is s"Transaction ${transaction.id.toHexString} not found"
+      .leftValue
+      .detail is s"Transaction ${transaction.id.toHexString} not found"
   }
 
   it should "get rich transaction that spends asset & contract output" in new ContractFixture {
