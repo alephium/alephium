@@ -346,9 +346,9 @@ final case class ContractAssetUnloaded(address: Address.Contract) extends ExeFai
   }
 }
 
-case object EmptyContractAsset extends ExeFailure {
+final case class EmptyContractAsset(address: Address.Contract) extends ExeFailure {
   override def toString: String =
-    s"The contract's asset(s) have been used up, but a minimum of ${ALPH.prettifyAmount(dustUtxoAmount)} ALPH is required"
+    s"No assets for contract $address, a minimum of ${ALPH.prettifyAmount(minimalAlphInContract)} ALPH is required"
 }
 
 case object NoCaller extends ExeFailure {

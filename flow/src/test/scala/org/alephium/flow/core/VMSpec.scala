@@ -833,7 +833,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).rightValue
-    fail(blockFlow, chainIndex, script, EmptyContractAsset)
+    fail(blockFlow, chainIndex, script, EmptyContractAsset(Address.contract(contractId)))
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -6037,7 +6037,7 @@ class VMSpec extends AlephiumSpec with Generators {
       getContractAsset(fooId).amount is (initialAmount - minimalAlphInContract * (idx + 1))
     }
     intercept[AssertionError](insert(entrySize - 1)).getMessage is
-      s"Right(TxScriptExeFailed($EmptyContractAsset))"
+      s"Right(TxScriptExeFailed(${EmptyContractAsset(Address.contract(fooId))}))"
 
     (0 until entrySize - 1).foreach { idx =>
       remove(idx)
