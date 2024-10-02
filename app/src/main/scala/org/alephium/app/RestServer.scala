@@ -109,6 +109,7 @@ class RestServer(
       getTransactionStatusLocalLogic,
       decodeUnsignedTransactionLogic,
       getTransactionLogic,
+      getRichTransactionLogic,
       getRawTransactionLogic,
       listMempoolTransactionsLogic,
       clearMempoolLogic,

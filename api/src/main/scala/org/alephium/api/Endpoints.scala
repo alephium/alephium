@@ -460,6 +460,16 @@ trait Endpoints
       .out(jsonBody[Transaction])
       .summary("Get transaction details")
 
+  lazy val getRichTransaction
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), RichTransaction] =
+    transactionsEndpoint.get
+      .in("rich-details")
+      .in(path[TransactionId]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[RichTransaction])
+      .summary("Get transaction with enriched input information when node indexes are enabled.")
+
   lazy val getRawTransaction
       : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), RawTransaction] =
     transactionsEndpoint.get
