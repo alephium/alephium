@@ -38,7 +38,12 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
     val predefined = ConfigFactory
       .parseMap(
         (configPortsValues ++ configValues).view
-          .mapValues(ConfigValueFactory.fromAnyRef)
+          .mapValues {
+            case value: AVector[_] =>
+              ConfigValueFactory.fromIterable(value.toIterable.asJava)
+            case value =>
+              ConfigValueFactory.fromAnyRef(value)
+          }
           .toMap
           .asJava
       )

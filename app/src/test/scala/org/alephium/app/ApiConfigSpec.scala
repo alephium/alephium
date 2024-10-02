@@ -24,7 +24,7 @@ import com.typesafe.config.{ConfigException, ConfigFactory, ConfigValueFactory}
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.protocol.model.NetworkId
-import org.alephium.util.{AlephiumSpec, Env}
+import org.alephium.util.{AlephiumSpec, AVector, Env}
 
 // scalastyle:off null
 class ApiConfigSpec extends AlephiumSpec {
@@ -48,30 +48,33 @@ class ApiConfigSpec extends AlephiumSpec {
 
   it should "use defined api key when key is provided" in new ApiKeyConfigFixture {
     override val apiKeyEnabled = true
-    override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
+    override val apiKey = AVector("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377")
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.map(_.value) is apiKey
   }
 
   it should "use defined api key even if key is not enabled" in new ApiKeyConfigFixture {
     override val apiKeyEnabled = false
-    override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
+    override val apiKey = AVector(
+      "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377",
+      "596e7b27e20967727763f3c88a1ef2049047cc6fa8ea27358b32c6837774beb"
+    )
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.map(_.value) is apiKey
   }
 
   it should "not ask for api key even if key is enabled" in new ApiKeyConfigFixture {
-    override def apiKeyEnabled: Boolean = true
-    override def apiKey: String         = null
+    override def apiKeyEnabled: Boolean  = true
+    override def apiKey: AVector[String] = null
 
-    apiConfig.apiKey is None
+    apiConfig.apiKey.headOption is None
   }
 
   it should "not ask for api key even if key is not enabled" in new ApiKeyConfigFixture {
-    override def apiKeyEnabled: Boolean = false
-    override def apiKey: String         = null
+    override def apiKeyEnabled: Boolean  = false
+    override def apiKey: AVector[String] = null
 
-    apiConfig.apiKey is None
+    apiConfig.apiKey.headOption is None
   }
 
   behavior of "Api interface is not 127.0.0.1"
@@ -79,23 +82,26 @@ class ApiConfigSpec extends AlephiumSpec {
   it should "use defined api key when key is enabled" in new ApiKeyConfigFixture {
     override def interface     = "1.2.3.4"
     override val apiKeyEnabled = true
-    override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
+    override val apiKey = AVector(
+      "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377",
+      "596e7b27e20967727763f3c88a1ef2049047cc6fa8ea27358b32c6837774beb"
+    )
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.map(_.value) is apiKey
   }
 
   it should "use defined api key key is not enabled" in new ApiKeyConfigFixture {
     override def interface     = "1.2.3.4"
     override val apiKeyEnabled = false
-    override val apiKey        = "74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377"
+    override val apiKey = AVector("74beb7e20967727763f3c88a1ef596e7b22049047cc6fa8ea27358b32c68377")
 
-    apiConfig.apiKey.get.value is apiKey
+    apiConfig.apiKey.map(_.value) is apiKey
   }
 
   it should "ask for api key if key is enabled" in new ApiKeyConfigFixture {
-    override def interface              = "1.2.3.4"
-    override def apiKeyEnabled: Boolean = true
-    override def apiKey: String         = null
+    override def interface               = "1.2.3.4"
+    override def apiKeyEnabled: Boolean  = true
+    override def apiKey: AVector[String] = null
 
     assertThrows[ConfigException] {
       apiConfig
@@ -103,24 +109,30 @@ class ApiConfigSpec extends AlephiumSpec {
   }
 
   it should "not ask for api key if key is not enabled" in new ApiKeyConfigFixture {
-    override def interface              = "1.2.3.4"
-    override def apiKeyEnabled: Boolean = false
-    override def apiKey: String         = null
+    override def interface               = "1.2.3.4"
+    override def apiKeyEnabled: Boolean  = false
+    override def apiKey: AVector[String] = null
 
-    apiConfig.apiKey is None
+    apiConfig.apiKey.headOption is None
   }
 
   trait ApiKeyConfigFixture {
     def interface: String = "127.0.0.1"
-    def apiKey: String
+    def apiKey: AVector[String]
     def apiKeyEnabled: Boolean
+
+    lazy val apiKeyValue = if (apiKey == null) {
+      null
+    } else {
+      if (apiKey.length == 1) apiKey.head else apiKey
+    }
 
     lazy val configValues: Map[String, Any] = Map(
       ("alephium.api.network-interface", interface),
       ("alephium.api.blockflow-fetch-max-age", "30 minutes"),
       ("alephium.api.ask-timeout", "5 seconds"),
       ("alephium.api.api-key-enabled", apiKeyEnabled),
-      ("alephium.api.api-key", apiKey),
+      ("alephium.api.api-key", apiKeyValue),
       ("alephium.api.gas-fee-cap", "1000000000000000000"),
       ("alephium.api.default-utxos-limit", 512)
     )
@@ -128,7 +140,12 @@ class ApiConfigSpec extends AlephiumSpec {
     lazy val config = ConfigFactory
       .parseMap(
         configValues.view
-          .mapValues(ConfigValueFactory.fromAnyRef)
+          .mapValues {
+            case value: AVector[_] =>
+              ConfigValueFactory.fromIterable(value.toIterable.asJava)
+            case value =>
+              ConfigValueFactory.fromAnyRef(value)
+          }
           .toMap
           .asJava
       )

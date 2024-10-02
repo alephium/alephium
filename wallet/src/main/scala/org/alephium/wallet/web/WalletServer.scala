@@ -36,7 +36,7 @@ import org.alephium.wallet.service.WalletService._
 class WalletServer(
     val walletService: WalletService,
     val blockflowFetchMaxAge: Duration,
-    override val maybeApiKey: Option[ApiKey]
+    override val apiKeys: AVector[ApiKey]
 )(implicit val groupConfig: GroupConfig, val executionContext: ExecutionContext)
     extends WalletEndpointsLogic
     with WalletDocumentation
@@ -67,7 +67,7 @@ class WalletServer(
   ).map(route(_))
 
   lazy val docsRoute = SwaggerUI(
-    openApiJson(walletOpenAPI, maybeApiKey.isEmpty, truncateAddresses = true)
+    openApiJson(walletOpenAPI, apiKeys.isEmpty, truncateAddresses = true)
   ).map(route(_))
 }
 

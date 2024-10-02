@@ -27,6 +27,7 @@ import sttp.tapir.server._
 
 import org.alephium.api.{TapirCodecs, TapirSchemasLike}
 import org.alephium.api.model.ApiKey
+import org.alephium.util.AVector
 
 trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike with StrictLogging {
   import Endpoints._
@@ -35,7 +36,7 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
   implicit val customConfiguration: Configuration =
     Configuration.default.withDiscriminator("type")
 
-  def maybeApiKey: Option[ApiKey]
+  def apiKeys: AVector[ApiKey]
 
   type BaseEndpointWithoutApi[I, O] =
     Endpoint[Unit, I, ApiError[_ <: StatusCode], O, Any]
@@ -56,21 +57,8 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
 
   val baseEndpoint: BaseEndpoint[Unit, Unit] = baseEndpointWithoutApiKey
     .securityIn(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
-    .serverSecurityLogic { apiKey => Future.successful(checkApiKey(apiKey)) }
-
-  private def checkApiKey(
-      maybeToCheck: Option[ApiKey]
-  ): Either[ApiError[_ <: StatusCode], Unit] =
-    (maybeApiKey, maybeToCheck) match {
-      case (None, None)    => Right(())
-      case (None, Some(_)) => Left(ApiError.Unauthorized("Api key not configured in server"))
-      case (Some(_), None) => Left(ApiError.Unauthorized("Missing api key"))
-      case (Some(apiKey), Some(toCheck)) =>
-        if (apiKey.value == toCheck.value) {
-          Right(())
-        } else {
-          Left(ApiError.Unauthorized("Wrong api key"))
-        }
+    .serverSecurityLogic { apiKeyToCheck =>
+      Future.successful(BaseEndpoint.checkApiKey(apiKeys, apiKeyToCheck))
     }
 
   def serverLogic[I, O](endpoint: BaseEndpoint[I, O])(
@@ -78,6 +66,33 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
   ): ServerEndpoint[Any, Future] = {
     endpoint.serverLogic { _ =>
       { case input => logic(input) }
+    }
+  }
+}
+
+object BaseEndpoint {
+  def checkApiKey(
+      allApiKeys: AVector[ApiKey],
+      apiKeyToCheck: Option[ApiKey]
+  ): Either[ApiError[_ <: StatusCode], Unit] = {
+    if (allApiKeys.isEmpty) {
+      apiKeyToCheck match {
+        case None =>
+          Right(())
+        case Some(_) =>
+          Left(ApiError.Unauthorized("Api key not configured in server"))
+      }
+    } else {
+      apiKeyToCheck match {
+        case None =>
+          Left(ApiError.Unauthorized("Missing api key"))
+        case Some(toCheck) =>
+          if (allApiKeys.map(_.value).contains(toCheck.value)) {
+            Right(())
+          } else {
+            Left(ApiError.Unauthorized("Wrong api key"))
+          }
+      }
     }
   }
 }

@@ -78,6 +78,8 @@ object BlockFlowClient {
   ) extends BlockFlowClient
       with Endpoints {
 
+    override def apiKeys: AVector[ApiKey] = AVector.empty
+
     private def uriFromGroup(
         fromGroup: GroupIndex
     ): Future[Either[ApiError[_ <: StatusCode], Uri]] =
