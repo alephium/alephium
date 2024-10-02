@@ -1485,7 +1485,7 @@ trait RestServerFixture
       ("alephium.node.indexes.tx-output-ref-index", true),
       ("alephium.node.indexes.subcontract-index", true)
     ) ++ apiKeys.headOption
-      .map(key => Map(("alephium.api.api-key", key.value)))
+      .map(_ => Map(("alephium.api.api-key", apiKeys.map(_.value))))
       .getOrElse(Map.empty)
   }
 
@@ -1539,7 +1539,13 @@ trait RestServerFixture
     (new java.io.File("")).toPath,
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
-    WalletConfig.BlockFlow("host", 0, 0, Duration.ofMinutesUnsafe(0), apiConfig.apiKey.headOption)
+    WalletConfig.BlockFlow(
+      "host",
+      0,
+      0,
+      Duration.ofMinutesUnsafe(0),
+      apiConfig.apiKey.shuffle().headOption
+    )
   )
 
   lazy val walletApp = new WalletApp(walletConfig)
@@ -1623,7 +1629,7 @@ trait RestServerFixture
   lazy val servers = buildServers(nbOfNodes)
 
   override lazy val port        = servers.sample().port
-  override lazy val maybeApiKey = apiKeys.headOption.map(_.value)
+  override lazy val maybeApiKey = apiKeys.shuffle().headOption.map(_.value)
 
   def getPort(group: GroupIndex): Int =
     servers.find(_.node.config.broker.contains(group)).get.port
