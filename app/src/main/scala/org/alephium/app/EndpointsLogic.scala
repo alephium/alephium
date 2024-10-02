@@ -578,6 +578,15 @@ trait EndpointsLogic extends Endpoints {
     }
   )
 
+  val getRichTransactionLogic = serverLogicRedirect(getRichTransaction)(
+    { case (txId, fromGroup, toGroup) =>
+      Future.successful(serverUtils.getRichTransaction(blockFlow, txId, fromGroup, toGroup))
+    },
+    { case (_, fromGroup, _) =>
+      getGroupIndex(fromGroup)
+    }
+  )
+
   val getRawTransactionLogic = serverLogicRedirect(getRawTransaction)(
     { case (txId, fromGroup, toGroup) =>
       Future.successful(serverUtils.getRawTransaction(blockFlow, txId, fromGroup, toGroup))

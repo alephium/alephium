@@ -686,6 +686,18 @@ class ServerUtils(implicit
     getTransaction(blockFlow, txId, fromGroup, toGroup, tx => model.Transaction.fromProtocol(tx))
   }
 
+  def getRichTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[model.RichTransaction] = {
+    for {
+      transaction     <- getTransaction(blockFlow, txId, fromGroup, toGroup, identity)
+      richTransaction <- getRichTransaction(blockFlow, transaction)
+    } yield richTransaction
+  }
+
   def getRawTransaction(
       blockFlow: BlockFlow,
       txId: TransactionId,
