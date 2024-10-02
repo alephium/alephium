@@ -139,7 +139,7 @@ object BlockFlowGroupView {
           case Some(output) if output.isContract =>
             Right(Some(output.asInstanceOf[ContractOutput]))
           case Some(_) =>
-            Left(WorldState.expectedAssetError)
+            Left(WorldState.expectedContractError)
           case None =>
             val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
             if (index != -1) {
@@ -147,7 +147,7 @@ object BlockFlowGroupView {
                 case Some(output) if output.isContract =>
                   Right(Some(output.asInstanceOf[ContractOutput]))
                 case Some(_) =>
-                  Left(WorldState.expectedAssetError)
+                  Left(WorldState.expectedContractError)
                 case _ =>
                   Right(None)
               }
@@ -288,7 +288,7 @@ object BlockFlowGroupView {
       } else {
         mempool.getOutput(outputRef) match {
           case Some(output) if output.isContract => Right(Some(output.asInstanceOf[ContractOutput]))
-          case Some(_)                           => Left(WorldState.expectedAssetError)
+          case Some(_)                           => Left(WorldState.expectedContractError)
           case None                              => super.getPreContractOutput(outputRef)
         }
       }
