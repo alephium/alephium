@@ -23,11 +23,13 @@ import org.alephium.protocol.Signature
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde._
 import org.alephium.util.AVector
+import org.alephium.util.TimeStamp
 
 final case class TransactionTemplate(
     unsigned: UnsignedTx,
     inputSignatures: AVector[ByteString],
-    scriptSignatures: AVector[ByteString]
+    scriptSignatures: AVector[ByteString],
+    seenAt: TimeStamp
 ) {
   def toProtocol()(implicit
       networkConfig: NetworkConfig
@@ -47,11 +49,15 @@ final case class TransactionTemplate(
 }
 
 object TransactionTemplate {
-  def fromProtocol(template: protocol.TransactionTemplate): TransactionTemplate = {
+  def fromProtocol(
+      template: protocol.TransactionTemplate,
+      seenAt: TimeStamp
+  ): TransactionTemplate = {
     TransactionTemplate(
       UnsignedTx.fromProtocol(template.unsigned),
       template.inputSignatures.map(sig => serialize(sig)),
-      template.scriptSignatures.map(sig => serialize(sig))
+      template.scriptSignatures.map(sig => serialize(sig)),
+      seenAt
     )
   }
 }
