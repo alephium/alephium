@@ -59,7 +59,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       networkInterface = address.getAddress,
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
-      None,
+      AVector.empty,
       ALPH.oneAlph,
       defaultUtxosLimit
     )
@@ -1000,11 +1000,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
+    val txSeenAt = TimeStamp.now()
     val txTemplate = signAndAddToMemPool(
       buildTransferTransaction.txId,
       buildTransferTransaction.unsignedTx,
       chainIndex,
-      fromPrivateKey
+      fromPrivateKey,
+      txSeenAt
     )
 
     val txs = serverUtils.listMempoolTransactions(blockFlow).rightValue
@@ -1013,7 +1015,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       MempoolTransactions(
         chainIndex.from.value,
         chainIndex.to.value,
-        AVector(api.TransactionTemplate.fromProtocol(txTemplate))
+        AVector(api.TransactionTemplate.fromProtocol(txTemplate, txSeenAt))
       )
     )
   }
@@ -4335,6 +4337,18 @@ class ServerUtilsSpec extends AlephiumSpec {
       ) is true
   }
 
+  it should "fail to find rich transaction when node.indexes.tx-output-ref-index is not enabled" in new TxOutputRefIndexFixture {
+    override def enableTxOutputRefIndex: Boolean = false
+
+    serverUtils
+      .getRichTransaction(blockFlow, txId, Some(chainIndex.from), Some(chainIndex.to))
+      .leftValue
+      .detail
+      .contains(
+        "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
+      ) is true
+  }
+
   it should "get rich transaction that spends asset output" in new Fixture {
     override val configValues = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")
@@ -4363,12 +4377,22 @@ class ServerUtilsSpec extends AlephiumSpec {
       val input = transaction.unsigned.inputs.head
       RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput])
     }
+    val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
-    serverUtils.getRichTransaction(blockFlow, transaction).rightValue is RichTransaction.from(
-      transaction,
-      AVector(richInput),
-      AVector.empty
-    )
+    serverUtils.getRichTransaction(blockFlow, transaction).rightValue is richTransaction
+
+    serverUtils
+      .getRichTransaction(blockFlow, transaction.id, Some(chainIndex.from), Some(chainIndex.to))
+      .rightValue is richTransaction
+
+    serverUtils
+      .getRichTransaction(blockFlow, transaction.id, None, None)
+      .rightValue is richTransaction
+
+    serverUtils
+      .getRichTransaction(blockFlow, transaction.id, GroupIndex.from(2), GroupIndex.from(3))
+      .leftValue
+      .detail is s"Transaction ${transaction.id.toHexString} not found"
   }
 
   it should "get rich transaction that spends asset & contract output" in new ContractFixture {
@@ -4429,12 +4453,18 @@ class ServerUtilsSpec extends AlephiumSpec {
       val input = scriptTransaction.contractInputs.head
       RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput])
     }
+    val richTransaction =
+      RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
 
-    serverUtils.getRichTransaction(blockFlow, scriptTransaction).rightValue is RichTransaction.from(
-      scriptTransaction,
-      AVector(richAssetInput),
-      AVector(richContractInput)
-    )
+    serverUtils.getRichTransaction(blockFlow, scriptTransaction).rightValue is richTransaction
+    serverUtils
+      .getRichTransaction(
+        blockFlow,
+        scriptTransaction.id,
+        Some(chainIndex.from),
+        Some(chainIndex.to)
+      )
+      .rightValue is richTransaction
 
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
@@ -4766,7 +4796,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       txId: TransactionId,
       unsignedTx: String,
       chainIndex: ChainIndex,
-      fromPrivateKey: PrivateKey
+      fromPrivateKey: PrivateKey,
+      txSeenAt: TimeStamp = TimeStamp.now()
   )(implicit
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
@@ -4779,7 +4810,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound()
 
-    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
+    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), txSeenAt)
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled()
 
     txTemplate

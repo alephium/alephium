@@ -22,7 +22,7 @@ import org.scalatest.Inside
 import sttp.client3._
 
 import org.alephium.api.Endpoints
-import org.alephium.api.model.{Amount, BuildTransferTx, Destination}
+import org.alephium.api.model.{Amount, ApiKey, BuildTransferTx, Destination}
 import org.alephium.http.EndpointSender
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
@@ -56,7 +56,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val toAddress                         = Address.Asset(script)
     val value                             = Amount(U256.unsafe(1000))
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
-    val maybeApiKey                       = None
-    val endpointSender                    = new EndpointSender(maybeApiKey)
+    val apiKeys                           = AVector.empty[ApiKey]
+    val endpointSender                    = new EndpointSender(apiKeys.headOption)
   }
 }

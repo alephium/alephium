@@ -57,13 +57,13 @@ class RestServer(
   lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
   val walletEndpoints                   = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 
-  override val maybeApiKey = apiConfig.apiKey
+  override val apiKeys = apiConfig.apiKey
 
-  val endpointSender: EndpointSender = new EndpointSender(maybeApiKey)
+  val endpointSender: EndpointSender = new EndpointSender(apiKeys.headOption)
 
   private val truncateAddresses = node.config.network.networkId == NetworkId.AlephiumMainNet
   private val swaggerUiRoute = SwaggerUI(
-    openApiJson(openAPI, maybeApiKey.isEmpty, truncateAddresses)
+    openApiJson(openAPI, apiKeys.isEmpty, truncateAddresses)
   ).map(route(_))
 
   private val blockFlowRoute: AVector[Router => Route] =
@@ -109,6 +109,7 @@ class RestServer(
       getTransactionStatusLocalLogic,
       decodeUnsignedTransactionLogic,
       getTransactionLogic,
+      getRichTransactionLogic,
       getRawTransactionLogic,
       listMempoolTransactionsLogic,
       clearMempoolLogic,

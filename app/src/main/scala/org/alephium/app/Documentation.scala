@@ -63,6 +63,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     submitTransaction,
     decodeUnsignedTransaction,
     getTransaction,
+    getRichTransaction,
     getRawTransaction,
     getTransactionStatus,
     getTxIdFromOutputRef,

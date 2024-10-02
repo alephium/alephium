@@ -18,6 +18,8 @@ package org.alephium.wallet.config
 
 import java.nio.file.Path
 
+import scala.util.Try
+
 import com.typesafe.config.ConfigException
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -26,13 +28,13 @@ import sttp.model.Uri
 
 import org.alephium.api.model.ApiKey
 import org.alephium.conf._
-import org.alephium.util.Duration
+import org.alephium.util.{AVector, Duration}
 
 final case class WalletConfig(
     port: Option[Int],
     secretDir: Path,
     lockingTimeout: Duration,
-    apiKey: Option[ApiKey],
+    apiKey: AVector[ApiKey],
     blockflow: WalletConfig.BlockFlow
 )
 
@@ -57,11 +59,15 @@ object WalletConfig {
 
   implicit val walletConfigReader: ValueReader[WalletConfig] =
     valueReader { implicit cfg =>
+      def apiKeys = Try(as[AVector[ApiKey]]("apiKey")).getOrElse(
+        AVector.from(as[Option[ApiKey]]("apiKey"))
+      )
+
       WalletConfig(
         as[Option[Int]]("port"),
         as[Path]("secretDir"),
         as[Duration]("lockingTimeout"),
-        as[Option[ApiKey]]("apiKey"),
+        apiKeys,
         as[WalletConfig.BlockFlow]("blockflow")
       )
     }

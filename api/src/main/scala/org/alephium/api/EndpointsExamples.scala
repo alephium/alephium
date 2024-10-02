@@ -155,7 +155,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val transactionTemplate = TransactionTemplate(
     unsignedTx,
     AVector(signature.bytes),
-    AVector(signature.bytes)
+    AVector(signature.bytes),
+    ts
   )
 
   private val utxo = UTXO.from(
@@ -399,6 +400,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
   // scalastyle:on line.size.limit
+
+  implicit val richTransactionExamples: List[Example[RichTransaction]] = List(
+    defaultExample(richTransaction)
+  )
 
   implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
     simpleExample(HashRateResponse("100 MH/s"))

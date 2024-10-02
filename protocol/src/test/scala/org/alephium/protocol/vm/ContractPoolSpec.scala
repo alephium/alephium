@@ -218,7 +218,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
 
     pool.checkAllAssetsFlushed() isE ()
     pool.markAssetInUsing(contractId1, MutBalancesPerLockup.empty) isE ()
-    pool.checkAllAssetsFlushed() is failed(EmptyContractAsset)
+    pool.checkAllAssetsFlushed() is failed(EmptyContractAsset(Address.contract(contractId1)))
     pool.markAssetFlushed(contractId1) isE ()
     pool.checkAllAssetsFlushed() isE ()
   }

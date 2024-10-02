@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.alephium.api.model.{Amount, ApiKey}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.util.{Duration, U256}
+import org.alephium.util.{AVector, Duration, U256}
 import org.alephium.wallet.api.WalletEndpoints
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
@@ -35,7 +35,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
   implicit def groupConfig: GroupConfig
   implicit def executionContext: ExecutionContext
 
-  override val maybeApiKey: Option[ApiKey] = None
+  override val apiKeys: AVector[ApiKey] = AVector.empty
 
   val createWalletLogic = serverLogic(createWallet) { walletCreation =>
     Future.successful(

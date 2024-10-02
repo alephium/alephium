@@ -216,15 +216,16 @@ class ServerUtils(implicit
     val result = brokerConfig.groupRange.foldLeft(
       AVector.ofCapacity[MempoolTransactions](brokerConfig.chainNum)
     ) { case (acc, group) =>
-      val groupIndex = GroupIndex.unsafe(group)
-      val txs        = blockFlow.getMemPool(groupIndex).getAll()
-      val groupedTxs = txs.filter(_.chainIndex.from == groupIndex).groupBy(_.chainIndex)
+      val groupIndex       = GroupIndex.unsafe(group)
+      val txsWithTimestamp = blockFlow.getMemPool(groupIndex).getAllWithTimestamp()
+      val groupedTxsWithTimestamp =
+        txsWithTimestamp.filter(_._1.chainIndex.from == groupIndex).groupBy(_._1.chainIndex)
       acc ++ AVector.from(
-        groupedTxs.map { case (chainIndex, txs) =>
+        groupedTxsWithTimestamp.map { case (chainIndex, txsWithTimestamp) =>
           MempoolTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
-            txs.map(model.TransactionTemplate.fromProtocol)
+            txsWithTimestamp.map(model.TransactionTemplate.fromProtocol.tupled)
           )
         }
       )
@@ -695,6 +696,18 @@ class ServerUtils(implicit
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
     getTransaction(blockFlow, txId, fromGroup, toGroup, tx => model.Transaction.fromProtocol(tx))
+  }
+
+  def getRichTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[model.RichTransaction] = {
+    for {
+      transaction     <- getTransaction(blockFlow, txId, fromGroup, toGroup, identity)
+      richTransaction <- getRichTransaction(blockFlow, transaction)
+    } yield richTransaction
   }
 
   def getRawTransaction(

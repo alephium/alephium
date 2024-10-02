@@ -1547,12 +1547,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TransactionTemplate" in {
-    val tx = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val now = TimeStamp.now()
+    val tx  = api.TransactionTemplate.fromProtocol(transactionTemplate, now)
     val jsonRaw = s"""
                      |{
                      |  "unsigned": ${write(tx.unsigned)},
                      |  "inputSignatures": ${write(tx.inputSignatures)},
-                     |  "scriptSignatures": ${write(tx.scriptSignatures)}
+                     |  "scriptSignatures": ${write(tx.scriptSignatures)},
+                     |  "seenAt": ${now.millis}
                      |}""".stripMargin
 
     checkData(tx, jsonRaw)
@@ -1778,5 +1780,18 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         Some(AVector(Token(tokenId, U256.MaxValue), Token(tokenId, U256.One)))
       )
       .leftValue is s"Token $tokenId amount overflow"
+  }
+
+  it should "get alph and token amounts while ignoring tokens with zero amounts" in {
+    val tokenId0 = TokenId.generate
+    val tokenId1 = TokenId.generate
+    val tokenId2 = TokenId.generate
+
+    BuildTxCommon.getAlphAndTokenAmounts(
+      None,
+      Some(
+        AVector(Token(tokenId0, U256.Zero), Token(tokenId1, U256.Zero), Token(tokenId2, U256.One))
+      )
+    ) isE (None, AVector(tokenId2 -> U256.One))
   }
 }
