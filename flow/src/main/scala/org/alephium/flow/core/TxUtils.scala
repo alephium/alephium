@@ -1116,7 +1116,9 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[AVector[TransactionTemplate]] = {
     for {
       groupView <- getImmutableGroupView(groupIndex)
-      failedTxs <- txs.filterE(tx => groupView.getPreAssetOutputs(tx.unsigned.inputs).map(_.isEmpty))
+      failedTxs <- txs.filterE(tx =>
+        groupView.getPreAssetOutputs(tx.unsigned.inputs).map(_.isEmpty)
+      )
     } yield failedTxs
   }
 

@@ -17,9 +17,11 @@
 package org.alephium.flow.core
 
 import scala.util.Random
+
 import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Succeeded}
+
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.{
@@ -38,7 +40,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
-import org.alephium.util.{AVector, AlephiumSpec, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
 class TxUtilsSpec extends AlephiumSpec {
@@ -168,13 +170,13 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      groupView.getPreAssetOutput(tx.unsigned.inputs.head.outputRef) isE None
+      groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
       tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
           if (chainIndex.isIntraGroup) {
             // the block is persisted and the lockTime of each output is updated as block timestamp
-            groupView.getPreAssetOutput(outputRef) isE Some(
+            groupView.getPreAssetOutputInfo(outputRef) isE Some(
               AssetOutputInfo(
                 outputRef,
                 output.copy(lockTime = block.timestamp),
@@ -183,12 +185,12 @@ class TxUtilsSpec extends AlephiumSpec {
             )
           } else {
             // the block is not persisted yet, so the lockTime of each output is still zero
-            groupView.getPreAssetOutput(outputRef) isE Some(
+            groupView.getPreAssetOutputInfo(outputRef) isE Some(
               AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)
             )
           }
         } else {
-          groupView.getPreAssetOutput(outputRef) isE None
+          groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
     }
@@ -207,21 +209,21 @@ class TxUtilsSpec extends AlephiumSpec {
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
         tx.fixedOutputRefs.foreach { outputRef =>
-          groupView.getPreAssetOutput(outputRef) isE None
+          groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
 
       {
         val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
-        groupView.getPreAssetOutput(tx.unsigned.inputs.head.outputRef) isE None
+        groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
         tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
           val output = tx.unsigned.fixedOutputs(index)
           if (output.toGroup equals chainIndex.from) {
-            groupView.getPreAssetOutput(outputRef) isE Some(
+            groupView.getPreAssetOutputInfo(outputRef) isE Some(
               AssetOutputInfo(outputRef, output, MemPoolOutput)
             )
           } else {
-            assertThrows[AssertionError](groupView.getPreAssetOutput(outputRef))
+            assertThrows[AssertionError](groupView.getPreAssetOutputInfo(outputRef))
           }
         }
       }

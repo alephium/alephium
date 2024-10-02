@@ -34,12 +34,12 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
 
   def getPreContractOutput(outputRef: ContractOutputRef): IOResult[Option[ContractOutput]]
 
-  def getPreAssetOutput(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]]
+  def getPreAssetOutputInfo(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]]
 
   def getPreAssetOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[AssetOutput]]] = {
     inputs.foldE(Option(AVector.ofCapacity[AssetOutput](inputs.length))) {
       case (Some(outputs), input) =>
-        getPreAssetOutput(input.outputRef).map(_.map(outputs :+ _.output))
+        getPreAssetOutputInfo(input.outputRef).map(_.map(outputs :+ _.output))
       case (None, _) => Right(None)
     }
   }
@@ -50,7 +50,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   ): IOResult[Option[AVector[AssetOutput]]] = {
     inputs.foldE(Option(AVector.ofCapacity[AssetOutput](inputs.length))) {
       case (Some(outputs), input) =>
-        getPreAssetOutput(input.outputRef).map {
+        getPreAssetOutputInfo(input.outputRef).map {
           case Some(outputInfo) => Some(outputs :+ outputInfo.output)
           case None => additionalCacheOpt.flatMap(_.get(input.outputRef).map(outputs :+ _))
         }
@@ -63,7 +63,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
       additionalCache: scala.collection.Set[AssetOutputRef]
   ): IOResult[Boolean] = {
     inputs.forallE { input =>
-      getPreAssetOutput(input.outputRef).map {
+      getPreAssetOutputInfo(input.outputRef).map {
         case Some(_) => true
         case None    => additionalCache.contains(input.outputRef)
       }
@@ -90,7 +90,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   ): IOResult[Option[AVector[AssetOutputInfo]]] = {
     inputs.foldE(Option(AVector.ofCapacity[AssetOutputInfo](inputs.length))) {
       case (Some(outputs), input) =>
-        getPreAssetOutput(input).map(_.map { assetOutputInfo =>
+        getPreAssetOutputInfo(input).map(_.map { assetOutputInfo =>
           outputs :+ assetOutputInfo
         })
       case (None, _) => Right(None)
@@ -159,7 +159,7 @@ object BlockFlowGroupView {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    def getPreAssetOutput(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
+    def getPreAssetOutputInfo(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
       if (TxUtils.isSpent(blockCaches, outputRef)) {
         Right(None)
       } else {
@@ -295,7 +295,9 @@ object BlockFlowGroupView {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    override def getPreAssetOutput(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
+    override def getPreAssetOutputInfo(
+        outputRef: AssetOutputRef
+    ): IOResult[Option[AssetOutputInfo]] = {
       if (mempool.isSpent(outputRef)) {
         Right(None)
       } else {
@@ -303,7 +305,7 @@ object BlockFlowGroupView {
           case Some(output) if output.isAsset =>
             Right(Some(AssetOutputInfo(outputRef, output.asInstanceOf[AssetOutput], MemPoolOutput)))
           case Some(_) => Left(WorldState.expectedAssetError)
-          case None    => super.getPreAssetOutput(outputRef)
+          case None    => super.getPreAssetOutputInfo(outputRef)
         }
       }
     }
