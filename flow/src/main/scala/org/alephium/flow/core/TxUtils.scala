@@ -522,12 +522,7 @@ trait TxUtils { Self: FlowUtils =>
           utxosLimit,
           txOutputLength
         ).map(_.map { selected =>
-          AssetOutputInfoWithGas(
-            selected.assets.map(asset =>
-              AssetOutputInfo(asset.ref, asset.output, asset.outputType)
-            ),
-            selected.gas
-          )
+          AssetOutputInfoWithGas(selected.assets, selected.gas)
         })
 
       case Some(utxoRefs) =>
