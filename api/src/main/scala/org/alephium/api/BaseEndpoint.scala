@@ -57,36 +57,42 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
 
   val baseEndpoint: BaseEndpoint[Unit, Unit] = baseEndpointWithoutApiKey
     .securityIn(auth.apiKey(header[Option[ApiKey]]("X-API-KEY")))
-    .serverSecurityLogic { apiKey => Future.successful(checkApiKey(apiKey)) }
-
-  private def checkApiKey(
-      maybeToCheck: Option[ApiKey]
-  ): Either[ApiError[_ <: StatusCode], Unit] = {
-    if (apiKeys.isEmpty) {
-      maybeToCheck match {
-        case None =>
-          Right(())
-        case Some(_) =>
-          Left(ApiError.Unauthorized("Api key not configured in server"))
-      }
-    } else {
-      maybeToCheck match {
-        case None => Left(ApiError.Unauthorized("Missing api key"))
-        case Some(toCheck) =>
-          if (apiKeys.map(_.value).contains(toCheck.value)) {
-            Right(())
-          } else {
-            Left(ApiError.Unauthorized("Wrong api key"))
-          }
-      }
+    .serverSecurityLogic { apiKeyToCheck =>
+      Future.successful(BaseEndpoint.checkApiKey(apiKeys, apiKeyToCheck))
     }
-  }
 
   def serverLogic[I, O](endpoint: BaseEndpoint[I, O])(
       logic: I => Future[Either[ApiError[_ <: StatusCode], O]]
   ): ServerEndpoint[Any, Future] = {
     endpoint.serverLogic { _ =>
       { case input => logic(input) }
+    }
+  }
+}
+
+object BaseEndpoint {
+  def checkApiKey(
+      allApiKeys: AVector[ApiKey],
+      apiKeyToCheck: Option[ApiKey]
+  ): Either[ApiError[_ <: StatusCode], Unit] = {
+    if (allApiKeys.isEmpty) {
+      apiKeyToCheck match {
+        case None =>
+          Right(())
+        case Some(_) =>
+          Left(ApiError.Unauthorized("Api key not configured in server"))
+      }
+    } else {
+      apiKeyToCheck match {
+        case None =>
+          Left(ApiError.Unauthorized("Missing api key"))
+        case Some(toCheck) =>
+          if (allApiKeys.map(_.value).contains(toCheck.value)) {
+            Right(())
+          } else {
+            Left(ApiError.Unauthorized("Wrong api key"))
+          }
+      }
     }
   }
 }
