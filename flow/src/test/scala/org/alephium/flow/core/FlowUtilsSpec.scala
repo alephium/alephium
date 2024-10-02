@@ -707,8 +707,8 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     tx1.unsigned.inputs.length is 2
     val groupView = blockFlow.getImmutableGroupView(chainIndex.from).rightValue
-    groupView.getAsset(tx1.unsigned.inputs.head.outputRef).rightValue.isDefined is true
-    groupView.getAsset(tx1.unsigned.inputs.last.outputRef).rightValue.isDefined is false
+    groupView.getPreAssetOutput(tx1.unsigned.inputs.head.outputRef).rightValue.isDefined is true
+    groupView.getPreAssetOutput(tx1.unsigned.inputs.last.outputRef).rightValue.isDefined is false
     tx1.unsigned.inputs.last.outputRef is tx0.unsigned.fixedOutputRefs(1)
     collectTxs() is AVector(tx0, tx1)
     val block = mineFromMemPool(blockFlow, chainIndex)

@@ -17,14 +17,18 @@
 package org.alephium.flow.core
 
 import scala.util.Random
-
 import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Succeeded}
-
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.flow.core.FlowUtils.{
+  AssetOutputInfo,
+  MemPoolOutput,
+  OutputType,
+  PersistedOutput,
+  UnpersistedBlockOutput
+}
 import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -34,7 +38,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, AlephiumSpec, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
 class TxUtilsSpec extends AlephiumSpec {
@@ -164,19 +168,27 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+      groupView.getPreAssetOutput(tx.unsigned.inputs.head.outputRef) isE None
       tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
           if (chainIndex.isIntraGroup) {
             // the block is persisted and the lockTime of each output is updated as block timestamp
-            groupView.getPreOutput(outputRef) isE Some(output.copy(lockTime = block.timestamp))
+            groupView.getPreAssetOutput(outputRef) isE Some(
+              AssetOutputInfo(
+                outputRef,
+                output.copy(lockTime = block.timestamp),
+                PersistedOutput
+              )
+            )
           } else {
             // the block is not persisted yet, so the lockTime of each output is still zero
-            groupView.getPreOutput(outputRef) isE Some(output)
+            groupView.getPreAssetOutput(outputRef) isE Some(
+              AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)
+            )
           }
         } else {
-          groupView.getPreOutput(outputRef) isE None
+          groupView.getPreAssetOutput(outputRef) isE None
         }
       }
     }
@@ -195,19 +207,21 @@ class TxUtilsSpec extends AlephiumSpec {
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
         tx.fixedOutputRefs.foreach { outputRef =>
-          groupView.getPreOutput(outputRef) isE None
+          groupView.getPreAssetOutput(outputRef) isE None
         }
       }
 
       {
         val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
-        groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+        groupView.getPreAssetOutput(tx.unsigned.inputs.head.outputRef) isE None
         tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
           val output = tx.unsigned.fixedOutputs(index)
           if (output.toGroup equals chainIndex.from) {
-            groupView.getPreOutput(outputRef) isE Some(output)
+            groupView.getPreAssetOutput(outputRef) isE Some(
+              AssetOutputInfo(outputRef, output, MemPoolOutput)
+            )
           } else {
-            assertThrows[AssertionError](groupView.getPreOutput(outputRef))
+            assertThrows[AssertionError](groupView.getPreAssetOutput(outputRef))
           }
         }
       }
@@ -241,8 +255,18 @@ class TxUtilsSpec extends AlephiumSpec {
       None
     )
 
-    def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
-      AVector.fill(nb)(input("input1", ALPH.alph(amount), fromLockupScript))
+    def buildInputsWithGas(
+        nb: Int,
+        gas: GasBox,
+        outputType: OutputType = MemPoolOutput
+    ): TxUtils.AssetOutputInfoWithGas =
+      TxUtils.AssetOutputInfoWithGas(
+        AVector.fill(nb) {
+          val (ref, output) = input("input1", ALPH.alph(amount), fromLockupScript)
+          AssetOutputInfo(ref, output, outputType)
+        },
+        gas
+      )
 
     def buildInputData(
         pubKey: PublicKey,
@@ -1941,8 +1965,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("one address with one input")
       val gas = minimalGas
 
-      val inputs          = buildInputs(1)
-      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas = buildInputsWithGas(1, gas)
 
       val entries = AVector((inputData, selectedWithGas))
       val updated = blockFlow.updateSelectedGas(entries, 2)
@@ -1957,8 +1980,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("one address with many inputs")
       val gas = minimalGas.mulUnsafe(10)
 
-      val inputs          = buildInputs(10)
-      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas = buildInputsWithGas(10, gas)
 
       val entries = AVector((inputData, selectedWithGas))
       val updated = blockFlow.updateSelectedGas(entries, 2)
@@ -1972,8 +1994,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("multiple addresses with one input")
       val gas = minimalGas.mulUnsafe(100)
 
-      val inputs          = buildInputs(1)
-      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas = buildInputsWithGas(1, gas)
 
       val entries = AVector(
         (inputData, selectedWithGas),

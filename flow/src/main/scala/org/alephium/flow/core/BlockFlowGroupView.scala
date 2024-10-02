@@ -17,7 +17,12 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.core.BlockFlowState.BlockCache
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, PersistedOutput, UnpersistedBlockOutput}
+import org.alephium.flow.core.FlowUtils.{
+  AssetOutputInfo,
+  MemPoolOutput,
+  PersistedOutput,
+  UnpersistedBlockOutput
+}
 import org.alephium.flow.mempool.MemPool
 import org.alephium.io.IOResult
 import org.alephium.protocol.model._
@@ -27,33 +32,27 @@ import org.alephium.util.AVector
 trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   def worldState: WS
 
-  def getPreOutput(outputRef: TxOutputRef): IOResult[Option[TxOutput]]
+  def getPreContractOutput(outputRef: ContractOutputRef): IOResult[Option[ContractOutput]]
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def getAsset(outputRef: TxOutputRef): IOResult[Option[AssetOutput]] = {
-    // we use asInstanceOf for optimization
-    getPreOutput(outputRef) match {
-      case Right(Some(_: ContractOutput)) => Left(WorldState.expectedAssetError)
-      case result                         => result.asInstanceOf[IOResult[Option[AssetOutput]]]
-    }
-  }
+  def getPreAssetOutput(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]]
 
-  def getPreOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[AssetOutput]]] = {
+  def getPreAssetOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[AssetOutput]]] = {
     inputs.foldE(Option(AVector.ofCapacity[AssetOutput](inputs.length))) {
-      case (Some(outputs), input) => getAsset(input.outputRef).map(_.map(outputs :+ _))
-      case (None, _)              => Right(None)
+      case (Some(outputs), input) =>
+        getPreAssetOutput(input.outputRef).map(_.map(outputs :+ _.output))
+      case (None, _) => Right(None)
     }
   }
 
-  private[core] def getPreOutputs(
+  private[core] def getPreAssetOutputs(
       inputs: AVector[TxInput],
       additionalCacheOpt: Option[scala.collection.Map[AssetOutputRef, AssetOutput]]
   ): IOResult[Option[AVector[AssetOutput]]] = {
     inputs.foldE(Option(AVector.ofCapacity[AssetOutput](inputs.length))) {
       case (Some(outputs), input) =>
-        getAsset(input.outputRef).map {
-          case Some(output) => Some(outputs :+ output)
-          case None         => additionalCacheOpt.flatMap(_.get(input.outputRef).map(outputs :+ _))
+        getPreAssetOutput(input.outputRef).map {
+          case Some(outputInfo) => Some(outputs :+ outputInfo.output)
+          case None => additionalCacheOpt.flatMap(_.get(input.outputRef).map(outputs :+ _))
         }
       case (None, _) => Right(None)
     }
@@ -64,7 +63,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
       additionalCache: scala.collection.Set[AssetOutputRef]
   ): IOResult[Boolean] = {
     inputs.forallE { input =>
-      getAsset(input.outputRef).map {
+      getPreAssetOutput(input.outputRef).map {
         case Some(_) => true
         case None    => additionalCache.contains(input.outputRef)
       }
@@ -75,10 +74,10 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
       tx: Transaction,
       additionalCacheOpt: Option[scala.collection.mutable.Map[AssetOutputRef, AssetOutput]]
   ): IOResult[Option[AVector[TxOutput]]] = {
-    getPreOutputs(tx.unsigned.inputs, additionalCacheOpt).flatMap {
+    getPreAssetOutputs(tx.unsigned.inputs, additionalCacheOpt).flatMap {
       case Some(outputs) =>
         tx.contractInputs.foldE(Option(outputs.as[TxOutput])) {
-          case (Some(outputs), input) => getPreOutput(input).map(_.map(outputs :+ _))
+          case (Some(outputs), input) => getPreContractOutput(input).map(_.map(outputs :+ _))
           case (None, _)              => Right(None)
         }
       case None => Right(None)
@@ -88,23 +87,13 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def getPrevAssetOutputs(
       inputs: AVector[AssetOutputRef]
-  ): IOResult[Option[AVector[(AssetOutputRef, AssetOutput)]]] = {
-    inputs.foldE(Option(AVector.ofCapacity[(AssetOutputRef, AssetOutput)](inputs.length))) {
+  ): IOResult[Option[AVector[AssetOutputInfo]]] = {
+    inputs.foldE(Option(AVector.ofCapacity[AssetOutputInfo](inputs.length))) {
       case (Some(outputs), input) =>
-        getPreOutput(input).map(_.map { output =>
-          val assetOutput = output.asInstanceOf[AssetOutput]
-          outputs :+ (input -> assetOutput)
+        getPreAssetOutput(input).map(_.map { assetOutputInfo =>
+          outputs :+ assetOutputInfo
         })
       case (None, _) => Right(None)
-    }
-  }
-
-  def getPreContractOutputs(
-      inputs: AVector[ContractOutputRef]
-  ): IOResult[Option[AVector[TxOutput]]] = {
-    inputs.foldE(Option(AVector.ofCapacity[TxOutput](inputs.length))) {
-      case (Some(outputs), input) => getPreOutput(input).map(_.map(outputs :+ _))
-      case (None, _)              => Right(None)
     }
   }
 
@@ -141,18 +130,67 @@ object BlockFlowGroupView {
   ) extends BlockFlowGroupView[WS] {
     def worldState: WS = _worldState
 
-    def getPreOutput(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def getPreContractOutput(outputRef: ContractOutputRef): IOResult[Option[ContractOutput]] = {
       if (TxUtils.isSpent(blockCaches, outputRef)) {
         Right(None)
       } else {
-        worldState.getOutputOpt(outputRef).map {
-          case Some(output) => Some(output)
+        worldState.getOutputOpt(outputRef).flatMap {
+          case Some(output) if output.isContract =>
+            Right(Some(output.asInstanceOf[ContractOutput]))
+          case Some(_) =>
+            Left(WorldState.expectedAssetError)
           case None =>
             val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
             if (index != -1) {
-              Some(blockCaches(index).relatedOutputs(outputRef))
+              blockCaches(index).relatedOutputs.get(outputRef) match {
+                case Some(output) if output.isContract =>
+                  Right(Some(output.asInstanceOf[ContractOutput]))
+                case Some(_) =>
+                  Left(WorldState.expectedAssetError)
+                case _ =>
+                  Right(None)
+              }
             } else {
-              None
+              Right(None)
+            }
+        }
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def getPreAssetOutput(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
+      if (TxUtils.isSpent(blockCaches, outputRef)) {
+        Right(None)
+      } else {
+        worldState.getOutputOpt(outputRef).flatMap {
+          case Some(output) if output.isAsset =>
+            Right(
+              Some(AssetOutputInfo(outputRef, output.asInstanceOf[AssetOutput], PersistedOutput))
+            )
+          case Some(_) =>
+            Left(WorldState.expectedAssetError)
+          case None =>
+            val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
+            if (index != -1) {
+              blockCaches(index).relatedOutputs.get(outputRef) match {
+                case Some(output) if output.isAsset =>
+                  Right(
+                    Some(
+                      AssetOutputInfo(
+                        outputRef,
+                        output.asInstanceOf[AssetOutput],
+                        UnpersistedBlockOutput
+                      )
+                    )
+                  )
+                case Some(_) =>
+                  Left(WorldState.expectedAssetError)
+                case _ =>
+                  Right(None)
+              }
+            } else {
+              Right(None)
             }
         }
       }
@@ -241,13 +279,31 @@ object BlockFlowGroupView {
       blockCaches: AVector[BlockCache],
       mempool: MemPool
   ) extends Impl0[WS](worldState, blockCaches) {
-    override def getPreOutput(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    override def getPreContractOutput(
+        outputRef: ContractOutputRef
+    ): IOResult[Option[ContractOutput]] = {
       if (mempool.isSpent(outputRef)) {
         Right(None)
       } else {
         mempool.getOutput(outputRef) match {
-          case Some(output) => Right(Some(output))
-          case None         => super.getPreOutput(outputRef)
+          case Some(output) if output.isContract => Right(Some(output.asInstanceOf[ContractOutput]))
+          case Some(_)                           => Left(WorldState.expectedAssetError)
+          case None                              => super.getPreContractOutput(outputRef)
+        }
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    override def getPreAssetOutput(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
+      if (mempool.isSpent(outputRef)) {
+        Right(None)
+      } else {
+        mempool.getOutput(outputRef) match {
+          case Some(output) if output.isAsset =>
+            Right(Some(AssetOutputInfo(outputRef, output.asInstanceOf[AssetOutput], MemPoolOutput)))
+          case Some(_) => Left(WorldState.expectedAssetError)
+          case None    => super.getPreAssetOutput(outputRef)
         }
       }
     }

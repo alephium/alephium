@@ -80,7 +80,7 @@ object TxScriptGasEstimator {
       for {
         blockEnv  <- flow.getDryrunBlockEnv(chainIndex).left.map(ioErrorMessage)
         groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(ioErrorMessage)
-        preOutputsOpt <- groupView.getPreOutputs(inputs).left.map(ioErrorMessage)
+        preOutputsOpt <- groupView.getPreAssetOutputs(inputs).left.map(ioErrorMessage)
         preOutputs    <- preOutputsOpt.toRight("Tx inputs do not exit")
         result        <- runScript(blockEnv, groupView, preOutputs)
       } yield {
