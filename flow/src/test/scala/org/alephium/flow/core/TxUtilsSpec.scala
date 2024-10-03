@@ -159,7 +159,22 @@ class TxUtilsSpec extends AlephiumSpec {
     test()
   }
 
-  it should "calculate preOutputs for txs in new blocks" in new FlowFixture with Generators {
+  it should "getPreContractOutput for txs in new blocks" in new ContractFixture with Generators {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
+      val chainIndex = ChainIndex(fromGroup, toGroup)
+      val groupView  = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      groupView
+        .getPreContractOutput(contractOutputRef)
+        .rightValue
+        .get
+        .lockupScript is contractOutputScript
+    }
+  }
+
+  it should "calculate getPreAssetOutputInfo for txs in new blocks" in new FlowFixture
+    with Generators {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
@@ -196,7 +211,8 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "calculate preOutputs for txs in mempool" in new FlowFixture with Generators {
+  it should "calculate getPreAssetOutputInfo for txs in mempool" in new FlowFixture
+    with Generators {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
@@ -1499,7 +1515,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends FlowFixture {
-    val code =
+    lazy val contractCode =
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -1507,19 +1523,19 @@ class TxUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (contractId, ref, _) =
+    lazy val (contractId, contractOutputRef, block) =
       createContract(
-        code,
+        contractCode,
         AVector.empty,
         AVector.empty,
         tokenIssuanceInfo = Some(TokenIssuance.Info(1))
       )
-    val address = LockupScript.p2c(contractId)
+    lazy val contractOutputScript = LockupScript.p2c(contractId)
   }
 
   it should "get balance for contract address" in new ContractFixture {
     val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
-      blockFlow.getBalance(address, Int.MaxValue, true).rightValue
+      blockFlow.getBalance(contractOutputScript, Int.MaxValue, true).rightValue
     attoAlphBalance is minimalAlphInContract
     attoAlphLockedBalance is U256.Zero
     tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
@@ -1528,11 +1544,11 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get UTXOs for contract address" in new ContractFixture {
-    val utxos = blockFlow.getUTXOs(address, Int.MaxValue, true).rightValue
+    val utxos = blockFlow.getUTXOs(contractOutputScript, Int.MaxValue, true).rightValue
     val utxo  = utxos.head.asInstanceOf[FlowUtils.ContractOutputInfo]
     utxos.length is 1
-    utxo.ref is ref
-    utxo.output.lockupScript is address
+    utxo.ref is contractOutputRef
+    utxo.output.lockupScript is contractOutputScript
     utxo.output.amount is minimalAlphInContract
     utxo.output.tokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
   }
@@ -1773,7 +1789,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val tokens = AVector.fill(nbOfTokens) {
         val (cId, _, _) = createContract(
-          code,
+          contractCode,
           AVector.empty,
           AVector.empty,
           tokenIssuanceInfo = Some(
