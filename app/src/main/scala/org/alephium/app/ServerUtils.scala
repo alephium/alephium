@@ -1356,10 +1356,10 @@ class ServerUtils(implicit
 
   def buildChainedTransactions(
       blockFlow: BlockFlow,
-      buildTransactionRequests: AVector[BuildTransaction]
-  ): Try[AVector[BuildTransactionResult]] = {
+      buildTransactionRequests: AVector[BuildChainedTx]
+  ): Try[AVector[BuildChainedTxResult]] = {
     val buildResults = buildTransactionRequests.foldE(
-      (AVector.empty[BuildTransactionResult], ExtraUtxosInfo.empty)
+      (AVector.empty[BuildChainedTxResult], ExtraUtxosInfo.empty)
     ) { case ((buildTransactionResults, extraUtxosInfo), buildTransactionRequest) =>
       for {
         keyPair <- buildTransactionRequest.value.getLockPair()
@@ -1383,11 +1383,11 @@ class ServerUtils(implicit
 
   def buildChainedTransaction(
       blockFlow: BlockFlow,
-      buildTransaction: BuildTransaction,
+      buildTransaction: BuildChainedTx,
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[(BuildTransactionResult, ExtraUtxosInfo)] = {
+  ): Try[(BuildChainedTxResult, ExtraUtxosInfo)] = {
     buildTransaction match {
-      case buildTransfer: BuildTransaction.Transfer =>
+      case buildTransfer: BuildChainedTransferTx =>
         for {
           unsignedTx <- buildTransferUnsignedTransaction(
             blockFlow,
@@ -1395,10 +1395,10 @@ class ServerUtils(implicit
             extraUtxosInfo
           )
         } yield (
-          BuildTransactionResult.Transfer(BuildTransferTxResult.from(unsignedTx)),
+          BuildChainedTransferTxResult(BuildTransferTxResult.from(unsignedTx)),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
-      case buildExecuteScript: BuildTransaction.ExecuteScript =>
+      case buildExecuteScript: BuildChainedExecuteScriptTx =>
         for {
           unsignedTx <- buildExecuteScriptUnsignedTx(
             blockFlow,
@@ -1406,10 +1406,10 @@ class ServerUtils(implicit
             extraUtxosInfo
           )
         } yield (
-          BuildTransactionResult.ExecuteScript(BuildExecuteScriptTxResult.from(unsignedTx)),
+          BuildChainedExecuteScriptTxResult(BuildExecuteScriptTxResult.from(unsignedTx)),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
-      case buildDeployContract: BuildTransaction.DeployContract =>
+      case buildDeployContract: BuildChainedDeployContractTx =>
         for {
           unsignedTx <- buildDeployContractUnsignedTx(
             blockFlow,
@@ -1417,7 +1417,9 @@ class ServerUtils(implicit
             extraUtxosInfo
           )
         } yield (
-          BuildTransactionResult.DeployContract(BuildDeployContractTxResult.from(unsignedTx)),
+          BuildChainedDeployContractTxResult(
+            BuildDeployContractTxResult.from(unsignedTx)
+          ),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
     }

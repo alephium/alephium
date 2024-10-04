@@ -15,17 +15,18 @@
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 package org.alephium.api.model
 
-sealed trait BuildTransactionResult {
+sealed trait BuildChainedTxResult {
   val value: GasInfo with ChainIndexInfo with TransactionInfo
 }
 
-object BuildTransactionResult {
-  @upickle.implicits.key("Transfer")
-  final case class Transfer(value: BuildTransferTxResult) extends BuildTransactionResult
+@upickle.implicits.key("Transfer")
+final case class BuildChainedTransferTxResult(value: BuildTransferTxResult)
+    extends BuildChainedTxResult
 
-  @upickle.implicits.key("DeployContract")
-  final case class DeployContract(value: BuildDeployContractTxResult) extends BuildTransactionResult
+@upickle.implicits.key("DeployContract")
+final case class BuildChainedDeployContractTxResult(value: BuildDeployContractTxResult)
+    extends BuildChainedTxResult
 
-  @upickle.implicits.key("ExecuteScript")
-  final case class ExecuteScript(value: BuildExecuteScriptTxResult) extends BuildTransactionResult
-}
+@upickle.implicits.key("ExecuteScript")
+final case class BuildChainedExecuteScriptTxResult(value: BuildExecuteScriptTxResult)
+    extends BuildChainedTxResult

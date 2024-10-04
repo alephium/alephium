@@ -16,17 +16,15 @@
 
 package org.alephium.api.model
 
-sealed trait BuildTransaction {
+sealed trait BuildChainedTx {
   val value: BuildTxCommon with BuildTxCommon.FromPublicKey
 }
 
-object BuildTransaction {
-  @upickle.implicits.key("Transfer")
-  final case class Transfer(value: BuildTransferTx) extends BuildTransaction
+@upickle.implicits.key("Transfer")
+final case class BuildChainedTransferTx(value: BuildTransferTx) extends BuildChainedTx
 
-  @upickle.implicits.key("DeployContract")
-  final case class DeployContract(value: BuildDeployContractTx) extends BuildTransaction
+@upickle.implicits.key("DeployContract")
+final case class BuildChainedDeployContractTx(value: BuildDeployContractTx) extends BuildChainedTx
 
-  @upickle.implicits.key("ExecuteScript")
-  final case class ExecuteScript(value: BuildExecuteScriptTx) extends BuildTransaction
-}
+@upickle.implicits.key("ExecuteScript")
+final case class BuildChainedExecuteScriptTx(value: BuildExecuteScriptTx) extends BuildChainedTx

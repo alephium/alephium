@@ -308,16 +308,18 @@ trait ApiModelCodec {
   implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
   implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult]   = macroRW
 
-  implicit val buildTransactionTransferRW: RW[BuildTransaction.Transfer]             = macroRW
-  implicit val buildTransactionDeployContractRW: RW[BuildTransaction.DeployContract] = macroRW
-  implicit val buildTransactionExecuteScriptRW: RW[BuildTransaction.ExecuteScript]   = macroRW
-  implicit val buildTransactionRW: RW[BuildTransaction]                              = macroRW
-  implicit val buildTransactionTransferResultRW: RW[BuildTransactionResult.Transfer] = macroRW
-  implicit val buildTransactionDeployContractResultRW: RW[BuildTransactionResult.DeployContract] =
+  implicit val buildTransactionTransferRW: RW[BuildChainedTransferTx] = macroRW
+  implicit val buildTransactionDeployContractRW: RW[BuildChainedDeployContractTx] =
     macroRW
-  implicit val buildTransactionExecuteScriptResultRW: RW[BuildTransactionResult.ExecuteScript] =
+  implicit val buildTransactionExecuteScriptRW: RW[BuildChainedExecuteScriptTx] = macroRW
+  implicit val buildTransactionRW: RW[BuildChainedTx]                           = macroRW
+  implicit val buildTransactionTransferResultRW: RW[BuildChainedTransferTxResult] =
     macroRW
-  implicit val buildTransactionResultRW: RW[BuildTransactionResult] = macroRW
+  implicit val buildTransactionDeployContractResultRW: RW[BuildChainedDeployContractTxResult] =
+    macroRW
+  implicit val buildTransactionExecuteScriptResultRW: RW[BuildChainedExecuteScriptTxResult] =
+    macroRW
+  implicit val buildChainedTxResultRW: RW[BuildChainedTxResult] = macroRW
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 

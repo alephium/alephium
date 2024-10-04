@@ -557,12 +557,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
-  it should "encode/decode BuildTransaction" in {
+  it should "encode/decode BuildChainedTx" in {
     val fromPublicKey = PublicKey.generate
     val toKey         = PublicKey.generate
     val toAddress     = Address.p2pkh(toKey)
 
-    val transfer = BuildTransaction.Transfer(
+    val transfer = BuildChainedTransferTx(
       BuildTransferTx(
         fromPublicKey.bytes,
         None,
@@ -586,7 +586,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(transfer, transferJson)
 
-    val deploy = BuildTransaction.DeployContract(
+    val deploy = BuildChainedDeployContractTx(
       BuildDeployContractTx(
         fromPublicKey = fromPublicKey.bytes,
         bytecode = ByteString(0, 0),
@@ -610,7 +610,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(deploy, deployJson)
 
-    val execute = BuildTransaction.ExecuteScript(
+    val execute = BuildChainedExecuteScriptTx(
       BuildExecuteScriptTx(
         fromPublicKey = fromPublicKey.bytes,
         bytecode = ByteString(0, 0),
@@ -632,7 +632,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(execute, executeJson)
 
-    val allBuildTxs = AVector[BuildTransaction](transfer, deploy, execute)
+    val allBuildTxs = AVector[BuildChainedTx](transfer, deploy, execute)
     val allBuildTxsJson = s"""
                              |[
                              |  $transferJson,
@@ -643,13 +643,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(allBuildTxs, allBuildTxsJson)
   }
 
-  it should "encode/decode BuildTransactionResult" in {
+  it should "encode/decode BuildChainedTxResult" in {
     val txId       = TransactionId.generate
     val gas        = GasBox.unsafe(1)
     val gasPrice   = GasPrice(1)
     val contractId = ContractId.generate
 
-    val transfer = BuildTransactionResult.Transfer(
+    val transfer = BuildChainedTransferTxResult(
       BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
     )
     val transferJson = s"""
@@ -667,7 +667,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(transfer, transferJson)
 
-    val deploy = BuildTransactionResult.DeployContract(
+    val deploy = BuildChainedDeployContractTxResult(
       BuildDeployContractTxResult(
         fromGroup = 2,
         toGroup = 2,
@@ -696,7 +696,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(deploy, deployJson)
 
-    val execute = BuildTransactionResult.ExecuteScript(
+    val execute = BuildChainedExecuteScriptTxResult(
       BuildExecuteScriptTxResult(
         fromGroup = 1,
         toGroup = 1,
@@ -723,7 +723,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(execute, executeJson)
 
-    val allBuildTxResults = AVector[BuildTransactionResult](transfer, deploy, execute)
+    val allBuildTxResults = AVector[BuildChainedTxResult](transfer, deploy, execute)
     val allBuildTxResultsJson = s"""
                                    |[
                                    |  $transferJson,

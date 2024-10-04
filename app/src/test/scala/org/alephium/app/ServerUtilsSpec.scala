@@ -3696,8 +3696,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     def buildChainedTransactions(
-        buildTransactions: BuildTransaction*
-    ): AVector[BuildTransactionResult] = {
+        buildTransactions: BuildChainedTx*
+    ): AVector[BuildChainedTxResult] = {
       serverUtils
         .buildChainedTransactions(
           blockFlow,
@@ -3707,7 +3707,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     def failedChainedTransactions(
-        buildTransactions: AVector[BuildTransaction],
+        buildTransactions: AVector[BuildChainedTx],
         errorDetails: String
     ) = {
       serverUtils
@@ -3776,90 +3776,82 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     failedChainedTransactions(
       AVector(
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo1.destination(ALPH.alph(2)))
-            )
-          ),
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo2.destination(ALPH.oneAlph))
-            )
-          )
-      ),
-      errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
-    )
-
-    failedChainedTransactions(
-      AVector(
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo1.destination(ALPH.alph(2)))
-            )
-          ),
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo1.publicKey.bytes,
-              None,
-              AVector(groupInfo2.destination(ALPH.oneAlph))
-            )
-          ),
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo3.destination(ALPH.alph(1)))
-            )
-          )
-      ),
-      errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
-    )
-
-    val buildTransactions = buildChainedTransactions(
-      BuildTransaction
-        .Transfer(
+        BuildChainedTransferTx(
           BuildTransferTx(
             groupInfo0.publicKey.bytes,
             None,
             AVector(groupInfo1.destination(ALPH.alph(2)))
           )
         ),
-      BuildTransaction
-        .Transfer(
+        BuildChainedTransferTx(
+          BuildTransferTx(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo2.destination(ALPH.oneAlph))
+          )
+        )
+      ),
+      errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
+    )
+
+    failedChainedTransactions(
+      AVector(
+        BuildChainedTransferTx(
+          BuildTransferTx(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(ALPH.alph(2)))
+          )
+        ),
+        BuildChainedTransferTx(
           BuildTransferTx(
             groupInfo1.publicKey.bytes,
             None,
             AVector(groupInfo2.destination(ALPH.oneAlph))
           )
         ),
-      BuildTransaction
-        .Transfer(
+        BuildChainedTransferTx(
           BuildTransferTx(
             groupInfo0.publicKey.bytes,
             None,
-            AVector(groupInfo3.destination(ALPH.alph(1) - nonCoinbaseMinGasFee * 3))
+            AVector(groupInfo3.destination(ALPH.alph(1)))
           )
         )
+      ),
+      errorDetails = "Not enough balance: got 998000000000000000, expected 1001000000000000000"
+    )
+
+    val buildTransactions = buildChainedTransactions(
+      BuildChainedTransferTx(
+        BuildTransferTx(
+          groupInfo0.publicKey.bytes,
+          None,
+          AVector(groupInfo1.destination(ALPH.alph(2)))
+        )
+      ),
+      BuildChainedTransferTx(
+        BuildTransferTx(
+          groupInfo1.publicKey.bytes,
+          None,
+          AVector(groupInfo2.destination(ALPH.oneAlph))
+        )
+      ),
+      BuildChainedTransferTx(
+        BuildTransferTx(
+          groupInfo0.publicKey.bytes,
+          None,
+          AVector(groupInfo3.destination(ALPH.alph(1) - nonCoinbaseMinGasFee * 3))
+        )
+      )
     )
 
     buildTransactions.length is 3
     val buildTransferTransaction01 =
-      buildTransactions(0).asInstanceOf[BuildTransactionResult.Transfer]
+      buildTransactions(0).asInstanceOf[BuildChainedTransferTxResult]
     val buildTransferTransaction12 =
-      buildTransactions(1).asInstanceOf[BuildTransactionResult.Transfer]
+      buildTransactions(1).asInstanceOf[BuildChainedTransferTxResult]
     val buildTransferTransaction03 =
-      buildTransactions(2).asInstanceOf[BuildTransactionResult.Transfer]
+      buildTransactions(2).asInstanceOf[BuildChainedTransferTxResult]
 
     signAndAndToMemPool(buildTransferTransaction01.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildTransferTransaction12.value, groupInfo1.privateKey)
@@ -3902,15 +3894,14 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     failedChainedTransactions(
       AVector(
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo1.destination(address0InitBalance - nonCoinbaseMinGasFee * 2))
-            )
-          ),
-        BuildTransaction.ExecuteScript(
+        BuildChainedTransferTx(
+          BuildTransferTx(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(address0InitBalance - nonCoinbaseMinGasFee * 2))
+          )
+        ),
+        BuildChainedExecuteScriptTx(
           buildExecuteScript(groupInfo0.publicKey)
         )
       ),
@@ -3919,18 +3910,17 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     failedChainedTransactions(
       AVector(
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo1.destination(ALPH.alph(2)))
-            )
-          ),
-        BuildTransaction.ExecuteScript(
+        BuildChainedTransferTx(
+          BuildTransferTx(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(ALPH.alph(2)))
+          )
+        ),
+        BuildChainedExecuteScriptTx(
           buildExecuteScript(groupInfo1.publicKey)
         ),
-        BuildTransaction.ExecuteScript(
+        BuildChainedExecuteScriptTx(
           buildExecuteScript(groupInfo0.publicKey, Some(Amount(ALPH.oneAlph)))
         )
       ),
@@ -3938,29 +3928,28 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     val buildTransactions = buildChainedTransactions(
-      BuildTransaction
-        .Transfer(
-          BuildTransferTx(
-            groupInfo0.publicKey.bytes,
-            None,
-            AVector(groupInfo1.destination(ALPH.alph(2)))
-          )
-        ),
-      BuildTransaction.ExecuteScript(
+      BuildChainedTransferTx(
+        BuildTransferTx(
+          groupInfo0.publicKey.bytes,
+          None,
+          AVector(groupInfo1.destination(ALPH.alph(2)))
+        )
+      ),
+      BuildChainedExecuteScriptTx(
         buildExecuteScript(groupInfo1.publicKey)
       ),
-      BuildTransaction.ExecuteScript(
+      BuildChainedExecuteScriptTx(
         buildExecuteScript(groupInfo0.publicKey, Some(Amount(ALPH.oneAlph / 2)))
       )
     )
 
     buildTransactions.length is 3
     val buildTransferTransaction =
-      buildTransactions(0).asInstanceOf[BuildTransactionResult.Transfer]
+      buildTransactions(0).asInstanceOf[BuildChainedTransferTxResult]
     val buildExecuteScriptTransaction1 =
-      buildTransactions(1).asInstanceOf[BuildTransactionResult.ExecuteScript]
+      buildTransactions(1).asInstanceOf[BuildChainedExecuteScriptTxResult]
     val buildExecuteScriptTransaction0 =
-      buildTransactions(2).asInstanceOf[BuildTransactionResult.ExecuteScript]
+      buildTransactions(2).asInstanceOf[BuildChainedExecuteScriptTxResult]
 
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction1.value, groupInfo1.privateKey)
@@ -3996,15 +3985,14 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     failedChainedTransactions(
       AVector(
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo1.destination(address0InitBalance - nonCoinbaseMinGasFee * 10))
-            )
-          ),
-        BuildTransaction.DeployContract(
+        BuildChainedTransferTx(
+          BuildTransferTx(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(address0InitBalance - nonCoinbaseMinGasFee * 10))
+          )
+        ),
+        BuildChainedDeployContractTx(
           buildDeployContract(groupInfo0.publicKey)
         )
       ),
@@ -4014,18 +4002,17 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     failedChainedTransactions(
       AVector(
-        BuildTransaction
-          .Transfer(
-            BuildTransferTx(
-              groupInfo0.publicKey.bytes,
-              None,
-              AVector(groupInfo1.destination(ALPH.alph(2)))
-            )
-          ),
-        BuildTransaction.DeployContract(
+        BuildChainedTransferTx(
+          BuildTransferTx(
+            groupInfo0.publicKey.bytes,
+            None,
+            AVector(groupInfo1.destination(ALPH.alph(2)))
+          )
+        ),
+        BuildChainedDeployContractTx(
           buildDeployContract(groupInfo1.publicKey)
         ),
-        BuildTransaction.DeployContract(
+        BuildChainedDeployContractTx(
           buildDeployContract(
             groupInfo0.publicKey,
             initialAttoAlphAmount = Some(Amount(ALPH.alph(1)))
@@ -4037,18 +4024,17 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     val buildTransactions = buildChainedTransactions(
-      BuildTransaction
-        .Transfer(
-          BuildTransferTx(
-            groupInfo0.publicKey.bytes,
-            None,
-            AVector(groupInfo1.destination(ALPH.alph(2)))
-          )
-        ),
-      BuildTransaction.DeployContract(
+      BuildChainedTransferTx(
+        BuildTransferTx(
+          groupInfo0.publicKey.bytes,
+          None,
+          AVector(groupInfo1.destination(ALPH.alph(2)))
+        )
+      ),
+      BuildChainedDeployContractTx(
         buildDeployContract(groupInfo1.publicKey)
       ),
-      BuildTransaction.DeployContract(
+      BuildChainedDeployContractTx(
         buildDeployContract(
           groupInfo0.publicKey,
           initialAttoAlphAmount = Some(Amount(ALPH.alph(1) / 2))
@@ -4058,11 +4044,11 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     buildTransactions.length is 3
     val buildTransferTransaction =
-      buildTransactions(0).asInstanceOf[BuildTransactionResult.Transfer]
+      buildTransactions(0).asInstanceOf[BuildChainedTransferTxResult]
     val buildDeployContractTransaction1 =
-      buildTransactions(1).asInstanceOf[BuildTransactionResult.DeployContract]
+      buildTransactions(1).asInstanceOf[BuildChainedDeployContractTxResult]
     val buildDeployContractTransaction0 =
-      buildTransactions(2).asInstanceOf[BuildTransactionResult.DeployContract]
+      buildTransactions(2).asInstanceOf[BuildChainedDeployContractTxResult]
 
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildDeployContractTransaction1.value, groupInfo1.privateKey)

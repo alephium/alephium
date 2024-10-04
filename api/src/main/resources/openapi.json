@@ -8758,7 +8758,7 @@
               "schema": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/BuildTransaction"
+                  "$ref": "#/components/schemas/BuildChainedTx"
                 }
               },
               "examples": {
@@ -8856,7 +8856,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/BuildTransactionResult"
+                    "$ref": "#/components/schemas/BuildChainedTxResult"
                   }
                 },
                 "example": [
@@ -12422,6 +12422,146 @@
           }
         }
       },
+      "BuildChainedDeployContractTx": {
+        "title": "BuildChainedDeployContractTx",
+        "type": "object",
+        "required": [
+          "value",
+          "type"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/BuildDeployContractTx"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildChainedDeployContractTxResult": {
+        "title": "BuildChainedDeployContractTxResult",
+        "type": "object",
+        "required": [
+          "value",
+          "type"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/BuildDeployContractTxResult"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildChainedExecuteScriptTx": {
+        "title": "BuildChainedExecuteScriptTx",
+        "type": "object",
+        "required": [
+          "value",
+          "type"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/BuildExecuteScriptTx"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildChainedExecuteScriptTxResult": {
+        "title": "BuildChainedExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "value",
+          "type"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildChainedTransferTx": {
+        "title": "BuildChainedTransferTx",
+        "type": "object",
+        "required": [
+          "value",
+          "type"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/BuildTransferTx"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildChainedTransferTxResult": {
+        "title": "BuildChainedTransferTxResult",
+        "type": "object",
+        "required": [
+          "value",
+          "type"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/BuildTransferTxResult"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildChainedTx": {
+        "title": "BuildChainedTx",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildChainedDeployContractTx"
+          },
+          {
+            "$ref": "#/components/schemas/BuildChainedExecuteScriptTx"
+          },
+          {
+            "$ref": "#/components/schemas/BuildChainedTransferTx"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildChainedDeployContractTx": "#/components/schemas/BuildChainedDeployContractTx",
+            "BuildChainedExecuteScriptTx": "#/components/schemas/BuildChainedExecuteScriptTx",
+            "BuildChainedTransferTx": "#/components/schemas/BuildChainedTransferTx"
+          }
+        }
+      },
+      "BuildChainedTxResult": {
+        "title": "BuildChainedTxResult",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildChainedDeployContractTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildChainedExecuteScriptTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildChainedTransferTxResult"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildChainedDeployContractTxResult": "#/components/schemas/BuildChainedDeployContractTxResult",
+            "BuildChainedExecuteScriptTxResult": "#/components/schemas/BuildChainedExecuteScriptTxResult",
+            "BuildChainedTransferTxResult": "#/components/schemas/BuildChainedTransferTxResult"
+          }
+        }
+      },
       "BuildDeployContractTx": {
         "title": "BuildDeployContractTx",
         "type": "object",
@@ -12820,50 +12960,6 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
-          }
-        }
-      },
-      "BuildTransaction": {
-        "title": "BuildTransaction",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/DeployContract"
-          },
-          {
-            "$ref": "#/components/schemas/ExecuteScript"
-          },
-          {
-            "$ref": "#/components/schemas/Transfer1"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "DeployContract": "#/components/schemas/DeployContract",
-            "ExecuteScript": "#/components/schemas/ExecuteScript",
-            "Transfer": "#/components/schemas/Transfer1"
-          }
-        }
-      },
-      "BuildTransactionResult": {
-        "title": "BuildTransactionResult",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/DeployContract1"
-          },
-          {
-            "$ref": "#/components/schemas/ExecuteScript1"
-          },
-          {
-            "$ref": "#/components/schemas/Transfer2"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "DeployContract": "#/components/schemas/DeployContract1",
-            "ExecuteScript": "#/components/schemas/ExecuteScript1",
-            "Transfer": "#/components/schemas/Transfer2"
           }
         }
       },
@@ -13796,38 +13892,6 @@
           }
         }
       },
-      "DeployContract": {
-        "title": "DeployContract",
-        "type": "object",
-        "required": [
-          "value",
-          "type"
-        ],
-        "properties": {
-          "value": {
-            "$ref": "#/components/schemas/BuildDeployContractTx"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "DeployContract1": {
-        "title": "DeployContract",
-        "type": "object",
-        "required": [
-          "value",
-          "type"
-        ],
-        "properties": {
-          "value": {
-            "$ref": "#/components/schemas/BuildDeployContractTxResult"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "Destination": {
         "title": "Destination",
         "type": "object",
@@ -13936,38 +14000,6 @@
             "items": {
               "type": "string"
             }
-          }
-        }
-      },
-      "ExecuteScript": {
-        "title": "ExecuteScript",
-        "type": "object",
-        "required": [
-          "value",
-          "type"
-        ],
-        "properties": {
-          "value": {
-            "$ref": "#/components/schemas/BuildExecuteScriptTx"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "ExecuteScript1": {
-        "title": "ExecuteScript",
-        "type": "object",
-        "required": [
-          "value",
-          "type"
-        ],
-        "properties": {
-          "value": {
-            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
-          },
-          "type": {
-            "type": "string"
           }
         }
       },
@@ -15497,38 +15529,6 @@
           "utxosLimit": {
             "type": "integer",
             "format": "int32"
-          }
-        }
-      },
-      "Transfer1": {
-        "title": "Transfer",
-        "type": "object",
-        "required": [
-          "value",
-          "type"
-        ],
-        "properties": {
-          "value": {
-            "$ref": "#/components/schemas/BuildTransferTx"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "Transfer2": {
-        "title": "Transfer",
-        "type": "object",
-        "required": [
-          "value",
-          "type"
-        ],
-        "properties": {
-          "value": {
-            "$ref": "#/components/schemas/BuildTransferTxResult"
-          },
-          "type": {
-            "type": "string"
           }
         }
       },

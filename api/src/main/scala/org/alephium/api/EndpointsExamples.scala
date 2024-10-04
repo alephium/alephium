@@ -787,14 +787,14 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   implicit val buildTransactionDeployContractTxExamples
-      : List[Example[BuildTransaction.DeployContract]] = List(
+      : List[Example[BuildChainedDeployContractTx]] = List(
     defaultExample(
-      BuildTransaction.DeployContract(
+      BuildChainedDeployContractTx(
         BuildDeployContractTx(publicKey.bytes, None, bytecode = byteString)
       )
     ),
     moreSettingsExample(
-      BuildTransaction.DeployContract(
+      BuildChainedDeployContractTx(
         BuildDeployContractTx(
           publicKey.bytes,
           Some(BuildTxCommon.BIP340Schnorr),
@@ -825,41 +825,44 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildChainedTransactionsExamples: List[Example[AVector[BuildTransaction]]] = List(
-    defaultExample(
-      AVector(
-        BuildTransaction.Transfer(BuildTransferTx(publicKey.bytes, None, defaultDestinations)),
-        BuildTransaction.ExecuteScript(
-          BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)
-        )
-      )
-    ),
-    moreSettingsExample(
-      AVector(
-        BuildTransaction.Transfer(
-          BuildTransferTx(
-            publicKey.bytes,
-            Some(BuildTxCommon.BIP340Schnorr),
-            moreSettingsDestinations,
-            Some(AVector(outputRef)),
-            Some(model.minimalGas),
-            Some(model.nonCoinbaseMinGasPrice)
+  implicit val buildChainedTransactionsExamples: List[Example[AVector[BuildChainedTx]]] =
+    List(
+      defaultExample(
+        AVector(
+          BuildChainedTransferTx(
+            BuildTransferTx(publicKey.bytes, None, defaultDestinations)
+          ),
+          BuildChainedExecuteScriptTx(
+            BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)
           )
-        ),
-        BuildTransaction.ExecuteScript(
-          BuildExecuteScriptTx(
-            publicKey.bytes,
-            Some(BuildTxCommon.Default),
-            byteString,
-            Some(Amount(model.dustUtxoAmount)),
-            Some(tokens),
-            Some(model.minimalGas),
-            Some(model.nonCoinbaseMinGasPrice)
+        )
+      ),
+      moreSettingsExample(
+        AVector(
+          BuildChainedTransferTx(
+            BuildTransferTx(
+              publicKey.bytes,
+              Some(BuildTxCommon.BIP340Schnorr),
+              moreSettingsDestinations,
+              Some(AVector(outputRef)),
+              Some(model.minimalGas),
+              Some(model.nonCoinbaseMinGasPrice)
+            )
+          ),
+          BuildChainedExecuteScriptTx(
+            BuildExecuteScriptTx(
+              publicKey.bytes,
+              Some(BuildTxCommon.Default),
+              byteString,
+              Some(Amount(model.dustUtxoAmount)),
+              Some(tokens),
+              Some(model.minimalGas),
+              Some(model.nonCoinbaseMinGasPrice)
+            )
           )
         )
       )
     )
-  )
 
   implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
@@ -875,9 +878,9 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildTransactionResultDeployContractTxExamples
-      : List[Example[BuildTransactionResult.DeployContract]] =
+      : List[Example[BuildChainedDeployContractTxResult]] =
     simpleExample(
-      BuildTransactionResult.DeployContract(
+      BuildChainedDeployContractTxResult(
         BuildDeployContractTxResult(
           fromGroup = 2,
           toGroup = 2,
@@ -903,9 +906,9 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildTransactionResultExecuteScriptExamples
-      : List[Example[BuildTransactionResult.ExecuteScript]] =
+      : List[Example[BuildChainedExecuteScriptTxResult]] =
     simpleExample(
-      BuildTransactionResult.ExecuteScript(
+      BuildChainedExecuteScriptTxResult(
         BuildExecuteScriptTxResult(
           fromGroup = 2,
           toGroup = 2,
@@ -918,10 +921,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildChainedTransactionsResultExamples
-      : List[Example[AVector[BuildTransactionResult]]] =
+      : List[Example[AVector[BuildChainedTxResult]]] =
     simpleExample(
       AVector(
-        BuildTransactionResult.Transfer(
+        BuildChainedTransferTxResult(
           BuildTransferTxResult(
             unsignedTx = hexString,
             model.minimalGas,
@@ -931,7 +934,7 @@ trait EndpointsExamples extends ErrorExamples {
             toGroup = 2
           )
         ),
-        BuildTransactionResult.ExecuteScript(
+        BuildChainedExecuteScriptTxResult(
           BuildExecuteScriptTxResult(
             fromGroup = 2,
             toGroup = 2,

@@ -543,11 +543,11 @@ trait Endpoints
       .summary("Build an unsigned contract")
 
   val buildChainedTransactions
-      : BaseEndpoint[AVector[BuildTransaction], AVector[BuildTransactionResult]] =
+      : BaseEndpoint[AVector[BuildChainedTx], AVector[BuildChainedTxResult]] =
     transactionsEndpoint.post
       .in("build-chained")
-      .in(jsonBody[AVector[BuildTransaction]])
-      .out(jsonBody[AVector[BuildTransactionResult]])
+      .in(jsonBody[AVector[BuildChainedTx]])
+      .out(jsonBody[AVector[BuildChainedTxResult]])
       .summary("Build a chain of transactions")
 
   lazy val contractState: BaseEndpoint[Address.Contract, ContractState] =
