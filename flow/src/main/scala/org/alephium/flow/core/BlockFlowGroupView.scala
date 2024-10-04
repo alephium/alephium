@@ -280,15 +280,8 @@ object BlockFlowGroupView {
     override def getPreContractOutput(
         outputRef: ContractOutputRef
     ): IOResult[Option[ContractOutput]] = {
-      if (mempool.isSpent(outputRef)) {
-        Right(None)
-      } else {
-        mempool.getOutput(outputRef) match {
-          case Some(output) if output.isContract => Right(Some(output.asInstanceOf[ContractOutput]))
-          case Some(_)                           => Left(WorldState.expectedContractError)
-          case None                              => super.getPreContractOutput(outputRef)
-        }
-      }
+      // MemPool ignores ContractOutputs
+      super.getPreContractOutput(outputRef)
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -299,10 +292,9 @@ object BlockFlowGroupView {
         Right(None)
       } else {
         mempool.getOutput(outputRef) match {
-          case Some(output) if output.isAsset =>
-            Right(Some(AssetOutputInfo(outputRef, output.asInstanceOf[AssetOutput], MemPoolOutput)))
-          case Some(_) => Left(WorldState.expectedAssetError)
-          case None    => super.getPreAssetOutputInfo(outputRef)
+          case Some(output) =>
+            Right(Some(AssetOutputInfo(outputRef, output, MemPoolOutput)))
+          case None => super.getPreAssetOutputInfo(outputRef)
         }
       }
     }
