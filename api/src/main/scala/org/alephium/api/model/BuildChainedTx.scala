@@ -16,14 +16,15 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ChainIndex
-
-trait ChainIndexInfo {
-  def fromGroup: Int
-  def toGroup: Int
-
-  def chainIndex()(implicit config: GroupConfig): Option[ChainIndex] = {
-    ChainIndex.from(fromGroup, toGroup)
-  }
+sealed trait BuildChainedTx {
+  val value: BuildTxCommon with BuildTxCommon.FromPublicKey
 }
+
+@upickle.implicits.key("Transfer")
+final case class BuildChainedTransferTx(value: BuildTransferTx) extends BuildChainedTx
+
+@upickle.implicits.key("DeployContract")
+final case class BuildChainedDeployContractTx(value: BuildDeployContractTx) extends BuildChainedTx
+
+@upickle.implicits.key("ExecuteScript")
+final case class BuildChainedExecuteScriptTx(value: BuildExecuteScriptTx) extends BuildChainedTx

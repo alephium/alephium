@@ -150,19 +150,19 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       restPort: Int
   ): SubmitTxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, destinations)
-    val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
+    val unsignedTx = request[BuildTransferTxResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[SubmitTxResult](submitTx, restPort)
     res
   }
 
-  def transferGeneric(
+  def transferChained(
       inputs: AVector[BuildMultiAddressesTransaction.Source],
       privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
-    val buildTx          = buildGenericTransaction(inputs)
-    val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
+    val buildTx          = buildChainedTransaction(inputs)
+    val unsignedTx       = request[BuildTransferTxResult](buildTx, restPort)
     val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
     val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
@@ -446,7 +446,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def buildGenericTransaction(
+  def buildChainedTransaction(
       inputs: AVector[BuildMultiAddressesTransaction.Source]
   ): Int => HttpRequest = {
     val p = s"""
@@ -584,7 +584,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def submitTransaction(buildTransactionResult: BuildTransactionResult, privateKey: String) = {
+  def submitTransaction(
+      buildTransactionResult: BuildTransferTxResult,
+      privateKey: String
+  ) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,
       PrivateKey.unsafe(Hex.unsafe(privateKey))
@@ -602,7 +605,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def signAndSubmitMultisigTransaction(
-      buildTransactionResult: BuildTransactionResult,
+      buildTransactionResult: BuildTransferTxResult,
       privateKeys: AVector[String]
   ) = {
     val signatures: AVector[Signature] = privateKeys.map { p =>
@@ -618,7 +621,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitMultisigTransaction(
-      buildTransactionResult: BuildTransactionResult,
+      buildTransactionResult: BuildTransferTxResult,
       signatures: AVector[Signature]
   ) = {
     val body =

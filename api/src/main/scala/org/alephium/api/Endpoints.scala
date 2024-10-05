@@ -331,19 +331,19 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  val buildTransaction: BaseEndpoint[BuildTransaction, BuildTransactionResult] =
+  val buildTransferTransaction: BaseEndpoint[BuildTransferTx, BuildTransferTxResult] =
     transactionsEndpoint.post
       .in("build")
-      .in(jsonBodyWithAlph[BuildTransaction])
-      .out(jsonBody[BuildTransactionResult])
-      .summary("Build an unsigned transaction to a number of recipients")
+      .in(jsonBodyWithAlph[BuildTransferTx])
+      .out(jsonBody[BuildTransferTxResult])
+      .summary("Build an unsigned transfer transaction to a number of recipients")
 
   val buildMultiAddressesTransaction
-      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransactionResult] =
+      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransferTxResult] =
     transactionsEndpoint.post
       .in("build-multi-addresses")
       .in(jsonBodyWithAlph[BuildMultiAddressesTransaction])
-      .out(jsonBody[BuildTransactionResult])
+      .out(jsonBody[BuildTransferTxResult])
       .summary(
         "Build an unsigned transaction with multiple addresses to a number of recipients"
       )
@@ -393,11 +393,11 @@ trait Endpoints
       .out(jsonBody[BuildMultisigAddressResult])
       .summary("Create the multisig address and unlock script")
 
-  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransactionResult] =
+  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransferTxResult] =
     multisigEndpoint.post
       .in("build")
       .in(jsonBody[BuildMultisig])
-      .out(jsonBody[BuildTransactionResult])
+      .out(jsonBody[BuildTransferTxResult])
       .summary("Build a multisig unsigned transaction")
 
   val buildSweepMultisig: BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =
@@ -541,6 +541,14 @@ trait Endpoints
       .in(jsonBody[BuildDeployContractTx])
       .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
+
+  val buildChainedTransactions
+      : BaseEndpoint[AVector[BuildChainedTx], AVector[BuildChainedTxResult]] =
+    transactionsEndpoint.post
+      .in("build-chained")
+      .in(jsonBody[AVector[BuildChainedTx]])
+      .out(jsonBody[AVector[BuildChainedTxResult]])
+      .summary("Build a chain of transactions")
 
   lazy val contractState: BaseEndpoint[Address.Contract, ContractState] =
     contractsEndpoint.get

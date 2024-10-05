@@ -280,7 +280,7 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+      response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
         ServerFixture.dummyTransferTx(
           dummyTx,
           AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
@@ -304,7 +304,7 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+      response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
         ServerFixture.dummyTransferTx(
           dummyTx,
           AVector(
@@ -607,7 +607,7 @@ abstract class RestServerSpec(
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransactionResult] is dummyBuildTransactionResult(
+      response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
         ServerFixture.dummyTransferTx(
           dummyTx,
           AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
