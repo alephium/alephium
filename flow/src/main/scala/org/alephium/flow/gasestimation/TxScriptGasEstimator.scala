@@ -17,7 +17,7 @@
 package org.alephium.flow.gasestimation
 
 import org.alephium.flow.core._
-import org.alephium.io.IOError
+import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -26,12 +26,15 @@ import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
 trait TxScriptGasEstimator {
-  def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox]
+  def estimate(
+      inputWithAssets: AVector[TxInputWithAsset],
+      script: StatefulScript
+  ): Either[String, GasBox]
 }
 
 object TxScriptGasEstimator {
 
-  // Is it because of not all inputs are picked for gas estimation?
+  // scalastyle:off method.length
   final case class Default(
       flow: BlockFlow
   )(implicit
@@ -39,9 +42,12 @@ object TxScriptGasEstimator {
       config: GroupConfig,
       logConfig: LogConfig
   ) extends TxScriptGasEstimator {
-    def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
-      assume(inputs.nonEmpty)
-      val groupIndex      = inputs.head.fromGroup
+    def estimate(
+        inputWithAssets: AVector[TxInputWithAsset],
+        script: StatefulScript
+    ): Either[String, GasBox] = {
+      assume(inputWithAssets.nonEmpty)
+      val groupIndex      = inputWithAssets.head.input.fromGroup
       val chainIndex      = ChainIndex(groupIndex, groupIndex)
       val maximalGasPerTx = getMaximalGasPerTx()
 
@@ -51,7 +57,7 @@ object TxScriptGasEstimator {
           preOutputs: AVector[AssetOutput]
       ): Either[String, TxScriptExecution] = {
         val txTemplate = TransactionTemplate(
-          UnsignedTransaction(Some(script), inputs, AVector.empty),
+          UnsignedTransaction(Some(script), inputWithAssets.map(_.input), AVector.empty),
           inputSignatures = AVector.fill(16)(Signature.generate),
           scriptSignatures = AVector.fill(16)(Signature.generate)
         )
@@ -78,29 +84,31 @@ object TxScriptGasEstimator {
       }
 
       for {
-        blockEnv  <- flow.getDryrunBlockEnv(chainIndex).left.map(ioErrorMessage)
-        groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(ioErrorMessage)
-        preOutputsOpt <- groupView.getPreAssetOutputs(inputs).left.map(ioErrorMessage)
-        preOutputs    <- preOutputsOpt.toRight("Tx inputs do not exit")
-        result        <- runScript(blockEnv, groupView, preOutputs)
+        blockEnv  <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
+        groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
+        preOutputs = inputWithAssets.map(_.asset.output)
+        result <- runScript(blockEnv, groupView, preOutputs)
       } yield {
         maximalGasPerTx.subUnsafe(result.gasBox)
       }
     }
   }
-
-  private def ioErrorMessage(error: IOError): String = {
-    s"IO error when estimating gas for tx script or contract: $error"
-  }
+  // scalastyle:on method.length
 
   object Mock extends TxScriptGasEstimator {
-    def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
+    def estimate(
+        inputWithAssets: AVector[TxInputWithAsset],
+        script: StatefulScript
+    ): Either[String, GasBox] = {
       Right(defaultGasPerInput)
     }
   }
 
   object NotImplemented extends TxScriptGasEstimator {
-    def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
+    def estimate(
+        inputWithAssets: AVector[TxInputWithAsset],
+        script: StatefulScript
+    ): Either[String, GasBox] = {
       throw new NotImplementedError("TxScriptGasEstimator not implemented")
     }
   }

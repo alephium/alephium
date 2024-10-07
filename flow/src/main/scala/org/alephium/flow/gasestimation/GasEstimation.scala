@@ -18,6 +18,7 @@ package org.alephium.flow.gasestimation
 
 import com.typesafe.scalalogging.StrictLogging
 
+import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.util._
@@ -80,14 +81,14 @@ object GasEstimation extends StrictLogging {
   }
 
   def estimate(
-      inputs: AVector[TxInput],
+      inputWithAssets: AVector[TxInputWithAsset],
       script: StatefulScript,
       txScriptGasEstimator: TxScriptGasEstimator
   ): Either[String, GasBox] = {
-    if (inputs.isEmpty) {
+    if (inputWithAssets.isEmpty) {
       Left("Insufficient funds for gas")
     } else {
-      txScriptGasEstimator.estimate(inputs, script)
+      txScriptGasEstimator.estimate(inputWithAssets, script)
     }
   }
 

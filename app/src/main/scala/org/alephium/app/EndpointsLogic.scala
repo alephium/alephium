@@ -32,7 +32,7 @@ import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.handler.{TxHandler, ViewHandler}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, InterCliqueManager}
@@ -379,14 +379,15 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
-  val buildTransactionLogic = serverLogicRedirect(buildTransaction)(
+  val buildTransactionLogic = serverLogicRedirect(buildTransferTransaction)(
     buildTransaction =>
       withSyncedClique {
         Future.successful(
           serverUtils
-            .buildTransaction(
+            .buildTransferTransaction(
               blockFlow,
-              buildTransaction
+              buildTransaction,
+              ExtraUtxosInfo.empty
             )
         )
       },
@@ -578,6 +579,15 @@ trait EndpointsLogic extends Endpoints {
     }
   )
 
+  val getRichTransactionLogic = serverLogicRedirect(getRichTransaction)(
+    { case (txId, fromGroup, toGroup) =>
+      Future.successful(serverUtils.getRichTransaction(blockFlow, txId, fromGroup, toGroup))
+    },
+    { case (_, fromGroup, _) =>
+      getGroupIndex(fromGroup)
+    }
+  )
+
   val getRawTransactionLogic = serverLogicRedirect(getRawTransaction)(
     { case (txId, fromGroup, toGroup) =>
       Future.successful(serverUtils.getRawTransaction(blockFlow, txId, fromGroup, toGroup))
@@ -653,7 +663,11 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val buildDeployContractTxLogic = serverLogic(buildDeployContractTx) { query =>
-    Future.successful(serverUtils.buildDeployContractTx(blockFlow, query))
+    Future.successful(serverUtils.buildDeployContractTx(blockFlow, query, ExtraUtxosInfo.empty))
+  }
+
+  val buildChainedTransactionsLogic = serverLogic(buildChainedTransactions) { query =>
+    Future.successful(serverUtils.buildChainedTransactions(blockFlow, query))
   }
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>

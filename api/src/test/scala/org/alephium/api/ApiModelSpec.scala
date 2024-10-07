@@ -371,14 +371,18 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(result, jsonRaw)
   }
 
-  it should "encode/decode BuildTransaction" in {
+  it should "encode/decode BuildTransfer" in {
     val fromPublicKey = PublicKey.generate
     val toKey         = PublicKey.generate
     val toAddress     = Address.p2pkh(toKey)
 
     {
       val transfer =
-        BuildTransaction(fromPublicKey.bytes, None, AVector(Destination(toAddress, Amount(1))))
+        BuildTransferTx(
+          fromPublicKey.bytes,
+          None,
+          AVector(Destination(toAddress, Amount(1)))
+        )
       val jsonRaw = s"""
                        |{
                        |  "fromPublicKey": "${fromPublicKey.toHexString}",
@@ -390,11 +394,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  ]
                        |}
         """.stripMargin
+
       checkData(transfer, jsonRaw)
     }
 
     {
-      val transfer = BuildTransaction(
+      val transfer = BuildTransferTx(
         fromPublicKey.bytes,
         None,
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
@@ -422,7 +427,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     {
       val tokenId1 = TokenId.hash("tokenId1")
 
-      val transfer = BuildTransaction(
+      val transfer = BuildTransferTx(
         fromPublicKey.bytes,
         None,
         AVector(
@@ -463,7 +468,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     {
       val tokenId1 = TokenId.hash("tokenId1")
 
-      val transfer = BuildTransaction(
+      val transfer = BuildTransferTx(
         fromPublicKey.bytes,
         Some(BuildTxCommon.Default),
         AVector(
@@ -506,7 +511,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val tokenId1 = TokenId.hash("tokenId1")
       val utxoKey1 = Hash.hash("utxo1")
 
-      val transfer = BuildTransaction(
+      val transfer = BuildTransferTx(
         fromPublicKey.bytes,
         Some(BuildTxCommon.BIP340Schnorr),
         AVector(
@@ -550,6 +555,183 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
+  }
+
+  it should "encode/decode BuildChainedTx" in {
+    val fromPublicKey = PublicKey.generate
+    val toKey         = PublicKey.generate
+    val toAddress     = Address.p2pkh(toKey)
+
+    val transfer = BuildChainedTransferTx(
+      BuildTransferTx(
+        fromPublicKey.bytes,
+        None,
+        AVector(Destination(toAddress, Amount(1)))
+      )
+    )
+    val transferJson = s"""
+                          |{
+                          |  "type": "Transfer",
+                          |  "value": {
+                          |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                          |    "destinations": [
+                          |      {
+                          |        "address": "${toAddress.toBase58}",
+                          |        "attoAlphAmount": "1"
+                          |      }
+                          |    ]
+                          |  }
+                          |}
+        """.stripMargin
+
+    checkData(transfer, transferJson)
+
+    val deploy = BuildChainedDeployContractTx(
+      BuildDeployContractTx(
+        fromPublicKey = fromPublicKey.bytes,
+        bytecode = ByteString(0, 0),
+        issueTokenAmount = Some(Amount(1)),
+        gasAmount = Some(GasBox.unsafe(1)),
+        gasPrice = Some(GasPrice(1))
+      )
+    )
+    val deployJson = s"""
+                        |{
+                        |  "type": "DeployContract",
+                        |  "value": {
+                        |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                        |    "bytecode": "0000",
+                        |    "issueTokenAmount": "1",
+                        |    "gasAmount": 1,
+                        |    "gasPrice": "1"
+                        |  }
+                        |}
+                        |""".stripMargin
+
+    checkData(deploy, deployJson)
+
+    val execute = BuildChainedExecuteScriptTx(
+      BuildExecuteScriptTx(
+        fromPublicKey = fromPublicKey.bytes,
+        bytecode = ByteString(0, 0),
+        gasAmount = Some(GasBox.unsafe(1)),
+        gasPrice = Some(GasPrice(1))
+      )
+    )
+    val executeJson = s"""
+                         |{
+                         |  "type": "ExecuteScript",
+                         |  "value": {
+                         |    "fromPublicKey": "${fromPublicKey.toHexString}",
+                         |    "bytecode": "0000",
+                         |    "gasAmount": 1,
+                         |    "gasPrice": "1"
+                         |  }
+                         |}
+                         |""".stripMargin
+
+    checkData(execute, executeJson)
+
+    val allBuildTxs = AVector[BuildChainedTx](transfer, deploy, execute)
+    val allBuildTxsJson = s"""
+                             |[
+                             |  $transferJson,
+                             |  $deployJson,
+                             |  $executeJson
+                             |]
+                             |""".stripMargin
+    checkData(allBuildTxs, allBuildTxsJson)
+  }
+
+  it should "encode/decode BuildChainedTxResult" in {
+    val txId       = TransactionId.generate
+    val gas        = GasBox.unsafe(1)
+    val gasPrice   = GasPrice(1)
+    val contractId = ContractId.generate
+
+    val transfer = BuildChainedTransferTxResult(
+      BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+    )
+    val transferJson = s"""
+                          |{
+                          |  "type": "Transfer",
+                          |  "value": {
+                          |    "unsignedTx":"tx",
+                          |    "gasAmount": 1,
+                          |    "gasPrice": "1",
+                          |    "txId":"${txId.toHexString}",
+                          |    "fromGroup":1,
+                          |    "toGroup":2
+                          |  }
+                          |}""".stripMargin
+
+    checkData(transfer, transferJson)
+
+    val deploy = BuildChainedDeployContractTxResult(
+      BuildDeployContractTxResult(
+        fromGroup = 2,
+        toGroup = 2,
+        unsignedTx = "0000",
+        gasAmount = GasBox.unsafe(1),
+        gasPrice = GasPrice(1),
+        txId = txId,
+        contractAddress = Address.contract(contractId)
+      )
+    )
+    val deployJson =
+      s"""
+         |{
+         |  "type": "DeployContract",
+         |  "value": {
+         |    "fromGroup": 2,
+         |    "toGroup": 2,
+         |    "unsignedTx": "0000",
+         |    "gasAmount":1,
+         |    "gasPrice":"1",
+         |    "txId": "${txId.toHexString}",
+         |    "contractAddress": "${Address.contract(contractId).toBase58}"
+         |  }
+         |}
+         |""".stripMargin
+
+    checkData(deploy, deployJson)
+
+    val execute = BuildChainedExecuteScriptTxResult(
+      BuildExecuteScriptTxResult(
+        fromGroup = 1,
+        toGroup = 1,
+        unsignedTx = "0000",
+        gasAmount = GasBox.unsafe(1),
+        gasPrice = GasPrice(1),
+        txId = txId
+      )
+    )
+    val executeJson =
+      s"""
+         |{
+         |  "type": "ExecuteScript",
+         |  "value": {
+         |    "fromGroup": 1,
+         |    "toGroup": 1,
+         |    "unsignedTx": "0000",
+         |    "gasAmount":1,
+         |    "gasPrice":"1",
+         |    "txId": "${txId.toHexString}"
+         |  }
+         |}
+         |""".stripMargin
+
+    checkData(execute, executeJson)
+
+    val allBuildTxResults = AVector[BuildChainedTxResult](transfer, deploy, execute)
+    val allBuildTxResultsJson = s"""
+                                   |[
+                                   |  $transferJson,
+                                   |  $deployJson,
+                                   |  $executeJson
+                                   |]
+                                   |""".stripMargin
+    checkData(allBuildTxResults, allBuildTxResultsJson)
   }
 
   it should "encode/decode BuildMultiAddressesTransaction" in {
@@ -668,13 +850,21 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(buildSweep, jsonRaw)
   }
 
-  it should "encode/decode BuildTransactionResult" in {
+  it should "encode/decode BuildTransferTxResult" in {
     val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
-    val result   = BuildTransactionResult("tx", gas, gasPrice, txId, 1, 2)
-    val jsonRaw =
-      s"""{"unsignedTx":"tx", "gasAmount": 1, "gasPrice": "1", "txId":"${txId.toHexString}", "fromGroup":1,"toGroup":2}"""
+    val result   = BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+    val jsonRaw = s"""
+                     |{
+                     |  "unsignedTx":"tx",
+                     |  "gasAmount": 1,
+                     |  "gasPrice": "1",
+                     |  "txId":"${txId.toHexString}",
+                     |  "fromGroup":1,
+                     |  "toGroup":2
+                     |}""".stripMargin
+
     checkData(result, jsonRaw)
   }
 
@@ -862,7 +1052,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
-  it should "encode/decode BuildContract" in {
+  it should "encode/decode BuildDeployContractTx" in {
     val publicKey = PublicKey.generate
     val buildDeployContractTx = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
@@ -871,16 +1061,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1))
     )
-    val jsonRaw =
-      s"""
-         |{
-         |  "fromPublicKey": "${publicKey.toHexString}",
-         |  "bytecode": "0000",
-         |  "issueTokenAmount": "1",
-         |  "gasAmount": 1,
-         |  "gasPrice": "1"
-         |}
-         |""".stripMargin
+    val jsonRaw = s"""
+                     |{
+                     |  "fromPublicKey": "${publicKey.toHexString}",
+                     |  "bytecode": "0000",
+                     |  "issueTokenAmount": "1",
+                     |  "gasAmount": 1,
+                     |  "gasPrice": "1"
+                     |}
+                     |""".stripMargin
+
     checkData(buildDeployContractTx, jsonRaw)
   }
 
@@ -908,10 +1098,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "contractAddress": "${Address.contract(contractId).toBase58}"
          |}
          |""".stripMargin
+
     checkData(buildDeployContractTxResult, jsonRaw)
   }
 
-  it should "encode/decode BuildScriptTx" in {
+  it should "encode/decode BuildExecuteScriptTx" in {
     val publicKey = PublicKey.generate
     val buildExecuteScriptTx = BuildExecuteScriptTx(
       fromPublicKey = publicKey.bytes,
@@ -928,10 +1119,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasPrice": "1"
          |}
          |""".stripMargin
+
     checkData(buildExecuteScriptTx, jsonRaw)
   }
 
-  it should "encode/decode BuildScriptTxResult" in {
+  it should "encode/decode BuildExecuteScriptTxResult" in {
     val txId = TransactionId.generate
     val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
       fromGroup = 1,
@@ -952,6 +1144,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "txId": "${txId.toHexString}"
          |}
          |""".stripMargin
+
     checkData(buildExecuteScriptTxResult, jsonRaw)
   }
 
@@ -1354,12 +1547,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TransactionTemplate" in {
-    val tx = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val now = TimeStamp.now()
+    val tx  = api.TransactionTemplate.fromProtocol(transactionTemplate, now)
     val jsonRaw = s"""
                      |{
                      |  "unsigned": ${write(tx.unsigned)},
                      |  "inputSignatures": ${write(tx.inputSignatures)},
-                     |  "scriptSignatures": ${write(tx.scriptSignatures)}
+                     |  "scriptSignatures": ${write(tx.scriptSignatures)},
+                     |  "seenAt": ${now.millis}
                      |}""".stripMargin
 
     checkData(tx, jsonRaw)

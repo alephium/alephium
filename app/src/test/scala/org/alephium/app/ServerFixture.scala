@@ -108,7 +108,8 @@ trait ServerFixture
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value
   )
-  def dummyBuildTransactionResult(tx: Transaction) = BuildTransactionResult.from(tx.unsigned)
+  def dummyBuildTransactionResult(tx: Transaction) =
+    BuildTransferTxResult.from(tx.unsigned)
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,
@@ -302,7 +303,8 @@ object ServerFixture {
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
-        utxosLimit: Int
+        utxosLimit: Int,
+        extraUtxosInfos: ExtraUtxosInfo
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
@@ -314,7 +316,8 @@ object ServerFixture {
         outputInfos: AVector[TxOutputInfo],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
-        utxosLimit: Int
+        utxosLimit: Int,
+        extraUtxosInfo: ExtraUtxosInfo
     ): IOResult[Either[String, UnsignedTransaction]] = {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }

@@ -20,13 +20,14 @@ import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model.ApiKey
 import org.alephium.app.Documentation
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.util.AVector
 import org.alephium.wallet.WalletDocumentation
 
 @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
 object OpenApiUpdate extends App {
 
   val wallet: WalletDocumentation = new WalletDocumentation {
-    override val maybeApiKey: Option[ApiKey] = None
+    override val apiKeys: AVector[ApiKey] = AVector.empty
 
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
@@ -35,16 +36,16 @@ object OpenApiUpdate extends App {
   }
 
   new Documentation {
-    override val port                        = 12973
-    override val maybeApiKey: Option[ApiKey] = None
-    override val walletEndpoints             = wallet.walletEndpoints
+    override val port                     = 12973
+    override val apiKeys: AVector[ApiKey] = AVector.empty
+    override val walletEndpoints          = wallet.walletEndpoints
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 4
       }
 
     private val json =
-      openApiJson(openAPI, dropAuth = maybeApiKey.isEmpty, truncateAddresses = true)
+      openApiJson(openAPI, dropAuth = apiKeys.isEmpty, truncateAddresses = true)
 
     import java.io.PrintWriter
     new PrintWriter("../api/src/main/resources/openapi.json") { write(json); close() }
