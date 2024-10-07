@@ -127,25 +127,24 @@ object BlockFlowGroupView {
   ) extends BlockFlowGroupView[WS] {
     def worldState: WS = _worldState
 
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def getPreContractOutput(outputRef: ContractOutputRef): IOResult[Option[ContractOutput]] = {
       if (TxUtils.isSpent(blockCaches, outputRef)) {
         Right(None)
       } else {
         worldState.getOutputOpt(outputRef).flatMap {
-          case Some(output) if output.isContract =>
-            Right(Some(output.asInstanceOf[ContractOutput]))
+          case Some(output: ContractOutput) =>
+            Right(Some(output))
           case Some(_) =>
             Left(WorldState.expectedContractError)
           case None =>
             val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
             if (index != -1) {
               blockCaches(index).relatedOutputs.get(outputRef) match {
-                case Some(output) if output.isContract =>
-                  Right(Some(output.asInstanceOf[ContractOutput]))
+                case Some(output: ContractOutput) =>
+                  Right(Some(output))
                 case Some(_) =>
                   Left(WorldState.expectedContractError)
-                case _ =>
+                case None =>
                   Right(None)
               }
             } else {
@@ -155,15 +154,14 @@ object BlockFlowGroupView {
       }
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def getPreAssetOutputInfo(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
       if (TxUtils.isSpent(blockCaches, outputRef)) {
         Right(None)
       } else {
         worldState.getOutputOpt(outputRef).flatMap {
-          case Some(output) if output.isAsset =>
+          case Some(output: AssetOutput) =>
             Right(
-              Some(AssetOutputInfo(outputRef, output.asInstanceOf[AssetOutput], PersistedOutput))
+              Some(AssetOutputInfo(outputRef, output, PersistedOutput))
             )
           case Some(_) =>
             Left(WorldState.expectedAssetError)
@@ -171,19 +169,19 @@ object BlockFlowGroupView {
             val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
             if (index != -1) {
               blockCaches(index).relatedOutputs.get(outputRef) match {
-                case Some(output) if output.isAsset =>
+                case Some(output: AssetOutput) =>
                   Right(
                     Some(
                       AssetOutputInfo(
                         outputRef,
-                        output.asInstanceOf[AssetOutput],
+                        output,
                         UnpersistedBlockOutput
                       )
                     )
                   )
                 case Some(_) =>
                   Left(WorldState.expectedAssetError)
-                case _ =>
+                case None =>
                   Right(None)
               }
             } else {
@@ -276,7 +274,7 @@ object BlockFlowGroupView {
       blockCaches: AVector[BlockCache],
       mempool: MemPool
   ) extends Impl0[WS](worldState, blockCaches) {
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+
     override def getPreContractOutput(
         outputRef: ContractOutputRef
     ): IOResult[Option[ContractOutput]] = {
@@ -284,7 +282,6 @@ object BlockFlowGroupView {
       super.getPreContractOutput(outputRef)
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def getPreAssetOutputInfo(
         outputRef: AssetOutputRef
     ): IOResult[Option[AssetOutputInfo]] = {

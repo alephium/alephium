@@ -183,6 +183,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      // return None when output is spent
       groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
       tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
@@ -203,6 +204,7 @@ class TxUtilsSpec extends AlephiumSpec {
             )
           }
         } else {
+          // return None for transaction output to different group
           groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
@@ -229,6 +231,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       {
         val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
+        // return None when output is spent
         groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
         tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
           val output = tx.unsigned.fixedOutputs(index)
@@ -237,6 +240,7 @@ class TxUtilsSpec extends AlephiumSpec {
               AssetOutputInfo(outputRef, output, MemPoolOutput)
             )
           } else {
+            // MemPool.isSpent throws when asking for output to different group
             assertThrows[AssertionError](groupView.getPreAssetOutputInfo(outputRef))
           }
         }
