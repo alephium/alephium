@@ -33,7 +33,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object BlockFlowSynchronizer {
@@ -82,11 +82,17 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     subscribeEvent(self, classOf[InterCliqueManager.HandShaked])
   }
 
-  override def receive: Receive = common orElse handleV2 orElse updateNodeSyncStatus
+  override def receive: Receive = v2
+
+  private[sync] var currentVersion: ProtocolVersion = ProtocolV2
+  private def v1: Receive = common orElse handleV1 orElse updateNodeSyncStatus
+  private def v2: Receive = common orElse handleV2 orElse updateNodeSyncStatus
 
   def common: Receive = {
     case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, protocolVersion) =>
       addBroker(broker, remoteBrokerInfo, protocolVersion)
+      // TODO: what if this peer is not synced?
+      if (protocolVersion == ProtocolV2 && currentVersion == ProtocolV1) switchToV2()
     case BlockFinalized(hash) =>
       finalized(hash)
       onBlockFinalized(hash)
@@ -118,6 +124,17 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     val frequency =
       if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
     scheduleOnce(self, Sync, frequency)
+  }
+
+  def switchToV1(): Unit = {
+    log.info("Switch to sync protocol V1")
+    currentVersion = ProtocolV1
+    context become v1
+  }
+  def switchToV2(): Unit = {
+    log.info("Switch to sync protocol V2")
+    currentVersion = ProtocolV2
+    context become v2
   }
 }
 
@@ -179,6 +196,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] val bestChainTips = mutable.HashMap.empty[ChainIndex, (BrokerActor, ChainTip)]
   private[sync] var selfChainTips: Option[AVector[ChainTip]] = None
   private[sync] val syncingChains = mutable.HashMap.empty[ChainIndex, SyncStatePerChain]
+  private[sync] var startTime: Option[TimeStamp] = None
 
   def handleBlockDownloaded(
       result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
@@ -315,8 +333,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def tryStartSync(): Unit = {
-    // TODO: fallback to v1 if we cannot get the best chain tips within the specified time?
     if (hasBestChainTips) {
+      startTime = None
       val chains = mutable.ArrayBuffer.empty[(ChainIndex, BrokerActor, ChainTip, ChainTip)]
       brokerConfig.chainIndexes.foreach { chainIndex =>
         val selfTip                = getSelfTip(chainIndex)
@@ -326,6 +344,18 @@ trait SyncState { _: BlockFlowSynchronizer =>
         }
       }
       if (chains.nonEmpty) startSync(chains)
+    } else {
+      startTime match {
+        case Some(ts) =>
+          if (ts.plusUnsafe(FallbackThreshold) < TimeStamp.now()) {
+            selfChainTips = None
+            bestChainTips.clear()
+            startTime = None
+            clearSyncState()
+            switchToV1()
+          }
+        case None => startTime = Some(TimeStamp.now())
+      }
     }
   }
 
@@ -485,9 +515,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
 object SyncState {
   import BrokerStatusTracker.BrokerActor
 
-  val SkeletonSize: Int = 16
-  val BatchSize: Int    = maxSyncBlocksPerChain
-  val MaxQueueSize: Int = SkeletonSize * BatchSize
+  val SkeletonSize: Int           = 16
+  val BatchSize: Int              = maxSyncBlocksPerChain
+  val MaxQueueSize: Int           = SkeletonSize * BatchSize
+  val FallbackThreshold: Duration = Duration.ofMinutesUnsafe(2)
 
   final case class Skeleton(from: Int, to: Int, step: Int) {
     lazy val heights: AVector[Int] = AVector.from(from.to(to, step))

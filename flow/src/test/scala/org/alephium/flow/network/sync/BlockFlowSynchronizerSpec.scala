@@ -27,9 +27,9 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, MisbehaviorManager}
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2}
+import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, TimeStamp}
 
 // scalastyle:off file.size.limit
 class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
@@ -82,12 +82,15 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    def addBroker(): (BrokerActor, BrokerStatus, TestProbe) = {
+    def addBroker(version: ProtocolVersion = ProtocolV2): (BrokerActor, BrokerStatus, TestProbe) = {
       val brokerInfo =
         BrokerInfo.unsafe(CliqueId.generate, 0, 1, socketAddressGen.sample.get)
       val probe                    = TestProbe()
       val brokerActor: BrokerActor = ActorRefT(probe.ref)
-      blockFlowSynchronizerActor.addBroker(brokerActor, brokerInfo, ProtocolV2)
+      probe.send(
+        blockFlowSynchronizer,
+        InterCliqueManager.HandShaked(probe.ref, brokerInfo, InboundConnection, "", version)
+      )
       val brokerStatus = blockFlowSynchronizerActor.getBrokerStatus(brokerActor).get
       brokerStatus.tips is None
       (brokerActor, brokerStatus, probe)
@@ -638,6 +641,48 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     probe0.ref ! PoisonPill
     eventually(probe1.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task))))
+  }
+
+  it should "switch between V1 and V2" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState.FallbackThreshold
+
+    val selfChainTips = genChainTips
+    blockFlowSynchronizerActor.startTime.isEmpty is true
+    blockFlowSynchronizerActor.isSyncing is false
+    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
+    blockFlowSynchronizerActor.startTime.isDefined is true
+    blockFlowSynchronizerActor.isSyncing is false
+
+    blockFlowSynchronizerActor.currentVersion is ProtocolV2
+    addBroker(ProtocolV1)
+    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
+    blockFlowSynchronizerActor.startTime.isDefined is true
+    blockFlowSynchronizerActor.isSyncing is false
+
+    blockFlowSynchronizerActor.startTime =
+      Some(TimeStamp.now().minusUnsafe(FallbackThreshold.timesUnsafe(2)))
+    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
+    blockFlowSynchronizerActor.currentVersion is ProtocolV1
+    blockFlowSynchronizerActor.startTime.isEmpty is true
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is true
+    blockFlowSynchronizerActor.bestChainTips.isEmpty is true
+    blockFlowSynchronizerActor.syncingChains.isEmpty is true
+
+    addBroker(ProtocolV2)
+    blockFlowSynchronizerActor.startTime.isDefined is false
+    blockFlowSynchronizerActor.isSyncing is false
+    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
+    blockFlowSynchronizerActor.currentVersion is ProtocolV2
+    blockFlowSynchronizerActor.startTime.isDefined is true
+    blockFlowSynchronizerActor.isSyncing is false
+
+    val selfChainTip    = selfChainTips(0)
+    val bestChainTip    = selfChainTip.copy(weight = selfChainTip.weight + Weight(1))
+    val remoteChainTips = selfChainTips.replace(0, bestChainTip)
+    blockFlowSynchronizer ! BlockFlowSynchronizer.ChainState(remoteChainTips)
+    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
+    blockFlowSynchronizerActor.startTime.isDefined is false
+    blockFlowSynchronizerActor.isSyncing is true
   }
 
   behavior of "SyncStatePerChain"
