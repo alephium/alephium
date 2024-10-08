@@ -836,11 +836,34 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.CheckPendingRequest
     brokerHandlerActor.pendingRequests.size is 1
 
-    Thread.sleep(5000)
-
+    brokerHandlerActor.pendingRequests.update(
+      defaultRequestId,
+      requestInfo.copy(expiry = now.plusSecondsUnsafe(2))
+    )
     brokerHandler ! BaseBrokerHandler.CheckPendingRequest
     listener.expectMsg(MisbehaviorManager.RequestTimeout(brokerHandlerActor.remoteAddress))
     expectTerminated(brokerHandler.ref)
+  }
+
+  it should "check if the node is synced by chain state" in new SyncV2Fixture {
+    setRemoteBrokerInfo()
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is false
+
+    val selfChainTips = genChainTips()
+    brokerHandler ! BaseBrokerHandler.ChainState(selfChainTips)
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is false
+
+    val remoteChainTips =
+      selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteChainTips))
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is true
+
+    brokerHandler ! BaseBrokerHandler.ChainState(remoteChainTips)
+    brokerHandlerActor.selfSynced is true
+    brokerHandlerActor.remoteSynced is true
   }
 
   trait Fixture extends FlowFixture {

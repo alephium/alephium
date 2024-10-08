@@ -117,10 +117,14 @@ trait BrokerStatusTracker {
       case ProtocolV2 => brokers.filter(_._2.version == ProtocolV2)
       case ProtocolV1 => brokers
     }
-    val peerSize   = samplePeersSize(filtered.size)
-    val startIndex = Random.nextInt(filtered.size)
-    AVector.tabulate(peerSize) { k =>
-      filtered((startIndex + k) % filtered.size)
+    if (filtered.isEmpty) {
+      AVector.empty
+    } else {
+      val peerSize   = samplePeersSize(filtered.size)
+      val startIndex = Random.nextInt(filtered.size)
+      AVector.tabulate(peerSize) { k =>
+        filtered((startIndex + k) % filtered.size)
+      }
     }
   }
 }

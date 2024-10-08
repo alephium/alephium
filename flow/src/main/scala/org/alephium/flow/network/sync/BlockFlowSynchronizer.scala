@@ -174,10 +174,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
   import BrokerStatusTracker._
   import SyncState._
 
-  private var isSyncing     = false
-  private val bestChainTips = mutable.HashMap.empty[ChainIndex, (BrokerActor, ChainTip)]
-  private var selfChainTips: Option[AVector[ChainTip]] = None
-  private val syncingChains = mutable.HashMap.empty[ChainIndex, SyncStatePerChain]
+  private[sync] var isSyncing     = false
+  private[sync] val bestChainTips = mutable.HashMap.empty[ChainIndex, (BrokerActor, ChainTip)]
+  private[sync] var selfChainTips: Option[AVector[ChainTip]] = None
+  private[sync] val syncingChains = mutable.HashMap.empty[ChainIndex, SyncStatePerChain]
 
   def handleBlockDownloaded(
       result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
@@ -236,7 +236,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
       .filter(_._2.getChainTip(state.chainIndex).exists(_.height >= taskId.to))
       .forall(_._2.containsMissedBlocks(state.chainIndex, taskId))
     if (isOriginBrokerInvalid) {
-      log.info("All the brokers do not have the required blocks, stop the origin broker and resync")
+      log.error(
+        "All the brokers do not have the required blocks, stop the origin broker and resync"
+      )
       // TODO: publish the broker's misbehavior and stop the broker
       onBrokerTerminated(state.originBroker)
     }
@@ -378,7 +380,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     downloadBlocks()
   }
 
-  private def downloadBlocks(): Unit = {
+  private[sync] def downloadBlocks(): Unit = {
     val chains = syncingChains.values.filter(!_.isTaskQueueEmpty)
     if (chains.nonEmpty) {
       val ordered  = AVector.from(chains).sortBy(_.taskSize)(Ordering[Int].reverse)
@@ -462,9 +464,12 @@ trait SyncState { _: BlockFlowSynchronizer =>
         log.info(s"Resync due to the origin broker ${status.info.address} terminated")
         resync()
       } else {
-        log.info(s"Reschedule the pending tasks from the terminated broker ${status.info.address}")
         val pendingTasks = status.getPendingTasks
         if (pendingTasks.nonEmpty) {
+          log.info(
+            s"Reschedule the pending tasks from the terminated broker ${status.info.address}, " +
+              s"tasks: ${SyncState.showTasks(AVector.from(pendingTasks))}"
+          )
           pendingTasks.groupBy(_.chainIndex).foreach { case (chainIndex, tasks) =>
             syncingChains.get(chainIndex).foreach(_.putBack(AVector.from(tasks)))
           }

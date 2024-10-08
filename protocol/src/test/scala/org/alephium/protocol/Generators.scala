@@ -169,7 +169,7 @@ trait Generators extends NumericHelpers {
     for {
       blockHash <- blockHashGen
       height    <- Gen.choose(0, Int.MaxValue)
-      weight    <- u256Gen.map(v => Weight(v.toBigInt))
+      weight    <- Gen.choose(U256.One.v, U256.MaxValue.subOneUnsafe().v).map(v => Weight(v))
     } yield ChainTip(blockHash, height, weight)
   }
 }
