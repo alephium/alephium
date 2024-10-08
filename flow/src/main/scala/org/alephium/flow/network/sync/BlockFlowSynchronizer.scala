@@ -27,14 +27,14 @@ import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, IOBaseActor}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network._
-import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.network.broker.{BrokerHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
-import org.alephium.util.EventStream.Subscriber
+import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object BlockFlowSynchronizer {
   def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
@@ -64,6 +64,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     val networkSetting: NetworkSetting,
     val brokerConfig: BrokerConfig
 ) extends IOBaseActor
+    with Publisher
     with Subscriber
     with DownloadTracker
     with BlockFetcher
@@ -239,8 +240,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
       log.error(
         "All the brokers do not have the required blocks, stop the origin broker and resync"
       )
-      // TODO: publish the broker's misbehavior and stop the broker
-      onBrokerTerminated(state.originBroker)
+      val misbehavior = MisbehaviorManager.InvalidFlowData(remoteAddress(state.originBroker))
+      publishEvent(misbehavior)
+      context.stop(state.originBroker.ref)
     }
     isOriginBrokerInvalid
   }

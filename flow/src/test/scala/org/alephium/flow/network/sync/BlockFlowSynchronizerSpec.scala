@@ -25,7 +25,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{DependencyHandler, FlowHandler, TestUtils}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
-import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection}
+import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, MisbehaviorManager}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2}
 import org.alephium.protocol.model._
@@ -571,12 +571,19 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     )
     probe1.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
 
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerActor0.ref)
+
     EventFilter.debug(start = "Clear syncing state and resync", occurrences = 1).intercept {
       blockFlowSynchronizer.tell(
         BlockFlowSynchronizer.BlockDownloaded(AVector((task, AVector.empty, false))),
         brokerActor1.ref
       )
     }
+
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerStatus0.info.address))
+    expectTerminated(brokerActor0.ref)
     syncingChain.isSkeletonFilled is false
     syncingChain.taskQueue.head is task
     blockFlowSynchronizerActor.getBrokerStatus(brokerActor0).isEmpty is true
