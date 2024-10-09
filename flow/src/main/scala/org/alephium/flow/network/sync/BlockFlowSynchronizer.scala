@@ -93,10 +93,17 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       addBroker(broker, remoteBrokerInfo, protocolVersion)
       // TODO: what if this peer is not synced?
       if (protocolVersion == ProtocolV2 && currentVersion == ProtocolV1) switchToV2()
+
     case BlockFinalized(hash) =>
       finalized(hash)
       onBlockFinalized(hash)
-    case CleanDownloading        => cleanupSyncing(networkSetting.syncExpiryPeriod)
+
+    case CleanDownloading =>
+      val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
+      if (sizeDelta > 0) {
+        log.debug(s"Clean up #$sizeDelta hashes from syncing pool")
+      }
+
     case BlockAnnouncement(hash) => handleBlockAnnouncement(hash)
   }
 
@@ -152,8 +159,12 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
       samplePeers(ProtocolV1).foreach { case (actor, broker) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
       }
-    case SyncInventories(hashes) => download(hashes)
-    case Terminated(actor)       => removeBroker(ActorRefT(actor))
+    case SyncInventories(hashes) =>
+      val blockHashes = download(hashes)
+      if (blockHashes.nonEmpty) {
+        sender() ! BrokerHandler.DownloadBlocks(blockHashes)
+      }
+    case Terminated(actor) => removeBroker(ActorRefT(actor))
   }
 }
 

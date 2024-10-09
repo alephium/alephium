@@ -16,12 +16,8 @@
 
 package org.alephium.flow.network.sync
 
-import akka.actor.Props
-import akka.testkit.TestActorRef
-
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
@@ -34,22 +30,9 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec {
       block.hash
     })
 
-    object TestDownloadTracker {
-      def props(): Props = Props(new TestDownloadTracker())
-    }
-
-    class TestDownloadTracker extends DownloadTracker {
+    val downloadTrack = new DownloadTracker {
       override def blockflow: BlockFlow = F.blockflow
-
-      override def receive: Receive = {
-        case BlockFlowSynchronizer.SyncInventories(hashes) =>
-          download(hashes)
-        case BlockFlowSynchronizer.BlockFinalized(hash) =>
-          finalized(hash)
-      }
     }
-
-    val downloadTrack = TestActorRef[TestDownloadTracker](TestDownloadTracker.props())
 
     val randomHashes = AVector.fill(5)(BlockHash.generate)
   }
@@ -57,23 +40,20 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec {
   it should "track downloading" in new Fixture {
     hashes.foreach(hash => blockFlow.contains(hash) isE true)
 
-    downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes))
-    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[BlockHash]))
-    downloadTrack.underlyingActor.syncing.isEmpty is true
+    downloadTrack.download(AVector(hashes)) is AVector.empty[BlockHash]
+    downloadTrack.syncing.isEmpty is true
 
-    downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
-    expectMsg(BrokerHandler.DownloadBlocks(randomHashes))
-    downloadTrack.underlyingActor.syncing.keys.toSet is randomHashes.toSet
+    downloadTrack.download(AVector(hashes ++ randomHashes)) is randomHashes
+    downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
-    downloadTrack ! BlockFlowSynchronizer.SyncInventories(AVector(hashes ++ randomHashes))
-    expectMsg(BrokerHandler.DownloadBlocks(AVector.empty[BlockHash]))
-    downloadTrack.underlyingActor.syncing.keys.toSet is randomHashes.toSet
+    downloadTrack.download(AVector(hashes ++ randomHashes)) is AVector.empty[BlockHash]
+    downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
-    hashes.foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))
-    downloadTrack.underlyingActor.syncing.keys.toSet is randomHashes.toSet
+    hashes.foreach(downloadTrack.finalized)
+    downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
-    (hashes ++ randomHashes).foreach(downloadTrack ! BlockFlowSynchronizer.BlockFinalized(_))
-    downloadTrack.underlyingActor.syncing.isEmpty is true
+    (hashes ++ randomHashes).foreach(downloadTrack.finalized)
+    downloadTrack.syncing.isEmpty is true
   }
 
   it should "cleanup expired downloading accordingly" in new Fixture {
@@ -82,20 +62,18 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec {
       currentTs.minusUnsafe(Duration.ofMinutesUnsafe(k.toLong))
     )
 
-    val downloadTrackObj = downloadTrack.underlyingActor
-
     downloadingTs.indices.foreach { k =>
-      downloadTrackObj.syncing.addOne(randomHashes(k) -> downloadingTs(k))
+      downloadTrack.syncing.addOne(randomHashes(k) -> downloadingTs(k))
     }
-    downloadTrackObj.syncing.size is randomHashes.length
+    downloadTrack.syncing.size is randomHashes.length
 
-    downloadTrackObj.cleanupSyncing(Duration.ofMinutesUnsafe(randomHashes.length.toLong))
-    downloadTrackObj.syncing.size is randomHashes.length
+    downloadTrack.cleanupSyncing(Duration.ofMinutesUnsafe(randomHashes.length.toLong)) is 0
+    downloadTrack.syncing.size is randomHashes.length
 
-    downloadTrackObj.cleanupSyncing(Duration.ofMinutesUnsafe(randomHashes.length.toLong - 1))
-    downloadTrackObj.syncing.size is randomHashes.length - 1
+    downloadTrack.cleanupSyncing(Duration.ofMinutesUnsafe(randomHashes.length.toLong - 1)) is 1
+    downloadTrack.syncing.size is randomHashes.length - 1
 
-    downloadTrackObj.cleanupSyncing(Duration.zero)
-    downloadTrackObj.syncing.size is 0
+    downloadTrack.cleanupSyncing(Duration.zero) is randomHashes.length - 1
+    downloadTrack.syncing.size is 0
   }
 }

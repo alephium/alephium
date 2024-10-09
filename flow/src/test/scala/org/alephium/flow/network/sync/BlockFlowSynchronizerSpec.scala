@@ -75,6 +75,47 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(blockFlowSynchronizerActor.fetching.states.contains(blockHash) is true)
   }
 
+  behavior of "BlockFlowSynchronizerV1"
+
+  it should "cleanup expired downloading accordingly" in new Fixture {
+    blockFlowSynchronizerActor.switchToV1()
+
+    val now   = TimeStamp.now()
+    val hash0 = BlockHash.generate
+    val hash1 = BlockHash.generate
+    blockFlowSynchronizerActor.syncing.addOne(
+      (hash0, now.minusUnsafe(networkConfig.syncExpiryPeriod.timesUnsafe(2)))
+    )
+    blockFlowSynchronizerActor.syncing.addOne((hash1, now))
+    blockFlowSynchronizer ! BlockFlowSynchronizer.CleanDownloading
+    blockFlowSynchronizerActor.syncing.size is 1
+    blockFlowSynchronizerActor.syncing.contains(hash0) is false
+    blockFlowSynchronizerActor.syncing.contains(hash1) is true
+  }
+
+  it should "download blocks by inventories" in new Fixture {
+    blockFlowSynchronizerActor.switchToV1()
+
+    val now   = TimeStamp.now()
+    val hash0 = BlockHash.generate
+    val hash1 = BlockHash.generate
+    blockFlowSynchronizerActor.syncing.addOne((hash0, now))
+    blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(AVector(AVector(hash0, hash1)))
+    expectMsg(BrokerHandler.DownloadBlocks(AVector(hash1)))
+
+    blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(AVector(AVector(hash0, hash1)))
+    expectNoMessage()
+  }
+
+  it should "handle finalized blocks" in new Fixture {
+    blockFlowSynchronizerActor.switchToV1()
+
+    val hash = BlockHash.generate
+    blockFlowSynchronizerActor.syncing.addOne((hash, TimeStamp.now()))
+    blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    blockFlowSynchronizerActor.syncing.isEmpty is true
+  }
+
   behavior of "BlockFlowSynchronizerV2"
 
   trait BlockFlowSynchronizerV2Fixture extends Fixture {
