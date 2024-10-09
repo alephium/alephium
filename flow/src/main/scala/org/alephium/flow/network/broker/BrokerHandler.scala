@@ -177,12 +177,10 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def flowEvents: Receive = {
-    case BlockChainHandler.BlockAdded(hash) =>
-      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    case _: BlockChainHandler.BlockAdded => ()
     case BlockChainHandler.BlockAddingFailed =>
       log.debug(s"Failed in adding new block")
-    case BlockChainHandler.InvalidBlock(hash, reason) =>
-      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    case BlockChainHandler.InvalidBlock(_, reason) =>
       if (reason.isInstanceOf[InvalidHeaderStatus] || reason == InvalidTestnetMiner) {
         handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
       }

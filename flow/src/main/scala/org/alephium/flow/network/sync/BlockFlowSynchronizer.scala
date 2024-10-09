@@ -24,7 +24,7 @@ import akka.actor.{Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
-import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, IOBaseActor}
+import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{BrokerHandler, MisbehaviorManager}
@@ -46,7 +46,6 @@ object BlockFlowSynchronizer {
   sealed trait Command
   case object Sync                                                      extends Command
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
-  final case class BlockFinalized(hash: BlockHash)                      extends Command
   case object CleanDownloading                                          extends Command
   final case class BlockAnnouncement(hash: BlockHash)                   extends Command
   final case class ChainState(tips: AVector[ChainTip])                  extends Command
@@ -80,6 +79,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     schedule(self, CleanDownloading, networkSetting.syncCleanupFrequency)
     scheduleSync()
     subscribeEvent(self, classOf[InterCliqueManager.HandShaked])
+    subscribeEvent(self, classOf[ChainHandler.FlowDataValidationEvent])
   }
 
   override def receive: Receive = v2
@@ -94,9 +94,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       // TODO: what if this peer is not synced?
       if (protocolVersion == ProtocolV2 && currentVersion == ProtocolV1) switchToV2()
 
-    case BlockFinalized(hash) =>
-      finalized(hash)
-      onBlockFinalized(hash)
+    case event: ChainHandler.FlowDataValidationEvent =>
+      finalized(event.data.hash)
+      onBlockFinalized(event.data.hash, event.data.chainIndex)
 
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
@@ -309,9 +309,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   // TODO: what should we do if the block is invalid?
-  def onBlockFinalized(hash: BlockHash): Unit = {
+  def onBlockFinalized(hash: BlockHash, chainIndex: ChainIndex): Unit = {
     if (isSyncing) {
-      val chainIndex = ChainIndex.from(hash)
       syncingChains.get(chainIndex).foreach(_.handleFinalizedBlock(hash))
       tryValidateMoreBlocks()
       if (isSynced) {

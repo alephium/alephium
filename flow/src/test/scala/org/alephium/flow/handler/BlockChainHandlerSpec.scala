@@ -276,4 +276,28 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
       brokerProbe.expectMsg(BlockChainHandler.InvalidBlock(block.hash, InvalidTestnetMiner))
     }
   }
+
+  it should "publish invalid flow data if the block is invalid and the block is not mined locally" in new InvalidBlockFixture {
+    override val dataOrigin = DataOrigin.InterClique(brokerInfo)
+
+    val probe = TestProbe()
+    system.eventStream.subscribe(probe.ref, classOf[ChainHandler.FlowDataValidationEvent])
+    blockChainHandler ! InterCliqueManager.SyncedResult(true)
+    validateBlock(invalidBlock)
+
+    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidBlockVersion))
+    probe.expectMsg(ChainHandler.InvalidFlowData(invalidBlock, dataOrigin))
+  }
+
+  it should "not publish invalid flow data if the block is invalid and the block is mined locally" in new InvalidBlockFixture {
+    override val dataOrigin = DataOrigin.Local
+
+    val probe = TestProbe()
+    system.eventStream.subscribe(probe.ref, classOf[ChainHandler.FlowDataValidationEvent])
+    blockChainHandler ! InterCliqueManager.SyncedResult(true)
+    validateBlock(invalidBlock)
+
+    brokerHandler.expectMsg(BlockChainHandler.InvalidBlock(invalidBlock.hash, InvalidBlockVersion))
+    probe.expectNoMessage()
+  }
 }

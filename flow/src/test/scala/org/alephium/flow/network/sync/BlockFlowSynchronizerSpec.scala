@@ -22,7 +22,7 @@ import akka.actor.PoisonPill
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.handler.{DependencyHandler, FlowHandler, TestUtils}
+import org.alephium.flow.handler.{ChainHandler, DependencyHandler, FlowHandler, TestUtils}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, MisbehaviorManager}
@@ -43,6 +43,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       BlockFlowSynchronizer.props(blockFlow, allHandlers)
     )
     lazy val blockFlowSynchronizerActor = blockFlowSynchronizer.underlyingActor
+
+    def blockFinalized(block: Block): Unit = {
+      blockFlowSynchronizer ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    }
   }
 
   it should "add/remove brokers" in new Fixture {
@@ -110,9 +114,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle finalized blocks" in new Fixture {
     blockFlowSynchronizerActor.switchToV1()
 
-    val hash = BlockHash.generate
-    blockFlowSynchronizerActor.syncing.addOne((hash, TimeStamp.now()))
-    blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlowSynchronizerActor.syncing.addOne((block.hash, TimeStamp.now()))
+    blockFinalized(block)
     blockFlowSynchronizerActor.syncing.isEmpty is true
   }
 
@@ -318,7 +322,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
     probe.expectMsg(BrokerHandler.ChainState(selfChainTips))
 
-    blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(BlockHash.generate)
+    blockFinalized(emptyBlock(blockFlow, chainIndex))
     val task = BlockDownloadTask(chainIndex, 191, 200, None)
     probe.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
   }
@@ -331,7 +335,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val selfChainTip = syncingChain.bestTip.copy(weight = syncingChain.bestTip.weight + Weight(1))
     blockFlowSynchronizer ! FlowHandler.ChainState(genChainTips.replace(0, selfChainTip))
     EventFilter.debug(start = "Clear syncing state and resync", occurrences = 1).intercept {
-      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(BlockHash.generate)
+      blockFinalized(emptyBlock(blockFlow, chainIndex))
     }
     blockFlowSynchronizerActor.isSyncing is false
     blockFlowSynchronizerActor.syncingChains.isEmpty is true
@@ -349,7 +353,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     )
     val selfChainTips = genChainTips.replace(0, selfChainTip)
     blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
-    blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(BlockHash.generate)
+    blockFinalized(emptyBlock(blockFlow, chainIndex))
     probe.expectMsg(BrokerHandler.ChainState(selfChainTips))
     syncingChain.skeletonHeights is Some(AVector(50, 100, 150, 200))
     syncingChain.nextFromHeight is 201
@@ -483,12 +487,12 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       val downloadedBlock = DownloadedBlock(block, (brokerActor, brokerStatus.info))
       syncingChain.blockQueue.addOne((block.hash, downloadedBlock))
     }
-    val blockHash = blocks(1).hash
-    syncingChain.validating.addOne(blockHash)
+    val block = blocks(1)
+    syncingChain.validating.addOne(block.hash)
 
-    blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(blockHash)
-    syncingChain.validating.contains(blockHash) is false
-    syncingChain.blockQueue.contains(blockHash) is false
+    blockFinalized(block)
+    syncingChain.validating.contains(block.hash) is false
+    syncingChain.blockQueue.contains(block.hash) is false
 
     val remainBlocks = AVector(blocks(0), blocks(2))
     remainBlocks.foreach { block =>
@@ -497,9 +501,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     }
     allProbes.dependencyHandler.expectMsg(DependencyHandler.AddFlowData(remainBlocks, dataOrigin))
 
-    remainBlocks.foreach { block =>
-      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(block.hash)
-    }
+    remainBlocks.foreach(blockFinalized)
     syncingChain.validating.isEmpty is true
     syncingChain.blockQueue.isEmpty is true
     allProbes.dependencyHandler.expectNoMessage()

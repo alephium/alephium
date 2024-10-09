@@ -106,18 +106,10 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "notify synchronizer when block added" in new Fixture {
-    receivedHandshakeMessage()
-    val hash = BlockHash.generate
-    brokerHandler ! BlockChainHandler.BlockAdded(hash)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
-  }
-
   it should "publish misbehavior if block is invalid" in new Fixture {
     receivedHandshakeMessage()
     val hash = BlockHash.generate
     brokerHandler ! BlockChainHandler.InvalidBlock(hash, InvalidHeaderFlow)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
     listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
   }
 
