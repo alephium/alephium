@@ -307,24 +307,40 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     )
   }
 
-  it should "download latest blocks if the node is close to the best tip" in new BlockFlowSynchronizerV2Fixture {
+  it should "download latest blocks from the origin broker" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor, _, probe) = addBroker()
-    val chainIndex              = ChainIndex.unsafe(0, 0)
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
+    val (_, brokerStatus1, probe1)            = addBroker()
+    val chainIndex                            = ChainIndex.unsafe(0, 0)
+
     blockFlowSynchronizerActor.isSyncing = true
-    val syncingChain = addSyncingChain(chainIndex, 200, brokerActor)
+    val syncingChain = addSyncingChain(chainIndex, 200, brokerActor0)
     syncingChain.nextFromHeight = 191
+    brokerStatus1.updateTips(brokerStatus0.tips.get)
+
     val selfChainTip = syncingChain.bestTip.copy(weight =
       Weight(syncingChain.bestTip.weight.value.subtract(BigInt(1)))
     )
     val selfChainTips = genChainTips.replace(0, selfChainTip)
+    probe0.ignoreMsg { case _: BrokerHandler.ChainState => true }
+    probe1.ignoreMsg { case _: BrokerHandler.ChainState => true }
     blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
-    probe.expectMsg(BrokerHandler.ChainState(selfChainTips))
 
     blockFinalized(emptyBlock(blockFlow, chainIndex))
     val task = BlockDownloadTask(chainIndex, 191, 200, None)
-    probe.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
+    brokerStatus0.canDownload(task) is true
+    brokerStatus1.canDownload(task) is true
+    probe0.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
+    probe1.expectNoMessage()
+
+    brokerStatus0.requestNum = MaxRequestNum
+    brokerStatus0.canDownload(task) is false
+    brokerStatus1.canDownload(task) is true
+    syncingChain.nextFromHeight = 191
+    blockFinalized(emptyBlock(blockFlow, chainIndex))
+    probe0.expectNoMessage()
+    probe1.expectNoMessage()
   }
 
   it should "try to resync if the sync is completed" in new BlockFlowSynchronizerV2Fixture {
@@ -514,10 +530,11 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 4))
 
     def genTasks(chainIndex: ChainIndex) = {
+      val toHeader = emptyBlock(blockFlow, chainIndex).header
       AVector.from(0 until 16).map { index =>
         val fromHeight = BatchSize * index + 1
         val toHeight   = BatchSize * (index + 1)
-        BlockDownloadTask(chainIndex, fromHeight, toHeight, None)
+        BlockDownloadTask(chainIndex, fromHeight, toHeight, Some(toHeader))
       }
     }
 
@@ -560,7 +577,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val (brokerActor1, brokerStatus1, probe1) = addBroker()
     val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
-    val task         = BlockDownloadTask(chainIndex, 1, 50, None)
+    val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
 
     syncingChain.taskIds.addOne(task.id)
     brokerStatus1.updateTips(AVector(syncingChain.bestTip))
@@ -598,7 +615,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val bestChainTips =
       selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
     val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
-    val task         = BlockDownloadTask(chainIndex, 1, 50, None)
+    val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
 
     syncingChain.taskIds.addOne(task.id)
     brokerStatus0.updateTips(bestChainTips)
@@ -675,7 +692,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     brokerStatus0.updateTips(AVector(syncingChain.bestTip))
     blockFlowSynchronizerActor.isSyncing = true
 
-    val task = BlockDownloadTask(chainIndex, 1, 50, None)
+    val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
     syncingChain.taskQueue.addOne(task)
     syncingChain.taskIds.addOne(task.id)
     blockFlowSynchronizerActor.downloadBlocks()

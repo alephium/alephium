@@ -447,7 +447,19 @@ trait SyncState { _: BlockFlowSynchronizer =>
     val acc = mutable.ArrayBuffer.empty[(BrokerActor, BlockDownloadTask)]
     chains.foreach { state =>
       state.nextTask { task =>
-        brokers.find(_._2.canDownload(task)) match {
+        val selectedBroker = if (task.toHeader.isDefined) {
+          brokers.find(_._2.canDownload(task))
+        } else {
+          // download the latest blocks from the `originBroker`
+          getBrokerStatus(state.originBroker).flatMap { status =>
+            if (status.canDownload(task)) {
+              Some((state.originBroker, status))
+            } else {
+              None
+            }
+          }
+        }
+        selectedBroker match {
           case Some((broker, brokerStatus)) =>
             brokerStatus.addPendingTask(task)
             acc.addOne((broker, task))
@@ -614,7 +626,6 @@ object SyncState {
     private[sync] def nextSkeletonHeights(from: Int, size: Int): Option[AVector[Int]] = {
       assume(from <= bestTip.height && size > BatchSize)
       if (bestTip.height - from < BatchSize) {
-        // TODO: download the latest blocks from `originBroker`
         nextFromHeight = bestTip.height + 1
         skeletonHeights = None
         val task = BlockDownloadTask(chainIndex, from, bestTip.height, None)
