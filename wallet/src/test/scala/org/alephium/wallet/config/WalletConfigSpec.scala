@@ -24,7 +24,7 @@ import net.ceedubs.ficus.Ficus._
 
 import org.alephium.api.model.ApiKey
 import org.alephium.protocol.Hash
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class WalletConfigSpec() extends AlephiumSpec {
   it should "load wallet config" in {
@@ -34,7 +34,7 @@ class WalletConfigSpec() extends AlephiumSpec {
     typesafeConfig.as[WalletConfig]("wallet")
   }
 
-  it should "load with api-key" in new Fixture {
+  it should "load with single api-key" in new Fixture {
     val walletApiKey    = Hash.generate.toHexString
     val blockflowApiKey = Hash.generate.toHexString
 
@@ -43,8 +43,21 @@ class WalletConfigSpec() extends AlephiumSpec {
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
 
-    config.apiKey.value is ApiKey.unsafe(walletApiKey)
-    config.blockflow.apiKey.value is ApiKey.unsafe(blockflowApiKey)
+    config.apiKey.headOption.value is ApiKey.unsafe(walletApiKey)
+    config.blockflow.apiKey.headOption.value is ApiKey.unsafe(blockflowApiKey)
+  }
+
+  it should "load with multiple api-key" in new Fixture {
+    val walletApiKeys   = AVector.fill(3)(Hash.generate.toHexString)
+    val blockflowApiKey = Hash.generate.toHexString
+
+    override val configValues: Map[String, Any] =
+      Map(("wallet.api-key", walletApiKeys), ("wallet.blockflow.api-key", blockflowApiKey))
+
+    val config = typesafeConfig.as[WalletConfig]("wallet")
+
+    config.apiKey is walletApiKeys.map(ApiKey.unsafe(_))
+    config.blockflow.apiKey.headOption.value is ApiKey.unsafe(blockflowApiKey)
   }
 
   it should "load without api-key" in new Fixture {
@@ -55,8 +68,8 @@ class WalletConfigSpec() extends AlephiumSpec {
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
 
-    config.apiKey is None
-    config.blockflow.apiKey is None
+    config.apiKey.headOption is None
+    config.blockflow.apiKey.headOption is None
   }
 
   it should "fail to load invalid api-key" in new Fixture {
@@ -72,7 +85,17 @@ class WalletConfigSpec() extends AlephiumSpec {
     val configValues: Map[String, Any] = Map.empty
 
     lazy val typesafeConfig = ConfigFactory
-      .parseMap(configValues.view.mapValues(ConfigValueFactory.fromAnyRef).toMap.asJava)
+      .parseMap(
+        configValues.view
+          .mapValues {
+            case value: AVector[_] =>
+              ConfigValueFactory.fromIterable(value.toIterable.asJava)
+            case value =>
+              ConfigValueFactory.fromAnyRef(value)
+          }
+          .toMap
+          .asJava
+      )
       .withFallback(ConfigFactory.load)
   }
 }

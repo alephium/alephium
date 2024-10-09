@@ -19,6 +19,8 @@ package org.alephium.flow.gasestimation
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.core.ExtraUtxosInfo
+import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -410,7 +412,8 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         output,
         None,
         nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        ExtraUtxosInfo.empty
       )
       .rightValue
   }
@@ -419,11 +422,14 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       raw: String,
       publicKey: PublicKey = genesisKeys(0)._2
   ): Either[String, GasBox] = {
-    val script    = Compiler.compileTxScript(raw).rightValue
-    val lockup    = LockupScript.p2pkh(publicKey)
-    val unlock    = UnlockScript.p2pkh(publicKey)
-    val utxos     = blockFlow.getUsableUtxos(lockup, 100).rightValue
-    val inputs    = utxos.map(_.ref).map(TxInput(_, unlock))
+    val script = Compiler.compileTxScript(raw).rightValue
+    val lockup = LockupScript.p2pkh(publicKey)
+    val unlock = UnlockScript.p2pkh(publicKey)
+    val utxos  = blockFlow.getUsableUtxos(lockup, 100).rightValue
+    val inputs = utxos.map { utxo =>
+      TxInputWithAsset(TxInput(utxo.ref, unlock), utxo)
+    }
+
     val estimator = TxScriptGasEstimator.Default(blockFlow)
 
     GasEstimation.estimate(inputs, script, estimator)

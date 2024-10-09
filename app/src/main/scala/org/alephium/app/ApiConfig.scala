@@ -18,6 +18,8 @@ package org.alephium.app
 
 import java.net.InetAddress
 
+import scala.util.Try
+
 import com.typesafe.config.{Config, ConfigException}
 import com.typesafe.scalalogging.StrictLogging
 import net.ceedubs.ficus.Ficus._
@@ -26,7 +28,7 @@ import net.ceedubs.ficus.readers.ValueReader
 import org.alephium.api.model.ApiKey
 import org.alephium.conf._
 import org.alephium.protocol.Hash
-import org.alephium.util.{Duration, U256}
+import org.alephium.util.{AVector, Duration, U256}
 
 /** @param networkInterface
   * @param blockflowFetchMaxAge
@@ -40,7 +42,7 @@ final case class ApiConfig(
     networkInterface: InetAddress,
     blockflowFetchMaxAge: Duration,
     askTimeout: Duration,
-    apiKey: Option[ApiKey],
+    apiKey: AVector[ApiKey],
     gasFeeCap: U256,
     defaultUtxosLimit: Int
 )
@@ -59,9 +61,11 @@ object ApiConfig extends StrictLogging {
     valueReader { implicit cfg =>
       val interface     = as[String]("networkInterface")
       val apiKeyEnabled = as[Boolean]("apiKeyEnabled")
-      val apiKeyOpt     = as[Option[ApiKey]]("apiKey")
+      val apiKeys = Try(as[AVector[ApiKey]]("apiKey")).getOrElse(
+        AVector.from(as[Option[ApiKey]]("apiKey"))
+      )
 
-      if ((interface != "127.0.0.1") && apiKeyEnabled && apiKeyOpt.isEmpty) {
+      if ((interface != "127.0.0.1") && apiKeyEnabled && apiKeys.isEmpty) {
         val errorMessage = s"""|
                                |Api key is necessary, please add:
                                |    alephium.api.api-key = ${generateApiKey().value}
@@ -75,7 +79,7 @@ object ApiConfig extends StrictLogging {
         as[InetAddress]("networkInterface"),
         as[Duration]("blockflowFetchMaxAge"),
         as[Duration]("askTimeout"),
-        apiKeyOpt,
+        apiKeys,
         as[U256]("gasFeeCap"),
         as[Int]("defaultUtxosLimit")
       )

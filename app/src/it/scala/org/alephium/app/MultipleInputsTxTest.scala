@@ -52,7 +52,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       BuildMultiAddressesTransaction.Source(pubKey(publicKey).bytes, destinations)
     )
 
-    val genericTx = transferGeneric(
+    val genericTx = transferChained(
       inputs,
       AVector(privateKey),
       clique.masterRestPort
@@ -133,7 +133,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       )
     )
 
-    val genericTx = transferGeneric(
+    val genericTx = transferChained(
       inputs,
       AVector(privateKey, privateKey2, privateKey3, privateKey4),
       clique.masterRestPort

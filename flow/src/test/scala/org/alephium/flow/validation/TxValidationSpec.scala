@@ -24,6 +24,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
+import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
@@ -106,7 +107,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           outputs,
           None,
           nonCoinbaseMinGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
         )
         .rightValue
         .rightValue
@@ -123,7 +125,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           outputs.tail,
           None,
           nonCoinbaseMinGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
         )
         .rightValue
         .rightValue

@@ -13,17 +13,22 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.api.model
 
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.ChainIndex
+import akka.util.ByteString
 
-trait ChainIndexInfo {
-  def fromGroup: Int
-  def toGroup: Int
+import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.AVector
 
-  def chainIndex()(implicit config: GroupConfig): Option[ChainIndex] = {
-    ChainIndex.from(fromGroup, toGroup)
-  }
-}
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildTransferTx(
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
+    destinations: AVector[Destination],
+    utxos: Option[AVector[OutputRef]] = None,
+    gasAmount: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None,
+    targetBlockHash: Option[BlockHash] = None
+) extends BuildTxCommon
+    with BuildTxCommon.FromPublicKey

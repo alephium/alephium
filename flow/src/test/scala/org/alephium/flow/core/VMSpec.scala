@@ -833,7 +833,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).rightValue
-    fail(blockFlow, chainIndex, script, EmptyContractAsset)
+    fail(blockFlow, chainIndex, script, EmptyContractAsset(Address.contract(contractId)))
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -1276,8 +1276,10 @@ class VMSpec extends AlephiumSpec with Generators {
 
     testSimpleScript(success())
 
-    def failure(length: Int): String = {
-      val bs         = ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
+    def genBytes(length: Int): ByteString = {
+      ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
+    }
+    def failure(bs: ByteString): String = {
       val contractId = new Blake2b(bs)
       s"""
          |@using(preapprovedAssets = false)
@@ -1287,8 +1289,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
 
-    failSimpleScript(failure(31), InvalidContractId)
-    failSimpleScript(failure(33), InvalidContractId)
+    val bytes31 = genBytes(31)
+    failSimpleScript(failure(bytes31), InvalidContractId(bytes31))
+    val bytes33 = genBytes(33)
+    failSimpleScript(failure(bytes33), InvalidContractId(bytes33))
   }
 
   it should "test addressToContractId builtin" in new ContractFixture with LockupScriptGenerators {
@@ -6033,7 +6037,7 @@ class VMSpec extends AlephiumSpec with Generators {
       getContractAsset(fooId).amount is (initialAmount - minimalAlphInContract * (idx + 1))
     }
     intercept[AssertionError](insert(entrySize - 1)).getMessage is
-      s"Right(TxScriptExeFailed($EmptyContractAsset))"
+      s"Right(TxScriptExeFailed(${EmptyContractAsset(Address.contract(fooId))}))"
 
     (0 until entrySize - 1).foreach { idx =>
       remove(idx)

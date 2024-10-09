@@ -22,7 +22,7 @@ import org.scalatest.Inside
 import sttp.client3._
 
 import org.alephium.api.Endpoints
-import org.alephium.api.model.{Amount, ApiKey, BuildTransaction, Destination}
+import org.alephium.api.model.{Amount, ApiKey, BuildTransferTx, Destination}
 import org.alephium.http.EndpointSender
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
@@ -31,14 +31,19 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
 
 class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
-    val destinations       = AVector(Destination(toAddress, value, None, None))
-    val buildTransactionIn = BuildTransaction(publicKey.bytes, None, destinations, None, None)
+    val destinations = AVector(Destination(toAddress, value, None, None))
+    val buildTransferTransactionIn =
+      BuildTransferTx(publicKey.bytes, None, destinations, None, None)
     val request =
-      endpointSender.createRequest(buildTransaction, buildTransactionIn, uri"http://127.0.0.1:1234")
+      endpointSender.createRequest(
+        buildTransferTransaction,
+        buildTransferTransactionIn,
+        uri"http://127.0.0.1:1234"
+      )
     request.uri is uri"http://127.0.0.1:1234/transactions/build"
 
     inside(request.body) { case body: StringBody =>
-      read[BuildTransaction](body.s) is buildTransactionIn
+      read[BuildTransferTx](body.s) is buildTransferTransactionIn
     }
   }
 
@@ -51,7 +56,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val toAddress                         = Address.Asset(script)
     val value                             = Amount(U256.unsafe(1000))
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
-    val maybeApiKey: Option[ApiKey]       = None
-    val endpointSender                    = new EndpointSender(maybeApiKey)
+    val apiKeys: AVector[ApiKey]          = AVector.empty[ApiKey]
+    val endpointSender                    = new EndpointSender(apiKeys.headOption)
   }
 }

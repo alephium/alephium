@@ -13,40 +13,35 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.api.model
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ContractId, TransactionId, UnsignedTransaction}
+import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildDeployContractTxResult(
-    fromGroup: Int,
-    toGroup: Int,
+final case class BuildTransferTxResult(
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: TransactionId,
-    contractAddress: Address.Contract
+    fromGroup: Int,
+    toGroup: Int
 ) extends GasInfo
     with ChainIndexInfo
+    with TransactionInfo
 
-object BuildDeployContractTxResult {
+object BuildTransferTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
-    val contractId =
-      ContractId.from(unsignedTx.id, unsignedTx.fixedOutputs.length, unsignedTx.fromGroup)
-    BuildDeployContractTxResult(
-      unsignedTx.fromGroup.value,
-      unsignedTx.toGroup.value,
+  )(implicit groupConfig: GroupConfig): BuildTransferTxResult =
+    BuildTransferTxResult(
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
       unsignedTx.id,
-      Address.contract(contractId)
+      unsignedTx.fromGroup.value,
+      unsignedTx.toGroup.value
     )
-  }
 }

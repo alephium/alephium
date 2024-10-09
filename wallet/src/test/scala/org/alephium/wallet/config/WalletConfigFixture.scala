@@ -19,8 +19,9 @@ package org.alephium.wallet.config
 import java.net.InetAddress
 import java.nio.file.Files
 
+import org.alephium.api.model.ApiKey
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.util.{Duration, SocketUtil}
+import org.alephium.util.{AVector, Duration, SocketUtil}
 
 trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
 
@@ -41,19 +42,19 @@ trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
     override def groups: Int = config.blockflow.groups
   }
 
-  val apiKey = None
+  val apiKeys = AVector.empty[ApiKey]
 
   lazy val config = WalletConfig(
     Some(walletPort),
     tempSecretDir,
     lockingTimeout,
-    apiKey,
+    apiKeys,
     WalletConfig.BlockFlow(
       host.getHostAddress,
       blockFlowPort,
       groupNum,
       blockflowFetchMaxAge,
-      apiKey
+      apiKeys.headOption
     )
   )
 }
