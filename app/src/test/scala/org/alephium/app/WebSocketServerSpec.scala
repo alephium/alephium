@@ -106,7 +106,7 @@ class WebSocketServerSpec
       dummyContract,
       storages
     )
-    lazy val server: WebSocketServer = WebSocketServer(node)
+    lazy val WebSocketServer(httpServer, eventHandler) = WebSocketServer(system, node)
   }
 
   trait RouteWS extends WebSocketServerFixture {
@@ -130,7 +130,8 @@ class WebSocketServerSpec
     }
 
     def checkWS[A](f: => A) = {
-      server.start().futureValue
+      val binding =
+        httpServer.listen(port, apiConfig.networkInterface.getHostAddress).asScala.futureValue
 
       implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(5).asScala)
       eventually {
@@ -139,7 +140,7 @@ class WebSocketServerSpec
           .mapTo[EventBus.Subscribers]
           .futureValue
           .value
-          .contains(server.eventHandler) is true
+          .contains(eventHandler) is true
       }
 
       val ws = webSocketClient
@@ -154,7 +155,7 @@ class WebSocketServerSpec
         .futureValue
 
       eventually {
-        server.eventHandler
+        eventHandler
           .ask(WebSocketServer.EventHandler.ListSubscribers)
           .mapTo[AVector[String]]
           .futureValue
@@ -164,7 +165,7 @@ class WebSocketServerSpec
       f
 
       ws.close().asScala.futureValue
-      server.stop().futureValue
+      binding.close().asScala
     }
   }
 }

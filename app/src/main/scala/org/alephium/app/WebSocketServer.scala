@@ -16,96 +16,55 @@
 
 package org.alephium.app
 
-import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.concurrent._
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.util.Timeout
-import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{EventBus => VertxEventBus}
 import io.vertx.core.http.{HttpServer, HttpServerOptions}
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.json.Json._
-import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AVector, BaseActor, EventBus, Service}
+import org.alephium.util.{AVector, BaseActor, EventBus}
 
-class WebSocketServer(node: Node, wsPort: Int)(implicit
-    val system: ActorSystem,
-    val apiConfig: ApiConfig,
-    val executionContext: ExecutionContext
-) extends ApiModelCodec
-    with StrictLogging
-    with Service {
-  import WebSocketServer._
-
-  implicit val groupConfig: GroupConfig     = node.config.broker
-  implicit val networkConfig: NetworkConfig = node.config.network
-  implicit val askTimeout: Timeout          = Timeout(apiConfig.askTimeout.asScala)
-  lazy val blockflowFetchMaxAge             = apiConfig.blockflowFetchMaxAge
-
-  private val vertx         = Vertx.vertx()
-  private val vertxEventBus = vertx.eventBus()
-  private val server = {
-    val options = new HttpServerOptions()
-      .setMaxWebSocketFrameSize(1024 * 1024)
-      .setRegisterWebSocketWriteHandlers(true)
-    vertx.createHttpServer(options)
-  }
-
-  val eventHandler: ActorRef = system.actorOf(EventHandler.props(vertxEventBus))
-
-  node.eventBus.tell(EventBus.Subscribe, eventHandler)
-
-  server.webSocketHandler { webSocket =>
-    webSocket.closeHandler(_ => eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID()))
-
-    if (!webSocket.path().equals("/events")) {
-      webSocket.reject();
-    } else {
-      eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
-    }
-  }
-
-  private val wsBindingPromise: Promise[HttpServer] = Promise()
-
-  override def subServices: ArraySeq[Service] = ArraySeq(node)
-
-  protected def startSelfOnce(): Future[Unit] = {
-    for {
-      wsBinding <- server.listen(wsPort, apiConfig.networkInterface.getHostAddress).asScala
-    } yield {
-      logger.info(s"Listening ws request on ${wsBinding.actualPort}")
-      wsBindingPromise.success(wsBinding)
-    }
-  }
-
-  protected def stopSelfOnce(): Future[Unit] = {
-    for {
-      _ <- wsBindingPromise.future.flatMap(_.close().asScala)
-    } yield {
-      logger.info(s"ws unbound")
-      ()
-    }
-  }
-}
-
+final case class WebSocketServer(underlying: HttpServer, eventHandler: ActorRef)
+    extends HttpServerLike
 object WebSocketServer {
 
-  def apply(node: Node)(implicit
-      system: ActorSystem,
-      apiConfig: ApiConfig,
-      executionContext: ExecutionContext
+  def apply(flowSystem: ActorSystem, node: Node)(implicit
+      networkConfig: NetworkConfig,
+      apiConfig: ApiConfig
   ): WebSocketServer = {
-    val wsPort = node.config.network.wsPort
-    new WebSocketServer(node, wsPort)
+    val vertx = Vertx.vertx()
+
+    val eventHandler: ActorRef = flowSystem.actorOf(EventHandler.props(vertx.eventBus()))
+
+    node.eventBus.tell(EventBus.Subscribe, eventHandler)
+
+    val server = vertx
+      .createHttpServer(
+        new HttpServerOptions()
+          .setMaxWebSocketFrameSize(1024 * 1024)
+          .setRegisterWebSocketWriteHandlers(true)
+      )
+
+    server.webSocketHandler { webSocket =>
+      webSocket.closeHandler(_ =>
+        eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
+      )
+
+      if (!webSocket.path().equals("/events")) {
+        webSocket.reject();
+      } else {
+        eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
+      }
+    }
+    WebSocketServer(server, eventHandler)
   }
 
   object EventHandler {

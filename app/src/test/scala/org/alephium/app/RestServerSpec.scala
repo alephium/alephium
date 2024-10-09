@@ -1617,6 +1617,7 @@ trait RestServerFixture
         peer.restPort,
         miner,
         blocksExporter,
+        SimpleHttpServer(),
         Some(walletApp.walletServer)
       )(
         serverConfig.broker,

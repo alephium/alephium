@@ -19,6 +19,7 @@ package org.alephium.app
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
+import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpMethod, HttpServer}
@@ -31,7 +32,7 @@ import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
 import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
@@ -42,6 +43,7 @@ class RestServer(
     val port: Int,
     val miner: ActorRefT[Miner.Command],
     val blocksExporter: BlocksExporter,
+    val httpServer: HttpServerLike,
     val walletServer: Option[WalletServer]
 )(implicit
     val brokerConfig: BrokerConfig,
@@ -157,7 +159,6 @@ class RestServer(
     .existsBlocking(
       "META-INF/resources/webjars/swagger-ui/"
     ) // Fix swagger ui being not found on the first call
-  private val server = vertx.createHttpServer().requestHandler(router)
 
   // scalastyle:off magic.number
   router
@@ -183,7 +184,10 @@ class RestServer(
 
   protected def startSelfOnce(): Future[Unit] = {
     for {
-      httpBinding <- server.listen(port, apiConfig.networkInterface.getHostAddress).asScala
+      httpBinding <- httpServer.underlying
+        .requestHandler(router)
+        .listen(port, apiConfig.networkInterface.getHostAddress)
+        .asScala
     } yield {
       logger.info(s"Listening http request on ${httpBinding.actualPort}")
       httpBindingPromise.success(httpBinding)
@@ -199,9 +203,10 @@ class RestServer(
       ()
     }
 }
-
+// scalastyle:off
 object RestServer {
   def apply(
+      flowSystem: ActorSystem,
       node: Node,
       miner: ActorRefT[Miner.Command],
       blocksExporter: BlocksExporter,
@@ -209,9 +214,12 @@ object RestServer {
   )(implicit
       brokerConfig: BrokerConfig,
       apiConfig: ApiConfig,
+      networkConfig: NetworkConfig,
       executionContext: ExecutionContext
   ): RestServer = {
-    val restPort = node.config.network.restPort
-    new RestServer(node, restPort, miner, blocksExporter, walletServer)
+    val restPort        = node.config.network.restPort
+    val webSocketServer = WebSocketServer(flowSystem, node)
+    new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }
+// scalastyle:on

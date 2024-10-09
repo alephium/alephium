@@ -22,6 +22,8 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
+import io.vertx.core.Vertx
+import io.vertx.core.http.HttpServer
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
@@ -32,6 +34,15 @@ import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
+
+trait HttpServerLike {
+  def underlying: HttpServer
+}
+
+final case class SimpleHttpServer(underlying: HttpServer) extends HttpServerLike
+object SimpleHttpServer {
+  def apply(): SimpleHttpServer = SimpleHttpServer(Vertx.vertx().createHttpServer())
+}
 
 trait Server extends Service {
   def flowSystem: ActorSystem
@@ -64,13 +75,12 @@ trait Server extends Service {
   def blocksExporter: BlocksExporter
 
   lazy val restServer: RestServer =
-    RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))(
+    RestServer(flowSystem, node, miner, blocksExporter, walletApp.map(_.walletServer))(
       config.broker,
       apiConfig,
+      config.network,
       executionContext
     )
-  lazy val webSocketServer: WebSocketServer =
-    WebSocketServer(node)(flowSystem, apiConfig, executionContext)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
@@ -79,7 +89,7 @@ trait Server extends Service {
   }
 
   override lazy val subServices: ArraySeq[Service] = {
-    ArraySeq(restServer, webSocketServer, node) ++ ArraySeq.from[Service](walletService.toList)
+    ArraySeq(restServer, node) ++ ArraySeq.from[Service](walletService.toList)
   }
 
   override protected def startSelfOnce(): Future[Unit] = Future {
