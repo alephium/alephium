@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.model
 
-import scala.annotation.nowarn
-
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.{avectorSerde, Serde}
@@ -28,7 +26,6 @@ import org.alephium.util.AVector
  * The first G - 1 hashes are from groups different from this group
  * The rest G hashes are from all the chain related to this group
  */
-@nowarn
 final case class BlockDeps private (deps: AVector[BlockHash]) extends AnyVal {
   def length: Int = deps.length
 

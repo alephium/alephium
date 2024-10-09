@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.model
 
-import scala.annotation.nowarn
-
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
@@ -42,7 +40,6 @@ trait TxOutputRef {
   def isContractType: Boolean
 }
 
-@nowarn
 final case class AssetOutputRef private (hint: Hint, key: TxOutputRef.Key) extends TxOutputRef {
   override def isAssetType: Boolean    = true
   override def isContractType: Boolean = false
@@ -84,7 +81,6 @@ object AssetOutputRef {
   }
 }
 
-@nowarn
 final case class ContractOutputRef private (hint: Hint, key: TxOutputRef.Key) extends TxOutputRef {
   override def isAssetType: Boolean    = false
   override def isContractType: Boolean = true

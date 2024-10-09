@@ -16,15 +16,12 @@
 
 package org.alephium.flow.network.bootstrap
 
-import scala.annotation.nowarn
-
 import org.alephium.protocol.{PrivateKey, SafeSerdeImpl}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{CliqueId, CliqueInfo}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-@nowarn
 final case class IntraCliqueInfo private (
     id: CliqueId,
     peers: AVector[PeerInfo],

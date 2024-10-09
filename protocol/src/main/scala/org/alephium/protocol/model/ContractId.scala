@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.model
 
-import scala.annotation.nowarn
-
 import akka.util.ByteString
 
 import org.alephium.crypto.HashUtils
@@ -26,7 +24,6 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes
 
-@nowarn
 final case class ContractId private (value: Hash) extends AnyVal with RandomBytes {
   def length: Int = ContractId.length
 

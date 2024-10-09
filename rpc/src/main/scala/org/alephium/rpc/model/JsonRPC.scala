@@ -16,7 +16,6 @@
 
 package org.alephium.rpc.model
 
-import scala.annotation.nowarn
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
@@ -124,7 +123,6 @@ object JsonRPC extends StrictLogging {
     implicit val requestUnsafeReader: Reader[RequestUnsafe] = macroR[RequestUnsafe]
   }
 
-  @nowarn
   final case class Request private (method: String, params: ujson.Value, id: Long) extends WithId {
     def paramsAs[A: Reader]: Either[Response.Failure, A] =
       Try(read[A](params)) match {
@@ -174,7 +172,6 @@ object JsonRPC extends StrictLogging {
       }
   }
 
-  @nowarn
   final case class Notification private (method: String, params: ujson.Value)
   object Notification {
     def apply(method: String, params: ujson.Value): Notification = {
@@ -193,7 +190,6 @@ object JsonRPC extends StrictLogging {
     def successful[T <: WithId, R](request: T, result: R)(implicit writer: Writer[R]): Success =
       Success(writeJs(result), request.id)
 
-    @nowarn
     final case class Success private (result: ujson.Value, id: Long) extends Response
     object Success {
       def apply(result: ujson.Value, id: Long): Success = {

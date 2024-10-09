@@ -16,14 +16,11 @@
 
 package org.alephium.protocol.model
 
-import scala.annotation.nowarn
-
 import akka.util.ByteString
 
 import org.alephium.crypto.{Blake3, HashUtils}
 import org.alephium.serde.{RandomBytes, Serde}
 
-@nowarn
 final case class BlockHash private (value: Blake3) extends AnyVal with RandomBytes {
   def length: Int = BlockHash.length
 

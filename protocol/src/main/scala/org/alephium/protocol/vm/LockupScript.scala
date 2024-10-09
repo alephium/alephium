@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.vm
 
-import scala.annotation.nowarn
-
 import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, PublicKey}
@@ -118,7 +116,6 @@ object LockupScript {
     lazy val scriptHint: ScriptHint = ScriptHint.fromHash(pkHash)
   }
   // pay to multi public key hash, i.e. m-of-n type multisig
-  @nowarn
   final case class P2MPKH private (pkHashes: AVector[Hash], m: Int) extends Asset {
     lazy val scriptHint: ScriptHint = ScriptHint.fromHash(pkHashes.head)
   }

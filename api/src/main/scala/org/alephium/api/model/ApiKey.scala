@@ -16,9 +16,6 @@
 
 package org.alephium.api.model
 
-import scala.annotation.nowarn
-
-@nowarn
 final case class ApiKey private (value: String)
 
 object ApiKey {

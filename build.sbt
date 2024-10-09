@@ -494,7 +494,8 @@ val commonSettings = publishSettings ++ Seq(
     "-Ywarn-unused:patvars",
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard",
-    "-Ymacro-annotations"
+    "-Ymacro-annotations",
+    "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:silent"
   ),
   Compile / console / scalacOptions --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
   Compile / compile / wartremoverErrors      := Warts.allBut(wartsCompileExcludes: _*),

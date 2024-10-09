@@ -18,15 +18,12 @@ package org.alephium.protocol.model
 
 import java.net.InetSocketAddress
 
-import scala.annotation.nowarn
-
 import org.alephium.protocol.{PrivateKey}
 import org.alephium.protocol.config.{CliqueConfig, GroupConfig}
 import org.alephium.util.AVector
 
 // All the groups [0, ..., G-1] are assigned to different brokers based `% brokerNum`
 // Assume the peers are ordered according to the groups they correspond to
-@nowarn
 final case class CliqueInfo private (
     id: CliqueId,
     externalAddresses: AVector[Option[InetSocketAddress]],
