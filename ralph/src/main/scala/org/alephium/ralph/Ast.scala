@@ -1614,21 +1614,21 @@ object Ast {
     def definedIn(typeId: TypeId): Boolean = origin.contains(typeId)
   }
 
-  sealed trait ConstantDefinition extends OriginContractInfo
+  sealed trait ConstantDefinition extends OriginContractInfo {
+    val ident: Ident
+    def name: String = ident.name
+  }
 
   final case class ConstantVarDef[Ctx <: StatelessContext](
       ident: Ident,
       expr: Expr[Ctx]
   ) extends GlobalDefinition
-      with ConstantDefinition {
-    def name: String = ident.name
-  }
+      with ConstantDefinition
 
   final case class EnumField[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
       extends UniqueDef
-      with ConstantDefinition {
-    def name: String = ident.name
-  }
+      with ConstantDefinition
+
   final case class EnumDef[Ctx <: StatelessContext](id: TypeId, fields: Seq[EnumField[Ctx]])
       extends GlobalDefinition {
     def name: String = id.name

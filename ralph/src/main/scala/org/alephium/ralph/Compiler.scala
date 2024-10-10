@@ -900,12 +900,12 @@ object Compiler {
         !accessedVars.contains(ReadVariable(varKey)) &&
         !varInfo.tpe.isMapType
       }
-      val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Type)]
+      val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       val unusedFields         = mutable.ArrayBuffer.empty[(String, Type)]
       unusedVars.foreach {
         case (varKey, c: VarInfo.Constant[_]) =>
           if (c.constantDef.definedIn(typeId)) {
-            unusedLocalConstants.addOne((varKey.name, c.tpe))
+            unusedLocalConstants.addOne((varKey.name, c.constantDef.ident.sourceIndex))
           }
         case (varKey, varInfo) if !varInfo.isLocal =>
           unusedFields.addOne((varKey.name, varInfo.tpe))
