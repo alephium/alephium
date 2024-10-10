@@ -126,7 +126,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox]
   ): IOResult[Either[String, AssetOutputInfoWithGas]] = {
     getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
-      .flatMap(_.getPrevAssetOutputs(utxoRefs))
+      .flatMap(_.getPreAssetOutputInfos(utxoRefs))
       .map { utxosOpt =>
         val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
         for {
@@ -448,7 +448,7 @@ trait TxUtils { Self: FlowUtils =>
               .buildTransferTx(
                 fromLockupScript,
                 fromUnlockScript,
-                assetsWithGas.assets,
+                assetsWithGas.assets.map(outputInfo => (outputInfo.ref, outputInfo.output)),
                 outputInfos,
                 assetsWithGas.gas,
                 gasPrice
@@ -531,10 +531,7 @@ trait TxUtils { Self: FlowUtils =>
           txOutputLength,
           ExtraUtxosInfo.empty
         ).map(_.map { selected =>
-          AssetOutputInfoWithGas(
-            selected.assets.map(asset => (asset.ref, asset.output)),
-            selected.gas
-          )
+          AssetOutputInfoWithGas(selected.assets, selected.gas)
         })
 
       case Some(utxoRefs) =>
@@ -595,7 +592,7 @@ trait TxUtils { Self: FlowUtils =>
           val from =
             UnlockScriptWithAssets(
               input.fromUnlockScript,
-              utxosWithGas.assets
+              utxosWithGas.assets.map(outputInfo => outputInfo.ref -> outputInfo.output)
             )
           (from, change, utxosWithGas.gas)
         }
@@ -629,7 +626,7 @@ trait TxUtils { Self: FlowUtils =>
          */
         val changeTokenOutputs = UnsignedTransaction
           .calculateTokensRemainder(
-            selected.assets.flatMap(_._2.tokens),
+            selected.assets.flatMap(_.output.tokens),
             input.tokens.getOrElse(AVector.empty)
           )
           .map(_.length)
@@ -703,7 +700,7 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice
   ): Either[String, U256] = {
     UnsignedTransaction.calculateAlphRemainder(
-      selected.assets.map(_._2.amount),
+      selected.assets.map(_.output.amount),
       AVector(input.amount),
       gasPrice * selected.gas
     )
@@ -714,7 +711,7 @@ trait TxUtils { Self: FlowUtils =>
       selected: AssetOutputInfoWithGas
   ): Either[String, AVector[(TokenId, U256)]] = {
     UnsignedTransaction.calculateTokensRemainder(
-      selected.assets.map(_._2).flatMap(_.tokens),
+      selected.assets.flatMap(_.output.tokens),
       input.tokens.getOrElse(AVector.empty)
     )
   }
@@ -1123,7 +1120,9 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[AVector[TransactionTemplate]] = {
     for {
       groupView <- getImmutableGroupView(groupIndex)
-      failedTxs <- txs.filterE(tx => groupView.getPreOutputs(tx.unsigned.inputs).map(_.isEmpty))
+      failedTxs <- txs.filterE(tx =>
+        groupView.getPreAssetOutputs(tx.unsigned.inputs).map(_.isEmpty)
+      )
     } yield failedTxs
   }
 
@@ -1362,7 +1361,7 @@ object TxUtils {
   )
 
   final case class AssetOutputInfoWithGas(
-      assets: AVector[(AssetOutputRef, AssetOutput)],
+      assets: AVector[AssetOutputInfo],
       gas: GasBox
   )
 

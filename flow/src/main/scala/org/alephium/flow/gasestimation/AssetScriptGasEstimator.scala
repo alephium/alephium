@@ -93,7 +93,7 @@ object AssetScriptGasEstimator {
         chainIndex <- getChainIndex(unsignedTx)
         blockEnv   <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
         groupView  <- flow.getMutableGroupView(chainIndex.from).left.map(_.toString())
-        preOutputs <- groupView.getPreOutputs(unsignedTx.inputs).left.map(_.toString())
+        preOutputs <- groupView.getPreAssetOutputs(unsignedTx.inputs).left.map(_.toString())
         result     <- runScript(blockEnv, unsignedTx, preOutputs)
       } yield {
         maximalGasPerTx.subUnsafe(result.gasRemaining)

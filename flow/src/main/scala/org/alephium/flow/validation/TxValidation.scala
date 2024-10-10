@@ -59,7 +59,7 @@ trait TxValidation {
       blockEnv: BlockEnv
   ): TxValidationResult[Unit] = {
     for {
-      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx.unsigned.inputs))
+      preOutputs <- fromGetPreOutputs(groupView.getPreAssetOutputs(tx.unsigned.inputs))
       // the tx might fail afterwards
       failedTx <- FlowUtils
         .convertFailedScriptTx(preOutputs, tx, script)
@@ -146,7 +146,7 @@ trait TxValidation {
         blockEnv.getHardFork(),
         isCoinbase = false
       )
-      preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx.unsigned.inputs))
+      preOutputs <- fromGetPreOutputs(groupView.getPreAssetOutputs(tx.unsigned.inputs))
       _ <- checkStateful(
         chainIndex,
         fullTx,
