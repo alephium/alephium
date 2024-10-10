@@ -32,7 +32,7 @@ import org.alephium.flow.core.FlowUtils.{
   PersistedOutput,
   UnpersistedBlockOutput
 }
-import org.alephium.flow.gasestimation.*
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
@@ -41,6 +41,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.ralph.Compiler
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -245,6 +246,62 @@ class TxUtilsSpec extends AlephiumSpec {
           }
         }
       }
+    }
+  }
+
+  it should "calculate getPreContractOutput" in new FlowFixture {
+    val fromGroup = GroupIndex.unsafe(0)
+    val toGroup   = GroupIndex.unsafe(0)
+    val contractCode =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val chainIndex    = ChainIndex(fromGroup, toGroup)
+    val contract      = Compiler.compileContract(contractCode).rightValue
+    val genesisLockup = getGenesisLockupScript(chainIndex)
+    val txScript =
+      contractCreation(
+        contract,
+        AVector.empty,
+        AVector.empty,
+        genesisLockup,
+        minimalAlphInContract
+      )
+    val block = payableCall(blockFlow, chainIndex, txScript)
+    val contractOutputRef =
+      TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
+    val contractId           = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
+    val contractOutputScript = LockupScript.p2c(contractId)
+
+    {
+      // it should be absent in mempool
+      val tx = block.nonCoinbase.head
+      blockFlow.getGrandPool().add(chainIndex, tx.toTemplate, TimeStamp.now())
+      blockFlow
+        .getMutableGroupViewIncludePool(fromGroup)
+        .rightValue
+        .getPreContractOutput(contractOutputRef)
+        .rightValue
+        .isEmpty is true
+
+    }
+
+    {
+      // it should be present in Persisted state
+      addAndCheck(blockFlow, block)
+      blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      blockFlow
+        .getMutableGroupView(fromGroup)
+        .rightValue
+        .getPreContractOutput(contractOutputRef)
+        .rightValue
+        .get
+        .lockupScript is contractOutputScript
     }
   }
 

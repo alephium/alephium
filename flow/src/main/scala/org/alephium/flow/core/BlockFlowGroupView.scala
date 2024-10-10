@@ -100,9 +100,6 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
       errorIfExceedMaxUtxos: Boolean
   ): IOResult[AVector[AssetOutputInfo]]
 
-  def getContractUtxos(lockupScript: LockupScript.P2C): IOResult[ContractOutput] = {
-    worldState.getContractAsset(lockupScript.contractId)
-  }
 }
 
 object BlockFlowGroupView {

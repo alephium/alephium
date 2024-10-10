@@ -988,79 +988,14 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  trait TxOutputRefIndexFixture extends FlowFixture {
-    def enableTxOutputRefIndex: Boolean
-    override val configValues = Map(
-      ("alephium.broker.broker-num", 1),
-      ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex"),
-      ("alephium.node.indexes.subcontract-index", "false")
-    )
-
-    def verifyTxIdIndex(lockupScript: LockupScript, block: Block) = {
-      val utxos = blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue
-      utxos.length is 1
-      val txOutputRef = utxos.head.ref
-      if (enableTxOutputRefIndex) {
-        blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
-      } else {
-        blockFlow
-          .getTxIdFromOutputRef(txOutputRef)
-          .leftValue
-          .reason
-          .getMessage is "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
-      }
-    }
-
-    val tokenContract =
-      s"""
-         |Contract Token() {
-         |  @using(assetsInContract = true)
-         |  pub fn withdraw(address: Address, amount: U256) -> () {
-         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
-         |  }
-         |}
-         |""".stripMargin
-
-    def callContract(contractId: ContractId) = {
-      callTxScript(
-        s"""
-           |TxScript Main {
-           |  let token = Token(#${contractId.toHexString})
-           |  token.withdraw(@${genesisAddress.toBase58}, 1024)
-           |}
-           |
-           |$tokenContract
-           |""".stripMargin
-      )
-    }
-
-    val (fromPriKey, fromPubKey, _) = genesisKeys(0)
-    val (_, toPubKey)               = GroupIndex.unsafe(0).generateKey
-    val genesisAddress              = Address.p2pkh(fromPubKey)
-
-    val transferBlock = transfer(blockFlow, fromPriKey, toPubKey, ALPH.alph(10))
-    addAndCheck(blockFlow, transferBlock)
-    verifyTxIdIndex(LockupScript.p2pkh(toPubKey), transferBlock)
-
-    val (contractId, _, contractCreationblock) = createContract(
-      tokenContract,
-      AVector.empty,
-      AVector.empty,
-      tokenIssuanceInfo = Some(TokenIssuance.Info(1024)),
-      chainIndex = ChainIndex.unsafe(0)
-    )
-    verifyTxIdIndex(LockupScript.p2c(contractId), contractCreationblock)
-
-    val withdrawBlock = callContract(contractId)
-    verifyTxIdIndex(LockupScript.p2c(contractId), withdrawBlock)
-  }
-
   it should "not store txOutputRef index when it is disabled" in new TxOutputRefIndexFixture {
     override def enableTxOutputRefIndex = false
+    testTxScriptCalling()
   }
 
   it should "store txOutputRef index when it is enabled" in new TxOutputRefIndexFixture {
     override def enableTxOutputRefIndex = true
+    testTxScriptCalling()
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
@@ -1076,5 +1011,79 @@ class BlockFlowSpec extends AlephiumSpec {
     blocks.exists { block =>
       bestDeps.contains(block.hash)
     } is true
+  }
+}
+
+trait TxOutputRefIndexFixture extends FlowFixture {
+  def enableTxOutputRefIndex: Boolean
+  override val configValues = Map(
+    ("alephium.broker.broker-num", 1),
+    ("alephium.node.indexes.tx-output-ref-index", s"$enableTxOutputRefIndex"),
+    ("alephium.node.indexes.subcontract-index", "false")
+  )
+
+  def verifyTxIdIndex(lockupScript: LockupScript, block: Block) = {
+    val utxos = blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue
+    utxos.length is 1
+    val txOutputRef = utxos.head.ref
+    if (enableTxOutputRefIndex) {
+      blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
+    } else {
+      blockFlow
+        .getTxIdFromOutputRef(txOutputRef)
+        .leftValue
+        .reason
+        .getMessage is "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
+    }
+  }
+
+  val tokenContract =
+    s"""
+       |Contract Token() {
+       |  @using(assetsInContract = true)
+       |  pub fn withdraw(address: Address, amount: U256) -> () {
+       |    transferTokenFromSelf!(address, selfTokenId!(), amount)
+       |  }
+       |}
+       |""".stripMargin
+
+  private def callContract(contractId: ContractId) = {
+    callTxScript(
+      s"""
+         |TxScript Main {
+         |  let token = Token(#${contractId.toHexString})
+         |  token.withdraw(@${genesisAddress.toBase58}, 1024)
+         |}
+         |
+         |$tokenContract
+         |""".stripMargin
+    )
+  }
+
+  val (fromPriKey, fromPubKey, _)          = genesisKeys(0)
+  val (_, toPubKey)                        = GroupIndex.unsafe(0).generateKey
+  val genesisAddress                       = Address.p2pkh(fromPubKey)
+  val fromLockupScript: LockupScript.Asset = LockupScript.p2pkh(fromPubKey)
+
+  val transferBlock = transfer(blockFlow, fromPriKey, toPubKey, ALPH.alph(10))
+  addAndCheck(blockFlow, transferBlock)
+  verifyTxIdIndex(LockupScript.p2pkh(toPubKey), transferBlock)
+
+  val (contractId, contractOutputRef, contractCreationBlock) = createContract(
+    tokenContract,
+    AVector.empty,
+    AVector.empty,
+    tokenIssuanceInfo = Some(TokenIssuance.Info(1024)),
+    chainIndex = ChainIndex.unsafe(0)
+  )
+  val contractOutputScript = LockupScript.p2c(contractId)
+  verifyTxIdIndex(LockupScript.p2c(contractId), contractCreationBlock)
+  val lockupScript = LockupScript.p2c(contractId)
+
+  // test whatever you want with transferBlock and then testTxScriptCalling
+  def testTxScriptCalling(): Block = {
+    val withdrawBlock = callContract(contractId)
+    verifyTxIdIndex(lockupScript, withdrawBlock)
+    withdrawBlock
   }
 }
