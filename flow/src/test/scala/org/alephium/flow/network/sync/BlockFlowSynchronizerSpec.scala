@@ -745,6 +745,33 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSyncing is true
   }
 
+  it should "resync if an invalid block is received" in new BlockFlowSynchronizerV2Fixture {
+    val chainIndex                            = ChainIndex.unsafe(0, 0)
+    val selfChainTips                         = genChainTips
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
+    val (brokerActor1, _, probe1)             = addBroker()
+    val broker0ChainTips =
+      selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
+
+    probe0.send(blockFlowSynchronizer, BlockFlowSynchronizer.ChainState(broker0ChainTips))
+    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
+    blockFlowSynchronizerActor.isSyncing is true
+    blockFlowSynchronizerActor.syncingChains.keys.toSeq is Seq(chainIndex)
+    blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor0
+
+    val broker1ChainTips =
+      selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(2)))
+    probe1.send(blockFlowSynchronizer, BlockFlowSynchronizer.ChainState(broker1ChainTips))
+    val block = emptyBlock(blockFlow, chainIndex)
+    blockFlowSynchronizer ! ChainHandler.InvalidFlowData(
+      block,
+      DataOrigin.InterClique(brokerStatus0.info)
+    )
+    blockFlowSynchronizerActor.isSyncing is true
+    blockFlowSynchronizerActor.syncingChains.keys.toSeq is Seq(chainIndex)
+    blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor1
+  }
+
   behavior of "SyncStatePerChain"
 
   trait SyncStatePerChainFixture extends Fixture {

@@ -96,7 +96,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
 
     case event: ChainHandler.FlowDataValidationEvent =>
       finalized(event.data.hash)
-      onBlockFinalized(event.data.hash, event.data.chainIndex)
+      onBlockFinalized(event)
 
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
@@ -308,16 +308,25 @@ trait SyncState { _: BlockFlowSynchronizer =>
     if (!isSyncing) tryStartSync()
   }
 
-  // TODO: what should we do if the block is invalid?
-  def onBlockFinalized(hash: BlockHash, chainIndex: ChainIndex): Unit = {
+  def onBlockFinalized(event: ChainHandler.FlowDataValidationEvent): Unit = {
     if (isSyncing) {
-      syncingChains.get(chainIndex).foreach(_.handleFinalizedBlock(hash))
-      tryValidateMoreBlocks()
-      if (isSynced) {
-        resync()
+      val isBlockValid = event match {
+        case _: ChainHandler.FlowDataAdded   => true
+        case _: ChainHandler.InvalidFlowData => false
+      }
+      val block = event.data
+      if (isBlockValid) {
+        syncingChains.get(block.chainIndex).foreach(_.handleFinalizedBlock(block.hash))
+        tryValidateMoreBlocks()
+        if (isSynced) {
+          resync()
+        } else {
+          tryMoveOn()
+          downloadBlocks()
+        }
       } else {
-        tryMoveOn()
-        downloadBlocks()
+        log.info(s"Block ${block.hash.toHexString} is invalid, resync")
+        resync()
       }
     }
   }
