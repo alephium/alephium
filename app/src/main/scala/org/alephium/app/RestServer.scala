@@ -21,7 +21,7 @@ import scala.concurrent._
 
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpMethod, HttpServer}
+import io.vertx.core.http.{HttpMethod, HttpServer, HttpServerOptions}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter
@@ -157,7 +157,12 @@ class RestServer(
     .existsBlocking(
       "META-INF/resources/webjars/swagger-ui/"
     ) // Fix swagger ui being not found on the first call
-  private val server = vertx.createHttpServer().requestHandler(router)
+
+  private val httpServerOptions =
+    new HttpServerOptions()
+      .setMaxFormBufferedBytes(apiConfig.maxFormBufferedKiloByte * 1024)
+
+  private val server = vertx.createHttpServer(httpServerOptions).requestHandler(router)
 
   // scalastyle:off magic.number
   router

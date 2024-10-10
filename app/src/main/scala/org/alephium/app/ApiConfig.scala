@@ -44,7 +44,8 @@ final case class ApiConfig(
     askTimeout: Duration,
     apiKey: AVector[ApiKey],
     gasFeeCap: U256,
-    defaultUtxosLimit: Int
+    defaultUtxosLimit: Int,
+    maxFormBufferedKiloByte: Int
 )
 
 object ApiConfig extends StrictLogging {
@@ -81,7 +82,8 @@ object ApiConfig extends StrictLogging {
         as[Duration]("askTimeout"),
         apiKeys,
         as[U256]("gasFeeCap"),
-        as[Int]("defaultUtxosLimit")
+        as[Int]("defaultUtxosLimit"),
+        as[Int]("maxFormBufferedKiloByte")
       )
     }
 
