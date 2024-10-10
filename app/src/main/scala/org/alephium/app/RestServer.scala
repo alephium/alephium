@@ -160,7 +160,7 @@ class RestServer(
 
   private val httpServerOptions =
     new HttpServerOptions()
-      .setMaxFormBufferedBytes(apiConfig.maxFormBufferedKiloByte * 1024)
+      .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
 
   private val server = vertx.createHttpServer(httpServerOptions).requestHandler(router)
 
