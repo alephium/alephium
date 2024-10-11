@@ -444,6 +444,19 @@ final class AVector[@sp A](
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def collectFirst[B](pf: PartialFunction[A, B]): Option[B] = {
+    val marker = Statics.pfMarker
+    cfor(start)(_ < end, _ + 1) { i =>
+      val elem = elems(i)
+      val v    = pf.applyOrElse(elem, ((_: A) => marker).asInstanceOf[A => B])
+      if (marker ne v.asInstanceOf[AnyRef]) {
+        return Some(v)
+      }
+    }
+    None
+  }
+
   def reduce(op: (A, A) => A): A = {
     reduceBy(identity)(op)
   }

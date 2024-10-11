@@ -17,9 +17,7 @@
 package org.alephium.flow.core
 
 import scala.collection.mutable
-
 import akka.util.ByteString
-
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.Generators.hashGen
@@ -29,6 +27,7 @@ import org.alephium.protocol.model.{
   ContractOutputRef,
   GroupIndex,
   Hint,
+  TxOutput,
   TxOutputRef
 }
 import org.alephium.util.{AVector, TimeStamp}
@@ -54,16 +53,10 @@ class BlockFlowGroupViewSpec extends AlephiumFlowSpec {
     val mainGroup    = GroupIndex.unsafe(0)
     val lockupScript = getGenesisLockupScript(ChainIndex(mainGroup, mainGroup))
 
-    val contractTxOutputRef = ContractOutputRef.unsafe(
-      Hint.unsafe(0),
-      TxOutputRef.unsafeKey(hashGen.sample.get)
-    )
-
     val tx1        = block1.nonCoinbase.head.toTemplate
     val groupView1 = blockFlow.getImmutableGroupView(mainGroup).rightValue
     groupView1.getPreAssetOutputs(tx1.unsigned.inputs).rightValue.get is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
-    groupView1.getPreContractOutput(contractTxOutputRef).rightValue.isEmpty is true
     groupView1.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue.map(_.output) is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
     grandPool.add(block1.chainIndex, tx1, now)
@@ -72,7 +65,10 @@ class BlockFlowGroupViewSpec extends AlephiumFlowSpec {
     val tx2        = block2.nonCoinbase.head.toTemplate
     val groupView2 = blockFlow.getImmutableGroupViewIncludePool(mainGroup).rightValue
     groupView2.getPreAssetOutputs(tx1.unsigned.inputs).rightValue.isEmpty is true
-    groupView2.getPreContractOutput(contractTxOutputRef).rightValue.isEmpty is true
+    groupView2
+      .getPreOutputs(block2.nonCoinbase.head, None)
+      .rightValue
+      .get is block1.nonCoinbase.head.unsigned.fixedOutputs.tail.as[TxOutput]
     groupView2.getPreAssetOutputs(tx2.unsigned.inputs).rightValue.get is
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView2.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue.map(_.output) is
@@ -113,8 +109,17 @@ class BlockFlowGroupViewSpec extends AlephiumFlowSpec {
   it should "fetch getPreContractOutput and getPreOutputs" in new TxOutputRefIndexFixture {
     override def enableTxOutputRefIndex: Boolean = true
 
-    // test new contract is not spent
+    val missingContractOutputRef = ContractOutputRef.unsafe(
+      Hint.unsafe(0),
+      TxOutputRef.unsafeKey(hashGen.sample.get)
+    )
+
     val groupView = blockFlow.getImmutableGroupView(GroupIndex.unsafe(0)).rightValue
+
+    // test non-existing contract is not found
+    groupView.getPreContractOutput(missingContractOutputRef).rightValue.isEmpty is true
+
+    // test new contract is not spent
     groupView
       .getPreContractOutput(contractOutputRef)
       .rightValue

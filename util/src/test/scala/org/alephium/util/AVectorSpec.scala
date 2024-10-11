@@ -511,6 +511,17 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     AVector(-1, 2, 3).collect { case i if i > 0 => i * i } is AVector(4, 9)
   }
 
+  it should "collectFirst" in new FixtureF {
+    AVector.empty[Int].collectFirst { case i if i > 0 => i * i } shouldBe None
+
+    AVector(-1, 2, 3).collectFirst { case i if i > 0 => i * i } shouldBe Some(4)
+
+    AVector(-1, -2, -3).collectFirst { case i if i > 0 => i * i } shouldBe None
+
+    // Case where the first match is returned, even if there are other matches
+    AVector(1, 2, 3).collectFirst { case i if i > 1 => i * i } shouldBe Some(4)
+  }
+
   it should "forall" in new Fixture {
     AVector.empty[Int].forall(_ > 0) is true
     AVector.empty[Int].forall(_ < 0) is true

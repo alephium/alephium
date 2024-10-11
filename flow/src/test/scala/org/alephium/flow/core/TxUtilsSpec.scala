@@ -288,7 +288,6 @@ class TxUtilsSpec extends AlephiumSpec {
         .getPreContractOutput(contractOutputRef)
         .rightValue
         .isEmpty is true
-
     }
 
     {
