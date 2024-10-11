@@ -17,7 +17,9 @@
 package org.alephium.flow.core
 
 import scala.collection.mutable
+
 import akka.util.ByteString
+
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.Generators.hashGen
