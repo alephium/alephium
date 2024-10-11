@@ -1970,7 +1970,8 @@ object Ast {
     }
     def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
       val tpe = Type.fromVal(value.tpe)
-      constants(ident) = Compiler.VarInfo.Constant(tpe, value, Seq(value.toConstInstr), constantDef)
+      constants(ident) =
+        Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
     }
 
     private val flattenSizeCache = mutable.Map.empty[Type, Int]

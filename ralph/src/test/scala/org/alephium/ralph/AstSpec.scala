@@ -688,6 +688,25 @@ class AstSpec extends AlephiumSpec {
     }
   }
 
+  it should "check unused field" in {
+    {
+      val code =
+        s"""
+           |Contract Test(field: U256) {
+           |  pub fn main() -> () {}
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
+      checkWarnings(
+        code,
+        warnings,
+        AVector(
+          ("Found unused field in Test: field", "field")
+        )
+      )
+    }
+  }
+
   it should "display the right warning message for check external caller" in {
     Warnings.noCheckExternalCallerMsg("Foo", "bar") is
       s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""

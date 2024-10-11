@@ -70,12 +70,12 @@ trait Warnings {
 
   def warnUnusedFields(
       typeId: Ast.TypeId,
-      unusedFields: mutable.ArrayBuffer[(String, Type)]
+      unusedFields: mutable.ArrayBuffer[(String, Option[SourceIndex])]
   ): Unit = {
-    val newWarnings = unusedFields.sortBy(_._1).map { case (name, typ) =>
+    val newWarnings = unusedFields.sortBy(_._1).map { case (name, sourceIndex) =>
       Warning(
         s"Found unused field in ${typeId.name}: $name",
-        typ.sourceIndex
+        sourceIndex
       )
     }
     if (!compilerOptions.ignoreUnusedFieldsWarnings) {
