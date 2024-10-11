@@ -134,19 +134,15 @@ object BlockFlowGroupView {
           case Some(_) =>
             Left(WorldState.expectedContractError)
           case None =>
-            val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
-            if (index != -1) {
-              blockCaches(index).relatedOutputs.get(outputRef) match {
-                case Some(output: ContractOutput) =>
-                  Right(Some(output))
-                case Some(_) =>
-                  Left(WorldState.expectedContractError)
-                case None =>
-                  Right(None)
+            blockCaches.iterator
+              .collectFirst {
+                case blockCache if blockCache.relatedOutputs.contains(outputRef) =>
+                  blockCache.relatedOutputs(outputRef) match {
+                    case output: ContractOutput => Right(Some(output))
+                    case _: AssetOutput         => Left(WorldState.expectedContractError)
+                  }
               }
-            } else {
-              Right(None)
-            }
+              .getOrElse(Right(None))
         }
       }
     }
@@ -157,33 +153,21 @@ object BlockFlowGroupView {
       } else {
         worldState.getOutputOpt(outputRef).flatMap {
           case Some(output: AssetOutput) =>
-            Right(
-              Some(AssetOutputInfo(outputRef, output, PersistedOutput))
-            )
+            Right(Some(AssetOutputInfo(outputRef, output, PersistedOutput)))
           case Some(_) =>
             Left(WorldState.expectedAssetError)
           case None =>
-            val index = blockCaches.indexWhere(_.relatedOutputs.contains(outputRef))
-            if (index != -1) {
-              blockCaches(index).relatedOutputs.get(outputRef) match {
-                case Some(output: AssetOutput) =>
-                  Right(
-                    Some(
-                      AssetOutputInfo(
-                        outputRef,
-                        output,
-                        UnpersistedBlockOutput
-                      )
-                    )
-                  )
-                case Some(_) =>
-                  Left(WorldState.expectedAssetError)
-                case None =>
-                  Right(None)
+            blockCaches.iterator
+              .collectFirst {
+                case blockCache if blockCache.relatedOutputs.contains(outputRef) =>
+                  blockCache.relatedOutputs(outputRef) match {
+                    case output: AssetOutput =>
+                      Right(Some(AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)))
+                    case _: ContractOutput =>
+                      Left(WorldState.expectedAssetError)
+                  }
               }
-            } else {
-              Right(None)
-            }
+              .getOrElse(Right(None))
         }
       }
     }
