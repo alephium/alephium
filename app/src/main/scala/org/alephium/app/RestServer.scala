@@ -189,7 +189,9 @@ class RestServer(
         .listen(port, apiConfig.networkInterface.getHostAddress)
         .asScala
     } yield {
-      logger.info(s"Listening http request on ${httpBinding.actualPort}")
+      logger.info(
+        s"Listening http requests including websocket /ws/events on ${httpBinding.actualPort}"
+      )
       httpBindingPromise.success(httpBinding)
     }
   }

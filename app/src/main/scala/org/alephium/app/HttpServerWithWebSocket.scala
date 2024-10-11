@@ -47,16 +47,10 @@ final case class HttpServerWithWebSocket(underlying: HttpServer, eventHandler: A
     extends HttpServerLike
 object HttpServerWithWebSocket {
 
-  private lazy val defaultHttpOptions =
-    new HttpServerOptions()
-      .setMaxWebSocketFrameSize(1024 * 1024)
-      .setRegisterWebSocketWriteHandlers(true)
-
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def apply(
       flowSystem: ActorSystem,
       node: Node,
-      httpOptions: HttpServerOptions = defaultHttpOptions
+      httpOptions: HttpServerOptions
   )(implicit
       networkConfig: NetworkConfig,
       apiConfig: ApiConfig
