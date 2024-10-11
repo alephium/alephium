@@ -20,7 +20,6 @@ import scala.{specialized => sp}
 import scala.collection.IndexedSeqView
 import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
-import scala.runtime.Statics
 import scala.util.Random
 
 import org.alephium.macros.HPC
@@ -432,26 +431,22 @@ final class AVector[@sp A](
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def collect[B: ClassTag](pf: PartialFunction[A, B]): AVector[B] = {
-    val marker = Statics.pfMarker
-    fold(AVector.empty[B]) { case (acc, elem) =>
-      val v = pf.applyOrElse(elem, ((_: A) => marker).asInstanceOf[A => B])
-      if (marker ne v.asInstanceOf[AnyRef]) {
-        acc :+ v
-      } else {
-        acc
-      }
+  def collect[B: ClassTag](f: A => Option[B]): AVector[B] = {
+    var res = AVector.empty[B]
+    cfor(0)(_ < length, _ + 1) { i =>
+      val a = apply(i)
+      f(a).foreach(b => res = res :+ b)
     }
+    res
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def collectFirst[B](pf: PartialFunction[A, B]): Option[B] = {
-    val marker = Statics.pfMarker
+  def collectFirst[B](f: A => Option[B]): Option[B] = {
     cfor(start)(_ < end, _ + 1) { i =>
-      val elem = elems(i)
-      val v    = pf.applyOrElse(elem, ((_: A) => marker).asInstanceOf[A => B])
-      if (marker ne v.asInstanceOf[AnyRef]) {
-        return Some(v)
+      val a = apply(i)
+      f(a) match {
+        case Some(b) => return Some(b)
+        case None    => ()
       }
     }
     None

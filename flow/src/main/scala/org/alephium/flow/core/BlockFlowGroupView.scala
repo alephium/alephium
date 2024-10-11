@@ -135,12 +135,10 @@ object BlockFlowGroupView {
             Left(WorldState.expectedContractError)
           case None =>
             blockCaches
-              .collectFirst {
-                case blockCache if blockCache.relatedOutputs.contains(outputRef) =>
-                  blockCache.relatedOutputs(outputRef) match {
-                    case output: ContractOutput => Right(Some(output))
-                    case _: AssetOutput         => Left(WorldState.expectedContractError)
-                  }
+              .collectFirst(_.relatedOutputs.get(outputRef))
+              .map {
+                case output: ContractOutput => Right(Some(output))
+                case _: AssetOutput         => Left(WorldState.expectedContractError)
               }
               .getOrElse(Right(None))
         }
@@ -158,14 +156,12 @@ object BlockFlowGroupView {
             Left(WorldState.expectedAssetError)
           case None =>
             blockCaches
-              .collectFirst {
-                case blockCache if blockCache.relatedOutputs.contains(outputRef) =>
-                  blockCache.relatedOutputs(outputRef) match {
-                    case output: AssetOutput =>
-                      Right(Some(AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)))
-                    case _: ContractOutput =>
-                      Left(WorldState.expectedAssetError)
-                  }
+              .collectFirst(_.relatedOutputs.get(outputRef))
+              .map {
+                case output: AssetOutput =>
+                  Right(Some(AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)))
+                case _: ContractOutput =>
+                  Left(WorldState.expectedAssetError)
               }
               .getOrElse(Right(None))
         }
