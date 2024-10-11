@@ -134,7 +134,7 @@ object BlockFlowGroupView {
           case Some(_) =>
             Left(WorldState.expectedContractError)
           case None =>
-            blockCaches.iterator
+            blockCaches
               .collectFirst {
                 case blockCache if blockCache.relatedOutputs.contains(outputRef) =>
                   blockCache.relatedOutputs(outputRef) match {
@@ -157,7 +157,7 @@ object BlockFlowGroupView {
           case Some(_) =>
             Left(WorldState.expectedAssetError)
           case None =>
-            blockCaches.iterator
+            blockCaches
               .collectFirst {
                 case blockCache if blockCache.relatedOutputs.contains(outputRef) =>
                   blockCache.relatedOutputs(outputRef) match {
