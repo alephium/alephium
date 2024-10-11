@@ -134,7 +134,8 @@ class ApiConfigSpec extends AlephiumSpec {
       ("alephium.api.api-key-enabled", apiKeyEnabled),
       ("alephium.api.api-key", apiKeyValue),
       ("alephium.api.gas-fee-cap", "1000000000000000000"),
-      ("alephium.api.default-utxos-limit", 512)
+      ("alephium.api.default-utxos-limit", 512),
+      ("alephium.api.max-form-buffered-bytes", 128 * 1024)
     )
 
     lazy val config = ConfigFactory

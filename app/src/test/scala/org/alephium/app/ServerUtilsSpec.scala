@@ -61,7 +61,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       askTimeout = Duration.ofMinutesUnsafe(1),
       AVector.empty,
       ALPH.oneAlph,
-      defaultUtxosLimit
+      defaultUtxosLimit,
+      128
     )
   }
 

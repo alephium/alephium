@@ -22,7 +22,7 @@ import scala.concurrent._
 import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpMethod, HttpServer}
+import io.vertx.core.http.{HttpMethod, HttpServer, HttpServerOptions}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter
@@ -217,8 +217,13 @@ object RestServer {
       networkConfig: NetworkConfig,
       executionContext: ExecutionContext
   ): RestServer = {
-    val restPort        = node.config.network.restPort
-    val webSocketServer = HttpServerWithWebSocket(flowSystem, node)
+    val restPort = node.config.network.restPort
+    val httpOptions =
+      new HttpServerOptions()
+        .setMaxWebSocketFrameSize(1024 * 1024)
+        .setRegisterWebSocketWriteHandlers(true)
+        .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
+    val webSocketServer = HttpServerWithWebSocket(flowSystem, node, httpOptions)
     new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }
