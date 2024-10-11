@@ -1615,7 +1615,7 @@ object Ast {
   }
 
   sealed trait ConstantDefinition extends OriginContractInfo {
-    val ident: Ident
+    def ident: Ident
     def name: String = ident.name
   }
 
