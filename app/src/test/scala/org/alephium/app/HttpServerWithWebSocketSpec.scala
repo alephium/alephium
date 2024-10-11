@@ -38,7 +38,7 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
-class WebSocketServerSpec
+class HttpServerWithWebSocketSpec
     extends AlephiumFutureSpec
     with NoIndexModelGenerators
     with EitherValues
@@ -47,7 +47,7 @@ class WebSocketServerSpec
 
   behavior of "http"
 
-  it should "encode BlockEntry" in new Fixture {
+  it should "encode BlockEntry" in new ServerFixture {
     val dep  = BlockHash.unsafe(Blake3.hash("foo"))
     val deps = AVector.fill(groupConfig.depsNum)(dep)
     val blockEntry = BlockEntry(
@@ -76,22 +76,23 @@ class WebSocketServerSpec
 
   behavior of "ws"
 
-  it should "receive multiple events" in new RouteWS {
-    checkWS {
-      (0 to 3).foreach { _ => sendEventAndCheck }
-    }
+  it should "receive multiple events by multiple websockets" in new RouteWS {
+    checkWS(
+      10,
+      (0 to 10).map { _ =>
+        (
+          BlockNotify(blockGen.sample.get, height = 0),
+          probeMsg =>
+            read[NotificationUnsafe](probeMsg).asNotification.rightValue.method is "block_notify"
+        )
+      }
+    )
   }
 
-  trait Fixture extends ServerFixture {
+  trait WebSocketServerFixture extends ServerFixture {
 
-    override val configValues = configPortsValues
-
-    implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
-    lazy val blockflowFetchMaxAge          = apiConfig.blockflowFetchMaxAge
-  }
-
-  trait WebSocketServerFixture extends Fixture {
-
+    implicit lazy val apiConfig: ApiConfig          = ApiConfig.load(newConfig)
+    override val configValues                       = configPortsValues
     implicit val system: ActorSystem                = ActorSystem("websocket-server-spec")
     implicit val executionContext: ExecutionContext = system.dispatcher
     lazy val blockFlowProbe                         = TestProbe()
@@ -106,7 +107,8 @@ class WebSocketServerSpec
       dummyContract,
       storages
     )
-    lazy val WebSocketServer(httpServer, eventHandler) = WebSocketServer(system, node)
+    lazy val HttpServerWithWebSocket(httpServer, eventHandler) =
+      HttpServerWithWebSocket(system, node)
   }
 
   trait RouteWS extends WebSocketServerFixture {
@@ -116,20 +118,9 @@ class WebSocketServerSpec
       val options = new WebSocketClientOptions().setMaxFrameSize(1024 * 1024)
       vertx.createWebSocketClient(options)
     }
-    val port             = node.config.network.wsPort
-    val blockNotifyProbe = TestProbe()
+    val port = node.config.network.wsPort
 
-    val blockNotify = BlockNotify(blockGen.sample.get, height = 0)
-    def sendEventAndCheck: Assertion = {
-      node.eventBus ! blockNotify
-
-      blockNotifyProbe.expectMsgPF() { case message: String =>
-        val notification = read[NotificationUnsafe](message).asNotification.rightValue
-        notification.method is "block_notify"
-      }
-    }
-
-    def checkWS[A](f: => A) = {
+    def checkWS(wsCount: Int, causeEffectList: Iterable[(EventBus.Event, String => Assertion)]) = {
       val binding =
         httpServer.listen(port, apiConfig.networkInterface.getHostAddress).asScala.futureValue
 
@@ -143,28 +134,38 @@ class WebSocketServerSpec
           .contains(eventHandler) is true
       }
 
-      val ws = webSocketClient
-        .connect(port, "127.0.0.1", "/events")
-        .asScala
-        .map { ws =>
-          ws.textMessageHandler { blockNotify =>
-            blockNotifyProbe.ref ! blockNotify
-          }
-          ws
+      val probedSockets =
+        AVector.fill(wsCount) {
+          val probe = TestProbe()
+          probe -> webSocketClient
+            .connect(port, "127.0.0.1", "/ws/events")
+            .asScala
+            .map { ws =>
+              ws.textMessageHandler { blockNotify =>
+                probe.ref ! blockNotify
+              }
+              ws
+            }
+            .futureValue
         }
-        .futureValue
 
       eventually {
         eventHandler
-          .ask(WebSocketServer.EventHandler.ListSubscribers)
+          .ask(HttpServerWithWebSocket.EventHandler.ListSubscribers)
           .mapTo[AVector[String]]
           .futureValue
-          .nonEmpty is true
+          .length is probedSockets.length
+      }
+      causeEffectList.foreach { case (cause, effect) =>
+        node.eventBus ! cause
+        probedSockets.foreach { case (probe, _) =>
+          probe.expectMsgPF() { case message: String =>
+            effect(message)
+          }
+        }
       }
 
-      f
-
-      ws.close().asScala.futureValue
+      probedSockets.foreach(_._2.close().asScala.futureValue)
       binding.close().asScala
     }
   }

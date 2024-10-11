@@ -203,7 +203,7 @@ class RestServer(
       ()
     }
 }
-// scalastyle:off
+// scalastyle:off parameter.number
 object RestServer {
   def apply(
       flowSystem: ActorSystem,
@@ -218,8 +218,8 @@ object RestServer {
       executionContext: ExecutionContext
   ): RestServer = {
     val restPort        = node.config.network.restPort
-    val webSocketServer = WebSocketServer(flowSystem, node)
+    val webSocketServer = HttpServerWithWebSocket(flowSystem, node)
     new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }
-// scalastyle:on
+// scalastyle:on parameter.number

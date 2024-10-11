@@ -32,39 +32,55 @@ import org.alephium.protocol.config.NetworkConfig
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, BaseActor, EventBus}
 
-final case class WebSocketServer(underlying: HttpServer, eventHandler: ActorRef)
-    extends HttpServerLike
-object WebSocketServer {
+trait HttpServerLike {
+  def underlying: HttpServer
+}
 
-  def apply(flowSystem: ActorSystem, node: Node)(implicit
+final case class SimpleHttpServer(underlying: HttpServer) extends HttpServerLike
+object SimpleHttpServer {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def apply(httpOptions: HttpServerOptions = new HttpServerOptions): SimpleHttpServer =
+    SimpleHttpServer(Vertx.vertx().createHttpServer(httpOptions))
+}
+
+final case class HttpServerWithWebSocket(underlying: HttpServer, eventHandler: ActorRef)
+    extends HttpServerLike
+object HttpServerWithWebSocket {
+
+  private lazy val defaultHttpOptions =
+    new HttpServerOptions()
+      .setMaxWebSocketFrameSize(1024 * 1024)
+      .setRegisterWebSocketWriteHandlers(true)
+
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def apply(
+      flowSystem: ActorSystem,
+      node: Node,
+      httpOptions: HttpServerOptions = defaultHttpOptions
+  )(implicit
       networkConfig: NetworkConfig,
       apiConfig: ApiConfig
-  ): WebSocketServer = {
+  ): HttpServerWithWebSocket = {
     val vertx = Vertx.vertx()
 
     val eventHandler: ActorRef = flowSystem.actorOf(EventHandler.props(vertx.eventBus()))
 
     node.eventBus.tell(EventBus.Subscribe, eventHandler)
 
-    val server = vertx
-      .createHttpServer(
-        new HttpServerOptions()
-          .setMaxWebSocketFrameSize(1024 * 1024)
-          .setRegisterWebSocketWriteHandlers(true)
-      )
+    val server = vertx.createHttpServer(httpOptions)
 
     server.webSocketHandler { webSocket =>
       webSocket.closeHandler(_ =>
         eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
       )
 
-      if (!webSocket.path().equals("/events")) {
-        webSocket.reject();
+      if (!webSocket.path().equals("/ws/events")) {
+        webSocket.reject()
       } else {
         eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
       }
     }
-    WebSocketServer(server, eventHandler)
+    HttpServerWithWebSocket(server, eventHandler)
   }
 
   object EventHandler {

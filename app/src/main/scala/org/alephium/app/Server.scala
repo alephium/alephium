@@ -22,8 +22,6 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
-import io.vertx.core.Vertx
-import io.vertx.core.http.HttpServer
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
@@ -34,15 +32,6 @@ import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
-
-trait HttpServerLike {
-  def underlying: HttpServer
-}
-
-final case class SimpleHttpServer(underlying: HttpServer) extends HttpServerLike
-object SimpleHttpServer {
-  def apply(): SimpleHttpServer = SimpleHttpServer(Vertx.vertx().createHttpServer())
-}
 
 trait Server extends Service {
   def flowSystem: ActorSystem
