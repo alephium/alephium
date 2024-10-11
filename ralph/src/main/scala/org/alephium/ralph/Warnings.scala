@@ -54,13 +54,13 @@ trait Warnings {
 
   def warnUnusedLocalConstants(
       typeId: Ast.TypeId,
-      unusedConstants: mutable.ArrayBuffer[(String, Type)]
+      unusedConstants: mutable.ArrayBuffer[(String, Option[SourceIndex])]
   ): Unit = {
     if (!compilerOptions.ignoreUnusedConstantsWarnings) {
-      val newWarnings = unusedConstants.map { case (name, typ) =>
+      val newWarnings = unusedConstants.map { case (name, sourceIndex) =>
         Warning(
           s"Found unused constant in ${typeId.name}: $name",
-          typ.sourceIndex
+          sourceIndex
         )
       }
 
