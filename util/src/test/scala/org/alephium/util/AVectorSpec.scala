@@ -516,13 +516,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
 
     AVector(-1, 2, 3).collectFirst { i => if (i > 0) Some(i * i) else None } is Some(4)
 
-<<<<<<< Updated upstream
     AVector(-1, -2, -3).collectFirst { i => if (i > 0) Some(i * i) else None } is None
-
-    AVector(1, 2, 3).collectFirst { i => if (i > 1) Some(i * i) else None } is Some(4)
-=======
-    AVector(-1, -2, -3).collectFirst { case i if i > 0 => i * i } is None
->>>>>>> Stashed changes
   }
 
   it should "forall" in new Fixture {
