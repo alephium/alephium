@@ -252,13 +252,6 @@ object BlockFlowGroupView {
       mempool: MemPool
   ) extends Impl0[WS](worldState, blockCaches) {
 
-    override def getPreContractOutput(
-        outputRef: ContractOutputRef
-    ): IOResult[Option[ContractOutput]] = {
-      // MemPool ignores ContractOutputs
-      super.getPreContractOutput(outputRef)
-    }
-
     override def getPreAssetOutputInfo(
         outputRef: AssetOutputRef
     ): IOResult[Option[AssetOutputInfo]] = {
