@@ -27,7 +27,7 @@ class BlocksExportImportTest extends AlephiumActorSpec {
     val blockMinedNum = 10
     server.start().futureValue is ()
 
-    startWS(defaultWsMasterPort)
+    startWsClient(defaultRestMasterPort)
 
     request[Boolean](startMining, defaultRestMasterPort) is true
 
@@ -44,7 +44,7 @@ class BlocksExportImportTest extends AlephiumActorSpec {
 
     newServer.start().futureValue is ()
 
-    startWS(wsPort(newPort))
+    startWsClient(restPort(newPort))
 
     val file = rootPath.resolve(filename).toFile
 

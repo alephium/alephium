@@ -102,7 +102,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   val defaultMasterPort     = generatePort()
   val defaultRestMasterPort = restPort(defaultMasterPort)
-  val defaultWsMasterPort   = wsPort(defaultMasterPort)
   val defaultWalletPort     = generatePort()
 
   val blockNotifyProbe = TestProbe()
@@ -277,7 +276,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
         ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
-        ("alephium.network.ws-port", wsPort(publicPort)),
         ("alephium.network.rest-port", restPort(publicPort)),
         ("alephium.network.miner-api-port", minerPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
@@ -390,9 +388,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWS(port: Int): Future[WebSocketBase] = {
+  def startWsClient(port: Int): Future[WebSocketBase] = {
     webSocketClient
-      .connect(port, "127.0.0.1", "/events")
+      .connect(port, "127.0.0.1", "/ws/events")
       .asScala
       .map { ws =>
         ws.textMessageHandler { blockNotify =>
@@ -867,7 +865,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
     def startWs(): Unit = {
       servers.foreach { server =>
-        startWS(server.config.network.wsPort)
+        startWsClient(server.config.network.restPort)
       }
     }
 

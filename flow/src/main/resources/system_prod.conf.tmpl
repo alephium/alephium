@@ -18,6 +18,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 16
     max-inbound-connections-per-group = 64
+    max-ws-connections = 100
     max-clique-from-same-ip = 2
 
     # The frequency at which peers will ping each other to check for liveness.
@@ -72,7 +73,6 @@ alephium {
     coordinator-address    = "127.0.0.1:9973"
 
     rest-port = 12973
-    ws-port = 11973
     miner-api-port = 10973
   }
 

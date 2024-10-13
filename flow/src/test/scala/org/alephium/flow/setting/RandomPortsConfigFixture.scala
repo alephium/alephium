@@ -23,7 +23,6 @@ trait RandomPortsConfigFixture extends SocketUtil {
   private val publicPort   = generatePort()
   private val masterPort   = generatePort()
   private val restPort     = generatePort()
-  private val wsPort       = generatePort()
   private val minerApiPort = generatePort()
 
   lazy val configPortsValues: Map[String, Any] = {
@@ -39,7 +38,6 @@ trait RandomPortsConfigFixture extends SocketUtil {
       ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
       ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
       ("alephium.network.rest-port", restPort),
-      ("alephium.network.ws-port", wsPort),
       ("alephium.network.miner-api-port", minerApiPort)
     )
   }

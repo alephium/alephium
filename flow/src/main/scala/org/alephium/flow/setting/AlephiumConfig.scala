@@ -132,6 +132,7 @@ final case class NetworkSetting(
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
+    maxWsConnections: Int,
     maxCliqueFromSameIp: Int,
     pingFrequency: Duration,
     retryTimeout: Duration,
@@ -156,7 +157,6 @@ final case class NetworkSetting(
     coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     restPort: Int,
-    wsPort: Int,
     minerApiPort: Int,
     connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
@@ -292,6 +292,7 @@ object AlephiumConfig {
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
+      maxWsConnections: Int,
       maxCliqueFromSameIp: Int,
       pingFrequency: Duration,
       retryTimeout: Duration,
@@ -316,7 +317,6 @@ object AlephiumConfig {
       coordinatorAddress: InetSocketAddress,
       externalAddress: Option[InetSocketAddress],
       restPort: Int,
-      wsPort: Int,
       minerApiPort: Int
   ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
@@ -328,6 +328,7 @@ object AlephiumConfig {
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
+        maxWsConnections,
         maxCliqueFromSameIp,
         pingFrequency,
         retryTimeout,
@@ -352,7 +353,6 @@ object AlephiumConfig {
         coordinatorAddress,
         externalAddress,
         restPort,
-        wsPort,
         minerApiPort,
         connectionBuild
       )

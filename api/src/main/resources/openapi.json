@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.8.2"
+    "version": "3.6.4"
   },
   "servers": [
     {
@@ -2475,7 +2475,6 @@
                     {
                       "address": "1.2.3.4",
                       "restPort": 12377,
-                      "wsPort": 12366,
                       "minerApiPort": 12355
                     }
                   ],
@@ -14491,7 +14490,6 @@
         "required": [
           "address",
           "restPort",
-          "wsPort",
           "minerApiPort"
         ],
         "properties": {
@@ -14500,10 +14498,6 @@
             "format": "inet-address"
           },
           "restPort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "wsPort": {
             "type": "integer",
             "format": "int32"
           },

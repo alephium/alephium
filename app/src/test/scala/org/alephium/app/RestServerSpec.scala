@@ -1567,7 +1567,6 @@ trait RestServerFixture
       publicAddress = None,
       privateAddress = address,
       restPort = peerPort,
-      wsPort = peerPort,
       minerApiPort = peerPort
     )
 

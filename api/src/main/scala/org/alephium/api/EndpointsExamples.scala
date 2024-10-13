@@ -63,11 +63,10 @@ trait EndpointsExamples extends ErrorExamples {
   private val cliqueId          = CliqueId(publicKey)
   private val port              = 12344
   private val minerApiPort      = 12355
-  private val wsPort            = 12366
   private val restPort          = 12377
   private val inetSocketAddress = new InetSocketAddress("1.2.3.4", port)
   private val inetAddress       = inetSocketAddress.getAddress
-  private val peerAddress       = PeerAddress(inetAddress, restPort, wsPort, minerApiPort)
+  private val peerAddress       = PeerAddress(inetAddress, restPort, minerApiPort)
   private val peers             = AVector(peerAddress)
   private val bigAmount         = Amount(ALPH.oneAlph.mulUnsafe(U256.Two))
   private def alph(value: Int)  = Amount(ALPH.oneAlph.mulUnsafe(U256.unsafe(value)))

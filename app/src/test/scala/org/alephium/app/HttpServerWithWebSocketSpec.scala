@@ -23,7 +23,7 @@ import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.WebSocketClientOptions
+import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions}
 import org.scalatest.{Assertion, EitherValues}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
@@ -108,7 +108,14 @@ class HttpServerWithWebSocketSpec
       storages
     )
     lazy val HttpServerWithWebSocket(httpServer, eventHandler) =
-      HttpServerWithWebSocket(system, node)
+      HttpServerWithWebSocket(
+        system,
+        node,
+        maxConnections = 100,
+        new HttpServerOptions()
+          .setMaxWebSocketFrameSize(1024 * 1024)
+          .setRegisterWebSocketWriteHandlers(true)
+      )
   }
 
   trait RouteWS extends WebSocketServerFixture {
@@ -118,7 +125,7 @@ class HttpServerWithWebSocketSpec
       val options = new WebSocketClientOptions().setMaxFrameSize(1024 * 1024)
       vertx.createWebSocketClient(options)
     }
-    val port = node.config.network.wsPort
+    val port = node.config.network.restPort
 
     def checkWS(wsCount: Int, causeEffectList: Iterable[(EventBus.Event, String => Assertion)]) = {
       val binding =

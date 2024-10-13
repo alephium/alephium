@@ -971,7 +971,7 @@ object EndpointsLogic {
     SelfClique(
       cliqueInfo.id,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
+        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.minerApiPort)
       ),
       selfReady = selfReady,
       synced = synced

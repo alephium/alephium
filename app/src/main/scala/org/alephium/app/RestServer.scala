@@ -31,13 +31,13 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
-import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
 
-// scalastyle:off method.length
 class RestServer(
     val node: Node,
     val port: Int,
@@ -183,14 +183,15 @@ class RestServer(
   private val httpBindingPromise: Promise[HttpServer] = Promise()
 
   protected def startSelfOnce(): Future[Unit] = {
+    val address = apiConfig.networkInterface.getHostAddress
     for {
       httpBinding <- httpServer.underlying
         .requestHandler(router)
-        .listen(port, apiConfig.networkInterface.getHostAddress)
+        .listen(port, address)
         .asScala
     } yield {
       logger.info(
-        s"Listening http requests including websocket /ws/events on ${httpBinding.actualPort}"
+        s"Listening http requests including websocket /ws/events on /$address:${httpBinding.actualPort}"
       )
       httpBindingPromise.success(httpBinding)
     }
@@ -205,7 +206,7 @@ class RestServer(
       ()
     }
 }
-// scalastyle:off parameter.number
+// scalastyle:off parameter.number magic.number
 object RestServer {
   def apply(
       flowSystem: ActorSystem,
@@ -214,10 +215,10 @@ object RestServer {
       blocksExporter: BlocksExporter,
       walletServer: Option[WalletServer]
   )(implicit
-      brokerConfig: BrokerConfig,
-      apiConfig: ApiConfig,
-      networkConfig: NetworkConfig,
-      executionContext: ExecutionContext
+    brokerConfig: BrokerConfig,
+    apiConfig: ApiConfig,
+    networkSetting: NetworkSetting,
+    executionContext: ExecutionContext
   ): RestServer = {
     val restPort = node.config.network.restPort
     val httpOptions =
@@ -225,8 +226,9 @@ object RestServer {
         .setMaxWebSocketFrameSize(1024 * 1024)
         .setRegisterWebSocketWriteHandlers(true)
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
-    val webSocketServer = HttpServerWithWebSocket(flowSystem, node, httpOptions)
+    val webSocketServer =
+      HttpServerWithWebSocket(flowSystem, node, networkSetting.maxWsConnections, httpOptions)
     new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }
-// scalastyle:on parameter.number
+// scalastyle:on parameter.number magic.number
