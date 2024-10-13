@@ -901,7 +901,7 @@ object Compiler {
 
       if (unusedMaps.nonEmpty) {
         val unusedMapsInfo = unusedMaps.map { case (varKey, varInfo) =>
-          (varKey.name, varInfo.tpe)
+          (varKey.name, varInfo.ident.sourceIndex)
         }.toSeq
         warnUnusedMaps(typeId, unusedMapsInfo)
       }

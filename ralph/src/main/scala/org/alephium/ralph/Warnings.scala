@@ -39,11 +39,11 @@ trait Warnings {
     }
   }
 
-  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[(String, Type)]): Unit = {
-    val newWarnings = unusedMaps.map { case (name, typ) =>
+  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[(String, Option[SourceIndex])]): Unit = {
+    val newWarnings = unusedMaps.map { case (name, sourceIndex) =>
       Warning(
         s"Found unused map in ${typeId.name}: $name",
-        typ.sourceIndex
+        sourceIndex
       )
     }
 

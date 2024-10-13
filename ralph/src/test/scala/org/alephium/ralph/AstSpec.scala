@@ -692,8 +692,10 @@ class AstSpec extends AlephiumSpec {
     {
       val code =
         s"""
-           |Contract Test(field: U256) {
-           |  pub fn main() -> () {}
+           |Contract Test(field1: U256, field2: U256) {
+           |  pub fn main() -> () {
+           |    assert!(field1 == 1, 0)
+           |  }
            |}
            |""".stripMargin
       val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
@@ -701,7 +703,31 @@ class AstSpec extends AlephiumSpec {
         code,
         warnings,
         AVector(
-          ("Found unused field in Test: field", "field")
+          ("Found unused field in Test: field2", "field2")
+        )
+      )
+    }
+  }
+
+  it should "check unused map" in {
+    {
+      val code =
+        s"""
+           |Contract Test() {
+           |  mapping[U256, U256] map1
+           |  mapping[U256, U256] map2
+           |
+           |  pub fn main() -> () {
+           |    assert!(map2[1] == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
+      checkWarnings(
+        code,
+        warnings,
+        AVector(
+          ("Found unused map in Test: map1", "map1")
         )
       )
     }
