@@ -125,12 +125,12 @@ class MemPoolSpec
     )
     tx0.fixedOutputRefs.foreachWithIndex((output, index) =>
       if (output.fromGroup equals mainGroup) {
-        pool.getOutput(output) is Some(tx0.getOutput(index))
+        pool.getOutput(output) is Some(tx0.getOutput(index).asInstanceOf[AssetOutput])
       }
     )
     tx1.fixedOutputRefs.foreachWithIndex((output, index) =>
       if (output.fromGroup equals mainGroup) {
-        pool.getOutput(output) is Some(tx1.getOutput(index))
+        pool.getOutput(output) is Some(tx1.getOutput(index).asInstanceOf[AssetOutput])
       }
     )
   }
