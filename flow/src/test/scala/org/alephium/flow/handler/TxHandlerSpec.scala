@@ -24,6 +24,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
 import org.alephium.flow.core.BlockFlowState.MemPooled
+import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.model.PersistedTxId
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
@@ -172,7 +173,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
-      TxHandler.props(blockFlow, storages.pendingTxStorage)
+      TxHandler.props(blockFlow, ActorRefT(TestProbe().ref), storages.pendingTxStorage)
     )
 
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
@@ -365,7 +366,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def test(message: String) = {
       EventFilter.debug(message, occurrences = 5).intercept {
         val txHandler = system.actorOf(
-          TxHandler.props(blockFlow, storages.pendingTxStorage)
+          TxHandler.props(blockFlow, ActorRefT(TestProbe().ref), storages.pendingTxStorage)
         )
         txHandler ! InterCliqueManager.SyncedResult(true)
       }
@@ -410,6 +411,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val tx    = block.transactions.head
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
+    eventBusProbe.expectMsgAllClassOf(classOf[BlockNotify])
     eventually(blockFlow.getMemPool(chainIndex).size is 0)
 
     val status = blockFlow.getTransactionStatus(tx.id, chainIndex).rightValue.get
@@ -427,6 +429,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     config.mempool.autoMineForDev is true
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx)
+    eventBusProbe.expectNoMessage()
     val failedMsg = expectMsgType[TxHandler.AddFailed]
     failedMsg.txId is tx.id
   }
@@ -436,6 +439,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     config.mempool.autoMineForDev is true
     val old = blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Right(())
+    eventBusProbe.expectNoMessage() // publishBlock closure is blank
     (old + 1) is blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     txHandler ! TxHandler.MineOneBlock(chainIndex)
     eventually(
@@ -593,10 +597,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
     // use lazy here because we want to override config values
-    lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val chainIndex    = ChainIndex.unsafe(0, 0)
+    lazy val eventBusProbe = TestProbe()
     lazy val txHandler =
       newTestActorRef[TxHandler](
-        TxHandler.props(blockFlow, storages.pendingTxStorage)
+        TxHandler.props(blockFlow, ActorRefT(eventBusProbe.ref), storages.pendingTxStorage)
       )
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false, isLocalTx: Boolean = true) =
