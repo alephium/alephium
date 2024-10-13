@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import scala.collection.mutable
 
 import akka.actor.{ActorRef, ActorSystem, Props}
@@ -46,10 +48,13 @@ object SimpleHttpServer {
 final case class HttpServerWithWebSocket(underlying: HttpServer, eventHandler: ActorRef)
     extends HttpServerLike
 object HttpServerWithWebSocket {
+  private val tooManyRequestsCode  = 429
+  private val currentWsConnections = new AtomicInteger(0)
 
   def apply(
       flowSystem: ActorSystem,
       node: Node,
+      maxConnections: Int,
       httpOptions: HttpServerOptions
   )(implicit
       networkConfig: NetworkConfig,
@@ -64,13 +69,16 @@ object HttpServerWithWebSocket {
     val server = vertx.createHttpServer(httpOptions)
 
     server.webSocketHandler { webSocket =>
-      webSocket.closeHandler(_ =>
-        eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
-      )
-
       if (!webSocket.path().equals("/ws/events")) {
         webSocket.reject()
+      } else if (currentWsConnections.get() >= maxConnections) {
+        webSocket.reject(tooManyRequestsCode)
       } else {
+        webSocket.closeHandler { _ =>
+          currentWsConnections.decrementAndGet()
+          eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
+        }
+        currentWsConnections.incrementAndGet()
         eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
       }
     }
