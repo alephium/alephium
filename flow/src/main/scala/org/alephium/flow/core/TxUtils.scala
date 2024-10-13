@@ -526,26 +526,33 @@ trait TxUtils { Self: FlowUtils =>
 
   def getUtxoSelectionOrArbitrary(
       targetBlockHashOpt: Option[BlockHash],
-      fromLockupScript: LockupScript.Asset,
+      lockupScript: LockupScript.Asset,
       inputSelection: AVector[AssetOutputRef],
       utxosLimit: Int
-  ): Either[String, AVector[AssetOutputInfo]] = {
-    for {
-      _ <- checkUTXOsInSameGroup(inputSelection)
-      utxos <- getUsableUtxos(
+  ): Either[String, AVector[AssetOutputInfo]] =
+    if (inputSelection.isEmpty) {
+      getUsableUtxos(
         targetBlockHashOpt,
-        fromLockupScript,
+        lockupScript,
         maxUtxosToRead = utxosLimit
       ).left.map(_.getMessage)
-      allInputsSet    = inputSelection.toSet
-      existingUtxoSet = utxos.map(_.ref).toSet
-      _ <- Either.cond(
-        allInputsSet.subsetOf(existingUtxoSet),
-        (),
-        s"Selected input UTXOs are not available: ${allInputsSet.diff(existingUtxoSet).map(_.key.value.toHexString).mkString(", ")}"
-      )
-    } yield if (allInputsSet.isEmpty) utxos else utxos.filter(out => allInputsSet.contains(out.ref))
-  }
+    } else {
+      for {
+        _ <- checkUTXOsInSameGroup(inputSelection)
+        groupView <- getImmutableGroupViewIncludePool(
+          lockupScript.groupIndex,
+          targetBlockHashOpt
+        ).left.map(_.getMessage)
+        utxoOpts <- inputSelection.mapE(groupView.getPreAssetOutputInfo).left.map(_.getMessage)
+        existingUtxos = utxoOpts.collect(identity)
+        _ <- Either.cond(
+          inputSelection.toSet.subsetOf(existingUtxos.map(_.ref).toSet),
+          (),
+          s"Selected input UTXOs are not available: " +
+            s"${inputSelection.toSet.diff(existingUtxos.map(_.ref).toSet).map(_.key.value.toHexString).mkString(", ")}"
+        )
+      } yield existingUtxos
+    }
 
   def transferMultiInputs(
       inputs: AVector[InputData],
