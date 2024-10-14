@@ -504,7 +504,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .leftValue
-      .detail is "Explicit Gas Amount not allowed"
+      .detail is "Explicit gas amount is not permitted. Gas estimation for this endpoint is sufficiently accurate."
   }
 
   it should "support Schnorr address" in new Fixture {

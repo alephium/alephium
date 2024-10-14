@@ -234,12 +234,19 @@ class ServerUtils(implicit
     Right(result)
   }
 
+  // scalastyle:off method.length
   def buildMultiGroupTransactions(
       blockFlow: BlockFlow,
       query: BuildTransferTx
   ): Try[AVector[BuildTransferTxResult]] =
     for {
-      _ <- Either.cond(query.gasAmount.isEmpty, (), badRequest("Explicit Gas Amount not allowed"))
+      _ <- Either.cond(
+        query.gasAmount.isEmpty,
+        (),
+        badRequest(
+          "Explicit gas amount is not permitted. Gas estimation for this endpoint is sufficiently accurate."
+        )
+      )
       assetOutputRefs <- query.utxos match {
         case Some(outputRefs) => prepareOutputRefs(outputRefs).left.map(badRequest)
         case None             => Right(AVector.empty[AssetOutputRef])
@@ -281,6 +288,7 @@ class ServerUtils(implicit
         .map(failed)
       txs <- unsignedTxs.mapE(validateUnsignedTransaction)
     } yield txs.map(BuildTransferTxResult.from)
+  // scalastyle:on method.length
 
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
