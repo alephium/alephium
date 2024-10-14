@@ -494,7 +494,7 @@ trait TxHandlerPersistence extends TxHandlerUtils {
         val chainIndex = tx.chainIndex
         val groupIndex = chainIndex.from
         val index      = brokerConfig.groupIndexOfBroker(groupIndex)
-        groupViews(index).getPreOutputs(tx.unsigned.inputs).map {
+        groupViews(index).getPreAssetOutputs(tx.unsigned.inputs).map {
           case Some(_) =>
             valid += 1
             handlePendingTx(tx)
