@@ -7855,7 +7855,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields in Foo: a"
+                    "Found unused field in Foo: a"
                   ]
                 }
               }
@@ -8207,7 +8207,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields in Foo: a"
+                    "Found unused field in Foo: a"
                   ],
                   "maps": {
                     "names": [
@@ -8436,7 +8436,7 @@
                         }
                       ],
                       "warnings": [
-                        "Found unused fields in Foo: a"
+                        "Found unused field in Foo: a"
                       ],
                       "maps": {
                         "names": [
@@ -8514,7 +8514,7 @@
                         }
                       ],
                       "warnings": [
-                        "Found unused fields in Foo: a"
+                        "Found unused field in Foo: a"
                       ]
                     }
                   ],
