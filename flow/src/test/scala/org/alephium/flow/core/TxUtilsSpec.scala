@@ -25,8 +25,14 @@ import org.scalatest.{Assertion, Succeeded}
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.ExtraUtxosInfo
-import org.alephium.flow.core.FlowUtils.AssetOutputInfo
-import org.alephium.flow.gasestimation.*
+import org.alephium.flow.core.FlowUtils.{
+  AssetOutputInfo,
+  MemPoolOutput,
+  OutputType,
+  PersistedOutput,
+  UnpersistedBlockOutput
+}
+import org.alephium.flow.gasestimation._
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
@@ -35,6 +41,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.ralph.Compiler
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -155,7 +162,18 @@ class TxUtilsSpec extends AlephiumSpec {
     test()
   }
 
-  it should "calculate preOutputs for txs in new blocks" in new FlowFixture with Generators {
+  it should "getPreContractOutput for txs in new blocks" in new ContractFixture {
+    blockFlow
+      .getMutableGroupView(GroupIndex.Zero)
+      .rightValue
+      .getPreContractOutput(contractOutputRef)
+      .rightValue
+      .get
+      .lockupScript is contractOutputScript
+  }
+
+  it should "calculate getPreAssetOutputInfo for txs in new blocks" in new FlowFixture
+    with Generators {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
@@ -166,25 +184,36 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+      // return None when output is spent
+      groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
       tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
           if (chainIndex.isIntraGroup) {
             // the block is persisted and the lockTime of each output is updated as block timestamp
-            groupView.getPreOutput(outputRef) isE Some(output.copy(lockTime = block.timestamp))
+            groupView.getPreAssetOutputInfo(outputRef) isE Some(
+              AssetOutputInfo(
+                outputRef,
+                output.copy(lockTime = block.timestamp),
+                PersistedOutput
+              )
+            )
           } else {
             // the block is not persisted yet, so the lockTime of each output is still zero
-            groupView.getPreOutput(outputRef) isE Some(output)
+            groupView.getPreAssetOutputInfo(outputRef) isE Some(
+              AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)
+            )
           }
         } else {
-          groupView.getPreOutput(outputRef) isE None
+          // return None for transaction output to different group
+          groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
     }
   }
 
-  it should "calculate preOutputs for txs in mempool" in new FlowFixture with Generators {
+  it should "calculate getPreAssetOutputInfo for txs in mempool" in new FlowFixture
+    with Generators {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
@@ -197,22 +226,81 @@ class TxUtilsSpec extends AlephiumSpec {
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
         tx.fixedOutputRefs.foreach { outputRef =>
-          groupView.getPreOutput(outputRef) isE None
+          groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
 
       {
         val groupView = blockFlow.getMutableGroupViewIncludePool(fromGroup).rightValue
-        groupView.getPreOutput(tx.unsigned.inputs.head.outputRef) isE None
+        // return None when output is spent
+        groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
         tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
           val output = tx.unsigned.fixedOutputs(index)
           if (output.toGroup equals chainIndex.from) {
-            groupView.getPreOutput(outputRef) isE Some(output)
+            groupView.getPreAssetOutputInfo(outputRef) isE Some(
+              AssetOutputInfo(outputRef, output, MemPoolOutput)
+            )
           } else {
-            assertThrows[AssertionError](groupView.getPreOutput(outputRef))
+            // MemPool.isSpent throws when asking for output to different group
+            assertThrows[AssertionError](groupView.getPreAssetOutputInfo(outputRef))
           }
         }
       }
+    }
+  }
+
+  it should "calculate getPreContractOutput" in new FlowFixture {
+    val fromGroup = GroupIndex.unsafe(0)
+    val toGroup   = GroupIndex.unsafe(0)
+    val contractCode =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val chainIndex    = ChainIndex(fromGroup, toGroup)
+    val contract      = Compiler.compileContract(contractCode).rightValue
+    val genesisLockup = getGenesisLockupScript(chainIndex)
+    val txScript =
+      contractCreation(
+        contract,
+        AVector.empty,
+        AVector.empty,
+        genesisLockup,
+        minimalAlphInContract
+      )
+    val block = payableCall(blockFlow, chainIndex, txScript)
+    val contractOutputRef =
+      TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
+    val contractId           = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
+    val contractOutputScript = LockupScript.p2c(contractId)
+
+    {
+      // it should be absent in mempool
+      val tx = block.nonCoinbase.head
+      blockFlow.getGrandPool().add(chainIndex, tx.toTemplate, TimeStamp.now())
+      blockFlow
+        .getMutableGroupViewIncludePool(fromGroup)
+        .rightValue
+        .getPreContractOutput(contractOutputRef)
+        .rightValue
+        .isEmpty is true
+    }
+
+    {
+      // it should be present in Persisted state
+      addAndCheck(blockFlow, block)
+      blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      blockFlow
+        .getMutableGroupView(fromGroup)
+        .rightValue
+        .getPreContractOutput(contractOutputRef)
+        .rightValue
+        .get
+        .lockupScript is contractOutputScript
     }
   }
 
@@ -243,8 +331,18 @@ class TxUtilsSpec extends AlephiumSpec {
       None
     )
 
-    def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
-      AVector.fill(nb)(input("input1", ALPH.alph(amount), fromLockupScript))
+    def buildInputsWithGas(
+        nb: Int,
+        gas: GasBox,
+        outputType: OutputType = MemPoolOutput
+    ): TxUtils.AssetOutputInfoWithGas =
+      TxUtils.AssetOutputInfoWithGas(
+        AVector.fill(nb) {
+          val (ref, output) = input("input1", ALPH.alph(amount), fromLockupScript)
+          AssetOutputInfo(ref, output, outputType)
+        },
+        gas
+      )
 
     def buildInputData(
         pubKey: PublicKey,
@@ -1483,7 +1581,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends FlowFixture {
-    val code =
+    val contractCode =
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -1491,19 +1589,19 @@ class TxUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (contractId, ref, _) =
+    val (contractId, contractOutputRef, block) =
       createContract(
-        code,
+        contractCode,
         AVector.empty,
         AVector.empty,
         tokenIssuanceInfo = Some(TokenIssuance.Info(1))
       )
-    val address = LockupScript.p2c(contractId)
+    val contractOutputScript = LockupScript.p2c(contractId)
   }
 
   it should "get balance for contract address" in new ContractFixture {
     val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
-      blockFlow.getBalance(address, Int.MaxValue, true).rightValue
+      blockFlow.getBalance(contractOutputScript, Int.MaxValue, true).rightValue
     attoAlphBalance is minimalAlphInContract
     attoAlphLockedBalance is U256.Zero
     tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
@@ -1512,11 +1610,11 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get UTXOs for contract address" in new ContractFixture {
-    val utxos = blockFlow.getUTXOs(address, Int.MaxValue, true).rightValue
+    val utxos = blockFlow.getUTXOs(contractOutputScript, Int.MaxValue, true).rightValue
     val utxo  = utxos.head.asInstanceOf[FlowUtils.ContractOutputInfo]
     utxos.length is 1
-    utxo.ref is ref
-    utxo.output.lockupScript is address
+    utxo.ref is contractOutputRef
+    utxo.output.lockupScript is contractOutputScript
     utxo.output.amount is minimalAlphInContract
     utxo.output.tokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
   }
@@ -1758,7 +1856,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val tokens = AVector.fill(nbOfTokens) {
         val (cId, _, _) = createContract(
-          code,
+          contractCode,
           AVector.empty,
           AVector.empty,
           tokenIssuanceInfo = Some(
@@ -1952,8 +2050,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("one address with one input")
       val gas = minimalGas
 
-      val inputs          = buildInputs(1)
-      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas = buildInputsWithGas(1, gas)
 
       val entries = AVector((inputData, selectedWithGas))
       val updated = blockFlow.updateSelectedGas(entries, 2)
@@ -1968,8 +2065,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("one address with many inputs")
       val gas = minimalGas.mulUnsafe(10)
 
-      val inputs          = buildInputs(10)
-      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas = buildInputsWithGas(10, gas)
 
       val entries = AVector((inputData, selectedWithGas))
       val updated = blockFlow.updateSelectedGas(entries, 2)
@@ -1983,8 +2079,7 @@ class TxUtilsSpec extends AlephiumSpec {
       info("multiple addresses with one input")
       val gas = minimalGas.mulUnsafe(100)
 
-      val inputs          = buildInputs(1)
-      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+      val selectedWithGas = buildInputsWithGas(1, gas)
 
       val entries = AVector(
         (inputData, selectedWithGas),

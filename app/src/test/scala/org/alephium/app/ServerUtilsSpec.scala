@@ -716,9 +716,12 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with provided UTXOs, if Alph amount isn't enough" in new MultipleUtxos {
-    val outputRefs = utxos.collect {
-      case utxo if utxo.amount.value.equals(ALPH.cent(50)) =>
-        OutputRef(utxo.ref.hint, utxo.ref.key)
+    val outputRefs = utxos.collect { utxo =>
+      if (utxo.amount.value.equals(ALPH.cent(50))) {
+        Some(OutputRef(utxo.ref.hint, utxo.ref.key))
+      } else {
+        None
+      }
     }
 
     outputRefs.length is 1
