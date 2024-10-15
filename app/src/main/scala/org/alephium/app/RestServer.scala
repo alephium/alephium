@@ -215,10 +215,10 @@ object RestServer {
       blocksExporter: BlocksExporter,
       walletServer: Option[WalletServer]
   )(implicit
-    brokerConfig: BrokerConfig,
-    apiConfig: ApiConfig,
-    networkSetting: NetworkSetting,
-    executionContext: ExecutionContext
+      brokerConfig: BrokerConfig,
+      apiConfig: ApiConfig,
+      networkSetting: NetworkSetting,
+      executionContext: ExecutionContext
   ): RestServer = {
     val restPort = node.config.network.restPort
     val httpOptions =

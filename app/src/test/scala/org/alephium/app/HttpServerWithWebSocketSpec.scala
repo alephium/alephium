@@ -28,6 +28,7 @@ import org.scalatest.{Assertion, EitherValues}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.model.{BlockEntry, GhostUncleBlockEntry}
+import org.alephium.app.HttpServerWithWebSocket.WsEventType
 import org.alephium.crypto.Blake3
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TestUtils
@@ -82,8 +83,7 @@ class HttpServerWithWebSocketSpec
       (0 to 10).map { _ =>
         (
           BlockNotify(blockGen.sample.get, height = 0),
-          probeMsg =>
-            read[NotificationUnsafe](probeMsg).asNotification.rightValue.method is "block_notify"
+          probeMsg => read[NotificationUnsafe](probeMsg).asNotification.rightValue.method is "block"
         )
       }
     )
@@ -145,12 +145,14 @@ class HttpServerWithWebSocketSpec
         AVector.fill(wsCount) {
           val probe = TestProbe()
           probe -> webSocketClient
-            .connect(port, "127.0.0.1", "/ws/events")
+            .connect(port, "127.0.0.1", "/ws")
             .asScala
             .map { ws =>
               ws.textMessageHandler { blockNotify =>
                 probe.ref ! blockNotify
               }
+              ws.writeTextMessage(s"subscribe:${WsEventType.Block.name}")
+              ws.writeTextMessage(s"subscribe:${WsEventType.Tx.name}")
               ws
             }
             .futureValue
