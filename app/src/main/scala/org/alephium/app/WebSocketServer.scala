@@ -45,9 +45,9 @@ object SimpleHttpServer {
     SimpleHttpServer(Vertx.vertx().createHttpServer(httpOptions))
 }
 
-final case class HttpServerWithWebSocket(underlying: HttpServer, eventHandler: ActorRef)
+final case class WebSocketServer(underlying: HttpServer, eventHandler: ActorRef)
     extends HttpServerLike
-object HttpServerWithWebSocket {
+object WebSocketServer {
   private val tooManyRequestsCode  = 429
   private val currentWsConnections = new AtomicInteger(0)
 
@@ -59,7 +59,7 @@ object HttpServerWithWebSocket {
       httpOptions: HttpServerOptions
   )(implicit
       networkConfig: NetworkConfig
-  ): HttpServerWithWebSocket = {
+  ): WebSocketServer = {
     val vertx                  = Vertx.vertx()
     val eventHandler: ActorRef = flowSystem.actorOf(EventHandler.props(vertx.eventBus()))
     node.eventBus.tell(EventBus.Subscribe, eventHandler)
@@ -101,7 +101,7 @@ object HttpServerWithWebSocket {
         webSocket.reject()
       }
     }
-    HttpServerWithWebSocket(server, eventHandler)
+    WebSocketServer(server, eventHandler)
   }
   // scalastyle:on method.length null
 
@@ -116,7 +116,7 @@ object HttpServerWithWebSocket {
     }
   }
 
-  object EventHandler {
+  object EventHandler extends ApiModelCodec {
     final case class Subscribe(clientId: String)
     final case class Unsubscribe(clientId: String)
     case object ListSubscribers
@@ -126,6 +126,17 @@ object HttpServerWithWebSocket {
         message.split(":").lastOption.map(_.trim).flatMap(WsEventType.fromString)
       } else {
         None
+      }
+    }
+
+    def extractNotification(
+        event: EventBus.Event
+    )(implicit networkConfig: NetworkConfig): Either[String, Notification] = {
+      event match {
+        case FlowHandler.BlockNotify(block, height) =>
+          BlockEntry.from(block, height).map { blockEntry =>
+            Notification(WsEventType.Block.name, writeJs(blockEntry))
+          }
       }
     }
 
@@ -141,29 +152,19 @@ object HttpServerWithWebSocket {
     private val subscribers: mutable.HashSet[String] = mutable.HashSet.empty
 
     def receive: Receive = {
-      case event: EventBus.Event => broadcast(event)
+      case event: EventBus.Event =>
+        EventHandler.extractNotification(event) match {
+          case Right(notification) =>
+            val _ = vertxEventBus.publish(notification.method, write(notification))
+          case Left(error) =>
+            log.error(error)
+        }
       case EventHandler.Subscribe(subscriber) =>
         if (!subscribers.contains(subscriber)) { subscribers += subscriber }
       case EventHandler.Unsubscribe(subscriber) =>
         if (subscribers.contains(subscriber)) { subscribers -= subscriber }
       case EventHandler.ListSubscribers =>
         sender() ! AVector.unsafe(subscribers.toArray)
-    }
-
-    private def broadcast(event: EventBus.Event): Unit = {
-      event match {
-        case FlowHandler.BlockNotify(block, height) =>
-          BlockEntry.from(block, height) match {
-            case Right(blockEntry) =>
-              val params = writeJs(blockEntry)
-              val notification = write(
-                Notification(WsEventType.Block.name, params)
-              )
-              val _ = vertxEventBus.publish(WsEventType.Block.name, notification)
-            case _ => // this should never happen
-              log.error(s"Received invalid block $block")
-          }
-      }
     }
   }
 }
