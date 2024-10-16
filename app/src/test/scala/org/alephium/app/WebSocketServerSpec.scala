@@ -47,8 +47,8 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
       ws.textMessageHandler { message =>
         probe.ref ! message
       }
-      ws.writeTextMessage(s"subscribe:${WsEventType.Block.name}")
-      ws.writeTextMessage(s"subscribe:${WsEventType.Tx.name}")
+      ws.writeTextMessage(WsEventType.buildSubscribeMsg(WsEventType.Block))
+      ws.writeTextMessage(WsEventType.buildSubscribeMsg(WsEventType.Tx))
       ws -> probe
     }
 

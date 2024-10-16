@@ -28,6 +28,7 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
+import org.alephium.app.WebSocketServer.WsEventType.Subscription
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.json.Json._
@@ -76,9 +77,9 @@ object WebSocketServer extends StrictLogging {
 
         // Receive subscription messages from the client
         webSocket.textMessageHandler { message =>
-          EventHandler.parseSubscription(message) match {
-            case Some(eventType) =>
-              EventHandler.subscribeToEvent(vertx, webSocket, eventType)
+          WsEventType.parseSubscription(message) match {
+            case Some(subscription) =>
+              EventHandler.subscribeToEvents(vertx, webSocket, subscription)
             case None =>
               webSocket.reject()
           }
@@ -94,41 +95,59 @@ object WebSocketServer extends StrictLogging {
     WebSocketServer(server, eventHandlerRef)
   }
 
-  sealed abstract class WsEventType(val name: String)
+  sealed trait WsEventType {
+    def name: String
+  }
+
   object WsEventType {
-    case object Block extends WsEventType("block")
-    case object Tx    extends WsEventType("tx")
+    private val SubscribePrefix = "subscribe:"
+
+    case object Block extends WsEventType { val name = "block" }
+    case object Tx    extends WsEventType { val name = "tx"    }
+
     def fromString(name: String): Option[WsEventType] = name match {
       case Block.name => Some(Block)
       case Tx.name    => Some(Tx)
       case _          => None
     }
-  }
 
-  object EventHandler extends ApiModelCodec {
-    val SubscribePrefix = "subscribe:"
-    final case class Subscribe(clientId: String)
-    final case class Unsubscribe(clientId: String)
-    case object ListSubscribers
+    final case class Subscription(eventType: WsEventType) {
+      def message: String = s"$SubscribePrefix${eventType.name}"
+    }
 
-    def parseSubscription(message: String): Option[WsEventType] = {
-      if (message.startsWith(SubscribePrefix)) {
-        message.split(":").lastOption.map(_.trim).flatMap(WsEventType.fromString)
+    def buildSubscribeMsg(eventType: WsEventType): String = s"$SubscribePrefix${eventType.name}"
+
+    private def isSubscription(message: String): Boolean = message.startsWith(SubscribePrefix)
+
+    def parseSubscription(message: String): Option[Subscription] = {
+      if (isSubscription(message)) {
+        message
+          .split(":")
+          .lastOption
+          .map(_.trim)
+          .flatMap(WsEventType.fromString)
+          .map(Subscription)
       } else {
         None
       }
     }
+  }
+
+  object EventHandler extends ApiModelCodec {
+    final case class Subscribe(clientId: String)
+    final case class Unsubscribe(clientId: String)
+    case object ListSubscribers
 
     // scalastyle:off null
-    def subscribeToEvent(
+    def subscribeToEvents(
         vertx: Vertx,
         ws: ServerWebSocket,
-        eventType: WsEventType
+        subscription: Subscription
     ): MessageConsumer[String] = {
       vertx
         .eventBus()
         .consumer[String](
-          eventType.name,
+          subscription.eventType.name,
           new io.vertx.core.Handler[Message[String]] {
             override def handle(message: Message[String]): Unit = {
               if (!ws.isClosed) {

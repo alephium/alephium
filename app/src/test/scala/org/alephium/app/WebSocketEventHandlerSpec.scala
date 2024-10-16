@@ -18,6 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.model.BlockEntry
 import org.alephium.app.WebSocketServer.{EventHandler, WsEventType}
+import org.alephium.app.WebSocketServer.WsEventType.Subscription
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
@@ -34,9 +35,15 @@ class WebSocketEventHandlerSpec extends AlephiumSpec with ServerFixture {
   }
 
   it should "parse subscription EventType" in {
-    EventHandler.parseSubscription(s"${EventHandler.SubscribePrefix}block").get is WsEventType.Block
-    EventHandler.parseSubscription(s"${EventHandler.SubscribePrefix}tx").get is WsEventType.Tx
-    EventHandler.parseSubscription(s"${EventHandler.SubscribePrefix}gandalf").isEmpty is true
+    WsEventType.parseSubscription("subscribe:block").get is Subscription(WsEventType.Block)
+    WsEventType.parseSubscription("subscribe:tx").get is Subscription(WsEventType.Tx)
+    WsEventType.parseSubscription("subscribe:gandalf").isEmpty is true
+    WsEventType.parseSubscription("nonsense:frodo").isEmpty is true
+  }
+
+  it should "build subscription message" in {
+    WsEventType.buildSubscribeMsg(WsEventType.Block) is "subscribe:block"
+    WsEventType.buildSubscribeMsg(WsEventType.Tx) is "subscribe:tx"
   }
 
   it should "build Notification from Event" in {
