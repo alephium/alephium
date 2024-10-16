@@ -18,41 +18,73 @@ package org.alephium.app
 
 import akka.testkit.TestProbe
 import io.vertx.core.http.WebSocket
-import org.scalatest.EitherValues
+import org.scalatest.{Assertion, EitherValues}
+import org.scalatest.exceptions.TestFailedException
 
-import org.alephium.app.WebSocketServer.WsEventType
+import org.alephium.app.WebSocketServer.{EventHandler, WsEventType}
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.json.Json._
-import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
-class WebSocketServerSpec
-    extends AlephiumFutureSpec
-    with NoIndexModelGenerators
-    with EitherValues
-    with NumericHelpers {
+class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
 
   behavior of "ws"
 
-  it should "receive multiple events by multiple websockets" in new RouteWS {
-    override def behavior(probe: TestProbe)(ws: WebSocket): WebSocket = {
-      ws.textMessageHandler { blockNotify =>
-        probe.ref ! blockNotify
+  it should "subscribe" in new WebSocketServerFixture {
+    val eventHandlerRef =
+      EventHandler.getSubscribedEventHandlerRef(vertx.eventBus(), node.eventBus, system)
+    node.eventBus
+      .ask(EventBus.ListSubscribers)
+      .mapTo[EventBus.Subscribers]
+      .futureValue
+      .value
+      .contains(eventHandlerRef) is true
+  }
+
+  it should "connect and subscribe multiple ws clients to multiple events" in new RouteWS {
+    def clientInitBehavior(ws: WebSocket, probe: TestProbe): (WebSocket, TestProbe) = {
+      ws.textMessageHandler { message =>
+        probe.ref ! message
       }
       ws.writeTextMessage(s"subscribe:${WsEventType.Block.name}")
       ws.writeTextMessage(s"subscribe:${WsEventType.Tx.name}")
-      ws
-
+      ws -> probe
     }
-    checkWS(
-      10,
-      (0 to 10).map { _ =>
-        (
-          BlockNotify(blockGen.sample.get, height = 0),
-          probeMsg => read[NotificationUnsafe](probeMsg).asNotification.rightValue.method is "block"
-        )
+
+    def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
+      eventBusRef ! BlockNotify(blockGen.sample.get, height = 0)
+    }
+
+    def clientAssertionOnMsg(probe: TestProbe): Assertion =
+      probe.expectMsgPF() { case msg: String =>
+        read[NotificationUnsafe](msg).asNotification.rightValue.method is WsEventType.Block.name
       }
-    )
+
+    val wsSpec = WebSocketSpec(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
+    checkWS(AVector.fill(3)(wsSpec))
   }
+
+  it should "not spin ws connections over limit" in new RouteWS {
+    override def maxConnections: Int = 2
+    val wsSpec = WebSocketSpec((ws, probe) => (ws, probe), _ => (), _ => true is true)
+    assertThrows[TestFailedException](checkWS(AVector.fill(3)(wsSpec)))
+  }
+
+  it should "connect and not subscribe multiple ws clients to any event" in new RouteWS {
+    def clientInitBehavior(ws: WebSocket, probe: TestProbe): (WebSocket, TestProbe) = {
+      ws.textMessageHandler { message =>
+        probe.ref ! message
+      }
+      ws -> probe
+    }
+
+    val wsSpec = WebSocketSpec(
+      clientInitBehavior,
+      _ ! BlockNotify(blockGen.sample.get, height = 0),
+      _.expectNoMessage()
+    )
+    checkWS(AVector.fill(3)(wsSpec))
+  }
+
 }

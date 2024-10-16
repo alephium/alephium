@@ -390,7 +390,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def startWsClient(port: Int): Future[WebSocketBase] = {
     webSocketClient
-      .connect(port, "127.0.0.1", "/ws/events")
+      .connect(port, "127.0.0.1", "/ws")
       .asScala
       .map { ws =>
         ws.textMessageHandler { blockNotify =>

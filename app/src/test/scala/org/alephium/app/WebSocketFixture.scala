@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
 import akka.pattern.ask
@@ -24,8 +24,7 @@ import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpServerOptions, WebSocket, WebSocketClientOptions}
-import org.scalatest.Assertion
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.app.ServerFixture.NodeDummy
@@ -35,9 +34,11 @@ import org.alephium.util._
 trait WebSocketServerFixture extends ServerFixture {
 
   implicit lazy val apiConfig: ApiConfig          = ApiConfig.load(newConfig)
+  implicit val timeout: Timeout                   = Timeout(Duration.ofSecondsUnsafe(5).asScala)
   override val configValues                       = configPortsValues
   implicit val system: ActorSystem                = ActorSystem("websocket-server-spec")
   implicit val executionContext: ExecutionContext = system.dispatcher
+  lazy val vertx                                  = Vertx.vertx()
   lazy val blockFlowProbe                         = TestProbe()
   val (allHandlers, _)                            = TestUtils.createAllHandlersProbe
   lazy val node = new NodeDummy(
@@ -50,30 +51,39 @@ trait WebSocketServerFixture extends ServerFixture {
     dummyContract,
     storages
   )
+
+  def maxConnections: Int = 10
+
   lazy val WebSocketServer(httpServer, eventHandler) =
     WebSocketServer(
       system,
       node,
-      maxConnections = 100,
+      maxConnections,
       new HttpServerOptions()
         .setMaxWebSocketFrameSize(1024 * 1024)
         .setRegisterWebSocketWriteHandlers(true)
     )
 }
 
-trait RouteWS extends WebSocketServerFixture with Eventually with ScalaFutures {
-  private val vertx = Vertx.vertx()
-  private val webSocketClient =
-    vertx.createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
+final case class WebSocketSpec(
+    clientInitBehavior: (WebSocket, TestProbe) => (WebSocket, TestProbe),
+    serverBehavior: ActorRefT[EventBus.Message] => Unit,
+    clientAssertionOnMsg: TestProbe => Any
+)
+trait RouteWS
+    extends WebSocketServerFixture
+    with Eventually
+    with ScalaFutures
+    with IntegrationPatience {
   private val port = node.config.network.restPort
 
-  def behavior(probe: TestProbe)(ws: WebSocket): WebSocket
+  private def newWebSocketClient =
+    vertx.createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
 
-  def checkWS(wsCount: Int, causeEffectList: Iterable[(EventBus.Event, String => Assertion)]) = {
+  def checkWS(behaviorCauseEffectList: AVector[WebSocketSpec]) = {
     val binding =
       httpServer.listen(port, apiConfig.networkInterface.getHostAddress).asScala.futureValue
 
-    implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(5).asScala)
     eventually {
       node.eventBus
         .ask(EventBus.ListSubscribers)
@@ -83,15 +93,18 @@ trait RouteWS extends WebSocketServerFixture with Eventually with ScalaFutures {
         .contains(eventHandler) is true
     }
 
+    // run defined Behavior of websocket clients like : Connecting and Subscribing
     val probedSockets =
-      AVector.fill(wsCount) {
-        val probe = TestProbe()
-        probe -> webSocketClient
-          .connect(port, "127.0.0.1", "/ws")
-          .asScala
-          .map(behavior(probe))
-          .futureValue
-      }
+      Future
+        .sequence(
+          behaviorCauseEffectList.map { case WebSocketSpec(clientInitBehavior, _, _) =>
+            newWebSocketClient
+              .connect(port, "127.0.0.1", "/ws")
+              .asScala
+              .map(ws => clientInitBehavior(ws, TestProbe()))
+          }.toSeq
+        )
+        .futureValue
 
     eventually {
       eventHandler
@@ -100,16 +113,16 @@ trait RouteWS extends WebSocketServerFixture with Eventually with ScalaFutures {
         .futureValue
         .length is probedSockets.length
     }
-    causeEffectList.foreach { case (cause, effect) =>
-      node.eventBus ! cause
-      probedSockets.foreach { case (probe, _) =>
-        probe.expectMsgPF() { case message: String =>
-          effect(message)
-        }
+
+    // run defined Cause of websocket server with Effect on websocket client
+    behaviorCauseEffectList.foreach { case WebSocketSpec(_, serverBehavior, clientAssertionOnMsg) =>
+      serverBehavior(node.eventBus)
+      probedSockets.foreach { case (_, probe) =>
+        clientAssertionOnMsg(probe)
       }
     }
 
-    probedSockets.foreach(_._2.close().asScala.futureValue)
-    binding.close().asScala
+    probedSockets.foreach(_._1.close().asScala.futureValue)
+    binding.close().asScala.futureValue
   }
 }
