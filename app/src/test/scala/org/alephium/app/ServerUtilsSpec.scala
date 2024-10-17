@@ -62,7 +62,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector.empty,
       ALPH.oneAlph,
       defaultUtxosLimit,
-      128
+      maxFormBufferedBytes = 128,
+      maxWebSocketFrameSize = 1024 * 1024
     )
   }
 

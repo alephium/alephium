@@ -223,7 +223,7 @@ object RestServer {
     val restPort = node.config.network.restPort
     val httpOptions =
       new HttpServerOptions()
-        .setMaxWebSocketFrameSize(1024 * 1024)
+        .setMaxWebSocketFrameSize(apiConfig.maxWebSocketFrameSize)
         .setRegisterWebSocketWriteHandlers(true)
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
     val webSocketServer =

@@ -61,7 +61,8 @@ abstract class RestServerSpec(
     val apiKeys: AVector[ApiKey] = AVector.empty,
     val apiKeyEnabled: Boolean = false,
     val utxosLimit: Int = Int.MaxValue,
-    val maxFormBufferedBytes: Int = 1024
+    val maxFormBufferedBytes: Int = 1024,
+    val maxWebSocketFrameSize: Int = 1024 * 1024
 ) extends RestServerFixture {
   it should "call GET /blockflow/blocks" in {
     Get(blockflowFromTo(0, 1)) check { response =>
@@ -1436,7 +1437,8 @@ abstract class RestServerApiKeyDisableSpec(
     val nbOfNodes: Int = 1,
     val apiKeyEnabled: Boolean = false,
     val utxosLimit: Int = Int.MaxValue,
-    val maxFormBufferedBytes: Int = 1024
+    val maxFormBufferedBytes: Int = 1024,
+    val maxWebSocketFrameSize: Int = 1024 * 1024
 ) extends RestServerFixture {
 
   it should "not require api key if disabled" in {
@@ -1476,6 +1478,7 @@ trait RestServerFixture
   val apiKeyEnabled: Boolean
   val utxosLimit: Int
   val maxFormBufferedBytes: Int
+  val maxWebSocketFrameSize: Int
 
   implicit val system: ActorSystem  = ActorSystem("rest-server-spec")
   implicit val ec: ExecutionContext = system.dispatcher
@@ -1486,6 +1489,7 @@ trait RestServerFixture
       ("alephium.api.api-key-enabled", apiKeyEnabled),
       ("alephium.api.default-utxos-limit", utxosLimit),
       ("alephium.api.max-form-buffered-bytes", maxFormBufferedBytes),
+      ("alephium.api.max-web-socket-frame-size", maxWebSocketFrameSize),
       ("alephium.node.indexes.tx-output-ref-index", true),
       ("alephium.node.indexes.subcontract-index", true)
     ) ++ apiKeys.headOption
@@ -1577,7 +1581,8 @@ trait RestServerFixture
       apiConfig.apiKey,
       ALPH.oneAlph,
       utxosLimit,
-      maxFormBufferedBytes
+      maxFormBufferedBytes,
+      maxWebSocketFrameSize
     )
 
     (peer, peerConf)
