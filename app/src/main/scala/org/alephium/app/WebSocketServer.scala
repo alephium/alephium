@@ -22,6 +22,7 @@ import scala.collection.mutable
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
+import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{EventBus => VertxEventBus, Message, MessageConsumer}
 import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
@@ -52,7 +53,6 @@ final case class WebSocketServer(underlying: HttpServer, eventHandler: ActorRef)
     extends HttpServerLike
 
 object WebSocketServer extends StrictLogging {
-  private val tooManyRequestsCode  = 429
   private val currentWsConnections = new AtomicInteger(0)
 
   def apply(
@@ -68,7 +68,7 @@ object WebSocketServer extends StrictLogging {
     server.webSocketHandler { webSocket =>
       if (currentWsConnections.get() >= maxConnections) {
         logger.warn(s"WebSocket connections reached max limit ${currentWsConnections.get()}")
-        webSocket.reject(tooManyRequestsCode)
+        webSocket.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
       } else if (webSocket.path().equals("/ws")) {
         webSocket.closeHandler { _ =>
           currentWsConnections.decrementAndGet()
@@ -81,7 +81,7 @@ object WebSocketServer extends StrictLogging {
             case Some(subscription) =>
               EventHandler.subscribeToEvents(vertx, webSocket, subscription)
             case None =>
-              webSocket.reject()
+              webSocket.reject(HttpResponseStatus.BAD_REQUEST.code())
           }
           ()
         }
@@ -89,7 +89,7 @@ object WebSocketServer extends StrictLogging {
         currentWsConnections.incrementAndGet()
         eventHandlerRef ! EventHandler.Subscribe(webSocket.textHandlerID())
       } else {
-        webSocket.reject()
+        webSocket.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
     }
     WebSocketServer(server, eventHandlerRef)
