@@ -2187,7 +2187,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |
-           |Contract Grandparent(mut x: U256) {
+           |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  @using(updateFields = true)
@@ -8465,6 +8465,129 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       test(code, AVector(Val.True), AVector(Val.U256(0)))
       test(code, AVector(Val.False), AVector(Val.U256(1)))
+    }
+  }
+
+  it should "report an error if accessing definitions in child contracts" in {
+    {
+      info("Access to enums in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  enum Error { Code = 0 }
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> () {
+           |    assert!(Error.$$Code$$ == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.Error.Code is not defined in the current scope or is used before being defined"
+      )
+    }
+
+    {
+      info("Access to constants in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  const Error = 0
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> () {
+           |    assert!($$Error$$ == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.Error is not defined in the current scope or is used before being defined"
+      )
+    }
+
+    {
+      info("Access to fields in child contracts")
+      val code =
+        s"""
+           |Contract Child(a: U256, b: U256) extends Parent(a) {
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent(a: U256) {
+           |  pub fn parent() -> () {
+           |    assert!($$b$$ == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.b is not defined in the current scope or is used before being defined"
+      )
+    }
+
+    {
+      info("Access to maps in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  mapping[U256, U256] map
+           |
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> U256 {
+           |    return $$map$$[0]
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.map is not defined in the current scope or is used before being defined"
+      )
+    }
+
+    {
+      info("Access to functions in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> () {
+           |    $$child$$()
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Function child does not exist")
+    }
+
+    {
+      info("Access to definitions in parent contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() extends Grandparent() {
+           |  pub fn parent() -> () {
+           |    assert!(Error == 0, 0)
+           |  }
+           |}
+           |Abstract Contract Grandparent() {
+           |  const Error = 0
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
     }
   }
 }
