@@ -37,6 +37,10 @@ class WebSocketEventHandlerSpec extends AlephiumSpec with ServerFixture {
   it should "parse subscription EventType" in {
     WsEventType.parseSubscription("subscribe:block").get is Subscription(WsEventType.Block)
     WsEventType.parseSubscription("subscribe:tx").get is Subscription(WsEventType.Tx)
+    // let's be strict
+    WsEventType.parseSubscription("subscribe : block").isEmpty is true
+    WsEventType.parseSubscription("subscribe,block").isEmpty is true
+    WsEventType.parseSubscription("subscribe block").isEmpty is true
     WsEventType.parseSubscription("subscribe:gandalf").isEmpty is true
     WsEventType.parseSubscription("nonsense:frodo").isEmpty is true
   }
