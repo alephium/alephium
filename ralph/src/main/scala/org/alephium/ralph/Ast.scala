@@ -1342,19 +1342,19 @@ object Ast {
     }
 
     def check(state: Compiler.State[Ctx]): Unit = {
+      state.setFuncScope(id)
+      state.checkArguments(args)
+      args.foreach { arg =>
+        val argTpe = state.resolveType(arg.tpe)
+        state.addLocalVariable(
+          arg.ident,
+          argTpe,
+          arg.isMutable,
+          arg.isUnused,
+          isGenerated = false
+        )
+      }
       if (bodyOpt.isDefined) {
-        state.setFuncScope(id)
-        state.checkArguments(args)
-        args.foreach { arg =>
-          val argTpe = state.resolveType(arg.tpe)
-          state.addLocalVariable(
-            arg.ident,
-            argTpe,
-            arg.isMutable,
-            arg.isUnused,
-            isGenerated = false
-          )
-        }
         funcAccessedVarsCache match {
           case Some(vars) => // the function has been compiled before
             state.addAccessedVars(vars)

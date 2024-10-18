@@ -8590,4 +8590,127 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compileContract(code).isRight is true
     }
   }
+
+  it should "check duplicate definitions in abstract contract" in {
+    {
+      info("Duplicate fields")
+      val code =
+        s"""
+           |Contract Child(v: U256, v: U256) extends Parent(v, v) {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent(v: U256, $$v$$: U256) {
+           |  pub fn p() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Global variable has the same name as local variable: v")
+    }
+
+    {
+      info("Duplicate function args")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  pub fn p(v: U256, $$v$$: U256) -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Local variables have the same name: v")
+    }
+
+    {
+      info("Duplicate local and global variables")
+      val code =
+        s"""
+           |Contract Child(v: U256) extends Parent(v) {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent(v: U256) {
+           |  pub fn p($$v$$: U256) -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Global variable has the same name as local variable: v")
+    }
+
+    {
+      info("Duplicate constants")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  const A = 0
+           |  $$const A = 1$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These constant variables are defined multiple times: A")
+    }
+
+    {
+      info("Duplicate enums")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  enum A {
+           |    Err = 0
+           |  }
+           |  enum A {
+           |    $$Err = 0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "There are conflict fields in the enum A: Err")
+    }
+
+    {
+      info("Duplicate events")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  event E(v: U256)
+           |  $$event E(v: I256)$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These events are defined multiple times: E")
+    }
+
+    {
+      info("Duplicate maps")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  mapping[U256, U256] map
+           |  $$mapping[U256, I256] map$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These maps are defined multiple times: map")
+    }
+
+    {
+      info("Duplicate functions")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  pub fn p() -> () {}
+           |  $$pub fn p() -> () {}$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These functions are implemented multiple times: p")
+    }
+  }
 }
