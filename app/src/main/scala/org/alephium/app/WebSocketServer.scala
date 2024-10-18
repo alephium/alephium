@@ -16,10 +16,6 @@
 
 package org.alephium.app
 
-import java.util.concurrent.atomic.AtomicInteger
-
-import scala.collection.mutable
-
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -29,13 +25,14 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
+import org.alephium.app.WebSocketServer.WsEventType
 import org.alephium.app.WebSocketServer.WsEventType.Subscription
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.FlowHandler
 import org.alephium.json.Json._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventBus}
+import org.alephium.util.{ActorRefT, BaseActor, ConcurrentHashMap, EventBus}
 
 trait HttpServerLike {
   def underlying: HttpServer
@@ -49,11 +46,13 @@ object SimpleHttpServer {
     SimpleHttpServer(Vertx.vertx().createHttpServer(httpOptions))
 }
 
-final case class WebSocketServer(underlying: HttpServer, eventHandler: ActorRef)
-    extends HttpServerLike
+final case class WebSocketServer(
+    underlying: HttpServer,
+    eventHandler: ActorRef,
+    subscribers: ConcurrentHashMap[WsEventType.SubscriberId, WsEventType.SubscriptionTime]
+) extends HttpServerLike
 
 object WebSocketServer extends StrictLogging {
-  private val currentWsConnections = new AtomicInteger(0)
 
   def apply(
       flowSystem: ActorSystem,
@@ -64,15 +63,16 @@ object WebSocketServer extends StrictLogging {
     val vertx = Vertx.vertx()
     val eventHandlerRef =
       EventHandler.getSubscribedEventHandlerRef(vertx.eventBus(), node.eventBus, flowSystem)
+    val subscribers =
+      ConcurrentHashMap.empty[WsEventType.SubscriberId, WsEventType.SubscriptionTime]
     val server = vertx.createHttpServer(httpOptions)
     server.webSocketHandler { webSocket =>
-      if (currentWsConnections.get() >= maxConnections) {
-        logger.warn(s"WebSocket connections reached max limit ${currentWsConnections.get()}")
+      if (subscribers.size >= maxConnections) {
+        logger.warn(s"WebSocket connections reached max limit ${subscribers.size}")
         webSocket.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
       } else if (webSocket.path().equals("/ws")) {
         webSocket.closeHandler { _ =>
-          currentWsConnections.decrementAndGet()
-          eventHandlerRef ! EventHandler.Unsubscribe(webSocket.textHandlerID())
+          val _ = subscribers.remove(webSocket.textHandlerID())
         }
 
         // Receive subscription messages from the client
@@ -86,13 +86,12 @@ object WebSocketServer extends StrictLogging {
           ()
         }
 
-        currentWsConnections.incrementAndGet()
-        eventHandlerRef ! EventHandler.Subscribe(webSocket.textHandlerID())
+        subscribers.put(webSocket.textHandlerID(), System.currentTimeMillis())
       } else {
         webSocket.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
     }
-    WebSocketServer(server, eventHandlerRef)
+    WebSocketServer(server, eventHandlerRef, subscribers)
   }
 
   sealed trait WsEventType {
@@ -101,6 +100,8 @@ object WebSocketServer extends StrictLogging {
 
   object WsEventType {
     private val SubscribePrefix = "subscribe:"
+    type SubscriberId     = String
+    type SubscriptionTime = Long
 
     case object Block extends WsEventType { val name = "block" }
     case object Tx    extends WsEventType { val name = "tx"    }
@@ -134,9 +135,6 @@ object WebSocketServer extends StrictLogging {
   }
 
   object EventHandler extends ApiModelCodec {
-    final case class Subscribe(clientId: String)
-    final case class Unsubscribe(clientId: String)
-    case object ListSubscribers
 
     // scalastyle:off null
     def subscribeToEvents(
@@ -187,22 +185,13 @@ object WebSocketServer extends StrictLogging {
       extends BaseActor
       with ApiModelCodec {
 
-    private val subscribers: mutable.HashSet[String] = mutable.HashSet.empty
-
-    def receive: Receive = {
-      case event: EventBus.Event =>
-        EventHandler.buildNotification(event) match {
-          case Right(notification) =>
-            val _ = vertxEventBus.publish(notification.method, write(notification))
-          case Left(error) =>
-            log.error(error)
-        }
-      case EventHandler.Subscribe(subscriber) =>
-        if (!subscribers.contains(subscriber)) { subscribers += subscriber }
-      case EventHandler.Unsubscribe(subscriber) =>
-        if (subscribers.contains(subscriber)) { subscribers -= subscriber }
-      case EventHandler.ListSubscribers =>
-        sender() ! AVector.unsafe(subscribers.toArray)
+    def receive: Receive = { case event: EventBus.Event =>
+      EventHandler.buildNotification(event) match {
+        case Right(notification) =>
+          val _ = vertxEventBus.publish(notification.method, write(notification))
+        case Left(error) =>
+          log.error(error)
+      }
     }
   }
 }

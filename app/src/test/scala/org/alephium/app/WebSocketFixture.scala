@@ -19,7 +19,6 @@ package org.alephium.app
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
-import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
@@ -54,7 +53,7 @@ trait WebSocketServerFixture extends ServerFixture {
 
   def maxConnections: Int = 10
 
-  lazy val WebSocketServer(httpServer, eventHandler) =
+  lazy val WebSocketServer(httpServer, eventHandler, subscribers) =
     WebSocketServer(
       system,
       node,
@@ -107,11 +106,7 @@ trait RouteWS
         .futureValue
 
     eventually {
-      eventHandler
-        .ask(WebSocketServer.EventHandler.ListSubscribers)
-        .mapTo[AVector[String]]
-        .futureValue
-        .length is probedSockets.length
+      subscribers.entries().map(_.getKey).size is probedSockets.length
     }
 
     // run defined Cause of websocket server with Effect on websocket client
