@@ -8469,6 +8469,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "report an error if accessing definitions in child contracts" in {
+    val options = CompilerOptions.Default.copy(checkAbstractContracts = false)
+
     {
       info("Access to enums in child contracts")
       val code =
@@ -8488,6 +8490,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "Variable parent.Error.Code is not defined in the current scope or is used before being defined"
       )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
     }
 
     {
@@ -8509,6 +8512,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "Variable parent.Error is not defined in the current scope or is used before being defined"
       )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
     }
 
     {
@@ -8529,6 +8533,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "Variable parent.b is not defined in the current scope or is used before being defined"
       )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
     }
 
     {
@@ -8551,6 +8556,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "Variable parent.map is not defined in the current scope or is used before being defined"
       )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
     }
 
     {
@@ -8568,6 +8574,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Function child does not exist")
+      Compiler.compileContract(replace(code), 0, options).isRight is true
     }
 
     {
@@ -8592,6 +8599,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "check duplicate definitions in abstract contract" in {
+    val options = CompilerOptions.Default.copy(checkAbstractContracts = false)
+    def compileCode(code: String, error: String) = {
+      Compiler.compileContract(replace(code), 0, options).leftValue.message is error
+    }
+
     {
       info("Duplicate fields")
       val code =
@@ -8604,6 +8616,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Global variables have the same name: v")
+      compileCode(code, "Global variables have the same name: v")
     }
 
     {
@@ -8618,6 +8631,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Local variables have the same name: v")
+      compileCode(code, "Local variables have the same name: v")
     }
 
     {
@@ -8632,6 +8646,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Global variables have the same name: v")
+      compileCode(code, "Global variables have the same name: v")
     }
 
     {
@@ -8647,6 +8662,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "These constant variables are defined multiple times: A")
+      compileCode(code, "These constant variables are defined multiple times: A")
     }
 
     {
@@ -8666,6 +8682,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "There are conflict fields in the enum A: Err")
+      compileCode(code, "There are conflict fields in the enum A: Err")
     }
 
     {
@@ -8681,6 +8698,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "These events are defined multiple times: E")
+      compileCode(code, "These events are defined multiple times: E")
     }
 
     {
@@ -8696,6 +8714,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "These maps are defined multiple times: map")
+      compileCode(code, "These maps are defined multiple times: map")
     }
 
     {
@@ -8711,6 +8730,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "These functions are implemented multiple times: p")
+      compileCode(code, "These functions are implemented multiple times: p")
     }
   }
 }

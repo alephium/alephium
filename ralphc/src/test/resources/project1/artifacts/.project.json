@@ -6,7 +6,8 @@
     "ignoreUnusedPrivateFunctionsWarnings": false,
     "ignoreUpdateFieldsCheckWarnings": false,
     "ignoreCheckExternalCallerWarnings": false,
-    "ignoreUnusedFunctionReturnWarnings": false
+    "ignoreUnusedFunctionReturnWarnings": false,
+    "checkAbstractContracts": true
   },
   "infos": {
     "Add": {

@@ -2849,7 +2849,9 @@ object Ast {
         compilerOptions: CompilerOptions
     ): (AVector[Warning], AVector[(CompiledContract, Int)]) = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
-      checkAbstractContracts(states)
+      if (compilerOptions.checkAbstractContracts) {
+        checkAbstractContracts(states)
+      }
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state = states(index)

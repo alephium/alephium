@@ -33,6 +33,7 @@ final case class Configs(
     ignoreUnusedPrivateFunctionsWarnings: Boolean = false,
     ignoreCheckExternalCallerWarnings: Boolean = false,
     ignoreUnusedFunctionReturnWarnings: Boolean = false,
+    checkAbstractContracts: Boolean = true,
     contracts: ArraySeq[Path] = ArraySeq(Paths.get(".")),
     artifacts: ArraySeq[Path] = ArraySeq(Paths.get("."))
 ) {
@@ -44,7 +45,8 @@ final case class Configs(
       ignoreUpdateFieldsCheckWarnings = ignoreUpdateFieldsCheckWarnings,
       ignoreUnusedPrivateFunctionsWarnings = ignoreUnusedPrivateFunctionsWarnings,
       ignoreCheckExternalCallerWarnings = ignoreCheckExternalCallerWarnings,
-      ignoreUnusedFunctionReturnWarnings = ignoreUnusedFunctionReturnWarnings
+      ignoreUnusedFunctionReturnWarnings = ignoreUnusedFunctionReturnWarnings,
+      checkAbstractContracts = checkAbstractContracts
     )
   }
 
