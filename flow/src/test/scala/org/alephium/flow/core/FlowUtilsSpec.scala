@@ -22,6 +22,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, Generators, PrivateKey, PublicKey, SignatureSchema}
@@ -666,7 +667,8 @@ class FlowUtilsSpec extends AlephiumSpec {
           AVector(output),
           None,
           gasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
         )
         .rightValue
         .rightValue

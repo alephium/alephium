@@ -606,9 +606,9 @@
     "name": "blockTimeStamp",
     "category": "Chain",
     "signature": "fn blockTimeStamp!() -> (U256)",
-    "doc": "Returns the block timestamp.",
+    "doc": "Returns the block timestamp in milliseconds.",
     "params": [],
-    "returns": "@returns the block timestamp"
+    "returns": "@returns the block timestamp in milliseconds"
   },
   {
     "name": "blockTarget",
@@ -672,7 +672,7 @@
     "name": "verifyAbsoluteLocktime",
     "category": "Chain",
     "signature": "fn verifyAbsoluteLocktime!(lockUntil:U256) -> ()",
-    "doc": "Verifies that the absolute locktime is before the block timestamp, otherwise it fails.",
+    "doc": "Verifies that the absolute locktime is before the block timestamp (milliseconds), otherwise it fails.",
     "params": [
       "@param lockUntil the timestamp until which the lock is valid"
     ],
@@ -682,7 +682,7 @@
     "name": "verifyRelativeLocktime",
     "category": "Chain",
     "signature": "fn verifyRelativeLocktime!(txInputIndex:U256, lockDuration:U256) -> ()",
-    "doc": "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails.",
+    "doc": "Verifies that the input's creation timestamp + lock duration is before the block timestamp (milliseconds), otherwise it fails.",
     "params": [
       "@param txInputIndex the index of the transaction input",
       "@param lockDuration the duration that the input is locked for"

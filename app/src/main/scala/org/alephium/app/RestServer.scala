@@ -32,6 +32,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
 import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
 
@@ -56,11 +57,14 @@ class RestServer(
   lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
   val walletEndpoints                   = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 
-  override val maybeApiKey = apiConfig.apiKey
+  override val apiKeys = apiConfig.apiKey
 
-  val endpointSender: EndpointSender = new EndpointSender(maybeApiKey)
+  val endpointSender: EndpointSender = new EndpointSender(apiKeys.headOption)
 
-  private val swaggerUiRoute = SwaggerUI(openApiJson(openAPI, maybeApiKey.isEmpty)).map(route(_))
+  private val truncateAddresses = node.config.network.networkId == NetworkId.AlephiumMainNet
+  private val swaggerUiRoute = SwaggerUI(
+    openApiJson(openAPI, apiKeys.isEmpty, truncateAddresses)
+  ).map(route(_))
 
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(
@@ -79,9 +83,11 @@ class RestServer(
       getCurrentDifficultyLogic,
       getBlocksLogic,
       getBlocksAndEventsLogic,
+      getRichBlocksAndEventsLogic,
       getBlockLogic,
       getMainChainBlockByGhostUncleLogic,
       getBlockAndEventsLogic,
+      getRichBlockAndEventsLogic,
       isBlockInMainChainLogic,
       getBalanceLogic,
       getUTXOsLogic,
@@ -104,6 +110,7 @@ class RestServer(
       getTransactionStatusLocalLogic,
       decodeUnsignedTransactionLogic,
       getTransactionLogic,
+      getRichTransactionLogic,
       getRawTransactionLogic,
       listMempoolTransactionsLogic,
       clearMempoolLogic,
@@ -118,6 +125,7 @@ class RestServer(
       compileContractLogic,
       compileProjectLogic,
       buildDeployContractTxLogic,
+      buildChainedTransactionsLogic,
       contractStateLogic,
       testContractLogic,
       callContractLogic,

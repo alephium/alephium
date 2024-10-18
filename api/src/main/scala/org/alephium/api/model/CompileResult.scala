@@ -22,7 +22,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ReleaseVersion
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.StatefulContext
-import org.alephium.ralph.{Ast, CompiledContract, CompiledScript}
+import org.alephium.ralph.{Ast, CompiledContract, CompiledScript, Warning => CompilerWarning}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, DiffMatchPatch, Hex}
 
@@ -53,7 +53,7 @@ object CompileScriptResult {
       CompileProjectResult.diffPatch(bytecodeTemplate, bytecodeDebugTemplate),
       fields = fields,
       functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
-      warnings = compiled.warnings
+      warnings = compiled.warnings.map(_.message)
     )
   }
 }
@@ -101,7 +101,7 @@ object CompileContractResult {
       constants =
         AVector.from(contractAst.getCalculatedConstants().map(CompileResult.Constant.from.tupled)),
       enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
-      warnings = compiled.warnings,
+      warnings = compiled.warnings.map(_.message),
       stdInterfaceId = if (contractAst.hasStdIdField) {
         contractAst.stdInterfaceId.map(id =>
           Hex.toHexString(id.bytes.drop(Ast.StdInterfaceIdPrefix.length))
@@ -128,7 +128,7 @@ object CompileProjectResult {
       contracts: AVector[CompiledContract],
       scripts: AVector[CompiledScript],
       globalState: Ast.GlobalState[StatefulContext],
-      warnings: AVector[String]
+      warnings: AVector[CompilerWarning]
   ): CompileProjectResult = {
     val compiledContracts = contracts.map(c => CompileContractResult.from(c))
     val compiledScripts   = scripts.map(s => CompileScriptResult.from(s))
@@ -141,7 +141,7 @@ object CompileProjectResult {
       Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from)),
       Option.when(constants.nonEmpty)(constants.map(CompileResult.Constant.from.tupled)),
       Option.when(enums.nonEmpty)(enums.map(CompileResult.Enum.from)),
-      Option.when(warnings.nonEmpty)(warnings)
+      Option.when(warnings.nonEmpty)(warnings.map(_.message))
     )
   }
 

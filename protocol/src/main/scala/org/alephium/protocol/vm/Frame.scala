@@ -111,7 +111,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def popContractId(): ExeResult[ContractId] = {
     for {
       byteVec    <- popOpStackByteVec()
-      contractId <- ContractId.from(byteVec.bytes).toRight(Right(InvalidContractId))
+      contractId <- ContractId.from(byteVec.bytes).toRight(Right(InvalidContractId.from(byteVec)))
     } yield contractId
   }
 

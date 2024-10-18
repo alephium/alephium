@@ -33,13 +33,13 @@ import org.alephium.util.{AVector, U256}
 final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
-    warnings: AVector[String],
+    warnings: AVector[Warning],
     debugCode: StatefulContract
 )
 final case class CompiledScript(
     code: StatefulScript,
     ast: Ast.TxScript,
-    warnings: AVector[String],
+    warnings: AVector[Warning],
     debugCode: StatefulScript
 )
 
@@ -51,7 +51,7 @@ object Compiler {
   def compileAssetScript(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (StatelessScript, AVector[String])] =
+  ): Either[Error, (StatelessScript, AVector[Warning])] =
     try {
       fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
         case Parsed.Success((script, globalState), _) =>
@@ -104,7 +104,7 @@ object Compiler {
       AVector[CompiledContract],
       AVector[CompiledScript],
       Ast.GlobalState[StatefulContext],
-      AVector[String]
+      AVector[Warning]
   )
 
   def compileProject(
@@ -119,10 +119,10 @@ object Compiler {
         val unusedGlobalConstantWarning = if (compilerOptions.ignoreUnusedConstantsWarnings) {
           None
         } else {
-          multiContract.globalState.getUnusedGlobalConstantsWarning()
+          Some(multiContract.globalState.getUnusedGlobalConstantsWarning())
         }
         val warnings1 = unusedGlobalConstantWarning match {
-          case Some(warning) => warnings0 :+ warning
+          case Some(warning) => warnings0 ++ warning
           case None          => warnings0
         }
         (statefulContracts, statefulScripts, multiContract.globalState, warnings1)
@@ -185,13 +185,6 @@ object Compiler {
     def isUnused: Boolean
     def isGenerated: Boolean
     def isLocal: Boolean
-
-    def getVariableScope(): Option[VariableScope] = {
-      this match {
-        case variable: VarInfo.Local => Some(variable.variableScope)
-        case _                       => None
-      }
-    }
   }
   object VarInfo {
     final case class Local(
@@ -199,8 +192,7 @@ object Compiler {
         isMutable: Boolean,
         isUnused: Boolean,
         index: Byte,
-        isGenerated: Boolean,
-        variableScope: VariableScope
+        isGenerated: Boolean
     ) extends VarInfo {
       def isLocal: Boolean = true
     }
@@ -516,9 +508,11 @@ object Compiler {
     }
   }
 
+  final case class VarKey(name: String, scope: VariableScope)
+
   sealed trait AccessVariable
-  final case class ReadVariable(name: String)  extends AccessVariable
-  final case class WriteVariable(name: String) extends AccessVariable
+  final case class ReadVariable(variable: VarKey)  extends AccessVariable
+  final case class WriteVariable(variable: VarKey) extends AccessVariable
 
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext]
@@ -530,7 +524,7 @@ object Compiler {
       with Constants[Ctx] {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
-    def varTable: mutable.HashMap[String, VarInfo]
+    def varTable: mutable.HashMap[VarKey, VarInfo]
     var allowDebug: Boolean = false
 
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
@@ -578,7 +572,7 @@ object Compiler {
         isLocal = true,
         isGenerated = true,
         isTemplate = false,
-        VarInfo.Local(_, _, _, _, _, variableScope)
+        VarInfo.Local
       )
       val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
       (ref, codes)
@@ -617,7 +611,7 @@ object Compiler {
     ): Unit = {
       val sname   = checkNewVariable(ident)
       val varInfo = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
-      addVarInfo(sname, varInfo)
+      trackAndAddVarInfo(sname, varInfo)
     }
 
     def getVariablesRef(ident: Ast.Ident): VariablesRef[Ctx] = {
@@ -636,18 +630,28 @@ object Compiler {
       s"${scopedNamePrefix(scopeId)}$name"
     }
 
-    @inline private def addVarInfo(sname: String, varInfo: VarInfo): Unit = {
-      varTable(sname) = varInfo
-      trackGenCodePhaseNewVars(sname)
+    @inline private def addVarInfo(name: String, varInfo: VarInfo): VarKey = {
+      val varKey = VarKey(name, variableScope)
+      varTable(varKey) = varInfo
+      varKey
+    }
+
+    @inline private def trackAndAddVarInfo(sname: String, varInfo: VarInfo): Unit = {
+      val varKey = addVarInfo(sname, varInfo)
+      trackGenCodePhaseNewVars(varKey)
     }
 
     private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)
-      addVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
+      trackAndAddVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
+    }
+
+    @inline private def getGlobalVariable(name: String): Option[VarInfo] = {
+      varTable.get(VarKey(name, FunctionRoot))
     }
 
     @inline private[ralph] def hasMapVar(ident: Ast.Ident): Boolean = {
-      varTable.get(ident.name).exists(_.tpe.isMapType)
+      getGlobalVariable(ident.name).exists(_.tpe.isMapType)
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
@@ -695,7 +699,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local(_, _, _, _, _, variableScope)
+        VarInfo.Local
       )
     }
     // scalastyle:off parameter.number
@@ -711,7 +715,6 @@ object Compiler {
         varInfoBuilder: Compiler.VarInfoBuilder
     ): Unit = {
       val sname = checkNewVariable(ident)
-      variableScopeChecked += sname -> ident.sourceIndex
       tpe match {
         case tpe: Type.NamedType => // this should never happen
           throw Error(s"Unresolved named type $tpe", ident.sourceIndex)
@@ -736,7 +739,7 @@ object Compiler {
             getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
-          addVarInfo(sname, varInfo)
+          trackAndAddVarInfo(sname, varInfo)
       }
     }
     // scalastyle:on parameter.number
@@ -744,19 +747,31 @@ object Compiler {
     def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
-      varTable(sname) =
+      val varInfo =
         VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr), constantDef)
+      addVarInfo(sname, varInfo)
+      ()
+    }
+
+    @scala.annotation.tailrec
+    private def varDefinedInScopeOrParent(sname: String, scope: VariableScope): Boolean = {
+      val varKey = VarKey(sname, scope)
+      scope match {
+        case FunctionRoot => varTable.contains(varKey)
+        case child: ChildScope =>
+          varTable.contains(varKey) || varDefinedInScopeOrParent(sname, child.parent)
+      }
     }
 
     private def checkNewVariable(ident: Ast.Ident): String = {
       val name  = ident.name
       val sname = scopedName(name)
-      if (varTable.contains(name)) {
+      if (getGlobalVariable(name).isDefined) {
         throw Error(
           s"Global variable has the same name as local variable: $name",
           ident.sourceIndex
         )
-      } else if (varTable.contains(sname)) {
+      } else if (varDefinedInScopeOrParent(sname, variableScope)) {
         throw Error(s"Local variables have the same name: $name", ident.sourceIndex)
       } else if (currentScopeState.varIndex >= State.maxVarIndex) {
         throw Error(s"Number of variables more than ${State.maxVarIndex}", ident.sourceIndex)
@@ -775,115 +790,126 @@ object Compiler {
       }
     }
 
+    @scala.annotation.tailrec
+    private def getVariableInScopeOrParent(
+        sname: String,
+        scope: VariableScope
+    ): Option[(VarKey, VarInfo)] = {
+      val varKey = VarKey(sname, scope)
+      scope match {
+        case FunctionRoot => varTable.get(varKey).map(info => (varKey, info))
+        case child: ChildScope =>
+          varTable.get(varKey) match {
+            case varInfo @ Some(_) => varInfo.map(info => (varKey, info))
+            case None              => getVariableInScopeOrParent(sname, child.parent)
+          }
+      }
+    }
+
     def getVariable(ident: Ast.Ident, isWrite: Boolean = false): VarInfo = {
       val name  = ident.name
       val sname = scopedName(ident.name)
-      val (varName, varInfo) = varTable.get(sname) match {
-        case Some(varInfo) => (sname, varInfo)
+      val (varKey, varInfo) = getVariableInScopeOrParent(sname, variableScope) match {
+        case Some(variable) => variable
         case None =>
-          varTable.get(name).orElse(globalState.getConstantOpt(ident)) match {
-            case Some(varInfo) => (name, varInfo)
+          val varKey = VarKey(name, FunctionRoot)
+          varTable.get(varKey).orElse(globalState.getConstantOpt(ident)) match {
+            case Some(varInfo) => (varKey, varInfo)
             case None =>
               throw Error(
-                s"Variable $sname does not exist or is used before declaration",
+                s"Variable $sname is not defined in the current scope or is used before being defined",
                 ident.sourceIndex
               )
           }
       }
       if (isWrite) {
-        currentScopeAccessedVars.add(WriteVariable(varName))
+        currentScopeAccessedVars.add(WriteVariable(varKey))
       } else {
-        currentScopeAccessedVars.add(ReadVariable(varName))
+        currentScopeAccessedVars.add(ReadVariable(varKey))
       }
 
-      checkVariableScope(sname, ident, varInfo)
       varInfo
-    }
-
-    def checkVariableScope(sname: String, ident: Ast.Ident, varInfo: VarInfo): Unit = {
-      val checkKey = sname -> ident.sourceIndex
-      if (phase == Phase.Check && !variableScopeChecked.contains(checkKey)) {
-        variableScopeChecked += checkKey
-        varInfo.getVariableScope() match {
-          case Some(variableScope) =>
-            if (!variableScope.include(this.variableScope)) {
-              throw Error(s"Variable $sname is not defined in the current scope", ident.sourceIndex)
-            }
-          case None => ()
-        }
-      }
     }
 
     def addAccessedVars(vars: Set[AccessVariable]): Unit = accessedVars.addAll(vars)
 
     def checkUnusedLocalVars(funcId: Ast.FuncId): Unit = {
       val prefix = scopedNamePrefix(funcId)
-      val unusedVars = varTable.filter { case (name, varInfo) =>
-        name.startsWith(prefix) &&
+      val unusedVars = varTable.filter { case (varKey, varInfo) =>
+        varKey.name.startsWith(prefix) &&
         !varInfo.isGenerated &&
         !varInfo.isUnused &&
-        !accessedVars.contains(ReadVariable(name))
+        !accessedVars.contains(ReadVariable(varKey))
       }
       if (unusedVars.nonEmpty) {
-        warnUnusedVariables(typeId, unusedVars)
+        val unusedVarsInfo = unusedVars.map { case (varKey, varInfo) =>
+          (varKey.name, varInfo.tpe)
+        }.toSeq
+        warnUnusedVariables(typeId, unusedVarsInfo)
       }
+
       accessedVars.filterInPlace {
-        case ReadVariable(name) => !name.startsWith(prefix)
-        case _                  => true
+        case ReadVariable(varKey) => !varKey.name.startsWith(prefix)
+        case _                    => true
       }
     }
 
     def checkUnassignedLocalMutableVars(funcId: Ast.FuncId): Unit = {
       val prefix = scopedNamePrefix(funcId)
       val unassignedMutableVars = varTable.view
-        .filter { case (name, varInfo) =>
+        .filter { case (varKey, varInfo) =>
           varInfo.isMutable &&
-          name.startsWith(prefix) &&
+          varKey.name.startsWith(prefix) &&
           !varInfo.isGenerated &&
           !varInfo.isUnused &&
-          !accessedVars.contains(WriteVariable(name))
+          !accessedVars.contains(WriteVariable(varKey))
         }
         .keys
         .toSeq
       if (unassignedMutableVars.nonEmpty) {
+        val names = unassignedMutableVars.map(_.name).sorted.mkString(",")
         throw Compiler.Error(
-          s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: ${unassignedMutableVars
-              .mkString(",")}",
+          s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: $names",
           funcId.sourceIndex
         )
       }
       accessedVars.filterInPlace {
-        case WriteVariable(name) => !name.startsWith(prefix)
-        case _                   => true
+        case WriteVariable(varKey) => !varKey.name.startsWith(prefix)
+        case _                     => true
       }
     }
 
     def checkUnusedMaps(): Unit = {
-      val unusedMaps = varTable.filter { case (name, varInfo) =>
-        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(name)) && !accessedVars
-          .contains(WriteVariable(name))
+      val unusedMaps = varTable.filter { case (varKey, varInfo) =>
+        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(varKey)) && !accessedVars
+          .contains(WriteVariable(varKey))
       }
+
       if (unusedMaps.nonEmpty) {
-        warnUnusedMaps(typeId, unusedMaps.keys.toSeq)
+        val unusedMapsInfo = unusedMaps.map { case (varKey, varInfo) =>
+          (varKey.name, varInfo.tpe)
+        }.toSeq
+        warnUnusedMaps(typeId, unusedMapsInfo)
       }
     }
 
     def checkUnusedFieldsAndConstants(): Unit = {
-      val unusedVars = varTable.filter { case (name, varInfo) =>
+      val unusedVars = varTable.filter { case (varKey, varInfo) =>
         !varInfo.isGenerated &&
         !varInfo.isUnused &&
-        !accessedVars.contains(ReadVariable(name)) &&
+        !accessedVars.contains(ReadVariable(varKey)) &&
         !varInfo.tpe.isMapType
       }
-      val unusedLocalConstants = mutable.ArrayBuffer.empty[String]
-      val unusedFields         = mutable.ArrayBuffer.empty[String]
+      val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Type)]
+      val unusedFields         = mutable.ArrayBuffer.empty[(String, Type)]
       unusedVars.foreach {
-        case (name, c: VarInfo.Constant[_]) =>
-          if (c.constantDef.origin.contains(typeId)) {
-            unusedLocalConstants.addOne(name)
+        case (varKey, c: VarInfo.Constant[_]) =>
+          if (c.constantDef.definedIn(typeId)) {
+            unusedLocalConstants.addOne((varKey.name, c.tpe))
           }
-        case (name, varInfo) if !varInfo.isLocal => unusedFields.addOne(name)
-        case _                                   => ()
+        case (varKey, varInfo) if !varInfo.isLocal =>
+          unusedFields.addOne((varKey.name, varInfo.tpe))
+        case _ => ()
       }
       if (unusedLocalConstants.nonEmpty) {
         warnUnusedLocalConstants(typeId, unusedLocalConstants)
@@ -893,14 +919,15 @@ object Compiler {
       }
     }
 
-    private[ralph] def getUsedParentConstants(): Iterable[(Ast.TypeId, String)] = {
-      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, String)]
+    private[ralph] def getUsedParentConstants()
+        : Iterable[(Ast.TypeId, (String, Option[SourceIndex]))] = {
+      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, (String, Option[SourceIndex]))]
       varTable.foreach {
-        case (name, c: VarInfo.Constant[_]) =>
-          if (accessedVars.contains(ReadVariable(name))) {
+        case (varKey, c: VarInfo.Constant[_]) =>
+          if (accessedVars.contains(ReadVariable(varKey))) {
             c.constantDef.origin match {
               case Some(originContractId) if originContractId != typeId =>
-                used.addOne((originContractId, name))
+                used.addOne((originContractId, (varKey.name, c.tpe.sourceIndex)))
               case _ => ()
             }
           }
@@ -923,9 +950,9 @@ object Compiler {
         .keys
         .toSeq
       if (unassignedMutableFields.nonEmpty) {
+        val names = unassignedMutableFields.map(_.name).sorted.mkString(",")
         throw Compiler.Error(
-          s"There are unassigned mutable fields in contract ${typeId.name}: ${unassignedMutableFields
-              .mkString(",")}",
+          s"There are unassigned mutable fields in contract ${typeId.name}: $names",
           typeId.sourceIndex
         )
       }
@@ -933,7 +960,7 @@ object Compiler {
 
     def getLocalVars(func: Ast.FuncId): Seq[VarInfo] = {
       varTable.view
-        .filterKeys(_.startsWith(func.name))
+        .filterKeys(_.name.startsWith(func.name))
         .values
         .filter(_.isInstanceOf[VarInfo.Local])
         .map(_.asInstanceOf[VarInfo.Local])
@@ -1145,7 +1172,7 @@ object Compiler {
   type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   final case class StateForScript(
       typeId: Ast.TypeId,
-      varTable: mutable.HashMap[String, VarInfo],
+      varTable: mutable.HashMap[VarKey, VarInfo],
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]],
@@ -1237,7 +1264,7 @@ object Compiler {
   final case class StateForContract(
       typeId: Ast.TypeId,
       isTxScript: Boolean,
-      varTable: mutable.HashMap[String, VarInfo],
+      varTable: mutable.HashMap[VarKey, VarInfo],
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],

@@ -84,6 +84,12 @@ object UtxoSelectionAlgo extends StrictLogging {
       gasEstimationMultiplier: Option[GasEstimationMultiplier]
   )
   final case class AssetAmounts(alph: U256, tokens: AVector[(TokenId, U256)])
+  final case class TxInputWithAsset(input: TxInput, asset: Asset)
+  object TxInputWithAsset {
+    def from(asset: Asset, unlockScript: UnlockScript): TxInputWithAsset = {
+      TxInputWithAsset(TxInput(asset.ref, unlockScript), asset)
+    }
+  }
 
   final case class Build(providedGas: ProvidedGas) {
     val ascendingOrderSelector: BuildWithOrder =
@@ -155,16 +161,16 @@ object UtxoSelectionAlgo extends StrictLogging {
 
         case None =>
           for {
-            allInputs <- selectTxInputsForGasEstimation(amounts, unlockScript, utxos)
+            inputWithAssets <- selectTxInputWithAssetsForGasEstimation(amounts, unlockScript, utxos)
             scriptGas <- txScriptOpt match {
               case None =>
                 Right(GasBox.zero)
               case Some(txScript) =>
-                GasEstimation.estimate(allInputs, txScript, txScriptGasEstimator).map { scriptGas =>
-                  providedGas.gasEstimationMultiplier.map(_ * scriptGas).getOrElse(scriptGas)
+                GasEstimation.estimate(inputWithAssets, txScript, txScriptGasEstimator).map {
+                  scriptGas =>
+                    providedGas.gasEstimationMultiplier.map(_ * scriptGas).getOrElse(scriptGas)
                 }
             }
-
             scriptGasFee = gasPrice * scriptGas
             totalAttoAlphAmount <- scriptGasFee
               .add(amounts.alph)
@@ -207,11 +213,11 @@ object UtxoSelectionAlgo extends StrictLogging {
       } yield (resultWithoutGas.selected ++ resultWithGas._1.selected, resultWithGas._2)
     }
 
-    private def selectTxInputsForGasEstimation(
+    private def selectTxInputWithAssetsForGasEstimation(
         amounts: AssetAmounts,
         unlockScript: UnlockScript,
         utxos: AVector[Asset]
-    )(implicit networkConfig: NetworkConfig): Either[String, AVector[TxInput]] = {
+    )(implicit networkConfig: NetworkConfig): Either[String, AVector[TxInputWithAsset]] = {
       val gasPrice        = providedGas.gasPrice
       val maximalGasPerTx = getMaximalGasPerTx()
       SelectionWithoutGasEstimation(assetOrder)
@@ -219,10 +225,8 @@ object UtxoSelectionAlgo extends StrictLogging {
           amounts.copy(alph = amounts.alph.addUnsafe(gasPrice * maximalGasPerTx)),
           utxos
         )
-        .map { selectedSoFar =>
-          selectedSoFar.selected.map(_.ref).map(TxInput(_, unlockScript))
-        }
-        .orElse(Right(utxos.map(_.ref).map(TxInput(_, unlockScript))))
+        .map(_.selected.map(TxInputWithAsset.from(_, unlockScript)))
+        .orElse(Right(utxos.map(TxInputWithAsset.from(_, unlockScript))))
     }
   }
 

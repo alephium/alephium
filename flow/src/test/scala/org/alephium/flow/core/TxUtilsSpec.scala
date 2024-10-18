@@ -24,6 +24,7 @@ import org.scalatest.{Assertion, Succeeded}
 
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
@@ -122,7 +123,8 @@ class TxUtilsSpec extends AlephiumSpec {
         AVector(output0),
         Some(minimalGas),
         nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue
@@ -782,7 +784,14 @@ class TxUtilsSpec extends AlephiumSpec {
         TxOutputInfo(fromLockupScript, amountPerUtxo, AVector.empty, None)
       )
       val unsignedTx = blockFlow
-        .transfer(genesisPubKey, outputInfos, None, nonCoinbaseMinGasPrice, Int.MaxValue)
+        .transfer(
+          genesisPubKey,
+          outputInfos,
+          None,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          ExtraUtxosInfo.empty
+        )
         .rightValue
         .rightValue
       val transaction = Transaction.from(unsignedTx, genesisPrivKey)
@@ -1438,7 +1447,8 @@ class TxUtilsSpec extends AlephiumSpec {
         outputInfos,
         None,
         nonCoinbaseMinGasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue
@@ -1704,7 +1714,8 @@ class TxUtilsSpec extends AlephiumSpec {
         AVector(TxOutputInfo(LockupScript.p2pkh(genesisPubKey), ALPH.oneAlph, AVector.empty, None)),
         None,
         nonCoinbaseMinGasPrice,
-        Int.MaxValue
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue

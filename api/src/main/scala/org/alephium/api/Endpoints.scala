@@ -245,6 +245,25 @@ trait Endpoints
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
 
+  lazy val getRichBlocksAndEvents
+      : BaseEndpoint[TimeInterval, RichBlocksAndEventsPerTimeStampRange] =
+    blockflowEndpoint.get
+      .in("rich-blocks")
+      .in(timeIntervalQuery)
+      .out(jsonBody[RichBlocksAndEventsPerTimeStampRange])
+      .summary(
+        "Given a time interval, list blocks containing events and transactions with enriched input information when node indexes are enabled."
+      )
+
+  lazy val getRichBlockAndEvents: BaseEndpoint[BlockHash, RichBlockAndEvents] =
+    blockflowEndpoint.get
+      .in("rich-blocks")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[RichBlockAndEvents])
+      .summary(
+        "Get a block containing events and transactions with enriched input information when node indexes are enabled."
+      )
+
   lazy val getMainChainBlockByGhostUncle: BaseEndpoint[BlockHash, BlockEntry] =
     blockflowEndpoint.get
       .in("main-chain-block-by-ghost-uncle")
@@ -312,28 +331,28 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  val buildTransaction: BaseEndpoint[BuildTransaction, BuildTransactionResult] =
+  val buildTransferTransaction: BaseEndpoint[BuildTransferTx, BuildTransferTxResult] =
     transactionsEndpoint.post
       .in("build")
-      .in(jsonBodyWithAlph[BuildTransaction])
-      .out(jsonBody[BuildTransactionResult])
-      .summary("Build an unsigned transaction to a number of recipients")
+      .in(jsonBodyWithAlph[BuildTransferTx])
+      .out(jsonBody[BuildTransferTxResult])
+      .summary("Build an unsigned transfer transaction to a number of recipients")
 
-  val buildMultiGroupTransactions: BaseEndpoint[BuildTransaction, AVector[BuildTransactionResult]] =
+  val buildMultiGroupTransactions: BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
     transactionsEndpoint.post
       .in("build-multi-group")
-      .in(jsonBodyWithAlph[BuildTransaction])
-      .out(jsonBody[AVector[BuildTransactionResult]])
+      .in(jsonBodyWithAlph[BuildTransferTx])
+      .out(jsonBody[AVector[BuildTransferTxResult]])
       .summary(
         "Build as many unsigned transactions as many unique groups is among given destinations"
       )
 
   val buildMultiAddressesTransaction
-      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransactionResult] =
+      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransferTxResult] =
     transactionsEndpoint.post
       .in("build-multi-addresses")
       .in(jsonBodyWithAlph[BuildMultiAddressesTransaction])
-      .out(jsonBody[BuildTransactionResult])
+      .out(jsonBody[BuildTransferTxResult])
       .summary(
         "Build an unsigned transaction with multiple addresses to a number of recipients"
       )
@@ -383,11 +402,11 @@ trait Endpoints
       .out(jsonBody[BuildMultisigAddressResult])
       .summary("Create the multisig address and unlock script")
 
-  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransactionResult] =
+  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransferTxResult] =
     multisigEndpoint.post
       .in("build")
       .in(jsonBody[BuildMultisig])
-      .out(jsonBody[BuildTransactionResult])
+      .out(jsonBody[BuildTransferTxResult])
       .summary("Build a multisig unsigned transaction")
 
   val buildSweepMultisig: BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =
@@ -449,6 +468,16 @@ trait Endpoints
       .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[Transaction])
       .summary("Get transaction details")
+
+  lazy val getRichTransaction
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), RichTransaction] =
+    transactionsEndpoint.get
+      .in("rich-details")
+      .in(path[TransactionId]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[RichTransaction])
+      .summary("Get transaction with enriched input information when node indexes are enabled.")
 
   lazy val getRawTransaction
       : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), RawTransaction] =
@@ -521,6 +550,14 @@ trait Endpoints
       .in(jsonBody[BuildDeployContractTx])
       .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
+
+  val buildChainedTransactions
+      : BaseEndpoint[AVector[BuildChainedTx], AVector[BuildChainedTxResult]] =
+    transactionsEndpoint.post
+      .in("build-chained")
+      .in(jsonBody[AVector[BuildChainedTx]])
+      .out(jsonBody[AVector[BuildChainedTxResult]])
+      .summary("Build a chain of transactions")
 
   lazy val contractState: BaseEndpoint[Address.Contract, ContractState] =
     contractsEndpoint.get

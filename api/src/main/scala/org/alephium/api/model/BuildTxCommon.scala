@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.api.{badRequest, Try}
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId}
+import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.{AVector, Hex, U256}
 
@@ -93,7 +93,7 @@ object BuildTxCommon {
               Right((alphOpt, tokenList + (tokenId -> tokenAmount)))
             }
         }
-        amounts.map(v => (v._1, AVector.from(v._2)))
+        amounts.map(v => (v._1, AVector.from(v._2.view.filter(_._2.nonZero))))
     }
   }
 
@@ -117,4 +117,12 @@ trait GasInfo {
   def gasAmount: GasBox
 
   def gasPrice: GasPrice
+
+  def gasFee: U256 = gasPrice * gasAmount
+}
+
+trait TransactionInfo {
+  def txId: TransactionId
+
+  def unsignedTx: String
 }

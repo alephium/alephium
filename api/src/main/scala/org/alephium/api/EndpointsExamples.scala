@@ -155,7 +155,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val transactionTemplate = TransactionTemplate(
     unsignedTx,
     AVector(signature.bytes),
-    AVector(signature.bytes)
+    AVector(signature.bytes),
+    ts
   )
 
   private val utxo = UTXO.from(
@@ -184,6 +185,49 @@ trait EndpointsExamples extends ErrorExamples {
     AVector(ghostUncleBlockEntry)
   )
 
+  private lazy val richTransaction = RichTransaction(
+    unsigned = RichUnsignedTx(
+      txId = unsignedTx.txId,
+      version = unsignedTx.version,
+      networkId = unsignedTx.networkId,
+      scriptOpt = transaction.unsigned.scriptOpt,
+      gasAmount = unsignedTx.gasAmount,
+      gasPrice = unsignedTx.gasPrice,
+      inputs = AVector(
+        RichAssetInput(
+          hint = outputRef.hint,
+          key = outputRef.key,
+          unlockScript = unlockupScriptBytes,
+          attoAlphAmount = Amount(ALPH.oneAlph),
+          address = Address.Asset(lockupScript),
+          tokens
+        )
+      ),
+      fixedOutputs = AVector(outputAsset)
+    ),
+    scriptExecutionOk = true,
+    contractInputs = AVector.empty,
+    generatedOutputs = AVector(outputContract),
+    AVector(signature.bytes),
+    AVector(signature.bytes)
+  )
+
+  private lazy val richBlockEntry = RichBlockEntry(
+    hash = blockHash,
+    timestamp = ts,
+    chainFrom = 1,
+    chainTo = 2,
+    height,
+    deps = AVector(blockHash, blockHash),
+    transactions = AVector(richTransaction),
+    hash.bytes,
+    1.toByte,
+    hash,
+    hash,
+    hash.bytes,
+    AVector(ghostUncleBlockEntry)
+  )
+
   private val eventByBlockHash = ContractEventByBlockHash(
     txId,
     Address.contract(contractId),
@@ -191,7 +235,8 @@ trait EndpointsExamples extends ErrorExamples {
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
-  private val blockAndEvents = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
+  private val blockAndEvents     = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
+  private val richBlockAndEvents = RichBlockAndEvents(richBlockEntry, AVector(eventByBlockHash))
 
   private val blockCandidate = BlockCandidate(
     fromGroup = 1,
@@ -356,6 +401,10 @@ trait EndpointsExamples extends ErrorExamples {
   )
   // scalastyle:on line.size.limit
 
+  implicit val richTransactionExamples: List[Example[RichTransaction]] = List(
+    defaultExample(richTransaction)
+  )
+
   implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
     simpleExample(HashRateResponse("100 MH/s"))
 
@@ -369,11 +418,21 @@ trait EndpointsExamples extends ErrorExamples {
       : List[Example[BlocksAndEventsPerTimeStampRange]] =
     simpleExample(BlocksAndEventsPerTimeStampRange(AVector(AVector(blockAndEvents))))
 
+  implicit val richBlocksAndEventsPerTimeStampRangeExamples
+      : List[Example[RichBlocksAndEventsPerTimeStampRange]] =
+    simpleExample(RichBlocksAndEventsPerTimeStampRange(AVector(AVector(richBlockAndEvents))))
+
   implicit val mempoolTransactionsExamples: List[Example[AVector[MempoolTransactions]]] =
     simpleExample(AVector(MempoolTransactions(0, 1, AVector(transactionTemplate))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
+
+  implicit val richBlockEntryExamples: List[Example[RichBlockEntry]] =
+    simpleExample(richBlockEntry)
+
+  implicit val richBlockAndEventsExamples: List[Example[RichBlockAndEvents]] =
+    simpleExample(richBlockAndEvents)
 
   implicit val blockAndEventsExamples: List[Example[BlockAndEvents]] =
     simpleExample(blockAndEvents)
@@ -422,16 +481,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val chainInfoExamples: List[Example[ChainInfo]] =
     simpleExample(ChainInfo(currentHeight = height))
 
-  implicit val buildTransactionExamples: List[Example[BuildTransaction]] = List(
+  implicit val buildTransferTransactionExamples: List[Example[BuildTransferTx]] = List(
     defaultExample(
-      BuildTransaction(
+      BuildTransferTx(
         publicKey.bytes,
         None,
         defaultDestinations
       )
     ),
     moreSettingsExample(
-      BuildTransaction(
+      BuildTransferTx(
         publicKey.bytes,
         Some(BuildTxCommon.BIP340Schnorr),
         moreSettingsDestinations,
@@ -478,9 +537,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildTransactionResultExamples: List[Example[BuildTransactionResult]] =
+  implicit val buildTransactionResultExamples: List[Example[BuildTransferTxResult]] =
     simpleExample(
-      BuildTransactionResult(
+      BuildTransferTxResult(
         unsignedTx = hexString,
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
@@ -491,10 +550,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildMultiGroupTransactionsResultsExamples
-      : List[Example[AVector[BuildTransactionResult]]] =
+      : List[Example[AVector[BuildTransferTxResult]]] =
     simpleExample(
       AVector(
-        BuildTransactionResult(
+        BuildTransferTxResult(
           unsignedTx = hexString,
           model.minimalGas,
           model.nonCoinbaseMinGasPrice,
@@ -742,6 +801,30 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildTransactionDeployContractTxExamples
+      : List[Example[BuildChainedDeployContractTx]] = List(
+    defaultExample(
+      BuildChainedDeployContractTx(
+        BuildDeployContractTx(publicKey.bytes, None, bytecode = byteString)
+      )
+    ),
+    moreSettingsExample(
+      BuildChainedDeployContractTx(
+        BuildDeployContractTx(
+          publicKey.bytes,
+          Some(BuildTxCommon.BIP340Schnorr),
+          byteString,
+          Some(bigAmount),
+          Some(tokens),
+          Some(bigAmount),
+          Some(address),
+          Some(model.minimalGas),
+          Some(model.nonCoinbaseMinGasPrice)
+        )
+      )
+    )
+  )
+
   implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
     defaultExample(BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
@@ -757,6 +840,45 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildChainedTransactionsExamples: List[Example[AVector[BuildChainedTx]]] =
+    List(
+      defaultExample(
+        AVector(
+          BuildChainedTransferTx(
+            BuildTransferTx(publicKey.bytes, None, defaultDestinations)
+          ),
+          BuildChainedExecuteScriptTx(
+            BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)
+          )
+        )
+      ),
+      moreSettingsExample(
+        AVector(
+          BuildChainedTransferTx(
+            BuildTransferTx(
+              publicKey.bytes,
+              Some(BuildTxCommon.BIP340Schnorr),
+              moreSettingsDestinations,
+              Some(AVector(outputRef)),
+              Some(model.minimalGas),
+              Some(model.nonCoinbaseMinGasPrice)
+            )
+          ),
+          BuildChainedExecuteScriptTx(
+            BuildExecuteScriptTx(
+              publicKey.bytes,
+              Some(BuildTxCommon.Default),
+              byteString,
+              Some(Amount(model.dustUtxoAmount)),
+              Some(tokens),
+              Some(model.minimalGas),
+              Some(model.nonCoinbaseMinGasPrice)
+            )
+          )
+        )
+      )
+    )
+
   implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
       BuildDeployContractTxResult(
@@ -770,6 +892,22 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val buildTransactionResultDeployContractTxExamples
+      : List[Example[BuildChainedDeployContractTxResult]] =
+    simpleExample(
+      BuildChainedDeployContractTxResult(
+        BuildDeployContractTxResult(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId,
+          contractAddress = Address.contract(contractId)
+        )
+      )
+    )
+
   implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
     simpleExample(
       BuildExecuteScriptTxResult(
@@ -779,6 +917,48 @@ trait EndpointsExamples extends ErrorExamples {
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
         txId = txId
+      )
+    )
+
+  implicit val buildTransactionResultExecuteScriptExamples
+      : List[Example[BuildChainedExecuteScriptTxResult]] =
+    simpleExample(
+      BuildChainedExecuteScriptTxResult(
+        BuildExecuteScriptTxResult(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId
+        )
+      )
+    )
+
+  implicit val buildChainedTransactionsResultExamples
+      : List[Example[AVector[BuildChainedTxResult]]] =
+    simpleExample(
+      AVector(
+        BuildChainedTransferTxResult(
+          BuildTransferTxResult(
+            unsignedTx = hexString,
+            model.minimalGas,
+            model.nonCoinbaseMinGasPrice,
+            txId,
+            fromGroup = 1,
+            toGroup = 2
+          )
+        ),
+        BuildChainedExecuteScriptTxResult(
+          BuildExecuteScriptTxResult(
+            fromGroup = 2,
+            toGroup = 2,
+            unsignedTx = hexString,
+            model.minimalGas,
+            model.nonCoinbaseMinGasPrice,
+            txId = txId
+          )
+        )
       )
     )
 

@@ -17,31 +17,37 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
+import org.alephium.protocol.model.{Address, ContractId, TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildTransactionResult(
+final case class BuildDeployContractTxResult(
+    fromGroup: Int,
+    toGroup: Int,
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: TransactionId,
-    fromGroup: Int,
-    toGroup: Int
+    contractAddress: Address.Contract
 ) extends GasInfo
     with ChainIndexInfo
-object BuildTransactionResult {
+    with TransactionInfo
 
+object BuildDeployContractTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildTransactionResult =
-    BuildTransactionResult(
+  )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
+    val contractId =
+      ContractId.from(unsignedTx.id, unsignedTx.fixedOutputs.length, unsignedTx.fromGroup)
+    BuildDeployContractTxResult(
+      unsignedTx.fromGroup.value,
+      unsignedTx.toGroup.value,
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
       unsignedTx.id,
-      unsignedTx.fromGroup.value,
-      unsignedTx.toGroup.value
+      Address.contract(contractId)
     )
+  }
 }

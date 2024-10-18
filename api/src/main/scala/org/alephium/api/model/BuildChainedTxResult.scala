@@ -13,23 +13,20 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.api.model
 
-import akka.util.ByteString
+sealed trait BuildChainedTxResult {
+  val value: GasInfo with ChainIndexInfo with TransactionInfo
+}
 
-import org.alephium.protocol.model.BlockHash
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+@upickle.implicits.key("Transfer")
+final case class BuildChainedTransferTxResult(value: BuildTransferTxResult)
+    extends BuildChainedTxResult
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildTransaction(
-    fromPublicKey: ByteString,
-    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
-    destinations: AVector[Destination],
-    utxos: Option[AVector[OutputRef]] = None,
-    gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon
-    with BuildTxCommon.FromPublicKey
+@upickle.implicits.key("DeployContract")
+final case class BuildChainedDeployContractTxResult(value: BuildDeployContractTxResult)
+    extends BuildChainedTxResult
+
+@upickle.implicits.key("ExecuteScript")
+final case class BuildChainedExecuteScriptTxResult(value: BuildExecuteScriptTxResult)
+    extends BuildChainedTxResult

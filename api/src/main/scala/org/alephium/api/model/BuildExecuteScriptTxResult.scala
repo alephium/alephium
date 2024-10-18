@@ -31,6 +31,8 @@ final case class BuildExecuteScriptTxResult(
     txId: TransactionId
 ) extends GasInfo
     with ChainIndexInfo
+    with TransactionInfo
+
 object BuildExecuteScriptTxResult {
   def from(
       unsignedTx: UnsignedTransaction
