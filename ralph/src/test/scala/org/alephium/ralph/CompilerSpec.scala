@@ -943,7 +943,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Global variable has the same name as local variable: x",
+        "Global variables have the same name: x",
       s"""
          |// assign to immutable array element(contract field)
          |Contract Foo(x: [U256; 2]) {
@@ -6118,7 +6118,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Global variable has the same name as local variable: counters")
+      testContractError(code, "Global variables have the same name: counters")
     }
   }
 
@@ -8603,7 +8603,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn p() -> () {}
            |}
            |""".stripMargin
-      testContractError(code, "Global variable has the same name as local variable: v")
+      testContractError(code, "Global variables have the same name: v")
     }
 
     {
@@ -8631,7 +8631,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn p($$v$$: U256) -> () {}
            |}
            |""".stripMargin
-      testContractError(code, "Global variable has the same name as local variable: v")
+      testContractError(code, "Global variables have the same name: v")
     }
 
     {
