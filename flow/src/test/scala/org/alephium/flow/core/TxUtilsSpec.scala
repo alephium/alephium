@@ -24,7 +24,6 @@ import org.scalatest.{Assertion, Succeeded}
 
 import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.core.FlowUtils.{
   AssetOutputInfo,
   MemPoolOutput,
@@ -1372,6 +1371,24 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val validation = TxValidation.build
 
+    def outputOfAmount(amount: U256): TxOutputInfo =
+      TxOutputInfo(
+        lockupScript,
+        amount,
+        AVector.empty,
+        None
+      )
+
+    def testAlphRemainderCheck(inputs: AVector[AssetOutputInfo], outputs: AVector[TxOutputInfo]) = {
+      blockFlow
+        .getPositiveRemaindersOrFail(
+          UnlockScript.p2pkh(fromPublicKey),
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice
+        )
+    }
+
     def splitGenesisUtxo: AVector[AssetOutputInfo] = {
       val block =
         transfer(
@@ -1599,6 +1616,68 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
       unsignedTxs.length is 0
     }
+  }
+
+  it should "get positive alph remainder or fail" in new MultiGroupTransactions {
+    val halfGenesisInput = splitGenesisUtxo.head
+
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector(outputOfAmount(genesisBalance / 4))
+    ).isRight is true
+
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector(outputOfAmount(genesisBalance))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      AVector.empty,
+      AVector(outputOfAmount(genesisBalance))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      AVector.empty,
+      AVector.empty
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      AVector.empty
+    ).isLeft is true
+
+    val overflowValueOutputs = AVector.fill(2)(outputOfAmount(U256.MaxValue))
+    testAlphRemainderCheck(
+      AVector(halfGenesisInput),
+      overflowValueOutputs
+    ).isLeft is true
+
+    val overflowValueInputs =
+      AVector.fill(2) {
+        AssetOutputInfo(
+          AssetOutputRef.unsafe(
+            Hint.unsafe(0),
+            TxOutputRef.unsafeKey(Hash.generate)
+          ),
+          org.alephium.protocol.model.AssetOutput(
+            U256.MaxValue,
+            lockupScript,
+            TimeStamp.now(),
+            AVector.empty,
+            ByteString.empty
+          ),
+          FlowUtils.PersistedOutput
+        )
+      }
+    testAlphRemainderCheck(
+      overflowValueInputs,
+      AVector(outputOfAmount(genesisBalance / 4))
+    ).isLeft is true
+
+    testAlphRemainderCheck(
+      overflowValueInputs,
+      overflowValueOutputs
+    ).isLeft is true
   }
 
   it should "build multi group transactions from just single genesis box" in new MultiGroupTransactions {
