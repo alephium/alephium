@@ -591,12 +591,14 @@ trait TxUtils { Self: FlowUtils =>
           targetBlockHashOpt
         ).left.map(_.getMessage)
         utxoOpts <- inputSelection.mapE(groupView.getPreAssetOutputInfo).left.map(_.getMessage)
-        existingUtxos = utxoOpts.collect(identity)
+        existingUtxos    = utxoOpts.collect(identity)
+        existingUtxoRefs = existingUtxos.map(_.ref)
         _ <- Either.cond(
-          inputSelection.toSet.subsetOf(existingUtxos.map(_.ref).toSet),
+          inputSelection.length == existingUtxos.length &&
+            inputSelection.forall(existingUtxoRefs.contains),
           (),
           s"Selected input UTXOs are not available: " +
-            s"${inputSelection.toSet.diff(existingUtxos.map(_.ref).toSet).map(_.key.value.toHexString).mkString(", ")}"
+            s"${inputSelection.filterNot(existingUtxoRefs.contains).map(_.key.value.toHexString).mkString(", ")}"
         )
       } yield existingUtxos
     }
