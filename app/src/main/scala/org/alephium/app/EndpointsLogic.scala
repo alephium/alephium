@@ -394,14 +394,14 @@ trait EndpointsLogic extends Endpoints {
     bt => bt.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
-  val buildMultiGroupTransactionsLogic = serverLogicRedirect(buildMultiGroupTransactions)(
-    buildMultiTransaction =>
+  val buildMultiTransferLogic = serverLogicRedirect(buildMultiTransfer)(
+    buildMultiTransfer =>
       withSyncedClique {
         Future.successful(
           serverUtils
-            .buildMultiGroupTransactions(
+            .buildMultiTransfer(
               blockFlow,
-              buildMultiTransaction
+              buildMultiTransfer
             )
         )
       },

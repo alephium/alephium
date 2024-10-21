@@ -6106,136 +6106,13 @@
         }
       }
     },
-    "/transactions/build-multi-addresses": {
-      "post": {
-        "tags": [
-          "Transactions"
-        ],
-        "summary": "Build an unsigned transaction with multiple addresses to a number of recipients",
-        "operationId": "postTransactionsBuild-multi-addresses",
-        "requestBody": {
-          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BuildMultiAddressesTransaction"
-              },
-              "examples": {
-                "Example": {
-                  "summary": "Default",
-                  "value": {
-                    "from": [
-                      {
-                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                        "destinations": [
-                          {
-                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                            "attoAlphAmount": "2000000000000000000"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BuildTransferTxResult"
-                },
-                "example": {
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "fromGroup": 2,
-                  "toGroup": 1
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/transactions/build-multi-group": {
+    "/transactions/build-multi-transfer": {
       "post": {
         "tags": [
           "Transactions"
         ],
         "summary": "Build as many unsigned transactions as many unique groups is among given destinations",
-        "operationId": "postTransactionsBuild-multi-group",
+        "operationId": "postTransactionsBuild-multi-transfer",
         "requestBody": {
           "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
           "content": {
@@ -6313,6 +6190,129 @@
                     "toGroup": 1
                   }
                 ]
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/build-multi-addresses": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Build an unsigned transaction with multiple addresses to a number of recipients",
+        "operationId": "postTransactionsBuild-multi-addresses",
+        "requestBody": {
+          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildMultiAddressesTransaction"
+              },
+              "examples": {
+                "Example": {
+                  "summary": "Default",
+                  "value": {
+                    "from": [
+                      {
+                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "destinations": [
+                          {
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "attoAlphAmount": "2000000000000000000"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTransferTxResult"
+                },
+                "example": {
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "gasAmount": 20000,
+                  "gasPrice": "100000000000",
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "fromGroup": 2,
+                  "toGroup": 1
+                }
               }
             }
           },

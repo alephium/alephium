@@ -338,9 +338,9 @@ trait Endpoints
       .out(jsonBody[BuildTransferTxResult])
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
-  val buildMultiGroupTransactions: BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
+  val buildMultiTransfer: BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
     transactionsEndpoint.post
-      .in("build-multi-group")
+      .in("build-multi-transfer")
       .in(jsonBodyWithAlph[BuildTransferTx])
       .out(jsonBody[AVector[BuildTransferTxResult]])
       .summary(

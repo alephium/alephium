@@ -234,7 +234,7 @@ class ServerUtils(implicit
   }
 
   // scalastyle:off method.length
-  def buildMultiGroupTransactions(
+  def buildMultiTransfer(
       blockFlow: BlockFlow,
       query: BuildTransferTx
   ): Try[AVector[BuildTransferTxResult]] =

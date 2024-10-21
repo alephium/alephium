@@ -144,7 +144,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val destinations =
         AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
       val buildTransactions = serverUtils
-        .buildMultiGroupTransactions(
+        .buildMultiTransfer(
           blockFlow,
           BuildTransferTx(
             fromPublicKey.bytes,
@@ -409,7 +409,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "fail in case gas amount is passed by user" in new MultiGroupFixture {
     serverUtils
-      .buildMultiGroupTransactions(
+      .buildMultiTransfer(
         blockFlow,
         BuildTransferTx(
           fromPublicKey.bytes,
