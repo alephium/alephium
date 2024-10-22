@@ -57,7 +57,8 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
         miner ! ViewHandler.NewTemplates(
           ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
         )
-        val block = blockHandlerProbe.expectMsgType[BlockChainHandler.Validate].block
+        val message = blockHandlerProbe.expectMsgType[BlockChainHandler.ValidateMinedBlock]
+        val block   = deserialize[Block](message.blockBytes).rightValue
         block.chainIndex is chainIndex
         miner ! BlockChainHandler.BlockAdded(block.hash)
       }
