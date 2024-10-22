@@ -82,9 +82,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     subscribeEvent(self, classOf[ChainHandler.FlowDataValidationEvent])
   }
 
-  override def receive: Receive = v2
+  override def receive: Receive = v1
 
-  private[sync] var currentVersion: ProtocolVersion = ProtocolV2
+  private[sync] var currentVersion: ProtocolVersion = ProtocolV1
   private def v1: Receive = common orElse handleV1 orElse updateNodeSyncStatus
   private def v2: Receive = common orElse handleV2 orElse updateNodeSyncStatus
 

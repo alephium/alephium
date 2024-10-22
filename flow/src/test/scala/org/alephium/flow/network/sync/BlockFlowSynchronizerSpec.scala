@@ -707,15 +707,12 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import SyncState.FallbackThreshold
 
     val selfChainTips = genChainTips
-    blockFlowSynchronizerActor.startTime.isEmpty is true
+    blockFlowSynchronizerActor.currentVersion is ProtocolV1
+    addBroker(ProtocolV2)
+    blockFlowSynchronizerActor.startTime.isDefined is false
     blockFlowSynchronizerActor.isSyncing is false
     blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
-    blockFlowSynchronizerActor.startTime.isDefined is true
-    blockFlowSynchronizerActor.isSyncing is false
-
     blockFlowSynchronizerActor.currentVersion is ProtocolV2
-    addBroker(ProtocolV1)
-    blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
     blockFlowSynchronizerActor.startTime.isDefined is true
     blockFlowSynchronizerActor.isSyncing is false
 
@@ -729,13 +726,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.syncingChains.isEmpty is true
 
     addBroker(ProtocolV2)
-    blockFlowSynchronizerActor.startTime.isDefined is false
-    blockFlowSynchronizerActor.isSyncing is false
     blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
     blockFlowSynchronizerActor.currentVersion is ProtocolV2
-    blockFlowSynchronizerActor.startTime.isDefined is true
-    blockFlowSynchronizerActor.isSyncing is false
-
     val selfChainTip    = selfChainTips(0)
     val bestChainTip    = selfChainTip.copy(weight = selfChainTip.weight + Weight(1))
     val remoteChainTips = selfChainTips.replace(0, bestChainTip)
