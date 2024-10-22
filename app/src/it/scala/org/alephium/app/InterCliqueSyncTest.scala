@@ -34,7 +34,7 @@ import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message.{Header, Hello, Message, Payload, Pong, RequestId}
-import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, NetworkId}
+import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, NetworkId, ReleaseVersion}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -85,16 +85,16 @@ object Injected {
 }
 
 class InterCliqueSyncTest extends AlephiumActorSpec {
-  it should "boot and sync two cliques of 2 nodes" in new Fixture {
-    test(2, 2)
+  it should "boot and sync two cliques of 2 nodes using protocol v1" in new Fixture {
+    test(2, 2, Injected.payload(injection1, _), Injected.payload(injection1, _))
   }
 
-  it should "boot and sync two cliques of 1 and 2 nodes" in new Fixture {
-    test(1, 2)
+  it should "boot and sync two cliques of 1 and 2 nodes using protocol v1" in new Fixture {
+    test(1, 2, Injected.payload(injection1, _), Injected.payload(injection1, _))
   }
 
-  it should "boot and sync two cliques of 2 and 1 nodes" in new Fixture {
-    test(2, 1)
+  it should "boot and sync two cliques of 2 and 1 nodes using protocol v1" in new Fixture {
+    test(2, 1, Injected.payload(injection1, _), Injected.payload(injection1, _))
   }
 
   it should "support injection" in new Fixture {
@@ -106,7 +106,41 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     )
   }
 
+  it should "boot and sync two cliques of 2 nodes using protocol v2" in new Fixture {
+    test(2, 2, Injected.payload(injection2, _), Injected.payload(injection2, _))
+  }
+
+  it should "boot and sync two cliques of 1 and 2 nodes using protocol v2" in new Fixture {
+    test(1, 2, Injected.payload(injection2, _), Injected.payload(injection2, _))
+  }
+
+  it should "boot and sync two cliques of 2 and 1 nodes using protocol v2" in new Fixture {
+    test(2, 1, Injected.payload(injection2, _), Injected.payload(injection2, _))
+  }
+
+  it should "boot and sync two cliques of 2 nodes using protocol v1 and v2" in new Fixture {
+    test(2, 2, Injected.payload(injection1, _), Injected.payload(injection2, _))
+  }
+
+  it should "boot and sync two cliques of 1 and 2 nodes using protocol v1 and v2" in new Fixture {
+    test(1, 2, Injected.payload(injection1, _), Injected.payload(injection2, _))
+  }
+
+  it should "boot and sync two cliques of 2 and 1 nodes using protocol v1 and v2" in new Fixture {
+    test(2, 1, Injected.payload(injection1, _), Injected.payload(injection2, _))
+  }
+
   class Fixture extends CliqueFixture {
+    val clientId1 =
+      s"scala-alephium/${ReleaseVersion(0, 0, 0)}/${System.getProperty("os.name")}"
+    val injection1: PartialFunction[Payload, Payload] = { case hello: Hello =>
+      Hello.unsafe(clientId1, hello.timestamp, hello.brokerInfo, hello.signature)
+    }
+    val clientId2 =
+      s"scala-alephium/${ReleaseVersion.protocolV2Version}/${System.getProperty("os.name")}"
+    val injection2: PartialFunction[Payload, Payload] = { case hello: Hello =>
+      Hello.unsafe(clientId2, hello.timestamp, hello.brokerInfo, hello.signature)
+    }
 
     // scalastyle:off method.length
     def test(
