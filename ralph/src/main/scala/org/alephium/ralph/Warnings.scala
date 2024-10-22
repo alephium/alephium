@@ -21,76 +21,117 @@ import scala.collection.mutable
 import org.alephium.util.AVector
 
 trait Warnings {
-  val warnings: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
+  val warnings: mutable.ArrayBuffer[Warning] = mutable.ArrayBuffer.empty[Warning]
+
   def compilerOptions: CompilerOptions
 
-  def getWarnings: AVector[String] = AVector.from(warnings)
+  def getWarnings: AVector[Warning] = AVector.from(warnings)
 
-  def warnUnusedVariables(typeId: Ast.TypeId, unusedVariables: Seq[String]): Unit = {
-    val unusedVarsString = unusedVariables.sorted.mkString(", ")
-    warnUnusedVariables(typeId, unusedVarsString)
-  }
-  def warnUnusedVariables(typeId: Ast.TypeId, unusedVariables: String): Unit = {
+  def warnUnusedVariables(typeId: Ast.TypeId, unusedVariablesInfo: Seq[(String, Type)]): Unit = {
+    val newWarnings = unusedVariablesInfo.sortBy(_._1).map { case (name, typ) =>
+      Warning(
+        s"Found unused variable in ${typeId.name}: $name",
+        typ.sourceIndex
+      )
+    }
     if (!compilerOptions.ignoreUnusedVariablesWarnings) {
-      warnings += s"Found unused variables in ${typeId.name}: ${unusedVariables}"
+      warnings ++= newWarnings
     }
   }
 
-  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[String]): Unit = {
+  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[(String, Option[SourceIndex])]): Unit = {
+    val newWarnings = unusedMaps.map { case (name, sourceIndex) =>
+      Warning(
+        s"Found unused map in ${typeId.name}: $name",
+        sourceIndex
+      )
+    }
+
     if (!compilerOptions.ignoreUnusedVariablesWarnings) {
-      warnings += s"Found unused maps in ${typeId.name}: ${unusedMaps.sorted.mkString(", ")}"
+      warnings ++= newWarnings
     }
   }
 
   def warnUnusedLocalConstants(
       typeId: Ast.TypeId,
-      unusedConstants: mutable.ArrayBuffer[String]
+      unusedConstants: mutable.ArrayBuffer[(String, Option[SourceIndex])]
   ): Unit = {
     if (!compilerOptions.ignoreUnusedConstantsWarnings) {
-      warnings += Warnings.unusedLocalConstants(typeId, unusedConstants)
+      val newWarnings = unusedConstants.map { case (name, sourceIndex) =>
+        Warning(
+          s"Found unused constant in ${typeId.name}: $name",
+          sourceIndex
+        )
+      }
+
+      warnings ++= newWarnings
     }
   }
 
-  def warnUnusedFields(typeId: Ast.TypeId, unusedFields: mutable.ArrayBuffer[String]): Unit = {
-    warnUnusedFields(typeId, unusedFields.sorted.mkString(", "))
-  }
-
-  def warnUnusedFields(typeId: Ast.TypeId, unusedFields: String): Unit = {
+  def warnUnusedFields(
+      typeId: Ast.TypeId,
+      unusedFields: mutable.ArrayBuffer[(String, Option[SourceIndex])]
+  ): Unit = {
+    val newWarnings = unusedFields.sortBy(_._1).map { case (name, sourceIndex) =>
+      Warning(
+        s"Found unused field in ${typeId.name}: $name",
+        sourceIndex
+      )
+    }
     if (!compilerOptions.ignoreUnusedFieldsWarnings) {
-      warnings += s"Found unused fields in ${typeId.name}: ${unusedFields}"
+      warnings ++= newWarnings
     }
   }
 
   def warnNoUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
-      warnings += s"""Function ${Ast.funcName(typeId, funcId)} updates fields. """ +
-        s"""Please use "@using(updateFields = true)" for the function."""
+      warnings += Warning(
+        s"""Function ${Ast.funcName(typeId, funcId)} updates fields. """ +
+          s"""Please use "@using(updateFields = true)" for the function.""",
+        funcId.sourceIndex
+      )
     }
   }
 
   def warnUnnecessaryUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
-      warnings += s"Function ${Ast.funcName(typeId, funcId)} does not update fields. " +
-        s"""Please remove "@using(updateFields = true)" for the function."""
+      warnings += Warning(
+        s"Function ${Ast.funcName(typeId, funcId)} does not update fields. " +
+          s"""Please remove "@using(updateFields = true)" for the function.""",
+        funcId.sourceIndex
+      )
     }
   }
 
-  def warnUnusedPrivateFunction(typeId: Ast.TypeId, funcIds: Seq[String]): Unit = {
+  def warnUnusedPrivateFunction(typeId: Ast.TypeId, funcIds: Seq[Ast.FuncId]): Unit = {
     if (!compilerOptions.ignoreUnusedPrivateFunctionsWarnings) {
-      warnings += Warnings.unusedPrivateFunctions(typeId, funcIds)
+      val newWarnings = funcIds.sortBy(_.name).map { funcId =>
+        Warning(
+          s"Found unused private function in ${typeId.name}: ${funcId.name}",
+          funcId.sourceIndex
+        )
+      }
+
+      warnings ++= newWarnings
     }
   }
 
   def warnCheckExternalCaller(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
-      warnings += Warnings.noCheckExternalCallerMsg(typeId.name, funcId.name)
+      warnings += Warning(
+        Warnings.noCheckExternalCallerMsg(typeId.name, funcId.name),
+        funcId.sourceIndex
+      )
     }
   }
 
   def warnPrivateFuncHasCheckExternalCaller(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
-      warnings += s"No need to add the checkExternalCaller annotation to the private function ${Ast
-          .funcName(typeId, funcId)}"
+      warnings += Warning(
+        s"No need to add the checkExternalCaller annotation to the private function ${Ast
+            .funcName(typeId, funcId)}",
+        funcId.sourceIndex
+      )
     }
   }
 
@@ -102,8 +143,11 @@ trait Warnings {
       } else {
         s"`let ${Seq.fill(retSize)("_").mkString("(", ", ", ")")} = `"
       }
-      warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
-        s" Please add $prefix before the function call to explicitly ignore its return value."
+      warnings += Warning(
+        s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
+          s" Please add $prefix before the function call to explicitly ignore its return value.",
+        funcId.sourceIndex
+      )
     }
   }
 }
@@ -114,15 +158,44 @@ object Warnings {
       s"""Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
   }
 
-  def unusedGlobalConstants(names: Seq[String]): String = {
-    s"Found unused global constants: ${names.sorted.mkString(", ")}"
+  def unusedGlobalConstants(
+      unusedConstants: collection.Seq[(String, Ast.Positioned)]
+  ): AVector[Warning] = {
+    AVector.from(
+      unusedConstants.map { case (name, position) =>
+        Warning(
+          s"Found unused global constant: $name",
+          position.sourceIndex
+        )
+      }
+    )
   }
 
-  def unusedLocalConstants(typeId: Ast.TypeId, unusedConstants: collection.Seq[String]): String = {
-    s"Found unused constants in ${typeId.name}: ${unusedConstants.sorted.mkString(", ")}"
+  def unusedLocalConstants(
+      typeId: Ast.TypeId,
+      unusedConstants: collection.Seq[(String, Option[SourceIndex])]
+  ): AVector[Warning] = {
+    AVector.from(
+      unusedConstants.sortBy(_._1).map { case (name, sourceIndex) =>
+        Warning(
+          s"Found unused constant in ${typeId.name}: $name",
+          sourceIndex
+        )
+      }
+    )
   }
 
-  def unusedPrivateFunctions(typeId: Ast.TypeId, unusedFuncs: collection.Seq[String]): String = {
-    s"Found unused private functions in ${typeId.name}: ${unusedFuncs.sorted.mkString(", ")}"
+  def unusedPrivateFunctions(
+      typeId: Ast.TypeId,
+      unusedFuncs: collection.Seq[(String, Option[SourceIndex])]
+  ): AVector[Warning] = {
+    AVector.from(
+      unusedFuncs.sortBy(_._1).map { case (name, sourceIndex) =>
+        Warning(
+          s"Found unused private function in ${typeId.name}: $name",
+          sourceIndex
+        )
+      }
+    )
   }
 }

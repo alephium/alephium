@@ -1175,7 +1175,9 @@ case object ContractIdToAddress
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractIdRaw <- frame.popOpStackByteVec()
-      contractId    <- ContractId.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
+      contractId <- ContractId
+        .from(contractIdRaw.bytes)
+        .toRight(Right(InvalidContractId.from(contractIdRaw)))
       address = Val.Address(LockupScript.p2c(contractId))
       _ <- frame.ctx.chargeGas(gas())
       _ <- frame.pushOpStack(address)
@@ -1631,7 +1633,7 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
     for {
       tokenAmount  <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId.from(tokenIdRaw)))
       fromAddress  <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <-
@@ -1763,7 +1765,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 with Approve
     for {
       amount       <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId.from(tokenIdRaw)))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       hardFork = frame.ctx.getHardFork()
@@ -1831,7 +1833,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
     for {
       tokenIdRaw   <- frame.popOpStackByteVec()
       address      <- frame.popOpStackAddress()
-      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId.from(tokenIdRaw)))
       balanceState <- frame.getBalanceState()
       amount       <- getAmount(frame.ctx.getHardFork(), balanceState, address, tokenId)
       _            <- frame.pushOpStack(Val.U256(amount))
@@ -1949,7 +1951,7 @@ sealed trait Transfer extends AssetInstr {
     for {
       amount     <- frame.popOpStackU256()
       tokenIdRaw <- frame.popOpStackByteVec()
-      tokenId    <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId    <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId.from(tokenIdRaw)))
       to         <- toThunk
       from       <- fromThunk
       _ <-

@@ -96,6 +96,14 @@ final case class Transaction(
     }
   }
 
+  def getOutput(txOutputRef: TxOutputRef): Option[TxOutput] = {
+    allOutputs.zipWithIndex
+      .find { case (output, index) =>
+        (output.hint == txOutputRef.hint) && (txOutputRef.key == TxOutputRef.key(id, index))
+      }
+      .map(_._1)
+  }
+
   lazy val outputRefs: AVector[TxOutputRef] = {
     AVector.tabulate(outputsLength) { outputIndex =>
       if (outputIndex < unsigned.fixedOutputs.length) {

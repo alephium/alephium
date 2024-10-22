@@ -173,7 +173,7 @@ class MultisigTest extends AlephiumActorSpec {
       transferAmount / 2
     )
 
-    val buildTxResult = request[BuildTransactionResult](buildTx, restPort)
+    val buildTxResult = request[BuildTransferTxResult](buildTx, restPort)
 
     val unsignedTx =
       deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
@@ -282,7 +282,7 @@ class MultisigTest extends AlephiumActorSpec {
     def createMultisigTransaction(
         allPubKeys: AVector[String],
         unlockPubKeys: AVector[String]
-    ): BuildTransactionResult = {
+    ): BuildTransferTxResult = {
       val multisigAddress = buildAddressAndSendFunds(allPubKeys, unlockPubKeys)
 
       val amount = transferAmount + (transferAmount / 2) // To force 2 inputs
@@ -294,7 +294,7 @@ class MultisigTest extends AlephiumActorSpec {
         amount
       )
 
-      request[BuildTransactionResult](buildTx, restPort)
+      request[BuildTransferTxResult](buildTx, restPort)
     }
 
     def createSweepTransaction(
@@ -313,7 +313,7 @@ class MultisigTest extends AlephiumActorSpec {
     }
 
     def submitSuccessfulMultisigTransaction(
-        buildTxResult: BuildTransactionResult,
+        buildTxResult: BuildTransferTxResult,
         unlockPrivKeys: AVector[String]
     ): UnsignedTransaction = {
       val unsignedTx =
@@ -337,7 +337,7 @@ class MultisigTest extends AlephiumActorSpec {
     }
 
     def submitFailedMultisigTransaction(
-        buildTxResult: BuildTransactionResult,
+        buildTxResult: BuildTransferTxResult,
         unlockPrivKeys: AVector[String]
     ): String = {
       val failedTx =
@@ -363,7 +363,7 @@ class MultisigTest extends AlephiumActorSpec {
     }
 
     def sweepToBuildTransactionResult(sweep: SweepAddressTransaction, from: Int, to: Int) =
-      BuildTransactionResult(
+      BuildTransferTxResult(
         sweep.unsignedTx,
         sweep.gasAmount,
         sweep.gasPrice,

@@ -515,7 +515,15 @@ class IntAVectorSpec extends AVectorSpec[Int] {
   }
 
   it should "collect" in new FixtureF {
-    AVector(-1, 2, 3).collect { case i if i > 0 => i * i } is AVector(4, 9)
+    AVector(-1, 2, 3).collect { i => if (i > 0) Some(i * i) else None } is AVector(4, 9)
+  }
+
+  it should "collectFirst" in new FixtureF {
+    AVector.empty[Int].collectFirst { i => if (i > 0) Some(i * i) else None } is None
+
+    AVector(-1, 2, 3).collectFirst { i => if (i > 0) Some(i * i) else None } is Some(4)
+
+    AVector(-1, -2, -3).collectFirst { i => if (i > 0) Some(i * i) else None } is None
   }
 
   it should "forall" in new Fixture {

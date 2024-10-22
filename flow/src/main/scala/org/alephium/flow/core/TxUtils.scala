@@ -97,7 +97,8 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int,
-      txOutputLength: Int
+      txOutputLength: Int,
+      extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UtxoSelectionAlgo.Selected]] = {
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
@@ -106,7 +107,7 @@ trait TxUtils { Self: FlowUtils =>
           .select(
             AssetAmounts(totalAmount, totalAmountPerToken),
             fromUnlockScript,
-            utxos,
+            extraUtxosInfo.merge(utxos),
             txOutputLength,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
@@ -125,7 +126,7 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox]
   ): IOResult[Either[String, AssetOutputInfoWithGas]] = {
     getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
-      .flatMap(_.getPrevAssetOutputs(utxoRefs))
+      .flatMap(_.getPreAssetOutputInfos(utxoRefs))
       .map { utxosOpt =>
         val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
         for {
@@ -195,6 +196,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def transfer(
       fromPublicKey: PublicKey,
       toLockupScript: LockupScript.Asset,
@@ -202,14 +204,16 @@ trait TxUtils { Self: FlowUtils =>
       amount: U256,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxoLimit: Int
+      utxoLimit: Int,
+      extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): IOResult[Either[String, UnsignedTransaction]] = {
     transfer(
       fromPublicKey,
       AVector(TxOutputInfo(toLockupScript, amount, AVector.empty, lockTimeOpt)),
       gasOpt,
       gasPrice,
-      utxoLimit
+      utxoLimit,
+      extraUtxosInfo
     )
   }
 
@@ -218,7 +222,8 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxoLimit: Int
+      utxoLimit: Int,
+      extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
@@ -229,7 +234,8 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos,
       gasOpt,
       gasPrice,
-      utxoLimit
+      utxoLimit,
+      extraUtxosInfo
     )
   }
 
@@ -338,7 +344,8 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      utxosLimit: Int
+      utxosLimit: Int,
+      extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
       _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
@@ -358,7 +365,8 @@ trait TxUtils { Self: FlowUtils =>
           gasOpt,
           gasPrice,
           utxosLimit,
-          txOutputLength
+          txOutputLength,
+          extraUtxosInfo
         ).map { utxoSelectionResult =>
           for {
             selected <- utxoSelectionResult
@@ -434,13 +442,13 @@ trait TxUtils { Self: FlowUtils =>
             fromUnlockScript,
             utxoRefs,
             outputInfos,
-            gasOpt
+            gasOpt // can i have an extra map here?
           ).map(_.flatMap { assetsWithGas =>
             UnsignedTransaction
               .buildTransferTx(
                 fromLockupScript,
                 fromUnlockScript,
-                assetsWithGas.assets,
+                assetsWithGas.assets.map(outputInfo => (outputInfo.ref, outputInfo.output)),
                 outputInfos,
                 assetsWithGas.gas,
                 gasPrice
@@ -520,12 +528,10 @@ trait TxUtils { Self: FlowUtils =>
           input.gasOpt,
           gasPrice,
           utxosLimit,
-          txOutputLength
+          txOutputLength,
+          ExtraUtxosInfo.empty
         ).map(_.map { selected =>
-          AssetOutputInfoWithGas(
-            selected.assets.map(asset => (asset.ref, asset.output)),
-            selected.gas
-          )
+          AssetOutputInfoWithGas(selected.assets, selected.gas)
         })
 
       case Some(utxoRefs) =>
@@ -586,7 +592,7 @@ trait TxUtils { Self: FlowUtils =>
           val from =
             UnlockScriptWithAssets(
               input.fromUnlockScript,
-              utxosWithGas.assets
+              utxosWithGas.assets.map(outputInfo => outputInfo.ref -> outputInfo.output)
             )
           (from, change, utxosWithGas.gas)
         }
@@ -620,7 +626,7 @@ trait TxUtils { Self: FlowUtils =>
          */
         val changeTokenOutputs = UnsignedTransaction
           .calculateTokensRemainder(
-            selected.assets.flatMap(_._2.tokens),
+            selected.assets.flatMap(_.output.tokens),
             input.tokens.getOrElse(AVector.empty)
           )
           .map(_.length)
@@ -694,7 +700,7 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice
   ): Either[String, U256] = {
     UnsignedTransaction.calculateAlphRemainder(
-      selected.assets.map(_._2.amount),
+      selected.assets.map(_.output.amount),
       AVector(input.amount),
       gasPrice * selected.gas
     )
@@ -705,7 +711,7 @@ trait TxUtils { Self: FlowUtils =>
       selected: AssetOutputInfoWithGas
   ): Either[String, AVector[(TokenId, U256)]] = {
     UnsignedTransaction.calculateTokensRemainder(
-      selected.assets.map(_._2).flatMap(_.tokens),
+      selected.assets.flatMap(_.output.tokens),
       input.tokens.getOrElse(AVector.empty)
     )
   }
@@ -1114,7 +1120,9 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[AVector[TransactionTemplate]] = {
     for {
       groupView <- getImmutableGroupView(groupIndex)
-      failedTxs <- txs.filterE(tx => groupView.getPreOutputs(tx.unsigned.inputs).map(_.isEmpty))
+      failedTxs <- txs.filterE(tx =>
+        groupView.getPreAssetOutputs(tx.unsigned.inputs).map(_.isEmpty)
+      )
     } yield failedTxs
   }
 
@@ -1353,7 +1361,7 @@ object TxUtils {
   )
 
   final case class AssetOutputInfoWithGas(
-      assets: AVector[(AssetOutputRef, AssetOutput)],
+      assets: AVector[AssetOutputInfo],
       gas: GasBox
   )
 

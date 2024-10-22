@@ -23,7 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
-import org.alephium.flow.core.{BlockFlow, FlowUtils}
+import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -203,7 +203,8 @@ trait FlowFixture
         AVector(TxOutputInfo(to, amount, tokens, None)),
         None,
         gasPrice,
-        defaultUtxoLimit
+        defaultUtxoLimit,
+        ExtraUtxosInfo.empty
       )
       .rightValue
       .rightValue
@@ -251,7 +252,8 @@ trait FlowFixture
           outputInfos,
           Some(gasAmount),
           nonCoinbaseMinGasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
         )
         .rightValue
         .rightValue
@@ -601,7 +603,7 @@ trait FlowFixture
   ): (AVector[ContractOutputRef], AVector[TxOutput]) = {
     val groupView  = blockFlow.getMutableGroupView(mainGroup).rightValue
     val blockEnv   = blockFlow.getDryrunBlockEnv(tx.chainIndex).rightValue
-    val preOutputs = groupView.getPreOutputs(tx.unsigned.inputs).rightValue.get
+    val preOutputs = groupView.getPreAssetOutputs(tx.unsigned.inputs).rightValue.get
     val result = StatefulVM
       .runTxScript(
         groupView.worldState.staging(),

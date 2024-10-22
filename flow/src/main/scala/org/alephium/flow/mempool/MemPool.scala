@@ -80,6 +80,10 @@ class MemPool private (
     AVector.from(flow.allTxs.values().map(_.tx))
   }
 
+  def getAllWithTimestamp(): AVector[(TransactionTemplate, TimeStamp)] = readOnly {
+    AVector.from(flow.allTxs.values().map(node => (node.tx, node.timestamp)))
+  }
+
   def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = readOnly {
     AVector.from(
       timestamps
@@ -241,13 +245,13 @@ class MemPool private (
     (utxosInBlock ++ newUtxos).filterNot(asset => _isSpent(asset.ref))
   }
 
-  def getOutput(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
+  def getOutput(outputRef: TxOutputRef): Option[AssetOutput] = outputRef match {
     case ref: AssetOutputRef => getOutput(ref)
     case _                   => None
   }
 
   // the output might have been spent
-  def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = readOnly {
+  def getOutput(outputRef: AssetOutputRef): Option[AssetOutput] = readOnly {
     sharedTxIndexes.outputIndex.get(outputRef).map(_._1)
   }
 

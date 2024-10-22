@@ -24,7 +24,7 @@ import akka.util.ByteString
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
-import org.alephium.ralph.Ast.MultiContract
+import org.alephium.ralph.Ast.{Ident, MultiContract}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.CompilerError.FastParseError
 import org.alephium.util.{AVector, U256}
@@ -33,13 +33,13 @@ import org.alephium.util.{AVector, U256}
 final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
-    warnings: AVector[String],
+    warnings: AVector[Warning],
     debugCode: StatefulContract
 )
 final case class CompiledScript(
     code: StatefulScript,
     ast: Ast.TxScript,
-    warnings: AVector[String],
+    warnings: AVector[Warning],
     debugCode: StatefulScript
 )
 
@@ -51,7 +51,7 @@ object Compiler {
   def compileAssetScript(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (StatelessScript, AVector[String])] =
+  ): Either[Error, (StatelessScript, AVector[Warning])] =
     try {
       fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
         case Parsed.Success((script, globalState), _) =>
@@ -104,7 +104,7 @@ object Compiler {
       AVector[CompiledContract],
       AVector[CompiledScript],
       Ast.GlobalState[StatefulContext],
-      AVector[String]
+      AVector[Warning]
   )
 
   def compileProject(
@@ -119,10 +119,10 @@ object Compiler {
         val unusedGlobalConstantWarning = if (compilerOptions.ignoreUnusedConstantsWarnings) {
           None
         } else {
-          multiContract.globalState.getUnusedGlobalConstantsWarning()
+          Some(multiContract.globalState.getUnusedGlobalConstantsWarning())
         }
         val warnings1 = unusedGlobalConstantWarning match {
-          case Some(warning) => warnings0 :+ warning
+          case Some(warning) => warnings0 ++ warning
           case None          => warnings0
         }
         (statefulContracts, statefulScripts, multiContract.globalState, warnings1)
@@ -170,7 +170,7 @@ object Compiler {
     def parse(failure: Parsed.Failure): Error = FastParseError(failure)
   }
 
-  def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
+  def expectOneType(ident: Ident, tpe: Seq[Type]): Type = {
     if (tpe.length == 1) {
       tpe(0)
     } else {
@@ -178,8 +178,9 @@ object Compiler {
     }
   }
 
-  type VarInfoBuilder = (Type, Boolean, Boolean, Byte, Boolean) => VarInfo
+  type VarInfoBuilder = (Ident, Type, Boolean, Boolean, Byte, Boolean) => VarInfo
   sealed trait VarInfo {
+    def ident: Ident
     def tpe: Type
     def isMutable: Boolean
     def isUnused: Boolean
@@ -188,6 +189,7 @@ object Compiler {
   }
   object VarInfo {
     final case class Local(
+        ident: Ident,
         tpe: Type,
         isMutable: Boolean,
         isUnused: Boolean,
@@ -197,6 +199,7 @@ object Compiler {
       def isLocal: Boolean = true
     }
     final case class Field(
+        ident: Ident,
         tpe: Type,
         isMutable: Boolean,
         isUnused: Boolean,
@@ -205,18 +208,20 @@ object Compiler {
     ) extends VarInfo {
       def isLocal: Boolean = false
     }
-    final case class MapVar(tpe: Type.Map, index: Int) extends VarInfo {
+    final case class MapVar(ident: Ident, tpe: Type.Map, index: Int) extends VarInfo {
       def isMutable: Boolean   = true
       def isUnused: Boolean    = false
       def isGenerated: Boolean = false
       def isLocal: Boolean     = false
     }
-    final case class Template(tpe: Type, index: Int, isGenerated: Boolean) extends VarInfo {
+    final case class Template(ident: Ident, tpe: Type, index: Int, isGenerated: Boolean)
+        extends VarInfo {
       def isMutable: Boolean = false
       def isUnused: Boolean  = false
       def isLocal: Boolean   = false
     }
     final case class MultipleVar[Ctx <: StatelessContext](
+        ident: Ident,
         isMutable: Boolean,
         isUnused: Boolean,
         isGenerated: Boolean,
@@ -226,6 +231,7 @@ object Compiler {
       def isLocal: Boolean = ref.isLocal
     }
     final case class Constant[Ctx <: StatelessContext](
+        ident: Ident,
         tpe: Type,
         value: Val,
         instrs: Seq[Instr[Ctx]],
@@ -610,7 +616,7 @@ object Compiler {
         ref: VariablesRef[Ctx]
     ): Unit = {
       val sname   = checkNewVariable(ident)
-      val varInfo = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
+      val varInfo = VarInfo.MultipleVar(ident, isMutable, isUnused, isGenerated, ref)
       trackAndAddVarInfo(sname, varInfo)
     }
 
@@ -643,7 +649,7 @@ object Compiler {
 
     private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)
-      trackAndAddVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
+      trackAndAddVarInfo(sname, VarInfo.MapVar(ident, tpe, mapIndex))
     }
 
     @inline private def getGlobalVariable(name: String): Option[VarInfo] = {
@@ -663,7 +669,8 @@ object Compiler {
         isLocal = false,
         isGenerated = false,
         isTemplate = true,
-        (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated)
+        (ident, tpe, _, _, index, isGenerated) =>
+          VarInfo.Template(ident, tpe, index.toInt, isGenerated)
       )
     }
     def addFieldVariable(
@@ -733,6 +740,7 @@ object Compiler {
           ()
         case _ =>
           val varInfo = varInfoBuilder(
+            ident,
             tpe,
             isMutable,
             isUnused,
@@ -748,7 +756,13 @@ object Compiler {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
       val varInfo =
-        VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr), constantDef)
+        VarInfo.Constant(
+          ident,
+          Type.fromVal(value.tpe),
+          value,
+          Seq(value.toConstInstr),
+          constantDef
+        )
       addVarInfo(sname, varInfo)
       ()
     }
@@ -842,8 +856,12 @@ object Compiler {
         !accessedVars.contains(ReadVariable(varKey))
       }
       if (unusedVars.nonEmpty) {
-        warnUnusedVariables(typeId, unusedVars.keys.map(_.name).toSeq)
+        val unusedVarsInfo = unusedVars.map { case (varKey, varInfo) =>
+          (varKey.name, varInfo.tpe)
+        }.toSeq
+        warnUnusedVariables(typeId, unusedVarsInfo)
       }
+
       accessedVars.filterInPlace {
         case ReadVariable(varKey) => !varKey.name.startsWith(prefix)
         case _                    => true
@@ -876,12 +894,16 @@ object Compiler {
     }
 
     def checkUnusedMaps(): Unit = {
-      val unusedMaps = varTable.filter { case (name, varInfo) =>
-        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(name)) && !accessedVars
-          .contains(WriteVariable(name))
+      val unusedMaps = varTable.filter { case (varKey, varInfo) =>
+        varInfo.tpe.isMapType && !accessedVars.contains(ReadVariable(varKey)) && !accessedVars
+          .contains(WriteVariable(varKey))
       }
+
       if (unusedMaps.nonEmpty) {
-        warnUnusedMaps(typeId, unusedMaps.keys.map(_.name).toSeq)
+        val unusedMapsInfo = unusedMaps.map { case (varKey, varInfo) =>
+          (varKey.name, varInfo.ident.sourceIndex)
+        }.toSeq
+        warnUnusedMaps(typeId, unusedMapsInfo)
       }
     }
 
@@ -892,15 +914,16 @@ object Compiler {
         !accessedVars.contains(ReadVariable(varKey)) &&
         !varInfo.tpe.isMapType
       }
-      val unusedLocalConstants = mutable.ArrayBuffer.empty[String]
-      val unusedFields         = mutable.ArrayBuffer.empty[String]
+      val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
+      val unusedFields         = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       unusedVars.foreach {
         case (varKey, c: VarInfo.Constant[_]) =>
           if (c.constantDef.definedIn(typeId)) {
-            unusedLocalConstants.addOne(varKey.name)
+            unusedLocalConstants.addOne((varKey.name, c.constantDef.ident.sourceIndex))
           }
-        case (varKey, varInfo) if !varInfo.isLocal => unusedFields.addOne(varKey.name)
-        case _                                     => ()
+        case (varKey, varInfo) if !varInfo.isLocal =>
+          unusedFields.addOne((varKey.name, varInfo.ident.sourceIndex))
+        case _ => ()
       }
       if (unusedLocalConstants.nonEmpty) {
         warnUnusedLocalConstants(typeId, unusedLocalConstants)
@@ -910,14 +933,15 @@ object Compiler {
       }
     }
 
-    private[ralph] def getUsedParentConstants(): Iterable[(Ast.TypeId, String)] = {
-      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, String)]
+    private[ralph] def getUsedParentConstants()
+        : Iterable[(Ast.TypeId, (String, Option[SourceIndex]))] = {
+      val used = mutable.ArrayBuffer.empty[(Ast.TypeId, (String, Option[SourceIndex]))]
       varTable.foreach {
         case (varKey, c: VarInfo.Constant[_]) =>
           if (accessedVars.contains(ReadVariable(varKey))) {
             c.constantDef.origin match {
               case Some(originContractId) if originContractId != typeId =>
-                used.addOne((originContractId, varKey.name))
+                used.addOne((originContractId, (varKey.name, c.tpe.sourceIndex)))
               case _ => ()
             }
           }
@@ -1342,7 +1366,7 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
-        case VarInfo.MapVar(_, index)                           => genMapIndex(index)
+        case VarInfo.MapVar(_, _, index)                        => genMapIndex(index)
       }
     }
 

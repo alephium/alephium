@@ -1267,7 +1267,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     Seq(31, 33).foreach { n =>
       val byteVec = Val.ByteVec(ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get))
       stack.push(byteVec)
-      ContractIdToAddress.runWith(frame).leftValue isE InvalidContractId
+      ContractIdToAddress.runWith(frame).leftValue isE InvalidContractId.from(byteVec)
     }
   }
 

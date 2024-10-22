@@ -448,7 +448,7 @@ trait FlowUtils
     val validator = TxValidation.build
     for {
       preOutputs <- groupView
-        .getPreOutputs(tx.unsigned.inputs, blockEnv.newOutputRefCache)
+        .getPreAssetOutputs(tx.unsigned.inputs, blockEnv.newOutputRefCache)
         .flatMap {
           case None =>
             // Runtime exception as we have validated the inputs in collectTransactions

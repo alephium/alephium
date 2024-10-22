@@ -22,6 +22,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, Generators, PrivateKey, PublicKey, SignatureSchema}
@@ -666,7 +667,8 @@ class FlowUtilsSpec extends AlephiumSpec {
           AVector(output),
           None,
           gasPrice,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
         )
         .rightValue
         .rightValue
@@ -707,8 +709,11 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     tx1.unsigned.inputs.length is 2
     val groupView = blockFlow.getImmutableGroupView(chainIndex.from).rightValue
-    groupView.getAsset(tx1.unsigned.inputs.head.outputRef).rightValue.isDefined is true
-    groupView.getAsset(tx1.unsigned.inputs.last.outputRef).rightValue.isDefined is false
+    groupView.getPreAssetOutputInfo(tx1.unsigned.inputs.head.outputRef).rightValue.isDefined is true
+    groupView
+      .getPreAssetOutputInfo(tx1.unsigned.inputs.last.outputRef)
+      .rightValue
+      .isDefined is false
     tx1.unsigned.inputs.last.outputRef is tx0.unsigned.fixedOutputRefs(1)
     collectTxs() is AVector(tx0, tx1)
     val block = mineFromMemPool(blockFlow, chainIndex)
