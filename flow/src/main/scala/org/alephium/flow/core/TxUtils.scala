@@ -1560,6 +1560,16 @@ object TxUtils {
     )
   }
 
+  def sizeLimitedGroupBy[T, K](elems: AVector[T], sizeLimit: Int)(
+      groupByFn: T => K
+  ): AVector[AVector[T]] =
+    AVector.from(
+      elems
+        .groupBy(groupByFn)
+        .values
+        .flatMap(_.groupedWithRemainder(sizeLimit))
+    )
+
   def checkTotalAttoAlphAmount(
       amounts: AVector[U256]
   ): Either[String, U256] = {

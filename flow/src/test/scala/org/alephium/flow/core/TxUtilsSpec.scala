@@ -1412,15 +1412,15 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .asUnsafe[AssetOutputInfo]
 
-    def buildOutputs(chainIndexes: AVector[ChainIndex]): AVector[AVector[TxOutputInfo]] = {
+    def buildOutputs(targetGroups: AVector[GroupIndex]): AVector[AVector[TxOutputInfo]] = {
       AVector.from(
-        chainIndexes
+        targetGroups
           .groupBy(identity)
           .view
-          .mapValues { chainIndexes =>
-            chainIndexes.map { chainIndex =>
+          .mapValues { groups =>
+            groups.map { group =>
               TxOutputInfo(
-                lockupScriptsByGroup(chainIndex.to),
+                lockupScriptsByGroup(group),
                 ALPH.oneAlph,
                 AVector.empty,
                 None
@@ -1681,13 +1681,13 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "build multi group transactions from just single genesis box" in new MultiGroupTransactions {
-    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
 
     testMultiGroupTxsBuilding(genesisUtxos, outputs) isE ()
   }
 
   it should "fail when building multi group txs with no inputs" in new MultiGroupTransactions {
-    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
 
     testMultiGroupTxsBuilding(
       AVector.empty,
@@ -1696,14 +1696,49 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "build multi group transactions from multiple boxes" in new MultiGroupTransactions {
-    val outputs = buildOutputs(AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)))
+    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
     val utxos   = splitGenesisUtxo
     testMultiGroupTxsBuilding(utxos, outputs) isE ()
   }
 
+  it should "group outputs by group index with max limit" in new MultiGroupTransactions {
+    val evenAndOddNumbers = AVector.from(1 to 12)
+    val evenAndOddGroupsWithLimit =
+      AVector(AVector(1, 3, 5, 7), AVector(9, 11), AVector(2, 4, 6, 8), AVector(10, 12))
+    TxUtils.sizeLimitedGroupBy(evenAndOddNumbers, 4)(_ % 2) is evenAndOddGroupsWithLimit
+  }
+
+  it should "support building more transactions for a group" in new MultiGroupTransactions {
+    val outputsToGroup1 = AVector.fill(4)(
+      TxOutputInfo(
+        Address.p2pkh(GroupIndex.unsafe(1).generateKey._2).lockupScript,
+        ALPH.oneAlph,
+        AVector.empty,
+        None
+      )
+    )
+    val sizeGroupedOutputsToGroup1 =
+      TxUtils.sizeLimitedGroupBy(outputsToGroup1, 2)(_.lockupScript.groupIndex)
+    sizeGroupedOutputsToGroup1.length is 2
+    val utxos = splitGenesisUtxo
+    testMultiGroupTxsBuilding(
+      utxos,
+      sizeGroupedOutputsToGroup1
+    ) isE ()
+  }
+
+  it should "fail with too many destinations in a single group" in new MultiGroupTransactions {
+    val outputs = buildOutputs(AVector.fill(257)(GroupIndex.unsafe(1)))
+    val utxos   = splitGenesisUtxo
+    testMultiGroupTxsBuilding(
+      utxos,
+      outputs
+    ).leftValue is "Too many transaction outputs, maximal value: 256"
+  }
+
   it should "build multi group transactions intra group" in new MultiGroupTransactions {
     val intraGroupOutputs = buildOutputs(
-      AVector(ChainIndex.unsafe(0, 0))
+      AVector(GroupIndex.unsafe(0))
     )
     testMultiGroupTxsBuilding(genesisUtxos, intraGroupOutputs) isE ()
   }

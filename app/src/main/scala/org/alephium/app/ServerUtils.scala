@@ -35,7 +35,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -276,12 +276,15 @@ class ServerUtils(implicit
         )
         .left
         .map(badRequest)
+      outputGroups = TxUtils.sizeLimitedGroupBy(outputInfos, ALPH.MaxTxInputNum / 2)(
+        _.lockupScript.groupIndex
+      )
       unsignedTxs <- blockFlow
         .buildMultiGroupTransactions(
           lockPair._1,
           lockPair._2,
           inputSelection,
-          outputGroups = AVector.from(outputInfos.groupBy(_.lockupScript.groupIndex).values),
+          outputGroups,
           gasPrice,
           AVector.empty[UnsignedTransaction]
         )
