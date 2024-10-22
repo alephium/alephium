@@ -399,7 +399,7 @@ trait EndpointsLogic extends Endpoints {
       withSyncedClique {
         Future.successful(
           serverUtils
-            .buildMultiTransfer(
+            .buildMultiTransferUnsignedTransactions(
               blockFlow,
               buildMultiTransfer
             )

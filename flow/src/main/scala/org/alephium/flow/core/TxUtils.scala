@@ -594,8 +594,7 @@ trait TxUtils { Self: FlowUtils =>
         existingUtxos    = utxoOpts.collect(identity)
         existingUtxoRefs = existingUtxos.map(_.ref)
         _ <- Either.cond(
-          inputSelection.length == existingUtxos.length &&
-            inputSelection.forall(existingUtxoRefs.contains),
+          inputSelection.length == existingUtxos.length,
           (),
           s"Selected input UTXOs are not available: " +
             s"${inputSelection.filterNot(existingUtxoRefs.contains).map(_.key.value.toHexString).mkString(", ")}"

@@ -144,7 +144,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val destinations =
         AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
       val buildTransactions = serverUtils
-        .buildMultiTransfer(
+        .buildMultiTransferUnsignedTransactions(
           blockFlow,
           BuildTransferTx(
             fromPublicKey.bytes,
@@ -409,7 +409,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "fail in case gas amount is passed by user" in new MultiGroupFixture {
     serverUtils
-      .buildMultiTransfer(
+      .buildMultiTransferUnsignedTransactions(
         blockFlow,
         BuildTransferTx(
           fromPublicKey.bytes,
@@ -423,7 +423,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .leftValue
-      .detail is "Explicit gas amount is not permitted. Gas estimation for this endpoint is sufficiently accurate."
+      .detail is "Explicit gas amount is not permitted. Gas estimation for multi-transfer is sufficiently accurate."
   }
 
   it should "support Schnorr address" in new Fixture {

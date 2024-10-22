@@ -234,7 +234,7 @@ class ServerUtils(implicit
   }
 
   // scalastyle:off method.length
-  def buildMultiTransfer(
+  def buildMultiTransferUnsignedTransactions(
       blockFlow: BlockFlow,
       query: BuildTransferTx
   ): Try[AVector[BuildTransferTxResult]] =
@@ -243,7 +243,7 @@ class ServerUtils(implicit
         query.gasAmount.isEmpty,
         (),
         badRequest(
-          "Explicit gas amount is not permitted. Gas estimation for this endpoint is sufficiently accurate."
+          "Explicit gas amount is not permitted. Gas estimation for multi-transfer is sufficiently accurate."
         )
       )
       assetOutputRefs <- query.utxos match {
