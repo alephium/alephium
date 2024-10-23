@@ -29,7 +29,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.model.{BlockEntry, GhostUncleBlockEntry}
 import org.alephium.crypto.Blake3
-import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PublicKey}
