@@ -781,10 +781,7 @@ object Compiler {
       val name  = ident.name
       val sname = scopedName(name)
       if (getGlobalVariable(name).isDefined) {
-        throw Error(
-          s"Global variable has the same name as local variable: $name",
-          ident.sourceIndex
-        )
+        throw Error(s"Global variables have the same name: $name", ident.sourceIndex)
       } else if (varDefinedInScopeOrParent(sname, variableScope)) {
         throw Error(s"Local variables have the same name: $name", ident.sourceIndex)
       } else if (currentScopeState.varIndex >= State.maxVarIndex) {

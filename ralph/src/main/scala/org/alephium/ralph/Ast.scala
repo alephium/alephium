@@ -1346,21 +1346,29 @@ object Ast {
       state.checkArguments(args)
       args.foreach { arg =>
         val argTpe = state.resolveType(arg.tpe)
-        state.addLocalVariable(arg.ident, argTpe, arg.isMutable, arg.isUnused, isGenerated = false)
+        state.addLocalVariable(
+          arg.ident,
+          argTpe,
+          arg.isMutable,
+          arg.isUnused,
+          isGenerated = false
+        )
       }
-      funcAccessedVarsCache match {
-        case Some(vars) => // the function has been compiled before
-          state.addAccessedVars(vars)
-          body.foreach(_.check(state))
-        case None =>
-          body.foreach(_.check(state))
-          val currentScopeUsedVars = Set.from(state.currentScopeAccessedVars)
-          funcAccessedVarsCache = Some(currentScopeUsedVars)
-          state.addAccessedVars(currentScopeUsedVars)
+      if (bodyOpt.isDefined) {
+        funcAccessedVarsCache match {
+          case Some(vars) => // the function has been compiled before
+            state.addAccessedVars(vars)
+            body.foreach(_.check(state))
+          case None =>
+            body.foreach(_.check(state))
+            val currentScopeUsedVars = Set.from(state.currentScopeAccessedVars)
+            funcAccessedVarsCache = Some(currentScopeUsedVars)
+            state.addAccessedVars(currentScopeUsedVars)
+        }
+        state.checkUnusedLocalVars(id)
+        state.checkUnassignedLocalMutableVars(id)
+        if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
       }
-      state.checkUnusedLocalVars(id)
-      state.checkUnassignedLocalMutableVars(id)
-      if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
     def genMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
@@ -2187,9 +2195,16 @@ object Ast {
       checkAndAddFields(state)
       checkConstants(state)
       funcs.foreach(_.check(state))
-      state.checkUnusedMaps()
-      state.checkUnusedFieldsAndConstants()
-      state.checkUnassignedMutableFields()
+      this match {
+        case c: Contract if c.isAbstract =>
+          // We don't need to check for unused variables in the abstract contract
+          // because some of them might be used in the child contract
+          ()
+        case _ =>
+          state.checkUnusedMaps()
+          state.checkUnusedFieldsAndConstants()
+          state.checkUnassignedMutableFields()
+      }
     }
 
     def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
@@ -2363,7 +2378,7 @@ object Ast {
     }
 
     private def checkFuncs(): Unit = {
-      if (funcs.length < 1) {
+      if (!isAbstract && funcs.length < 1) {
         throw Compiler.Error(
           s"No function found in Contract ${quote(ident.name)}",
           ident.sourceIndex
@@ -2822,10 +2837,21 @@ object Ast {
       }
     }
 
+    private def checkAbstractContracts(states: AVector[Compiler.State[StatefulContext]]): Unit = {
+      contracts.view.zipWithIndex.foreach {
+        case (contract: Contract, index) if contract.isAbstract =>
+          contract.check(states(index))
+        case _ => ()
+      }
+    }
+
     def genStatefulContracts()(implicit
         compilerOptions: CompilerOptions
     ): (AVector[Warning], AVector[(CompiledContract, Int)]) = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+      if (!compilerOptions.skipAbstractContractCheck) {
+        checkAbstractContracts(states)
+      }
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state = states(index)
