@@ -51,7 +51,6 @@ object FlowHandler {
         .map { case (_, locators) => locators }
     }
   }
-  final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
 }
 
 // Queue all the work related to miner, rpc server, etc. in this actor
