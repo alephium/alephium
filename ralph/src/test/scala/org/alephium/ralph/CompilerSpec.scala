@@ -8469,7 +8469,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "report an error if accessing definitions in child contracts" in {
-    val options = CompilerOptions.Default.copy(checkAbstractContracts = false)
+    val options = CompilerOptions.Default.copy(skipAbstractContractCheck = true)
 
     {
       info("Access to enums in child contracts")
@@ -8599,7 +8599,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "check duplicate definitions in abstract contract" in {
-    val options = CompilerOptions.Default.copy(checkAbstractContracts = false)
+    val options = CompilerOptions.Default.copy(skipAbstractContractCheck = true)
     def compileCode(code: String, error: String) = {
       Compiler.compileContract(replace(code), 0, options).leftValue.message is error
     }

@@ -13534,7 +13534,7 @@
           "ignoreUnusedFunctionReturnWarnings": {
             "type": "boolean"
           },
-          "checkAbstractContracts": {
+          "skipAbstractContractCheck": {
             "type": "boolean"
           }
         }

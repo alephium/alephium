@@ -24,7 +24,7 @@ final case class CompilerOptions(
     ignoreUpdateFieldsCheckWarnings: Boolean,
     ignoreCheckExternalCallerWarnings: Boolean,
     ignoreUnusedFunctionReturnWarnings: Boolean,
-    checkAbstractContracts: Boolean
+    skipAbstractContractCheck: Boolean
 )
 
 object CompilerOptions {
@@ -36,6 +36,6 @@ object CompilerOptions {
     ignoreUnusedPrivateFunctionsWarnings = false,
     ignoreCheckExternalCallerWarnings = false,
     ignoreUnusedFunctionReturnWarnings = false,
-    checkAbstractContracts = true
+    skipAbstractContractCheck = false
   )
 }
