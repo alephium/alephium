@@ -42,7 +42,7 @@ object Upnp extends StrictLogging {
 
       val gatewayMapOpt = Option(discovery.discover()).map(_.asScala).map(_.toMap)
       gatewayMapOpt.flatMap { gatewayMap =>
-        gatewayMap.foreach { case (address, _) =>
+        gatewayMap.foreachEntry { case (address, _) =>
           logger.debug(s"UPnP gateway device found on ${address.getHostAddress}")
         }
         Option(discovery.getValidGateway).map(new UpnpClient(_))

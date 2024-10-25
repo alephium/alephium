@@ -26,7 +26,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.{deserialize, Serde, SerdeResult}
+import org.alephium.serde.{avectorSerde, deserialize, Serde, SerdeResult}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction])

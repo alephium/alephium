@@ -26,7 +26,7 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.util.{AlephiumSpec, SocketUtil}
 
 class ServerSpec extends AlephiumSpec with ScalaFutures with SocketUtil {
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(1, Minutes))
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(1, Minutes))
 
   it should "start and stop correctly" in new AlephiumConfigFixture {
     override val configValues = configPortsValues

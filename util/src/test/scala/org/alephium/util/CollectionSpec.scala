@@ -20,7 +20,7 @@ import scala.collection.immutable.ArraySeq
 
 class CollectionSpec extends AlephiumSpec {
   it should "get element safely" in {
-    forAll { array: Array[Int] =>
+    forAll { (array: Array[Int]) =>
       Collection.get(array, -1) is None
       Collection.get(array, array.length) is None
       if (array.nonEmpty) {

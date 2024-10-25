@@ -58,7 +58,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "compute the headers and blocks for sync" in new Fixture with ModelGenerators {
-    override val configValues = Map(("alephium.broker.broker-id", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
 
     config.broker.brokerNum is 3
     config.broker.groupNumPerBroker is 1

@@ -132,7 +132,7 @@ class I256Spec extends AlephiumSpec {
   }
 
   it should "construct from Long" in {
-    forAll { x: Long => I256.from(x).toBigInt is BigInteger.valueOf(x) }
+    forAll { (x: Long) => I256.from(x).toBigInt is BigInteger.valueOf(x) }
   }
 
   it should "convert from ByteString" in {
@@ -185,7 +185,7 @@ class I256Spec extends AlephiumSpec {
   }
 
   it should "convert from Int" in {
-    forAll { x: Int =>
+    forAll { (x: Int) =>
       I256.from(x).v.longValue() is x.toLong
     }
   }

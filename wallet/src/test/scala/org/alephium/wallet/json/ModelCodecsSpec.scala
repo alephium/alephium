@@ -29,7 +29,7 @@ import org.alephium.wallet.api.model._
 
 class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
-  implicit val groupConfig =
+  implicit val groupConfig: GroupConfig =
     new GroupConfig {
       override def groups: Int = 4
     }

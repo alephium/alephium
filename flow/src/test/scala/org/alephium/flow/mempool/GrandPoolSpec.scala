@@ -26,7 +26,7 @@ class GrandPoolSpec extends AlephiumSpec {
   behavior of "Single Broker"
 
   trait SingleBrokerFixture extends Fixture with ModelGenerators {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     pool.mempools.foreach(_.size is 0)
   }

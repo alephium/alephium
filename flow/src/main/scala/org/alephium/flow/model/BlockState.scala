@@ -17,7 +17,7 @@
 package org.alephium.flow.model
 
 import org.alephium.protocol.model.Weight
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 
 final case class BlockState(height: Int, weight: Weight)
 

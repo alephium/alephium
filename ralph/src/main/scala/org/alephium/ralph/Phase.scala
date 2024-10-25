@@ -48,7 +48,7 @@ trait PhaseLike { self: Compiler.State[_] =>
     assume(phase == Phase.Check)
     assume(checkPhaseVarIndexes.isEmpty)
     phase = Phase.GenCode
-    scopes.foreach { case (scopeId, scopeState) =>
+    scopes.foreachEntry { case (scopeId, scopeState) =>
       checkPhaseVarIndexes += scopeId -> scopeState.varIndex
     }
   }
@@ -58,7 +58,7 @@ trait PhaseLike { self: Compiler.State[_] =>
     phase = Phase.GenCode
 
     varTable --= genCodePhaseNewVars
-    scopes.foreach { case (scopeId, scopeState) =>
+    scopes.foreachEntry { case (scopeId, scopeState) =>
       scopeState.varIndex = checkPhaseVarIndexes(scopeId)
       scopeState.freshNameIndex = 0
       scopeState.localArrayIndexVar = None

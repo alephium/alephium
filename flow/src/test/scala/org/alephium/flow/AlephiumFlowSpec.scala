@@ -34,7 +34,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods file.size.limit

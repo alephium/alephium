@@ -41,7 +41,7 @@ import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.ralph.Compiler
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -72,7 +72,7 @@ class ServerUtils(implicit
         .mapE(_._2.mapE { case (block, height) =>
           BlockEntry.from(block, height).left.map(failed)
         })
-        .map(BlocksPerTimeStampRange)
+        .map(BlocksPerTimeStampRange.apply)
     }
   }
 
@@ -91,7 +91,7 @@ class ServerUtils(implicit
           }
 
         })
-        .map(BlocksAndEventsPerTimeStampRange)
+        .map(BlocksAndEventsPerTimeStampRange.apply)
     }
   }
 
@@ -111,7 +111,7 @@ class ServerUtils(implicit
           }
 
         })
-        .map(RichBlocksAndEventsPerTimeStampRange)
+        .map(RichBlocksAndEventsPerTimeStampRange.apply)
     }
   }
 
@@ -1904,7 +1904,7 @@ class ServerUtils(implicit
     val result = for {
       state          <- worldState.getContractState(contractId)
       code           <- worldState.getContractCode(state)
-      contract       <- code.toContract().left.map(IOError.Serde)
+      contract       <- code.toContract().left.map(IOError.Serde.apply)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
     } yield ContractState(
       Address.contract(contractId),

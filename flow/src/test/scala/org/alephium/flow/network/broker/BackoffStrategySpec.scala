@@ -18,11 +18,11 @@ package org.alephium.flow.network.broker
 
 import org.scalatest.concurrent.Eventually
 
-import org.alephium.flow.setting.AlephiumConfigFixture
+import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}
 import org.alephium.util.{discard, AlephiumSpec, Duration, Math}
 
 class BackoffStrategySpec extends AlephiumSpec with AlephiumConfigFixture {
-  implicit lazy val network                    = networkConfig
+  implicit lazy val network: NetworkSetting    = networkConfig
   def createStrategy(): DefaultBackoffStrategy = DefaultBackoffStrategy()
 
   it should "calculate the correct delay" in new DefaultFixture {

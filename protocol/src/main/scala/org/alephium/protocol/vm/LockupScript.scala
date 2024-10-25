@@ -48,11 +48,11 @@ object LockupScript {
     override def _deserialize(input: ByteString): SerdeResult[Staging[LockupScript]] = {
       byteSerde._deserialize(input).flatMap {
         case Staging(0, content) =>
-          serdeImpl[Hash]._deserialize(content).map(_.mapValue(P2PKH))
+          serdeImpl[Hash]._deserialize(content).map(_.mapValue(P2PKH.apply))
         case Staging(1, content) =>
           P2MPKH.serde._deserialize(content)
         case Staging(2, content) =>
-          serdeImpl[Hash]._deserialize(content).map(_.mapValue(P2SH))
+          serdeImpl[Hash]._deserialize(content).map(_.mapValue(P2SH.apply))
         case Staging(3, content) =>
           P2C.serde._deserialize(content)
         case Staging(n, _) =>

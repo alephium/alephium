@@ -33,7 +33,7 @@ object UnlockScript {
     val p2mpkhSerde: Serde[P2MPKH] =
       Serde
         .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
-    val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH, t => (t.script, t.params))
+    val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH.apply, t => (t.script, t.params))
 
     new Serde[UnlockScript] {
       override def serialize(input: UnlockScript): ByteString = {
@@ -49,7 +49,7 @@ object UnlockScript {
       override def _deserialize(input: ByteString): SerdeResult[Staging[UnlockScript]] = {
         byteSerde._deserialize(input).flatMap {
           case Staging(0, content) =>
-            serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH))
+            serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH.apply))
           case Staging(1, content) => p2mpkhSerde._deserialize(content)
           case Staging(2, content) => p2shSerde._deserialize(content)
           case Staging(3, content) => Right(Staging(SameAsPrevious, content))

@@ -22,7 +22,7 @@ class ConcurrentHashSetSpec extends AlephiumSpec {
   }
 
   it should "add / remove /contains" in new Fixture {
-    forAll { n: Int =>
+    forAll { (n: Int) =>
       set.contains(n) is false
       set.add(n)
       set.contains(n) is true

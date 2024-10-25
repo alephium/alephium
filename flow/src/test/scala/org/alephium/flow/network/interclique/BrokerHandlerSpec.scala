@@ -157,7 +157,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "publish misbehavior when receive invalid pow block hash" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.consensus.num-zeros-at-least-in-hash", 1)
     )
 

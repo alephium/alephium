@@ -30,7 +30,7 @@ import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.protocol.vm.ContractStorageImmutableState
-import org.alephium.serde.deserialize
+import org.alephium.serde.{deserialize, eitherSerde}
 import org.alephium.util.AVector
 import org.alephium.util.BloomFilter
 

@@ -337,13 +337,14 @@ abstract class Parser[Ctx <: StatelessContext] {
           Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex, fileURI)
         }
     }
-  def funcArgument[Unknown: P]: P[Ast.Argument]   = argument(allowMutable = true)(Type.NamedType)
+  def funcArgument[Unknown: P]: P[Ast.Argument] =
+    argument(allowMutable = true)(Type.NamedType.apply)
   def funParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[Unknown: P]: P[Seq[Type]]        = P(simpleReturnType | bracketReturnType)
   def simpleReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ parseType(Type.NamedType)).map(tpe => Seq(tpe))
+    P("->" ~ parseType(Type.NamedType.apply)).map(tpe => Seq(tpe))
   def bracketReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ "(" ~ parseType(Type.NamedType).rep(0, ",") ~ ")")
+    P("->" ~ "(" ~ parseType(Type.NamedType.apply).rep(0, ",") ~ ")")
   // scalastyle:off method.length
   def funcTmp[Unknown: P]: P[FuncDefTmp[Ctx]] =
     PP(
@@ -518,13 +519,13 @@ abstract class Parser[Ctx <: StatelessContext] {
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
   def contractField[Unknown: P](allowMutable: Boolean): P[Ast.Argument] =
-    argument(allowMutable)(Type.NamedType)
+    argument(allowMutable)(Type.NamedType.apply)
 
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
   def field[Unknown: P]: P[(Ast.Ident, Type)] = P(Lexer.ident ~ ":").flatMap { ident =>
-    parseType(Type.NamedType).map { tpe => (ident, tpe) }
+    parseType(Type.NamedType.apply).map { tpe => (ident, tpe) }
   }
 
   def eventField[Unknown: P]: P[Ast.EventField] = P(Index ~ field ~~ Index).map {
@@ -533,7 +534,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
 
   def structField[Unknown: P]: P[Ast.StructField] = PP(
-    Lexer.mut ~ Lexer.ident ~ ":" ~ parseType(Type.NamedType)
+    Lexer.mut ~ Lexer.ident ~ ":" ~ parseType(Type.NamedType.apply)
   ) { case (mutable, ident, tpe) =>
     Ast.StructField(ident, mutable, tpe)
   }
@@ -903,7 +904,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     )
 
   def mapKeyType[Unknown: P]: P[Type] = {
-    P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
+    P(Index ~ parseType(Type.NamedType.apply) ~ Index).map { case (from, tpe, to) =>
       if (!tpe.isPrimitive) {
         val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
         throw Compiler.Error("The key type of map can only be primitive type", sourceIndex)
@@ -915,7 +916,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def mapDef[Unknown: P]: P[Ast.MapDef] = {
     PP(
       Lexer.token(Keyword.`mapping`) ~ "[" ~ mapKeyType ~ ","
-        ~ parseType(Type.NamedType) ~ "]" ~ Lexer.ident
+        ~ parseType(Type.NamedType.apply) ~ "]" ~ Lexer.ident
     ) { case (_, key, value, ident) =>
       Ast.MapDef(ident, Type.Map(key, value))
     }

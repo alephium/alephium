@@ -19,6 +19,7 @@ package org.alephium.io
 import scala.collection.mutable
 
 import org.alephium.crypto.Blake2b
+import org.alephium.serde.intSerde
 import org.alephium.util.AlephiumSpec
 
 class CachedKVStorageSpec extends AlephiumSpec with StorageFixture {

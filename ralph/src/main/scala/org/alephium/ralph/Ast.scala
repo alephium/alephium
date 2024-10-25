@@ -2739,7 +2739,7 @@ object Ast {
         genWarning: (TypeId, collection.Seq[(String, Option[SourceIndex])]) => AVector[Warning]
     ): AVector[Warning] = {
       val allDefs = mutable.Map.empty[(TypeId, String), Option[SourceIndex]]
-      states.foreach { case (_, (contract, _)) =>
+      states.foreachEntry { case (_, (contract, _)) =>
         if (contract.isAbstract) {
           defsInParentContract(contract).map { case (typeId, (name, sourceIndex)) =>
             allDefs.addOne((typeId, name) -> sourceIndex)
@@ -2747,7 +2747,7 @@ object Ast {
         }
       }
 
-      states.foreach { case (_, (contract, state)) =>
+      states.foreachEntry { case (_, (contract, state)) =>
         if (!contract.isAbstract) {
           usedDefsInContract(contract, state).foreach { case (typeId, (name, _)) =>
             allDefs.remove((typeId, name))

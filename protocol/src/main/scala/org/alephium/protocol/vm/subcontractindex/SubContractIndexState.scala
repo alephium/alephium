@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm.subcontractindex
 
 import org.alephium.protocol.model.ContractId
-import org.alephium.serde.Serde
+import org.alephium.serde.{avectorSerde, intSerde, Serde}
 import org.alephium.util.AVector
 
 final case class SubContractIndexStateId(contractId: ContractId, counter: Int)

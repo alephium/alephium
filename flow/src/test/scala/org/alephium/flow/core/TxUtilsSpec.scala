@@ -113,7 +113,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait PredefinedTxFixture extends UnsignedTxFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     def chainIndex: ChainIndex
 
@@ -174,7 +174,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "calculate getPreAssetOutputInfo for txs in new blocks" in new FlowFixture
     with Generators {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
@@ -214,7 +214,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "calculate getPreAssetOutputInfo for txs in mempool" in new FlowFixture
     with Generators {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
@@ -1378,7 +1378,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get all available utxos" in new LargeUtxos {
-    val fetchedUtxos = blockFlow.getUsableUtxos(output.lockupScript, n).rightValue
+    val fetchedUtxos = blockFlow.getUsableUtxos(this.output.lockupScript, n).rightValue
     fetchedUtxos.length is n
   }
 
@@ -1386,8 +1386,8 @@ class TxUtilsSpec extends AlephiumSpec {
     val txValidation = TxValidation.build
     val unsignedTx0 = blockFlow
       .transfer(
-        keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
+        keyManager(this.output.lockupScript).publicKey,
+        this.output.lockupScript,
         None,
         ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
         Some(GasBox.unsafe(600000)),
@@ -1396,15 +1396,15 @@ class TxUtilsSpec extends AlephiumSpec {
       )
       .rightValue
       .rightValue
-    val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
+    val tx0 = Transaction.from(unsignedTx0, keyManager(this.output.lockupScript))
     tx0.unsigned.inputs.length is ALPH.MaxTxInputNum
     tx0.inputSignatures.length is 1
     txValidation.validateTxOnlyForTest(tx0, blockFlow, None) isE ()
 
     blockFlow
       .transfer(
-        keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
+        keyManager(this.output.lockupScript).publicKey,
+        this.output.lockupScript,
         None,
         ALPH.alph(ALPH.MaxTxInputNum.toLong),
         Some(GasBox.unsafe(600000)),
@@ -1421,13 +1421,13 @@ class TxUtilsSpec extends AlephiumSpec {
     info("With provided Utxos")
 
     val availableUtxos = blockFlow
-      .getUTXOs(output.lockupScript, Int.MaxValue, true)
+      .getUTXOs(this.output.lockupScript, Int.MaxValue, true)
       .rightValue
       .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
     val outputInfos = AVector.fill(255)(
       TxOutputInfo(
-        output.lockupScript,
+        this.output.lockupScript,
         ALPH.alph(1),
         AVector.empty,
         None
@@ -1436,7 +1436,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val tx0 = blockFlow
       .transfer(
-        keyManager(output.lockupScript).publicKey,
+        keyManager(this.output.lockupScript).publicKey,
         availableInputs.take(maxP2PKHInputsAllowedByGas),
         outputInfos,
         None,
@@ -1452,7 +1452,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val tx1 = blockFlow
       .transfer(
-        keyManager(output.lockupScript).publicKey,
+        keyManager(this.output.lockupScript).publicKey,
         outputInfos,
         None,
         nonCoinbaseMinGasPrice,
@@ -1474,8 +1474,8 @@ class TxUtilsSpec extends AlephiumSpec {
       val unsignedTxs = blockFlow
         .sweepAddress(
           None,
-          keyManager(output.lockupScript).publicKey,
-          output.lockupScript,
+          keyManager(this.output.lockupScript).publicKey,
+          this.output.lockupScript,
           None,
           None,
           nonCoinbaseMinGasPrice,
@@ -1488,7 +1488,7 @@ class TxUtilsSpec extends AlephiumSpec {
       unsignedTxs.length is 3
 
       unsignedTxs.foreach { unsignedTx =>
-        val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
+        val sweepTx = Transaction.from(unsignedTx, keyManager(this.output.lockupScript))
         txValidation.validateTxOnlyForTest(sweepTx, blockFlow, None) isE ()
       }
     }
@@ -1498,8 +1498,8 @@ class TxUtilsSpec extends AlephiumSpec {
       val unsignedTxs = blockFlow
         .sweepAddress(
           None,
-          keyManager(output.lockupScript).publicKey,
-          output.lockupScript,
+          keyManager(this.output.lockupScript).publicKey,
+          this.output.lockupScript,
           None,
           None,
           nonCoinbaseMinGasPrice,
@@ -1620,7 +1620,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer to Schnorr addrss" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
@@ -2220,7 +2220,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "check gas amount: pre-rhone" in new FlowFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman

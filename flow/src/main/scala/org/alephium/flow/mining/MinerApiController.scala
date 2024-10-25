@@ -32,7 +32,7 @@ import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce}
-import org.alephium.serde.{serialize, SerdeResult, Staging}
+import org.alephium.serde.{avectorSerde, serialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex}
 
 object MinerApiController {

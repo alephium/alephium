@@ -24,7 +24,7 @@ import akka.util.ByteString
 
 class BytesSpec extends AlephiumSpec {
   it should "convert byte into positive int" in {
-    forAll { input: Byte =>
+    forAll { (input: Byte) =>
       val output = Bytes.toPosInt(input)
       output >= 0 is true
       output.toByte is input
@@ -32,7 +32,7 @@ class BytesSpec extends AlephiumSpec {
   }
 
   it should "convert int to correct bytes" in {
-    forAll { input: Int =>
+    forAll { (input: Int) =>
       val output   = Bytes.from(input)
       val expected = ByteBuffer.allocate(4).putInt(input).array()
       output is ByteString.fromArrayUnsafe(expected)
@@ -42,7 +42,7 @@ class BytesSpec extends AlephiumSpec {
   }
 
   it should "convert long to correct bytes" in {
-    forAll { input: Long =>
+    forAll { (input: Long) =>
       val output   = Bytes.from(input)
       val expected = ByteBuffer.allocate(8).putLong(input).array()
       output is ByteString.fromArrayUnsafe(expected)
@@ -52,7 +52,7 @@ class BytesSpec extends AlephiumSpec {
   }
 
   it should "compute correct xor byte for int" in {
-    forAll { input: Int =>
+    forAll { (input: Int) =>
       val output   = Bytes.xorByte(input)
       val bytes    = Bytes.from(input)
       val expected = bytes.tail.fold(bytes.head)(_ ^ _ toByte)

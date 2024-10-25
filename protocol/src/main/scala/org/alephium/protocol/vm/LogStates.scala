@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId}
-import org.alephium.serde.Serde
+import org.alephium.serde.{avectorSerde, byteSerde, intSerde, Serde}
 import org.alephium.util.AVector
 
 final case class LogStatesId(contractId: ContractId, counter: Int)

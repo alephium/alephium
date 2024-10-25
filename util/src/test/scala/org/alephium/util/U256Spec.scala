@@ -172,7 +172,7 @@ class U256Spec extends AlephiumSpec {
   }
 
   it should "construct from Long" in {
-    forAll { x: Long =>
+    forAll { (x: Long) =>
       if (x >= 0) {
         U256.unsafe(x).toBigInt is BigInteger.valueOf(x)
       } else {
@@ -219,7 +219,7 @@ class U256Spec extends AlephiumSpec {
   }
 
   it should "convert from Int" in {
-    forAll { x: Int =>
+    forAll { (x: Int) =>
       if (x >= 0) {
         U256.unsafe(x).v.longValue() is x.toLong
       } else {

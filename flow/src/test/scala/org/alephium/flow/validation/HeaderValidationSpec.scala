@@ -24,8 +24,10 @@ import org.scalatest.EitherValues._
 
 import org.alephium.crypto.Blake3
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
+import org.alephium.serde.intSerde
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -53,10 +55,10 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   behavior of "genesis validation"
 
   trait GenesisFixture extends Fixture {
-    val chainIndex               = ChainIndex.unsafe(1, 2)
-    implicit val consensusConfig = consensusConfigs.mainnet
-    val genesis                  = BlockHeader.genesis(chainIndex, Hash.zero)
-    val headerValidator          = HeaderValidation.build
+    val chainIndex                                 = ChainIndex.unsafe(1, 2)
+    implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
+    val genesis                                    = BlockHeader.genesis(chainIndex, Hash.zero)
+    val headerValidator                            = HeaderValidation.build
 
     def passValidation(header: BlockHeader): Assertion = {
       passValidation(headerValidator.validateGenesisHeader(header))
@@ -74,7 +76,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   it should "check genesis version" in new GenesisFixture {
     genesis.version is DefaultBlockVersion
 
-    forAll { byte: Byte =>
+    forAll { (byte: Byte) =>
       whenever(byte != DefaultBlockVersion) {
         val header = genesis.copy(version = byte)
         failValidation(headerValidator.validateGenesisHeader(header), InvalidGenesisVersion)
@@ -138,7 +140,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   trait HeaderFixture extends Fixture with FlowFixture {
     def rhoneHardForkTimestamp: TimeStamp = TimeStamp.now()
 
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.consensus.num-zeros-at-least-in-hash", 1),
       ("alephium.network.rhone-hard-fork-timestamp", rhoneHardForkTimestamp.millis)

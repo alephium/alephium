@@ -42,7 +42,7 @@ object CachedKVStorage {
       putAccumulate: (K, V) => Unit,
       caches: mutable.HashMap[K, Cache[V]]
   ): Unit = {
-    caches.foreach {
+    caches.foreachEntry {
       case (_, Cached(_))         => Right(())
       case (key, Updated(value))  => putAccumulate(key, value)
       case (key, Inserted(value)) => putAccumulate(key, value)

@@ -42,7 +42,7 @@ class UtilJsonSpec extends AlephiumSpec {
   }
 
   it should "write/read vectors" in {
-    forAll { ys: List[Int] => check(AVector.from(ys), ys.mkString("[", ",", "]")) }
+    forAll { (ys: List[Int]) => check(AVector.from(ys), ys.mkString("[", ",", "]")) }
   }
 
   def addressJson(addr: String): String = s"""{"addr":"$addr","port":9000}"""

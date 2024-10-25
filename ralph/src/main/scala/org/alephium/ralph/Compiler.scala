@@ -493,7 +493,7 @@ object Compiler {
     // callee -> callers
     lazy val internalCallsReversed: mutable.Map[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]] = {
       val reversed = mutable.Map.empty[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]]
-      internalCalls.foreach { case (caller, callees) =>
+      internalCalls.foreachEntry { case (caller, callees) =>
         callees.foreach { callee =>
           reversed.get(callee) match {
             case None          => reversed.update(callee, mutable.ArrayBuffer(caller))
@@ -578,7 +578,7 @@ object Compiler {
         isLocal = true,
         isGenerated = true,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local.apply
       )
       val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
       (ref, codes)
@@ -688,7 +688,7 @@ object Compiler {
         isLocal = false,
         isGenerated,
         isTemplate = false,
-        VarInfo.Field
+        VarInfo.Field.apply
       )
     }
     def addLocalVariable(
@@ -706,7 +706,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local.apply
       )
     }
     // scalastyle:off parameter.number

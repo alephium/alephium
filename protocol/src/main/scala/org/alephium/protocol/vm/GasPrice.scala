@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{coinbaseGasPrice, nonCoinbaseMinGasPrice, HardFork}
-import org.alephium.serde.Serde
+import org.alephium.serde.{u256Serde, Serde}
 import org.alephium.util.U256
 
 final case class GasPrice(value: U256) extends Ordered[GasPrice] {
