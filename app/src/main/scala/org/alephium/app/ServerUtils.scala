@@ -276,7 +276,7 @@ class ServerUtils(implicit
         )
         .left
         .map(badRequest)
-      outputGroups = TxUtils.sizeLimitedGroupBy(outputInfos, ALPH.MaxTxInputNum / 2)(
+      outputGroups = TxUtils.sizeLimitedGroupBy(outputInfos, ALPH.MaxTxOutputNum)(
         _.lockupScript.groupIndex
       )
       unsignedTxs <- blockFlow

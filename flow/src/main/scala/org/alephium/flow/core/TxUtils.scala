@@ -496,30 +496,53 @@ trait TxUtils { Self: FlowUtils =>
             AssetScriptGasEstimator.Default(Self.blockFlow),
             TxScriptGasEstimator.NotImplemented
           )
-        txWithChange <- UnsignedTransaction
-          .buildTransferTxAndReturnChange(
-            fromLockupScript,
-            fromUnlockScript,
-            selected.assets.map(a => a.ref -> a.output),
-            currentOutputs,
-            selected.gas,
-            gasPrice
-          )
-        selectedAssetSet = selected.assets.map(_.ref).toSet
-        reusableInputs = txWithChange._2.map { case (oRef, output) =>
-          AssetOutputInfo(oRef, output, MemPoolOutput)
-        }
-        newRemainingInputs = remainingInputs.filterNot(out =>
-          selectedAssetSet.contains(out.ref)
-        ) ++ reusableInputs
-        txs <- buildMultiGroupTransactions(
-          fromLockupScript,
-          fromUnlockScript,
-          remainingInputs = newRemainingInputs,
-          outputGroups.tail,
-          gasPrice,
-          acc :+ txWithChange._1
-        )
+        txs <-
+          if (selected.gas > getMaximalGasPerTx()) {
+            if (currentOutputs.length <= 1) {
+              Left("Unable to make multi-group transactions with given inputs")
+            } else {
+              val smallerOutputGroups =
+                currentOutputs.splitAt(currentOutputs.length / 2) match {
+                  case (firstPart, secondPart) => firstPart +: secondPart +: outputGroups.tail
+                }
+
+              buildMultiGroupTransactions(
+                fromLockupScript,
+                fromUnlockScript,
+                remainingInputs,
+                smallerOutputGroups,
+                gasPrice,
+                acc
+              )
+            }
+          } else {
+            for {
+              txWithChange <- UnsignedTransaction
+                .buildTransferTxAndReturnChange(
+                  fromLockupScript,
+                  fromUnlockScript,
+                  selected.assets.map(a => a.ref -> a.output),
+                  currentOutputs,
+                  selected.gas,
+                  gasPrice
+                )
+              selectedAssetSet = selected.assets.map(_.ref).toSet
+              reusableInputs = txWithChange._2.map { case (oRef, output) =>
+                AssetOutputInfo(oRef, output, MemPoolOutput)
+              }
+              newRemainingInputs = remainingInputs.filterNot(out =>
+                selectedAssetSet.contains(out.ref)
+              ) ++ reusableInputs
+              txs <- buildMultiGroupTransactions(
+                fromLockupScript,
+                fromUnlockScript,
+                remainingInputs = newRemainingInputs,
+                outputGroups.tail,
+                gasPrice,
+                acc :+ txWithChange._1
+              )
+            } yield txs
+          }
       } yield txs
     }
   }

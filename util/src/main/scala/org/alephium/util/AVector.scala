@@ -597,6 +597,18 @@ final class AVector[@sp A](
     minA
   }
 
+  def splitAt(index: Int): (AVector[A], AVector[A]) = {
+    if (this.isEmpty) {
+      (AVector.empty, AVector.empty)
+    } else if (index <= 0) {
+      (AVector.empty, this)
+    } else if (index >= this.length) {
+      (this, AVector.empty)
+    } else {
+      (this.take(index), this.drop(index))
+    }
+  }
+
   def split(): AVector[AVector[A]] = {
     splitBy(identity)
   }
