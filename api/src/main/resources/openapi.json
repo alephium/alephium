@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.8.0"
+    "version": "3.8.5"
   },
   "servers": [
     {
@@ -7855,7 +7855,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields in Foo: a"
+                    "Found unused field in Foo: a"
                   ]
                 }
               }
@@ -8207,7 +8207,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields in Foo: a"
+                    "Found unused field in Foo: a"
                   ],
                   "maps": {
                     "names": [
@@ -8436,7 +8436,7 @@
                         }
                       ],
                       "warnings": [
-                        "Found unused fields in Foo: a"
+                        "Found unused field in Foo: a"
                       ],
                       "maps": {
                         "names": [
@@ -8514,7 +8514,7 @@
                         }
                       ],
                       "warnings": [
-                        "Found unused fields in Foo: a"
+                        "Found unused field in Foo: a"
                       ]
                     }
                   ],
@@ -13532,6 +13532,9 @@
             "type": "boolean"
           },
           "ignoreUnusedFunctionReturnWarnings": {
+            "type": "boolean"
+          },
+          "skipAbstractContractCheck": {
             "type": "boolean"
           }
         }

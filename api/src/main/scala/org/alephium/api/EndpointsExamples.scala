@@ -701,7 +701,7 @@ trait EndpointsExamples extends ErrorExamples {
         returnTypes = AVector("U256", "I256", "ByteVec", "Address")
       )
     ),
-    warnings = AVector("Found unused fields in Foo: a")
+    warnings = AVector("Found unused field in Foo: a")
   )
   private val structSig = CompileResult.StructSig(
     name = "Foo",
@@ -754,7 +754,7 @@ trait EndpointsExamples extends ErrorExamples {
         fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
       )
     ),
-    warnings = AVector("Found unused fields in Foo: a"),
+    warnings = AVector("Found unused field in Foo: a"),
     stdInterfaceId = Some("0001")
   )
   implicit val compileContractResultExamples: List[Example[CompileContractResult]] =

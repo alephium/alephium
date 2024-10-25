@@ -39,11 +39,11 @@ trait Warnings {
     }
   }
 
-  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[(String, Type)]): Unit = {
-    val newWarnings = unusedMaps.map { case (name, typ) =>
+  def warnUnusedMaps(typeId: Ast.TypeId, unusedMaps: Seq[(String, Option[SourceIndex])]): Unit = {
+    val newWarnings = unusedMaps.map { case (name, sourceIndex) =>
       Warning(
         s"Found unused map in ${typeId.name}: $name",
-        typ.sourceIndex
+        sourceIndex
       )
     }
 
@@ -54,13 +54,13 @@ trait Warnings {
 
   def warnUnusedLocalConstants(
       typeId: Ast.TypeId,
-      unusedConstants: mutable.ArrayBuffer[(String, Type)]
+      unusedConstants: mutable.ArrayBuffer[(String, Option[SourceIndex])]
   ): Unit = {
     if (!compilerOptions.ignoreUnusedConstantsWarnings) {
-      val newWarnings = unusedConstants.map { case (name, typ) =>
+      val newWarnings = unusedConstants.map { case (name, sourceIndex) =>
         Warning(
           s"Found unused constant in ${typeId.name}: $name",
-          typ.sourceIndex
+          sourceIndex
         )
       }
 
@@ -70,12 +70,12 @@ trait Warnings {
 
   def warnUnusedFields(
       typeId: Ast.TypeId,
-      unusedFields: mutable.ArrayBuffer[(String, Type)]
+      unusedFields: mutable.ArrayBuffer[(String, Option[SourceIndex])]
   ): Unit = {
-    val newWarnings = unusedFields.sortBy(_._1).map { case (name, typ) =>
+    val newWarnings = unusedFields.sortBy(_._1).map { case (name, sourceIndex) =>
       Warning(
         s"Found unused field in ${typeId.name}: $name",
-        typ.sourceIndex
+        sourceIndex
       )
     }
     if (!compilerOptions.ignoreUnusedFieldsWarnings) {

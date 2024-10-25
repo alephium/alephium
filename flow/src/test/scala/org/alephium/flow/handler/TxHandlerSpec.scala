@@ -173,7 +173,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
-      TxHandler.props(blockFlow, storages.pendingTxStorage)
+      TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref))
     )
 
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
@@ -368,7 +368,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def test(message: String) = {
       EventFilter.debug(message, occurrences = 5).intercept {
         val txHandler = system.actorOf(
-          TxHandler.props(blockFlow, storages.pendingTxStorage)
+          TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref))
         )
         txHandler ! InterCliqueManager.SyncedResult(true)
       }
@@ -497,6 +497,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.toGroupConfirmations is 0
     val blockHash = confirmed.index.hash
     blockFlow.getBestDeps(index.from).deps.contains(blockHash) is true
+    val autoMinedBlock = blockFlow.getBlock(blockHash).rightValue
+    eventBus.expectMsg(AllHandlers.BlockNotify(autoMinedBlock, 1))
 
     val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
     val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
@@ -600,9 +602,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     // use lazy here because we want to override config values
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val eventBus   = TestProbe()
     lazy val txHandler =
       newTestActorRef[TxHandler](
-        TxHandler.props(blockFlow, storages.pendingTxStorage)
+        TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(eventBus.ref))
       )
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false, isLocalTx: Boolean = true) =
