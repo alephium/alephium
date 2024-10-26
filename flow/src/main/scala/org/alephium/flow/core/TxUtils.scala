@@ -464,7 +464,7 @@ trait TxUtils { Self: FlowUtils =>
   def buildMultiGroupTransactions(
       fromLockupScript: LockupScript.Asset, // Self address for receiving change outputs
       fromUnlockScript: UnlockScript,
-      remainingInputs: AVector[AssetOutputInfo],
+      inputs: AVector[AssetOutputInfo],
       outputGroups: AVector[AVector[TxOutputInfo]],
       gasPrice: GasPrice,
       acc: AVector[UnsignedTransaction]
@@ -477,7 +477,7 @@ trait TxUtils { Self: FlowUtils =>
       } else {
         Right(acc)
       }
-    } else if (remainingInputs.isEmpty) {
+    } else if (inputs.isEmpty) {
       Left("Not enough inputs to build multi-group transaction")
     } else {
       val currentOutputs = outputGroups.head
@@ -490,7 +490,7 @@ trait TxUtils { Self: FlowUtils =>
           .select(
             AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
             fromUnlockScript,
-            remainingInputs,
+            inputs,
             amountTokensOutputCount._3,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
@@ -499,49 +499,46 @@ trait TxUtils { Self: FlowUtils =>
         txs <-
           if (selected.gas > getMaximalGasPerTx()) {
             if (currentOutputs.length <= 1) {
-              Left("Unable to make multi-group transactions with given inputs")
+              Left(
+                "Unable to build multi-group transactions due to exceeding gas per tx most likely due to dusty input utxos"
+              )
             } else {
-              val smallerOutputGroups =
-                currentOutputs.splitAt(currentOutputs.length / 2) match {
-                  case (firstPart, secondPart) => firstPart +: secondPart +: outputGroups.tail
-                }
-
+              val (firstOutputs, secondOutputs) = currentOutputs.splitAt(currentOutputs.length / 2)
+              val smallerOutputGroups           = firstOutputs +: secondOutputs +: outputGroups.tail
               buildMultiGroupTransactions(
                 fromLockupScript,
                 fromUnlockScript,
-                remainingInputs,
+                inputs,
                 smallerOutputGroups,
                 gasPrice,
                 acc
               )
             }
           } else {
-            for {
-              txWithChange <- UnsignedTransaction
-                .buildTransferTxAndReturnChange(
-                  fromLockupScript,
-                  fromUnlockScript,
-                  selected.assets.map(a => a.ref -> a.output),
-                  currentOutputs,
-                  selected.gas,
-                  gasPrice
-                )
-              selectedAssetSet = selected.assets.map(_.ref).toSet
-              reusableInputs = txWithChange._2.map { case (oRef, output) =>
-                AssetOutputInfo(oRef, output, MemPoolOutput)
-              }
-              newRemainingInputs = remainingInputs.filterNot(out =>
-                selectedAssetSet.contains(out.ref)
-              ) ++ reusableInputs
-              txs <- buildMultiGroupTransactions(
+            UnsignedTransaction
+              .buildTransferTxAndReturnChange(
                 fromLockupScript,
                 fromUnlockScript,
-                remainingInputs = newRemainingInputs,
-                outputGroups.tail,
-                gasPrice,
-                acc :+ txWithChange._1
+                selected.assets.map(a => a.ref -> a.output),
+                currentOutputs,
+                selected.gas,
+                gasPrice
               )
-            } yield txs
+              .flatMap { case (tx, change) =>
+                val changeInputs = change.map { case (oRef, output) =>
+                  AssetOutputInfo(oRef, output, MemPoolOutput)
+                }
+                val remainingInputs =
+                  inputs.filterNot(out => selected.assets.exists(_.ref == out.ref))
+                buildMultiGroupTransactions(
+                  fromLockupScript,
+                  fromUnlockScript,
+                  remainingInputs ++ changeInputs,
+                  outputGroups.tail,
+                  gasPrice,
+                  acc :+ tx
+                )
+              }
           }
       } yield txs
     }
