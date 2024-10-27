@@ -456,7 +456,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion             := "2.13.14",
+  scalaVersion             := "2.13.15",
   Test / parallelExecution := false,
   scalacOptions ++= Seq(
     "-Xsource:3",

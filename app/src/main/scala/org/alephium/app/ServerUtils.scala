@@ -140,7 +140,7 @@ class ServerUtils(implicit
 
   private def tooManyUtxos[T](error: IOError): Try[T] = {
     error match {
-      case IOError.MaxNodeReadLimitExceeded =>
+      case _: IOError.MaxNodeReadLimitExceeded =>
         val message =
           "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
         Left(ApiError.InternalServerError(message))
@@ -1361,21 +1361,26 @@ class ServerUtils(implicit
     val buildResults = buildTransactionRequests.foldE(
       (AVector.empty[BuildChainedTxResult], ExtraUtxosInfo.empty)
     ) { case ((buildTransactionResults, extraUtxosInfo), buildTransactionRequest) =>
-      for {
-        keyPair <- buildTransactionRequest.value.getLockPair()
-        (newUtxosForThisLockupScript, restOfUtxos) = extraUtxosInfo.newUtxos.partition(
-          _.output.lockupScript == keyPair._1
-        )
-        buildResult <- buildChainedTransaction(
-          blockFlow,
-          buildTransactionRequest,
-          extraUtxosInfo.copy(newUtxos = newUtxosForThisLockupScript)
-        )
-        (buildTransactionResult, updatedExtraUtxosInfo) = buildResult
-      } yield (
-        buildTransactionResults :+ buildTransactionResult,
-        updatedExtraUtxosInfo.copy(newUtxos = updatedExtraUtxosInfo.newUtxos ++ restOfUtxos)
-      )
+      buildTransactionRequest.value.getLockPair() match {
+        case Right(keyPair) =>
+          val (newUtxosForThisLockupScript, restOfUtxos) = extraUtxosInfo.newUtxos.partition(
+            _.output.lockupScript == keyPair._1
+          )
+          for {
+            buildResult <- buildChainedTransaction(
+              blockFlow,
+              buildTransactionRequest,
+              extraUtxosInfo.copy(newUtxos = newUtxosForThisLockupScript)
+            )
+          } yield {
+            val (buildTransactionResult, updatedExtraUtxosInfo) = buildResult
+            (
+              buildTransactionResults :+ buildTransactionResult,
+              updatedExtraUtxosInfo.copy(newUtxos = updatedExtraUtxosInfo.newUtxos ++ restOfUtxos)
+            )
+          }
+        case Left(error) => Left(error)
+      }
     }
 
     buildResults.map(_._1)
