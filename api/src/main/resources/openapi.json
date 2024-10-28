@@ -493,21 +493,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "password",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WalletDeletion"
-              },
-              "example": {
-                "password": "my-secret-password"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "Ok"
@@ -16050,18 +16045,6 @@
             "type": "string"
           },
           "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "WalletDeletion": {
-        "title": "WalletDeletion",
-        "type": "object",
-        "required": [
-          "password"
-        ],
-        "properties": {
-          "password": {
             "type": "string"
           }
         }
