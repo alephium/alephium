@@ -187,10 +187,13 @@ object OpenAPIWriters extends EndpointsExamples {
       ("else", writeJs(schema.`else`)),
       ("dependentSchemas", writeJs(schema.dependentSchemas)),
       ("multipleOf", writeJs(schema.multipleOf)),
-      ("minimum", writeJs(schema.minimum)),
-      ("exclusiveMinimum", writeJs(schema.exclusiveMinimum)),
-      ("maximum", writeJs(schema.maximum)),
-      ("exclusiveMaximum", writeJs(schema.exclusiveMaximum)),
+      // `minimum` and `maximum` are BigDecimal, but we need to convert them to Long
+      // so they can be serialized as JSON numbers. Our BigDecimal serializer converts them to strings.
+      // `toLongExact` can throw an exception, but tests will catch it.
+      ("minimum", writeJs(schema.minimum.map(_.toLongExact))),
+      ("exclusiveMinimum", writeJs(schema.exclusiveMinimum.map(_.toLongExact))),
+      ("maximum", writeJs(schema.maximum.map(_.toLongExact))),
+      ("exclusiveMaximum", writeJs(schema.exclusiveMaximum.map(_.toLongExact))),
       ("maxLength", writeJs(schema.maxLength)),
       ("minLength", writeJs(schema.minLength)),
       ("pattern", writeJs(schema.pattern)),
