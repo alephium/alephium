@@ -25,7 +25,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.io.PendingTxStorage
-import org.alephium.flow.mempool.{GrandPool, MemPool, TxHandlerBuffer}
+import org.alephium.flow.mempool.{GrandPool, MemPool}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.{DataOrigin, PersistedTxId}
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
@@ -63,7 +63,7 @@ object TxHandler {
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
   case object CleanMemPool                              extends Command
-  case object CleanMissingInputsTx                      extends Command
+  case object CleanOrphanPool                           extends Command
   private[handler] case object BroadcastTxs             extends Command
   private[handler] case object DownloadTxs              extends Command
   case object ClearMemPool                              extends Command
@@ -176,10 +176,10 @@ final class TxHandler(
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
   val txBufferMaxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
-  val batchBroadcastTxsFrequency: Duration    = memPoolSetting.batchBroadcastTxsFrequency
-  val batchDownloadTxsFrequency: Duration     = memPoolSetting.batchDownloadTxsFrequency
-  val cleanMissingInputsTxFrequency: Duration = memPoolSetting.cleanMissingInputsTxFrequency
-  val missingInputsTxExpiryDuration: Duration = cleanMissingInputsTxFrequency.timesUnsafe(2)
+  val batchBroadcastTxsFrequency: Duration = memPoolSetting.batchBroadcastTxsFrequency
+  val batchDownloadTxsFrequency: Duration  = memPoolSetting.batchDownloadTxsFrequency
+  val cleanOrphanTxFrequency: Duration     = memPoolSetting.cleanMissingInputsTxFrequency
+  val orphanTxExpiryDuration: Duration     = cleanOrphanTxFrequency.timesUnsafe(2)
 
   val nonCoinbaseValidation = TxValidation.build
   val fetching: FetchState[TransactionId] =
@@ -198,7 +198,7 @@ final class TxHandler(
         if (isIntraCliqueSyncing) {
           txs.foreach(handleIntraCliqueSyncingTx)
         } else {
-          txs.foreach(handleInterCliqueTx(_, acknowledge = true, cacheMissingInputsTx = !isLocalTx))
+          txs.foreach(handleInterCliqueTx(_, acknowledge = true, cacheOrphanTx = !isLocalTx))
         }
       } else {
         mineTxsForDev(txs)
@@ -211,33 +211,23 @@ final class TxHandler(
         .forceMineForDev(blockFlow, chainIndex, Env.currentEnv, publishBlock)
         .swap
         .foreach(log.error(_))
-    case TxHandler.CleanMissingInputsTx =>
-      cleanMissingInputsBuffer()
+    case TxHandler.CleanOrphanPool => cleanOrphanPool()
     case TxHandler.CleanMemPool =>
       log.debug("Start to clean mempools")
-      val now = TimeStamp.now()
-      blockFlow.grandPool.cleanUnconfirmedTxs(
-        now.minusUnsafe(memPoolSetting.unconfirmedTxExpiryDuration)
-      )
-      blockFlow.grandPool.cleanInvalidTxs(
-        blockFlow,
-        now.minusUnsafe(memPoolSetting.cleanMempoolFrequency)
-      )
-      ()
+      blockFlow.getGrandPool().cleanMemPool(blockFlow, TimeStamp.now())
     case TxHandler.Rebroadcast(tx) =>
       outgoingTxBuffer.put(tx, ())
     case TxHandler.ClearMemPool =>
       blockFlow.grandPool.clear()
       clearPersistedTxs()
-      missingInputsTxBuffer.clear()
   }
 
   override def onFirstTimeSynced(): Unit = {
     clearStorageAndLoadTxs(
-      handleInterCliqueTx(_, acknowledge = false, cacheMissingInputsTx = false)
+      handleInterCliqueTx(_, acknowledge = false, cacheOrphanTx = false)
     )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
-    scheduleOnce(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
+    scheduleOnce(self, TxHandler.CleanOrphanPool, memPoolSetting.cleanMissingInputsTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
@@ -267,17 +257,15 @@ trait TxCoreHandler extends TxHandlerUtils {
   implicit def brokerConfig: BrokerConfig
   def outgoingTxBuffer: Cache[TransactionTemplate, Unit]
 
-  val missingInputsTxBuffer = TxHandlerBuffer.default()
-  def cleanMissingInputsTxFrequency: Duration
-  def missingInputsTxExpiryDuration: Duration
+  def cleanOrphanTxFrequency: Duration
+  def orphanTxExpiryDuration: Duration
 
   def nonCoinbaseValidation: TxValidation
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleInterCliqueTx(
       tx: TransactionTemplate,
       acknowledge: Boolean,
-      cacheMissingInputsTx: Boolean
+      cacheOrphanTx: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
     assume(!brokerConfig.isIncomingChain(chainIndex))
@@ -288,39 +276,36 @@ trait TxCoreHandler extends TxHandlerUtils {
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {
+      val grandPool = blockFlow.getGrandPool()
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case failed @ Left(Right(s: InvalidTxStatus)) =>
-          if (s.isInstanceOf[NonExistInput.type] && cacheMissingInputsTx) {
-            missingInputsTxBuffer.add(tx, TimeStamp.now())
-          } else {
-            handleInvalidTx(tx, acknowledge, failed)
-          }
-        case Right(_) =>
-          val grandPool = blockFlow.getGrandPool()
-          handleValidTx(chainIndex, tx, grandPool, acknowledge)
-        case failed @ Left(Left(_)) =>
-          handleInvalidTx(tx, acknowledge, failed)
+        case Left(Right(NonExistInput)) if cacheOrphanTx =>
+          grandPool.orphanPool.add(tx, TimeStamp.now())
+        case failed @ Left(Right(_)) => handleInvalidTx(tx, acknowledge, failed)
+        case Right(_)                => handleValidTx(chainIndex, tx, grandPool, acknowledge)
+        case failed @ Left(Left(_))  => handleInvalidTx(tx, acknowledge, failed)
       }
     }
   }
 
-  def cleanMissingInputsBuffer(): Unit = {
-    missingInputsTxBuffer.getRootTxs().foreach(validateMissingInputRootTx)
-    missingInputsTxBuffer.clean(TimeStamp.now().minusUnsafe(missingInputsTxExpiryDuration))
-    scheduleOnce(self, TxHandler.CleanMissingInputsTx, cleanMissingInputsTxFrequency)
+  def cleanOrphanPool(): Unit = {
+    val orphanPool = blockFlow.getGrandPool().orphanPool
+    orphanPool.getRootTxs().foreach(validateOrphanTx)
+    orphanPool.clean(TimeStamp.now().minusUnsafe(orphanTxExpiryDuration))
+    scheduleOnce(self, TxHandler.CleanOrphanPool, cleanOrphanTxFrequency)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def validateMissingInputRootTx(tx: TransactionTemplate): Unit = {
+  def validateOrphanTx(tx: TransactionTemplate): Unit = {
+    val orphanPool = blockFlow.getGrandPool().orphanPool
     nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-      case Left(Right(_: NonExistInput.type)) => ()
-      case Left(Right(_: InvalidTxStatus)) | Left(Left(_)) =>
-        missingInputsTxBuffer.removeInvalidTx(tx)
+      case Left(Right(NonExistInput)) => ()
+      case Left(_) =>
+        orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid pending tx ${tx.id.toHexString}: ${hex(tx)}")
       case Right(_) =>
-        val children = missingInputsTxBuffer.removeValidTx(tx)
-        handleInterCliqueTx(tx, false, cacheMissingInputsTx = false)
-        children.foreach(_.foreach(validateMissingInputRootTx))
+        val children = orphanPool.removeValidTx(tx)
+        handleInterCliqueTx(tx, false, cacheOrphanTx = false)
+        children.foreach(_.foreach(validateOrphanTx))
     }
   }
 
@@ -342,9 +327,10 @@ trait TxCoreHandler extends TxHandlerUtils {
     result match {
       case MemPool.AddedToMemPool =>
         outgoingTxBuffer.put(tx, ())
-        if (missingInputsTxBuffer.pool.contains(tx.id)) {
-          val newRoots = missingInputsTxBuffer.removeValidTx(tx)
-          newRoots.foreach(_.foreach(validateMissingInputRootTx))
+        val orphanPool = blockFlow.getGrandPool().orphanPool
+        if (orphanPool.contains(tx.id)) {
+          val newRoots = orphanPool.removeValidTx(tx)
+          newRoots.foreach(_.foreach(validateOrphanTx))
         }
         addSucceeded(tx, acknowledge)
       case MemPool.MemPoolIsFull =>

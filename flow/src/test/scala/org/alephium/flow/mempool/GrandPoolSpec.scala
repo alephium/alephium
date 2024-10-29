@@ -20,7 +20,7 @@ import scala.util.Random
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, ModelGenerators}
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class GrandPoolSpec extends AlephiumSpec {
   behavior of "Single Broker"
@@ -101,6 +101,38 @@ class GrandPoolSpec extends AlephiumSpec {
       }
     }
     checkMetrics(AVector.empty)
+  }
+
+  it should "clean mempool" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.mempool.clean-mempool-frequency", "3 s"),
+      ("alephium.mempool.unconfirmed-tx-expiry-duration", "1 s")
+    )
+    val chainIndex0 = ChainIndex.unsafe(0, 0)
+    val block       = transfer(blockFlow, chainIndex0)
+    val tx0         = block.nonCoinbase.head.toTemplate
+    val mempool0    = pool.getMemPool(chainIndex0.from)
+    val now         = TimeStamp.now()
+    mempool0.add(chainIndex0, tx0, now) is MemPool.AddedToMemPool
+
+    val chainIndex1 = ChainIndex.unsafe(1, 1)
+    val tx1         = transfer(blockFlow, chainIndex1).nonCoinbase.head.toTemplate
+    val mempool1    = pool.getMemPool(chainIndex1.from)
+    mempool1.add(
+      chainIndex1,
+      tx1,
+      now.minusUnsafe(Duration.ofSecondsUnsafe(2))
+    ) is MemPool.AddedToMemPool
+
+    pool.cleanMemPool(blockFlow, now)
+    mempool0.contains(tx0) is true
+    mempool1.contains(tx1) is false
+
+    addAndCheck(blockFlow, block)
+    pool.cleanMemPool(blockFlow, now.plusSecondsUnsafe(4))
+    mempool0.contains(tx0) is false
+    mempool1.contains(tx1) is false
   }
 
   trait Fixture extends FlowFixture {

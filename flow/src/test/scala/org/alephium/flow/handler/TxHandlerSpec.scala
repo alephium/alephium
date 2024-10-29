@@ -136,7 +136,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
-  it should "temporarily cache missing inputs tx" in new Fixture {
+  it should "temporarily cache orphan tx" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
       ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
@@ -144,26 +144,25 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx, isLocalTx = false)
-    txHandler.underlyingActor.missingInputsTxBuffer.getRootTxs() willBe AVector(tx.toTemplate)
+    orphanPool.getRootTxs() willBe AVector(tx.toTemplate)
     interCliqueProbe.expectNoMessage()
 
     setSynced()
-    txHandler.underlyingActor.missingInputsTxBuffer.getRootTxs().isEmpty willBe true
+    orphanPool.getRootTxs().isEmpty willBe true
   }
 
-  it should "broadcast ready txs from missing inputs tx buffer" in new Fixture {
+  it should "broadcast ready txs from orphan pool" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms")
     )
 
-    val tx     = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
-    val buffer = txHandler.underlyingActor.missingInputsTxBuffer
-    buffer.add(tx, TimeStamp.now())
-    buffer.getRootTxs() is AVector(tx)
+    val tx = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
+    orphanPool.add(tx, TimeStamp.now())
+    orphanPool.getRootTxs() is AVector(tx)
 
-    txHandler ! TxHandler.CleanMissingInputsTx
+    txHandler ! TxHandler.CleanOrphanPool
     txHandler.underlyingActor.outgoingTxBuffer.contains(tx) willBe true
-    buffer.getRootTxs().isEmpty willBe true
+    orphanPool.getRootTxs().isEmpty willBe true
 
     setSynced()
     interCliqueProbe.expectMsg(
@@ -222,13 +221,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     (blockFlow
       .getGrandPool()
       .size >= txNum) is true // Inter-group txs are counted twice, this will be improved in the future.
-    txHandler.underlyingActor.missingInputsTxBuffer.add(txs.head.toTemplate, TimeStamp.now())
-    txHandler.underlyingActor.missingInputsTxBuffer.size is 1
+    orphanPool.add(txs.head.toTemplate, TimeStamp.now())
+    orphanPool.size is 1
 
     txHandler ! TxHandler.ClearMemPool
     storages.pendingTxStorage.size() willBe 0
     blockFlow.getGrandPool().size is 0
-    txHandler.underlyingActor.missingInputsTxBuffer.size is 0
+    orphanPool.size is 0
   }
 
   it should "persist all of the pending txs once the handler is stopped" in new Fixture {
@@ -516,19 +515,18 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     balance12 is balance11.subUnsafe(ALPH.oneAlph)
   }
 
-  it should "remove tx from missingInputTxBuffer after tx is added to mempool" in new Fixture {
+  it should "remove tx from the orphan pool after tx is added to mempool" in new Fixture {
     override val configValues: Map[String, Any] =
       Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 1))
-    val missingInputsTxBuffer   = txHandler.underlyingActor.missingInputsTxBuffer.pool
     val Seq(tx1, tx2, tx3, tx4) = prepareRandomSequentialTxs(4).toSeq
     txHandler ! addTx(tx2, isLocalTx = false)
     txHandler ! addTx(tx3, isLocalTx = false)
     txHandler ! addTx(tx4, isLocalTx = false)
 
-    eventually(missingInputsTxBuffer.contains(tx1.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx2.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx3.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx4.id) is true)
+    eventually(orphanPool.contains(tx1.id) is false)
+    eventually(orphanPool.contains(tx2.id) is true)
+    eventually(orphanPool.contains(tx3.id) is true)
+    eventually(orphanPool.contains(tx4.id) is true)
 
     val mempool = blockFlow.getMemPool(chainIndex)
     txHandler ! addTx(tx1, isLocalTx = false)
@@ -538,24 +536,23 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     eventually(mempool.contains(tx2.id) is true)
     eventually(mempool.contains(tx3.id) is true)
     eventually(mempool.contains(tx4.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx2.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx3.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx4.id) is false)
+    eventually(orphanPool.contains(tx2.id) is false)
+    eventually(orphanPool.contains(tx3.id) is false)
+    eventually(orphanPool.contains(tx4.id) is false)
   }
 
-  it should "handle missing inputs txs properly" in new Fixture {
+  it should "handle orphan txs properly" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
       ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
     )
-    val missingInputsTxBuffer             = txHandler.underlyingActor.missingInputsTxBuffer.pool
     val sequentialTxs                     = prepareRandomSequentialTxs(6)
     val Seq(tx1, tx2, tx3, tx4, tx5, tx6) = sequentialTxs.toSeq
 
-    val missingInputTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
-    missingInputTxs.foreach(tx => txHandler ! addTx(tx, isLocalTx = false))
-    missingInputTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is true))
+    val orphanTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
+    orphanTxs.foreach(tx => txHandler ! addTx(tx, isLocalTx = false))
+    orphanTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is true))
 
     setSynced()
 
@@ -564,14 +561,14 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     eventually(mempool.contains(tx1.id) is true)
     eventually(mempool.contains(tx2.id) is true)
     eventually(mempool.contains(tx3.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx2.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx3.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx5.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx6.id) is true)
+    eventually(orphanPool.contains(tx2.id) is false)
+    eventually(orphanPool.contains(tx3.id) is false)
+    eventually(orphanPool.contains(tx5.id) is true)
+    eventually(orphanPool.contains(tx6.id) is true)
 
     txHandler ! addTx(tx4)
     sequentialTxs.foreach(tx => eventually(mempool.contains(tx.id) is true))
-    sequentialTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is false))
+    sequentialTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is false))
   }
 
   it should "remove unconfirmed txs based on expiry duration" in new Fixture {
@@ -642,6 +639,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       newTestActorRef[TxHandler](
         TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(eventBus.ref))
       )
+    lazy val orphanPool = blockFlow.getGrandPool().orphanPool
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false, isLocalTx: Boolean = true) =
       TxHandler.AddToMemPool(AVector(tx.toTemplate), isIntraCliqueSyncing, isLocalTx)

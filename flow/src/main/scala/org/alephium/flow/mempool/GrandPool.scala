@@ -22,7 +22,7 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
 import org.alephium.util.{AVector, OptionF, TimeStamp}
 
-class GrandPool(val mempools: AVector[MemPool])(implicit
+class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(implicit
     val brokerConfig: BrokerConfig
 ) {
   def size: Int = mempools.fold(0)(_ + _.size)
@@ -71,12 +71,18 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     mempools.fold(0)(_ + _.cleanInvalidTxs(blockFlow, timeStampThreshold))
   }
 
-  def cleanUnconfirmedTxs(timeStampThreshold: TimeStamp): Int = {
-    mempools.fold(0)(_ + _.cleanUnconfirmedTxs(timeStampThreshold))
+  def cleanMemPool(blockFlow: BlockFlow, now: TimeStamp)(implicit
+      memPoolSetting: MemPoolSetting
+  ): Unit = {
+    val unconfirmedTxThreshold = now.minusUnsafe(memPoolSetting.unconfirmedTxExpiryDuration)
+    mempools.foreach(_.cleanUnconfirmedTxs(unconfirmedTxThreshold))
+    cleanInvalidTxs(blockFlow, now.minusUnsafe(memPoolSetting.cleanMempoolFrequency))
+    ()
   }
 
   def clear(): Unit = {
     mempools.foreach(_.clear())
+    orphanPool.clear()
   }
 
   def validateAllTxs(blockFlow: BlockFlow): Int = {
@@ -90,6 +96,6 @@ object GrandPool {
       val group = GroupIndex.unsafe(brokerConfig.groupRange(idx))
       MemPool.empty(group)
     }
-    new GrandPool(mempools)
+    new GrandPool(mempools, OrphanPool.default())
   }
 }
