@@ -102,7 +102,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         txOutputsLength: Int,
         txScriptOpt: Option[StatefulScript],
         assetScriptGasEstimator: AssetScriptGasEstimator,
-        txScriptGasEstimator: TxScriptGasEstimator
+        txScriptEmulator: TxScriptEmulator
     )(implicit networkConfig: NetworkConfig): Either[String, Selected] = {
       val ascendingResult = ascendingOrderSelector.select(
         amounts,
@@ -111,7 +111,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         txOutputsLength,
         txScriptOpt,
         assetScriptGasEstimator,
-        txScriptGasEstimator
+        txScriptEmulator
       )
 
       ascendingResult match {
@@ -130,7 +130,7 @@ object UtxoSelectionAlgo extends StrictLogging {
             txOutputsLength,
             txScriptOpt,
             assetScriptGasEstimator,
-            txScriptGasEstimator
+            txScriptEmulator
           )
       }
     }
@@ -147,7 +147,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         txOutputsLength: Int,
         txScriptOpt: Option[StatefulScript],
         assetScriptGasEstimator: AssetScriptGasEstimator,
-        txScriptGasEstimator: TxScriptGasEstimator
+        txScriptEmulator: TxScriptEmulator
     )(implicit networkConfig: NetworkConfig): Either[String, Selected] = {
       val gasPrice = providedGas.gasPrice
       providedGas.gasOpt match {
@@ -166,7 +166,7 @@ object UtxoSelectionAlgo extends StrictLogging {
               case None =>
                 Right(GasBox.zero)
               case Some(txScript) =>
-                GasEstimation.estimate(inputWithAssets, txScript, txScriptGasEstimator).map {
+                GasEstimation.estimate(inputWithAssets, txScript, txScriptEmulator).map {
                   scriptGas =>
                     providedGas.gasEstimationMultiplier.map(_ * scriptGas).getOrElse(scriptGas)
                 }

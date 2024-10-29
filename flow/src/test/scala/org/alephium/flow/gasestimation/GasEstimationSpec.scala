@@ -430,7 +430,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       TxInputWithAsset(TxInput(utxo.ref, unlock), utxo)
     }
 
-    val estimator = TxScriptGasEstimator.Default(blockFlow)
+    val estimator = TxScriptEmulator.Default(blockFlow)
 
     GasEstimation.estimate(inputs, script, estimator)
   }
