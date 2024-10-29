@@ -23,9 +23,8 @@ import org.alephium.util.{AVector, TimeStamp}
 class OrphanPool private (val pool: MemPool) {
   def size: Int = pool.size
 
-  def add(transaction: TransactionTemplate, timeStamp: TimeStamp): Unit = {
-    pool.add(OrphanPool.bufferChainIndex, transaction, timeStamp)
-    ()
+  def add(tx: TransactionTemplate, timeStamp: TimeStamp): MemPool.NewTxCategory = {
+    pool.add(OrphanPool.bufferChainIndex, tx, timeStamp)
   }
 
   def contains(txId: TransactionId): Boolean = pool.contains(txId)
