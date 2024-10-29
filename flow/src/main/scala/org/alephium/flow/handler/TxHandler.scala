@@ -346,9 +346,12 @@ trait TxCoreHandler extends TxHandlerUtils {
           val newRoots = missingInputsTxBuffer.removeValidTx(tx)
           newRoots.foreach(_.foreach(validateMissingInputRootTx))
         }
+        addSucceeded(tx, acknowledge)
+      case MemPool.MemPoolIsFull =>
+        val reason = s"the mempool is full when trying to add the tx ${tx.id.shortHex}: ${hex(tx)}"
+        addFailed(tx, reason, acknowledge)
       case _ => ()
     }
-    addSucceeded(tx, acknowledge)
   }
 
   private def hex(tx: TransactionTemplate): String = {

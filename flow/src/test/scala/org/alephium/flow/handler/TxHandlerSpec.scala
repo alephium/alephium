@@ -30,6 +30,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -595,6 +596,40 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     txHandler ! TxHandler.CleanMemPool
     txs.foreach(tx => eventually(mempool.contains(tx.id) is false))
+  }
+
+  it should "return an error if the mempool is full" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.mempool.mempool-capacity-per-chain", 1)
+    )
+
+    val mempool        = blockFlow.getGrandPool().getMemPool(chainIndex.from)
+    val fromPrivateKey = genesisKeys(chainIndex.from.value)._1
+    val toPublicKey    = chainIndex.to.generateKey._2
+    val gasPrice       = GasPrice(nonCoinbaseMinGasPrice * 2)
+    mempool.capacity is 3
+    (0 until 3).foreach { _ =>
+      val tx = transferWithGas(
+        blockFlow,
+        fromPrivateKey,
+        toPublicKey,
+        ALPH.oneAlph,
+        gasPrice
+      ).nonCoinbase.head
+      txHandler ! addTx(tx)
+      expectMsg(TxHandler.AddSucceeded(tx.id))
+      eventually(mempool.contains(tx.id) is true)
+    }
+    mempool.isFull() is true
+
+    val tx = transfer(blockFlow, chainIndex).nonCoinbase.head
+    txHandler ! addTx(tx)
+    eventually(mempool.contains(tx.id) is false)
+
+    val txString = Hex.toHexString(serialize(tx.toTemplate))
+    val reason   = s"the mempool is full when trying to add the tx ${tx.id.shortHex}: $txString"
+    expectMsg(TxHandler.AddFailed(tx.id, reason))
   }
 
   trait Fixture extends FlowFixture with TxGenerators {
