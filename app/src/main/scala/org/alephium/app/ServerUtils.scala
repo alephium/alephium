@@ -1292,7 +1292,7 @@ class ServerUtils(implicit
             txOutputsLength = estimatedTxOutputsLength,
             Some(script),
             AssetScriptGasEstimator.Default(blockFlow),
-            TxScriptGasEstimator.Default(blockFlow)
+            TxScriptEmulator.Default(blockFlow)
           )
       )
     } yield selectedUtxos

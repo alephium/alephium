@@ -83,12 +83,12 @@ object GasEstimation extends StrictLogging {
   def estimate(
       inputWithAssets: AVector[TxInputWithAsset],
       script: StatefulScript,
-      txScriptGasEstimator: TxScriptGasEstimator
+      txScriptEmulator: TxScriptEmulator
   ): Either[String, GasBox] = {
     if (inputWithAssets.isEmpty) {
       Left("Insufficient funds for gas")
     } else {
-      txScriptGasEstimator.estimate(inputWithAssets, script)
+      txScriptEmulator.emulate(inputWithAssets, script).map(_._1)
     }
   }
 
