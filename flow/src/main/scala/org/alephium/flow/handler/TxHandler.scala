@@ -294,18 +294,19 @@ trait TxCoreHandler extends TxHandlerUtils {
     scheduleOnce(self, TxHandler.CleanOrphanPool, cleanOrphanTxFrequency)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def validateOrphanTx(tx: TransactionTemplate): Unit = {
-    val orphanPool = blockFlow.getGrandPool().orphanPool
+    val grandPool = blockFlow.getGrandPool()
     nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
       case Left(Right(NonExistInput)) => ()
       case Left(_) =>
-        orphanPool.removeInvalidTx(tx)
+        grandPool.orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid pending tx ${tx.id.toHexString}: ${hex(tx)}")
       case Right(_) =>
-        val children = orphanPool.removeValidTx(tx)
-        handleInterCliqueTx(tx, false, cacheOrphanTx = false)
-        children.foreach(_.foreach(validateOrphanTx))
+        val chainIndex = tx.chainIndex
+        val mempool    = blockFlow.getGrandPool().getMemPool(chainIndex.from)
+        if (!mempool.contains(tx.id) && !mempool.isDoubleSpending(chainIndex, tx)) {
+          handleValidTx(chainIndex, tx, grandPool, false)
+        }
     }
   }
 
