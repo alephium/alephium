@@ -37,6 +37,7 @@
         "operationId": "getWallets",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -169,6 +170,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -295,6 +297,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -395,6 +398,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -489,23 +493,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "password",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WalletDeletion"
-              },
-              "example": {
-                "password": "my-secret-password"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -593,7 +594,9 @@
           }
         ],
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -706,7 +709,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -918,6 +923,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1066,6 +1072,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1195,6 +1202,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1328,6 +1336,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1446,6 +1455,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1545,6 +1555,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1661,6 +1672,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1764,6 +1776,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1885,6 +1898,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1988,6 +2002,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2107,7 +2122,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -2186,6 +2203,7 @@
         "operationId": "getInfosNode",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2283,6 +2301,7 @@
         "operationId": "getInfosVersion",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2372,6 +2391,7 @@
         "operationId": "getInfosChain-params",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2464,6 +2484,7 @@
         "operationId": "getInfosSelf-clique",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2563,6 +2584,7 @@
         "operationId": "getInfosInter-clique-peer-info",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2665,6 +2687,7 @@
         "operationId": "getInfosDiscovered-neighbors",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2765,6 +2788,7 @@
         "operationId": "getInfosMisbehaviors",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2890,7 +2914,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -2969,6 +2995,7 @@
         "operationId": "getInfosUnreachable",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3091,7 +3118,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -3176,7 +3205,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3186,12 +3215,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3287,12 +3317,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "1"
+              "minimum": 1
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3382,6 +3413,7 @@
         "operationId": "getInfosCurrent-difficulty",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3477,7 +3509,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3487,12 +3519,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3704,7 +3737,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3714,12 +3747,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3950,7 +3984,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3960,12 +3994,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4188,6 +4223,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4398,6 +4434,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4608,6 +4645,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4837,6 +4875,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5053,6 +5092,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5311,6 +5351,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5436,6 +5477,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5554,6 +5596,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5667,6 +5710,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5767,6 +5811,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5921,6 +5966,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6026,6 +6072,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6144,6 +6191,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6268,6 +6316,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6380,6 +6429,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6484,6 +6534,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6639,6 +6690,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6848,6 +6900,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7044,6 +7097,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7167,6 +7221,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7297,6 +7352,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7385,6 +7441,7 @@
         "operationId": "getMempoolTransactions",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7524,7 +7581,9 @@
         "summary": "Remove all transactions from mempool",
         "operationId": "deleteMempoolTransactions",
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -7613,7 +7672,9 @@
           }
         ],
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -7691,7 +7752,9 @@
         "summary": "Validate all mempool transactions and remove invalid ones",
         "operationId": "putMempoolTransactionsValidate",
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -7786,6 +7849,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7979,6 +8043,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8089,6 +8154,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8316,6 +8382,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8659,6 +8726,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8851,6 +8919,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8975,6 +9044,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9174,6 +9244,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9385,6 +9456,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9599,6 +9671,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9784,6 +9857,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9903,6 +9977,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10006,6 +10081,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10108,6 +10184,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10278,6 +10355,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10422,6 +10500,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10554,6 +10633,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10668,6 +10748,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10777,6 +10858,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10884,6 +10966,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10971,6 +11054,7 @@
         "operationId": "getMinersAddresses",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11074,7 +11158,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -11191,6 +11277,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11308,6 +11395,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11416,6 +11504,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11541,6 +11630,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11661,6 +11751,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11761,6 +11852,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11849,7 +11941,9 @@
         "summary": "Check and repair the indexing of block hashes",
         "operationId": "putUtilsCheck-hash-indexing",
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -15951,18 +16045,6 @@
             "type": "string"
           },
           "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "WalletDeletion": {
-        "title": "WalletDeletion",
-        "type": "object",
-        "required": [
-          "password"
-        ],
-        "properties": {
-          "password": {
             "type": "string"
           }
         }

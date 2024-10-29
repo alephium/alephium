@@ -114,9 +114,6 @@ trait WalletExamples extends EndpointsExamples {
       )
     )
 
-  implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
-    simpleExample(WalletDeletion(password))
-
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(
       Balances(

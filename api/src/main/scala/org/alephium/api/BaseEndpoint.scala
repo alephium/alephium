@@ -45,6 +45,7 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
     PartialServerEndpoint[Option[ApiKey], Unit, I, ApiError[_ <: StatusCode], O, Any, Future]
 
   val baseEndpointWithoutApiKey: BaseEndpointWithoutApi[Unit, Unit] = endpoint
+    .out(emptyOutput.description("Ok"))
     .errorOut(
       oneOf[ApiError[_ <: StatusCode]](
         error(BadRequest, { case BadRequest(_) => true }),

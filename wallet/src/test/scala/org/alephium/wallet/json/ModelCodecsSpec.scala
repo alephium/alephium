@@ -129,12 +129,6 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     check(walletUnlock2, json2)
   }
 
-  it should "WalletDeletion" in {
-    val json           = s"""{"password":"$password"}"""
-    val walletDeletion = WalletDeletion(password)
-    check(walletDeletion, json)
-  }
-
   it should "WalletRestore" in {
     val json1 =
       s"""{"password":"$password","mnemonic":"${mnemonic.toLongString}","walletName":"$walletName"}"""
