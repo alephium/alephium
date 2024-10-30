@@ -2838,10 +2838,17 @@ object Ast {
     }
 
     private def checkAbstractContracts(states: AVector[Compiler.State[StatefulContext]]): Unit = {
-      contracts.view.zipWithIndex.foreach {
-        case (contract: Contract, index) if contract.isAbstract =>
-          contract.check(states(index))
-        case _ => ()
+      val abstractContracts = contracts.collect {
+        case contract: Contract if contract.isAbstract => contract
+      }
+      val sortedAbstractContracts = dependencies match {
+        case Some(deps) => abstractContracts.sortBy(c => deps(c.ident).length)
+        case None =>
+          val deps = buildDependencies()
+          abstractContracts.sortBy(c => deps(c.ident).length)
+      }
+      sortedAbstractContracts.foreach { contract =>
+        states.find(_.typeId == contract.ident).foreach(contract.check)
       }
     }
 

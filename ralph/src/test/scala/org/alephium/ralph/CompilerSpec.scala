@@ -8596,6 +8596,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       compileContract(code).isRight is true
     }
+
+    {
+      info("Define the child abstract contract before the parent abstract contract")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |Abstract Contract MyContract(boolean: Bool) extends Utils() {}
+           |
+           |Abstract Contract Utils() {
+           |  pub fn wassup() -> () {
+           |    let copy = $$boolean$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable wassup.boolean is not defined in the current scope or is used before being defined"
+      )
+    }
   }
 
   it should "check duplicate definitions in abstract contract" in {
