@@ -20,7 +20,7 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
-import org.alephium.protocol.model.{ChainIndex, ModelGenerators, TxGenerators}
+import org.alephium.protocol.model.{AssetOutputRef, ChainIndex, ModelGenerators, TxGenerators}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class ExtraUtxosInfoSpec extends AlephiumSpec {
@@ -99,5 +99,54 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
         .map(_.output) is restOfUtxos.map(_.output) ++ unsignedTx.fixedOutputs
       updatedExtraUtxosInfo.spentUtxos is alreadySpentUtxos ++ unsignedTx.inputs.map(_.outputRef)
     }
+  }
+
+  "ExtraUtxosInfo.updateWithGeneratedOutputs" should "update UTXO info" in new FlowFixture
+    with TxGenerators {
+    val chainIndex = chainIndexGen.sample.value
+
+    {
+      info("Empty extraUtxosInfo")
+
+      val assetInfos       = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+      val unsignedTx       = unsignedTxGen(chainIndex)(assetInfos).sample.value
+      val generatedOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
+
+      val extraUtxosInfo = ExtraUtxosInfo.empty
+      val updatedExtraUtxosInfo =
+        extraUtxosInfo.updateWithGeneratedOutputs(unsignedTx, generatedOutputs)
+      updatedExtraUtxosInfo.newUtxos.map(_.output) is generatedOutputs
+      updatedExtraUtxosInfo.spentUtxos is AVector.empty[AssetOutputRef]
+    }
+
+    {
+      info("Non-empty extraUtxosInfo")
+
+      val assetInfos       = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+      val unsignedTx       = unsignedTxGen(chainIndex)(assetInfos).sample.value
+      val generatedOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
+
+      val existingUtxos =
+        AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value).map { output =>
+          val ref = assetOutputRefGen(chainIndex.from).sample.value
+          AssetOutputInfo(ref, output, MemPoolOutput)
+        }
+
+      val alreadySpentUtxos =
+        AVector.from(Gen.nonEmptyListOf(assetOutputRefGen(chainIndex.from)).sample.value)
+
+      val extraUtxosInfo = ExtraUtxosInfo(
+        newUtxos = existingUtxos,
+        spentUtxos = alreadySpentUtxos
+      )
+
+      val updatedExtraUtxosInfo =
+        extraUtxosInfo.updateWithGeneratedOutputs(unsignedTx, generatedOutputs)
+      updatedExtraUtxosInfo.newUtxos.map(_.output) is existingUtxos.map(
+        _.output
+      ) ++ generatedOutputs
+      updatedExtraUtxosInfo.spentUtxos is alreadySpentUtxos
+    }
+
   }
 }

@@ -88,7 +88,7 @@ object GasEstimation extends StrictLogging {
     if (inputWithAssets.isEmpty) {
       Left("Insufficient funds for gas")
     } else {
-      txScriptEmulator.emulate(inputWithAssets, script).map(_._1)
+      txScriptEmulator.emulate(inputWithAssets, script).map(_.gasUsed)
     }
   }
 

@@ -1176,7 +1176,7 @@ class ServerUtils(implicit
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[UnsignedTransaction] = {
+  ): Try[(UnsignedTransaction, AVector[TxInputWithAsset])] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
         blockFlow,
@@ -1190,8 +1190,8 @@ class ServerUtils(implicit
         gasEstimationMultiplier,
         extraUtxosInfo
       )
+      inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
       unsignedTx <- wrapError {
-        val inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
         UnsignedTransaction.buildScriptTx(
           script,
           fromLockupScript,
@@ -1204,7 +1204,10 @@ class ServerUtils(implicit
         )
       }
       validatedUnsignedTx <- validateUnsignedTransaction(unsignedTx)
-    } yield validatedUnsignedTx
+    } yield (
+      validatedUnsignedTx,
+      selectedUtxos.assets.map(TxInputWithAsset.from(_, fromUnlockScript))
+    )
   }
 
   final def buildSelectedUtxos(
@@ -1328,7 +1331,7 @@ class ServerUtils(implicit
       totalAttoAlphAmount <- initialAttoAlphAmount
         .add(query.issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
         .toRight(failed("ALPH amount overflow"))
-      utx <- unsignedTxFromScript(
+      result <- unsignedTxFromScript(
         blockFlow,
         script,
         totalAttoAlphAmount,
@@ -1340,7 +1343,7 @@ class ServerUtils(implicit
         None,
         extraUtxosInfo
       )
-    } yield utx
+    } yield result._1
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -1381,6 +1384,7 @@ class ServerUtils(implicit
     buildResults.map(_._1)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def buildChainedTransaction(
       blockFlow: BlockFlow,
       buildTransaction: BuildChainedTx,
@@ -1400,14 +1404,22 @@ class ServerUtils(implicit
         )
       case buildExecuteScript: BuildChainedExecuteScriptTx =>
         for {
-          unsignedTx <- buildExecuteScriptUnsignedTx(
+          buildTxResult <- buildExecuteScriptUnsignedTx(
             blockFlow,
             buildExecuteScript.value,
             extraUtxosInfo
           )
+          (unsignedTx, inputWithAssets) = buildTxResult
+          emulationResult <- TxScriptEmulator
+            .Default(blockFlow)
+            .emulate(inputWithAssets, unsignedTx.scriptOpt.get)
+            .left
+            .map(failed)
         } yield (
           BuildChainedExecuteScriptTxResult(BuildExecuteScriptTxResult.from(unsignedTx)),
-          extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
+          extraUtxosInfo
+            .updateWithUnsignedTx(unsignedTx)
+            .updateWithGeneratedOutputs(unsignedTx, emulationResult.generatedOutputs)
         )
       case buildDeployContract: BuildChainedDeployContractTx =>
         for {
@@ -1462,7 +1474,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[UnsignedTransaction] = {
+  ): Try[(UnsignedTransaction, AVector[TxInputWithAsset])] = {
     for {
       _          <- query.check().left.map(badRequest)
       multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
@@ -1474,7 +1486,7 @@ class ServerUtils(implicit
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      utx <- unsignedTxFromScript(
+      result <- unsignedTxFromScript(
         blockFlow,
         script,
         amounts._1.getOrElse(U256.Zero),
@@ -1486,7 +1498,7 @@ class ServerUtils(implicit
         multiplier,
         extraUtxosInfo
       )
-    } yield utx
+    } yield result
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -1496,8 +1508,8 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
     for {
-      utx <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildExecuteScriptTxResult.from(utx)
+      result <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
+    } yield BuildExecuteScriptTxResult.from(result._1)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

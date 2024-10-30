@@ -25,11 +25,13 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
+final case class TxScriptEmulationResult(gasUsed: GasBox, generatedOutputs: AVector[AssetOutput])
+
 trait TxScriptEmulator {
   def emulate(
       inputWithAssets: AVector[TxInputWithAsset],
       script: StatefulScript
-  ): Either[String, (GasBox, AVector[AssetOutput])]
+  ): Either[String, TxScriptEmulationResult]
 }
 
 object TxScriptEmulator {
@@ -45,7 +47,7 @@ object TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
         script: StatefulScript
-    ): Either[String, (GasBox, AVector[AssetOutput])] = {
+    ): Either[String, TxScriptEmulationResult] = {
       assume(inputWithAssets.nonEmpty)
       val groupIndex      = inputWithAssets.head.input.fromGroup
       val chainIndex      = ChainIndex(groupIndex, groupIndex)
@@ -88,15 +90,13 @@ object TxScriptEmulator {
         groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
         preOutputs = inputWithAssets.map(_.asset.output)
         result <- runScript(blockEnv, groupView, preOutputs)
-      } yield {
-        (
-          maximalGasPerTx.subUnsafe(result.gasBox),
-          result.generatedOutputs.collect {
-            case o: AssetOutput => Some(o)
-            case _              => None
-          }
-        )
-      }
+      } yield TxScriptEmulationResult(
+        maximalGasPerTx.subUnsafe(result.gasBox),
+        result.generatedOutputs.collect {
+          case o: AssetOutput => Some(o)
+          case _              => None
+        }
+      )
     }
   }
   // scalastyle:on method.length
@@ -105,8 +105,8 @@ object TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
         script: StatefulScript
-    ): Either[String, (GasBox, AVector[AssetOutput])] = {
-      Right((defaultGasPerInput, AVector.empty))
+    ): Either[String, TxScriptEmulationResult] = {
+      Right(TxScriptEmulationResult(defaultGasPerInput, AVector.empty))
     }
   }
 
@@ -114,7 +114,7 @@ object TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
         script: StatefulScript
-    ): Either[String, (GasBox, AVector[AssetOutput])] = {
+    ): Either[String, TxScriptEmulationResult] = {
       throw new NotImplementedError("TxScriptEmulator not implemented")
     }
   }
