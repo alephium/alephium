@@ -1162,7 +1162,7 @@ object Ast {
 
   sealed trait VarDeclaration                               extends Positioned
   final case class NamedVar(mutable: Boolean, ident: Ident) extends VarDeclaration
-  case object AnonymousVar                                  extends VarDeclaration
+  final case class AnonymousVar()                           extends VarDeclaration
 
   final case class VarDef[Ctx <: StatelessContext](
       vars: Seq[VarDeclaration],
@@ -1190,7 +1190,7 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val storeCodes = vars.zip(value.getType(state)).flatMap {
         case (NamedVar(_, ident), _) => state.genStoreCode(ident)
-        case (AnonymousVar, tpe) =>
+        case (_: AnonymousVar, tpe) =>
           Seq(Seq.fill(state.flattenTypeLength(Seq(tpe)))(Pop))
       }
       value.genCode(state) ++ storeCodes.reverse.flatten

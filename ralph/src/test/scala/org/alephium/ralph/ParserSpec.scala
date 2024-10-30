@@ -884,23 +884,23 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let _ = foo()" -> Ast.VarDef(
-        Seq(Ast.AnonymousVar),
+        Seq(Ast.AnonymousVar()),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (_, _) = foo()" -> Ast.VarDef(
-        Seq(Ast.AnonymousVar, Ast.AnonymousVar),
+        Seq(Ast.AnonymousVar(), Ast.AnonymousVar()),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (_, a, b) = foo()" -> Ast.VarDef(
         Seq(
-          Ast.AnonymousVar,
+          Ast.AnonymousVar(),
           Ast.NamedVar(false, Ast.Ident("a")),
           Ast.NamedVar(false, Ast.Ident("b"))
         ),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (mut a, _, _) = foo()" -> Ast.VarDef(
-        Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.AnonymousVar, Ast.AnonymousVar),
+        Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.AnonymousVar(), Ast.AnonymousVar()),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       )
     )
