@@ -21,8 +21,8 @@ import org.alephium.flow.io.PruneStorageService
 import org.alephium.flow.setting.Platform
 
 object PruneStorage extends App {
-  private val rootPath              = Platform.getRootPath()
-  private val (blockFlow, storages) = Node.buildBlockFlowUnsafe(rootPath)
+  private val rootPath                 = Platform.getRootPath()
+  private val (blockFlow, storages, _) = Node.buildBlockFlowUnsafe(rootPath)
 
   new PruneStorageService(storages)(blockFlow, blockFlow.brokerConfig).prune()
 }

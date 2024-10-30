@@ -136,14 +136,14 @@ object Node {
       )
   }
 
-  def buildBlockFlowUnsafe(rootPath: Path): (BlockFlow, Storages) = {
+  def buildBlockFlowUnsafe(rootPath: Path): (BlockFlow, Storages, AlephiumConfig) = {
     val typesafeConfig =
       Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
     val config = AlephiumConfig.load(typesafeConfig, "alephium")
     val dbPath = rootPath.resolve(config.network.networkId.nodeFolder)
     val storages =
       Storages.createUnsafe(dbPath, "db", ProdSettings.writeOptions)(config.broker, config.node)
-    buildBlockFlowUnsafe(storages)(config) -> storages
+    (buildBlockFlowUnsafe(storages)(config), storages, config)
   }
 
   def buildBlockFlowUnsafe(storages: Storages)(implicit config: AlephiumConfig): BlockFlow = {

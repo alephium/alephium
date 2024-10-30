@@ -72,7 +72,7 @@ object BatchReplayBlockFlow extends App with StrictLogging {
     (blockFlow, storages, allHandlers, flowSystem)
   }
 
-  private val (sourceBlockFlow, sourceStorages) = Node.buildBlockFlowUnsafe(sourcePath)
+  private val (sourceBlockFlow, sourceStorages, _) = Node.buildBlockFlowUnsafe(sourcePath)
   private val (targetBlockFlow, targetStorages, targetHandlers, flowSystem) =
     buildTargetBlockFlowUnsafe()
 

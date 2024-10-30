@@ -86,8 +86,8 @@ object ReplayBlockFlow extends App with StrictLogging {
     path
   }
 
-  private val (sourceBlockFlow, sourceStorages) = Node.buildBlockFlowUnsafe(sourcePath)
-  private val (targetBlockFlow, targetStorages) = Node.buildBlockFlowUnsafe(targetPath)
+  private val (sourceBlockFlow, sourceStorages, _) = Node.buildBlockFlowUnsafe(sourcePath)
+  private val (targetBlockFlow, targetStorages, _) = Node.buildBlockFlowUnsafe(targetPath)
 
   Runtime.getRuntime.addShutdownHook(new Thread(() => {
     sourceStorages.closeUnsafe()
