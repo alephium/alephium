@@ -1384,7 +1384,6 @@ class ServerUtils(implicit
     buildResults.map(_._1)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def buildChainedTransaction(
       blockFlow: BlockFlow,
       buildTransaction: BuildChainedTx,
@@ -1404,23 +1403,26 @@ class ServerUtils(implicit
         )
       case buildExecuteScript: BuildChainedExecuteScriptTx =>
         for {
-          buildTxResult <- buildExecuteScriptUnsignedTx(
+          buildUnsignedTxResult <- buildExecuteScriptUnsignedTx(
             blockFlow,
             buildExecuteScript.value,
             extraUtxosInfo
           )
-          (unsignedTx, inputWithAssets) = buildTxResult
-          emulationResult <- TxScriptEmulator
-            .Default(blockFlow)
-            .emulate(inputWithAssets, unsignedTx.scriptOpt.get)
-            .left
-            .map(failed)
-        } yield (
-          BuildChainedExecuteScriptTxResult(BuildExecuteScriptTxResult.from(unsignedTx)),
-          extraUtxosInfo
-            .updateWithUnsignedTx(unsignedTx)
-            .updateWithGeneratedOutputs(unsignedTx, emulationResult.generatedOutputs)
-        )
+        } yield {
+          val (unsignedTx, generatedOutputs) = buildUnsignedTxResult
+          val generatedAssetOutputs = generatedOutputs.collect {
+            case o: model.AssetOutput => Some(o.toProtocol())
+            case _                    => None
+          }
+          (
+            BuildChainedExecuteScriptTxResult(
+              BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
+            ),
+            extraUtxosInfo
+              .updateWithUnsignedTx(unsignedTx)
+              .updateWithGeneratedOutputs(unsignedTx, generatedAssetOutputs)
+          )
+        }
       case buildDeployContract: BuildChainedDeployContractTx =>
         for {
           unsignedTx <- buildDeployContractUnsignedTx(
@@ -1470,11 +1472,12 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def buildExecuteScriptUnsignedTx(
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[(UnsignedTransaction, AVector[TxInputWithAsset])] = {
+  ): Try[(UnsignedTransaction, AVector[model.Output])] = {
     for {
       _          <- query.check().left.map(badRequest)
       multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
@@ -1486,7 +1489,7 @@ class ServerUtils(implicit
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      result <- unsignedTxFromScript(
+      buildUnsignedTxResult <- unsignedTxFromScript(
         blockFlow,
         script,
         amounts._1.getOrElse(U256.Zero),
@@ -1498,7 +1501,19 @@ class ServerUtils(implicit
         multiplier,
         extraUtxosInfo
       )
-    } yield result
+      (unsignedTx, inputWithAssets) = buildUnsignedTxResult
+      emulationResult <- TxScriptEmulator
+        .Default(blockFlow)
+        .emulate(inputWithAssets, unsignedTx.scriptOpt.get)
+        .left
+        .map(failed)
+    } yield {
+      val fixedOutputsLength = unsignedTx.fixedOutputs.length
+      val generatedOutputs = emulationResult.generatedOutputs.mapWithIndex { case (output, index) =>
+        Output.from(output, unsignedTx.id, fixedOutputsLength + index)
+      }
+      (unsignedTx, generatedOutputs)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -1507,9 +1522,10 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
-    for {
-      result <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildExecuteScriptTxResult.from(result._1)
+    buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo).map {
+      case (unsignedTx, generatedOutputs) =>
+        BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

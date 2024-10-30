@@ -901,7 +901,8 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
-        txId = txId
+        txId = txId,
+        generatedOutputs = AVector(outputAsset.upCast())
       )
     )
 
@@ -915,7 +916,8 @@ trait EndpointsExamples extends ErrorExamples {
           unsignedTx = hexString,
           model.minimalGas,
           model.nonCoinbaseMinGasPrice,
-          txId = txId
+          txId = txId,
+          generatedOutputs = AVector(outputAsset.upCast())
         )
       )
     )
@@ -941,7 +943,8 @@ trait EndpointsExamples extends ErrorExamples {
             unsignedTx = hexString,
             model.minimalGas,
             model.nonCoinbaseMinGasPrice,
-            txId = txId
+            txId = txId,
+            generatedOutputs = AVector(outputAsset.upCast())
           )
         )
       )
