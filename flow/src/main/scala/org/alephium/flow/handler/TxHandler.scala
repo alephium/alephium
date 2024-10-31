@@ -297,11 +297,11 @@ trait TxCoreHandler extends TxHandlerUtils {
     val grandPool = blockFlow.getGrandPool()
     grandPool.validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, false) match {
       case Left(Right(NonExistInput)) => ()
-      case Left(_) =>
+      case Left(_) | Right(MemPool.DoubleSpending) =>
         grandPool.orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid orphan tx ${tx.id.toHexString}: ${tx.hex}")
       case Right(MemPool.AddedToMemPool) => handleValidTx(tx)
-      case _                             => ()
+      case Right(_)                      => ()
     }
   }
 

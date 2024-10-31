@@ -629,6 +629,40 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     expectMsg(TxHandler.AddFailed(tx.id, reason))
   }
 
+  it should "remove double spending orphan tx" in new Fixture {
+    val genesisKey              = genesisKeys(chainIndex.from.value)._1
+    val (privateKey, publicKey) = chainIndex.from.generateKey
+    (0 until 2).foreach { _ =>
+      val block = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+      addAndCheck(blockFlow, block)
+    }
+
+    val toPublicKey = chainIndex.from.generateKey._2
+    val mempool     = blockFlow.grandPool.getMemPool(chainIndex.from)
+    val tx0         = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(5)).nonCoinbase.head
+    txHandler ! addTx(tx0)
+    eventually(mempool.contains(tx0.id) is true)
+
+    val tx1 = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(5)).nonCoinbase.head
+    tx1.allInputRefs isnot tx0.allInputRefs
+
+    val tx2 = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(12)).nonCoinbase.head
+    tx2.allInputRefs.toSet is (tx1.allInputRefs ++ tx0.fixedOutputRefs.tail).toSet
+
+    mempool.clear()
+    txHandler ! addTx(tx2, false, false)
+    eventually(orphanPool.contains(tx2.id) is true)
+    txHandler ! addTx(tx1)
+    eventually(mempool.contains(tx1.id) is true)
+    txHandler ! addTx(tx0)
+    txHandler ! TxHandler.CleanOrphanPool
+    eventually {
+      mempool.contains(tx0.id) is true
+      mempool.contains(tx1.id) is true
+      orphanPool.contains(tx2.id) is false
+    }
+  }
+
   trait Fixture extends FlowFixture with TxGenerators {
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
