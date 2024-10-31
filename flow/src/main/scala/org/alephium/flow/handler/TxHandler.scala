@@ -177,7 +177,7 @@ final class TxHandler(
   val txBufferMaxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val batchBroadcastTxsFrequency: Duration = memPoolSetting.batchBroadcastTxsFrequency
   val batchDownloadTxsFrequency: Duration  = memPoolSetting.batchDownloadTxsFrequency
-  val cleanOrphanTxFrequency: Duration     = memPoolSetting.cleanMissingInputsTxFrequency
+  val cleanOrphanTxFrequency: Duration     = memPoolSetting.cleanOrphanTxFrequency
   val orphanTxExpiryDuration: Duration     = cleanOrphanTxFrequency.timesUnsafe(2)
 
   val nonCoinbaseValidation = TxValidation.build
@@ -226,7 +226,7 @@ final class TxHandler(
       handleInterCliqueTx(_, acknowledge = false, cacheOrphanTx = false)
     )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
-    scheduleOnce(self, TxHandler.CleanOrphanPool, memPoolSetting.cleanMissingInputsTxFrequency)
+    scheduleOnce(self, TxHandler.CleanOrphanPool, memPoolSetting.cleanOrphanTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
