@@ -25,7 +25,7 @@ import org.alephium.util.{AlephiumSpec, AVector}
 
 class ExtraUtxosInfoSpec extends AlephiumSpec {
 
-  "ExtraUtxosInfo.merge" should "merge UTXOs" in new FlowFixture with ModelGenerators {
+  trait UtxoFixture extends FlowFixture with ModelGenerators {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val spentUtxoRefs =
       AVector.from(Gen.nonEmptyListOf(assetOutputRefGen(chainIndex.from)).sample.value)
@@ -38,6 +38,9 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
         AssetOutputInfo(txInputRef, assetOutput, MemPoolOutput)
       }
     }
+  }
+
+  "ExtraUtxosInfo.merge" should "merge UTXOs" in new UtxoFixture {
     val newUtxos       = genUtxos()
     val extraUtxosInfo = ExtraUtxosInfo(newUtxos, spentUtxoRefs)
 
@@ -101,30 +104,21 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
     }
   }
 
-  "ExtraUtxosInfo.updateWithGeneratedOutputs" should "update UTXO info" in new FlowFixture
-    with TxGenerators {
-    val chainIndex = chainIndexGen.sample.value
+  "ExtraUtxosInfo.updateWithGeneratedOutputs" should "update UTXO info" in new UtxoFixture {
 
     {
       info("Empty extraUtxosInfo")
 
-      val assetInfos       = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
-      val unsignedTx       = unsignedTxGen(chainIndex)(assetInfos).sample.value
-      val generatedOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
+      val utxos = genUtxos()
 
-      val extraUtxosInfo = ExtraUtxosInfo.empty
-      val updatedExtraUtxosInfo =
-        extraUtxosInfo.updateWithGeneratedOutputs(unsignedTx, generatedOutputs)
-      updatedExtraUtxosInfo.newUtxos.map(_.output) is generatedOutputs
+      val extraUtxosInfo        = ExtraUtxosInfo.empty
+      val updatedExtraUtxosInfo = extraUtxosInfo.updateWithGeneratedAssetOutputs(utxos)
+      updatedExtraUtxosInfo.newUtxos.map(_.output) is utxos.map(_.output)
       updatedExtraUtxosInfo.spentUtxos is AVector.empty[AssetOutputRef]
     }
 
     {
       info("Non-empty extraUtxosInfo")
-
-      val assetInfos       = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
-      val unsignedTx       = unsignedTxGen(chainIndex)(assetInfos).sample.value
-      val generatedOutputs = AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value)
 
       val existingUtxos =
         AVector.from(Gen.nonEmptyListOf(assetOutputGen).sample.value).map { output =>
@@ -140,13 +134,13 @@ class ExtraUtxosInfoSpec extends AlephiumSpec {
         spentUtxos = alreadySpentUtxos
       )
 
-      val updatedExtraUtxosInfo =
-        extraUtxosInfo.updateWithGeneratedOutputs(unsignedTx, generatedOutputs)
-      updatedExtraUtxosInfo.newUtxos.map(_.output) is existingUtxos.map(
+      val utxos = genUtxos()
+
+      val updatedExtraUtxosInfo = extraUtxosInfo.updateWithGeneratedAssetOutputs(utxos)
+      updatedExtraUtxosInfo.newUtxos.map(_.output) is existingUtxos.map(_.output) ++ utxos.map(
         _.output
-      ) ++ generatedOutputs
+      )
       updatedExtraUtxosInfo.spentUtxos is alreadySpentUtxos
     }
-
   }
 }

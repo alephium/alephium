@@ -29,6 +29,7 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
@@ -1411,8 +1412,11 @@ class ServerUtils(implicit
         } yield {
           val (unsignedTx, generatedOutputs) = buildUnsignedTxResult
           val generatedAssetOutputs = generatedOutputs.collect {
-            case o: model.AssetOutput => Some(o.toProtocol())
-            case _                    => None
+            case o: model.AssetOutput =>
+              val txOutputRef =
+                AssetOutputRef.from(new ScriptHint(o.hint), TxOutputRef.unsafeKey(o.key))
+              Some(AssetOutputInfo(txOutputRef, o.toProtocol(), MemPoolOutput))
+            case _ => None
           }
           (
             BuildChainedExecuteScriptTxResult(
@@ -1420,7 +1424,7 @@ class ServerUtils(implicit
             ),
             extraUtxosInfo
               .updateWithUnsignedTx(unsignedTx)
-              .updateWithGeneratedOutputs(unsignedTx, generatedAssetOutputs)
+              .updateWithGeneratedAssetOutputs(generatedAssetOutputs)
           )
         }
       case buildDeployContract: BuildChainedDeployContractTx =>
