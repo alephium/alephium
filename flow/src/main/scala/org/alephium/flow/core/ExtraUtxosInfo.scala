@@ -17,7 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
-import org.alephium.protocol.model.{AssetOutput, AssetOutputRef, TxOutputRef, UnsignedTransaction}
+import org.alephium.protocol.model.{AssetOutputRef, TxOutputRef, UnsignedTransaction}
 import org.alephium.util.AVector
 
 final case class ExtraUtxosInfo(
@@ -45,18 +45,11 @@ final case class ExtraUtxosInfo(
     )
   }
 
-  def updateWithGeneratedOutputs(
-      unsignedTx: UnsignedTransaction,
-      generatedOutputs: AVector[AssetOutput]
+  def updateWithGeneratedAssetOutputs(
+      generatedAssetOutputs: AVector[AssetOutputInfo]
   ): ExtraUtxosInfo = {
-    val fixedOutputsLength = unsignedTx.fixedOutputs.length
-    val newUtxosFromGeneratedOutputs = generatedOutputs.mapWithIndex { (txOutput, index) =>
-      val txOutputRef =
-        AssetOutputRef.from(txOutput, TxOutputRef.key(unsignedTx.id, index + fixedOutputsLength))
-      AssetOutputInfo(txOutputRef, txOutput, MemPoolOutput)
-    }
     ExtraUtxosInfo(
-      newUtxos = newUtxos ++ newUtxosFromGeneratedOutputs,
+      newUtxos = newUtxos ++ generatedAssetOutputs,
       spentUtxos = spentUtxos
     )
   }
