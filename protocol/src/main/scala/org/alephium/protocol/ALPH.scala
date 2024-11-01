@@ -16,6 +16,8 @@
 
 package org.alephium.protocol
 
+import java.text.{DecimalFormat, DecimalFormatSymbols}
+
 import org.alephium.protocol.model.{Address, ChainIndex, HardFork, Weight}
 import org.alephium.util.{AVector, Duration, Number, TimeStamp, U256}
 
@@ -90,11 +92,28 @@ object ALPH {
 
   def prettifyAmount(amount: U256): String = {
     if (amount == U256.Zero) {
-      "0 alph"
+      "0 ALPH"
     } else {
       val converted = (BigDecimal(amount.v) / BigDecimal(oneAlph.v)).toDouble
-      s"$converted alph"
+      s"${format(converted)} ALPH"
     }
+  }
+
+  private def format(value: Double): String = {
+    // scalastyle:off magic.number
+    val decimalFormat = new DecimalFormat()
+    decimalFormat.setGroupingUsed(true)
+    decimalFormat.setMinimumIntegerDigits(1)
+    decimalFormat.setMinimumFractionDigits(1)
+    decimalFormat.setMaximumFractionDigits(18)
+    // scalastyle:on magic.number
+
+    val symbols = new DecimalFormatSymbols()
+    symbols.setDecimalSeparator('.')
+    symbols.setGroupingSeparator(',')
+    decimalFormat.setDecimalFormatSymbols(symbols)
+
+    decimalFormat.format(value)
   }
 
   @inline def isSequentialTxSupported(chainIndex: ChainIndex, hardFork: HardFork): Boolean = {

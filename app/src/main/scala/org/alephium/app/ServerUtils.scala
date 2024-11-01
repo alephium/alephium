@@ -2158,8 +2158,8 @@ object ServerUtils {
       val gasFeeAmount = ALPH.prettifyAmount(gasFee)
       Left(
         ApiError.BadRequest(
-          s"Too much gas fee, cap at $capAmount, got $gasFeeAmount. " +
-            "You can reduce the gas price or increase the alephium.api.gas-fee-cap in user.conf"
+          s"Gas fee exceeds the limit: maximum allowed is $capAmount, but got $gasFeeAmount. " +
+            s"Please lower the gas price or adjust the alephium.api.gas-fee-cap in your user.conf file."
         )
       )
     }
