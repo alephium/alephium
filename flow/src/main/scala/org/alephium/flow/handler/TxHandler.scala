@@ -293,7 +293,7 @@ trait TxCoreHandler extends TxHandlerUtils {
     scheduleOnce(self, TxHandler.CleanOrphanPool, cleanOrphanTxFrequency)
   }
 
-  private def validateOrphanTx(tx: TransactionTemplate): Unit = {
+  private[handler] def validateOrphanTx(tx: TransactionTemplate): Unit = {
     val grandPool = blockFlow.getGrandPool()
     grandPool.validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, false) match {
       case Left(Right(NonExistInput)) => ()

@@ -139,7 +139,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "temporarily cache orphan tx" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
-      ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
+      ("alephium.mempool.clean-orphan-tx-frequency", "500 ms")
     )
 
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
@@ -545,7 +545,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
-      ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
+      ("alephium.mempool.clean-orphan-tx-frequency", "500 ms")
     )
     val sequentialTxs                     = prepareRandomSequentialTxs(6)
     val Seq(tx1, tx2, tx3, tx4, tx5, tx6) = sequentialTxs.toSeq
@@ -655,12 +655,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler ! addTx(tx1)
     eventually(mempool.contains(tx1.id) is true)
     txHandler ! addTx(tx0)
-    txHandler ! TxHandler.CleanOrphanPool
     eventually {
       mempool.contains(tx0.id) is true
       mempool.contains(tx1.id) is true
-      orphanPool.contains(tx2.id) is false
     }
+
+    txHandler.underlyingActor.validateOrphanTx(tx2.toTemplate)
+    orphanPool.contains(tx2.id) is false
   }
 
   trait Fixture extends FlowFixture with TxGenerators {
