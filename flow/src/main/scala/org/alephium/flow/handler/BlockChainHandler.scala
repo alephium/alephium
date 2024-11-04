@@ -28,7 +28,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, NetworkId}
 import org.alephium.protocol.vm.{LogConfig, WorldState}
@@ -80,6 +80,14 @@ object BlockChainHandler {
     .build(
       "alephium_blocks_received_total",
       "Total number of blocks received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val uncleBlocksReceivedTotal: Counter = Counter
+    .build(
+      "alephium_uncle_blocks_received_total",
+      "Total number of uncle blocks received"
     )
     .labelNames("chain_from", "chain_to")
     .register()
@@ -234,14 +242,23 @@ class BlockChainHandler(
   private val blocksTotalLabeled = blocksTotal.labels(chainIndexFromString, chainIndexToString)
   private val blocksReceivedTotalLabeled =
     blocksReceivedTotal.labels(chainIndexFromString, chainIndexToString)
+  // how to get uncle blocks received total for this block?
+  private val uncleBlocksReceivedTotalLabeled =
+    uncleBlocksReceivedTotal.labels(chainIndexFromString, chainIndexToString)
   private val transactionsReceivedTotalLabeled =
     transactionsReceivedTotal.labels(chainIndexFromString, chainIndexToString)
-  override def measure(block: Block): Unit = {
+  override def measure(block: Block)(implicit networkConfig: NetworkConfig): Unit = {
     val chain             = measureCommon(block.header)
     val numOfTransactions = block.transactions.length
 
     blocksTotalLabeled.set(chain.numHashes.toDouble)
     blocksReceivedTotalLabeled.inc()
+    block.ghostUncleData match {
+      case Right(ghostUncleData) =>
+        uncleBlocksReceivedTotalLabeled.inc(ghostUncleData.length.toDouble)
+      case Left(error) =>
+        log.error(s"Error getting ghost uncle data: $error")
+    }
     transactionsReceivedTotalLabeled.inc(numOfTransactions.toDouble)
   }
 
