@@ -4173,6 +4173,66 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkTokenBalance(genesisAddress.lockupScript, tokenId2, U256.unsafe(1))
   }
 
+  it should "only take generated asset outputs in buildChainedTransaction" in new ChainedTransactionsFixture {
+    val tokenContract =
+      s"""
+         |Contract TokenContract() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), selfTokenId!(), 1)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenContractAddress = deployContract(
+      tokenContract,
+      initialAttoAlphAmount = Amount(ALPH.alph(5)),
+      keyPair = (genesisPrivateKey, genesisPublicKey),
+      issueTokenAmount = Some(Amount(U256.unsafe(100)))
+    )
+
+    val withdrawTokenScript =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${tokenContractAddress.toBase58}).withdraw()
+         |}
+         |$tokenContract
+         |""".stripMargin
+
+    val withdrawTokenScriptCode = Compiler.compileTxScript(withdrawTokenScript).toOption.get
+    val buildWithdrawTokenExecuteScriptTx = BuildExecuteScriptTx(
+      fromPublicKey = genesisPublicKey.bytes,
+      attoAlphAmount = Some(Amount(ALPH.alph(1))),
+      bytecode = serialize(withdrawTokenScriptCode)
+    )
+
+    val (unsignedTx, generatedOutputs) = serverUtils
+      .buildExecuteScriptUnsignedTx(
+        blockFlow,
+        buildWithdrawTokenExecuteScriptTx,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+
+    val generatedAssetOutputs = generatedOutputs.map(_.toProtocol()).collect {
+      case output: model.AssetOutput => Some(output)
+      case _                         => None
+    }
+
+    val (_, extraUtxosInfo) = serverUtils
+      .buildChainedTransaction(
+        blockFlow,
+        BuildChainedExecuteScriptTx(buildWithdrawTokenExecuteScriptTx),
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+
+    unsignedTx.fixedOutputs.length is 1
+    generatedOutputs.length is 3
+    generatedAssetOutputs.length is 2
+    extraUtxosInfo.newUtxos.map(_.output) is (unsignedTx.fixedOutputs ++ generatedAssetOutputs)
+  }
+
   it should "get ghost uncles" in new Fixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block0     = emptyBlock(blockFlow, chainIndex)
