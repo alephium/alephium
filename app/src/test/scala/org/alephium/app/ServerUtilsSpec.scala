@@ -4231,6 +4231,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     generatedOutputs.length is 3
     generatedAssetOutputs.length is 2
     extraUtxosInfo.newUtxos.map(_.output) is (unsignedTx.fixedOutputs ++ generatedAssetOutputs)
+    extraUtxosInfo.newUtxos.tail.map(o => (o.ref.hint.value, o.ref.key.value)) is
+      generatedOutputs.filter(_.toProtocol().isAsset).map(o => (o.hint, o.key))
   }
 
   it should "get ghost uncles" in new Fixture {
