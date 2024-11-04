@@ -35,7 +35,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -2154,7 +2154,14 @@ object ServerUtils {
     if (gasFee <= apiConfig.gasFeeCap) {
       Right(())
     } else {
-      Left(ApiError.BadRequest(s"Too much gas fee, cap at ${apiConfig.gasFeeCap}, got $gasFee"))
+      val capAmount    = ALPH.prettifyAmount(apiConfig.gasFeeCap)
+      val gasFeeAmount = ALPH.prettifyAmount(gasFee)
+      Left(
+        ApiError.BadRequest(
+          s"Gas fee exceeds the limit: maximum allowed is $capAmount, but got $gasFeeAmount. " +
+            s"Please lower the gas price or adjust the alephium.api.gas-fee-cap in your user.conf file."
+        )
+      )
     }
   }
 

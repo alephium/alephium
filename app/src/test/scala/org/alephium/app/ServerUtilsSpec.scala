@@ -694,7 +694,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     ServerUtils.validateUnsignedTransaction(tooMuchGasFee) is Left(
       ApiError.BadRequest(
-        "Too much gas fee, cap at 1000000000000000000, got 20000000000000000000000"
+        "Gas fee exceeds the limit: maximum allowed is 1.0 ALPH, but got 20,000.0 ALPH. Please lower the gas price or adjust the alephium.api.gas-fee-cap in your user.conf file."
       )
     )
 
