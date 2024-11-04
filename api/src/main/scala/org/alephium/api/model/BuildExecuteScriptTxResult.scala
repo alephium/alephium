@@ -29,7 +29,7 @@ final case class BuildExecuteScriptTxResult(
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: TransactionId,
-    generatedOutputs: AVector[Output]
+    simulatedOutputs: AVector[Output]
 ) extends GasInfo
     with ChainIndexInfo
     with TransactionInfo

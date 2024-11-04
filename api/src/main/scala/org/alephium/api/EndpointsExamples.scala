@@ -902,7 +902,7 @@ trait EndpointsExamples extends ErrorExamples {
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
         txId = txId,
-        generatedOutputs = AVector(outputAsset.upCast())
+        simulatedOutputs = AVector(outputAsset.upCast())
       )
     )
 
@@ -917,7 +917,7 @@ trait EndpointsExamples extends ErrorExamples {
           model.minimalGas,
           model.nonCoinbaseMinGasPrice,
           txId = txId,
-          generatedOutputs = AVector(outputAsset.upCast())
+          simulatedOutputs = AVector(outputAsset.upCast())
         )
       )
     )
@@ -944,7 +944,7 @@ trait EndpointsExamples extends ErrorExamples {
             model.minimalGas,
             model.nonCoinbaseMinGasPrice,
             txId = txId,
-            generatedOutputs = AVector(outputAsset.upCast())
+            simulatedOutputs = AVector(outputAsset.upCast())
           )
         )
       )

@@ -7991,7 +7991,7 @@
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "generatedOutputs": [
+                  "simulatedOutputs": [
                     {
                       "type": "AssetOutput",
                       "hint": 1,
@@ -8901,7 +8901,7 @@
                       "gasAmount": 20000,
                       "gasPrice": "100000000000",
                       "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                      "generatedOutputs": [
+                      "simulatedOutputs": [
                         {
                           "type": "AssetOutput",
                           "hint": 1,
@@ -12756,7 +12756,7 @@
           "gasAmount",
           "gasPrice",
           "txId",
-          "generatedOutputs"
+          "simulatedOutputs"
         ],
         "properties": {
           "fromGroup": {
@@ -12782,7 +12782,7 @@
             "type": "string",
             "format": "32-byte-hash"
           },
-          "generatedOutputs": {
+          "simulatedOutputs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Output"
