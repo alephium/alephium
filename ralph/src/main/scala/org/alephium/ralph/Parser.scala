@@ -253,7 +253,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           .atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
-  def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = PP("_")(_ => Ast.AnonymousVar)
+  def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = PP("_")(_ => Ast.AnonymousVar())
   def namedVar[Unknown: P]: P[Ast.NamedVar] =
     P(Index ~ Lexer.mut ~ Lexer.ident ~~ Index).map { case (from, mutable, id, to) =>
       Ast.NamedVar(mutable, id).atSourceIndex(from, to, fileURI)
