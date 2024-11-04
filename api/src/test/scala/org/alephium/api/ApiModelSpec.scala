@@ -705,7 +705,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         gasAmount = GasBox.unsafe(1),
         gasPrice = GasPrice(1),
         txId = txId,
-        generatedOutputs = AVector(
+        simulatedOutputs = AVector(
           Output.from(assetOutput, txId, 0)
         )
       )
@@ -721,7 +721,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    "gasAmount":1,
          |    "gasPrice":"1",
          |    "txId": "${txId.toHexString}",
-         |    "generatedOutputs": [
+         |    "simulatedOutputs": [
          |      {
          |        "type": "AssetOutput",
          |        "hint": -383063803,
@@ -1148,7 +1148,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
       txId = txId,
-      generatedOutputs = AVector.empty
+      simulatedOutputs = AVector.empty
     )
     val jsonRaw =
       s"""
@@ -1159,7 +1159,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasAmount":1,
          |  "gasPrice":"1",
          |  "txId": "${txId.toHexString}",
-         |  "generatedOutputs": []
+         |  "simulatedOutputs": []
          |}
          |""".stripMargin
 
