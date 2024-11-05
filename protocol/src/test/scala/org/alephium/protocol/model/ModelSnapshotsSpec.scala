@@ -18,6 +18,8 @@ package org.alephium.protocol.model
 
 import org.scalatest.flatspec.AnyFlatSpecLike
 
+import org.alephium.serde.stringSerde
+
 // This is to verify that the `verify` and `fail` method in ModelSnapshots
 // work as intended
 class ModelSnapshotsSpec extends ModelSnapshots with AnyFlatSpecLike {

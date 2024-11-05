@@ -241,7 +241,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "toTxOutput for Leman fork + asset lockup script" in new ToTxOutputFixture {
-    override val lockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
+    override val lockupScript: LockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
 
     Test(0).expectLeman()
     Test(dustUtxoAmount - 1).failLeman()
@@ -283,8 +283,8 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "toTxOutput for Leman fork + contract lockup script" in new ToTxOutputFixture {
-    override val lockupScript = LockupScript.p2c(ContractId.generate)
-    val address               = Address.from(lockupScript)
+    override val lockupScript: LockupScript = LockupScript.p2c(ContractId.generate)
+    val address                             = Address.from(lockupScript)
 
     Test(0).expectLeman()
     Test(ALPH.oneAlph - 1).failLeman(LowerThanContractMinimalBalance(address, ALPH.oneAlph - 1))
@@ -304,9 +304,9 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "toTxOutput for rhone fork + contract lockup script" in new ToTxOutputFixture {
-    override val lockupScript = LockupScript.p2c(ContractId.generate)
-    val address               = Address.from(lockupScript)
-    val minimalDeposit        = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
+    override val lockupScript: LockupScript = LockupScript.p2c(ContractId.generate)
+    val address                             = Address.from(lockupScript)
+    val minimalDeposit                      = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
 
     Test(0).expectRhone()
     Test(minimalDeposit - 1).failRhone(LowerThanContractMinimalBalance(address, minimalDeposit - 1))

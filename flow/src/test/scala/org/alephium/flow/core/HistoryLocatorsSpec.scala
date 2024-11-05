@@ -37,7 +37,7 @@ class HistoryLocatorsSpec extends AlephiumSpec {
       val steps   = AVector(0) ++ AVector.tabulate(k + 2)(i => 1 << i)
       val heights = steps.reverse.map((1 << k) - _).tail
       HistoryLocators.sampleHeights(0, 1 << k) is heights
-      forAll { from: Int =>
+      forAll { (from: Int) =>
         val to = from + (1 << k)
         if (to >= from && from >= 0) {
           HistoryLocators.sampleHeights(from, to) is heights.map(from + _)

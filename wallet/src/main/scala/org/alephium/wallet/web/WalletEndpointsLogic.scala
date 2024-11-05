@@ -64,7 +64,7 @@ trait WalletEndpointsLogic extends WalletEndpoints {
           walletRestore.walletName,
           walletRestore.mnemonicPassphrase
         )
-        .map(model.WalletRestoreResult)
+        .map(model.WalletRestoreResult.apply)
         .left
         .map(toApiError)
     )
@@ -80,9 +80,9 @@ trait WalletEndpointsLogic extends WalletEndpoints {
         .map(toApiError)
     )
   }
-  val deleteWalletLogic = serverLogic(deleteWallet) { case (wallet, walletDeletion) =>
+  val deleteWalletLogic = serverLogic(deleteWallet) { case (wallet, password) =>
     Future.successful(
-      walletService.deleteWallet(wallet, walletDeletion.password).left.map(toApiError)
+      walletService.deleteWallet(wallet, password).left.map(toApiError)
     )
   }
 

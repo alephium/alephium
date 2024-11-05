@@ -37,7 +37,7 @@ trait WalletExamples extends EndpointsExamples {
       )
       .get
 
-  implicit private val groupConfig =
+  implicit private val groupConfig: GroupConfig =
     new GroupConfig {
       override def groups: Int = 4
     }
@@ -113,9 +113,6 @@ trait WalletExamples extends EndpointsExamples {
         "More Settings (with pass phrase)"
       )
     )
-
-  implicit val walletDeletionExamples: List[Example[WalletDeletion]] =
-    simpleExample(WalletDeletion(password))
 
   implicit val balancesExamples: List[Example[Balances]] =
     simpleExample(

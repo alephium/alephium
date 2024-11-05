@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 
 final case class DiscoveryVersion(value: Int) extends AnyVal
 

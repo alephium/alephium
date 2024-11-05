@@ -458,7 +458,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion             := "2.13.10",
+  scalaVersion             := "2.13.14",
   Test / parallelExecution := false,
   scalacOptions ++= Seq(
     "-Xsource:3",
@@ -496,7 +496,8 @@ val commonSettings = publishSettings ++ Seq(
     "-Ywarn-unused:patvars",
     "-Ywarn-unused:privates",
     "-Ywarn-value-discard",
-    "-Ymacro-annotations"
+    "-Ymacro-annotations",
+    "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:silent"
   ),
   Compile / console / scalacOptions --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
   Compile / compile / wartremoverErrors      := Warts.allBut(wartsCompileExcludes: _*),
@@ -532,7 +533,9 @@ val wartsCompileExcludes = Seq(
   Wart.StringPlusAny,
   Wart.While,
   Wart.SizeIs,
-  Wart.ScalaApp
+  Wart.ScalaApp,
+  Wart.SeqApply,
+  Wart.TripleQuestionMark
 )
 
 val wartsTestExcludes = wartsCompileExcludes ++ Seq(

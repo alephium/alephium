@@ -89,7 +89,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   }
 
   it should "create vector from Iterable" in new Fixture {
-    forAll { xs: List[A] =>
+    forAll { (xs: List[A]) =>
       val vector = AVector.from(xs)
       checkState(vector, xs.length)
       xs.indices.foreach { i => vector(i) is xs(i) }
@@ -97,7 +97,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   }
 
   it should "create vector from Array using unsafe" in new Fixture {
-    forAll { arr: Array[A] =>
+    forAll { (arr: Array[A]) =>
       val vector = AVector.unsafe(arr)
       checkState(vector, arr.length)
       vector.elems is arr
@@ -117,7 +117,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     vc0.isEmpty is true
     vc0.nonEmpty is false
 
-    forAll { xs: Array[A] =>
+    forAll { (xs: Array[A]) =>
       val vc1 = AVector.from(xs)
       vc1.isEmpty is xs.isEmpty
       vc1.nonEmpty is xs.nonEmpty
@@ -125,7 +125,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   }
 
   it should "deconstruct" in new Fixture {
-    forAll { xs: Array[A] =>
+    forAll { (xs: Array[A]) =>
       whenever(xs.nonEmpty) {
         val vc = AVector.from(xs)
         vc.head is xs.head
@@ -150,7 +150,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   }
 
   it should "get element by index" in {
-    forAll { xs: Array[A] =>
+    forAll { (xs: Array[A]) =>
       whenever(xs.length >= 4) {
         val vc0 = AVector.unsafe(xs)
         vc0.get(-1).isEmpty is true

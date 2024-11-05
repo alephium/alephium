@@ -29,7 +29,7 @@ import org.alephium.wallet.api.model._
 
 class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
-  implicit val groupConfig =
+  implicit val groupConfig: GroupConfig =
     new GroupConfig {
       override def groups: Int = 4
     }
@@ -127,12 +127,6 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
     val json2         = s"""{"password":"$password","mnemonicPassphrase":"$mnemonicPassphrase"}"""
     val walletUnlock2 = WalletUnlock(password, Some(mnemonicPassphrase))
     check(walletUnlock2, json2)
-  }
-
-  it should "WalletDeletion" in {
-    val json           = s"""{"password":"$password"}"""
-    val walletDeletion = WalletDeletion(password)
-    check(walletDeletion, json)
   }
 
   it should "WalletRestore" in {

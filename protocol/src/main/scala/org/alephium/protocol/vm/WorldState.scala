@@ -27,7 +27,7 @@ import org.alephium.protocol.vm.nodeindexes.{
   NodeIndexesStorage,
   StagingNodeIndexes
 }
-import org.alephium.serde.{Serde, SerdeError}
+import org.alephium.serde.{intSerde, Serde, SerdeError}
 import org.alephium.util.{AVector, SizedLruCache}
 
 // scalastyle:off number.of.methods file.size.limit

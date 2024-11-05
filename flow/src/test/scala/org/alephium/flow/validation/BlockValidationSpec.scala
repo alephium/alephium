@@ -108,7 +108,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait GenesisForkFixture extends Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
     )
@@ -116,14 +116,14 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "validate group for block" in new Fixture {
-    implicit val validator = checkGroup _
+    implicit val validator: (Block) => BlockValidationResult[Unit] = checkGroup _
 
     forAll(blockGenOf(brokerConfig))(_.pass())
     forAll(blockGenNotOf(brokerConfig))(_.fail(InvalidGroup))
   }
 
   it should "validate nonEmpty transaction list" in new Fixture {
-    implicit val validator = checkNonEmptyTransactions _
+    implicit val validator: (Block) => BlockValidationResult[Unit] = checkNonEmptyTransactions _
 
     forAll(blockGen) { block =>
       if (block.transactions.nonEmpty) {
@@ -176,7 +176,8 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "validate coinbase transaction simple format" in new CoinbaseFormatFixture {
-    implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 0, false)
+    implicit val validator: (Block) => BlockValidationResult[Unit] =
+      (blk: Block) => checkCoinbaseEasy(blk, 0, false)
     implicit val error: InvalidBlockStatus = InvalidCoinbaseFormat
 
     commonTest(block)
@@ -195,7 +196,8 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "validate PoLW coinbase transaction simple format" in new CoinbaseFormatFixture {
-    implicit val validator = (blk: Block) => checkCoinbaseEasy(blk, 0, isPoLW = true)
+    implicit val validator: (Block) => BlockValidationResult[Unit] =
+      (blk: Block) => checkCoinbaseEasy(blk, 0, isPoLW = true)
     implicit val error: InvalidBlockStatus = InvalidPoLWCoinbaseFormat
     val inputs                             = AVector(txInputGen.sample.get)
     override val block = emptyBlock(blockFlow, chainIndex).Coinbase
@@ -226,7 +228,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait PreRhoneForkFixture extends Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
     )
   }
@@ -254,11 +256,12 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase data for pre-rhone hardfork" in new CoinbaseDataFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
-    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
+    implicit val validator: (Block) => BlockValidationResult[Unit] =
+      (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
     val block          = emptyBlock(blockFlow, chainIndex)
     val selectedUncles = AVector.empty
@@ -284,7 +287,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check uncles for pre-rhone hardfork" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
@@ -292,7 +295,7 @@ class BlockValidationSpec extends AlephiumSpec {
       GhostUncleData(BlockHash.random, assetLockupGen(chainIndex.to).sample.get)
     )
 
-    implicit val validator = (blk: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       networkConfig.getHardFork(blk.timestamp) is HardFork.Leman
       checkGhostUncles(blockFlow, blk.chainIndex, blk, ghostUncles).map(_ => ())
     }
@@ -302,10 +305,12 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase data for rhone hardfork" in new CoinbaseDataFixture {
-    override val configValues = Map(("alephium.network.rhone-hard-fork-timestamp", 0))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.rhone-hard-fork-timestamp", 0))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
-    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
+    implicit val validator: (Block) => BlockValidationResult[Unit] =
+      (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
     val uncleBlock     = blockGen(chainIndex).sample.get
     val uncleMiner     = assetLockupGen(chainIndex.to).sample.get
@@ -344,13 +349,14 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase locked amount pre-rhone" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    val block              = emptyBlock(blockFlow, chainIndex)
-    val consensusConfig    = consensusConfigs.getConsensusConfig(block.timestamp)
-    val miningReward       = consensusConfig.emission.reward(block.header).miningReward
-    val lockedAmount       = miningReward
-    implicit val validator = (blk: Block) => checkLockedReward(blk, AVector(lockedAmount))
+    val block           = emptyBlock(blockFlow, chainIndex)
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block.header).miningReward
+    val lockedAmount    = miningReward
+    implicit val validator: (Block) => BlockValidationResult[Unit] =
+      (blk: Block) => checkLockedReward(blk, AVector(lockedAmount))
 
     info("valid")
     block.pass()
@@ -363,10 +369,10 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase reward pre-rhone" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     val block = emptyBlock(blockFlow, chainIndex)
-    implicit val validator = (blk: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
@@ -381,7 +387,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "check gas reward cap for Genesis fork" in new GenesisForkFixture {
 
-    implicit val validator = (blk: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Mainnet)
     }
@@ -407,11 +413,11 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check gas reward for Leman fork" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 
-    implicit val validator = (blk: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
@@ -430,7 +436,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check the number of txs" in new Fixture {
-    implicit val validator = checkTxNumber _
+    implicit val validator: (Block) => BlockValidationResult[Unit] = checkTxNumber _
 
     val block   = transfer(blockFlow, chainIndex)
     val maxTxs  = AVector.fill(maximalTxsInOneBlock)(block.nonCoinbase.head)
@@ -442,7 +448,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check the gas price decreasing" in new Fixture {
-    implicit val validator = checkGasPriceDecreasing _
+    implicit val validator: (Block) => BlockValidationResult[Unit] = checkGasPriceDecreasing _
 
     val block = transfer(blockFlow, chainIndex)
     val low   = block.nonCoinbase.head
@@ -495,8 +501,8 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check double spending in a same block" in new Fixture {
-    implicit val validator = checkBlockDoubleSpending _
-    val intraChainIndex    = ChainIndex.unsafe(0, 0)
+    implicit val validator: (Block) => BlockValidationResult[Unit] = checkBlockDoubleSpending _
+    val intraChainIndex                                            = ChainIndex.unsafe(0, 0)
 
     val block0 = transferOnlyForIntraGroup(blockFlow, intraChainIndex)
     block0.nonCoinbase.length is 1
@@ -614,7 +620,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate blocks with breaking instrs" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
     val newStorages =
@@ -724,11 +730,12 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check coinbase locked amount rhone" in new RhoneCoinbaseFixture {
     {
       info("block has no uncle")
-      val block              = emptyBlock(blockFlow, chainIndex)
-      val miningReward       = getMiningReward(block)
-      val mainChainReward    = Coinbase.calcMainChainReward(miningReward)
-      val lockedReward       = mainChainReward
-      implicit val validator = (blk: Block) => checkLockedReward(blk, AVector(lockedReward))
+      val block           = emptyBlock(blockFlow, chainIndex)
+      val miningReward    = getMiningReward(block)
+      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val lockedReward    = mainChainReward
+      implicit val validator: (Block) => BlockValidationResult[Unit] =
+        (blk: Block) => checkLockedReward(blk, AVector(lockedReward))
 
       info("valid")
       block.pass()
@@ -749,7 +756,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val mainChainReward = Coinbase.calcMainChainReward(miningReward)
       val uncleReward     = Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
       val blockReward     = mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
-      implicit val validator =
+      implicit val validator: (Block) => BlockValidationResult[Unit] =
         (blk: Block) => checkLockedReward(blk, AVector(blockReward, uncleReward))
 
       info("valid")
@@ -803,7 +810,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase reward rhone" in new RhoneCoinbaseFixture {
-    implicit val validator = (blk: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Rhone)
     }
@@ -883,7 +890,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait RhoneFixture extends Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
@@ -1072,7 +1079,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate block with invalid uncle intra deps" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().millis)
     )
@@ -1167,7 +1174,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate blocks with sequential txs for pre-rhone hardfork" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     override lazy val chainIndex = ChainIndex.unsafe(0, 0)
@@ -1359,7 +1366,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check PoLW coinbase tx" in new PoLWCoinbaseFixture {
-    implicit val validator = (block: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
       val hardFork  = networkConfig.getHardFork(block.timestamp)
       val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
@@ -1457,11 +1464,11 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check PoLW coinbase tx pre-rhone" in new PoLWCoinbaseFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
-    implicit val validator = (block: Block) => {
+    implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
       val hardFork  = networkConfig.getHardFork(block.timestamp)
       val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
@@ -1486,7 +1493,7 @@ class BlockValidationSpec extends AlephiumSpec {
       emptyBlock.Coinbase.output(o => o.copy(lockupScript = miner))
     }
 
-    implicit lazy val validator = (block: Block) => {
+    implicit lazy val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
       val hardFork = networkConfig.getHardFork(block.timestamp)
       checkTestnetMiner(block, hardFork)
     }

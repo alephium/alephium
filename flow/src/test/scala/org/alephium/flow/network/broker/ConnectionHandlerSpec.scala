@@ -117,7 +117,7 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "close connection when write buffer overrun" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       "alephium.network.connection-buffer-capacity-in-byte" -> 100
     )
 

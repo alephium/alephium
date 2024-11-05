@@ -43,11 +43,11 @@ object Message extends SimpleSerde[Message] {
   )(implicit groupConfig: GroupConfig): SerdeResult[Message] = {
     byteSerde._deserialize(input).flatMap { case Staging(byte, rest) =>
       if (byte == 0) {
-        PeerInfo.deserialize(rest).map(Peer)
+        PeerInfo.deserialize(rest).map(Peer.apply)
       } else if (byte == 1) {
-        IntraCliqueInfo.deserialize(rest).map(Clique)
+        IntraCliqueInfo.deserialize(rest).map(Clique.apply)
       } else if (byte == 2) {
-        intSerde.deserialize(rest).map(Ack)
+        intSerde.deserialize(rest).map(Ack.apply)
       } else if (byte == 3) {
         Right(Ready)
       } else {

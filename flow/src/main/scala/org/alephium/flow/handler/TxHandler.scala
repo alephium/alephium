@@ -23,6 +23,7 @@ import akka.actor.Props
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.io.PendingTxStorage
 import org.alephium.flow.mempool.{GrandPool, MemPool, TxHandlerBuffer}
 import org.alephium.flow.mining.Miner
@@ -40,12 +41,16 @@ import org.alephium.serde.serialize
 import org.alephium.util._
 
 object TxHandler {
-  def props(blockFlow: BlockFlow, txStorage: PendingTxStorage)(implicit
+  def props(
+      blockFlow: BlockFlow,
+      txStorage: PendingTxStorage,
+      eventBus: ActorRefT[EventBus.Message]
+  )(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props = Props(new TxHandler(blockFlow, txStorage))
+  ): Props = Props(new TxHandler(blockFlow, txStorage, eventBus))
 
   sealed trait Command
   final case class AddToMemPool(
@@ -153,7 +158,11 @@ object TxHandler {
   }
 }
 
-final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxStorage)(implicit
+final class TxHandler(
+    val blockFlow: BlockFlow,
+    val pendingTxStorage: PendingTxStorage,
+    val eventBus: ActorRefT[EventBus.Message]
+)(implicit
     val brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
     val networkSetting: NetworkSetting,
@@ -392,7 +401,7 @@ trait DownloadTxsHandler extends TxHandlerUtils {
             downloads(announcement.brokerHandler) = chainIndexedHashes
         }
       }
-      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
+      downloads.foreachEntry { case (brokerHandler, chainIndexedHashes) =>
         val txHashes = chainIndexedTxsToAVector(chainIndexedHashes)
         log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
         brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
@@ -435,6 +444,7 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
 
 trait AutoMineHandler extends TxCoreHandler {
   def blockFlow: BlockFlow
+  def eventBus: ActorRefT[EventBus.Message]
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
@@ -457,6 +467,10 @@ trait AutoMineHandler extends TxCoreHandler {
     val blockMessage = Message.serialize(NewBlock(block))
     val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
     publishEvent(event)
+
+    escapeIOError(blockFlow.getHeight(block)) { height =>
+      eventBus ! BlockNotify(block, height)
+    }
   }
 }
 

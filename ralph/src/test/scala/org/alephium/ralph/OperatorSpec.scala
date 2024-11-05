@@ -54,206 +54,206 @@ class OperatorSpec
   }
 
   it should "test + (I256)" in new I256Fixture {
-    val operator = ArithOperator.Add
+    val operator: Operator = ArithOperator.Add
     test(Seq(3, 4), 7)
     operator.calc(Seq(Val.I256(I256.MaxValue), 1)) is Left("I256 overflow")
   }
 
   it should "test - (I256)" in new I256Fixture {
-    val operator = ArithOperator.Sub
+    val operator: Operator = ArithOperator.Sub
     test(Seq(3, 4), -1)
     operator.calc(Seq(Val.I256(I256.MinValue), 1)) is Left("I256 overflow")
   }
 
   it should "test * (I256)" in new I256Fixture {
-    val operator = ArithOperator.Mul
+    val operator: Operator = ArithOperator.Mul
     test(Seq(3, 4), 12)
     operator.calc(Seq(Val.I256(I256.MaxValue), 2)) is Left("I256 overflow")
   }
 
   it should "test / (I256)" in new I256Fixture {
-    val operator = ArithOperator.Div
+    val operator: Operator = ArithOperator.Div
     test(Seq(3, 4), 0)
     operator.calc(Seq(Val.I256(I256.MinValue), -1)) is Left("I256 overflow")
   }
 
   it should "test % (I256)" in new I256Fixture {
-    val operator = ArithOperator.Mod
+    val operator: Operator = ArithOperator.Mod
     test(Seq(3, 4), 3)
     operator.calc(Seq(Val.I256(I256.MinValue), -1)) is Left("I256 overflow")
   }
 
   it should "test ** (I256)" in new I256Fixture {
-    val operator = ArithOperator.Exp
+    val operator: Operator = ArithOperator.Exp
     test(Seq(3, Val.U256(U256.unsafe(4))), 81)
     operator.calc(Seq(Val.I256(I256.MaxValue), Val.U256(U256.Two))) is Left("I256 overflow")
   }
 
   it should "test + (U256)" in new U256Fixture {
-    val operator = ArithOperator.Add
+    val operator: Operator = ArithOperator.Add
     test(Seq(3, 4), 7)
     operator.calc(Seq(Val.U256(U256.MaxValue), 1)) is Left("U256 overflow")
   }
 
   it should "test - (U256)" in new U256Fixture {
-    val operator = ArithOperator.Sub
+    val operator: Operator = ArithOperator.Sub
     test(Seq(4, 3), 1)
     operator.calc(Seq(Val.U256(U256.MinValue), 1)) is Left("U256 overflow")
   }
 
   it should "test * (U256)" in new U256Fixture {
-    val operator = ArithOperator.Mul
+    val operator: Operator = ArithOperator.Mul
     test(Seq(3, 4), 12)
     operator.calc(Seq(Val.U256(U256.MaxValue), 2)) is Left("U256 overflow")
   }
 
   it should "test / (U256)" in new U256Fixture {
-    val operator = ArithOperator.Div
+    val operator: Operator = ArithOperator.Div
     test(Seq(3, 4), 0)
     operator.calc(Seq(Val.U256(U256.MinValue), 0)) is Left("U256 overflow")
   }
 
   it should "test % (U256)" in new U256Fixture {
-    val operator = ArithOperator.Mod
+    val operator: Operator = ArithOperator.Mod
     test(Seq(3, 4), 3)
     operator.calc(Seq(Val.U256(U256.MinValue), 0)) is Left("U256 overflow")
   }
 
   it should "test ** (U256)" in new U256Fixture {
-    val operator = ArithOperator.Exp
+    val operator: Operator = ArithOperator.Exp
     test(Seq(3, 4), 81)
     operator.calc(Seq(Val.U256(U256.MaxValue), 2)) is Left("U256 overflow")
   }
 
   it should "test |+|" in new U256Fixture {
-    val operator = ArithOperator.ModAdd
+    val operator: Operator = ArithOperator.ModAdd
     test(Seq(3, 4), 7)
     test(Seq.fill(2)(Val.U256(U256.MaxValue)), Val.U256(U256.MaxValue.subOneUnsafe()))
   }
 
   it should "test |-|" in new U256Fixture {
-    val operator = ArithOperator.ModSub
+    val operator: Operator = ArithOperator.ModSub
     test(Seq(4, 3), 1)
     test(Seq(0, 1), Val.U256(U256.MaxValue))
   }
 
   it should "test |*|" in new U256Fixture {
-    val operator = ArithOperator.ModMul
+    val operator: Operator = ArithOperator.ModMul
     test(Seq(3, 4), 12)
     test(Seq(Val.U256(U256.MaxValue), 2), Val.U256(U256.MaxValue.subOneUnsafe()))
   }
 
   it should "test |**|" in new U256Fixture {
-    val operator = ArithOperator.ModExp
+    val operator: Operator = ArithOperator.ModExp
     test(Seq(3, 4), 81)
     test(Seq(2, 256), 0)
   }
 
   it should "test <<" in new U256Fixture {
-    val operator = ArithOperator.SHL
+    val operator: Operator = ArithOperator.SHL
     test(Seq(0xff, 4), 0xff0)
   }
 
   it should "test >>" in new U256Fixture {
-    val operator = ArithOperator.SHR
+    val operator: Operator = ArithOperator.SHR
     test(Seq(0xff, 4), 0x0f)
   }
 
   it should "test &" in new U256Fixture {
-    val operator = ArithOperator.BitAnd
+    val operator: Operator = ArithOperator.BitAnd
     test(Seq(0xff, 0xf0), 0xf0)
   }
 
   it should "test |" in new U256Fixture {
-    val operator = ArithOperator.BitOr
+    val operator: Operator = ArithOperator.BitOr
     test(Seq(0xff, 0xf0), 0xff)
   }
 
   it should "test ^" in new U256Fixture {
-    val operator = ArithOperator.Xor
+    val operator: Operator = ArithOperator.Xor
     test(Seq(0xff, 0xf0), 0x0f)
   }
 
   it should "test ==" in new Fixture {
-    val operator = TestOperator.Eq
-    val value0   = vmValGen.sample.get
-    val value1   = vmValGen.sample.get
+    val operator: Operator = TestOperator.Eq
+    val value0             = vmValGen.sample.get
+    val value1             = vmValGen.sample.get
     test(Seq(value0, value0), true)
     test(Seq(value0, value1), value0 == value1)
   }
 
   it should "test !=" in new Fixture {
-    val operator = TestOperator.Ne
-    val value0   = vmValGen.sample.get
-    val value1   = vmValGen.sample.get
+    val operator: Operator = TestOperator.Ne
+    val value0             = vmValGen.sample.get
+    val value1             = vmValGen.sample.get
     test(Seq(value0, value0), false)
     test(Seq(value0, value1), value0 != value1)
   }
 
   it should "test < (I256)" in new I256Fixture {
-    val operator = TestOperator.Lt
+    val operator: Operator = TestOperator.Lt
     test(Seq(3, 4), true)
     test(Seq(3, 3), false)
     test(Seq(4, 3), false)
   }
 
   it should "test <= (I256)" in new I256Fixture {
-    val operator = TestOperator.Le
+    val operator: Operator = TestOperator.Le
     test(Seq(3, 4), true)
     test(Seq(3, 3), true)
     test(Seq(4, 3), false)
   }
 
   it should "test > (I256)" in new I256Fixture {
-    val operator = TestOperator.Gt
+    val operator: Operator = TestOperator.Gt
     test(Seq(3, 4), false)
     test(Seq(3, 3), false)
     test(Seq(4, 3), true)
   }
 
   it should "test >= (I256)" in new I256Fixture {
-    val operator = TestOperator.Ge
+    val operator: Operator = TestOperator.Ge
     test(Seq(3, 4), false)
     test(Seq(3, 3), true)
     test(Seq(4, 3), true)
   }
 
   it should "test < (U256)" in new U256Fixture {
-    val operator = TestOperator.Lt
+    val operator: Operator = TestOperator.Lt
     test(Seq(3, 4), true)
     test(Seq(3, 3), false)
     test(Seq(4, 3), false)
   }
 
   it should "test <= (U256)" in new U256Fixture {
-    val operator = TestOperator.Le
+    val operator: Operator = TestOperator.Le
     test(Seq(3, 4), true)
     test(Seq(3, 3), true)
     test(Seq(4, 3), false)
   }
 
   it should "test > (U256)" in new U256Fixture {
-    val operator = TestOperator.Gt
+    val operator: Operator = TestOperator.Gt
     test(Seq(3, 4), false)
     test(Seq(3, 3), false)
     test(Seq(4, 3), true)
   }
 
   it should "test >= (U256)" in new U256Fixture {
-    val operator = TestOperator.Ge
+    val operator: Operator = TestOperator.Ge
     test(Seq(3, 4), false)
     test(Seq(3, 3), true)
     test(Seq(4, 3), true)
   }
 
   it should "test !" in new Fixture {
-    val operator = LogicalOperator.Not
+    val operator: Operator = LogicalOperator.Not
     test(Seq(false), true)
     test(Seq(true), false)
   }
 
   it should "test &&" in new Fixture {
-    val operator = LogicalOperator.And
+    val operator: Operator = LogicalOperator.And
     test(Seq(false, false), false)
     test(Seq(false, true), false)
     test(Seq(true, false), false)
@@ -261,7 +261,7 @@ class OperatorSpec
   }
 
   it should "test ||" in new Fixture {
-    val operator = LogicalOperator.Or
+    val operator: Operator = LogicalOperator.Or
     test(Seq(false, false), false)
     test(Seq(false, true), true)
     test(Seq(true, false), true)

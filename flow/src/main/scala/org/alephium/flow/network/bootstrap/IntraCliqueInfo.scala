@@ -49,8 +49,8 @@ object IntraCliqueInfo extends SafeSerdeImpl[IntraCliqueInfo, GroupConfig] {
     new IntraCliqueInfo(id, peers, groupNumPerBroker, priKey)
   }
 
-  implicit private val peerSerde  = PeerInfo.unsafeSerde
-  implicit private val peersSerde = avectorSerde[PeerInfo]
+  implicit private val peerSerde: Serde[PeerInfo]           = PeerInfo.unsafeSerde
+  implicit private val peersSerde: Serde[AVector[PeerInfo]] = avectorSerde[PeerInfo]
   override val unsafeSerde: Serde[IntraCliqueInfo] =
     Serde.forProduct4(unsafe, t => (t.id, t.peers, t.groupNumPerBroker, t.priKey))
 

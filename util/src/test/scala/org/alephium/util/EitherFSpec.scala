@@ -20,7 +20,7 @@ import scala.util.Random
 
 class EitherFSpec extends AlephiumSpec {
   it should "foreach for positive case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       var sum    = 0
       val result = EitherF.foreachTry[Int, Unit](ns)(n => Right(sum += n))
       result.isRight is true
@@ -29,7 +29,7 @@ class EitherFSpec extends AlephiumSpec {
   }
 
   it should "foreach for negative case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       if (ns.nonEmpty) {
         val r = ns(Random.nextInt(ns.length))
         val result = EitherF.foreachTry[Int, Unit](ns) { n =>
@@ -41,14 +41,14 @@ class EitherFSpec extends AlephiumSpec {
   }
 
   it should "fold for positive case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       val result = EitherF.foldTry[Int, Unit, Int](ns, 0) { case (acc, n) => Right(acc + n) }
       result isE ns.sum
     }
   }
 
   it should "fold for negative case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       if (ns.nonEmpty) {
         val r = ns(Random.nextInt(ns.length))
         val result = EitherF.foldTry[Int, Unit, Unit](ns, ()) { case (_, n) =>
@@ -60,14 +60,14 @@ class EitherFSpec extends AlephiumSpec {
   }
 
   it should "forall for positive case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       val result = EitherF.forallTry[Int, Unit](ns)(n => Right(n > 0))
       result isE ns.forall(_ > 0)
     }
   }
 
   it should "forall for negative case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       whenever(ns.nonEmpty) {
         val r = ns(Random.nextInt(ns.length))
         val result = EitherF.forallTry[Int, Unit](ns) { n =>

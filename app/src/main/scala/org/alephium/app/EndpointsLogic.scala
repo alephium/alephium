@@ -721,7 +721,7 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
-  val testContractLogic = serverLogic(testContract) { testContract: TestContract =>
+  val testContractLogic = serverLogic(testContract) { (testContract: TestContract) =>
     val (blockFlow, storages) = BlockFlow.emptyAndStoragesUnsafe(node.config)
     Future.successful {
       val result = for {
@@ -734,11 +734,11 @@ trait EndpointsLogic extends Endpoints {
     }
   }
 
-  val callContractLogic = serverLogic(callContract) { params: CallContract =>
+  val callContractLogic = serverLogic(callContract) { (params: CallContract) =>
     Future.successful(Right(serverUtils.callContract(blockFlow, params)))
   }
 
-  val multipleCallContractLogic = serverLogic(multiCallContract) { params: MultipleCallContract =>
+  val multipleCallContractLogic = serverLogic(multiCallContract) { (params: MultipleCallContract) =>
     Future.successful(serverUtils.multipleCallContract(blockFlow, params))
   }
 
@@ -793,10 +793,10 @@ trait EndpointsLogic extends Endpoints {
   )
 
   val callTxScriptLogic = serverLogicRedirect(callTxScript)(
-    { params: CallTxScript =>
+    { (params: CallTxScript) =>
       Future.successful(serverUtils.callTxScript(blockFlow, params))
     },
-    { params: CallTxScript =>
+    { (params: CallTxScript) =>
       getGroupIndex(GroupIndex.from(params.group))
     }
   )

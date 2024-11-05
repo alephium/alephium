@@ -17,7 +17,7 @@
 package org.alephium.flow.model
 
 import org.alephium.crypto.SecP256K1PrivateKey
-import org.alephium.serde.Serde
+import org.alephium.serde.{serdeTS, Serde}
 import org.alephium.util.TimeStamp
 
 final case class BootstrapInfo(key: SecP256K1PrivateKey, timestamp: TimeStamp)

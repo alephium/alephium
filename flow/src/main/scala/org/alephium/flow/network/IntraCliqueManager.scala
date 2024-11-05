@@ -158,7 +158,7 @@ class IntraCliqueManager(
       assume(block.chainIndex.relateTo(brokerConfig))
       log.debug(s"Broadcasting block ${block.shortHex} for ${block.chainIndex}")
       // TODO: optimize this without using iteration
-      brokers.foreach { case (_, (info, broker)) =>
+      brokers.foreachEntry { case (_, (info, broker)) =>
         if (!origin.isFrom(info)) {
           if (block.chainIndex.relateTo(info)) {
             log.debug(s"Send block ${block.shortHex} to broker $info")
@@ -170,7 +170,7 @@ class IntraCliqueManager(
         }
       }
     case IntraCliqueManager.BroadCastTx(txs) =>
-      brokers.foreach { case (_, (info, broker)) =>
+      brokers.foreachEntry { case (_, (info, broker)) =>
         val needToSend =
           txs.view.filter(p => info.isIncomingChain(p._1)).map(_._2).fold(AVector.empty)(_ ++ _)
         if (needToSend.nonEmpty) {
@@ -186,7 +186,7 @@ class IntraCliqueManager(
       actor: ActorRef,
       brokers: Map[Int, (BrokerInfo, ActorRefT[BrokerHandler.Command])]
   ): Unit = {
-    brokers.foreach {
+    brokers.foreachEntry {
       case (_, (info, broker)) if broker == ActorRefT[BrokerHandler.Command](actor) =>
         log.error(s"Self clique node $info is not functioning, shutdown the system now")
         terminateSystem()

@@ -20,7 +20,7 @@ import scala.util.Random
 
 class OptionFSpec extends AlephiumSpec {
   it should "foreach for positive case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       var sum    = 0
       val result = OptionF.foreach[Int](ns)(n => Some(sum += n))
       result.nonEmpty is true
@@ -29,7 +29,7 @@ class OptionFSpec extends AlephiumSpec {
   }
 
   it should "foreach for negative case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       if (ns.nonEmpty) {
         val r = ns(Random.nextInt(ns.length))
         val result = OptionF.foreach[Int](ns) { n =>
@@ -41,14 +41,14 @@ class OptionFSpec extends AlephiumSpec {
   }
 
   it should "fold for positive case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       val result = OptionF.fold[Int, Int](ns, 0) { case (acc, n) => Some(acc + n) }
       result.value is ns.sum
     }
   }
 
   it should "fold for negative case" in {
-    forAll { ns: Seq[Int] =>
+    forAll { (ns: Seq[Int]) =>
       if (ns.nonEmpty) {
         val r = ns(Random.nextInt(ns.length))
         val result = OptionF.fold[Int, Unit](ns, ()) { case (_, n) =>

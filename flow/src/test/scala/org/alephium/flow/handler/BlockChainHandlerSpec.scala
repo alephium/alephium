@@ -70,7 +70,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "not broadcast block if the block comes from other broker groups" in new Fixture { F =>
     val fixture = new AlephiumConfigFixture {
-      override val configValues = Map(
+      override val configValues: Map[String, Any] = Map(
         ("alephium.broker.broker-id", 1)
       )
       override lazy val genesisKeys = F.genesisKeys
@@ -176,7 +176,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   trait InvalidBlockFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val block         = emptyBlock(blockFlow, chainIndex)
     val invalidHeader = block.header.copy(version = 4.toByte)
@@ -184,7 +184,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "not broadcast block if the block header is invalid and the block is not mined locally" in new InvalidBlockFixture {
-    override val dataOrigin = DataOrigin.InterClique(brokerInfo)
+    override val dataOrigin: DataOrigin = DataOrigin.InterClique(brokerInfo)
 
     blockChainHandler ! InterCliqueManager.SyncedResult(true)
     validateBlock(invalidBlock)
@@ -195,7 +195,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "broadcast block if the block header is invalid and the block is mined locally" in new InvalidBlockFixture {
-    override val dataOrigin = DataOrigin.Local
+    override val dataOrigin: DataOrigin = DataOrigin.Local
 
     blockChainHandler ! InterCliqueManager.SyncedResult(true)
     blockChainHandler ! BlockChainHandler.ValidateMinedBlock(
@@ -217,7 +217,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "publish misbehavior when receiving deep forked blocks from remote" in new Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val invalidForkedBlock = emptyBlock(blockFlow, chainIndex)
     val listener           = TestProbe()
@@ -257,7 +257,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "not broadcast block if the testnet miner is invalid" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 1),
       ("alephium.consensus.num-zeros-at-least-in-hash", 0)
     )

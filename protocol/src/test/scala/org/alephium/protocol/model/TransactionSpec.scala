@@ -148,7 +148,7 @@ class TransactionSpec
   }
 
   it should "seder the snapshots properly" in new TransactionSnapshotsFixture {
-    implicit val basePath = "src/test/resources/models/transaction"
+    implicit val basePath: String = "src/test/resources/models/transaction"
 
     import Hex._
 

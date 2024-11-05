@@ -30,7 +30,7 @@ import org.alephium.util._
 class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
 
   trait Fixture {
-    implicit val system = createSystem()
+    implicit val system: ActorSystem = createSystem()
 
     val discoveryServer    = TestProbe()
     val misbehaviorManager = TestProbe()

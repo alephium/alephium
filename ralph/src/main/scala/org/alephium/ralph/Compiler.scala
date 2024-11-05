@@ -24,7 +24,7 @@ import akka.util.ByteString
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
-import org.alephium.ralph.Ast.MultiContract
+import org.alephium.ralph.Ast.{Ident, MultiContract}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.CompilerError.FastParseError
 import org.alephium.util.{AVector, U256}
@@ -170,7 +170,7 @@ object Compiler {
     def parse(failure: Parsed.Failure): Error = FastParseError(failure)
   }
 
-  def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
+  def expectOneType(ident: Ident, tpe: Seq[Type]): Type = {
     if (tpe.length == 1) {
       tpe(0)
     } else {
@@ -178,8 +178,9 @@ object Compiler {
     }
   }
 
-  type VarInfoBuilder = (Type, Boolean, Boolean, Byte, Boolean) => VarInfo
+  type VarInfoBuilder = (Ident, Type, Boolean, Boolean, Byte, Boolean) => VarInfo
   sealed trait VarInfo {
+    def ident: Ident
     def tpe: Type
     def isMutable: Boolean
     def isUnused: Boolean
@@ -188,6 +189,7 @@ object Compiler {
   }
   object VarInfo {
     final case class Local(
+        ident: Ident,
         tpe: Type,
         isMutable: Boolean,
         isUnused: Boolean,
@@ -197,6 +199,7 @@ object Compiler {
       def isLocal: Boolean = true
     }
     final case class Field(
+        ident: Ident,
         tpe: Type,
         isMutable: Boolean,
         isUnused: Boolean,
@@ -205,18 +208,20 @@ object Compiler {
     ) extends VarInfo {
       def isLocal: Boolean = false
     }
-    final case class MapVar(tpe: Type.Map, index: Int) extends VarInfo {
+    final case class MapVar(ident: Ident, tpe: Type.Map, index: Int) extends VarInfo {
       def isMutable: Boolean   = true
       def isUnused: Boolean    = false
       def isGenerated: Boolean = false
       def isLocal: Boolean     = false
     }
-    final case class Template(tpe: Type, index: Int, isGenerated: Boolean) extends VarInfo {
+    final case class Template(ident: Ident, tpe: Type, index: Int, isGenerated: Boolean)
+        extends VarInfo {
       def isMutable: Boolean = false
       def isUnused: Boolean  = false
       def isLocal: Boolean   = false
     }
     final case class MultipleVar[Ctx <: StatelessContext](
+        ident: Ident,
         isMutable: Boolean,
         isUnused: Boolean,
         isGenerated: Boolean,
@@ -226,6 +231,7 @@ object Compiler {
       def isLocal: Boolean = ref.isLocal
     }
     final case class Constant[Ctx <: StatelessContext](
+        ident: Ident,
         tpe: Type,
         value: Val,
         instrs: Seq[Instr[Ctx]],
@@ -487,7 +493,7 @@ object Compiler {
     // callee -> callers
     lazy val internalCallsReversed: mutable.Map[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]] = {
       val reversed = mutable.Map.empty[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]]
-      internalCalls.foreach { case (caller, callees) =>
+      internalCalls.foreachEntry { case (caller, callees) =>
         callees.foreach { callee =>
           reversed.get(callee) match {
             case None          => reversed.update(callee, mutable.ArrayBuffer(caller))
@@ -572,7 +578,7 @@ object Compiler {
         isLocal = true,
         isGenerated = true,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local.apply
       )
       val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
       (ref, codes)
@@ -610,7 +616,7 @@ object Compiler {
         ref: VariablesRef[Ctx]
     ): Unit = {
       val sname   = checkNewVariable(ident)
-      val varInfo = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
+      val varInfo = VarInfo.MultipleVar(ident, isMutable, isUnused, isGenerated, ref)
       trackAndAddVarInfo(sname, varInfo)
     }
 
@@ -643,7 +649,7 @@ object Compiler {
 
     private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)
-      trackAndAddVarInfo(sname, VarInfo.MapVar(tpe, mapIndex))
+      trackAndAddVarInfo(sname, VarInfo.MapVar(ident, tpe, mapIndex))
     }
 
     @inline private def getGlobalVariable(name: String): Option[VarInfo] = {
@@ -663,7 +669,8 @@ object Compiler {
         isLocal = false,
         isGenerated = false,
         isTemplate = true,
-        (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated)
+        (ident, tpe, _, _, index, isGenerated) =>
+          VarInfo.Template(ident, tpe, index.toInt, isGenerated)
       )
     }
     def addFieldVariable(
@@ -681,7 +688,7 @@ object Compiler {
         isLocal = false,
         isGenerated,
         isTemplate = false,
-        VarInfo.Field
+        VarInfo.Field.apply
       )
     }
     def addLocalVariable(
@@ -699,7 +706,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local.apply
       )
     }
     // scalastyle:off parameter.number
@@ -733,6 +740,7 @@ object Compiler {
           ()
         case _ =>
           val varInfo = varInfoBuilder(
+            ident,
             tpe,
             isMutable,
             isUnused,
@@ -748,7 +756,13 @@ object Compiler {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
       val varInfo =
-        VarInfo.Constant(Type.fromVal(value.tpe), value, Seq(value.toConstInstr), constantDef)
+        VarInfo.Constant(
+          ident,
+          Type.fromVal(value.tpe),
+          value,
+          Seq(value.toConstInstr),
+          constantDef
+        )
       addVarInfo(sname, varInfo)
       ()
     }
@@ -767,10 +781,7 @@ object Compiler {
       val name  = ident.name
       val sname = scopedName(name)
       if (getGlobalVariable(name).isDefined) {
-        throw Error(
-          s"Global variable has the same name as local variable: $name",
-          ident.sourceIndex
-        )
+        throw Error(s"Global variables have the same name: $name", ident.sourceIndex)
       } else if (varDefinedInScopeOrParent(sname, variableScope)) {
         throw Error(s"Local variables have the same name: $name", ident.sourceIndex)
       } else if (currentScopeState.varIndex >= State.maxVarIndex) {
@@ -887,7 +898,7 @@ object Compiler {
 
       if (unusedMaps.nonEmpty) {
         val unusedMapsInfo = unusedMaps.map { case (varKey, varInfo) =>
-          (varKey.name, varInfo.tpe)
+          (varKey.name, varInfo.ident.sourceIndex)
         }.toSeq
         warnUnusedMaps(typeId, unusedMapsInfo)
       }
@@ -901,14 +912,14 @@ object Compiler {
         !varInfo.tpe.isMapType
       }
       val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
-      val unusedFields         = mutable.ArrayBuffer.empty[(String, Type)]
+      val unusedFields         = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       unusedVars.foreach {
         case (varKey, c: VarInfo.Constant[_]) =>
           if (c.constantDef.definedIn(typeId)) {
             unusedLocalConstants.addOne((varKey.name, c.constantDef.ident.sourceIndex))
           }
         case (varKey, varInfo) if !varInfo.isLocal =>
-          unusedFields.addOne((varKey.name, varInfo.tpe))
+          unusedFields.addOne((varKey.name, varInfo.ident.sourceIndex))
         case _ => ()
       }
       if (unusedLocalConstants.nonEmpty) {
@@ -1352,7 +1363,7 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
-        case VarInfo.MapVar(_, index)                           => genMapIndex(index)
+        case VarInfo.MapVar(_, _, index)                        => genMapIndex(index)
       }
     }
 

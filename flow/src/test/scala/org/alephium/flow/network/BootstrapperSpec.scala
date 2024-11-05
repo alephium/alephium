@@ -29,7 +29,7 @@ import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
 class BootstrapperSpec extends AlephiumActorSpec {
   it should "bootstrap a master" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.internal-address", s"127.0.0.1:9972"),
       ("alephium.network.coordinator-address", s"127.0.0.1:9972"),
       ("alephium.network.external-address", s"127.0.0.1:9972")
