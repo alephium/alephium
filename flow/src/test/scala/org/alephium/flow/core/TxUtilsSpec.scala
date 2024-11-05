@@ -1356,22 +1356,26 @@ class TxUtilsSpec extends AlephiumSpec {
     sweep().leftValue is "Not enough ALPH for gas fee in sweeping"
   }
 
-  trait MultiGroupTransactions extends FlowFixture with UnsignedTxFixture {
-    implicit override lazy val blockFlow   = isolatedBlockFlow()
-    override val configValues              = Map(("alephium.broker.broker-num", 1))
-    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
-    val lockupScript                       = LockupScript.p2pkh(fromPublicKey)
-    val unlockScript                       = UnlockScript.p2pkh(fromPublicKey)
-
-    val lockupScriptsByGroup = Map(
-      GroupIndex.unsafe(0) -> lockupScript,
-      GroupIndex.unsafe(1) -> Address.p2pkh(GroupIndex.unsafe(1).generateKey._2).lockupScript,
-      GroupIndex.unsafe(2) -> Address.p2pkh(GroupIndex.unsafe(2).generateKey._2).lockupScript
-    )
+  trait MultiTransferFixture extends FlowFixture with UnsignedTxFixture {
+    implicit override lazy val blockFlow             = isolatedBlockFlow()
+    override val configValues                        = Map(("alephium.broker.broker-num", 1))
+    val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
+    val (genesisPrivateKey_1, genesisPublicKey_1, _) = genesisKeys(1)
+    val (genesisPrivateKey_2, genesisPublicKey_2, _) = genesisKeys(2)
 
     val validation = TxValidation.build
 
-    def outputOfAmount(amount: U256): TxOutputInfo =
+    def issueTokens(code: String, to: LockupScript.Asset): (TokenId, U256) = {
+      val (contractId, _, _) = createContract(
+        code,
+        AVector.empty,
+        AVector.empty,
+        tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1), Some(to)))
+      )
+      (TokenId.from(contractId), U256.One)
+    }
+
+    def outputOfAmount(lockupScript: LockupScript.Asset, amount: U256): TxOutputInfo =
       TxOutputInfo(
         lockupScript,
         amount,
@@ -1379,88 +1383,108 @@ class TxUtilsSpec extends AlephiumSpec {
         None
       )
 
-    def testAlphRemainderCheck(inputs: AVector[AssetOutputInfo], outputs: AVector[TxOutputInfo]) = {
+    def testAlphRemainderCheck(
+        unlockScript: UnlockScript,
+        inputs: AVector[AssetOutputInfo],
+        outputs: AVector[TxOutputInfo]
+    ) = {
       blockFlow
         .getPositiveRemaindersOrFail(
-          UnlockScript.p2pkh(fromPublicKey),
+          unlockScript,
           inputs,
           outputs,
           nonCoinbaseMinGasPrice
         )
     }
 
-    def splitGenesisUtxo: AVector[AssetOutputInfo] = {
-      val block =
-        transfer(
-          blockFlow,
-          fromPrivateKey,
-          amount = genesisBalance.divUnsafe(U256.Two),
-          to = fromPublicKey
-        )
-      addAndCheck(blockFlow, block)
-      val utxos = blockFlow
-        .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
-        .rightValue
-        .asUnsafe[AssetOutputInfo]
-      assume(utxos.length == 2)
-      utxos
-    }
-
-    def genesisUtxos: AVector[AssetOutputInfo] =
-      blockFlow
-        .getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true)
-        .rightValue
-        .asUnsafe[AssetOutputInfo]
-
-    def buildOutputs(targetGroups: AVector[GroupIndex]): AVector[AVector[TxOutputInfo]] = {
-      AVector.from(
-        targetGroups
-          .groupBy(identity)
-          .view
-          .mapValues { groups =>
-            groups.map { group =>
-              TxOutputInfo(
-                lockupScriptsByGroup(group),
-                ALPH.oneAlph,
-                AVector.empty,
-                None
-              )
-            }
+    def buildOutputs(
+        targetGroups: AVector[GroupIndex],
+        amount: U256 = ALPH.oneAlph,
+        tokens: AVector[(TokenId, U256)] = AVector.empty
+    ): AVector[AVector[TxOutputInfo]] = {
+      targetGroups
+        .groupByAsVec(identity)
+        .map { case (_, groups) =>
+          groups.map { group =>
+            TxOutputInfo(
+              Address.p2pkh(group.generateKey._2).lockupScript,
+              amount,
+              tokens,
+              None
+            )
           }
-          .values
-      )
-    }
-
-    def testMultiGroupTxsBuilding(
-        allRemainingInputs: AVector[AssetOutputInfo],
-        outputGroups: AVector[AVector[TxOutputInfo]]
-    ): Either[String, Unit] = {
-      blockFlow
-        .buildMultiGroupTransactions(
-          lockupScript,
-          unlockScript,
-          allRemainingInputs,
-          outputGroups,
-          nonCoinbaseMinGasPrice,
-          AVector.empty
-        )
-        .map { unsignedTxs =>
-          unsignedTxs
-            .map { unsignedTx =>
-              testUnsignedTx(unsignedTx, fromPrivateKey)
-              val tx = Transaction.from(unsignedTx, fromPrivateKey)
-              validation.validateTxOnlyForTest(tx, blockFlow, None)
-              tx
-            }
-            .groupBy(tx => ChainIndex(tx.fromGroup, tx.toGroup))
-            .foreach { case (chainIndex, txs) =>
-              val block =
-                mine(blockFlow, chainIndex, txs, lockupScriptsByGroup(chainIndex.to), None)
-              addAndCheck(blockFlow, block)
-            }
         }
     }
 
+    // scalastyle:off parameter.number
+    def testMultiTransferTxsBuilding(
+        fromPrivateKey: PrivateKey,
+        fromPublicKey: PublicKey,
+        initialInputsCount: Option[Int],
+        outputGroups: AVector[AVector[TxOutputInfo]],
+        gasPrice: GasPrice = nonCoinbaseMinGasPrice
+    )(
+        expectedSenderUtxosCount: Int,
+        expectedDestUtxosCount: Int,
+        expectedDestBalance: U256,
+        expectedTxsCount: Int
+    ): Either[String, Assertion] = {
+      val senderBalance =
+        blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
+      val (inputs, initialSenderBalance) = initialInputsCount match {
+        case Some(inputsCount) if inputsCount < 1 =>
+          (AVector.empty[AssetOutputInfo], senderBalance)
+        case inputsCountOpt =>
+          val (initialUtxos, fee) =
+            generateUtxosWithTxFee(fromPrivateKey, fromPublicKey, inputsCountOpt)
+          (initialUtxos, senderBalance - fee)
+      }
+      blockFlow
+        .buildMultiGroupTransactions(
+          LockupScript.p2pkh(fromPublicKey),
+          UnlockScript.p2pkh(fromPublicKey),
+          inputs,
+          outputGroups,
+          gasPrice,
+          AVector.empty
+        )
+        .map { unsignedTxs =>
+          val confirmedBlocks =
+            unsignedTxs.map { unsignedTx =>
+              testUnsignedTx(unsignedTx, fromPrivateKey)
+              val tx = Transaction.from(unsignedTx, fromPrivateKey)
+              validation.validateTxOnlyForTest(tx, blockFlow, None)
+              val minerScript = Address.p2pkh(tx.toGroup.generateKey._2).lockupScript
+              val block       = mine(blockFlow, tx.chainIndex, AVector(tx), minerScript, None)
+              addAndCheck(blockFlow, block)
+              if (!tx.chainIndex.isIntraGroup) {
+                addAndCheck(
+                  blockFlow,
+                  emptyBlock(blockFlow, ChainIndex(tx.fromGroup, tx.fromGroup))
+                )
+              }
+              block
+            }
+
+          val txs = confirmedBlocks.flatMap(_.nonCoinbase)
+          txs.length is expectedTxsCount
+
+          val outputs                          = outputGroups.flatMap(identity)
+          val (actualUtxoCount, actualBalance) = getTotalUtxoCountsAndBalance(blockFlow, outputs)
+          actualUtxoCount is expectedDestUtxosCount
+          actualBalance is expectedDestBalance
+
+          val txsFee         = U256.from(txs.map(_.gasFeeUnsafe.v).sum).get
+          val senderHasSpent = U256.from(outputs.map(_.attoAlphAmount.v).sum).get + txsFee
+          val expectedSenderBalanceWithGas = initialSenderBalance - senderHasSpent
+
+          val sendersBalance =
+            blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue
+          sendersBalance._1 is expectedSenderBalanceWithGas
+          sendersBalance._5 is expectedSenderUtxosCount
+        }
+    }
+    // scalastyle:on parameter.number
   }
 
   trait LargeUtxos extends FlowFixture {
@@ -1618,36 +1642,46 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "get positive alph remainder or fail" in new MultiGroupTransactions {
-    val halfGenesisInput = splitGenesisUtxo.head
+  it should "get positive alph remainder or fail" in new MultiTransferFixture {
+    val halfGenesisInput =
+      generateUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, Some(2))._1.head
+    val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
+    val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
 
     testAlphRemainderCheck(
+      genesisUnlockScript,
       AVector(halfGenesisInput),
-      AVector(outputOfAmount(genesisBalance / 4))
+      AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4))
     ).isRight is true
 
     testAlphRemainderCheck(
+      genesisUnlockScript,
       AVector(halfGenesisInput),
-      AVector(outputOfAmount(genesisBalance))
+      AVector(outputOfAmount(genesisLockupScript, genesisBalance))
     ).isLeft is true
 
     testAlphRemainderCheck(
+      genesisUnlockScript,
       AVector.empty,
-      AVector(outputOfAmount(genesisBalance))
+      AVector(outputOfAmount(genesisLockupScript, genesisBalance))
     ).isLeft is true
 
     testAlphRemainderCheck(
+      genesisUnlockScript,
       AVector.empty,
       AVector.empty
     ).isLeft is true
 
     testAlphRemainderCheck(
+      genesisUnlockScript,
       AVector(halfGenesisInput),
       AVector.empty
     ).isLeft is true
 
-    val overflowValueOutputs = AVector.fill(2)(outputOfAmount(U256.MaxValue))
+    val overflowValueOutputs =
+      AVector.fill(2)(outputOfAmount(genesisLockupScript, U256.MaxValue))
     testAlphRemainderCheck(
+      genesisUnlockScript,
       AVector(halfGenesisInput),
       overflowValueOutputs
     ).isLeft is true
@@ -1661,7 +1695,7 @@ class TxUtilsSpec extends AlephiumSpec {
           ),
           org.alephium.protocol.model.AssetOutput(
             U256.MaxValue,
-            lockupScript,
+            genesisLockupScript,
             TimeStamp.now(),
             AVector.empty,
             ByteString.empty
@@ -1670,45 +1704,126 @@ class TxUtilsSpec extends AlephiumSpec {
         )
       }
     testAlphRemainderCheck(
+      genesisUnlockScript,
       overflowValueInputs,
-      AVector(outputOfAmount(genesisBalance / 4))
+      AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4))
     ).isLeft is true
 
     testAlphRemainderCheck(
+      genesisUnlockScript,
       overflowValueInputs,
       overflowValueOutputs
     ).isLeft is true
   }
 
-  it should "build multi group transactions from just single genesis box" in new MultiGroupTransactions {
-    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
-
-    testMultiGroupTxsBuilding(genesisUtxos, outputs) isE ()
+  "weightGroupedWithRemainder" should "group elements based on weight limit" in {
+    val elems = AVector((1, 2), (3, 4), (5, 1), (6, 2), (8, 3))
+    TxUtils.weightGroupedWithRemainder(elems, 5)(_._2) is AVector(
+      AVector((1, 2)),
+      AVector((3, 4), (5, 1)),
+      AVector((6, 2), (8, 3))
+    )
   }
 
-  it should "fail when building multi group txs with no inputs" in new MultiGroupTransactions {
-    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
+  "weightGroupedWithRemainder" should "return a single group if weight limit is larger than all elements combined" in {
+    val elems = AVector((1, 3), (2, 2), (3, 4))
+    TxUtils.weightGroupedWithRemainder(elems, 20)(_._2) is AVector(AVector((1, 3), (2, 2), (3, 4)))
+  }
 
-    testMultiGroupTxsBuilding(
-      AVector.empty,
-      outputs
+  "weightGroupedWithRemainder" should "return an empty AVector when the input is empty" in {
+    val elems = AVector.empty[(Int, Int)]
+    TxUtils.weightGroupedWithRemainder(elems, 10)(_._2) is AVector.empty[AVector[(Int, Int)]]
+  }
+
+  "weightGroupedWithRemainder" should "start a new group if a single element exceeds the weight limit" in {
+    val elems = AVector((1, 2), (2, 5), (4, 1))
+    TxUtils.weightGroupedWithRemainder(elems, 4)(_._2) is AVector(
+      AVector((1, 2)),
+      AVector((2, 5)),
+      AVector((4, 1))
+    )
+  }
+
+  "weightGroupedWithRemainder" should "allow all elements to be in separate groups when weight limit is minimal" in {
+    val elems = AVector((1, 2), (2, 5), (3, 3))
+    TxUtils.weightGroupedWithRemainder(elems, 1)(_._2) is AVector(
+      AVector((1, 2)),
+      AVector((2, 5)),
+      AVector((3, 3))
+    )
+  }
+
+  "weightLimitedGroupBy" should "group elements by odd/even and apply weight limit within each group" in {
+    val elems = AVector((1, 2), (3, 4), (5, 1), (6, 2), (8, 3))
+    TxUtils.weightLimitedGroupBy(elems, 5)(_._1 % 2, _._2) is AVector(
+      AVector((1, 2)),
+      AVector((3, 4), (5, 1)),
+      AVector((6, 2), (8, 3))
+    )
+  }
+
+  "weightLimitedGroupBy" should "return a single group per odd/even category if weight limit is large enough" in {
+    val elems = AVector((1, 3), (3, 2), (5, 4), (2, 3), (4, 2))
+    TxUtils.weightLimitedGroupBy(elems, 20)(_._1 % 2, _._2) is AVector(
+      AVector((1, 3), (3, 2), (5, 4)), // Odd group, total weight: 9
+      AVector((2, 3), (4, 2))          // Even group, total weight: 5
+    )
+  }
+
+  "weightLimitedGroupBy" should "return an empty list when the input is empty" in {
+    val elems = AVector.empty[(Int, Int)]
+    TxUtils.weightLimitedGroupBy(elems, 10)(_._1 % 2, _._2) is AVector.empty[AVector[(Int, Int)]]
+  }
+
+  "weightLimitedGroupBy" should "start a new group if a single element exceeds the weight limit" in {
+    val elems = AVector((1, 2), (3, 5), (2, 1), (4, 2))
+    TxUtils.weightLimitedGroupBy(elems, 4)(_._1 % 2, _._2) is AVector(
+      AVector((1, 2)),
+      AVector((3, 5)),        // new Odd group, exceeds weight limit
+      AVector((2, 1), (4, 2)) // Even group, not exceeding
+    )
+  }
+
+  "weightLimitedGroupBy" should "allow all elements in separate groups if weight limit is minimal" in {
+    val elems = AVector((1, 2), (2, 3), (3, 3))
+    TxUtils.weightLimitedGroupBy(elems, 1)(_._1 % 2, _._2) is AVector(
+      AVector((1, 2)),
+      AVector((3, 3)),
+      AVector((2, 3))
+    )
+  }
+
+  "multi-transfer" should "build multi group transactions from just single genesis box" in new MultiTransferFixture {
+    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
+    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(1), outputs)(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    ) isE Succeeded
+  }
+
+  "multi-transfer" should "fail with no inputs" in new MultiTransferFixture {
+    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
+    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(0), outputs)(
+      expectedSenderUtxosCount = 0,
+      expectedDestUtxosCount = 0,
+      expectedDestBalance = ALPH.alph(0),
+      expectedTxsCount = 0
     ).leftValue is "Not enough inputs to build multi-group transaction"
   }
 
-  it should "build multi group transactions from multiple boxes" in new MultiGroupTransactions {
+  "multi-transfer" should "build multi group transactions from multiple boxes" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
-    val utxos   = splitGenesisUtxo
-    testMultiGroupTxsBuilding(utxos, outputs) isE ()
+    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(2), outputs)(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    ) isE Succeeded
   }
 
-  it should "group outputs by group index with max limit" in new MultiGroupTransactions {
-    val evenAndOddNumbers = AVector.from(1 to 12)
-    val evenAndOddGroupsWithLimit =
-      AVector(AVector(1, 3, 5, 7), AVector(9, 11), AVector(2, 4, 6, 8), AVector(10, 12))
-    TxUtils.sizeLimitedGroupBy(evenAndOddNumbers, 4)(_ % 2) is evenAndOddGroupsWithLimit
-  }
-
-  it should "support building more transactions for a group" in new MultiGroupTransactions {
+  "multi-transfer" should "support building more transactions for a group" in new MultiTransferFixture {
     val outputsToGroup1 = AVector.fill(4)(
       TxOutputInfo(
         Address.p2pkh(GroupIndex.unsafe(1).generateKey._2).lockupScript,
@@ -1718,49 +1833,138 @@ class TxUtilsSpec extends AlephiumSpec {
       )
     )
     val sizeGroupedOutputsToGroup1 =
-      TxUtils.sizeLimitedGroupBy(outputsToGroup1, 2)(_.lockupScript.groupIndex)
+      TxUtils.weightLimitedGroupBy(outputsToGroup1, 2)(
+        _.lockupScript.groupIndex,
+        _.tokens.length + 1
+      )
     sizeGroupedOutputsToGroup1.length is 2
-    val utxos = splitGenesisUtxo
-    testMultiGroupTxsBuilding(
-      utxos,
+    testMultiTransferTxsBuilding(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      Some(2),
       sizeGroupedOutputsToGroup1
-    ) isE ()
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 4,
+      expectedDestBalance = ALPH.oneAlph * 4,
+      expectedTxsCount = 2
+    ) isE Succeeded
   }
 
-  it should "fail with too many destinations in a single group" in new MultiGroupTransactions {
+  "multi-transfer" should "fail with too many outputs in a single group" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector.fill(257)(GroupIndex.unsafe(1)))
-    val utxos   = splitGenesisUtxo
-    testMultiGroupTxsBuilding(
-      utxos,
-      outputs
+    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(2), outputs)(
+      expectedSenderUtxosCount = 0,
+      expectedDestUtxosCount = 0,
+      expectedDestBalance = ALPH.alph(0),
+      expectedTxsCount = 0
     ).leftValue is "Too many transaction outputs, maximal value: 256"
   }
 
-  it should "build multi group transactions intra group" in new MultiGroupTransactions {
-    val intraGroupOutputs = buildOutputs(
-      AVector(GroupIndex.unsafe(0))
-    )
-    testMultiGroupTxsBuilding(genesisUtxos, intraGroupOutputs) isE ()
+  "multi-transfer" should "build multi group transactions with tokens" in new MultiTransferFixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val tokens = AVector.fill(10)(issueTokens(contract, LockupScript.p2pkh(genesisPublicKey_0)))
+    val outputsWithTokens = buildOutputs(AVector(GroupIndex.unsafe(0)), ALPH.oneAlph, tokens)
+    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, None, outputsWithTokens)(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 11,
+      expectedDestBalance = ALPH.oneAlph,
+      expectedTxsCount = 1
+    ) isE Succeeded
   }
 
-  it should "get utxo selection if non-empty or arbitrary utxos" in new MultiGroupTransactions {
+  "multi-transfer" should "build multi group transaction with many inputs/outputs and high gasPrice" in new MultiTransferFixture {
+    val outputs = buildOutputs(AVector.fill(255)(GroupIndex.unsafe(1)))
+    testMultiTransferTxsBuilding(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      Some(255),
+      outputs,
+      gasPrice = GasPrice(ALPH.nanoAlph(100000000))
+    )(
+      expectedSenderUtxosCount = 224,
+      expectedDestUtxosCount = 255,
+      expectedDestBalance = ALPH.oneAlph * 255,
+      expectedTxsCount = 1
+    ) isE Succeeded
+  }
+
+  "multi-transfer" should "build multi group transactions across all groups" in new MultiTransferFixture {
+    val outputs =
+      AVector(0, 1, 2).map { groupIndex =>
+        AVector(
+          TxOutputInfo(
+            Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2).lockupScript,
+            ALPH.oneAlph,
+            AVector.empty,
+            Option.empty
+          )
+        )
+      }
+
+    testMultiTransferTxsBuilding(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      Some(1),
+      outputs
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 3,
+      expectedDestBalance = ALPH.oneAlph * 3,
+      expectedTxsCount = 3
+    ) isE Succeeded
+
+    testMultiTransferTxsBuilding(
+      genesisPrivateKey_1,
+      genesisPublicKey_1,
+      Some(1),
+      outputs
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 6,
+      expectedDestBalance = ALPH.oneAlph * 6,
+      expectedTxsCount = 3
+    ) isE Succeeded
+
+    testMultiTransferTxsBuilding(
+      genesisPrivateKey_2,
+      genesisPublicKey_2,
+      Some(1),
+      outputs
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 9,
+      expectedDestBalance = ALPH.oneAlph * 9,
+      expectedTxsCount = 3
+    ) isE Succeeded
+
+  }
+
+  it should "get utxo selection if non-empty or arbitrary utxos" in new MultiTransferFixture {
+    val utxos = generateUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0)._1
     blockFlow.getUtxoSelectionOrArbitrary(
       None,
-      lockupScript,
-      genesisUtxos.map(_.ref),
+      LockupScript.p2pkh(genesisPublicKey_0),
+      utxos.map(_.ref),
       100
-    ) isE genesisUtxos
+    ) isE utxos
 
     blockFlow.getUtxoSelectionOrArbitrary(
       None,
-      lockupScript,
+      LockupScript.p2pkh(genesisPublicKey_0),
       AVector.empty,
       100
-    ) isE genesisUtxos
-
+    ) isE utxos
   }
 
-  it should "fail if any of the input utxos does not exist" in new MultiGroupTransactions {
+  it should "fail if any of the input utxos does not exist" in new MultiTransferFixture {
     val nonExistingHash = Hash.hash("0")
     val nonExistingUtxo =
       AssetOutputRef.from(new ScriptHint(2), TxOutputRef.unsafeKey(nonExistingHash))
@@ -1768,7 +1972,7 @@ class TxUtilsSpec extends AlephiumSpec {
     blockFlow
       .getUtxoSelectionOrArbitrary(
         None,
-        lockupScript,
+        LockupScript.p2pkh(genesisPublicKey_0),
         AVector(nonExistingUtxo),
         100
       )
@@ -1777,8 +1981,12 @@ class TxUtilsSpec extends AlephiumSpec {
     blockFlow
       .getUtxoSelectionOrArbitrary(
         None,
-        lockupScript,
-        AVector(nonExistingUtxo) ++ genesisUtxos.map(_.ref),
+        LockupScript.p2pkh(genesisPublicKey_0),
+        AVector(nonExistingUtxo) ++ generateUtxosWithTxFee(
+          genesisPrivateKey_0,
+          genesisPublicKey_0
+        )._1
+          .map(_.ref),
         100
       )
       .leftValue is s"Selected input UTXOs are not available: ${nonExistingHash.toHexString}"

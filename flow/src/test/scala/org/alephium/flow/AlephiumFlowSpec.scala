@@ -24,6 +24,7 @@ import akka.util.ByteString
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -127,6 +128,57 @@ trait FlowFixture
       invoker -> txScripts(index)
     }
     mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
+  }
+
+  def generateUtxosWithTxFee(
+      fromPrivateKey: PrivateKey,
+      fromPublicKey: PublicKey,
+      outputsLimitOpt: Option[Int] = None
+  ): (AVector[AssetOutputInfo], U256) = {
+    val initialUtxos = blockFlow
+      .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+      .rightValue
+      .asUnsafe[AssetOutputInfo]
+    outputsLimitOpt match {
+      case None =>
+        initialUtxos -> U256.Zero
+      case Some(outputsLimit) =>
+        require(outputsLimit < ALPH.MaxTxOutputNum, "Number of outputs must fit in a transaction")
+        if (initialUtxos.length >= outputsLimit) {
+          initialUtxos.take(outputsLimit) -> U256.Zero
+        } else {
+          require(outputsLimit > 0, "Number of outputs must be greater than 0")
+          val amountPerOutput = genesisBalance.divUnsafe(U256.unsafe(outputsLimit))
+          val outputs = AVector.fill(outputsLimit - initialUtxos.length) {
+            TxOutputInfo(
+              Address.p2pkh(fromPublicKey).lockupScript,
+              amountPerOutput,
+              AVector.empty,
+              None
+            )
+          }
+          val unsignedTx = blockFlow
+            .transfer(
+              fromPublicKey,
+              outputs,
+              None,
+              nonCoinbaseMinGasPrice,
+              Int.MaxValue,
+              ExtraUtxosInfo.empty
+            )
+            .rightValue
+            .rightValue
+          val tx    = Transaction.from(unsignedTx, fromPrivateKey)
+          val block = mineWithTxs(blockFlow, tx.chainIndex)((_, _) => AVector(tx))
+          addAndCheck(blockFlow, block)
+          val utxos = blockFlow
+            .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+            .rightValue
+            .asUnsafe[AssetOutputInfo]
+          assume(utxos.length == outputsLimit)
+          utxos -> tx.gasFeeUnsafe
+        }
+    }
   }
 
   def transfer(
@@ -697,6 +749,17 @@ trait FlowFixture
     brokerConfig.contains(lockupScript.groupIndex) is true
     val query = blockFlow.getUsableUtxos(lockupScript, defaultUtxoLimit)
     U256.unsafe(query.rightValue.sumBy(_.output.amount.v: BigInt).underlying())
+  }
+
+  def getTotalUtxoCountsAndBalance(
+      blockFlow: BlockFlow,
+      outs: AVector[TxOutputInfo]
+  ): (Int, U256) = {
+    outs.fold((0, U256.Zero)) { case ((utxoCount, balance), output) =>
+      val balanceInfo =
+        blockFlow.getBalance(output.lockupScript, Int.MaxValue, false).rightValue
+      (utxoCount + balanceInfo._5, balance + balanceInfo._1)
+    }
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {

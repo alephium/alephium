@@ -22,6 +22,7 @@ import scala.util.Random
 
 import akka.util.ByteString
 import org.scalacheck.Gen
+import org.scalatest.Assertion
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
@@ -30,7 +31,6 @@ import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
-import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, OutputInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
@@ -38,6 +38,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{deserialize, serialize}
@@ -73,132 +74,98 @@ class ServerUtilsSpec extends AlephiumSpec {
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
 
-  trait MultiGroupFixture extends FlowFixtureWithApi with GetTxFixture {
-
+  trait MultiTransferFixture extends FlowFixtureWithApi with GetTxFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
 
     implicit override lazy val blockFlow = isolatedBlockFlow()
 
-    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(0)
-    val lockupScript                       = LockupScript.p2pkh(fromPublicKey)
-    val unlockScript                       = UnlockScript.p2pkh(fromPublicKey)
-
-    def splitGenesisUtxo: AVector[AssetOutputInfo] = {
-      val block =
-        transfer(
-          blockFlow,
-          fromPrivateKey,
-          amount = genesisBalance.divUnsafe(U256.Two),
-          to = fromPublicKey
-        )
-      addAndCheck(blockFlow, block)
-      val utxos = blockFlow
-        .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
-        .rightValue
-        .asUnsafe[AssetOutputInfo]
-      assume(utxos.length == 2)
-      utxos
-    }
-
-    private def testDependencies(txsWithBlock: AVector[(Block, BuildTransferTxResult)]) = {
-      val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-      addAndCheck(blockFlow, block1)
-      val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
-      addAndCheck(blockFlow, block2)
-      val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2))
-      addAndCheck(blockFlow, block3)
-
-      txsWithBlock
-        .foreach { case (blockWithTx, BuildTransferTxResult(_, _, _, txId, fromGroup, toGroup)) =>
-          serverUtils.getTransactionStatus(
-            blockFlow,
-            txId,
-            ChainIndex.unsafe(fromGroup, toGroup)
-          ) isE
-            Confirmed(blockWithTx.hash, 0, 1, 1, 1)
-        }
-    }
+    val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
+    val (genesisPrivateKey_1, genesisPublicKey_1, _) = genesisKeys(1)
+    val (genesisPrivateKey_2, genesisPublicKey_2, _) = genesisKeys(2)
 
     // scalastyle:off method.length
-    def testMultiTransferToTwoGroupsWithProvidedInputs(
-        provideInputs: AVector[OutputInfo] => Option[AVector[OutputInfo]]
+    def testMultiTransfer(
+        fromPrivateKey: PrivateKey,
+        fromPublicKey: PublicKey,
+        senderInputsCount: Int,
+        destinations: AVector[Destination]
     )(
-        testFn: (
-            AVector[BuildTransferTxResult]
-        ) => (U256, Int, Int, AVector[BuildTransferTxResult])
-    ): Unit = {
-
-      val chainIndex1                        = ChainIndex.unsafe(0, 1)
-      val chainIndex2                        = ChainIndex.unsafe(0, 2)
-      val fromGroup                          = chainIndex1.from
-      val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
-      val senderAddress                      = Address.p2pkh(fromPublicKey)
-      val destinationsByChainIndex = Map(
-        chainIndex1 -> generateDestination(chainIndex1),
-        chainIndex2 -> generateDestination(chainIndex2)
-      )
-      val genesisUtxos =
-        blockFlow.getUTXOs(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, true).rightValue
-      val destinations =
-        AVector(destinationsByChainIndex(chainIndex1), destinationsByChainIndex(chainIndex2))
-      val buildTransactions = serverUtils
+        expectedSenderUtxosCount: Int,
+        expectedDestUtxosCount: Int,
+        expectedDestBalance: U256,
+        expectedTxsCount: Int
+    ): Assertion = {
+      val senderBalance =
+        blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
+      val (inputs, initialSenderBalance) = senderInputsCount match {
+        case x if x < 1 =>
+          (None, senderBalance)
+        case x =>
+          val (initialUtxos, fee) = generateUtxosWithTxFee(fromPrivateKey, fromPublicKey, Some(x))
+          (Some(initialUtxos), senderBalance - fee)
+      }
+      val transactionResults = serverUtils
         .buildMultiTransferUnsignedTransactions(
           blockFlow,
           BuildTransferTx(
             fromPublicKey.bytes,
             None,
             destinations,
-            provideInputs(genesisUtxos).map(_.map(output => OutputRef.from(output.ref)))
+            inputs.map(_.map(output => OutputRef.from(output.ref)))
           )
         )
         .rightValue
 
-      var (initialSenderBalance, senderUtxoNum, destUtxoNum, txToTest) = testFn(buildTransactions)
-
-      val txsWithBlock =
-        txToTest
-          .map { case tx @ BuildTransferTxResult(unsignedTx, _, _, txId, fromGroup, toGroup) =>
-            val txChainIndex = ChainIndex.unsafe(fromGroup, toGroup)
-            val txTemplate = signAndAddToMemPool(
-              txId,
-              unsignedTx,
-              txChainIndex,
+      val confirmedBlocks =
+        transactionResults.map { txResult =>
+          val chainIndex = txResult.chainIndex().get
+          val template =
+            signAndAddToMemPool(
+              txResult.txId,
+              txResult.unsignedTx,
+              chainIndex,
               fromPrivateKey
             )
-            txTemplate.outputsLength is 2
-
-            val destination             = destinationsByChainIndex(txChainIndex)
-            val newSenderBalanceWithGas = initialSenderBalance - destination.attoAlphAmount.value
-            checkAddressBalance(
-              senderAddress,
-              newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
-              senderUtxoNum
+          val block = mineFromMemPool(blockFlow, chainIndex)
+          addAndCheck(blockFlow, block)
+          if (!chainIndex.isIntraGroup) {
+            // To confirm the transaction so its cross-chain output can be used
+            addAndCheck(
+              blockFlow,
+              emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
             )
-            checkDestinationBalance(destination, destUtxoNum)
-
-            val block = mineFromMemPool(blockFlow, txChainIndex)
-            addAndCheck(blockFlow, block)
-            serverUtils.getTransactionStatus(blockFlow, txTemplate.id, txChainIndex) isE
-              Confirmed(block.hash, 0, 1, 0, 0)
-
-            block.nonCoinbase.head.id is txId
-
-            checkAddressBalance(
-              senderAddress,
-              newSenderBalanceWithGas - txTemplate.gasFeeUnsafe,
-              senderUtxoNum
-            )
-            checkDestinationBalance(destination, destUtxoNum)
-            checkTx(blockFlow, block.nonCoinbase.head, txChainIndex)
-
-            initialSenderBalance = newSenderBalanceWithGas - block.transactions.head.gasFeeUnsafe
-            block -> tx
           }
-      testDependencies(txsWithBlock)
-    }
+          val txStatus =
+            serverUtils.getTransactionStatus(blockFlow, template.id, chainIndex).rightValue
+          txStatus.isInstanceOf[Confirmed] is true
+          block.transactions.foreach(checkTx(blockFlow, _, chainIndex))
+          block
+        }
 
+      val txs = confirmedBlocks.flatMap(_.nonCoinbase)
+      txs.length is expectedTxsCount
+      txs.map(_.outputsLength - 1).sum is destinations.length
+      val outputs =
+        destinations.map(d =>
+          TxOutputInfo(d.address.lockupScript, d.attoAlphAmount.value, AVector.empty, Option.empty)
+        )
+
+      val (actualUtxoCount, actualBalance) = getTotalUtxoCountsAndBalance(blockFlow, outputs)
+      actualUtxoCount is expectedDestUtxosCount
+      actualBalance is expectedDestBalance
+
+      val txsFee = txs.map(_.gasFeeUnsafe.v).sum
+      val senderHasSpent =
+        U256.from(destinations.map(_.attoAlphAmount.value.v).sum).get + U256.from(txsFee).get
+      val expectedSenderBalanceWithGas = initialSenderBalance - senderHasSpent
+      checkAddressBalance(
+        Address.p2pkh(fromPublicKey),
+        expectedSenderBalanceWithGas,
+        expectedSenderUtxosCount
+      )
+    }
   }
   // scalastyle:on method.length
 
@@ -374,45 +341,76 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "test multi group txs from single transfer with inputs auto-selected" in new MultiGroupFixture {
-    testMultiTransferToTwoGroupsWithProvidedInputs(_ => None) { resultingTxs =>
-      resultingTxs.length is 2
-      val expectedSenderUtxos      = 1
-      val expectedDestinationUtxos = 1
-      (genesisBalance, expectedSenderUtxos, expectedDestinationUtxos, resultingTxs)
-    }
+  "multi-transfer" should "support inputs auto-selection" in new MultiTransferFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testMultiTransfer(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 0,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
   }
 
-  it should "test multi group txs from single transfer with enough inputs provided" in new MultiGroupFixture {
-    testMultiTransferToTwoGroupsWithProvidedInputs { _ =>
-      Some(splitGenesisUtxo.as[OutputInfo])
-    } { resultingTxs =>
-      resultingTxs.length is 2
-      val initialBalance           = genesisBalance - nonCoinbaseMinGasFee // for splitting genesis
-      val expectedSenderUtxos      = 2
-      val expectedDestinationUtxos = 1
-      (initialBalance, expectedSenderUtxos, expectedDestinationUtxos, resultingTxs)
-    }
+  "multi-transfer" should "support providing inputs" in new MultiTransferFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testMultiTransfer(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 2,
+      destinations
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
   }
 
-  it should "test multi group txs from single transfer with fewer inputs than outputs provided" in new MultiGroupFixture {
-    testMultiTransferToTwoGroupsWithProvidedInputs { genesisUtxos =>
-      genesisUtxos.headOption.map(AVector(_))
-    } { resultingTxs =>
-      resultingTxs.length is 2
-      val expectedSenderUtxos      = 1
-      val expectedDestinationUtxos = 1
-      (genesisBalance, expectedSenderUtxos, expectedDestinationUtxos, resultingTxs)
-    }
-
+  "multi-transfer" should "support fewer inputs than provided outputs" in new MultiTransferFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testMultiTransfer(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
   }
 
-  it should "fail in case gas amount is passed by user" in new MultiGroupFixture {
+  "multi-transfer" should "split too many destinations into more transactions" in new MultiTransferFixture {
+    val destinations_1 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 1)))
+    val destinations_2 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 2)))
+    testMultiTransfer(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 2,
+      destinations_1 ++ destinations_2
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 514,
+      expectedDestBalance = ALPH.oneAlph * 514,
+      expectedTxsCount = 4
+    )
+  }
+
+  "multi-transfer" should "fail in case gas amount is passed by user" in new MultiTransferFixture {
     serverUtils
       .buildMultiTransferUnsignedTransactions(
         blockFlow,
         BuildTransferTx(
-          fromPublicKey.bytes,
+          genesisPublicKey_0.bytes,
           None,
           AVector(
             generateDestination(ChainIndex.unsafe(0, 0))
@@ -424,6 +422,52 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .leftValue
       .detail is "Explicit gas amount is not permitted. Gas estimation for multi-transfer is sufficiently accurate."
+  }
+
+  "multi-transfer" should "work across all groups" in new MultiTransferFixture {
+    val destinations =
+      AVector(0, 1, 2).map { groupIndex =>
+        Destination(
+          Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2),
+          Amount(ALPH.oneAlph)
+        )
+      }
+
+    testMultiTransfer(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 3,
+      expectedDestBalance = ALPH.oneAlph * 3,
+      expectedTxsCount = 3
+    )
+
+    testMultiTransfer(
+      genesisPrivateKey_1,
+      genesisPublicKey_1,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 6,
+      expectedDestBalance = ALPH.oneAlph * 6,
+      expectedTxsCount = 3
+    )
+
+    testMultiTransfer(
+      genesisPrivateKey_2,
+      genesisPublicKey_2,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 9,
+      expectedDestBalance = ALPH.oneAlph * 9,
+      expectedTxsCount = 3
+    )
   }
 
   it should "support Schnorr address" in new Fixture {
