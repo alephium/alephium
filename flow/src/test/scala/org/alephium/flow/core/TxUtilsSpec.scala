@@ -1357,8 +1357,10 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait MultiTransferFixture extends FlowFixture with UnsignedTxFixture {
-    implicit override lazy val blockFlow             = isolatedBlockFlow()
-    override val configValues                        = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    implicit override lazy val blockFlow: BlockFlow = isolatedBlockFlow()
+
     val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
     val (genesisPrivateKey_1, genesisPublicKey_1, _) = genesisKeys(1)
     val (genesisPrivateKey_2, genesisPublicKey_2, _) = genesisKeys(2)
