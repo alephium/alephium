@@ -200,7 +200,7 @@ final case class MemPoolSetting(
     unconfirmedTxExpiryDuration: Duration,
     batchBroadcastTxsFrequency: Duration,
     batchDownloadTxsFrequency: Duration,
-    cleanMissingInputsTxFrequency: Duration,
+    cleanOrphanTxFrequency: Duration,
     autoMineForDev: Boolean // for dev only
 )
 
