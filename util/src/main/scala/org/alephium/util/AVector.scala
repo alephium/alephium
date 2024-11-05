@@ -654,6 +654,16 @@ final class AVector[@sp A](
     }
   }
 
+  def groupByAsVec[K](f: A => K): AVector[(K, AVector[A])] = {
+    fold(AVector.empty[(K, AVector[A])]) { (acc, elem) =>
+      val key = f(elem)
+      acc.indexWhere(_._1 == key) match {
+        case -1  => acc :+ (key -> AVector(elem))
+        case idx => acc.replace(idx, key -> (acc(idx)._2 :+ elem))
+      }
+    }
+  }
+
   def replace(i: Int, a: A): AVector[A] = {
     assume(i >= 0 && i < length)
     val arr = Array.ofDim[A](length)

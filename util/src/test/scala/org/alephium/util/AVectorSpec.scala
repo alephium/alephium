@@ -624,6 +624,21 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     vc0.groupBy(_ % 2) is Map(0 -> AVector(0, 2), 1 -> AVector(1))
   }
 
+  it should "groupByAsVec" in {
+    val emptyVec = AVector.empty[Int]
+    emptyVec.groupByAsVec(_ % 2) is AVector.empty[(Int, AVector[Int])]
+    val alphaVec = AVector("apple", "banana", "apricot", "cherry", "blueberry")
+    alphaVec.groupByAsVec(_.head) is AVector(
+      ('a', AVector("apple", "apricot")),
+      ('b', AVector("banana", "blueberry")),
+      ('c', AVector("cherry"))
+    )
+    val numVec = AVector(0, 1, 2)
+    numVec.groupByAsVec(identity) is AVector(0 -> AVector(0), 1 -> AVector(1), 2 -> AVector(2))
+    numVec.groupByAsVec(_ => 1) is AVector(1 -> AVector(0, 1, 2))
+    numVec.groupByAsVec(_ % 2) is AVector(0 -> AVector(0, 2), 1 -> AVector(1))
+  }
+
   it should "create matrix using tabulate" in new Fixture {
     forAll(sizeGen, sizeGen) { (n1, n2) =>
       val matrix = AVector.tabulate[Int](n1, n2)(_ + _)
