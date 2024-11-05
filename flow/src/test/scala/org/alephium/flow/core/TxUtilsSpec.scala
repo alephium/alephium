@@ -1436,7 +1436,7 @@ class TxUtilsSpec extends AlephiumSpec {
           (AVector.empty[AssetOutputInfo], senderBalance)
         case inputsCountOpt =>
           val (initialUtxos, fee) =
-            generateUtxosWithTxFee(fromPrivateKey, fromPublicKey, inputsCountOpt)
+            changeUtxosWithTxFee(fromPrivateKey, fromPublicKey, inputsCountOpt)
           (initialUtxos, senderBalance - fee)
       }
       blockFlow
@@ -1644,7 +1644,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "get positive alph remainder or fail" in new MultiTransferFixture {
     val halfGenesisInput =
-      generateUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, Some(2))._1.head
+      changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, Some(2))._1.head
     val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
     val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
 
@@ -1948,7 +1948,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get utxo selection if non-empty or arbitrary utxos" in new MultiTransferFixture {
-    val utxos = generateUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0)._1
+    val utxos = changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0)._1
     blockFlow.getUtxoSelectionOrArbitrary(
       None,
       LockupScript.p2pkh(genesisPublicKey_0),
@@ -1982,7 +1982,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .getUtxoSelectionOrArbitrary(
         None,
         LockupScript.p2pkh(genesisPublicKey_0),
-        AVector(nonExistingUtxo) ++ generateUtxosWithTxFee(
+        AVector(nonExistingUtxo) ++ changeUtxosWithTxFee(
           genesisPrivateKey_0,
           genesisPublicKey_0
         )._1

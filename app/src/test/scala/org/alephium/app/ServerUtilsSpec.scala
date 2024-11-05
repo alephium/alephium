@@ -103,7 +103,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         case x if x < 1 =>
           (None, senderBalance)
         case x =>
-          val (initialUtxos, fee) = generateUtxosWithTxFee(fromPrivateKey, fromPublicKey, Some(x))
+          val (initialUtxos, fee) = changeUtxosWithTxFee(fromPrivateKey, fromPublicKey, Some(x))
           (Some(initialUtxos), senderBalance - fee)
       }
       val transactionResults = serverUtils

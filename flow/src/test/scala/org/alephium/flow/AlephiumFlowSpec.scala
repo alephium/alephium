@@ -130,7 +130,7 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
   }
 
-  def generateUtxosWithTxFee(
+  def changeUtxosWithTxFee(
       fromPrivateKey: PrivateKey,
       fromPublicKey: PublicKey,
       outputsLimitOpt: Option[Int] = None
