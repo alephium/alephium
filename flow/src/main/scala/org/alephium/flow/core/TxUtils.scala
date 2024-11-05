@@ -18,6 +18,7 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import TxUtils._
 import akka.util.ByteString
@@ -1580,15 +1581,36 @@ object TxUtils {
     )
   }
 
-  def sizeLimitedGroupBy[T, K](elems: AVector[T], sizeLimit: Int)(
-      groupByFn: T => K
-  ): AVector[AVector[T]] =
+  def weightLimitedGroupBy[E: ClassTag, K](elems: AVector[E], weightLimit: Int)(
+      groupByFn: E => K,
+      weightFn: E => Int
+  ): AVector[AVector[E]] =
     AVector.from(
       elems
-        .groupBy(groupByFn)
-        .values
-        .flatMap(_.groupedWithRemainder(sizeLimit))
+        .groupByAsVec(groupByFn)
+        .flatMap { case (_, elems) =>
+          weightGroupedWithRemainder(elems, weightLimit)(weightFn)
+        }
     )
+
+  def weightGroupedWithRemainder[E: ClassTag](elems: AVector[E], weightLimit: Int)(
+      weightFn: E => Int
+  ): AVector[AVector[E]] = {
+    elems.fold((AVector.empty[AVector[E]], AVector.empty[E], 0)) {
+      case ((resultingGroups, currentGroup, currentWeight), elem) =>
+        val elemWeight = weightFn(elem)
+        if (currentWeight + elemWeight <= weightLimit) {
+          (resultingGroups, currentGroup :+ elem, currentWeight + elemWeight)
+        } else {
+          val newResultingGroups =
+            if (currentGroup.nonEmpty) resultingGroups :+ currentGroup else resultingGroups
+          (newResultingGroups, AVector(elem), elemWeight)
+        }
+    } match {
+      case (groups, lastGroup, _) if lastGroup.nonEmpty => groups :+ lastGroup
+      case (groups, _, _)                               => groups
+    }
+  }
 
   def checkTotalAttoAlphAmount(
       amounts: AVector[U256]
