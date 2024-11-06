@@ -696,6 +696,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(deploy, deployJson)
 
+    val outputKey = TxOutputRef.key(txId, 0).value
     val execute = BuildChainedExecuteScriptTxResult(
       BuildExecuteScriptTxResult(
         fromGroup = 1,
@@ -703,7 +704,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         unsignedTx = "0000",
         gasAmount = GasBox.unsafe(1),
         gasPrice = GasPrice(1),
-        txId = txId
+        txId = txId,
+        simulatedOutputs = AVector(
+          Output.from(assetOutput, txId, 0)
+        )
       )
     )
     val executeJson =
@@ -716,7 +720,19 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    "unsignedTx": "0000",
          |    "gasAmount":1,
          |    "gasPrice":"1",
-         |    "txId": "${txId.toHexString}"
+         |    "txId": "${txId.toHexString}",
+         |    "simulatedOutputs": [
+         |      {
+         |        "type": "AssetOutput",
+         |        "hint": -383063803,
+         |        "key": "${outputKey.toHexString}",
+         |        "attoAlphAmount": "1000000000000000000",
+         |        "address": "111111111111111111111111111111111",
+         |        "tokens": [],
+         |        "lockTime": 0,
+         |        "message": ""
+         |      }
+         |    ]
          |  }
          |}
          |""".stripMargin
@@ -1131,7 +1147,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
-      txId = txId
+      txId = txId,
+      simulatedOutputs = AVector.empty
     )
     val jsonRaw =
       s"""
@@ -1141,7 +1158,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "unsignedTx": "0000",
          |  "gasAmount":1,
          |  "gasPrice":"1",
-         |  "txId": "${txId.toHexString}"
+         |  "txId": "${txId.toHexString}",
+         |  "simulatedOutputs": []
          |}
          |""".stripMargin
 
