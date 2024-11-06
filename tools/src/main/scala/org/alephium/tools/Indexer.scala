@@ -18,24 +18,52 @@ package org.alephium.tools
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import scala.jdk.CollectionConverters._
+
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.client.Node
-import org.alephium.flow.setting.Platform
+import org.alephium.flow.io.Storages
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.io.IOUtils
+import org.alephium.io.RocksDBSource.ColumnFamily
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.protocol.vm.WorldState
+import org.alephium.util.{AVector, Env}
 
 object Indexer extends App with StrictLogging {
-  private val sourcePath                    = Platform.getRootPath()
-  private val (blockFlow, storages, config) = Node.buildBlockFlowUnsafe(sourcePath)
-  private val brokerConfig                  = blockFlow.brokerConfig
-  private val intraChainIndexes             = brokerConfig.chainIndexes.filter(_.isIntraGroup)
-  private val indexedBlockCount             = new AtomicInteger(0)
-  private val totalBlockCount =
+  private val rootPath       = Platform.getRootPath()
+  private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
+  private val config         = AlephiumConfig.load(typesafeConfig, "alephium")
+  private val brokerConfig   = config.broker
+  private val intraChainIndexes = brokerConfig.chainIndexes.filter(_.isIntraGroup)
+  private val indexedBlockCount = new AtomicInteger(0)
+
+  private lazy val (blockFlow, storages) = Node.buildBlockFlowUnsafe(rootPath)
+  private lazy val totalBlockCount =
     intraChainIndexes.map(chainIndex => blockFlow.getBlockChain(chainIndex).numHashes).sum
+
+  private def clearIndexStorage(): Unit = {
+    val dbPath  = rootPath.resolve(config.network.networkId.nodeFolder)
+    val rocksdb = Storages.createRocksDBUnsafe(dbPath, "db")
+    val indexColumnFamilies: AVector[ColumnFamily] = AVector(
+      ColumnFamily.Log,
+      ColumnFamily.LogCounter,
+      ColumnFamily.TxOutputRefIndex,
+      ColumnFamily.ParentContract,
+      ColumnFamily.SubContract,
+      ColumnFamily.SubContractCounter
+    )
+    IOUtils.tryExecute {
+      rocksdb.db.dropColumnFamilies(indexColumnFamilies.map(rocksdb.handle).toSeq.asJava)
+      rocksdb.closeUnsafe()
+    } match {
+      case Right(_)    => ()
+      case Left(error) => exit(s"Failed to clear index storage due to $error")
+    }
+  }
 
   private def checkConfig(): Unit = {
     val nodeSettings = config.node
@@ -44,7 +72,7 @@ object Indexer extends App with StrictLogging {
       !nodeSettings.indexesConfig.subcontractIndex &&
       !nodeSettings.indexesConfig.txOutputRefIndex
     ) {
-      throw new RuntimeException("The index configs is not enabled")
+      exit("The index configs is not enabled")
     }
   }
 
@@ -105,6 +133,7 @@ object Indexer extends App with StrictLogging {
   private def start(): Unit = {
     assume(intraChainIndexes.length == brokerConfig.groups)
     checkConfig()
+    clearIndexStorage()
 
     indexGenesis()
 
@@ -115,6 +144,11 @@ object Indexer extends App with StrictLogging {
     threads.foreach(_.join)
 
     print("Indexing blocks completed\n")
+
+    storages.close() match {
+      case Right(_)    => ()
+      case Left(error) => exit(s"Failed to close the storage due to $error")
+    }
   }
 
   start()
