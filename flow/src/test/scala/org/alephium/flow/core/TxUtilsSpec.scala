@@ -1882,16 +1882,16 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "build multi group transaction with many inputs/outputs and high gasPrice" in new MultiTransferFixture {
+  "multi-transfer" should "build multi group transaction with max inputs/outputs and high gasPrice" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector.fill(255)(GroupIndex.unsafe(1)))
     testMultiTransferTxsBuilding(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       Some(255),
       outputs,
-      gasPrice = GasPrice(ALPH.nanoAlph(100000000))
+      gasPrice = GasPrice(ALPH.cent(60))
     )(
-      expectedSenderUtxosCount = 224,
+      expectedSenderUtxosCount = 1, // change
       expectedDestUtxosCount = 255,
       expectedDestBalance = ALPH.oneAlph * 255,
       expectedTxsCount = 1

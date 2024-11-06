@@ -463,7 +463,7 @@ trait TxUtils { Self: FlowUtils =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def buildMultiGroupTransactions(
-      fromLockupScript: LockupScript.Asset, // Self address for receiving change outputs
+      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputGroups: AVector[AVector[TxOutputInfo]],
