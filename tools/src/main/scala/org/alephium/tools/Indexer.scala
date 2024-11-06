@@ -23,6 +23,7 @@ import scala.jdk.CollectionConverters._
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.flow.client.Node
+import org.alephium.flow.core.maxForkDepth
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.flow.validation.BlockValidation
@@ -89,27 +90,38 @@ object Indexer extends App with StrictLogging {
       .foreach(error => exit(s"IO error when indexing block ${block.hash.toHexString}: $error"))
   }
 
+  private def indexBlock(validator: BlockValidation, block: Block): Unit = {
+    validator
+      .validate(block, blockFlow)
+      .map {
+        case Some(worldState) => indexBlock(worldState, block)
+        case None             => ()
+      }
+      .left
+      .foreach(error => exit(s"failed to index block ${block.hash.toHexString}: $error"))
+  }
+
   private def index(chainIndex: ChainIndex): Unit = {
     assume(chainIndex.isIntraGroup)
     val validator = BlockValidation.build(blockFlow)
     val chain     = blockFlow.getBlockChain(chainIndex)
     IOUtils
       .tryExecute {
-        val maxHeight = chain.maxHeightByWeightUnsafe
-        (ALPH.GenesisHeight + 1 to maxHeight).foreach { height =>
-          val hashes = chain.getHashesUnsafe(height)
-          hashes.map(chain.getBlockUnsafe).foreach { block =>
-            validator
-              .validate(block, blockFlow)
-              .map {
-                case Some(worldState) => indexBlock(worldState, block)
-                case None             => ()
-              }
-              .left
-              .foreach(error => exit(s"failed to index block ${block.hash.toHexString}: $error"))
+        val fromHeight      = ALPH.GenesisHeight + 1
+        val maxHeight       = chain.maxHeightByWeightUnsafe
+        val finalizedHeight = if (maxHeight > maxForkDepth) maxHeight - maxForkDepth else fromHeight
+        (fromHeight to maxHeight).foreach { height =>
+          val count = if (height < finalizedHeight) {
+            val hash  = chain.getHashesUnsafe(height).head
+            val block = chain.getBlockUnsafe(hash)
+            indexBlock(validator, block)
+            indexedBlockCount.addAndGet(1)
+          } else {
+            val hashes = chain.getHashesUnsafe(height)
+            hashes.foreach(hash => indexBlock(validator, chain.getBlockUnsafe(hash)))
+            indexedBlockCount.addAndGet(hashes.length)
           }
 
-          val count = indexedBlockCount.addAndGet(hashes.length)
           if (count % 10000 == 0) {
             val progress = (count.toDouble / totalBlockCount.toDouble) * 100
             print(s"Indexed #$count blocks, progress: ${f"$progress%.0f%%"}\n")
