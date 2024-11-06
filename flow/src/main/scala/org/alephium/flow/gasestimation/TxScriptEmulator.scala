@@ -112,7 +112,7 @@ object TxScriptEmulator {
         inputWithAssets: AVector[TxInputWithAsset],
         script: StatefulScript
     ): Either[String, TxScriptEmulationResult] = {
-      throw new NotImplementedError("TxScriptEmulator not implemented")
+      Left("TxScriptEmulator not implemented")
     }
   }
 }

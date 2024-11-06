@@ -1408,11 +1408,13 @@ class ServerUtils(implicit
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
       case buildExecuteScript: BuildChainedExecuteScriptTx =>
+        val txScriptEmulator = TxScriptEmulator.Default(blockFlow)
         for {
           buildUnsignedTxResult <- buildExecuteScriptUnsignedTx(
             blockFlow,
             buildExecuteScript.value,
-            extraUtxosInfo
+            extraUtxosInfo,
+            txScriptEmulator
           )
         } yield {
           val (unsignedTx, generatedOutputs) = buildUnsignedTxResult
@@ -1485,7 +1487,8 @@ class ServerUtils(implicit
   def buildExecuteScriptUnsignedTx(
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
-      extraUtxosInfo: ExtraUtxosInfo
+      extraUtxosInfo: ExtraUtxosInfo,
+      txScriptEmulator: TxScriptEmulator
   ): Try[(UnsignedTransaction, AVector[model.Output])] = {
     for {
       _          <- query.check().left.map(badRequest)
@@ -1511,8 +1514,7 @@ class ServerUtils(implicit
         extraUtxosInfo
       )
       (unsignedTx, inputWithAssets) = buildUnsignedTxResult
-      emulationResult <- TxScriptEmulator
-        .Default(blockFlow)
+      emulationResult <- txScriptEmulator
         .emulate(inputWithAssets, unsignedTx.scriptOpt.get)
         .left
         .map(failed)
@@ -1531,7 +1533,8 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
-    buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo).map {
+    val txScriptEmulator = TxScriptEmulator.Default(blockFlow)
+    buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo, txScriptEmulator).map {
       case (unsignedTx, generatedOutputs) =>
         BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
     }

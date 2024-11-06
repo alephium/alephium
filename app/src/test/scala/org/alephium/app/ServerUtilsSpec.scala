@@ -30,6 +30,7 @@ import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
+import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
@@ -37,7 +38,14 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
+import org.alephium.protocol.vm.{
+  GasBox,
+  GasPrice,
+  LockupScript,
+  StatefulScript,
+  TokenIssuance,
+  UnlockScript
+}
 import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -3647,15 +3655,33 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait ChainedTransactionsFixture extends ExecuteScriptFixture with ContractFixture {
-    val contract =
+    val tokenContract =
       s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    return
+         |Contract TokenContract() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), selfTokenId!(), 1)
          |  }
          |}
          |""".stripMargin
-    val contractCode = Compiler.compileContract(contract).toOption.get
+
+    val tokenContractCode = Compiler.compileContract(tokenContract).toOption.get
+    val tokenContractAddress = deployContract(
+      tokenContract,
+      initialAttoAlphAmount = Amount(ALPH.alph(5)),
+      keyPair = (genesisPrivateKey, genesisPublicKey),
+      issueTokenAmount = Some(Amount(U256.unsafe(100)))
+    )
+
+    val withdrawTokenScript =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${tokenContractAddress.toBase58}).withdraw()
+         |}
+         |$tokenContract
+         |""".stripMargin
+
+    val withdrawTokenScriptCode = Compiler.compileTxScript(withdrawTokenScript).toOption.get
 
     def checkAlphBalance(
         lockupScript: LockupScript,
@@ -3980,7 +4006,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       BuildDeployContractTx(
         fromPublicKey = publicKey.bytes,
         initialAttoAlphAmount = initialAttoAlphAmount,
-        bytecode = serialize(contractCode) ++ ByteString(0, 0)
+        bytecode = serialize(tokenContractCode) ++ ByteString(0, 0)
       )
 
     failedDeployContract(
@@ -4075,25 +4101,8 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "build chained execute script transactions" in new ChainedTransactionsFixture {
-    val tokenContract1 =
-      s"""
-         |Contract TokenContract1() {
-         |  @using(assetsInContract = true)
-         |  pub fn withdraw() -> () {
-         |    transferTokenFromSelf!(callerAddress!(), selfTokenId!(), 1)
-         |  }
-         |}
-         |""".stripMargin
-
-    val tokenContract1Address = deployContract(
-      tokenContract1,
-      initialAttoAlphAmount = Amount(ALPH.alph(5)),
-      keyPair = (genesisPrivateKey, genesisPublicKey),
-      issueTokenAmount = Some(Amount(U256.unsafe(100)))
-    )
-
-    val tokenId1 = TokenId.from(tokenContract1Address.contractId)
-    checkTokenBalance(tokenContract1Address.lockupScript, tokenId1, U256.unsafe(100))
+    val tokenId1 = TokenId.from(tokenContractAddress.contractId)
+    checkTokenBalance(tokenContractAddress.lockupScript, tokenId1, U256.unsafe(100))
 
     val tokenContract2 =
       s"""
@@ -4139,19 +4148,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"Execution error when emulating tx script or contract: Not enough approved balance for address ${genesisAddress.toBase58}, tokenId: ${tokenId1.toHexString}, expected: 1, got: 0"
     )
 
-    val withdrawToken1Script =
-      s"""
-         |TxScript Main {
-         |  TokenContract1(#${tokenContract1Address.toBase58}).withdraw()
-         |}
-         |$tokenContract1
-         |""".stripMargin
-
-    val withdrawToken1ScriptCode = Compiler.compileTxScript(withdrawToken1Script).toOption.get
     val buildWithdrawToken1ExecuteScriptTx = BuildExecuteScriptTx(
       fromPublicKey = genesisPublicKey.bytes,
       attoAlphAmount = Some(Amount(ALPH.alph(1))),
-      bytecode = serialize(withdrawToken1ScriptCode)
+      bytecode = serialize(withdrawTokenScriptCode)
     )
 
     val buildTransactions = buildChainedTransactions(
@@ -4174,43 +4174,19 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "only take generated asset outputs in buildChainedTransaction" in new ChainedTransactionsFixture {
-    val tokenContract =
-      s"""
-         |Contract TokenContract() {
-         |  @using(assetsInContract = true)
-         |  pub fn withdraw() -> () {
-         |    transferTokenFromSelf!(callerAddress!(), selfTokenId!(), 1)
-         |  }
-         |}
-         |""".stripMargin
-
-    val tokenContractAddress = deployContract(
-      tokenContract,
-      initialAttoAlphAmount = Amount(ALPH.alph(5)),
-      keyPair = (genesisPrivateKey, genesisPublicKey),
-      issueTokenAmount = Some(Amount(U256.unsafe(100)))
-    )
-
-    val withdrawTokenScript =
-      s"""
-         |TxScript Main {
-         |  TokenContract(#${tokenContractAddress.toBase58}).withdraw()
-         |}
-         |$tokenContract
-         |""".stripMargin
-
-    val withdrawTokenScriptCode = Compiler.compileTxScript(withdrawTokenScript).toOption.get
     val buildWithdrawTokenExecuteScriptTx = BuildExecuteScriptTx(
       fromPublicKey = genesisPublicKey.bytes,
       attoAlphAmount = Some(Amount(ALPH.alph(1))),
       bytecode = serialize(withdrawTokenScriptCode)
     )
 
+    val txScriptEmulator = TxScriptEmulator.Default(blockFlow)
     val (unsignedTx, generatedOutputs) = serverUtils
       .buildExecuteScriptUnsignedTx(
         blockFlow,
         buildWithdrawTokenExecuteScriptTx,
-        ExtraUtxosInfo.empty
+        ExtraUtxosInfo.empty,
+        txScriptEmulator
       )
       .rightValue
 
@@ -4233,6 +4209,41 @@ class ServerUtilsSpec extends AlephiumSpec {
     extraUtxosInfo.newUtxos.map(_.output) is (unsignedTx.fixedOutputs ++ generatedAssetOutputs)
     extraUtxosInfo.newUtxos.tail.map(o => (o.ref.hint.value, o.ref.key.value)) is
       generatedOutputs.filter(_.toProtocol().isAsset).map(o => (o.hint, o.key))
+  }
+
+  it should "fail to build execute script transaction with invalid TxScriptEmulator" in new ChainedTransactionsFixture {
+    val buildWithdrawTokenExecuteScriptTx = BuildExecuteScriptTx(
+      fromPublicKey = genesisPublicKey.bytes,
+      attoAlphAmount = Some(Amount(ALPH.alph(1))),
+      bytecode = serialize(withdrawTokenScriptCode)
+    )
+
+    val invalidTxScriptEmulator = new TxScriptEmulator {
+      override def emulate(
+          inputWithAssets: AVector[TxInputWithAsset],
+          script: StatefulScript
+      ): Either[String, TxScriptEmulationResult] =
+        Left("Execution error when emulating tx script or contract")
+    }
+    serverUtils
+      .buildExecuteScriptUnsignedTx(
+        blockFlow,
+        buildWithdrawTokenExecuteScriptTx,
+        ExtraUtxosInfo.empty,
+        invalidTxScriptEmulator
+      )
+      .leftValue
+      .detail is "Execution error when emulating tx script or contract"
+
+    serverUtils
+      .buildExecuteScriptUnsignedTx(
+        blockFlow,
+        buildWithdrawTokenExecuteScriptTx,
+        ExtraUtxosInfo.empty,
+        TxScriptEmulator.NotImplemented
+      )
+      .leftValue
+      .detail is "TxScriptEmulator not implemented"
   }
 
   it should "get ghost uncles" in new Fixture {
