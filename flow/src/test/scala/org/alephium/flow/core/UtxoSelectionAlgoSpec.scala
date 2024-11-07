@@ -381,7 +381,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
             outputs.length,
             txScriptOpt = None,
             AssetScriptGasEstimator.Mock,
-            TxScriptGasEstimator.Mock
+            TxScriptEmulator.Mock
           )
       }
 

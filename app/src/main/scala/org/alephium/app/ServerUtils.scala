@@ -29,13 +29,14 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -1176,7 +1177,7 @@ class ServerUtils(implicit
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[UnsignedTransaction] = {
+  ): Try[(UnsignedTransaction, AVector[TxInputWithAsset])] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
         blockFlow,
@@ -1190,8 +1191,8 @@ class ServerUtils(implicit
         gasEstimationMultiplier,
         extraUtxosInfo
       )
+      inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
       unsignedTx <- wrapError {
-        val inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
         UnsignedTransaction.buildScriptTx(
           script,
           fromLockupScript,
@@ -1204,7 +1205,10 @@ class ServerUtils(implicit
         )
       }
       validatedUnsignedTx <- validateUnsignedTransaction(unsignedTx)
-    } yield validatedUnsignedTx
+    } yield (
+      validatedUnsignedTx,
+      selectedUtxos.assets.map(TxInputWithAsset.from(_, fromUnlockScript))
+    )
   }
 
   final def buildSelectedUtxos(
@@ -1292,7 +1296,7 @@ class ServerUtils(implicit
             txOutputsLength = estimatedTxOutputsLength,
             Some(script),
             AssetScriptGasEstimator.Default(blockFlow),
-            TxScriptGasEstimator.Default(blockFlow)
+            TxScriptEmulator.Default(blockFlow)
           )
       )
     } yield selectedUtxos
@@ -1328,7 +1332,7 @@ class ServerUtils(implicit
       totalAttoAlphAmount <- initialAttoAlphAmount
         .add(query.issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
         .toRight(failed("ALPH amount overflow"))
-      utx <- unsignedTxFromScript(
+      result <- unsignedTxFromScript(
         blockFlow,
         script,
         totalAttoAlphAmount,
@@ -1340,7 +1344,7 @@ class ServerUtils(implicit
         None,
         extraUtxosInfo
       )
-    } yield utx
+    } yield result._1
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -1400,15 +1404,29 @@ class ServerUtils(implicit
         )
       case buildExecuteScript: BuildChainedExecuteScriptTx =>
         for {
-          unsignedTx <- buildExecuteScriptUnsignedTx(
+          buildUnsignedTxResult <- buildExecuteScriptUnsignedTx(
             blockFlow,
             buildExecuteScript.value,
             extraUtxosInfo
           )
-        } yield (
-          BuildChainedExecuteScriptTxResult(BuildExecuteScriptTxResult.from(unsignedTx)),
-          extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
-        )
+        } yield {
+          val (unsignedTx, generatedOutputs) = buildUnsignedTxResult
+          val generatedAssetOutputs = generatedOutputs.collect {
+            case o: model.AssetOutput =>
+              val txOutputRef =
+                AssetOutputRef.from(new ScriptHint(o.hint), TxOutputRef.unsafeKey(o.key))
+              Some(AssetOutputInfo(txOutputRef, o.toProtocol(), MemPoolOutput))
+            case _ => None
+          }
+          (
+            BuildChainedExecuteScriptTxResult(
+              BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
+            ),
+            extraUtxosInfo
+              .updateWithUnsignedTx(unsignedTx)
+              .updateWithGeneratedAssetOutputs(generatedAssetOutputs)
+          )
+        }
       case buildDeployContract: BuildChainedDeployContractTx =>
         for {
           unsignedTx <- buildDeployContractUnsignedTx(
@@ -1458,11 +1476,12 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def buildExecuteScriptUnsignedTx(
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[UnsignedTransaction] = {
+  ): Try[(UnsignedTransaction, AVector[model.Output])] = {
     for {
       _          <- query.check().left.map(badRequest)
       multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
@@ -1474,7 +1493,7 @@ class ServerUtils(implicit
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      utx <- unsignedTxFromScript(
+      buildUnsignedTxResult <- unsignedTxFromScript(
         blockFlow,
         script,
         amounts._1.getOrElse(U256.Zero),
@@ -1486,7 +1505,19 @@ class ServerUtils(implicit
         multiplier,
         extraUtxosInfo
       )
-    } yield utx
+      (unsignedTx, inputWithAssets) = buildUnsignedTxResult
+      emulationResult <- TxScriptEmulator
+        .Default(blockFlow)
+        .emulate(inputWithAssets, unsignedTx.scriptOpt.get)
+        .left
+        .map(failed)
+    } yield {
+      val fixedOutputsLength = unsignedTx.fixedOutputs.length
+      val generatedOutputs = emulationResult.generatedOutputs.mapWithIndex { case (output, index) =>
+        Output.from(output, unsignedTx.id, fixedOutputsLength + index)
+      }
+      (unsignedTx, generatedOutputs)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -1495,9 +1526,10 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
-    for {
-      utx <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildExecuteScriptTxResult.from(utx)
+    buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo).map {
+      case (unsignedTx, generatedOutputs) =>
+        BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -2154,7 +2186,14 @@ object ServerUtils {
     if (gasFee <= apiConfig.gasFeeCap) {
       Right(())
     } else {
-      Left(ApiError.BadRequest(s"Too much gas fee, cap at ${apiConfig.gasFeeCap}, got $gasFee"))
+      val capAmount    = ALPH.prettifyAmount(apiConfig.gasFeeCap)
+      val gasFeeAmount = ALPH.prettifyAmount(gasFee)
+      Left(
+        ApiError.BadRequest(
+          s"Gas fee exceeds the limit: maximum allowed is $capAmount, but got $gasFeeAmount. " +
+            s"Please lower the gas price or adjust the alephium.api.gas-fee-cap in your user.conf file."
+        )
+      )
     }
   }
 

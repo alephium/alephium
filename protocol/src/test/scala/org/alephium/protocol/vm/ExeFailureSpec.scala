@@ -40,21 +40,29 @@ class ExeFailureSpec extends AlephiumSpec {
     val lockupScript = Address.fromBase58(address).get.lockupScript
 
     InvalidOutputBalances(lockupScript, 2, U256.Zero).toString is
-      s"Invalid ALPH balance for address $address, expected 0.002 alph, got 0 alph, you need to transfer more ALPH to this address"
+      s"Invalid ALPH balance for address $address, expected 0.002 ALPH, got 0 ALPH, you need to transfer more ALPH to this address"
 
     val attoAlphAmount0 = dustUtxoAmount.subUnsafe(U256.One)
     InvalidOutputBalances(lockupScript, 0, attoAlphAmount0).toString is
-      s"Invalid ALPH balance for address $address, expected 0.001 alph, got 9.99999999999999E-4 alph, you need to transfer more ALPH to this address"
+      s"Invalid ALPH balance for address $address, expected 0.001 ALPH, got 0.000999999999999999 ALPH, you need to transfer more ALPH to this address"
 
     InvalidOutputBalances(lockupScript, 2, dustUtxoAmount).toString is
-      s"Invalid ALPH balance for address $address, expected 0.002 alph, got 0.001 alph, you need to transfer more ALPH to this address"
+      s"Invalid ALPH balance for address $address, expected 0.002 ALPH, got 0.001 ALPH, you need to transfer more ALPH to this address"
 
     val attoAlphAmount1 = dustUtxoAmount.addUnsafe(U256.One)
     InvalidOutputBalances(lockupScript, 2, attoAlphAmount1).toString is
-      s"Invalid ALPH balance for address $address, expected 0.002 alph, got 0.001000000000000001 alph, you need to transfer more ALPH to this address"
+      s"Invalid ALPH balance for address $address, expected 0.002 ALPH, got 0.001000000000000001 ALPH, you need to transfer more ALPH to this address"
 
     val attoAlphAmount2 = dustUtxoAmount.mulUnsafe(U256.unsafe(3)).subUnsafe(U256.One)
     InvalidOutputBalances(lockupScript, 2, attoAlphAmount2).toString is
-      s"Invalid ALPH balance for address $address, expected 0.003 alph, got 0.002999999999999999 alph, you need to transfer more ALPH to this address"
+      s"Invalid ALPH balance for address $address, expected 0.003 ALPH, got 0.002999999999999999 ALPH, you need to transfer more ALPH to this address"
+  }
+
+  it should "test EmptyContractAsset" in {
+    val address         = "22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr"
+    val contractAddress = Address.fromBase58(address).get.asInstanceOf[Address.Contract]
+
+    EmptyContractAsset(contractAddress).toString is
+      s"No assets for contract 22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr, a minimum of 0.1 ALPH is required"
   }
 }
