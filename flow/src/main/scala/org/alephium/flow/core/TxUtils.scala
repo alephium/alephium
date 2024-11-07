@@ -461,8 +461,8 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def buildMultiGroupTransactions(
+  @tailrec
+  final def buildMultiGroupTransactions(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
@@ -482,7 +482,7 @@ trait TxUtils { Self: FlowUtils =>
       Left("Not enough inputs to build multi-group transaction")
     } else {
       val currentOutputs = outputGroups.head
-      for {
+      val selectedResult = for {
         _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
         _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
         amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
@@ -497,7 +497,11 @@ trait TxUtils { Self: FlowUtils =>
             AssetScriptGasEstimator.Default(Self.blockFlow),
             TxScriptGasEstimator.NotImplemented
           )
-        txs <-
+      } yield selected
+
+      selectedResult match {
+        case Left(error) => Left(error)
+        case Right(selected) =>
           if (selected.gas > getMaximalGasPerTx()) {
             if (currentOutputs.length <= 1) {
               Left(
@@ -524,8 +528,9 @@ trait TxUtils { Self: FlowUtils =>
                 currentOutputs,
                 selected.gas,
                 gasPrice
-              )
-              .flatMap { case (tx, change) =>
+              ) match {
+              case Left(error) => Left(error)
+              case Right((tx, change)) =>
                 val changeInputs = change.map { case (oRef, output) =>
                   AssetOutputInfo(oRef, output, MemPoolOutput)
                 }
@@ -539,13 +544,13 @@ trait TxUtils { Self: FlowUtils =>
                   gasPrice,
                   acc :+ tx
                 )
-              }
+            }
           }
-      } yield txs
+      }
     }
   }
 
-  def getPositiveRemaindersOrFail(
+  def getAssetRemainders(
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
@@ -1567,13 +1572,11 @@ object TxUtils {
       groupByFn: E => K,
       weightFn: E => Int
   ): AVector[AVector[E]] =
-    AVector.from(
-      elems
-        .groupByAsVec(groupByFn)
-        .flatMap { case (_, elems) =>
-          weightGroupedWithRemainder(elems, weightLimit)(weightFn)
-        }
-    )
+    elems
+      .groupByAsVec(groupByFn)
+      .flatMap { case (_, elems) =>
+        weightGroupedWithRemainder(elems, weightLimit)(weightFn)
+      }
 
   def weightGroupedWithRemainder[E: ClassTag](elems: AVector[E], weightLimit: Int)(
       weightFn: E => Int

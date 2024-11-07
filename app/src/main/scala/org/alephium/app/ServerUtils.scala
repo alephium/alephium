@@ -268,7 +268,7 @@ class ServerUtils(implicit
       outputInfos = prepareOutputInfos(query.destinations)
       gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
       _ <- blockFlow
-        .getPositiveRemaindersOrFail(
+        .getAssetRemainders(
           lockPair._2,
           inputSelection,
           outputInfos,

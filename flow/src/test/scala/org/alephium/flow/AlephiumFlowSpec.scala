@@ -135,23 +135,24 @@ trait FlowFixture
       fromPublicKey: PublicKey,
       outputsLimitOpt: Option[Int] = None
   ): (AVector[AssetOutputInfo], U256) = {
+    val lockupScript = Address.p2pkh(fromPublicKey).lockupScript
     val initialUtxos = blockFlow
-      .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+      .getUTXOs(lockupScript, Int.MaxValue, true)
       .rightValue
       .asUnsafe[AssetOutputInfo]
     outputsLimitOpt match {
-      case None =>
-        initialUtxos -> U256.Zero
+      case None => initialUtxos -> U256.Zero
       case Some(outputsLimit) =>
         require(outputsLimit < ALPH.MaxTxOutputNum, "Number of outputs must fit in a transaction")
         if (initialUtxos.length >= outputsLimit) {
           initialUtxos.take(outputsLimit) -> U256.Zero
         } else {
           require(outputsLimit > 0, "Number of outputs must be greater than 0")
-          val amountPerOutput = genesisBalance.divUnsafe(U256.unsafe(outputsLimit))
+          val amountPerOutput =
+            getAlphBalance(blockFlow, lockupScript).divUnsafe(U256.unsafe(outputsLimit))
           val outputs = AVector.fill(outputsLimit - initialUtxos.length) {
             TxOutputInfo(
-              Address.p2pkh(fromPublicKey).lockupScript,
+              lockupScript,
               amountPerOutput,
               AVector.empty,
               None
@@ -172,7 +173,7 @@ trait FlowFixture
           val block = mineWithTxs(blockFlow, tx.chainIndex)((_, _) => AVector(tx))
           addAndCheck(blockFlow, block)
           val utxos = blockFlow
-            .getUTXOs(Address.p2pkh(fromPublicKey).lockupScript, Int.MaxValue, true)
+            .getUTXOs(lockupScript, Int.MaxValue, true)
             .rightValue
             .asUnsafe[AssetOutputInfo]
           assume(utxos.length == outputsLimit)

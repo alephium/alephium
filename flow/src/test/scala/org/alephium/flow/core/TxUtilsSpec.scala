@@ -1389,7 +1389,7 @@ class TxUtilsSpec extends AlephiumSpec {
         outputs: AVector[TxOutputInfo]
     ) = {
       blockFlow
-        .getPositiveRemaindersOrFail(
+        .getAssetRemainders(
           unlockScript,
           inputs,
           outputs,
