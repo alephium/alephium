@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.BuildInfo
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.TimeStamp
 
 final case class ReleaseVersion(major: Int, minor: Int, patch: Int)

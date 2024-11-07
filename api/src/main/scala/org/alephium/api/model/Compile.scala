@@ -49,7 +49,8 @@ final case class CompilerOptions(
     ignoreUnusedPrivateFunctionsWarnings: Option[Boolean] = None,
     ignoreUpdateFieldsCheckWarnings: Option[Boolean] = None,
     ignoreCheckExternalCallerWarnings: Option[Boolean] = None,
-    ignoreUnusedFunctionReturnWarnings: Option[Boolean] = None
+    ignoreUnusedFunctionReturnWarnings: Option[Boolean] = None,
+    skipAbstractContractCheck: Option[Boolean] = None
 ) {
   def toLangCompilerOptions(): ralph.CompilerOptions = {
     ralph.CompilerOptions(
@@ -73,6 +74,9 @@ final case class CompilerOptions(
       ),
       ignoreUnusedFunctionReturnWarnings = ignoreUnusedFunctionReturnWarnings.getOrElse(
         ralph.CompilerOptions.Default.ignoreUnusedFunctionReturnWarnings
+      ),
+      skipAbstractContractCheck = skipAbstractContractCheck.getOrElse(
+        ralph.CompilerOptions.Default.skipAbstractContractCheck
       )
     )
   }

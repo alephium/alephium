@@ -20,9 +20,11 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
+import org.alephium.flow.setting._
 import org.alephium.protocol.{ALPH, PrivateKey, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
 import org.alephium.util.{AVector, Duration, Env, Number, U256}
 
 trait AlephiumConfigFixture extends RandomPortsConfigFixture {
@@ -62,7 +64,7 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
       (privateKey, publicKey, genesisBalance)
     }
 
-  implicit lazy val config = {
+  implicit lazy val config: AlephiumConfig = {
     val tmp = AlephiumConfig
       .load(newConfig)
 
@@ -72,13 +74,13 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
     tmp.copy(genesis = GenesisSetting(allocations))
   }
 
-  implicit lazy val brokerConfig      = config.broker
-  implicit lazy val consensusConfigs  = config.consensus
-  implicit lazy val networkConfig     = config.network
-  implicit lazy val discoverySetting  = config.discovery
-  implicit lazy val memPoolSetting    = config.mempool
-  implicit lazy val miningSetting     = config.mining
-  implicit lazy val nodeSetting       = config.node
-  implicit lazy val logConfig         = config.node.eventLogConfig
-  implicit lazy val nodeIndexesConfig = config.node.indexesConfig
+  implicit lazy val brokerConfig: BrokerSetting          = config.broker
+  implicit lazy val consensusConfigs: ConsensusSettings  = config.consensus
+  implicit lazy val networkConfig: NetworkSetting        = config.network
+  implicit lazy val discoverySetting: DiscoverySetting   = config.discovery
+  implicit lazy val memPoolSetting: MemPoolSetting       = config.mempool
+  implicit lazy val miningSetting: MiningSetting         = config.mining
+  implicit lazy val nodeSetting: NodeSetting             = config.node
+  implicit lazy val logConfig: LogConfig                 = config.node.eventLogConfig
+  implicit lazy val nodeIndexesConfig: NodeIndexesConfig = config.node.indexesConfig
 }

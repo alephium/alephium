@@ -44,7 +44,7 @@ class BlocksExporterSpec extends AlephiumSpec {
 
   trait Fixture extends FlowFixture {
 
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1)
     )
 

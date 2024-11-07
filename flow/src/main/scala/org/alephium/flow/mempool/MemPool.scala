@@ -348,9 +348,10 @@ object MemPool {
   sealed trait AddTxFailed extends NewTxCategory {
     def addedCount: Int = 0
   }
-  case object MemPoolIsFull  extends AddTxFailed
-  case object DoubleSpending extends AddTxFailed
-  case object AlreadyExisted extends AddTxFailed
+  case object MemPoolIsFull     extends AddTxFailed
+  case object DoubleSpending    extends AddTxFailed
+  case object AlreadyExisted    extends AddTxFailed
+  case object AddedToOrphanPool extends AddTxFailed
 
   val txOrdering: Ordering[TransactionTemplate] =
     Ordering

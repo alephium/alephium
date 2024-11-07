@@ -15,7 +15,7 @@
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 package org.alephium.ralph
 
-import fastparse.Parsed
+import fastparse.{EagerOps, Parsed}
 
 import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter, FastParseErrorUtil}
 import org.alephium.ralph.util.OperatingSystem

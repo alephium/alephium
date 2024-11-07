@@ -1162,7 +1162,7 @@ object Ast {
 
   sealed trait VarDeclaration                               extends Positioned
   final case class NamedVar(mutable: Boolean, ident: Ident) extends VarDeclaration
-  case object AnonymousVar                                  extends VarDeclaration
+  final case class AnonymousVar()                           extends VarDeclaration
 
   final case class VarDef[Ctx <: StatelessContext](
       vars: Seq[VarDeclaration],
@@ -1190,7 +1190,7 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val storeCodes = vars.zip(value.getType(state)).flatMap {
         case (NamedVar(_, ident), _) => state.genStoreCode(ident)
-        case (AnonymousVar, tpe) =>
+        case (_: AnonymousVar, tpe) =>
           Seq(Seq.fill(state.flattenTypeLength(Seq(tpe)))(Pop))
       }
       value.genCode(state) ++ storeCodes.reverse.flatten
@@ -1346,21 +1346,29 @@ object Ast {
       state.checkArguments(args)
       args.foreach { arg =>
         val argTpe = state.resolveType(arg.tpe)
-        state.addLocalVariable(arg.ident, argTpe, arg.isMutable, arg.isUnused, isGenerated = false)
+        state.addLocalVariable(
+          arg.ident,
+          argTpe,
+          arg.isMutable,
+          arg.isUnused,
+          isGenerated = false
+        )
       }
-      funcAccessedVarsCache match {
-        case Some(vars) => // the function has been compiled before
-          state.addAccessedVars(vars)
-          body.foreach(_.check(state))
-        case None =>
-          body.foreach(_.check(state))
-          val currentScopeUsedVars = Set.from(state.currentScopeAccessedVars)
-          funcAccessedVarsCache = Some(currentScopeUsedVars)
-          state.addAccessedVars(currentScopeUsedVars)
+      if (bodyOpt.isDefined) {
+        funcAccessedVarsCache match {
+          case Some(vars) => // the function has been compiled before
+            state.addAccessedVars(vars)
+            body.foreach(_.check(state))
+          case None =>
+            body.foreach(_.check(state))
+            val currentScopeUsedVars = Set.from(state.currentScopeAccessedVars)
+            funcAccessedVarsCache = Some(currentScopeUsedVars)
+            state.addAccessedVars(currentScopeUsedVars)
+        }
+        state.checkUnusedLocalVars(id)
+        state.checkUnassignedLocalMutableVars(id)
+        if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
       }
-      state.checkUnusedLocalVars(id)
-      state.checkUnassignedLocalMutableVars(id)
-      if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
     def genMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
@@ -1970,7 +1978,8 @@ object Ast {
     }
     def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
       val tpe = Type.fromVal(value.tpe)
-      constants(ident) = Compiler.VarInfo.Constant(tpe, value, Seq(value.toConstInstr), constantDef)
+      constants(ident) =
+        Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
     }
 
     private val flattenSizeCache = mutable.Map.empty[Type, Int]
@@ -2186,9 +2195,16 @@ object Ast {
       checkAndAddFields(state)
       checkConstants(state)
       funcs.foreach(_.check(state))
-      state.checkUnusedMaps()
-      state.checkUnusedFieldsAndConstants()
-      state.checkUnassignedMutableFields()
+      this match {
+        case c: Contract if c.isAbstract =>
+          // We don't need to check for unused variables in the abstract contract
+          // because some of them might be used in the child contract
+          ()
+        case _ =>
+          state.checkUnusedMaps()
+          state.checkUnusedFieldsAndConstants()
+          state.checkUnassignedMutableFields()
+      }
     }
 
     def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
@@ -2362,7 +2378,7 @@ object Ast {
     }
 
     private def checkFuncs(): Unit = {
-      if (funcs.length < 1) {
+      if (!isAbstract && funcs.length < 1) {
         throw Compiler.Error(
           s"No function found in Contract ${quote(ident.name)}",
           ident.sourceIndex
@@ -2723,7 +2739,7 @@ object Ast {
         genWarning: (TypeId, collection.Seq[(String, Option[SourceIndex])]) => AVector[Warning]
     ): AVector[Warning] = {
       val allDefs = mutable.Map.empty[(TypeId, String), Option[SourceIndex]]
-      states.foreach { case (_, (contract, _)) =>
+      states.foreachEntry { case (_, (contract, _)) =>
         if (contract.isAbstract) {
           defsInParentContract(contract).map { case (typeId, (name, sourceIndex)) =>
             allDefs.addOne((typeId, name) -> sourceIndex)
@@ -2731,7 +2747,7 @@ object Ast {
         }
       }
 
-      states.foreach { case (_, (contract, state)) =>
+      states.foreachEntry { case (_, (contract, state)) =>
         if (!contract.isAbstract) {
           usedDefsInContract(contract, state).foreach { case (typeId, (name, _)) =>
             allDefs.remove((typeId, name))
@@ -2821,10 +2837,28 @@ object Ast {
       }
     }
 
+    private def checkAbstractContracts(states: AVector[Compiler.State[StatefulContext]]): Unit = {
+      val abstractContracts = contracts.collect {
+        case contract: Contract if contract.isAbstract => contract
+      }
+      val sortedAbstractContracts = dependencies match {
+        case Some(deps) => abstractContracts.sortBy(c => deps(c.ident).length)
+        case None =>
+          val deps = buildDependencies()
+          abstractContracts.sortBy(c => deps(c.ident).length)
+      }
+      sortedAbstractContracts.foreach { contract =>
+        states.find(_.typeId == contract.ident).foreach(contract.check)
+      }
+    }
+
     def genStatefulContracts()(implicit
         compilerOptions: CompilerOptions
     ): (AVector[Warning], AVector[(CompiledContract, Int)]) = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+      if (!compilerOptions.skipAbstractContractCheck) {
+        checkAbstractContracts(states)
+      }
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state = states(index)

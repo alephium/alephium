@@ -44,9 +44,9 @@ class CompactIntegerSpec extends AlephiumSpec {
     decodeU256(encode(U256.MinValue)) isE Staging(U256.MinValue, ByteString.empty)
     decodeU256(encode(U256.MaxValue)) isE Staging(U256.MaxValue, ByteString.empty)
 
-    forAll { n: Int => test(n) }
+    forAll { (n: Int) => test(n) }
 
-    forAll { _: Int =>
+    forAll { (_: Int) =>
       val u256 = UnsecureRandom.nextU256()
       decodeU256(encode(u256)) isE Staging(u256, ByteString.empty)
     }
@@ -79,9 +79,9 @@ class CompactIntegerSpec extends AlephiumSpec {
     decodeI256(encode(I256.MaxValue)) isE Staging(I256.MaxValue, ByteString.empty)
     decodeI256(encode(I256.MinValue)) isE Staging(I256.MinValue, ByteString.empty)
 
-    forAll { n: Int => test(n) }
+    forAll { (n: Int) => test(n) }
 
-    forAll { _: Int =>
+    forAll { (_: Int) =>
       val i256 = UnsecureRandom.nextI256()
       decodeI256(encode(i256)) isE Staging(i256, ByteString.empty)
     }

@@ -404,7 +404,7 @@ object WalletService {
                     (res.txId, GroupIndex.unsafe(res.fromGroup), GroupIndex.unsafe(res.toGroup))
                   )
                 )
-                .map(_.left.map(BlockFlowClientError))
+                .map(_.left.map(BlockFlowClientError.apply))
           }
       }
     }
@@ -465,7 +465,7 @@ object WalletService {
                   val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
                   blockFlowClient
                     .postTransaction(unsignedTx, signature, buildSweepAllTxResult.fromGroup)
-                    .map(_.map(_.txId +: txIds).left.map(BlockFlowClientError))
+                    .map(_.map(_.txId +: txIds).left.map(BlockFlowClientError.apply))
                 }
               }
               .map { res =>

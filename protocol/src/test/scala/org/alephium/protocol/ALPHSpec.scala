@@ -61,6 +61,24 @@ class ALPHSpec extends AlephiumSpec {
     fail("0.000000000000000000001 ALPH")
   }
 
+  it should "pretty format" in new Fixture {
+    def check(alphAmount: String, str: String) = {
+      val amount = ALPH.alphFromString(s"$alphAmount ALPH").get
+      ALPH.prettifyAmount(amount) is s"$str ALPH"
+    }
+
+    check("0", "0")
+    check("1", "1.0")
+    check("100", "100.0")
+    check("1000", "1,000.0")
+    check("1000000", "1,000,000.0")
+    check("1000000.0", "1,000,000.0")
+    check("1000000.011", "1,000,000.011")
+    check("0.001", "0.001")
+    check("0.000000001", "0.000000001")
+    check("0.000000000000000001", "0.000000000000000001")
+  }
+
   trait Fixture extends NumericHelpers {
 
     def check(str: String, expected: U256) = {

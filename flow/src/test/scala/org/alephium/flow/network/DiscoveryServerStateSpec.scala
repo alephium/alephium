@@ -62,7 +62,7 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
 
     implicit lazy val groupConfig: GroupConfig = config
 
-    implicit override val patienceConfig =
+    implicit override val patienceConfig: PatienceConfig =
       PatienceConfig(timeout = Span(10, Seconds))
 
     val storage = mutable.HashMap.empty[PeerId, BrokerInfo]

@@ -23,6 +23,7 @@ import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.subcontractindex._
+import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.AVector
 
 trait VMFactory extends StorageFixture {

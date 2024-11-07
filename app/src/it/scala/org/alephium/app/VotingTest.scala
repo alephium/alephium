@@ -326,10 +326,10 @@ trait VotingFixture extends WalletFixture {
 }
 
 trait WalletFixture extends CliqueFixture {
-  override val configValues = Map(("alephium.broker.broker-num", 1))
-  val clique                = bootClique(1)
-  val activeAddressesGroup  = 0
-  val genesisWalletName     = "genesis-wallet"
+  override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+  val clique                                  = bootClique(1)
+  val activeAddressesGroup                    = 0
+  val genesisWalletName                       = "genesis-wallet"
   def submitTx(unsignedTx: String, txId: TransactionId, walletName: String): SubmitTxResult = {
     val signature =
       request[SignResult](sign(walletName, s"${txId.toHexString}"), restPort).signature

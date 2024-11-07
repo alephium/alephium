@@ -62,7 +62,7 @@ final case class MutBalancesPerLockup(
     Try {
       attoAlphAmount =
         attoAlphAmount.add(another.attoAlphAmount).getOrElse(throw MutBalancesPerLockup.error)
-      another.tokenAmounts.foreach { case (tokenId, amount) =>
+      another.tokenAmounts.foreachEntry { case (tokenId, amount) =>
         tokenAmounts.get(tokenId) match {
           case Some(currentAmount) =>
             tokenAmounts(tokenId) =
@@ -77,7 +77,7 @@ final case class MutBalancesPerLockup(
     Try {
       attoAlphAmount =
         attoAlphAmount.sub(another.attoAlphAmount).getOrElse(throw MutBalancesPerLockup.error)
-      another.tokenAmounts.foreach { case (tokenId, amount) =>
+      another.tokenAmounts.foreachEntry { case (tokenId, amount) =>
         tokenAmounts.get(tokenId) match {
           case Some(currentAmount) =>
             tokenAmounts(tokenId) =

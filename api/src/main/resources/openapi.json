@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.8.3"
+    "version": "3.8.8"
   },
   "servers": [
     {
@@ -37,6 +37,7 @@
         "operationId": "getWallets",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -169,6 +170,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -295,6 +297,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -395,6 +398,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -489,23 +493,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "password",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WalletDeletion"
-              },
-              "example": {
-                "password": "my-secret-password"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -593,7 +594,9 @@
           }
         ],
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -706,7 +709,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -918,6 +923,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1066,6 +1072,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1195,6 +1202,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1328,6 +1336,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1446,6 +1455,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1545,6 +1555,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1661,6 +1672,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1764,6 +1776,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1885,6 +1898,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -1988,6 +2002,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2107,7 +2122,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -2186,6 +2203,7 @@
         "operationId": "getInfosNode",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2283,6 +2301,7 @@
         "operationId": "getInfosVersion",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2372,6 +2391,7 @@
         "operationId": "getInfosChain-params",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2464,6 +2484,7 @@
         "operationId": "getInfosSelf-clique",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2562,6 +2583,7 @@
         "operationId": "getInfosInter-clique-peer-info",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2664,6 +2686,7 @@
         "operationId": "getInfosDiscovered-neighbors",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2764,6 +2787,7 @@
         "operationId": "getInfosMisbehaviors",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -2889,7 +2913,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -2968,6 +2994,7 @@
         "operationId": "getInfosUnreachable",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3090,7 +3117,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -3175,7 +3204,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3185,12 +3214,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3286,12 +3316,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "1"
+              "minimum": 1
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3381,6 +3412,7 @@
         "operationId": "getInfosCurrent-difficulty",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3476,7 +3508,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3486,12 +3518,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3703,7 +3736,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3713,12 +3746,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -3949,7 +3983,7 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           },
           {
@@ -3959,12 +3993,13 @@
             "schema": {
               "type": "integer",
               "format": "int64",
-              "minimum": "0"
+              "minimum": 0
             }
           }
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4187,6 +4222,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4397,6 +4433,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4607,6 +4644,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -4836,6 +4874,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5052,6 +5091,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5310,6 +5350,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5435,6 +5476,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5553,6 +5595,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5666,6 +5709,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5766,6 +5810,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -5920,6 +5965,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6025,6 +6071,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6143,6 +6190,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6267,6 +6315,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6379,6 +6428,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6483,6 +6533,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6638,6 +6689,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -6847,6 +6899,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7043,6 +7096,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7166,6 +7220,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7296,6 +7351,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7384,6 +7440,7 @@
         "operationId": "getMempoolTransactions",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7523,7 +7580,9 @@
         "summary": "Remove all transactions from mempool",
         "operationId": "deleteMempoolTransactions",
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -7612,7 +7671,9 @@
           }
         ],
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -7690,7 +7751,9 @@
         "summary": "Validate all mempool transactions and remove invalid ones",
         "operationId": "putMempoolTransactionsValidate",
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -7785,6 +7848,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7854,7 +7918,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields in Foo: a"
+                    "Found unused field in Foo: a"
                   ]
                 }
               }
@@ -7978,6 +8042,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -7989,7 +8054,28 @@
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "simulatedOutputs": [
+                    {
+                      "type": "AssetOutput",
+                      "hint": 1,
+                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "attoAlphAmount": "2000000000000000000",
+                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                      "tokens": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42000000000000000000"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000000000000000000000"
+                        }
+                      ],
+                      "lockTime": 1611041396892,
+                      "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                    }
+                  ]
                 }
               }
             }
@@ -8088,6 +8174,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8206,7 +8293,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields in Foo: a"
+                    "Found unused field in Foo: a"
                   ],
                   "maps": {
                     "names": [
@@ -8315,6 +8402,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8435,7 +8523,7 @@
                         }
                       ],
                       "warnings": [
-                        "Found unused fields in Foo: a"
+                        "Found unused field in Foo: a"
                       ],
                       "maps": {
                         "names": [
@@ -8513,7 +8601,7 @@
                         }
                       ],
                       "warnings": [
-                        "Found unused fields in Foo: a"
+                        "Found unused field in Foo: a"
                       ]
                     }
                   ],
@@ -8658,6 +8746,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8850,6 +8939,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -8878,7 +8968,28 @@
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000",
-                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "simulatedOutputs": [
+                        {
+                          "type": "AssetOutput",
+                          "hint": 1,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "attoAlphAmount": "2000000000000000000",
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ],
+                          "lockTime": 1611041396892,
+                          "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        }
+                      ]
                     }
                   }
                 ]
@@ -8974,6 +9085,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9173,6 +9285,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9384,6 +9497,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9598,6 +9712,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9783,6 +9898,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -9902,6 +10018,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10005,6 +10122,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10107,6 +10225,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10277,6 +10396,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10421,6 +10541,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10553,6 +10674,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10667,6 +10789,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10776,6 +10899,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10883,6 +11007,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -10970,6 +11095,7 @@
         "operationId": "getMinersAddresses",
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11073,7 +11199,9 @@
           "required": true
         },
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -11190,6 +11318,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11307,6 +11436,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11415,6 +11545,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11540,6 +11671,7 @@
         ],
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11660,6 +11792,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11760,6 +11893,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {
@@ -11848,7 +11982,9 @@
         "summary": "Check and repair the indexing of block hashes",
         "operationId": "putUtilsCheck-hash-indexing",
         "responses": {
-          "200": {},
+          "200": {
+            "description": "Ok"
+          },
           "400": {
             "description": "BadRequest",
             "content": {
@@ -12712,7 +12848,8 @@
           "unsignedTx",
           "gasAmount",
           "gasPrice",
-          "txId"
+          "txId",
+          "simulatedOutputs"
         ],
         "properties": {
           "fromGroup": {
@@ -12737,6 +12874,12 @@
           "txId": {
             "type": "string",
             "format": "32-byte-hash"
+          },
+          "simulatedOutputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Output"
+            }
           }
         }
       },
@@ -13531,6 +13674,9 @@
             "type": "boolean"
           },
           "ignoreUnusedFunctionReturnWarnings": {
+            "type": "boolean"
+          },
+          "skipAbstractContractCheck": {
             "type": "boolean"
           }
         }
@@ -15942,18 +16088,6 @@
             "type": "string"
           },
           "mnemonic": {
-            "type": "string"
-          }
-        }
-      },
-      "WalletDeletion": {
-        "title": "WalletDeletion",
-        "type": "object",
-        "required": [
-          "password"
-        ],
-        "properties": {
-          "password": {
             "type": "string"
           }
         }

@@ -20,16 +20,16 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model.NoIndexModelGeneratorsLike
 import org.alephium.util.TimeStamp
 
-class TxHandlerBufferSpec
+class OrphanPoolSpec
     extends AlephiumFlowSpec
     with TxIndexesSpec.Fixture
     with NoIndexModelGeneratorsLike {
-  override val configValues = Map(("alephium.broker.broker-num", 1))
+  override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
   it should "work for parallel transactions" in {
     val block = blockGen.sample.get
     val txs   = block.transactions.map(_.toTemplate)
-    val pool  = TxHandlerBuffer.default()
+    val pool  = OrphanPool.default()
     txs.foreach(pool.add(_, TimeStamp.now()))
     pool.getRootTxs().toSet is txs.toSet
     pool.size is txs.length
@@ -53,7 +53,7 @@ class TxHandlerBufferSpec
     brokerConfig.brokerNum is 1
 
     val txs  = prepareRandomSequentialTxs(4).map(_.toTemplate)
-    val pool = TxHandlerBuffer.default()
+    val pool = OrphanPool.default()
     txs.foreach(pool.add(_, TimeStamp.now()))
     pool.getRootTxs().toSet is Set(txs.head)
     pool.size is txs.length
@@ -72,7 +72,7 @@ class TxHandlerBufferSpec
   }
 
   it should "check capacity" in {
-    val pool = TxHandlerBuffer.ofCapacity(1)
+    val pool = OrphanPool.ofCapacity(1)
     val tx0  = transactionGen().sample.get.toTemplate
     val tx1  = transactionGen().sample.get.toTemplate
     pool.add(tx0, TimeStamp.now())

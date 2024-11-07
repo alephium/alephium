@@ -1558,7 +1558,7 @@ trait RestServerFixture
 
   lazy val walletApp = new WalletApp(walletConfig)
 
-  implicit lazy val blockflowFetchMaxAge = Duration.ofHoursUnsafe(1)
+  implicit lazy val blockflowFetchMaxAge: Duration = Duration.ofHoursUnsafe(1)
 
   private def buildPeer(id: Int): (PeerInfo, ApiConfig) = {
     val peerPort = generatePort()

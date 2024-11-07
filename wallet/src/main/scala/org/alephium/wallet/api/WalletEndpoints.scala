@@ -88,9 +88,9 @@ trait WalletEndpoints
       .in(jsonBody[WalletUnlock])
       .summary("Unlock your wallet")
 
-  val deleteWallet: BaseEndpoint[(String, WalletDeletion), Unit] =
+  val deleteWallet: BaseEndpoint[(String, String), Unit] =
     wallet.delete
-      .in(jsonBody[WalletDeletion])
+      .in(query[String]("password"))
       .summary("Delete your wallet file (can be recovered with your mnemonic)")
 
   val getBalances: BaseEndpoint[String, Balances] =

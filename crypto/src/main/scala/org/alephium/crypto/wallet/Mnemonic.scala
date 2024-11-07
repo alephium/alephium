@@ -29,7 +29,7 @@ import org.alephium.util.{AVector, Bits, SecureAndSlowRandom}
 
 //scalastyle:off magic.number
 
-final case class Mnemonic private (words: AVector[String]) extends AnyVal {
+final class Mnemonic private (val words: AVector[String]) extends AnyVal {
 
   def toSeed(passphraseOpt: Option[String]): ByteString = {
     val mnemonic     = toLongString.toCharArray
@@ -48,7 +48,7 @@ final case class Mnemonic private (words: AVector[String]) extends AnyVal {
 }
 
 object Mnemonic {
-  final case class Size private (value: Int) extends AnyVal
+  final class Size private (val value: Int) extends AnyVal
   object Size {
     val list: AVector[Size] =
       AVector(new Size(12), new Size(15), new Size(18), new Size(21), new Size(24))

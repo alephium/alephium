@@ -26,7 +26,7 @@ class BrokerInfoSpec extends AlephiumSpec {
   it should "check if group included" in {
     forAll(Gen.oneOf(2 to 1 << 4)) { _groups =>
       new Generators {
-        implicit val config = new GroupConfig { override def groups: Int = _groups }
+        implicit val config: GroupConfig = new GroupConfig { override def groups: Int = _groups }
         forAll(groupNumPerBrokerGen) { _groupNumPerBroker =>
           implicit val cliqueConfig = new CliqueConfig {
             override def brokerNum: Int = groups / _groupNumPerBroker

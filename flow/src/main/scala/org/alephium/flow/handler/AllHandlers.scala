@@ -23,7 +23,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, EventBus}
 
@@ -115,7 +115,7 @@ object AllHandlers {
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): AllHandlers = {
-    val txProps   = TxHandler.props(blockFlow, eventBus, storages.pendingTxStorage)
+    val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage, eventBus)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)
@@ -193,4 +193,6 @@ object AllHandlers {
     }
     headerHandlers.toMap
   }
+
+  final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
 }

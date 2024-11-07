@@ -29,7 +29,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.serde.{serialize, Serde}
+import org.alephium.serde.{avectorSerde, intSerde, serialize, Serde}
 import org.alephium.util.{AVector, TimeStamp}
 
 // scalastyle:off number.of.methods

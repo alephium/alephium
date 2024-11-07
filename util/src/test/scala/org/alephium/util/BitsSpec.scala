@@ -29,6 +29,6 @@ class BitsSpec extends AlephiumSpec {
   }
 
   it should "convert general byte" in {
-    forAll { byte: Byte => Bits.toInt(Bits.from(byte)) is Bytes.toPosInt(byte) }
+    forAll { (byte: Byte) => Bits.toInt(Bits.from(byte)) is Bytes.toPosInt(byte) }
   }
 }

@@ -22,6 +22,7 @@ import java.math.BigInteger
 import akka.util.ByteString
 import org.bouncycastle.asn1.{ASN1Integer, ASN1StreamParser, DLSequence}
 
+import org.alephium.serde.byteAVectorSerde
 import org.alephium.util.{AlephiumSpec, AVector}
 import org.alephium.util.Hex._
 

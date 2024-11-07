@@ -31,7 +31,7 @@ class SerdeSpec extends AlephiumSpec {
 
   def checkException[T](serde: FixedSizeSerde[T]): Unit = {
     it should "throw correct exceptions when error occurs" in {
-      forAll { inputs: Array[Byte] =>
+      forAll { (inputs: Array[Byte]) =>
         lazy val exception = serde.deserialize(ByteString(inputs)).leftValue
         if (inputs.length < serde.serdeSize) {
           exception is SerdeError.WrongFormat(s"Too few bytes: expected 1, got 0")
@@ -47,12 +47,12 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   it should "serde correctly" in {
-    forAll { b: Byte =>
+    forAll { (b: Byte) =>
       val bb = deserialize[Byte](serialize(b))
       bb isE b
     }
 
-    forAll { b: Byte =>
+    forAll { (b: Byte) =>
       val input  = ByteString(b)
       val output = serialize(deserialize[Byte](input).toOption.get)
       output is input
@@ -67,7 +67,7 @@ class SerdeSpec extends AlephiumSpec {
   checkException(ByteSerde)
 
   "Serde for Int" should "serde correctly" in {
-    forAll { n: Int =>
+    forAll { (n: Int) =>
       val nn = deserialize[Int](serialize(n))
       nn isE n
     }
@@ -106,7 +106,7 @@ class SerdeSpec extends AlephiumSpec {
 
   "Serde for ByteString" should "serialize correctly" in {
     deserialize[ByteString](serialize(ByteString.empty)) isE ByteString.empty
-    forAll { n: Int =>
+    forAll { (n: Int) =>
       val bs = ByteString.fromInts(n)
       deserialize[ByteString](serialize(bs)) isE bs
     }
@@ -118,11 +118,11 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for String" should "serialize correctly" in {
-    forAll { s: String => deserialize[String](serialize(s)) isE s }
+    forAll { (s: String) => deserialize[String](serialize(s)) isE s }
   }
 
   "Serde for BigInteger" should "serde correctly" in {
-    forAll { n: Long =>
+    forAll { (n: Long) =>
       val bn = BigInteger.valueOf(n)
       deserialize[BigInteger](serialize(bn)) isE bn
     }
@@ -131,7 +131,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for fixed size sequence" should "serde correctly" in {
-    forAll { input: AVector[Byte] =>
+    forAll { (input: AVector[Byte]) =>
       {
         val serde  = Serde.fixedSizeSerde(input.length, byteSerde)
         val output = serde.deserialize(serde.serialize(input)).toOption.get
@@ -152,7 +152,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for sequence" should "serde correctly" in {
-    forAll { input: AVector[Byte] =>
+    forAll { (input: AVector[Byte]) =>
       deserialize[AVector[Byte]](serialize(input)) isE input
       val seq = ArraySeq.from(input.toIterable)
       deserialize[ArraySeq[Byte]](serialize(seq)) isE seq
@@ -197,7 +197,7 @@ class SerdeSpec extends AlephiumSpec {
   }
 
   "Serde for case class" should "serde one field correctly" in {
-    forAll { x: Int =>
+    forAll { (x: Int) =>
       val input  = Test1(x)
       val output = deserialize[Test1](serialize(input))
       output isE input
@@ -241,7 +241,7 @@ class SerdeSpec extends AlephiumSpec {
   // scalastyle:on regex
 
   it should "serde timestamp" in {
-    forAll { millis: Long =>
+    forAll { (millis: Long) =>
       if (millis >= 0) {
         val ts = TimeStamp.from(millis).get
         deserialize[TimeStamp](serialize(ts)) isE ts

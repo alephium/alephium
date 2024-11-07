@@ -35,7 +35,7 @@ import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
-import org.alephium.serde.{serialize, Serde}
+import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off file.size.limit method.length number.of.methods
@@ -1323,7 +1323,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "test groupOfAddress builtin" in new ContractFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.broker.groups", 4), ("alephium.broker.broker-num", 1))
 
     val script =
@@ -2302,7 +2302,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in random order" in new TxExecutionOrderFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
     )
@@ -2384,7 +2384,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in sequential order" in new TxExecutionOrderFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
     val block      = callScript(contractId, identity)
@@ -3636,7 +3636,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "check subContractIdInParentGroup" in new SubContractFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val subContractPath = "00"
     val parentContract =
@@ -3807,7 +3807,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
     override def useMethodSelector: Boolean = false
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
     )
     config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
@@ -6117,7 +6117,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
     override def useMethodSelector: Boolean = false
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     failCallTxScript(
@@ -6194,7 +6194,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not call the same deposit function multiple times in the same contract: Leman" in new PayToContractOnlyFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
@@ -6518,7 +6518,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   trait SubContractIndexesFixture extends ContractFixture {
     def subcontractIndexEnabled: Boolean
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       "alephium.node.indexes.subcontract-index"   -> s"$subcontractIndexEnabled",
       "alephium.node.indexes.tx-output-ref-index" -> "false"
     )
@@ -6637,7 +6637,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   // Inactive instrs check will be enabled in future upgrades
   ignore should "check inactive instrs when creating contract" in new ContractFixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 

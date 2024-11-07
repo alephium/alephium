@@ -63,8 +63,8 @@ class WalletAppSpec
   val walletApp: WalletApp =
     new WalletApp(config)
 
-  override val port: Int   = config.port.get
-  override val maybeApiKey = None
+  override val port: Int                   = config.port.get
+  override val maybeApiKey: Option[String] = None
 
   walletApp.start().futureValue is ()
 
@@ -108,7 +108,7 @@ class WalletAppSpec
   def unlock(mnemonicPassphrase: Option[String] = None) =
     Post(s"/wallets/$wallet/unlock", unlockJson(mnemonicPassphrase))
   def lock()              = Post(s"/wallets/$wallet/lock")
-  def delete()            = Delete(s"/wallets/$wallet", passwordJson)
+  def delete()            = Delete(s"/wallets/$wallet?password=$password")
   def getBalance()        = Get(s"/wallets/$wallet/balances")
   def getAddresses()      = Get(s"/wallets/$wallet/addresses")
   def getMinerAddresses() = Get(s"/wallets/$minerWallet/miner-addresses")

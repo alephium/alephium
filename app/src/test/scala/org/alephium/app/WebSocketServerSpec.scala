@@ -22,7 +22,7 @@ import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.exceptions.TestFailedException
 
 import org.alephium.app.WebSocketServer.{EventHandler, WsEventType}
-import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._

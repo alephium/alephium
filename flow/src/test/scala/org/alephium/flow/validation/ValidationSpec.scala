@@ -23,7 +23,7 @@ import org.alephium.protocol.model.*
 import org.alephium.util.{AVector, Duration}
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
-  override val configValues = Map(
+  override val configValues: Map[String, Any] = Map(
     ("alephium.consensus.num-zeros-at-least-in-hash", 1)
   )
 

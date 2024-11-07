@@ -201,7 +201,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "serde the snapshots properly" in new BlockSnapshotsFixture {
-    implicit val basePath                          = "src/test/resources/models/block"
+    implicit val basePath: String                  = "src/test/resources/models/block"
     override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
 
     import Hex._

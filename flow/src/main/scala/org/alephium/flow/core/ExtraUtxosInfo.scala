@@ -44,6 +44,15 @@ final case class ExtraUtxosInfo(
       spentUtxos = spentUtxos ++ unsignedTx.inputs.map(_.outputRef)
     )
   }
+
+  def updateWithGeneratedAssetOutputs(
+      generatedAssetOutputs: AVector[AssetOutputInfo]
+  ): ExtraUtxosInfo = {
+    ExtraUtxosInfo(
+      newUtxos = newUtxos ++ generatedAssetOutputs,
+      spentUtxos = spentUtxos
+    )
+  }
 }
 
 object ExtraUtxosInfo {

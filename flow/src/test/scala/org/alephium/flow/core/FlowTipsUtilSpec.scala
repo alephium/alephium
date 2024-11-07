@@ -23,7 +23,7 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class FlowTipsUtilSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
   }
 
   it should "compute light tips for genesis" in new Fixture {

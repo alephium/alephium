@@ -72,9 +72,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   private val vertx           = Vertx.vertx()
   private val webSocketClient = vertx.createWebSocketClient()
 
-  implicit override val patienceConfig =
+  implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
-  implicit lazy val apiConfig = ApiConfig.load(newConfig)
+  implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
 
   lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
@@ -289,7 +289,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
       ) ++ configOverrides
-      implicit override lazy val config = {
+      implicit override lazy val config: AlephiumConfig = {
         val minerAddresses =
           genesisKeys.map(p => Address.Asset(LockupScript.p2pkh(p._2)))
 
@@ -367,9 +367,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       val defaultNetwork = platformEnv.config.network
       val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
 
-      implicit val config    = platformEnv.config.copy(network = network)
-      implicit val apiConfig = ApiConfig.load(platformEnv.newConfig)
-      val storages           = platformEnv.storages
+      implicit val config: AlephiumConfig = platformEnv.config.copy(network = network)
+      implicit val apiConfig: ApiConfig   = ApiConfig.load(platformEnv.newConfig)
+      val storages                        = platformEnv.storages
 
       override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)

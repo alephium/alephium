@@ -625,7 +625,7 @@ abstract class SparseMerkleTrieBase[K: Serde, V: Serde, T] extends MutableKV[K, 
         AVector.empty[(K, V)]
       }
     }
-    deser.left.map(IOError.Serde)
+    deser.left.map(IOError.Serde.apply)
   }
 }
 

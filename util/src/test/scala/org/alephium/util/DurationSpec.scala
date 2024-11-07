@@ -43,7 +43,7 @@ class DurationSpec extends AlephiumSpec {
 
   it should "initialize correctly" in {
     Duration.zero.millis is 0
-    forAll { millis: Long =>
+    forAll { (millis: Long) =>
       val seconds = millis / 1000
       val minutes = seconds / 60
       val hours   = minutes / 60

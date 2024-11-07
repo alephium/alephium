@@ -19,7 +19,7 @@ package org.alephium.app
 import org.alephium.api.model.BlockEntry
 import org.alephium.app.WebSocketServer.{EventHandler, WsEventType}
 import org.alephium.app.WebSocketServer.WsEventType.Subscription
-import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
 

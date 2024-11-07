@@ -28,7 +28,7 @@ import org.alephium.api.model._
 import org.alephium.app.WebSocketServer.WsEventType
 import org.alephium.app.WebSocketServer.WsEventType.Subscription
 import org.alephium.flow.client.Node
-import org.alephium.flow.handler.FlowHandler
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.rpc.model.JsonRPC._
@@ -127,7 +127,7 @@ object WebSocketServer extends StrictLogging {
           .lastOption
           .map(_.trim)
           .flatMap(WsEventType.fromString)
-          .map(Subscription)
+          .map(Subscription(_))
       } else {
         None
       }
@@ -161,7 +161,7 @@ object WebSocketServer extends StrictLogging {
         event: EventBus.Event
     )(implicit networkConfig: NetworkConfig): Either[String, Notification] = {
       event match {
-        case FlowHandler.BlockNotify(block, height) =>
+        case BlockNotify(block, height) =>
           BlockEntry.from(block, height).map { blockEntry =>
             Notification(WsEventType.Block.name, writeJs(blockEntry))
           }

@@ -36,6 +36,7 @@ import org.alephium.protocol.vm.subcontractindex.{
   SubContractIndexStateId,
   SubContractIndexStorage
 }
+import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.AVector
 
 object Storages {
