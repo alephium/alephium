@@ -18,12 +18,12 @@ package org.alephium.flow.core
 
 import org.scalacheck.Gen
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.protocol.model.{AssetOutputRef, ChainIndex, ModelGenerators, TxGenerators}
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.AVector
 
-class ExtraUtxosInfoSpec extends AlephiumSpec {
+class ExtraUtxosInfoSpec extends AlephiumFlowBasicSpec {
 
   trait UtxoFixture extends FlowFixture with ModelGenerators {
     val chainIndex = ChainIndex.unsafe(0, 0)

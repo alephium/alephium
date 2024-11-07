@@ -24,7 +24,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.flow.core.{BlockFlow, FlowUtils}
 import org.alephium.flow.gasestimation.GasEstimation
 import org.alephium.flow.io.StoragesFixture
@@ -35,10 +35,10 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{BlockHash => _, NetworkId => _, _}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp, U256}
+import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
-class BlockValidationSpec extends AlephiumSpec {
+class BlockValidationSpec extends AlephiumFlowBasicSpec {
 
   trait Fixture extends BlockValidation with FlowFixture with NoIndexModelGeneratorsLike {
     lazy val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value

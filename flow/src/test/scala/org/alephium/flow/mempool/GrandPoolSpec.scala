@@ -18,12 +18,12 @@ package org.alephium.flow.mempool
 
 import scala.util.Random
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.flow.validation.{NonExistInput, TxValidation}
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, ModelGenerators, Transaction}
-import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
-class GrandPoolSpec extends AlephiumSpec {
+class GrandPoolSpec extends AlephiumFlowBasicSpec {
   behavior of "Single Broker"
 
   trait SingleBrokerFixture extends Fixture with ModelGenerators {

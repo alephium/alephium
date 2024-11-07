@@ -16,14 +16,14 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{ChainIndex, NetworkId, Target}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, TimeStamp}
+import org.alephium.util.TimeStamp
 
-class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
+class FlowDifficultyAdjustmentSpec extends AlephiumFlowBasicSpec {
 
   it should "calculate weighted target" in new PreLemanDifficultyFixture {
     prepareBlocks(2)

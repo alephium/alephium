@@ -16,11 +16,10 @@
 
 package org.alephium.flow.client
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.protocol.ALPH
-import org.alephium.util.AlephiumSpec
 
-class NodeSpec extends AlephiumSpec {
+class NodeSpec extends AlephiumFlowBasicSpec {
   it should "check genesis blocks" in {
     val defaultFixture   = new FlowFixture {}
     val defaultConfig    = defaultFixture.config

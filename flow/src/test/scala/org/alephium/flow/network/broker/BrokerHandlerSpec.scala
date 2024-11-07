@@ -21,7 +21,7 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowActorBasicSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
@@ -32,9 +32,9 @@ import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId}
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 
-class BrokerHandlerSpec extends AlephiumActorSpec {
+class BrokerHandlerSpec extends AlephiumFlowActorBasicSpec {
   it should "handshake with new connection" in new Fixture {
     receivedHandshakeMessage()
     brokerHandlerActor.pingPongTickOpt is a[Some[_]]

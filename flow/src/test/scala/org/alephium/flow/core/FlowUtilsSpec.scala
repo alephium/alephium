@@ -21,7 +21,7 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalacheck.Gen
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.BlockValidation
@@ -32,7 +32,7 @@ import org.alephium.ralph.Compiler
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
-class FlowUtilsSpec extends AlephiumSpec {
+class FlowUtilsSpec extends AlephiumFlowBasicSpec {
   it should "generate failed tx" in new FlowFixture with NoIndexModelGeneratorsLike {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val groupIndex = chainIndex.from

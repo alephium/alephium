@@ -20,15 +20,15 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Transaction}
 import org.alephium.serde.{avectorSerde, serialize, Staging}
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.AVector
 import org.alephium.util.Hex.HexStringSyntax
 
-class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class MessageSpec extends AlephiumFlowBasicSpec with GroupConfigFixture.Default {
   "ClientMessage" should "serde properly" in {
     val message    = ClientMessage.from(SubmitBlock(hex"bbbb"))
     val serialized = ClientMessage.serialize(message)
