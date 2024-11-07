@@ -278,13 +278,15 @@ object UnsignedTransaction {
           buildInputs(fromUnlockScript, inputs),
           outputs
         )
-      val changeOutputsRefs =
-        changeOutputs.map { changeOutput =>
-          AssetOutputRef.from(
-            changeOutput,
-            TxOutputRef.key(tx.id, outputs.indexWhere(_ == changeOutput))
-          ) -> changeOutput
-        }
+      var changeOutputIndex = txOutputs.length
+      val changeOutputsRefs = changeOutputs.map { changeOutput =>
+        val ref = AssetOutputRef.from(
+          changeOutput,
+          TxOutputRef.key(tx.id, changeOutputIndex)
+        )
+        changeOutputIndex += 1
+        ref -> changeOutput
+      }
       tx -> changeOutputsRefs
     }
   }

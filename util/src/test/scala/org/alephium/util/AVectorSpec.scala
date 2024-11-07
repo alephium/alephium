@@ -564,43 +564,43 @@ class IntAVectorSpec extends AVectorSpec[Int] {
   it should "splitAt the middle into two valid parts" in {
     val vector        = AVector(1, 2, 3, 4, 5)
     val (left, right) = vector.splitAt(2)
-    assert(left == AVector(1, 2))
-    assert(right == AVector(3, 4, 5))
+    left is AVector(1, 2)
+    right is AVector(3, 4, 5)
   }
 
   it should "splitAt zero index into empty left and full right" in {
     val vector        = AVector(1, 2, 3, 4, 5)
     val (left, right) = vector.splitAt(0)
-    assert(left.isEmpty)
-    assert(right == vector)
+    left.isEmpty is true
+    right is vector
   }
 
   it should "splitAt index equal to length into full left and empty right" in {
     val vector        = AVector(1, 2, 3, 4, 5)
     val (left, right) = vector.splitAt(5)
-    assert(left == vector)
-    assert(right.isEmpty)
+    left is vector
+    right.isEmpty is true
   }
 
   it should "splitAt an empty vector into two empty vectors" in {
     val vector        = AVector.empty[Int]
     val (left, right) = vector.splitAt(3)
-    assert(left.isEmpty)
-    assert(right.isEmpty)
+    left.isEmpty is true
+    right.isEmpty is true
   }
 
   it should "splitAt negative index the same as at zero (return empty left)" in {
     val vector        = AVector(1, 2, 3)
     val (left, right) = vector.splitAt(-1)
-    assert(left.isEmpty)
-    assert(right == vector)
+    left.isEmpty is true
+    right is vector
   }
 
   it should "splitAt index greater than length into full left and empty right" in {
     val vector        = AVector(1, 2, 3)
     val (left, right) = vector.splitAt(10)
-    assert(left == vector)
-    assert(right.isEmpty)
+    left is vector
+    right.isEmpty is true
   }
 
   it should "splitBy" in {

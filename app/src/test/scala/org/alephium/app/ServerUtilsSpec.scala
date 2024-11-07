@@ -79,7 +79,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
-    implicit override lazy val blockFlow: BlockFlow = isolatedBlockFlow()
+    implicit lazy val bf: BlockFlow = blockFlow
 
     val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
     val (genesisPrivateKey_1, genesisPublicKey_1, _) = genesisKeys(1)

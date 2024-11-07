@@ -554,41 +554,23 @@ trait TxUtils { Self: FlowUtils =>
     if (inputs.isEmpty || outputs.isEmpty) {
       Left("Both inputs and outputs must be specified")
     } else {
-      val inputAmounts = inputs.map(_.output.amount)
-      val totalInputValue =
-        EitherF.foldTry(inputAmounts, U256.Zero) { case (acc, n) =>
-          acc.add(n).toRight(s"Invalid total input value $acc + $n")
-        }
-      val outputAmounts = outputs.map(_.attoAlphAmount)
-      val totalOutputValue =
-        EitherF.foldTry(outputAmounts, U256.Zero) { case (acc, n) =>
-          acc.add(n).toRight(s"Invalid total output value $acc + $n")
-        }
-
-      (totalInputValue, totalOutputValue) match {
-        case (Right(iv), Right(ov)) if iv > ov =>
-          for {
-            gasBox <- GasEstimation.estimateWithInputScript(
-              fromUnlockScript,
-              inputs.length,
-              outputs.length + 1, // + 1 is for change utxo
-              AssetScriptGasEstimator.Default(blockFlow)
-            )
-            alphRemainder <- UnsignedTransaction.calculateAlphRemainder(
-              inputAmounts,
-              outputAmounts,
-              gasPrice * gasBox
-            )
-            tokenRemainder <- UnsignedTransaction.calculateTokensRemainder(
-              inputs.flatMap(_.output.tokens),
-              outputs.flatMap(_.tokens)
-            )
-          } yield (alphRemainder, tokenRemainder)
-        case (Right(iv), Right(ov)) =>
-          Left(s"Total input value $iv is not enough for output value $ov and a minimal gas fee")
-        case (Left(err), _) => Left(err)
-        case (_, Left(err)) => Left(err)
-      }
+      for {
+        gasBox <- GasEstimation.estimateWithInputScript(
+          fromUnlockScript,
+          inputs.length,
+          outputs.length + 1, // + 1 is for change utxo
+          AssetScriptGasEstimator.Default(blockFlow)
+        )
+        alphRemainder <- UnsignedTransaction.calculateAlphRemainder(
+          inputs.map(_.output.amount),
+          outputs.map(_.attoAlphAmount),
+          gasPrice * gasBox
+        )
+        tokenRemainder <- UnsignedTransaction.calculateTokensRemainder(
+          inputs.flatMap(_.output.tokens),
+          outputs.flatMap(_.tokens)
+        )
+      } yield (alphRemainder, tokenRemainder)
     }
   }
 
