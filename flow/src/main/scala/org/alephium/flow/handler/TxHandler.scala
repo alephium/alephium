@@ -431,8 +431,10 @@ trait AutoMineHandler extends TxCoreHandler {
     val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
     publishEvent(event)
 
-    escapeIOError(blockFlow.getHeight(block)) { height =>
-      eventBus ! BlockNotify(block, height)
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      escapeIOError(blockFlow.getHeight(block)) { height =>
+        eventBus ! BlockNotify(block, height)
+      }
     }
   }
 }
