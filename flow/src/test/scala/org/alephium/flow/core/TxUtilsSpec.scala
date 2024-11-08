@@ -1365,7 +1365,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val validation = TxValidation.build
 
-    def issueTokens(code: String, to: LockupScript.Asset): (TokenId, U256) = {
+    def issueToken(code: String, to: LockupScript.Asset): (TokenId, U256) = {
       val (contractId, _, _) = createContract(
         code,
         AVector.empty,
@@ -1382,20 +1382,6 @@ class TxUtilsSpec extends AlephiumSpec {
         AVector.empty,
         None
       )
-
-    def testAlphRemainderCheck(
-        unlockScript: UnlockScript,
-        inputs: AVector[AssetOutputInfo],
-        outputs: AVector[TxOutputInfo]
-    ) = {
-      blockFlow
-        .getAssetRemainders(
-          unlockScript,
-          inputs,
-          outputs,
-          nonCoinbaseMinGasPrice
-        )
-    }
 
     def buildOutputs(
         targetGroups: AVector[GroupIndex],
@@ -1642,49 +1628,106 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "get positive alph remainder or fail" in new MultiTransferFixture {
-    val halfGenesisInput =
-      changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, Some(2))._1.head
+  "getAssetRemainders" should "return alph and token remainder" in new MultiTransferFixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    createContract(
+      contract,
+      AVector.empty,
+      AVector.empty,
+      tokenIssuanceInfo =
+        Some(TokenIssuance.Info(Val.U256(2), Some(LockupScript.p2pkh(genesisPublicKey_0))))
+    )
+
+    val (genesisUtxos, _)   = changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, None)
     val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
     val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
 
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      AVector(halfGenesisInput),
-      AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4))
-    ).isRight is true
+    val inputUtxoWithTokens = genesisUtxos.find(_.output.tokens.nonEmpty).get
+    val halfOfInputAmount   = inputUtxoWithTokens.output.amount / 2
+    val halfOfInputTokens =
+      inputUtxoWithTokens.output.tokens.map { case (tokenId, amount) => (tokenId, amount / 2) }
 
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      AVector(halfGenesisInput),
-      AVector(outputOfAmount(genesisLockupScript, genesisBalance))
-    ).isLeft is true
+    val outputUtxoWithTokens =
+      TxOutputInfo(
+        genesisLockupScript,
+        halfOfInputAmount,
+        halfOfInputTokens,
+        None
+      )
 
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      AVector.empty,
-      AVector(outputOfAmount(genesisLockupScript, genesisBalance))
-    ).isLeft is true
+    val (alphRemainder, tokenRemainder) =
+      blockFlow
+        .getAssetRemainders(
+          genesisUnlockScript,
+          AVector(inputUtxoWithTokens),
+          AVector(outputUtxoWithTokens),
+          GasPrice(ALPH.nanoAlph(10))
+        )
+        .rightValue
 
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      AVector.empty,
-      AVector.empty
-    ).isLeft is true
+    alphRemainder is halfOfInputAmount - GasPrice(ALPH.nanoAlph(10)) * minimalGas
+    tokenRemainder is halfOfInputTokens
+  }
 
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      AVector(halfGenesisInput),
-      AVector.empty
-    ).isLeft is true
+  "getAssetRemainders" should "fail unless conditions are met" in new MultiTransferFixture {
+    val (genesisUtxos, _)   = changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, None)
+    val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
+    val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
+
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        AVector(genesisUtxos.head),
+        AVector(outputOfAmount(genesisLockupScript, genesisBalance)),
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
+
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        AVector.empty,
+        AVector(outputOfAmount(genesisLockupScript, genesisBalance)),
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
+
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        AVector.empty,
+        AVector.empty,
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
+
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        AVector(genesisUtxos.head),
+        AVector.empty,
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
 
     val overflowValueOutputs =
       AVector.fill(2)(outputOfAmount(genesisLockupScript, U256.MaxValue))
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      AVector(halfGenesisInput),
-      overflowValueOutputs
-    ).isLeft is true
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        AVector(genesisUtxos.head),
+        overflowValueOutputs,
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
 
     val overflowValueInputs =
       AVector.fill(2) {
@@ -1703,17 +1746,23 @@ class TxUtilsSpec extends AlephiumSpec {
           FlowUtils.PersistedOutput
         )
       }
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      overflowValueInputs,
-      AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4))
-    ).isLeft is true
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        overflowValueInputs,
+        AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4)),
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
 
-    testAlphRemainderCheck(
-      genesisUnlockScript,
-      overflowValueInputs,
-      overflowValueOutputs
-    ).isLeft is true
+    blockFlow
+      .getAssetRemainders(
+        genesisUnlockScript,
+        overflowValueInputs,
+        overflowValueOutputs,
+        nonCoinbaseMinGasPrice
+      )
+      .isLeft is true
   }
 
   "weightGroupedWithRemainder" should "group elements based on weight limit" in {
@@ -1793,7 +1842,7 @@ class TxUtilsSpec extends AlephiumSpec {
     )
   }
 
-  "multi-transfer" should "build multi group transactions from just single genesis box" in new MultiTransferFixture {
+  "multi-transfer" should "build multi group transactions from just single genesis utxo" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
     testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(1), outputs)(
       expectedSenderUtxosCount = 1,
@@ -1813,7 +1862,7 @@ class TxUtilsSpec extends AlephiumSpec {
     ).leftValue is "Not enough inputs to build multi-group transaction"
   }
 
-  "multi-transfer" should "build multi group transactions from multiple boxes" in new MultiTransferFixture {
+  "multi-transfer" should "build multi group transactions from multiple utxos" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
     testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(2), outputs)(
       expectedSenderUtxosCount = 2,
@@ -1870,7 +1919,7 @@ class TxUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val tokens = AVector.fill(10)(issueTokens(contract, LockupScript.p2pkh(genesisPublicKey_0)))
+    val tokens = AVector.fill(10)(issueToken(contract, LockupScript.p2pkh(genesisPublicKey_0)))
     val outputsWithTokens = buildOutputs(AVector(GroupIndex.unsafe(0)), ALPH.oneAlph, tokens)
     testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, None, outputsWithTokens)(
       expectedSenderUtxosCount = 1,
