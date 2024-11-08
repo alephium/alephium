@@ -654,7 +654,7 @@ final class AVector[@sp A](
     }
   }
 
-  def groupByAsVec[K](f: A => K): AVector[(K, AVector[A])] = {
+  def groupByOrdered[K](f: A => K): AVector[(K, AVector[A])] = {
     fold(AVector.empty[(K, AVector[A])]) { (acc, elem) =>
       val key = f(elem)
       acc.indexWhere(_._1 == key) match {

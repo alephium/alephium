@@ -1573,7 +1573,7 @@ object TxUtils {
       weightFn: E => Int
   ): AVector[AVector[E]] =
     elems
-      .groupByAsVec(groupByFn)
+      .groupByOrdered(groupByFn)
       .flatMap { case (_, elems) =>
         weightGroupedWithRemainder(elems, weightLimit)(weightFn)
       }

@@ -1403,7 +1403,7 @@ class TxUtilsSpec extends AlephiumSpec {
         tokens: AVector[(TokenId, U256)] = AVector.empty
     ): AVector[AVector[TxOutputInfo]] = {
       targetGroups
-        .groupByAsVec(identity)
+        .groupByOrdered(identity)
         .map { case (_, groups) =>
           groups.map { group =>
             TxOutputInfo(
