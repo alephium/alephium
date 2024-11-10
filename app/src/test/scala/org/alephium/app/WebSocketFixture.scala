@@ -112,8 +112,8 @@ trait RouteWS
     // run defined Cause of websocket server with Effect on websocket client
     behaviorCauseEffectList.foreach { case WebSocketSpec(_, serverBehavior, clientAssertionOnMsg) =>
       serverBehavior(node.eventBus)
-      probedSockets.foreach { case (_, probe) =>
-        clientAssertionOnMsg(probe)
+      probedSockets.foreach { case (_, clientProbe) =>
+        clientAssertionOnMsg(clientProbe)
       }
     }
 

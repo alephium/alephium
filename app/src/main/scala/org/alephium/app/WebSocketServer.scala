@@ -99,7 +99,7 @@ object WebSocketServer extends StrictLogging {
   }
 
   object WsEventType {
-    private val SubscribePrefix = "subscribe:"
+    private val SubscribeCmd = "subscribe"
     type SubscriberId     = String
     type SubscriptionTime = Long
 
@@ -113,23 +113,16 @@ object WebSocketServer extends StrictLogging {
     }
 
     final case class Subscription(eventType: WsEventType) {
-      def message: String = s"$SubscribePrefix${eventType.name}"
+      def message: String = s"$SubscribeCmd:${eventType.name}"
     }
 
-    def buildSubscribeMsg(eventType: WsEventType): String = s"$SubscribePrefix${eventType.name}"
-
-    private def isSubscription(message: String): Boolean = message.startsWith(SubscribePrefix)
+    def buildSubscribeMsg(eventType: WsEventType): String = s"$SubscribeCmd:${eventType.name}"
 
     def parseSubscription(message: String): Option[Subscription] = {
-      if (isSubscription(message)) {
-        message
-          .split(":")
-          .lastOption
-          .map(_.trim)
-          .flatMap(WsEventType.fromString)
-          .map(Subscription(_))
-      } else {
-        None
+      message.split(":").toList match {
+        case SubscribeCmd :: event :: Nil =>
+          WsEventType.fromString(event).map(Subscription(_))
+        case _ => None
       }
     }
   }

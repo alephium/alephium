@@ -43,21 +43,21 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
   }
 
   it should "connect and subscribe multiple ws clients to multiple events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, probe: TestProbe): (WebSocket, TestProbe) = {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
       ws.textMessageHandler { message =>
-        probe.ref ! message
+        clientProbe.ref ! message
       }
       ws.writeTextMessage(WsEventType.buildSubscribeMsg(WsEventType.Block))
       ws.writeTextMessage(WsEventType.buildSubscribeMsg(WsEventType.Tx))
-      ws -> probe
+      ws -> clientProbe
     }
 
     def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
       eventBusRef ! BlockNotify(blockGen.sample.get, height = 0)
     }
 
-    def clientAssertionOnMsg(probe: TestProbe): Assertion =
-      probe.expectMsgPF() { case msg: String =>
+    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
+      clientProbe.expectMsgPF() { case msg: String =>
         read[NotificationUnsafe](msg).asNotification.rightValue.method is WsEventType.Block.name
       }
 
@@ -67,16 +67,16 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
 
   it should "not spin ws connections over limit" in new RouteWS {
     override def maxConnections: Int = 2
-    val wsSpec = WebSocketSpec((ws, probe) => (ws, probe), _ => (), _ => true is true)
+    val wsSpec = WebSocketSpec((ws, clientProbe) => (ws, clientProbe), _ => (), _ => true is true)
     assertThrows[TestFailedException](checkWS(AVector.fill(3)(wsSpec)))
   }
 
   it should "connect and not subscribe multiple ws clients to any event" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, probe: TestProbe): (WebSocket, TestProbe) = {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
       ws.textMessageHandler { message =>
-        probe.ref ! message
+        clientProbe.ref ! message
       }
-      ws -> probe
+      ws -> clientProbe
     }
 
     val wsSpec = WebSocketSpec(
@@ -86,5 +86,4 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
     )
     checkWS(AVector.fill(3)(wsSpec))
   }
-
 }
