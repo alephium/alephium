@@ -21,7 +21,7 @@ import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.exceptions.TestFailedException
 
-import org.alephium.app.WebSocketServer.{EventHandler, WsEventType}
+import org.alephium.app.WebSocketServer.{EventHandler, WsSubscription}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC._
@@ -47,8 +47,8 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
       ws.textMessageHandler { message =>
         clientProbe.ref ! message
       }
-      ws.writeTextMessage(WsEventType.buildSubscribeMsg(WsEventType.Block))
-      ws.writeTextMessage(WsEventType.buildSubscribeMsg(WsEventType.Tx))
+      ws.writeTextMessage(WsSubscription.buildSubscribeMsg(WsSubscription.Block))
+      ws.writeTextMessage(WsSubscription.buildSubscribeMsg(WsSubscription.Tx))
       ws -> clientProbe
     }
 
@@ -58,7 +58,7 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
       clientProbe.expectMsgPF() { case msg: String =>
-        read[NotificationUnsafe](msg).asNotification.rightValue.method is WsEventType.Block.name
+        read[NotificationUnsafe](msg).asNotification.rightValue.method is WsSubscription.Block.method
       }
 
     val wsSpec = WebSocketSpec(clientInitBehavior, serverBehavior, clientAssertionOnMsg)

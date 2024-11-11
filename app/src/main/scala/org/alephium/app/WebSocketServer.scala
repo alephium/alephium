@@ -25,8 +25,7 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.app.WebSocketServer.WsEventType
-import org.alephium.app.WebSocketServer.WsEventType.Subscription
+import org.alephium.app.WebSocketServer.WsSubscription
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
@@ -49,7 +48,7 @@ object SimpleHttpServer {
 final case class WebSocketServer(
     underlying: HttpServer,
     eventHandler: ActorRef,
-    subscribers: ConcurrentHashMap[WsEventType.SubscriberId, WsEventType.SubscriptionTime]
+    subscribers: ConcurrentHashMap[WsSubscription.SubscriberId, WsSubscription.SubscriptionTime]
 ) extends HttpServerLike
 
 object WebSocketServer extends StrictLogging {
@@ -64,7 +63,7 @@ object WebSocketServer extends StrictLogging {
     val eventHandlerRef =
       EventHandler.getSubscribedEventHandlerRef(vertx.eventBus(), node.eventBus, flowSystem)
     val subscribers =
-      ConcurrentHashMap.empty[WsEventType.SubscriberId, WsEventType.SubscriptionTime]
+      ConcurrentHashMap.empty[WsSubscription.SubscriberId, WsSubscription.SubscriptionTime]
     val server = vertx.createHttpServer(httpOptions)
     server.webSocketHandler { webSocket =>
       if (subscribers.size >= maxConnections) {
@@ -77,7 +76,7 @@ object WebSocketServer extends StrictLogging {
 
         // Receive subscription messages from the client
         webSocket.textMessageHandler { message =>
-          WsEventType.parseSubscription(message) match {
+          WsSubscription.parseSubscription(message) match {
             case Some(subscription) =>
               EventHandler.subscribeToEvents(vertx, webSocket, subscription)
             case None =>
@@ -94,34 +93,30 @@ object WebSocketServer extends StrictLogging {
     WebSocketServer(server, eventHandlerRef, subscribers)
   }
 
-  sealed trait WsEventType {
-    def name: String
+  sealed trait WsSubscription {
+    def method: String
   }
 
-  object WsEventType {
+  object WsSubscription {
     private val SubscribeCmd = "subscribe"
     type SubscriberId     = String
     type SubscriptionTime = Long
 
-    case object Block extends WsEventType { val name = "block" }
-    case object Tx    extends WsEventType { val name = "tx"    }
+    case object Block extends WsSubscription { val method = "block" }
+    case object Tx    extends WsSubscription { val method = "tx"    }
 
-    def fromString(name: String): Option[WsEventType] = name match {
-      case Block.name => Some(Block)
-      case Tx.name    => Some(Tx)
-      case _          => None
+    def fromString(name: String): Option[WsSubscription] = name match {
+      case Block.`method` => Some(Block)
+      case Tx.`method`    => Some(Tx)
+      case _              => None
     }
 
-    final case class Subscription(eventType: WsEventType) {
-      def message: String = s"$SubscribeCmd:${eventType.name}"
-    }
+    def buildSubscribeMsg(eventType: WsSubscription): String = s"$SubscribeCmd:${eventType.method}"
 
-    def buildSubscribeMsg(eventType: WsEventType): String = s"$SubscribeCmd:${eventType.name}"
-
-    def parseSubscription(message: String): Option[Subscription] = {
+    def parseSubscription(message: String): Option[WsSubscription] = {
       message.split(":").toList match {
         case SubscribeCmd :: event :: Nil =>
-          WsEventType.fromString(event).map(Subscription(_))
+          WsSubscription.fromString(event)
         case _ => None
       }
     }
@@ -133,12 +128,12 @@ object WebSocketServer extends StrictLogging {
     def subscribeToEvents(
         vertx: Vertx,
         ws: ServerWebSocket,
-        subscription: Subscription
+        subscription: WsSubscription
     ): MessageConsumer[String] = {
       vertx
         .eventBus()
         .consumer[String](
-          subscription.eventType.name,
+          subscription.method,
           new io.vertx.core.Handler[Message[String]] {
             override def handle(message: Message[String]): Unit = {
               if (!ws.isClosed) {
@@ -156,7 +151,7 @@ object WebSocketServer extends StrictLogging {
       event match {
         case BlockNotify(block, height) =>
           BlockEntry.from(block, height).map { blockEntry =>
-            Notification(WsEventType.Block.name, writeJs(blockEntry))
+            Notification(WsSubscription.Block.method, writeJs(blockEntry))
           }
       }
     }

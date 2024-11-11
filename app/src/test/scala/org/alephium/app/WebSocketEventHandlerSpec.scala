@@ -17,8 +17,7 @@
 package org.alephium.app
 
 import org.alephium.api.model.BlockEntry
-import org.alephium.app.WebSocketServer.{EventHandler, WsEventType}
-import org.alephium.app.WebSocketServer.WsEventType.Subscription
+import org.alephium.app.WebSocketServer.{EventHandler, WsSubscription}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
@@ -35,26 +34,26 @@ class WebSocketEventHandlerSpec extends AlephiumSpec with ServerFixture {
   }
 
   it should "parse subscription EventType" in {
-    WsEventType.parseSubscription("subscribe:block").get is Subscription(WsEventType.Block)
-    WsEventType.parseSubscription("subscribe:tx").get is Subscription(WsEventType.Tx)
+    WsSubscription.parseSubscription("subscribe:block").get is WsSubscription.Block
+    WsSubscription.parseSubscription("subscribe:tx").get is WsSubscription.Tx
     // let's be strict
-    WsEventType.parseSubscription("subscribe:xxx:block").isEmpty is true
-    WsEventType.parseSubscription("subscribe : block").isEmpty is true
-    WsEventType.parseSubscription("subscribe,block").isEmpty is true
-    WsEventType.parseSubscription("subscribe block").isEmpty is true
-    WsEventType.parseSubscription("subscribe:gandalf").isEmpty is true
-    WsEventType.parseSubscription("nonsense:frodo").isEmpty is true
+    WsSubscription.parseSubscription("subscribe:xxx:block").isEmpty is true
+    WsSubscription.parseSubscription("subscribe : block").isEmpty is true
+    WsSubscription.parseSubscription("subscribe,block").isEmpty is true
+    WsSubscription.parseSubscription("subscribe block").isEmpty is true
+    WsSubscription.parseSubscription("subscribe:gandalf").isEmpty is true
+    WsSubscription.parseSubscription("nonsense:frodo").isEmpty is true
   }
 
   it should "build subscription message" in {
-    WsEventType.buildSubscribeMsg(WsEventType.Block) is "subscribe:block"
-    WsEventType.buildSubscribeMsg(WsEventType.Tx) is "subscribe:tx"
+    WsSubscription.buildSubscribeMsg(WsSubscription.Block) is "subscribe:block"
+    WsSubscription.buildSubscribeMsg(WsSubscription.Tx) is "subscribe:tx"
   }
 
   it should "build Notification from Event" in {
     val notification = EventHandler.buildNotification(BlockNotify(dummyBlock, 0)).rightValue
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    notification.method is WsEventType.Block.name
+    notification.method is WsSubscription.Block.method
     show(notification.params) is write(blockEntry)
   }
 }
