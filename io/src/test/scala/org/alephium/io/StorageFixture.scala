@@ -16,16 +16,21 @@
 
 package org.alephium.io
 
+import java.nio.file.{Files => JFiles}
+
 import org.alephium.crypto.Keccak256
 import org.alephium.serde.Serde
-import org.alephium.util.{AlephiumFixture, AlephiumSpec, Files}
+import org.alephium.util.{AlephiumFixture, AlephiumSpec, Env, Files}
 
 trait StorageFixture extends AlephiumFixture {
 
   def newDBStorage(): RocksDBSource = {
-    val tmpdir  = Files.tmpDir
+    val rootPath = Files.testRootPath(Env.currentEnv)
+    if (!JFiles.exists(rootPath)) {
+      rootPath.toFile.mkdir()
+    }
     val dbname  = s"test-db-${Keccak256.generate.toHexString}"
-    val dbPath  = tmpdir.resolve(dbname)
+    val dbPath  = rootPath.resolve(dbname)
     val storage = RocksDBSource.openUnsafe(dbPath)
     AlephiumSpec.addCleanTask(() => storage.dESTROYUnsafe())
     storage

@@ -16,6 +16,8 @@
 
 package org.alephium.util
 
+import java.nio.file.{Files => JFiles, Path}
+
 import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.language.implicitConversions
@@ -50,9 +52,21 @@ object AlephiumSpec {
 
   def addCleanTask(task: () => Unit): Unit = cleanTasks.addOne(task)
 
+  def deleteRecursive(path: Path): Unit = {
+    if (JFiles.exists(path)) {
+      if (JFiles.isDirectory(path)) {
+        JFiles.list(path).forEach(deleteRecursive)
+      }
+      JFiles.delete(path)
+    }
+  }
+
   def clean(): Unit = {
     cleanTasks.foreach(task => task())
     cleanTasks.clear()
+
+    deleteRecursive(Files.testRootPath(Env.Test))
+    deleteRecursive(Files.testRootPath(Env.Integration))
   }
 }
 

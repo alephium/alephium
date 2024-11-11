@@ -54,8 +54,7 @@ trait FlowFixture
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   def isolatedBlockFlow(): BlockFlow = {
-    val newStorages =
-      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    val newStorages = StoragesFixture.buildStorages(rootPath.resolve(Hash.generate.toHexString))
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
