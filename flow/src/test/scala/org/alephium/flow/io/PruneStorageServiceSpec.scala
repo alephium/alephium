@@ -18,16 +18,16 @@ package org.alephium.flow.io
 
 import scala.util.Random
 
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.io.RocksDBKeyValueStorage
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, Block, ChainIndex, ContractId}
 import org.alephium.protocol.vm.TokenIssuance
-import org.alephium.util.AVector
+import org.alephium.util.{AlephiumSpec, AVector}
 
-class PruneStorageServiceSpec extends AlephiumFlowBasicSpec {
+class PruneStorageServiceSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", 4),

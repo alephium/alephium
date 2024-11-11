@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 
-import org.alephium.flow.{AlephiumFlowActorBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
@@ -28,7 +28,7 @@ import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScrip
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.*
 
-class ViewHandlerSpec extends AlephiumFlowActorBasicSpec {
+class ViewHandlerSpec extends AlephiumActorSpec {
   it should "update when necessary" in {
     implicit val brokerConfig = new BrokerConfig {
       override def brokerId: Int  = 1

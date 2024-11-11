@@ -21,15 +21,15 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.testkit.{TestActorRef, TestProbe}
 
-import org.alephium.flow.{AlephiumFlowActorBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{maxSyncBlocksPerChain}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
-class DependencyHandlerSpec extends AlephiumFlowActorBasicSpec {
+class DependencyHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture { Self =>
     lazy val brokerProbe = TestProbe()
     lazy val broker      = ActorRefT[ChainHandler.Event](brokerProbe.ref)

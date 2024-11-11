@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 import org.scalatest.{Assertion, Succeeded}
 
 import org.alephium.crypto.BIP340Schnorr
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.core.FlowUtils.{
   AssetOutputInfo,
@@ -42,10 +42,10 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
-class TxUtilsSpec extends AlephiumFlowBasicSpec {
+class TxUtilsSpec extends AlephiumSpec {
   it should "consider use minimal gas fee" in new FlowFixture {
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, _, _) = genesisKeys(0)

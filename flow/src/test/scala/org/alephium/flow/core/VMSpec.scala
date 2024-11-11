@@ -27,7 +27,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.crypto._
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
 import org.alephium.io.IOResult
@@ -39,7 +39,7 @@ import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off file.size.limit method.length number.of.methods
-class VMSpec extends AlephiumFlowBasicSpec with Generators {
+class VMSpec extends AlephiumSpec with Generators {
 
   it should "not start with private function" in new ContractFixture {
     val input =

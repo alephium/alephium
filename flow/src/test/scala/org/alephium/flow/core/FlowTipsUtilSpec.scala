@@ -16,12 +16,12 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{BlockHash, ChainIndex, GroupIndex}
-import org.alephium.util.{AVector, Duration, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
-class FlowTipsUtilSpec extends AlephiumFlowBasicSpec {
+class FlowTipsUtilSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
   }

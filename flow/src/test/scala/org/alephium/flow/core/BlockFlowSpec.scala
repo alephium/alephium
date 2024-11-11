@@ -22,7 +22,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed}
 import org.alephium.flow.io.StoragesFixture
@@ -31,10 +31,10 @@ import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, TokenIssuance}
-import org.alephium.util.{AVector, TimeStamp, U256, UnsecureRandom}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256, UnsecureRandom}
 
 // scalastyle:off file.size.limit
-class BlockFlowSpec extends AlephiumFlowBasicSpec {
+class BlockFlowSpec extends AlephiumSpec {
   it should "compute correct blockflow height" in new FlowFixture {
     config.genesisBlocks.flatMap(identity).foreach { block =>
       blockFlow.getWeight(block.hash) isE Weight.zero

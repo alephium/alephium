@@ -958,20 +958,16 @@ trait FlowFixture
   }
 }
 
-trait AlephiumFlowBasicSpec extends AlephiumSpec with BeforeAndAfterAll {
+trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {
   override def afterAll(): Unit = {
     super.afterAll()
-    StoragesFixture.cleanStorages()
+    cleanStorages()
   }
 }
 
-trait AlephiumFlowActorBasicSpec extends AlephiumActorSpec with BeforeAndAfterAll {
+class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec {
   override def afterAll(): Unit = {
     super.afterAll()
-    StoragesFixture.cleanStorages()
+    cleanStorages()
   }
 }
-
-trait AlephiumFlowSpec extends AlephiumFlowBasicSpec with FlowFixture
-
-class AlephiumFlowActorSpec extends AlephiumFlowActorBasicSpec with FlowFixture

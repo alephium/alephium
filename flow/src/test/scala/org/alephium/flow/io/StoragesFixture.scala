@@ -18,8 +18,6 @@ package org.alephium.flow.io
 
 import java.nio.file.{Files, Path}
 
-import scala.collection.mutable
-
 import org.alephium.flow.setting.NodeSetting
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.Hash
@@ -29,18 +27,11 @@ trait StoragesFixture {
   def storages: Storages
 
   def cleanStorages(): Unit = {
-    StoragesFixture.cleanStorages()
+    storages.dESTROYUnsafe()
   }
 }
 
 object StoragesFixture {
-  private val allStorages: mutable.ArrayBuffer[Storages] = mutable.ArrayBuffer.empty
-
-  def cleanStorages(): Unit = {
-    allStorages.foreach(_.dESTROYUnsafe())
-    allStorages.clear()
-  }
-
   def buildStorages(
       rootPath: Path
   )(implicit groupConfig: GroupConfig, nodeSetting: NodeSetting): Storages = {
@@ -50,7 +41,6 @@ object StoragesFixture {
     val dbFolders = s"db-$postFix"
     val storages: Storages =
       Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.ProdSettings.syncWrite)
-    allStorages.addOne(storages)
     storages
   }
 

@@ -18,15 +18,15 @@ package org.alephium.flow.network.sync
 
 import akka.testkit.{TestActorRef, TestProbe}
 
-import org.alephium.flow.{AlephiumFlowActorBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.model.BlockHash
-import org.alephium.util.AVector
+import org.alephium.util.{AlephiumActorSpec, AVector}
 
-class BlockFlowSynchronizerSpec extends AlephiumFlowActorBasicSpec {
+class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture with Generators {
     val (allHandlers, _) = TestUtils.createAllHandlersProbe
     val blockFlowSynchronizer = TestActorRef[BlockFlowSynchronizer](

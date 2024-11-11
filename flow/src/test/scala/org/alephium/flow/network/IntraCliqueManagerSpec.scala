@@ -19,16 +19,16 @@ package org.alephium.flow.network
 import akka.io.Tcp
 import akka.testkit.TestProbe
 
-import org.alephium.flow.{AlephiumFlowActorBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.bootstrap.InfoFixture
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, OutboundConnection}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader, RequestId, TxsResponse}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
-class IntraCliqueManagerSpec extends AlephiumFlowActorBasicSpec {
+class IntraCliqueManagerSpec extends AlephiumActorSpec {
   it should "sync with other brokers" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       "alephium.broker.broker-id" -> 1

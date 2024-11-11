@@ -25,7 +25,7 @@ import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.flow.{AlephiumFlowActorBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.{BrokerState, SyncedResult}
@@ -35,7 +35,7 @@ import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, TransactionId}
 import org.alephium.util._
 
-class InterCliqueManagerSpec extends AlephiumFlowActorBasicSpec with Generators with ScalaFutures {
+class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with ScalaFutures {
   override def actorSystemConfig = AlephiumActorSpec.debugConfig
   implicit val timeout: Timeout  = Timeout(Duration.ofSecondsUnsafe(2).asScala)
   val clientInfo: String         = "v0.0.0"

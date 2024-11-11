@@ -16,11 +16,11 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.{LockFixture, TimeStamp}
+import org.alephium.util.{AlephiumSpec, LockFixture, TimeStamp}
 
-class FlowCacheSpec extends AlephiumFlowBasicSpec with LockFixture {
+class FlowCacheSpec extends AlephiumSpec with LockFixture {
   it should "remove blocks when the cache is full" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),

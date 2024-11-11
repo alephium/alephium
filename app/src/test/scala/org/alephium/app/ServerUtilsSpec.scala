@@ -28,7 +28,7 @@ import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
@@ -43,7 +43,7 @@ import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit number.of.methods
-class ServerUtilsSpec extends AlephiumFlowBasicSpec {
+class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
 

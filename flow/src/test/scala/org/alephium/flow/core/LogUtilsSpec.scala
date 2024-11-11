@@ -17,13 +17,13 @@
 package org.alephium.flow.core
 
 import org.alephium.crypto.Byte32
-import org.alephium.flow.{AlephiumFlowBasicSpec, FlowFixture}
+import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId, Val}
 import org.alephium.protocol.vm.event.CachedLog
-import org.alephium.util.{AVector, I256}
+import org.alephium.util.{AlephiumSpec, AVector, I256}
 
-class LogUtilsSpec extends AlephiumFlowBasicSpec {
+class LogUtilsSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
     val blockHash  = BlockHash.random
     val txId       = TransactionId.random
