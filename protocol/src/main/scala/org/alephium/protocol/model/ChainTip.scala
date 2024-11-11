@@ -17,7 +17,7 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 
 final case class ChainTip(hash: BlockHash, height: Int, weight: Weight) {
   private var _chainIndex: Option[ChainIndex] = None

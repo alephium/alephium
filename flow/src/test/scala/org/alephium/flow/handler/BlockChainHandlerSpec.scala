@@ -278,7 +278,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "publish invalid flow data if the block is invalid and the block is not mined locally" in new InvalidBlockFixture {
-    override val dataOrigin = DataOrigin.InterClique(brokerInfo)
+    override val dataOrigin: DataOrigin = DataOrigin.InterClique(brokerInfo)
 
     val probe = TestProbe()
     system.eventStream.subscribe(probe.ref, classOf[ChainHandler.FlowDataValidationEvent])
@@ -290,7 +290,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "not publish invalid flow data if the block is invalid and the block is mined locally" in new InvalidBlockFixture {
-    override val dataOrigin = DataOrigin.Local
+    override val dataOrigin: DataOrigin = DataOrigin.Local
 
     val probe = TestProbe()
     system.eventStream.subscribe(probe.ref, classOf[ChainHandler.FlowDataValidationEvent])

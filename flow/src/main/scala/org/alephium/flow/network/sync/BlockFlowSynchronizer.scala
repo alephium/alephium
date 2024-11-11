@@ -221,7 +221,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private def tryValidateMoreBlocks(): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
     syncingChains.foreach(_._2.tryValidateMoreBlocks(acc))
-    acc.groupBy(_.from).foreach { case (from, blocks) =>
+    acc.groupBy(_.from).foreachEntry { case (from, blocks) =>
       val dataOrigin = DataOrigin.InterClique(from._2)
       val addFlowData =
         DependencyHandler.AddFlowData(AVector.from(blocks.map(_.block)), dataOrigin)
@@ -340,13 +340,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private def tryMoveOn(): Unit = {
     val requests =
       mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, AVector[Int])]]
-    syncingChains.foreach { case (chainIndex, state) =>
+    syncingChains.foreachEntry { case (chainIndex, state) =>
       state.tryMoveOn() match {
         case Some(heights) => addToMap(requests, state.originBroker, (chainIndex, heights))
         case None          => ()
       }
     }
-    requests.foreach { case (broker, requestsPerActor) =>
+    requests.foreachEntry { case (broker, requestsPerActor) =>
       broker ! BrokerHandler.GetSkeletons(AVector.from(requestsPerActor))
     }
   }
@@ -393,7 +393,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
           requestsPerBroker(brokerActor) = mutable.ArrayBuffer((chainIndex, bestTip, selfTip))
       }
     }
-    requestsPerBroker.foreach { case (broker, chainsPerBroker) =>
+    requestsPerBroker.foreachEntry { case (broker, chainsPerBroker) =>
       val requests = chainsPerBroker.map { case (chainIndex, bestTip, selfTip) =>
         (chainIndex, bestTip, selfTip)
       }
@@ -442,7 +442,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
         newTasks.foreach { case (broker, task) => addToMap(allTasks, broker, task) }
         continue = newTasks.nonEmpty
       }
-      allTasks.foreach { case (brokerActor, tasksPerBroker) =>
+      allTasks.foreachEntry { case (brokerActor, tasksPerBroker) =>
         val tasks = AVector.from(tasksPerBroker)
         log.debug(
           s"Trying to download blocks from ${remoteAddress(brokerActor)}, tasks: ${SyncState.showTasks(tasks)}"
@@ -496,7 +496,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     assume(getBrokerStatus(terminatedBroker).isEmpty)
     val tipsFromBroker = bestChainTips.filter(_._2._1 == terminatedBroker)
     if (tipsFromBroker.nonEmpty) {
-      tipsFromBroker.foreach { case (chainIndex, _) =>
+      tipsFromBroker.foreachEntry { case (chainIndex, _) =>
         val selected = brokers.view
           .map { case (newBroker, status) =>
             (newBroker, status.getChainTip(chainIndex))
@@ -533,7 +533,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
             s"Reschedule the pending tasks from the terminated broker ${status.info.address}, " +
               s"tasks: ${SyncState.showTasks(AVector.from(pendingTasks))}"
           )
-          pendingTasks.groupBy(_.chainIndex).foreach { case (chainIndex, tasks) =>
+          pendingTasks.groupBy(_.chainIndex).foreachEntry { case (chainIndex, tasks) =>
             syncingChains.get(chainIndex).foreach(_.putBack(AVector.from(tasks)))
           }
           downloadBlocks()

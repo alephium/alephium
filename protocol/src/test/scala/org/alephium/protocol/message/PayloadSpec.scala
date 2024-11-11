@@ -27,7 +27,7 @@ import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model._
-import org.alephium.serde.{serialize, Serde, SerdeError}
+import org.alephium.serde.{intSerde, serialize, Serde, SerdeError}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {

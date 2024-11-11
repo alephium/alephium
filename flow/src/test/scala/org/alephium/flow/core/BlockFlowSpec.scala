@@ -376,7 +376,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "get chain state" in new FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-id", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
 
     val tips0 = blockFlow.getChainStateUnsafe()
     tips0 is brokerConfig.chainIndexes.map { chainIndex =>

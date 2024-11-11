@@ -125,7 +125,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   trait BlockFlowSynchronizerV2Fixture extends Fixture {
     import SyncState._
 
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     def addBroker(version: ProtocolVersion = ProtocolV2): (BrokerActor, BrokerStatus, TestProbe) = {
       val brokerInfo =
@@ -526,7 +526,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "download blocks from multiple peers" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 4))
 
     def genTasks(chainIndex: ChainIndex) = {

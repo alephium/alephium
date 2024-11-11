@@ -414,7 +414,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "stop handler and publish misbehavior if the tip hash is invalid" in new Fixture {
-    override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
 
     val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
     val invalidTip   = ChainTip(invalidBlock.hash, 1, invalidBlock.weight)
@@ -567,7 +568,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
     info("invalid header hash")
     new GetAncestorsFixture {
-      override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+      override val configValues: Map[String, Any] =
+        Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
 
       val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
       checkInvalidHeaders(AVector(AVector(invalidBlock.header)))
@@ -575,7 +577,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
     info("invalid chain index")
     new GetAncestorsFixture {
-      override val configValues = Map(("alephium.broker.broker-num", 1))
+      override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
       val block0 = emptyBlock(blockFlow, chainIndex)
       val block1 = emptyBlock(
