@@ -40,7 +40,7 @@ class WalletApp(config: WalletConfig)(implicit
 ) extends Service
     with StrictLogging {
 
-  implicit private val groupConfig = new GroupConfig {
+  implicit private val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = config.blockflow.groups
   }
 

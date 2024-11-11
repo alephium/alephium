@@ -64,7 +64,7 @@ class KeywordSpec extends AlephiumSpec {
   }
 
   it should "return false for non-existing String keywords" in {
-    forAll { string: String =>
+    forAll { (string: String) =>
       Keyword.Used.exists(string) is false
     }
   }

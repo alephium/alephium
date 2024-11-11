@@ -183,7 +183,7 @@ class AddressSpec extends AlephiumSpec {
       copy(pubKey = Some(key))
     }
 
-    def script = {
+    def script: LockupScript = {
       LockupScript.p2pkh(PublicKey.unsafe(Hex.from(pubKey.value).value))
     }
   }
@@ -201,7 +201,7 @@ class AddressSpec extends AlephiumSpec {
       copy(pubKeys = AVector.from(keys))
     }
 
-    def script = {
+    def script: LockupScript = {
       val keys = pubKeys.map(key => PublicKey.unsafe(Hex.from(key).value))
       LockupScript.p2mpkhUnsafe(keys, m.value)
     }
@@ -215,7 +215,7 @@ class AddressSpec extends AlephiumSpec {
       copy(contractId = Some(id))
     }
 
-    def script = {
+    def script: LockupScript = {
       LockupScript.p2c(ContractId.from(contractId.value).value)
     }
   }
@@ -228,7 +228,7 @@ class AddressSpec extends AlephiumSpec {
       copy(scriptHash = Some(hash))
     }
 
-    def script = {
+    def script: LockupScript = {
       LockupScript.p2sh(Hash.from(scriptHash.value).value)
     }
   }

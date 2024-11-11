@@ -143,16 +143,16 @@ class TargetSpec extends AlephiumSpec with GroupConfigFixture {
   it should "average targets" in new GroupConfigFixture.Default {
     val target = Target.unsafe(Hex.unsafe("200FFFFF"))
     val value  = target.value
-    Target.average(target, AVector.fill(2 * groups - 1)(target)) is target
-    Target.average(Target.Zero, AVector.fill(2 * groups - 1)(target)) is
-      Target.unsafe(target.value * (2 * groups - 1) / (4 * groups))
-    Target.average(target, AVector.fill(2 * groups - 1)(Target.Zero)) is
-      Target.unsafe(target.value * (2 * groups + 1) / (4 * groups))
-    val target1 = Target.unsafe(value * (2 * groups + 1))
-    Target.average(target1, AVector.fill(2 * groups - 1)(target)) is
-      Target.unsafe(value * (2 * groups + 3) / 2)
-    val target2 = Target.unsafe(value * (2 * groups + 1))
-    Target.average(target, AVector.fill(2 * groups - 1)(target2)) is
-      Target.unsafe(value * (2 * groups + 1) / 2)
+    Target.average(target, AVector.fill(2 * this.groups - 1)(target)) is target
+    Target.average(Target.Zero, AVector.fill(2 * this.groups - 1)(target)) is
+      Target.unsafe(target.value * (2 * this.groups - 1) / (4 * this.groups))
+    Target.average(target, AVector.fill(2 * this.groups - 1)(Target.Zero)) is
+      Target.unsafe(target.value * (2 * this.groups + 1) / (4 * this.groups))
+    val target1 = Target.unsafe(value * (2 * this.groups + 1))
+    Target.average(target1, AVector.fill(2 * this.groups - 1)(target)) is
+      Target.unsafe(value * (2 * this.groups + 3) / 2)
+    val target2 = Target.unsafe(value * (2 * this.groups + 1))
+    Target.average(target, AVector.fill(2 * this.groups - 1)(target2)) is
+      Target.unsafe(value * (2 * this.groups + 1) / 2)
   }
 }

@@ -943,7 +943,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Global variable has the same name as local variable: x",
+        "Global variables have the same name: x",
       s"""
          |// assign to immutable array element(contract field)
          |Contract Foo(x: [U256; 2]) {
@@ -2187,7 +2187,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |
-           |Contract Grandparent(mut x: U256) {
+           |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  @using(updateFields = true)
@@ -6118,7 +6118,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Global variable has the same name as local variable: counters")
+      testContractError(code, "Global variables have the same name: counters")
     }
   }
 
@@ -8465,6 +8465,293 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       test(code, AVector(Val.True), AVector(Val.U256(0)))
       test(code, AVector(Val.False), AVector(Val.U256(1)))
+    }
+  }
+
+  it should "report an error if accessing definitions in child contracts" in {
+    val options = CompilerOptions.Default.copy(skipAbstractContractCheck = true)
+
+    {
+      info("Access to enums in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  enum Error { Code = 0 }
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> () {
+           |    assert!(Error.$$Code$$ == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.Error.Code is not defined in the current scope or is used before being defined"
+      )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
+    }
+
+    {
+      info("Access to constants in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  const Error = 0
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> () {
+           |    assert!($$Error$$ == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.Error is not defined in the current scope or is used before being defined"
+      )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
+    }
+
+    {
+      info("Access to fields in child contracts")
+      val code =
+        s"""
+           |Contract Child(a: U256, b: U256) extends Parent(a) {
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent(a: U256) {
+           |  pub fn parent() -> () {
+           |    assert!($$b$$ == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.b is not defined in the current scope or is used before being defined"
+      )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
+    }
+
+    {
+      info("Access to maps in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  mapping[U256, U256] map
+           |
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> U256 {
+           |    return $$map$$[0]
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable parent.map is not defined in the current scope or is used before being defined"
+      )
+      Compiler.compileContract(replace(code), 0, options).isRight is true
+    }
+
+    {
+      info("Access to functions in child contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() {
+           |  pub fn parent() -> () {
+           |    $$child$$()
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Function child does not exist")
+      Compiler.compileContract(replace(code), 0, options).isRight is true
+    }
+
+    {
+      info("Access to definitions in parent contracts")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn child() -> () {}
+           |}
+           |
+           |Abstract Contract Parent() extends Grandparent() {
+           |  pub fn parent() -> () {
+           |    assert!(Error == 0, 0)
+           |  }
+           |}
+           |Abstract Contract Grandparent() {
+           |  const Error = 0
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
+
+    {
+      info("Define the child abstract contract before the parent abstract contract")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |Abstract Contract MyContract(boolean: Bool) extends Utils() {}
+           |
+           |Abstract Contract Utils() {
+           |  pub fn wassup() -> () {
+           |    let copy = $$boolean$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Variable wassup.boolean is not defined in the current scope or is used before being defined"
+      )
+    }
+  }
+
+  it should "check duplicate definitions in abstract contract" in {
+    val options = CompilerOptions.Default.copy(skipAbstractContractCheck = true)
+    def compileCode(code: String, error: String) = {
+      Compiler.compileContract(replace(code), 0, options).leftValue.message is error
+    }
+
+    {
+      info("Duplicate fields")
+      val code =
+        s"""
+           |Contract Child(v: U256, v: U256) extends Parent(v, v) {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent(v: U256, $$v$$: U256) {
+           |  pub fn p() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Global variables have the same name: v")
+      compileCode(code, "Global variables have the same name: v")
+    }
+
+    {
+      info("Duplicate function args")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  pub fn p(v: U256, $$v$$: U256) -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Local variables have the same name: v")
+      compileCode(code, "Local variables have the same name: v")
+    }
+
+    {
+      info("Duplicate local and global variables")
+      val code =
+        s"""
+           |Contract Child(v: U256) extends Parent(v) {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent(v: U256) {
+           |  pub fn p($$v$$: U256) -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Global variables have the same name: v")
+      compileCode(code, "Global variables have the same name: v")
+    }
+
+    {
+      info("Duplicate constants")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  const A = 0
+           |  $$const A = 1$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These constant variables are defined multiple times: A")
+      compileCode(code, "These constant variables are defined multiple times: A")
+    }
+
+    {
+      info("Duplicate enums")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  enum A {
+           |    Err = 0
+           |  }
+           |  enum A {
+           |    $$Err = 0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "There are conflict fields in the enum A: Err")
+      compileCode(code, "There are conflict fields in the enum A: Err")
+    }
+
+    {
+      info("Duplicate events")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  event E(v: U256)
+           |  $$event E(v: I256)$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These events are defined multiple times: E")
+      compileCode(code, "These events are defined multiple times: E")
+    }
+
+    {
+      info("Duplicate maps")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  mapping[U256, U256] map
+           |  $$mapping[U256, I256] map$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These maps are defined multiple times: map")
+      compileCode(code, "These maps are defined multiple times: map")
+    }
+
+    {
+      info("Duplicate functions")
+      val code =
+        s"""
+           |Contract Child() extends Parent() {
+           |  pub fn f() -> () {}
+           |}
+           |Abstract Contract Parent() {
+           |  pub fn p() -> () {}
+           |  $$pub fn p() -> () {}$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These functions are implemented multiple times: p")
+      compileCode(code, "These functions are implemented multiple times: p")
     }
   }
 }

@@ -172,7 +172,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "return correct tx status for forks 0" in new Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val shortChain = chainGenOf(2, genesis).sample.get
     val longChain  = chainGenOf(4, genesis).sample.get
@@ -217,7 +217,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "return correct tx status for forks 1" in new Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val longChain = chainGenOf(4, genesis).sample.get
     val shortChain = chainGenOf(2, genesis).sample.get.mapWithIndex { case (block, index) =>
@@ -397,7 +397,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "update mainchain hash based on heights instead of weight" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.consensus.num-zeros-at-least-in-hash", 10)
     )
 
@@ -644,7 +644,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "fix hash indexing" in new Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val shortChain = chainGenOf(2, genesis).sample.get
     val longChain  = chainGenOf(4, genesis).sample.get

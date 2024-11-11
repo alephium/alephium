@@ -37,7 +37,7 @@ final case class Difficulty private (value: BigInteger) extends AnyVal {
 }
 
 object Difficulty {
-  def unsafe(value: BigInteger): Difficulty = new Difficulty(value)
+  def unsafe(value: BigInteger): Difficulty = Difficulty(value)
 
-  val zero: Difficulty = Difficulty(BigInteger.valueOf(0))
+  val zero: Difficulty = new Difficulty(BigInteger.valueOf(0))
 }

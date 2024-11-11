@@ -22,7 +22,7 @@ import org.alephium.util.{AlephiumSpec, LockFixture, TimeStamp}
 
 class FlowCacheSpec extends AlephiumSpec with LockFixture {
   it should "remove blocks when the cache is full" in new FlowFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.consensus.block-cache-capacity-per-chain", 1)
     )

@@ -35,7 +35,7 @@ class MinerSpec extends AlephiumFlowActorSpec with ScalaFutures {
   implicit val askTimeout: Timeout = Timeout(Duration.ofSecondsUnsafe(10).asScala)
 
   trait WorkflowFixture extends FlowFixture with NoIndexModelGeneratorsLike {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.broker.groups", 1), ("alephium.broker.broker-num", 1))
 
     val minerAddresses =

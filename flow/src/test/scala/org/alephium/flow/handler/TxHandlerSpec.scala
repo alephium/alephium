@@ -30,6 +30,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -40,9 +41,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     brokerConfig.brokerId is 0
     override lazy val chainIndex = ChainIndex.unsafe(1, 0)
     val tx = (new FlowFixture {
-      override val configValues = Map(("alephium.broker.broker-id", 1))
-      val block                 = transfer(blockFlow, chainIndex)
-      val tx                    = block.nonCoinbase.head
+      override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+      val block                                   = transfer(blockFlow, chainIndex)
+      val tx                                      = block.nonCoinbase.head
     }).tx
 
     setSynced()
@@ -63,7 +64,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "broadcast valid transactions for single-broker clique" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
       ("alephium.broker.groups", 4),
       ("alephium.broker.broker-num", 1),
@@ -123,7 +124,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "rebroadcast tx" in new Fixture {
-    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"))
     setSynced()
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get.toTemplate
     txHandler ! TxHandler.Rebroadcast(tx)
@@ -134,34 +136,33 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
-  it should "temporarily cache missing inputs tx" in new Fixture {
-    override val configValues = Map(
+  it should "temporarily cache orphan tx" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
-      ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
+      ("alephium.mempool.clean-orphan-tx-frequency", "500 ms")
     )
 
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx, isLocalTx = false)
-    txHandler.underlyingActor.missingInputsTxBuffer.getRootTxs() willBe AVector(tx.toTemplate)
+    orphanPool.getRootTxs() willBe AVector(tx.toTemplate)
     interCliqueProbe.expectNoMessage()
 
     setSynced()
-    txHandler.underlyingActor.missingInputsTxBuffer.getRootTxs().isEmpty willBe true
+    orphanPool.getRootTxs().isEmpty willBe true
   }
 
-  it should "broadcast ready txs from missing inputs tx buffer" in new Fixture {
-    override val configValues = Map(
+  it should "broadcast ready txs from orphan pool" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms")
     )
 
-    val tx     = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
-    val buffer = txHandler.underlyingActor.missingInputsTxBuffer
-    buffer.add(tx, TimeStamp.now())
-    buffer.getRootTxs() is AVector(tx)
+    val tx = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
+    orphanPool.add(tx, TimeStamp.now())
+    orphanPool.getRootTxs() is AVector(tx)
 
-    txHandler ! TxHandler.CleanMissingInputsTx
+    txHandler ! TxHandler.CleanOrphanPool
     txHandler.underlyingActor.outgoingTxBuffer.contains(tx) willBe true
-    buffer.getRootTxs().isEmpty willBe true
+    orphanPool.getRootTxs().isEmpty willBe true
 
     setSynced()
     interCliqueProbe.expectMsg(
@@ -170,9 +171,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "load persisted pending txs only once when node synced" in new FlowFixture {
-    implicit lazy val system = createSystem(Some(AlephiumActorSpec.infoConfig))
+    implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
-      TxHandler.props(blockFlow, storages.pendingTxStorage)
+      TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref))
     )
 
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
@@ -190,7 +191,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   trait StorageFixture extends Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val txNum   = 4
     val txs     = prepareRandomSequentialTxs(txNum)
@@ -220,18 +221,18 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     (blockFlow
       .getGrandPool()
       .size >= txNum) is true // Inter-group txs are counted twice, this will be improved in the future.
-    txHandler.underlyingActor.missingInputsTxBuffer.add(txs.head.toTemplate, TimeStamp.now())
-    txHandler.underlyingActor.missingInputsTxBuffer.size is 1
+    orphanPool.add(txs.head.toTemplate, TimeStamp.now())
+    orphanPool.size is 1
 
     txHandler ! TxHandler.ClearMemPool
     storages.pendingTxStorage.size() willBe 0
     blockFlow.getGrandPool().size is 0
-    txHandler.underlyingActor.missingInputsTxBuffer.size is 0
+    orphanPool.size is 0
   }
 
   it should "persist all of the pending txs once the handler is stopped" in new Fixture {
-    implicit lazy val system  = createSystem(Some(AlephiumActorSpec.infoConfig))
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    implicit lazy val system: ActorSystem       = createSystem(Some(AlephiumActorSpec.infoConfig))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val txs = prepareRandomSequentialTxs(4)
     txs.foreach(tx => blockFlow.getGrandPool().add(tx.chainIndex, tx.toTemplate, TimeStamp.now()))
@@ -244,7 +245,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "fail in case of duplicate txs" in new Fixture {
-    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
 
     val tx = transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None).head
 
@@ -263,7 +265,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "fail in double-spending" in new Fixture {
-    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"))
 
     val tx0 = transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None).head
     val tx1 = transferTxs(blockFlow, chainIndex, ALPH.alph(2), 1, None, true, None).head
@@ -286,7 +289,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "download txs" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms"),
       ("alephium.broker.groups", 4),
       ("alephium.broker.broker-num", 1),
@@ -365,7 +368,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def test(message: String) = {
       EventFilter.debug(message, occurrences = 5).intercept {
         val txHandler = system.actorOf(
-          TxHandler.props(blockFlow, storages.pendingTxStorage)
+          TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref))
         )
         txHandler ! InterCliqueManager.SyncedResult(true)
       }
@@ -373,25 +376,28 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "broadcast txs regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "300 ms"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mempool.batch-broadcast-txs-frequency", "300 ms"))
 
     test("Start to broadcast txs")
   }
 
   it should "download txs regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.batch-download-txs-frequency", "300 ms"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mempool.batch-download-txs-frequency", "300 ms"))
 
     test("Start to download txs")
   }
 
   it should "clean mempools regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.clean-mempool-frequency", "300 ms"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mempool.clean-mempool-frequency", "300 ms"))
 
     test("Start to clean mempools")
   }
 
   it should "reject tx with low gas price" in new Fixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val tx            = transactionGen().sample.get
     val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = coinbaseGasPrice))
@@ -403,7 +409,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "mine new block if auto-mine is enabled" in new Fixture {
-    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    override val configValues: Map[String, Any] = Map(("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
 
     val block = transfer(blockFlow, chainIndex)
@@ -423,7 +429,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "report validation error when auto-mine is enabled" in new Fixture {
-    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    override val configValues: Map[String, Any] = Map(("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx)
@@ -432,7 +438,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "auto mine new blocks if auto-mine is enabled" in new Fixture {
-    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    override val configValues: Map[String, Any] = Map(("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
     val old = blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Right(())
@@ -444,14 +450,14 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "auto mine new blocks if env is not PROD" in new Fixture {
-    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", false))
+    override val configValues: Map[String, Any] = Map(("alephium.mempool.auto-mine-for-dev", false))
     config.mempool.autoMineForDev is false
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Test, _ => ()) isE ()
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()).isLeft is true
   }
 
   it should "check force mine block for dev if auto-mine is disabled" in new Fixture {
-    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", false))
+    override val configValues: Map[String, Any] = Map(("alephium.mempool.auto-mine-for-dev", false))
     config.mempool.autoMineForDev is false
     val old = blockFlow.getBlockChain(chainIndex).maxHeightByWeight.rightValue
     TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Left(
@@ -465,7 +471,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "mine new block for inter-group chain if auto-mine is enabled" in new Fixture {
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("alephium.broker.broker-num", 1), ("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
 
@@ -491,6 +497,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.toGroupConfirmations is 0
     val blockHash = confirmed.index.hash
     blockFlow.getBestDeps(index.from).deps.contains(blockHash) is true
+    val autoMinedBlock = blockFlow.getBlock(blockHash).rightValue
+    eventBus.expectMsg(AllHandlers.BlockNotify(autoMinedBlock, 1))
 
     val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
     val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
@@ -507,19 +515,18 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     balance12 is balance11.subUnsafe(ALPH.oneAlph)
   }
 
-  it should "remove tx from missingInputTxBuffer after tx is added to mempool" in new Fixture {
-    override val configValues =
+  it should "remove tx from the orphan pool after tx is added to mempool" in new Fixture {
+    override val configValues: Map[String, Any] =
       Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 1))
-    val missingInputsTxBuffer   = txHandler.underlyingActor.missingInputsTxBuffer.pool
     val Seq(tx1, tx2, tx3, tx4) = prepareRandomSequentialTxs(4).toSeq
     txHandler ! addTx(tx2, isLocalTx = false)
     txHandler ! addTx(tx3, isLocalTx = false)
     txHandler ! addTx(tx4, isLocalTx = false)
 
-    eventually(missingInputsTxBuffer.contains(tx1.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx2.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx3.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx4.id) is true)
+    eventually(orphanPool.contains(tx1.id) is false)
+    eventually(orphanPool.contains(tx2.id) is true)
+    eventually(orphanPool.contains(tx3.id) is true)
+    eventually(orphanPool.contains(tx4.id) is true)
 
     val mempool = blockFlow.getMemPool(chainIndex)
     txHandler ! addTx(tx1, isLocalTx = false)
@@ -529,24 +536,23 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     eventually(mempool.contains(tx2.id) is true)
     eventually(mempool.contains(tx3.id) is true)
     eventually(mempool.contains(tx4.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx2.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx3.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx4.id) is false)
+    eventually(orphanPool.contains(tx2.id) is false)
+    eventually(orphanPool.contains(tx3.id) is false)
+    eventually(orphanPool.contains(tx4.id) is false)
   }
 
-  it should "handle missing inputs txs properly" in new Fixture {
-    override val configValues = Map(
+  it should "handle orphan txs properly" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
-      ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
+      ("alephium.mempool.clean-orphan-tx-frequency", "500 ms")
     )
-    val missingInputsTxBuffer             = txHandler.underlyingActor.missingInputsTxBuffer.pool
     val sequentialTxs                     = prepareRandomSequentialTxs(6)
     val Seq(tx1, tx2, tx3, tx4, tx5, tx6) = sequentialTxs.toSeq
 
-    val missingInputTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
-    missingInputTxs.foreach(tx => txHandler ! addTx(tx, isLocalTx = false))
-    missingInputTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is true))
+    val orphanTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
+    orphanTxs.foreach(tx => txHandler ! addTx(tx, isLocalTx = false))
+    orphanTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is true))
 
     setSynced()
 
@@ -555,18 +561,18 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     eventually(mempool.contains(tx1.id) is true)
     eventually(mempool.contains(tx2.id) is true)
     eventually(mempool.contains(tx3.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx2.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx3.id) is false)
-    eventually(missingInputsTxBuffer.contains(tx5.id) is true)
-    eventually(missingInputsTxBuffer.contains(tx6.id) is true)
+    eventually(orphanPool.contains(tx2.id) is false)
+    eventually(orphanPool.contains(tx3.id) is false)
+    eventually(orphanPool.contains(tx5.id) is true)
+    eventually(orphanPool.contains(tx6.id) is true)
 
     txHandler ! addTx(tx4)
     sequentialTxs.foreach(tx => eventually(mempool.contains(tx.id) is true))
-    sequentialTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is false))
+    sequentialTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is false))
   }
 
   it should "remove unconfirmed txs based on expiry duration" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
       ("alephium.mempool.unconfirmed-tx-expiry-duration", "500 ms")
@@ -589,15 +595,86 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txs.foreach(tx => eventually(mempool.contains(tx.id) is false))
   }
 
+  it should "return an error if the mempool is full" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.mempool.mempool-capacity-per-chain", 1)
+    )
+
+    val mempool        = blockFlow.getGrandPool().getMemPool(chainIndex.from)
+    val fromPrivateKey = genesisKeys(chainIndex.from.value)._1
+    val toPublicKey    = chainIndex.to.generateKey._2
+    val gasPrice       = GasPrice(nonCoinbaseMinGasPrice * 2)
+    mempool.capacity is 3
+    (0 until 3).foreach { _ =>
+      val tx = transferWithGas(
+        blockFlow,
+        fromPrivateKey,
+        toPublicKey,
+        ALPH.oneAlph,
+        gasPrice
+      ).nonCoinbase.head
+      txHandler ! addTx(tx)
+      expectMsg(TxHandler.AddSucceeded(tx.id))
+      eventually(mempool.contains(tx.id) is true)
+    }
+    mempool.isFull() is true
+
+    val tx = transfer(blockFlow, chainIndex).nonCoinbase.head
+    txHandler ! addTx(tx)
+    eventually(mempool.contains(tx.id) is false)
+
+    val txString = Hex.toHexString(serialize(tx.toTemplate))
+    val reason   = s"the mempool is full when trying to add the tx ${tx.id.shortHex}: $txString"
+    expectMsg(TxHandler.AddFailed(tx.id, reason))
+  }
+
+  it should "remove double spending orphan tx" in new Fixture {
+    val genesisKey              = genesisKeys(chainIndex.from.value)._1
+    val (privateKey, publicKey) = chainIndex.from.generateKey
+    (0 until 2).foreach { _ =>
+      val block = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+      addAndCheck(blockFlow, block)
+    }
+
+    val toPublicKey = chainIndex.from.generateKey._2
+    val mempool     = blockFlow.grandPool.getMemPool(chainIndex.from)
+    val tx0         = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(5)).nonCoinbase.head
+    txHandler ! addTx(tx0)
+    eventually(mempool.contains(tx0.id) is true)
+
+    val tx1 = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(5)).nonCoinbase.head
+    tx1.allInputRefs isnot tx0.allInputRefs
+
+    val tx2 = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(12)).nonCoinbase.head
+    tx2.allInputRefs.toSet is (tx1.allInputRefs ++ tx0.fixedOutputRefs.tail).toSet
+
+    mempool.clear()
+    txHandler ! addTx(tx2, false, false)
+    eventually(orphanPool.contains(tx2.id) is true)
+    txHandler ! addTx(tx1)
+    eventually(mempool.contains(tx1.id) is true)
+    txHandler ! addTx(tx0)
+    eventually {
+      mempool.contains(tx0.id) is true
+      mempool.contains(tx1.id) is true
+    }
+
+    txHandler.underlyingActor.validateOrphanTx(tx2.toTemplate)
+    orphanPool.contains(tx2.id) is false
+  }
+
   trait Fixture extends FlowFixture with TxGenerators {
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 
     // use lazy here because we want to override config values
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    lazy val eventBus   = TestProbe()
     lazy val txHandler =
       newTestActorRef[TxHandler](
-        TxHandler.props(blockFlow, storages.pendingTxStorage)
+        TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(eventBus.ref))
       )
+    lazy val orphanPool = blockFlow.getGrandPool().orphanPool
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false, isLocalTx: Boolean = true) =
       TxHandler.AddToMemPool(AVector(tx.toTemplate), isIntraCliqueSyncing, isLocalTx)

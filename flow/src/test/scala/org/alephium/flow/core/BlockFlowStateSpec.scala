@@ -23,7 +23,7 @@ import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
 class BlockFlowStateSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
   }
 
   it should "calculate all the hashes for state update" in new Fixture {

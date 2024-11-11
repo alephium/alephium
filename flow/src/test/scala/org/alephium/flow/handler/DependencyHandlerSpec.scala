@@ -219,7 +219,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "remove pending hashes based on capacity" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1)
     )
@@ -454,7 +454,8 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "clean pending block hashes" in new Fixture {
-    override val configValues = Map(("alephium.network.dependency-expiry-period", "1s"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.dependency-expiry-period", "1s"))
     config.network.dependencyExpiryPeriod is Duration.ofSecondsUnsafe(1)
 
     val chainIndex = ChainIndex.unsafe(0, 0)

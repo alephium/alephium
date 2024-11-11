@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 
 final case class PeerId(cliqueId: CliqueId, brokerId: Int)
 

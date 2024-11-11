@@ -56,7 +56,7 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val toAddress                         = Address.Asset(script)
     val value                             = Amount(U256.unsafe(1000))
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
-    val apiKeys                           = AVector.empty[ApiKey]
+    val apiKeys: AVector[ApiKey]          = AVector.empty[ApiKey]
     val endpointSender                    = new EndpointSender(apiKeys.headOption)
   }
 }

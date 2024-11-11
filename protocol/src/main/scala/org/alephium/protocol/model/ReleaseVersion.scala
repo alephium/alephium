@@ -20,7 +20,7 @@ import org.alephium.protocol.BuildInfo
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model.ReleaseVersion.protocolV2Version
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.TimeStamp
 
 final case class ReleaseVersion(major: Int, minor: Int, patch: Int)

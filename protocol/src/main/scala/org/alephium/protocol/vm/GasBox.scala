@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.model.{getMaximalGasPerTx, minimalGas, HardFork}
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.U256
 
 final case class GasBox private (value: Int) extends AnyVal with Ordered[GasBox] {

@@ -25,6 +25,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
+import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {

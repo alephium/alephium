@@ -21,7 +21,7 @@ import akka.util.ByteString
 import io.prometheus.client.{Counter, Gauge, Histogram}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.FlowHandler.BlockNotify
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.MisbehaviorManager

@@ -545,9 +545,9 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "seder the snapshots properly" in new BlockSnapshotsFixture {
     override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
 
-    implicit val basePath = "src/test/resources/message/payloads"
+    implicit val basePath: String = "src/test/resources/message/payloads"
 
-    implicit val serde = new Serde[Payload] {
+    implicit val serde: Serde[Payload] = new Serde[Payload] {
       override def serialize(input: Payload)       = Payload.serialize(input)
       override def _deserialize(input: ByteString) = Payload._deserialize(input)
     }

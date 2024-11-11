@@ -131,7 +131,8 @@ class ViewHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "subscribe and unsubscribe actors" in new Fixture {
-    override val configValues = Map(("alephium.mining.polling-interval", "100 seconds"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.mining.polling-interval", "100 seconds"))
     viewHandler ! InterCliqueManager.SyncedResult(true)
 
     val probe0 = TestProbe()

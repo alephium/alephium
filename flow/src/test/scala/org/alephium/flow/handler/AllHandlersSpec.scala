@@ -26,7 +26,7 @@ import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.util.AVector
 
 class AllHandlersSpec extends AlephiumFlowActorSpec {
-  override val configValues = Map(
+  override val configValues: Map[String, Any] = Map(
     ("alephium.consensus.num-zeros-at-least-in-hash", 1)
   )
 

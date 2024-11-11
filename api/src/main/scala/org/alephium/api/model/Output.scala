@@ -33,7 +33,6 @@ sealed trait Output {
 }
 
 object Output {
-
   def from(output: TxOutput, txId: TransactionId, index: Int): Output = {
     output match {
       case o: model.AssetOutput =>

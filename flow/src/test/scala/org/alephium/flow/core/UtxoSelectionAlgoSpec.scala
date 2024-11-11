@@ -34,7 +34,7 @@ import org.alephium.util._
 // scalastyle:off number.of.methods
 class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
-  implicit val groupConfig = new GroupConfig {
+  implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = 2
   }
 
@@ -161,7 +161,8 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
         (40000, AVector((tokenId1, 10))),
         (23000, AVector((tokenId1, 11)))
       )
-      implicit val utxos1 = AVector(utxos0(0).copy(outputType = UnpersistedBlockOutput), utxos0(1))
+      implicit val utxos1: AVector[Asset] =
+        AVector(utxos0(0).copy(outputType = UnpersistedBlockOutput), utxos0(1))
 
       UtxoSelection(7, (tokenId1, 10))(utxos0).verifyWithGas(0)
       UtxoSelection(7, (tokenId1, 10)).verifyWithGas(1)
@@ -170,7 +171,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
   it should "prefer non-token utxos for ALPH selection" in new Fixture {
     val tokenId = TokenId.generate
-    implicit val utxos = buildUtxosWithTokens(
+    implicit val utxos: AVector[Asset] = buildUtxosWithTokens(
       (20, AVector((tokenId, 10))),
       (10, AVector.empty),
       (30, AVector.empty)
@@ -270,7 +271,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
   }
 
   it should "fall back to the descending order when ascending order doesn't work" in new Fixture {
-    implicit val utxos = buildUtxos(40000, 20, 55000)
+    implicit val utxos: AVector[Asset] = buildUtxos(40000, 20, 55000)
 
     // Ascending order
     //   72460 = 40000 + 20 + 55000 - 22560
@@ -292,7 +293,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       (alphAmount, AVector((tokenIds(i), tokenAmounts(i))))
     }.toSeq
 
-    implicit val utxos = buildUtxosWithTokens(amounts: _*)
+    implicit val utxos: AVector[Asset] = buildUtxosWithTokens(amounts: _*)
 
     UtxoSelection(0).verifyCanSelect()
 
@@ -380,7 +381,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
             outputs.length,
             txScriptOpt = None,
             AssetScriptGasEstimator.Mock,
-            TxScriptGasEstimator.Mock
+            TxScriptEmulator.Mock
           )
       }
 

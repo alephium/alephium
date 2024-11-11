@@ -159,7 +159,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "not accept incoming connection when the number of inbound connections is large" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.max-inbound-connections-per-group", 1)
     )
 
@@ -180,7 +180,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "not accept outbound connection when the number of outbound connections is large" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.max-outbound-connections-per-group", 1)
     )
 
@@ -199,7 +199,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "not accept outbound connection when the number of pending outbound connections is large" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.max-outbound-connections-per-group", 1)
     )
 
@@ -216,7 +216,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "not start outbound connection when the number of pending outbound connections is large" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.network.max-outbound-connections-per-group", 1)
     )
 
@@ -413,7 +413,8 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "publish node synced status" in new SyncFixture {
-    override val configValues = Map(("alephium.network.update-synced-frequency", "1 minute"))
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.update-synced-frequency", "1 minute"))
     interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
 
     def checkPublish(synced: Boolean) = {

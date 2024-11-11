@@ -123,7 +123,7 @@ class HashSpec extends AlephiumSpec {
     def test[T <: RandomBytes](hasher: HashSchema[T], bytes: Seq[Byte]) = {
       hasher.doubleHash(bytes) is hasher.hash(hasher.hash(bytes).bytes)
     }
-    forAll { bytes: Seq[Byte] =>
+    forAll { (bytes: Seq[Byte]) =>
       test(Sha256, bytes)
       test(Keccak256, bytes)
       test(Blake2b, bytes)

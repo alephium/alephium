@@ -493,7 +493,7 @@ object Compiler {
     // callee -> callers
     lazy val internalCallsReversed: mutable.Map[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]] = {
       val reversed = mutable.Map.empty[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]]
-      internalCalls.foreach { case (caller, callees) =>
+      internalCalls.foreachEntry { case (caller, callees) =>
         callees.foreach { callee =>
           reversed.get(callee) match {
             case None          => reversed.update(callee, mutable.ArrayBuffer(caller))
@@ -578,7 +578,7 @@ object Compiler {
         isLocal = true,
         isGenerated = true,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local.apply
       )
       val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
       (ref, codes)
@@ -688,7 +688,7 @@ object Compiler {
         isLocal = false,
         isGenerated,
         isTemplate = false,
-        VarInfo.Field
+        VarInfo.Field.apply
       )
     }
     def addLocalVariable(
@@ -706,7 +706,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local
+        VarInfo.Local.apply
       )
     }
     // scalastyle:off parameter.number
@@ -781,10 +781,7 @@ object Compiler {
       val name  = ident.name
       val sname = scopedName(name)
       if (getGlobalVariable(name).isDefined) {
-        throw Error(
-          s"Global variable has the same name as local variable: $name",
-          ident.sourceIndex
-        )
+        throw Error(s"Global variables have the same name: $name", ident.sourceIndex)
       } else if (varDefinedInScopeOrParent(sname, variableScope)) {
         throw Error(s"Local variables have the same name: $name", ident.sourceIndex)
       } else if (currentScopeState.varIndex >= State.maxVarIndex) {

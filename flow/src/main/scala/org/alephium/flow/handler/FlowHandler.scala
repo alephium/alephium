@@ -57,7 +57,6 @@ object FlowHandler {
       tips.filter(tip => another.contains(tip.chainIndex.from))
     }
   }
-  final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
 }
 
 // Queue all the work related to miner, rpc server, etc. in this actor

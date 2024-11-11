@@ -29,7 +29,7 @@ import org.alephium.util.{AlephiumSpec, AVector}
 
 class PruneStorageServiceSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", 4),
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.broker-id", 0)

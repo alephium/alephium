@@ -38,7 +38,7 @@ class WalletConfigSpec() extends AlephiumSpec {
     val walletApiKey    = Hash.generate.toHexString
     val blockflowApiKey = Hash.generate.toHexString
 
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("wallet.api-key", walletApiKey), ("wallet.blockflow.api-key", blockflowApiKey))
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
@@ -51,7 +51,7 @@ class WalletConfigSpec() extends AlephiumSpec {
     val walletApiKeys   = AVector.fill(3)(Hash.generate.toHexString)
     val blockflowApiKey = Hash.generate.toHexString
 
-    override val configValues =
+    override val configValues: Map[String, Any] =
       Map(("wallet.api-key", walletApiKeys), ("wallet.blockflow.api-key", blockflowApiKey))
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
@@ -62,7 +62,8 @@ class WalletConfigSpec() extends AlephiumSpec {
 
   it should "load without api-key" in new Fixture {
     // scalastyle:off null
-    override val configValues = Map(("wallet.api-key", null), ("wallet.blockflow.api-key", null))
+    override val configValues: Map[String, Any] =
+      Map(("wallet.api-key", null), ("wallet.blockflow.api-key", null))
     // scalastyle:on null
 
     val config = typesafeConfig.as[WalletConfig]("wallet")
@@ -72,7 +73,7 @@ class WalletConfigSpec() extends AlephiumSpec {
   }
 
   it should "fail to load invalid api-key" in new Fixture {
-    override val configValues = Map(("wallet.api-key", "to-short"))
+    override val configValues: Map[String, Any] = Map(("wallet.api-key", "to-short"))
 
     Try(
       typesafeConfig.as[WalletConfig]("wallet")

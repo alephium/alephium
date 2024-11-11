@@ -20,7 +20,7 @@ import org.alephium.util.AlephiumSpec
 
 class HintSpec extends AlephiumSpec {
   it should "present correct types" in {
-    forAll { n: Int =>
+    forAll { (n: Int) =>
       val scriptHint = ScriptHint.fromHash(n)
 
       val hint0 = Hint.ofAsset(scriptHint)

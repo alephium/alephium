@@ -18,11 +18,12 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.MemPoolSetting
+import org.alephium.flow.validation._
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
 import org.alephium.util.{AVector, OptionF, TimeStamp}
 
-class GrandPool(val mempools: AVector[MemPool])(implicit
+class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(implicit
     val brokerConfig: BrokerConfig
 ) {
   def size: Int = mempools.fold(0)(_ + _.size)
@@ -60,6 +61,32 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     }
   }
 
+  def validateAndAddTx(
+      blockFlow: BlockFlow,
+      txValidation: TxValidation,
+      tx: TransactionTemplate,
+      cacheOrphanTx: Boolean
+  ): Either[TxValidationError, MemPool.NewTxCategory] = {
+    val chainIndex = tx.chainIndex
+    assume(!brokerConfig.isIncomingChain(chainIndex))
+    val mempool = getMemPool(chainIndex.from)
+    if (mempool.contains(tx)) {
+      Right(MemPool.AlreadyExisted)
+    } else if (mempool.isDoubleSpending(chainIndex, tx)) {
+      Right(MemPool.DoubleSpending)
+    } else {
+      txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+        case Left(Right(NonExistInput)) if cacheOrphanTx =>
+          orphanPool.add(tx, TimeStamp.now()) match {
+            case MemPool.AddedToMemPool => Right(MemPool.AddedToOrphanPool)
+            case result                 => Right(result)
+          }
+        case Right(_)    => Right(add(chainIndex, tx, TimeStamp.now()))
+        case Left(error) => Left(error)
+      }
+    }
+  }
+
   def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = {
     mempools.flatMap(_.getOutTxsWithTimestamp())
   }
@@ -71,12 +98,18 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     mempools.fold(0)(_ + _.cleanInvalidTxs(blockFlow, timeStampThreshold))
   }
 
-  def cleanUnconfirmedTxs(timeStampThreshold: TimeStamp): Int = {
-    mempools.fold(0)(_ + _.cleanUnconfirmedTxs(timeStampThreshold))
+  def cleanMemPool(blockFlow: BlockFlow, now: TimeStamp)(implicit
+      memPoolSetting: MemPoolSetting
+  ): Unit = {
+    val unconfirmedTxThreshold = now.minusUnsafe(memPoolSetting.unconfirmedTxExpiryDuration)
+    mempools.foreach(_.cleanUnconfirmedTxs(unconfirmedTxThreshold))
+    cleanInvalidTxs(blockFlow, now.minusUnsafe(memPoolSetting.cleanMempoolFrequency))
+    ()
   }
 
   def clear(): Unit = {
     mempools.foreach(_.clear())
+    orphanPool.clear()
   }
 
   def validateAllTxs(blockFlow: BlockFlow): Int = {
@@ -90,6 +123,6 @@ object GrandPool {
       val group = GroupIndex.unsafe(brokerConfig.groupRange(idx))
       MemPool.empty(group)
     }
-    new GrandPool(mempools)
+    new GrandPool(mempools, OrphanPool.default())
   }
 }

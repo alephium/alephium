@@ -18,7 +18,7 @@ package org.alephium.flow.io
 
 import akka.util.ByteString
 
-import org.alephium.serde.Serde
+import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.Bytes
 
 final case class DatabaseVersion(value: Int) extends AnyVal with Ordered[DatabaseVersion] {

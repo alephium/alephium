@@ -53,7 +53,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "stop when handshake message contains invalid client id" in new Fixture {
-    override val configValues = Map(("alephium.network.network-id", 1))
+    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
 
     networkConfig.networkId.id is 1.toByte
     networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled() is true
@@ -148,7 +148,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
   }
 
   it should "publish misbehavior when received invalid block" in new Fixture {
-    override val configValues = Map(
+    override val configValues: Map[String, Any] = Map(
       ("alephium.consensus.num-zeros-at-least-in-hash", 1)
     )
 
