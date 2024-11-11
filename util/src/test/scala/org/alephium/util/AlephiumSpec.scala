@@ -17,13 +17,14 @@
 package org.alephium.util
 
 import scala.annotation.nowarn
+import scala.collection.mutable
 import scala.language.implicitConversions
 
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
 import org.scalactic.source.Position
-import org.scalatest.{Assertion, OptionValues}
+import org.scalatest.{Assertion, BeforeAndAfterAll, OptionValues}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.dsl.ResultOfATypeInvocation
@@ -34,8 +35,25 @@ trait AlephiumSpec
     extends AnyFlatSpecLike
     with OptionValues
     with ScalaCheckDrivenPropertyChecks
-    with AlephiumFixture {
+    with AlephiumFixture
+    with BeforeAndAfterAll {
   @nowarn implicit protected def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    AlephiumSpec.clean()
+  }
+}
+
+object AlephiumSpec {
+  private val cleanTasks: mutable.ArrayBuffer[() => Unit] = mutable.ArrayBuffer.empty
+
+  def addCleanTask(task: () => Unit): Unit = cleanTasks.addOne(task)
+
+  def clean(): Unit = {
+    cleanTasks.foreach(task => task())
+    cleanTasks.clear()
+  }
 }
 
 trait AlephiumFutureSpec
