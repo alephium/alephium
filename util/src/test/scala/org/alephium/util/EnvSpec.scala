@@ -33,5 +33,6 @@ class EnvSpec extends AlephiumSpec {
     Env.resolve("it") is Env.Integration
 
     Env.resolve() is Env.Test
+    Env.isTestEnv is true
   }
 }

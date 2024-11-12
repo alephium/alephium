@@ -16,7 +16,9 @@
 
 package org.alephium.util
 
-import java.nio.file.{Files => JFiles, Path}
+import java.io.IOException
+import java.nio.file.{Files => JFiles, FileVisitResult, Path, SimpleFileVisitor}
+import java.nio.file.attribute.BasicFileAttributes
 
 import scala.annotation.nowarn
 import scala.collection.mutable
@@ -52,12 +54,22 @@ object AlephiumSpec {
 
   def addCleanTask(task: () => Unit): Unit = cleanTasks.addOne(task)
 
-  def deleteRecursive(path: Path): Unit = {
+  def delete(path: Path): Unit = {
     if (JFiles.exists(path)) {
-      if (JFiles.isDirectory(path)) {
-        JFiles.list(path).forEach(deleteRecursive)
-      }
-      JFiles.delete(path)
+      JFiles.walkFileTree(
+        path,
+        new SimpleFileVisitor[Path] {
+          override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+            JFiles.delete(file)
+            FileVisitResult.CONTINUE
+          }
+          override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+            JFiles.delete(dir)
+            FileVisitResult.CONTINUE
+          }
+        }
+      )
+      ()
     }
   }
 
@@ -65,8 +77,8 @@ object AlephiumSpec {
     cleanTasks.foreach(task => task())
     cleanTasks.clear()
 
-    deleteRecursive(Files.testRootPath(Env.Test))
-    deleteRecursive(Files.testRootPath(Env.Integration))
+    delete(Files.testRootPath(Env.Test))
+    delete(Files.testRootPath(Env.Integration))
   }
 }
 
