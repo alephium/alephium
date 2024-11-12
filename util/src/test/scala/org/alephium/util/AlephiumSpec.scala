@@ -67,6 +67,7 @@ object AlephiumSpec {
 
     deleteRecursive(Files.testRootPath(Env.Test))
     deleteRecursive(Files.testRootPath(Env.Integration))
+    Thread.sleep(2000)
   }
 }
 
