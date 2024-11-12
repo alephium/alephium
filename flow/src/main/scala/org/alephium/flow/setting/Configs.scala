@@ -58,7 +58,9 @@ object Configs extends StrictLogging {
     if (overwrite && file.exists()) { file.delete() }
     if (!file.exists()) {
       Files.copyFromResource(s"/$templateName.conf.tmpl", file.toPath)
-      file.setWritable(false)
+      if (!Env.isTestEnv) {
+        file.setWritable(false)
+      }
     }
 
     file

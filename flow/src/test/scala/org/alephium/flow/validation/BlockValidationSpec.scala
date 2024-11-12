@@ -623,8 +623,7 @@ class BlockValidationSpec extends AlephiumSpec {
     override val configValues: Map[String, Any] =
       Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
     override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
-    val newStorages =
-      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    val newStorages = StoragesFixture.buildStorages(rootPath.resolve(Hash.generate.toHexString))
     val genesisNetworkConfig = new NetworkConfigFixture.Default {
       override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
       override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
