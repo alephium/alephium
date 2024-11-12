@@ -40,6 +40,13 @@ object Env {
     }
   }
 
+  def isTestEnv: Boolean = {
+    currentEnv match {
+      case Test | Integration => true
+      case _                  => false
+    }
+  }
+
   def forProd(f: => Unit): Unit = {
     currentEnv match {
       case Prod => f

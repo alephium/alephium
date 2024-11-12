@@ -28,7 +28,7 @@ class SecretStorageSpec() extends AlephiumSpec with Generators {
 
   val secretDir = Files.createTempDirectory("secret-storage-spec")
   secretDir.toFile.deleteOnExit
-  AlephiumSpec.addCleanTask(() => AlephiumSpec.deleteRecursive(secretDir))
+  AlephiumSpec.addCleanTask(() => AlephiumSpec.delete(secretDir))
 
   val mnemonicGen = Mnemonic.generate(24).get
   val passwordGen = hashGen.map(_.toHexString)

@@ -37,7 +37,7 @@ trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
-  AlephiumSpec.addCleanTask(() => AlephiumSpec.deleteRecursive(tempSecretDir))
+  AlephiumSpec.addCleanTask(() => AlephiumSpec.delete(tempSecretDir))
 
   implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = config.blockflow.groups
