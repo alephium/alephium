@@ -641,22 +641,26 @@ object Ast {
         case (BuiltIn.transferTokenToSelf.funcId, Seq(from, ALPHTokenId(), amount)) =>
           Seq(from, amount).flatMap(_.genCode(state)) :+ TransferAlphToSelf.asInstanceOf[Instr[Ctx]]
         case _ =>
-          val func     = getFunc(state)
-          val argsType = args.flatMap(_.getType(state))
-          val variadicInstrs = if (func.isVariadic) {
-            Seq(U256Const(Val.U256.unsafe(args.length)))
+          val func = getFunc(state)
+          if (func.inline) {
+            func.genInlineCode(args, state)
           } else {
-            Seq.empty
-          }
-          val instrs = genApproveCode(state, func) ++
-            func.genCodeForArgs(args, state) ++
-            variadicInstrs ++
-            func.genCode(argsType)
-          if (ignoreReturn) {
-            val returnType = positionedError(func.getReturnType(argsType, state))
-            instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
-          } else {
-            instrs
+            val argsType = args.flatMap(_.getType(state))
+            val variadicInstrs = if (func.isVariadic) {
+              Seq(U256Const(Val.U256.unsafe(args.length)))
+            } else {
+              Seq.empty
+            }
+            val instrs = genApproveCode(state, func) ++
+              func.genCodeForArgs(args, state) ++
+              variadicInstrs ++
+              func.genCode(argsType)
+            if (ignoreReturn) {
+              val returnType = positionedError(func.getReturnType(argsType, state))
+              instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
+            } else {
+              instrs
+            }
           }
       }
     }

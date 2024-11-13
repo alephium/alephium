@@ -151,10 +151,13 @@ object Compiler {
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Ast.ContractAssetsAnnotation
     def useUpdateFields: Boolean
+    def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
+    def genInlineCode[C <: Ctx](args: Seq[Ast.Expr[C]], state: Compiler.State[C]): Seq[Instr[C]] =
+      ???
   }
 
   type Error = CompilerError.FormattableError
@@ -242,6 +245,16 @@ object Compiler {
       def isGenerated: Boolean = false
       def isLocal: Boolean     = true
     }
+    final case class InlinedArgument[Ctx <: StatelessContext](
+        ident: Ident,
+        tpe: Type,
+        instrs: Seq[Instr[Ctx]]
+    ) extends VarInfo {
+      def isMutable: Boolean   = false
+      def isUnused: Boolean    = false
+      def isGenerated: Boolean = false
+      def isLocal: Boolean     = true
+    }
   }
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def argsType: Seq[Type]
@@ -264,6 +277,16 @@ object Compiler {
       index: Byte
   ) extends ContractFunc[Ctx] {
     def name: String = funcDef.name
+
+    override def inline: Boolean = funcDef.inline
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    override def genInlineCode[C <: Ctx](
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      state.genInlineCode(args, funcDef.asInstanceOf[Ast.FuncDef[C]])
+    }
 
     override def getReturnType[C <: Ctx](
         inputType: Seq[Type],
@@ -531,7 +554,8 @@ object Compiler {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]
-    var allowDebug: Boolean = false
+    var allowDebug: Boolean               = false
+    private var allowSameVarName: Boolean = false
 
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
@@ -660,6 +684,33 @@ object Compiler {
       getGlobalVariable(ident.name).exists(_.tpe.isMapType)
     }
 
+    def addInlinedArgument(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
+      val sname   = checkNewVariable(ident)
+      val varInfo = VarInfo.InlinedArgument(ident, tpe, instrs)
+      trackAndAddVarInfo(sname, varInfo)
+    }
+
+    def genInlineCode(args: Seq[Ast.Expr[Ctx]], funcDef: Ast.FuncDef[Ctx]): Seq[Instr[Ctx]] = {
+      assume(funcDef.inline && args.length == funcDef.args.length)
+      val argCodes = args.map(_.genCode(this))
+      withScope(funcDef) {
+        allowSameVarName = true
+        argCodes.view.zipWithIndex.foreach { case (code, index) =>
+          val arg = funcDef.args(index)
+          addInlinedArgument(arg.ident, arg.tpe, code)
+        }
+        funcDef.body.foreach(_.check(this))
+        val instrs = funcDef.body.flatMap(_.genCode(this))
+        val result = if (instrs.lastOption.contains(Return)) {
+          instrs.dropRight(1)
+        } else {
+          instrs
+        }
+        allowSameVarName = false
+        result
+      }
+    }
+
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
       addVariable(
         ident,
@@ -782,7 +833,7 @@ object Compiler {
       val sname = scopedName(name)
       if (getGlobalVariable(name).isDefined) {
         throw Error(s"Global variables have the same name: $name", ident.sourceIndex)
-      } else if (varDefinedInScopeOrParent(sname, variableScope)) {
+      } else if (!allowSameVarName && varDefinedInScopeOrParent(sname, variableScope)) {
         throw Error(s"Local variables have the same name: $name", ident.sourceIndex)
       } else if (currentScopeState.varIndex >= State.maxVarIndex) {
         throw Error(s"Number of variables more than ${State.maxVarIndex}", ident.sourceIndex)
@@ -1169,12 +1220,14 @@ object Compiler {
     }
 
     def checkReturn(returnType: Seq[Type], sourceIndex: Option[SourceIndex]): Unit = {
-      val rtype = funcIdents(currentScope).returnType
-      if (returnType != resolveTypes(rtype)) {
-        throw Error(
-          s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
-          sourceIndex
-        )
+      if (phase == Phase.Check) {
+        val rtype = funcIdents(currentScope).returnType
+        if (returnType != resolveTypes(rtype)) {
+          throw Error(
+            s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
+            sourceIndex
+          )
+        }
       }
     }
   }
@@ -1253,6 +1306,7 @@ object Compiler {
         case v: VarInfo.Constant[StatelessContext @unchecked]    => v.instrs
         case _: VarInfo.MapVar =>
           throw Error("Script should not have map variables", typeId.sourceIndex)
+        case v: VarInfo.InlinedArgument[StatelessContext @unchecked] => v.instrs
       }
     }
 
@@ -1268,6 +1322,8 @@ object Compiler {
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
         case _: VarInfo.MapVar =>
           throw Error(s"Unexpected map variable: ${ident.name}", ident.sourceIndex)
+        case v: VarInfo.InlinedArgument[StatelessContext @unchecked] =>
+          throw Error(s"Unexpected inlined argument: ${v.ident.name}", v.ident.sourceIndex)
       }
     }
   }
@@ -1361,9 +1417,10 @@ object Compiler {
         case v: VarInfo.Local => Seq(LoadLocal(v.index))
         case v: VarInfo.Template =>
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
-        case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
-        case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
-        case VarInfo.MapVar(_, _, index)                        => genMapIndex(index)
+        case v: VarInfo.MultipleVar[StatefulContext @unchecked]     => v.ref.genLoadCode(this)
+        case v: VarInfo.Constant[StatefulContext @unchecked]        => v.instrs
+        case VarInfo.MapVar(_, _, index)                            => genMapIndex(index)
+        case v: VarInfo.InlinedArgument[StatefulContext @unchecked] => v.instrs
       }
     }
 
@@ -1379,6 +1436,8 @@ object Compiler {
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
         case _: VarInfo.MapVar =>
           throw Error(s"Unexpected map variable: ${ident.name}", ident.sourceIndex)
+        case v: VarInfo.InlinedArgument[StatefulContext @unchecked] =>
+          throw Error(s"Unexpected inlined argument: ${v.ident.name}", v.ident.sourceIndex)
       }
     }
   }

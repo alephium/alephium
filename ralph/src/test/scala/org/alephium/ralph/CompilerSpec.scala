@@ -8826,4 +8826,227 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContract(replace(code("@inline "))).isRight is true
     }
   }
+
+  it should "generate code for inline func calls" in new Fixture {
+    def check(code: String, expected: AVector[Instr[StatefulContext]]) = {
+      val method = Compiler.compileContract(code).rightValue.methods.head
+      val instrs = method.instrs
+      instrs.head.isInstanceOf[MethodSelector] is true
+      instrs.tail is expected
+    }
+
+    {
+      info("Simple inline function")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |  @inline fn bar() -> U256 {
+           |    return 1
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(U256Const1, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(1)))
+    }
+
+    {
+      info("Calling an inline function using variables")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let a = 2
+           |    return bar(a)
+           |  }
+           |  @inline fn bar(a: U256) -> U256 {
+           |    return a + 1
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(U256Const2, StoreLocal(0), LoadLocal(0), U256Const1, U256Add, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Calling an inline function using constants")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar(2)
+           |  }
+           |  @inline fn bar(a: U256) -> U256 {
+           |    return a + 1
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(U256Const2, U256Const1, U256Add, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Inline function with local variables")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let a = 1
+           |    let b = 2
+           |    let c = bar(b, a)
+           |    return c
+           |  }
+           |  @inline fn bar(a: U256, b: U256) -> U256 {
+           |    let c = a * 2
+           |    let d = b * 3
+           |    return c + d
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(
+        code, AVector(
+          U256Const1, StoreLocal(0), U256Const2, StoreLocal(1), LoadLocal(1), U256Const2, U256Mul, StoreLocal(3),
+          LoadLocal(0), U256Const3, U256Mul, StoreLocal(4), LoadLocal(3), LoadLocal(4), U256Add, StoreLocal(2), LoadLocal(2), Return
+        )
+      )
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(7)))
+    }
+
+    {
+      info("Inline function that returns multiple values")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let (a, b) = bar()
+           |    return (a * 2) + (b * 3)
+           |  }
+           |  @inline fn bar() -> (U256, U256) {
+           |    let a = 1
+           |    let b = 2
+           |    return b, a
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(
+        code, AVector(
+          U256Const1, StoreLocal(2), U256Const2, StoreLocal(3), LoadLocal(3), LoadLocal(2), StoreLocal(1), StoreLocal(0),
+          LoadLocal(0), U256Const2, U256Mul, LoadLocal(1), U256Const3, U256Mul, U256Add, Return
+        )
+      )
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(7)))
+    }
+
+    {
+      info("Inline function that returns an array")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let array = bar()
+           |    return array[0] + array[1]
+           |  }
+           |  @inline fn bar() -> [U256; 2] {
+           |    return [1, 2]
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(code, AVector(U256Const1, U256Const2, StoreLocal(1), StoreLocal(0), LoadLocal(0), LoadLocal(1), U256Add, Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Inline function to update contract fields")
+      val code =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |  @inline fn bar() -> U256 {
+           |    v = v + 1
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(code, AVector(LoadMutField(0), U256Const1, U256Add, StoreMutField(0), LoadMutField(0), Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(3)), AVector.empty, AVector(Val.U256(2)))
+    }
+
+    {
+      info("Calling multiple inline functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar(1) + bar(2)
+           |  }
+           |  @inline fn bar(v: U256) -> U256 {
+           |    return v + 1
+           |  }
+           |}
+           |""".stripMargin
+
+      // format: off
+      check(code, AVector(U256Const1, U256Const1, U256Add, U256Const2, U256Const1, U256Add, U256Add, Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(5)))
+    }
+
+    {
+      info("Calling an inline function within an inline function")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar0(2)
+           |  }
+           |  @inline fn bar0(a: U256) -> U256 {
+           |    let b = 1
+           |    return bar1(a, b)
+           |  }
+           |  @inline fn bar1(a: U256, b: U256) -> U256 {
+           |    return a + b
+           |  }
+           |}
+           |""".stripMargin
+
+      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), U256Add, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Calling a non-inline function within an inline function")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar0(2)
+           |  }
+           |  @inline fn bar0(a: U256) -> U256 {
+           |    let b = 1
+           |    return bar1(a, b)
+           |  }
+           |  fn bar1(a: U256, b: U256) -> U256 {
+           |    return a + b
+           |  }
+           |}
+           |""".stripMargin
+
+      // format: off
+      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), CallLocal(2), Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+  }
 }
