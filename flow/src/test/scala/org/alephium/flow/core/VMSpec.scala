@@ -6721,6 +6721,42 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(script)
   }
 
+  it should "be able to use assets in the inline function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @inline fn transfer() -> () {
+         |    let caller = callerAddress!()
+         |    assert!(caller == @$genesisAddress, 0)
+         |    transferTokenToSelf!(caller, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    checkCaller!(callerAddress!() == @$genesisAddress, 0)
+         |    transfer()
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val fooId = createCompiledContract(compiled.code)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo{@$genesisAddress -> ALPH: 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is ALPH.oneAlph.addUnsafe(minimalAlphInContract)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
