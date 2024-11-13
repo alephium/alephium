@@ -8828,9 +8828,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "generate code for inline func calls" in new Fixture {
-    def check(code: String, expected: AVector[Instr[StatefulContext]]) = {
-      val method = Compiler.compileContract(code).rightValue.methods.head
-      val instrs = method.instrs
+    def check(code: String, expected: AVector[Instr[StatefulContext]], methodLength: Int = 1) = {
+      val methods = Compiler.compileContract(code).rightValue.methods
+      methods.length is methodLength
+      val instrs = methods.head.instrs
       instrs.head.isInstanceOf[MethodSelector] is true
       instrs.tail is expected
     }
@@ -9044,7 +9045,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       // format: off
-      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), CallLocal(2), Return))
+      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), CallLocal(1), Return), 2)
       // format: on
       testContract(code, AVector.empty, AVector(Val.U256(3)))
     }

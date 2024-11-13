@@ -29,9 +29,9 @@ object StaticAnalysis {
       methods: AVector[vm.Method[Ctx]],
       state: Compiler.State[Ctx]
   ): Unit = {
-    assume(ast.funcs.length == methods.length)
+    assume(ast.nonInlineFuncs.length == methods.length)
     checkIfPrivateMethodsUsed(ast, state)
-    ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
+    ast.nonInlineFuncs.zip(methods.toIterable).foreach { case (func, method) =>
       // skip check update fields for main function
       if (!(ast.isInstanceOf[Ast.TxScript] && (func.name == "main"))) {
         checkUpdateFields(state, func, method)
@@ -45,7 +45,7 @@ object StaticAnalysis {
       state: Compiler.State[vm.StatefulContext]
   ): Unit = {
     checkMethodsStateless(ast, methods, state)
-    ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
+    ast.nonInlineFuncs.zip(methods.toIterable).foreach { case (func, method) =>
       checkCodeUsingContractAssets(ast.ident, func, method)
       checkCodeUsingPayToContract(ast.ident, func, method)
       checkCodeUsingAssets(ast.ident, func, method)

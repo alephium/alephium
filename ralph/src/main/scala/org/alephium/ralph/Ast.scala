@@ -2146,6 +2146,7 @@ object Ast {
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
+    def nonInlineFuncs: Seq[FuncDef[Ctx]] = funcs.filterNot(_.inline)
 
     def name: String = ident.name
 
@@ -2229,7 +2230,7 @@ object Ast {
     }
 
     def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
-      AVector.from(funcs.view.map(_.genMethod(state)))
+      AVector.from(nonInlineFuncs.view.map(_.genMethod(state)))
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
@@ -2490,7 +2491,7 @@ object Ast {
         state: Compiler.State[StatefulContext]
     ): AVector[Method[StatefulContext]] = {
       val selectors = mutable.Map.empty[Method.Selector, FuncId]
-      AVector.from(funcs.view.map { func =>
+      AVector.from(nonInlineFuncs.view.map { func =>
         val method = func.genMethod(state)
         if (func.isPublic && state.isUseMethodSelector(ident, func.id)) {
           val methodSelector = func.getMethodSelector(state.globalState)
