@@ -8755,4 +8755,75 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compileCode(code, "These functions are implemented multiple times: p")
     }
   }
+
+  it should "check inline functions" in {
+    {
+      info("Inline functions cannot be public")
+      def code(modifier: String) =
+        s"""
+           |Contract Foo(count: U256) {
+           |  @inline $modifier fn $$foo$$() -> U256 {
+           |    return count
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code("pub"), "Inline functions cannot be public")
+      Compiler.compileContract(replace(code(""))).isRight is true
+    }
+
+    {
+      info("Inline functions cannot have asset annotations")
+      def code(annotation: String) =
+        s"""
+           |Contract Foo() {
+           |  $annotation
+           |  @inline fn $$foo$$() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+
+      val annotations = Seq(
+        "@using(preapprovedAssets = true)",
+        "@using(preapprovedAssets = false)",
+        "@using(assetsInContract = true)",
+        "@using(assetsInContract = false)",
+        "@using(payToContractOnly = true)",
+        "@using(payToContractOnly = false)",
+        "@using(updateFields = true)",
+        "@using(updateFields = false)",
+        "@using(checkExternalCaller = true)",
+        "@using(checkExternalCaller = false)"
+      )
+      annotations.foreach { annotation =>
+        testContractError(
+          code(annotation),
+          "Inline functions cannot have the `using` annotation. Please add the `using` annotation to the non-inline caller function."
+        )
+      }
+      Compiler.compileContract(replace(code(""))).isRight is true
+    }
+
+    {
+      info("Return an error if the inline function signature is inconsistent")
+      def code(annotation: String) = {
+        s"""
+           |Contract Foo() extends Bar() {
+           |  $$${annotation}fn bar() -> U256 {
+           |    return 0
+           |  }$$
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |}
+           |Abstract Contract Bar() {
+           |  @inline fn bar() -> U256
+           |}
+           |""".stripMargin
+      }
+
+      testContractError(code(""), "Function \"bar\" is implemented with wrong signature")
+      Compiler.compileContract(replace(code("@inline "))).isRight is true
+    }
+  }
 }

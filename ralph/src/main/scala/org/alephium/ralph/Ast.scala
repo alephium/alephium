@@ -1227,6 +1227,7 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
+      inline: Boolean,
       args: Seq[(Type, Boolean)],
       rtypes: Seq[Type]
   )
@@ -1310,6 +1311,7 @@ object Ast {
       id,
       isPublic,
       usePreapprovedAssets,
+      inline,
       args.map(arg => (arg.tpe, arg.isMutable)),
       rtypes
     )
@@ -1342,6 +1344,18 @@ object Ast {
       }
     }
 
+    private def checkInline(): Unit = {
+      if (isPublic) {
+        throw Compiler.Error("Inline functions cannot be public", id.sourceIndex)
+      }
+      if (annotations.exists(_.id.name == FunctionUsingAnnotation.id)) {
+        throw Compiler.Error(
+          "Inline functions cannot have the `using` annotation. Please add the `using` annotation to the non-inline caller function.",
+          id.sourceIndex
+        )
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setFuncScope(id)
       state.checkArguments(args)
@@ -1355,6 +1369,7 @@ object Ast {
           isGenerated = false
         )
       }
+      if (inline) checkInline()
       if (bodyOpt.isDefined) {
         funcAccessedVarsCache match {
           case Some(vars) => // the function has been compiled before

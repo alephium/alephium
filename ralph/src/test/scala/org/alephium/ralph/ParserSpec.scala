@@ -717,6 +717,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("add", false),
         true,
         true,
+        false,
         Seq((Type.U256, false), (Type.U256, true)),
         Seq(Type.U256, Type.U256)
       )
@@ -743,6 +744,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("add", false),
         true,
         true,
+        false,
         Seq((Type.U256, false), (Type.U256, false)),
         Seq(Type.U256)
       )
@@ -765,6 +767,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("add", false),
         true,
         false,
+        false,
         Seq((Type.U256, false), (Type.U256, false)),
         Seq(Type.U256)
       )
@@ -785,6 +788,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.signature is FuncSignature(
         FuncId("add", false),
         true,
+        false,
         false,
         Seq((Type.U256, false), (Type.U256, false)),
         Seq(Type.U256)
@@ -808,6 +812,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("add", false),
         true,
         false,
+        false,
         Seq((Type.U256, false), (Type.U256, false)),
         Seq(Type.U256)
       )
@@ -826,6 +831,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         FuncId("foo", false),
         false,
         false,
+        true,
         Seq.empty,
         Seq.empty
       )
