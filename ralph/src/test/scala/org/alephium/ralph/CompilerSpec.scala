@@ -9048,5 +9048,42 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       // format: on
       testContract(code, AVector.empty, AVector(Val.U256(3)))
     }
+
+    {
+      info("Return an error if there are recursive inline function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |  @inline fn $$bar$$() -> U256 {
+           |    return bar()
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Inline functions cannot have recursive calls")
+    }
+
+    {
+      info("Return an error if there are mutual recursive inline function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar0()
+           |  }
+           |  @inline fn $$bar0$$() -> U256 {
+           |    return bar1()
+           |  }
+           |  @inline fn bar1() -> U256 {
+           |    return bar0()
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Inline functions cannot have recursive calls")
+    }
   }
 }

@@ -554,8 +554,9 @@ object Compiler {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]
-    var allowDebug: Boolean               = false
-    private var allowSameVarName: Boolean = false
+    var allowDebug: Boolean                                = false
+    private var allowSameVarName: Boolean                  = false
+    private val inlineFuncStack: mutable.Stack[Ast.FuncId] = mutable.Stack.empty
 
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
@@ -691,9 +692,14 @@ object Compiler {
     }
 
     def genInlineCode(args: Seq[Ast.Expr[Ctx]], funcDef: Ast.FuncDef[Ctx]): Seq[Instr[Ctx]] = {
+      if (inlineFuncStack.contains(funcDef.id)) {
+        throw Error("Inline functions cannot have recursive calls", funcDef.id.sourceIndex)
+      }
+
       assume(funcDef.inline && args.length == funcDef.args.length)
       val argCodes = args.map(_.genCode(this))
       withScope(funcDef) {
+        inlineFuncStack.push(funcDef.id)
         allowSameVarName = true
         argCodes.view.zipWithIndex.foreach { case (code, index) =>
           val arg = funcDef.args(index)
@@ -707,6 +713,7 @@ object Compiler {
           instrs
         }
         allowSameVarName = false
+        inlineFuncStack.pop()
         result
       }
     }
