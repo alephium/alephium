@@ -3924,7 +3924,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Warning for functions which does not update fields but has @using(updateFields = true)")
+      info(
+        "Warning for contract functions which does not update fields but has @using(updateFields = true)"
+      )
       val code =
         s"""
            |Contract Foo() {
@@ -3937,6 +3939,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val warnings = compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(
         s"""Function "Foo.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
+      )
+    }
+
+    {
+      info(
+        "Warning for script functions which does not update fields but has @using(updateFields = true)"
+      )
+      val code =
+        s"""
+           |@using(updateFields = true)
+           |TxScript Main {
+           |  foo()
+           |
+           |  @using(updateFields = true)
+           |  fn foo() -> () {}
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileTxScriptFull(code, 0).rightValue.warnings.map(_.message)
+      warnings is AVector(
+        s"""Function "Main.main" does not update fields. Please remove "@using(updateFields = true)" for the function.""",
+        s"""Function "Main.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
       )
     }
   }
@@ -8824,6 +8847,45 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(code(""), "Function \"bar\" is implemented with wrong signature")
       Compiler.compileContract(replace(code("@inline "))).isRight is true
+    }
+
+    {
+      info("Unused inline functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @inline fn foo() -> () {}
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      val compiled = compileContractFull(code).rightValue
+      compiled.warnings is AVector(
+        Warning("Found unused private function in Foo: foo", compiled.ast.funcs.head.id.sourceIndex)
+      )
+    }
+
+    {
+      info("Check update fields in non-inline caller")
+      val code =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled = compileContractFull(code).rightValue
+      compiled.warnings is AVector(
+        Warning(
+          s"""Function "Foo.bar" updates fields. Please use "@using(updateFields = true)" for the function.""",
+          compiled.ast.funcs(1).id.sourceIndex
+        )
+      )
     }
   }
 

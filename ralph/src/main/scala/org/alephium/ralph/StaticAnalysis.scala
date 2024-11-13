@@ -32,10 +32,7 @@ object StaticAnalysis {
     assume(ast.nonInlineFuncs.length == methods.length)
     checkIfPrivateMethodsUsed(ast, state)
     ast.nonInlineFuncs.zip(methods.toIterable).foreach { case (func, method) =>
-      // skip check update fields for main function
-      if (!(ast.isInstanceOf[Ast.TxScript] && (func.name == "main"))) {
-        checkUpdateFields(state, func, method)
-      }
+      checkUpdateFields(state, func, method)
     }
   }
 
