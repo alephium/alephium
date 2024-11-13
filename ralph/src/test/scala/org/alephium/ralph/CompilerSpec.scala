@@ -6639,6 +6639,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         useCheckExternalCaller = false,
         useUpdateFields = false,
         methodIndex,
+        inline = false,
         Seq.empty,
         Seq.empty,
         None

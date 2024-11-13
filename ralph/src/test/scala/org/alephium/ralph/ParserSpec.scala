@@ -684,134 +684,180 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       fastparse.parse(code, StatelessParser.func(_))
     }
 
-    val parsed0 =
-      parseFunc("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }").get.value
-    parsed0.id is Ast.FuncId("add", false)
-    parsed0.isPublic is false
-    parsed0.usePreapprovedAssets is false
-    parsed0.useAssetsInContract is Ast.NotUseContractAssets
-    parsed0.usePayToContractOnly is false
-    parsed0.args.size is 2
-    parsed0.rtypes is Seq(Type.U256, Type.U256)
+    {
+      val parsed =
+        parseFunc("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }").get.value
+      parsed.id is Ast.FuncId("add", false)
+      parsed.isPublic is false
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.inline is false
+      parsed.args.size is 2
+      parsed.rtypes is Seq(Type.U256, Type.U256)
+    }
 
-    val parsed1 = parseFunc(
-      """@using(preapprovedAssets = true, updateFields = false)
-        |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
-        |""".stripMargin
-    ).get.value
-    parsed1.id is Ast.FuncId("add", false)
-    parsed1.isPublic is true
-    parsed1.usePreapprovedAssets is true
-    parsed1.useAssetsInContract is Ast.NotUseContractAssets
-    parsed1.usePayToContractOnly is false
-    parsed1.useCheckExternalCaller is true
-    parsed1.useUpdateFields is false
-    parsed1.args.size is 2
-    parsed1.rtypes is Seq(Type.U256, Type.U256)
-    parsed1.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      true,
-      Seq((Type.U256, false), (Type.U256, true)),
-      Seq(Type.U256, Type.U256)
-    )
-
-    info("Simple return type")
-    val parsed2 =
-      parseFunc(
-        """@using(preapprovedAssets = true, assetsInContract = true)
-          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    {
+      val parsed = parseFunc(
+        """@using(preapprovedAssets = true, updateFields = false)
+          |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
+          |""".stripMargin
       ).get.value
-    parsed2.id is Ast.FuncId("add", false)
-    parsed2.isPublic is true
-    parsed2.usePreapprovedAssets is true
-    parsed2.useAssetsInContract is Ast.UseContractAssets
-    parsed2.usePayToContractOnly is false
-    parsed2.useCheckExternalCaller is true
-    parsed2.useUpdateFields is false
-    parsed2.args.size is 2
-    parsed2.rtypes is Seq(Type.U256)
-    parsed2.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      true,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+      parsed.id is Ast.FuncId("add", false)
+      parsed.isPublic is true
+      parsed.usePreapprovedAssets is true
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.args.size is 2
+      parsed.rtypes is Seq(Type.U256, Type.U256)
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        true,
+        Seq((Type.U256, false), (Type.U256, true)),
+        Seq(Type.U256, Type.U256)
+      )
+    }
 
-    info("More use annotation")
-    val parsed3 =
-      parseFunc(
-        """@using(assetsInContract = true, updateFields = true)
+    {
+      info("Simple return type")
+      val parsed =
+        parseFunc(
+          """@using(preapprovedAssets = true, assetsInContract = true)
+            |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+        ).get.value
+      parsed.id is Ast.FuncId("add", false)
+      parsed.isPublic is true
+      parsed.usePreapprovedAssets is true
+      parsed.useAssetsInContract is Ast.UseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.args.size is 2
+      parsed.rtypes is Seq(Type.U256)
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        true,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
+
+    {
+      info("More use annotation")
+      val parsed =
+        parseFunc(
+          """@using(assetsInContract = true, updateFields = true)
+            |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+        ).get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.UseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is true
+      parsed.inline is false
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
+
+    {
+      info("Enforce using contract assets")
+      val code =
+        """@using(assetsInContract = enforced)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-      ).get.value
-    parsed3.usePreapprovedAssets is false
-    parsed3.useAssetsInContract is Ast.UseContractAssets
-    parsed3.usePayToContractOnly is false
-    parsed3.useCheckExternalCaller is true
-    parsed3.useUpdateFields is true
-    parsed3.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      false,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+      val parsed = parseFunc(code).get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.EnforcedUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
 
-    info("Enforce using contract assets")
-    val code = """@using(assetsInContract = enforced)
-                 |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    val parsed4 = parseFunc(code).get.value
-    parsed4.usePreapprovedAssets is false
-    parsed4.useAssetsInContract is Ast.EnforcedUseContractAssets
-    parsed4.usePayToContractOnly is false
-    parsed4.useCheckExternalCaller is true
-    parsed4.useUpdateFields is false
-    parsed4.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      false,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+    {
+      info("Use PayToContractOnly annotation")
+      val parsed =
+        parseFunc(
+          """@using(payToContractOnly = true)
+            |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+        ).get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is true
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
 
-    info("Use PayToContractOnly annotation")
-    val parsed5 =
-      parseFunc(
-        """@using(payToContractOnly = true)
+    {
+      info("Inline annotation")
+      val parsed = parseFunc("@inline fn foo() -> () {}").get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is true
+      parsed.signature is FuncSignature(
+        FuncId("foo", false),
+        false,
+        false,
+        Seq.empty,
+        Seq.empty
+      )
+    }
+
+    {
+      info("Invalid annotations")
+      val invalidCode =
+        """@using(assetsInContract = enforced, assetsInContract = false)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-      ).get.value
-    parsed5.usePreapprovedAssets is false
-    parsed5.useAssetsInContract is Ast.NotUseContractAssets
-    parsed5.usePayToContractOnly is true
-    parsed5.useCheckExternalCaller is true
-    parsed5.useUpdateFields is false
-    parsed5.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      false,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+      intercept[Compiler.Error](parseFunc(invalidCode)).message is
+        "These keys are defined multiple times: assetsInContract"
 
-    val invalidCode = """@using(assetsInContract = enforced, assetsInContract = false)
-                        |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    intercept[Compiler.Error](parseFunc(invalidCode)).message is
-      "These keys are defined multiple times: assetsInContract"
+      val invalidAssetsInContract =
+        s"""@using($$assetsInContract = 1)
+           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      val error = intercept[Compiler.Error](parseFunc(invalidAssetsInContract.replace("$", "")))
+      error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
+      error.position is invalidAssetsInContract.indexOf("$")
 
-    val invalidAssetsInContract =
-      s"""@using($$assetsInContract = 1)
-         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    val error = intercept[Compiler.Error](parseFunc(invalidAssetsInContract.replace("$", "")))
-    error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
-    error.position is invalidAssetsInContract.indexOf("$")
+      val conflictedAnnotations =
+        s"""@using($$assetsInContract = true, payToContractOnly = true)
+           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      val error1 = intercept[Compiler.Error](parseFunc(conflictedAnnotations.replace("$", "")))
+      error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)"
+      error1.position is conflictedAnnotations.indexOf("$")
 
-    val conflictedAnnotations =
-      s"""@using($$assetsInContract = true, payToContractOnly = true)
-         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    val error1 = intercept[Compiler.Error](parseFunc(conflictedAnnotations.replace("$", "")))
-    error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)"
-    error1.position is invalidAssetsInContract.indexOf("$")
+      val unknownAnnotations = s"""$$@unknown(field = false) fn foo() -> ()""".stripMargin
+      val error2 = intercept[Compiler.Error](parseFunc(unknownAnnotations.replace("$", "")))
+      error2.message is "Invalid annotation unknown, function only supports these annotations: using,inline"
+      error2.position is unknownAnnotations.indexOf("$")
+    }
   }
 
   it should "parse bytes and address" in {
@@ -1296,6 +1342,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1523,6 +1570,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             None
@@ -1664,6 +1712,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1705,6 +1754,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -1754,6 +1804,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
+        inline = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1770,6 +1821,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
+        inline = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1960,6 +2012,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useCheckExternalCaller = true,
         useUpdateFields = false,
         useMethodIndex = None,
+        inline = false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))
@@ -1994,6 +2047,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           useCheckExternalCaller = true,
           useUpdateFields = false,
           useMethodIndex = None,
+          inline = false,
           Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
           Seq(Type.NamedType(TypeId("Foo"))),
           Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))

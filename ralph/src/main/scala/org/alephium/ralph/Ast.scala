@@ -1241,6 +1241,7 @@ object Ast {
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
+      inline: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -1412,6 +1413,7 @@ object Ast {
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         useMethodIndex = None,
+        inline = false,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)
