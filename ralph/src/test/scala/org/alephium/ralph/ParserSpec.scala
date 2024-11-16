@@ -1138,7 +1138,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
   it should "parse enum definitions" in {
     {
-      info("Invalid enum type")
+      info("Valid enum type")
       val definition =
         s"""
            |enum errorCodes {
@@ -1264,7 +1264,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     }
 
     {
-      info("Enum definition with U256 fields with optional definitions")
+      info("Enum definition with U256 fields with optional values")
       val definition =
         s"""
            |enum ErrorCodes {
@@ -1285,6 +1285,32 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       )
     }
 
+    {
+      info("First enum field value can not be optional")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0
+           |  Error10 = 10
+           |  Error11 = 11
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Enum field Error0 must have explicit value"
+    }
+
+    {
+      info("Non-U256 enum field value can not be optional")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error10
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Enum field Error10 must have explicit value"
+    }
   }
 
   it should "parse contract inheritance" in {
