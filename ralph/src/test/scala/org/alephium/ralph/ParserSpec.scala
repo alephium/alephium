@@ -1262,6 +1262,29 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     }
+
+    {
+      info("Enum definition with U256 fields with optional definitions")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = 0
+           |  Error1
+           |  Error10 = 10
+           |  Error11
+           |}
+           |""".stripMargin
+      parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.U256(U256.Zero))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.U256(U256.One))),
+          EnumField(Ident("Error10"), Const[StatefulContext](Val.U256(U256.unsafe(10)))),
+          EnumField(Ident("Error11"), Const[StatefulContext](Val.U256(U256.unsafe(11))))
+        )
+      )
+    }
+
   }
 
   it should "parse contract inheritance" in {
