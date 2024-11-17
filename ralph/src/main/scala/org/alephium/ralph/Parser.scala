@@ -25,7 +25,7 @@ import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.FastParseExtension._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 @SuppressWarnings(
@@ -625,7 +625,14 @@ abstract class Parser[Ctx <: StatelessContext] {
               val (newValue, value) = valueOpt match {
                 case Some(v) => (v.v.asInstanceOf[Val.U256].v, v)
                 case None =>
-                  val nextValue = currentValue.addOneUnsafe()
+                  val nextValue = currentValue
+                    .add(U256.One)
+                    .getOrElse(
+                      throw Compiler.Error(
+                        s"Enum field ${ident.name} value overflows, it must not exceed ${U256.MaxValue}",
+                        ident.sourceIndex
+                      )
+                    )
                   (
                     nextValue,
                     Ast.Const[Ctx](Val.U256(nextValue)).atSourceIndex(ident.sourceIndex)

@@ -1648,14 +1648,14 @@ object Ast {
       }
     }
 
-    def validate(enumName: String, firstFieldType: Val): Unit = {
+    def validate(enumName: String, firstFieldVal: Val): Unit = {
       value match {
-        case Some(v) if v.v.tpe != firstFieldType.tpe =>
+        case Some(v) if v.v.tpe != firstFieldVal.tpe =>
           throw Compiler.Error(
             s"Fields have different types in Enum $enumName",
             ident.sourceIndex
           )
-        case None if firstFieldType.tpe != Val.U256 =>
+        case None if firstFieldVal.tpe != Val.U256 =>
           throw Compiler.Error(
             s"Enum field ${ident.name} must have explicit value",
             ident.sourceIndex

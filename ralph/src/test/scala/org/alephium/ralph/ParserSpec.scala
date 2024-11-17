@@ -1311,6 +1311,19 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
       error.message is "Enum field Error10 must have explicit value"
     }
+
+    {
+      info("Non-U256 enum field value can not overflow")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  ErrorMax = ${U256.MaxValue}
+           |  ErrorOverflow
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is s"Enum field ErrorOverflow value overflows, it must not exceed ${U256.MaxValue}"
+    }
   }
 
   it should "parse contract inheritance" in {
