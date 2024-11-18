@@ -863,6 +863,12 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val error2 = intercept[Compiler.Error](parseFunc(unknownAnnotations.replace("$", "")))
       error2.message is "Invalid annotation unknown, function only supports these annotations: using,inline"
       error2.position is unknownAnnotations.indexOf("$")
+
+      val duplicateAnnotations =
+        s"""$$@inline @inline fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      val error3 = intercept[Compiler.Error](parseFunc(duplicateAnnotations.replace("$", "")))
+      error3.message is "There are duplicate annotations: inline"
+      error3.position is duplicateAnnotations.indexOf("$")
     }
   }
 

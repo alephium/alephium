@@ -653,8 +653,8 @@ object Parser {
     def validate[Ctx <: StatelessContext](
         annotations: Seq[Ast.Annotation[Ctx]]
     ): Option[Annotation[Ctx]] = {
-      annotations.find(_.id.name == id) match {
-        case result @ Some(annotation) =>
+      annotations.filter(_.id.name == id) match {
+        case Seq(result @ annotation) =>
           val duplicateKeys = keys.filter(key => annotation.fields.count(_.ident.name == key) > 1)
           if (duplicateKeys.nonEmpty) {
             throw Compiler.Error(
@@ -669,8 +669,13 @@ object Parser {
               annotation.sourceIndex
             )
           }
-          result
-        case None => None
+          Some(result)
+        case Nil => None
+        case list =>
+          throw Compiler.Error(
+            s"There are duplicate annotations: $id",
+            list.headOption.flatMap(_.sourceIndex)
+          )
       }
     }
 
