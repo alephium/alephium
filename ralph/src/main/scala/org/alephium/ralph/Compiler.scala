@@ -156,7 +156,11 @@ object Compiler {
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
-    def genInlineCode[C <: Ctx](args: Seq[Ast.Expr[C]], state: Compiler.State[C]): Seq[Instr[C]] =
+    def genInlineCode[C <: Ctx](
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C],
+        callAst: Ast.CallAst[C]
+    ): Seq[Instr[C]] =
       ???
   }
 
@@ -283,9 +287,10 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genInlineCode[C <: Ctx](
         args: Seq[Ast.Expr[C]],
-        state: Compiler.State[C]
+        state: Compiler.State[C],
+        callAst: Ast.CallAst[C]
     ): Seq[Instr[C]] = {
-      state.genInlineCode(args, funcDef.asInstanceOf[Ast.FuncDef[C]])
+      state.genInlineCode(args, funcDef.asInstanceOf[Ast.FuncDef[C]], callAst)
     }
 
     override def getReturnType[C <: Ctx](
@@ -696,14 +701,18 @@ object Compiler {
       trackAndAddVarInfo(sname, varInfo)
     }
 
-    def genInlineCode(args: Seq[Ast.Expr[Ctx]], funcDef: Ast.FuncDef[Ctx]): Seq[Instr[Ctx]] = {
+    def genInlineCode(
+        args: Seq[Ast.Expr[Ctx]],
+        funcDef: Ast.FuncDef[Ctx],
+        callAst: Ast.CallAst[Ctx]
+    ): Seq[Instr[Ctx]] = {
       if (inlineFuncStack.contains(funcDef.id)) {
         throw Error("Inline functions cannot have recursive calls", funcDef.id.sourceIndex)
       }
 
       assume(funcDef.inline && args.length == funcDef.args.length)
       val argCodes = args.map(_.genCode(this))
-      withScope(funcDef) {
+      withScope(callAst) {
         inlineFuncStack.push(funcDef.id)
         allowSameVarName = true
         argCodes.view.zipWithIndex.foreach { case (code, index) =>

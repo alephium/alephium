@@ -643,7 +643,7 @@ object Ast {
         case _ =>
           val func = getFunc(state)
           if (func.inline) {
-            func.genInlineCode(args, state)
+            func.genInlineCode(args, state, this)
           } else {
             val argsType = args.flatMap(_.getType(state))
             val variadicInstrs = if (func.isVariadic) {

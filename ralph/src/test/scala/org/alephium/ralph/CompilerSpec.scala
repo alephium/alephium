@@ -8980,6 +8980,38 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Call inline function multiple times")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let a = 1
+           |    let b = 2
+           |    let c = bar(b, a)
+           |    let d = bar(b, a)
+           |    return c + d
+           |  }
+           |  @inline fn bar(a: U256, b: U256) -> U256 {
+           |    let c = a * 2
+           |    let d = b * 3
+           |    return c + d
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(
+        code, AVector(
+          U256Const1, StoreLocal(0), U256Const2, StoreLocal(1), LoadLocal(1), U256Const2, U256Mul, StoreLocal(4),
+          LoadLocal(0), U256Const3, U256Mul, StoreLocal(5), LoadLocal(4), LoadLocal(5), U256Add, StoreLocal(2),
+          LoadLocal(1), U256Const2, U256Mul, StoreLocal(6), LoadLocal(0), U256Const3, U256Mul, StoreLocal(7),
+          LoadLocal(6), LoadLocal(7), U256Add, StoreLocal(3), LoadLocal(2), LoadLocal(3), U256Add, Return
+        )
+      )
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(14)))
+    }
+
+    {
       info("Inline function that returns multiple values")
       val code =
         s"""
