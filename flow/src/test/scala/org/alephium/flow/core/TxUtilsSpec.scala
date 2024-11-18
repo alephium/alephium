@@ -1387,18 +1387,15 @@ class TxUtilsSpec extends AlephiumSpec {
         targetGroups: AVector[GroupIndex],
         amount: U256 = ALPH.oneAlph,
         tokens: AVector[(TokenId, U256)] = AVector.empty
-    ): AVector[AVector[TxOutputInfo]] = {
+    ): AVector[TxOutputInfo] = {
       targetGroups
-        .groupByOrdered(identity)
-        .map { case (_, groups) =>
-          groups.map { group =>
-            TxOutputInfo(
-              Address.p2pkh(group.generateKey._2).lockupScript,
-              amount,
-              tokens,
-              None
-            )
-          }
+        .map { group =>
+          TxOutputInfo(
+            Address.p2pkh(group.generateKey._2).lockupScript,
+            amount,
+            tokens,
+            None
+          )
         }
     }
 
@@ -1407,7 +1404,7 @@ class TxUtilsSpec extends AlephiumSpec {
         fromPrivateKey: PrivateKey,
         fromPublicKey: PublicKey,
         initialInputsCount: Option[Int],
-        outputGroups: AVector[AVector[TxOutputInfo]],
+        outputs: AVector[TxOutputInfo],
         gasPrice: GasPrice = nonCoinbaseMinGasPrice
     )(
         expectedSenderUtxosCount: Int,
@@ -1430,9 +1427,8 @@ class TxUtilsSpec extends AlephiumSpec {
           LockupScript.p2pkh(fromPublicKey),
           UnlockScript.p2pkh(fromPublicKey),
           inputs,
-          outputGroups,
-          gasPrice,
-          AVector.empty
+          outputs,
+          gasPrice
         )
         .map { unsignedTxs =>
           val confirmedBlocks =
@@ -1455,7 +1451,6 @@ class TxUtilsSpec extends AlephiumSpec {
           val txs = confirmedBlocks.flatMap(_.nonCoinbase)
           txs.length is expectedTxsCount
 
-          val outputs                          = outputGroups.flatMap(identity)
           val (actualUtxoCount, actualBalance) = getTotalUtxoCountsAndBalance(blockFlow, outputs)
           actualUtxoCount is expectedDestUtxosCount
           actualBalance is expectedDestBalance
@@ -1765,80 +1760,64 @@ class TxUtilsSpec extends AlephiumSpec {
       .isLeft is true
   }
 
-  "weightGroupedWithRemainder" should "group elements based on weight limit" in {
-    val elems = AVector((1, 2), (3, 4), (5, 1), (6, 2), (8, 3))
-    TxUtils.weightGroupedWithRemainder(elems, 5)(_._2) is AVector(
-      AVector((1, 2)),
-      AVector((3, 4), (5, 1)),
-      AVector((6, 2), (8, 3))
+  "weightLimitedGroupBy" should "group elements correctly for valid indices and apply weight limits" in {
+    val elems = AVector((0, "A", 2), (1, "B", 5), (2, "C", 3), (0, "D", 4), (1, "E", 2))
+    TxUtils.weightLimitedGroupBy(elems, 3, 6)(_._1, _._3).rightValue is AVector(
+      AVector((0, "A", 2), (0, "D", 4)),
+      AVector((1, "B", 5)),
+      AVector((1, "E", 2)),
+      AVector((2, "C", 3))
     )
   }
 
-  "weightGroupedWithRemainder" should "return a single group if weight limit is larger than all elements combined" in {
-    val elems = AVector((1, 3), (2, 2), (3, 4))
-    TxUtils.weightGroupedWithRemainder(elems, 20)(_._2) is AVector(AVector((1, 3), (2, 2), (3, 4)))
+  "weightLimitedGroupBy" should "return an empty list for empty input" in {
+    val elems = AVector.empty[(Int, String, Int)]
+    TxUtils.weightLimitedGroupBy(elems, 3, 10)(_._1, _._3).rightValue is AVector
+      .empty[AVector[(Int, String, Int)]]
   }
 
-  "weightGroupedWithRemainder" should "return an empty AVector when the input is empty" in {
-    val elems = AVector.empty[(Int, Int)]
-    TxUtils.weightGroupedWithRemainder(elems, 10)(_._2) is AVector.empty[AVector[(Int, Int)]]
+  "weightLimitedGroupBy" should "fail for group indices exceeding groupCount" in {
+    val elems = AVector((0, "A", 2), (3, "B", 4), (1, "C", 3))
+    TxUtils
+      .weightLimitedGroupBy(elems, 3, 10)(_._1, _._3)
+      .leftValue is "Unexpected group index 3 for element (3,B,4)"
   }
 
-  "weightGroupedWithRemainder" should "start a new group if a single element exceeds the weight limit" in {
-    val elems = AVector((1, 2), (2, 5), (4, 1))
-    TxUtils.weightGroupedWithRemainder(elems, 4)(_._2) is AVector(
-      AVector((1, 2)),
-      AVector((2, 5)),
-      AVector((4, 1))
+  "weightLimitedGroupBy" should "fail for negative group indices" in {
+    val elems = AVector((-1, "A", 2), (0, "B", 3))
+    TxUtils
+      .weightLimitedGroupBy(elems, 3, 10)(_._1, _._3)
+      .leftValue is "Unexpected group index -1 for element (-1,A,2)"
+  }
+
+  "weightLimitedGroupBy" should "fail for negative element weight" in {
+    val elems = AVector((1, "A", 2), (0, "B", -1))
+    TxUtils
+      .weightLimitedGroupBy(elems, 3, 10)(_._1, _._3)
+      .leftValue is s"Element weight -1 was not positive for element (0,B,-1)"
+  }
+
+  "weightLimitedGroupBy" should "allow all elements in separate groups when weight limit is minimal" in {
+    val elems = AVector((1, "A", 2), (2, "B", 3), (3, "C", 3))
+    TxUtils.weightLimitedGroupBy(elems, 4, 1)(_._1, _._3).rightValue is AVector(
+      AVector((1, "A", 2)),
+      AVector((2, "B", 3)),
+      AVector((3, "C", 3))
     )
   }
 
-  "weightGroupedWithRemainder" should "allow all elements to be in separate groups when weight limit is minimal" in {
-    val elems = AVector((1, 2), (2, 5), (3, 3))
-    TxUtils.weightGroupedWithRemainder(elems, 1)(_._2) is AVector(
-      AVector((1, 2)),
-      AVector((2, 5)),
-      AVector((3, 3))
+  "weightLimitedGroupBy" should "handle unbalanced group distribution" in {
+    val elems = AVector((0, "A", 3), (2, "B", 5))
+    TxUtils.weightLimitedGroupBy(elems, 3, 10)(_._1, _._3).rightValue is AVector(
+      AVector((0, "A", 3)),
+      AVector((2, "B", 5))
     )
   }
 
-  "weightLimitedGroupBy" should "group elements by odd/even and apply weight limit within each group" in {
-    val elems = AVector((1, 2), (3, 4), (5, 1), (6, 2), (8, 3))
-    TxUtils.weightLimitedGroupBy(elems, 5)(_._1 % 2, _._2) is AVector(
-      AVector((1, 2)),
-      AVector((3, 4), (5, 1)),
-      AVector((6, 2), (8, 3))
-    )
-  }
-
-  "weightLimitedGroupBy" should "return a single group per odd/even category if weight limit is large enough" in {
-    val elems = AVector((1, 3), (3, 2), (5, 4), (2, 3), (4, 2))
-    TxUtils.weightLimitedGroupBy(elems, 20)(_._1 % 2, _._2) is AVector(
-      AVector((1, 3), (3, 2), (5, 4)), // Odd group, total weight: 9
-      AVector((2, 3), (4, 2))          // Even group, total weight: 5
-    )
-  }
-
-  "weightLimitedGroupBy" should "return an empty list when the input is empty" in {
-    val elems = AVector.empty[(Int, Int)]
-    TxUtils.weightLimitedGroupBy(elems, 10)(_._1 % 2, _._2) is AVector.empty[AVector[(Int, Int)]]
-  }
-
-  "weightLimitedGroupBy" should "start a new group if a single element exceeds the weight limit" in {
-    val elems = AVector((1, 2), (3, 5), (2, 1), (4, 2))
-    TxUtils.weightLimitedGroupBy(elems, 4)(_._1 % 2, _._2) is AVector(
-      AVector((1, 2)),
-      AVector((3, 5)),        // new Odd group, exceeds weight limit
-      AVector((2, 1), (4, 2)) // Even group, not exceeding
-    )
-  }
-
-  "weightLimitedGroupBy" should "allow all elements in separate groups if weight limit is minimal" in {
-    val elems = AVector((1, 2), (2, 3), (3, 3))
-    TxUtils.weightLimitedGroupBy(elems, 1)(_._1 % 2, _._2) is AVector(
-      AVector((1, 2)),
-      AVector((3, 3)),
-      AVector((2, 3))
+  "weightLimitedGroupBy" should "return a single group if weight limit is large enough for all elements" in {
+    val elems = AVector((0, "A", 3), (0, "B", 2), (0, "C", 4))
+    TxUtils.weightLimitedGroupBy(elems, 1, 20)(_._1, _._3).rightValue is AVector(
+      AVector((0, "A", 3), (0, "B", 2), (0, "C", 4))
     )
   }
 
@@ -1854,12 +1833,16 @@ class TxUtilsSpec extends AlephiumSpec {
 
   "multi-transfer" should "fail with no inputs" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
-    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(0), outputs)(
-      expectedSenderUtxosCount = 0,
-      expectedDestUtxosCount = 0,
-      expectedDestBalance = ALPH.alph(0),
-      expectedTxsCount = 0
-    ).leftValue is "Not enough inputs to build multi-group transaction"
+    blockFlow
+      .buildMultiGroupTransactions(
+        LockupScript.p2pkh(genesisPublicKey_0),
+        UnlockScript.p2pkh(genesisPublicKey_0),
+        AVector.empty,
+        AVector(outputs),
+        nonCoinbaseMinGasPrice,
+        AVector.empty
+      )
+      .leftValue is "Not enough inputs to build multi-group transaction"
   }
 
   "multi-transfer" should "build multi group transactions from multiple utxos" in new MultiTransferFixture {
@@ -1873,41 +1856,32 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   "multi-transfer" should "support building more transactions for a group" in new MultiTransferFixture {
-    val outputsToGroup1 = AVector.fill(4)(
-      TxOutputInfo(
-        Address.p2pkh(GroupIndex.unsafe(1).generateKey._2).lockupScript,
-        ALPH.oneAlph,
-        AVector.empty,
-        None
-      )
-    )
-    val sizeGroupedOutputsToGroup1 =
-      TxUtils.weightLimitedGroupBy(outputsToGroup1, 2)(
-        _.lockupScript.groupIndex,
-        _.tokens.length + 1
-      )
-    sizeGroupedOutputsToGroup1.length is 2
+    val outputsToGroup1 = buildOutputs(AVector.fill(257)(GroupIndex.unsafe(1)))
     testMultiTransferTxsBuilding(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       Some(2),
-      sizeGroupedOutputsToGroup1
+      outputsToGroup1
     )(
       expectedSenderUtxosCount = 2,
-      expectedDestUtxosCount = 4,
-      expectedDestBalance = ALPH.oneAlph * 4,
+      expectedDestUtxosCount = 257,
+      expectedDestBalance = ALPH.oneAlph * 257,
       expectedTxsCount = 2
     ) isE Succeeded
   }
 
   "multi-transfer" should "fail with too many outputs in a single group" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector.fill(257)(GroupIndex.unsafe(1)))
-    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(2), outputs)(
-      expectedSenderUtxosCount = 0,
-      expectedDestUtxosCount = 0,
-      expectedDestBalance = ALPH.alph(0),
-      expectedTxsCount = 0
-    ).leftValue is "Too many transaction outputs, maximal value: 256"
+    blockFlow
+      .buildMultiGroupTransactions(
+        LockupScript.p2pkh(genesisPublicKey_0),
+        UnlockScript.p2pkh(genesisPublicKey_0),
+        changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, None)._1,
+        AVector(outputs),
+        nonCoinbaseMinGasPrice,
+        AVector.empty
+      )
+      .leftValue is "Too many transaction outputs, maximal value: 256"
   }
 
   "multi-transfer" should "build multi group transactions with tokens" in new MultiTransferFixture {
@@ -1948,13 +1922,11 @@ class TxUtilsSpec extends AlephiumSpec {
   "multi-transfer" should "build multi group transactions across all groups" in new MultiTransferFixture {
     val outputs =
       AVector(0, 1, 2).map { groupIndex =>
-        AVector(
-          TxOutputInfo(
-            Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2).lockupScript,
-            ALPH.oneAlph,
-            AVector.empty,
-            Option.empty
-          )
+        TxOutputInfo(
+          Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2).lockupScript,
+          ALPH.oneAlph,
+          AVector.empty,
+          Option.empty
         )
       }
 

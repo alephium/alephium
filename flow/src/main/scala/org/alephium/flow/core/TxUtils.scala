@@ -461,6 +461,32 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  def buildMultiGroupTransactions(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  )(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, AVector[UnsignedTransaction]] = {
+    TxUtils
+      .weightLimitedGroupBy(outputs, groups, ALPH.MaxTxOutputNum - 1)(
+        _.lockupScript.groupIndex.value,
+        _.tokens.length + 1
+      )
+      .flatMap { outputGroups =>
+        buildMultiGroupTransactions(
+          fromLockupScript,
+          fromUnlockScript,
+          inputs,
+          outputGroups,
+          gasPrice,
+          AVector.empty
+        )
+      }
+  }
+
   @tailrec
   final def buildMultiGroupTransactions(
       fromLockupScript: LockupScript.Asset,
@@ -1350,14 +1376,6 @@ trait TxUtils { Self: FlowUtils =>
     Self.blockFlow.getMemPool(chainIndex).contains(txId)
   }
 
-  def checkTxChainIndex(chainIndex: ChainIndex, tx: TransactionId): Either[String, Unit] = {
-    if (brokerConfig.contains(chainIndex.from)) {
-      Right(())
-    } else {
-      Left(s"${tx.toHexString} belongs to other groups")
-    }
-  }
-
   private def checkProvidedGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {
     for {
       _ <- checkProvidedGasAmount(gasOpt)
@@ -1568,35 +1586,6 @@ object TxUtils {
     )
   }
 
-  def weightLimitedGroupBy[E: ClassTag, K](elems: AVector[E], weightLimit: Int)(
-      groupByFn: E => K,
-      weightFn: E => Int
-  ): AVector[AVector[E]] =
-    elems
-      .groupByOrdered(groupByFn)
-      .flatMap { case (_, elems) =>
-        weightGroupedWithRemainder(elems, weightLimit)(weightFn)
-      }
-
-  def weightGroupedWithRemainder[E: ClassTag](elems: AVector[E], weightLimit: Int)(
-      weightFn: E => Int
-  ): AVector[AVector[E]] = {
-    elems.fold((AVector.empty[AVector[E]], AVector.empty[E], 0)) {
-      case ((resultingGroups, currentGroup, currentWeight), elem) =>
-        val elemWeight = weightFn(elem)
-        if (currentWeight + elemWeight <= weightLimit) {
-          (resultingGroups, currentGroup :+ elem, currentWeight + elemWeight)
-        } else {
-          val newResultingGroups =
-            if (currentGroup.nonEmpty) resultingGroups :+ currentGroup else resultingGroups
-          (newResultingGroups, AVector(elem), elemWeight)
-        }
-    } match {
-      case (groups, lastGroup, _) if lastGroup.nonEmpty => groups :+ lastGroup
-      case (groups, _, _)                               => groups
-    }
-  }
-
   def checkTotalAttoAlphAmount(
       amounts: AVector[U256]
   ): Either[String, U256] = {
@@ -1608,6 +1597,46 @@ object TxUtils {
           Right(newAmount)
         }
       }
+    }
+  }
+
+  def weightLimitedGroupBy[E: ClassTag](
+      elems: AVector[E],
+      groupCount: Int,
+      weightLimit: Int
+  )(groupByFn: E => Int, weightFn: E => Int): Either[String, AVector[AVector[E]]] = {
+    assert(groupCount > 0, "groupCount must be positive")
+    assert(weightLimit > 0, "weightLimit must be positive")
+
+    val outputGroups        = Array.fill(groupCount)(mutable.ArrayBuffer[mutable.ArrayBuffer[E]]())
+    val currentGroupWeights = Array.fill(groupCount)(0)
+
+    elems.collectFirst { elem =>
+      val groupIndex = groupByFn(elem)
+      val elemWeight = weightFn(elem)
+
+      if (groupIndex >= groupCount || groupIndex < 0) {
+        Some(s"Unexpected group index $groupIndex for element $elem")
+      } else if (elemWeight <= 0) {
+        Some(s"Element weight $elemWeight was not positive for element $elem")
+      } else {
+        val groupWeight = currentGroupWeights(groupIndex)
+        val groupList   = outputGroups(groupIndex)
+
+        if (groupList.isEmpty || groupWeight + elemWeight > weightLimit) {
+          groupList.append(mutable.ArrayBuffer(elem))
+          currentGroupWeights(groupIndex) = elemWeight
+        } else {
+          groupList(groupList.length - 1).append(elem)
+          currentGroupWeights(groupIndex) += elemWeight
+        }
+        None
+      }
+    } match {
+      case Some(errorMessage) =>
+        Left(errorMessage)
+      case None =>
+        Right(AVector.from(outputGroups.iterator.flatMap(_.iterator.map(AVector.from))))
     }
   }
 }

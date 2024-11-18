@@ -598,6 +598,7 @@ final class AVector[@sp A](
   }
 
   def splitAt(index: Int): (AVector[A], AVector[A]) = {
+    assume(index >= 0 && index < this.length)
     if (this.isEmpty) {
       (AVector.empty, AVector.empty)
     } else if (index <= 0) {
@@ -650,16 +651,6 @@ final class AVector[@sp A](
       acc.get(key) match {
         case Some(values) => acc + (key -> (values :+ elem))
         case None         => acc + (key -> AVector(elem))
-      }
-    }
-  }
-
-  def groupByOrdered[K](f: A => K): AVector[(K, AVector[A])] = {
-    fold(AVector.empty[(K, AVector[A])]) { (acc, elem) =>
-      val key = f(elem)
-      acc.indexWhere(_._1 == key) match {
-        case -1  => acc :+ (key -> AVector(elem))
-        case idx => acc.replace(idx, key -> (acc(idx)._2 :+ elem))
       }
     }
   }

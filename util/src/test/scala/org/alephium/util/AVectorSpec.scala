@@ -575,32 +575,14 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     right is vector
   }
 
-  it should "splitAt index equal to length into full left and empty right" in {
-    val vector        = AVector(1, 2, 3, 4, 5)
-    val (left, right) = vector.splitAt(5)
-    left is vector
-    right.isEmpty is true
+  it should "splitAt negative index throws error" in {
+    val vector = AVector(1, 2, 3)
+    assertThrows[AssertionError](vector.splitAt(-1))
   }
 
-  it should "splitAt an empty vector into two empty vectors" in {
-    val vector        = AVector.empty[Int]
-    val (left, right) = vector.splitAt(3)
-    left.isEmpty is true
-    right.isEmpty is true
-  }
-
-  it should "splitAt negative index the same as at zero (return empty left)" in {
-    val vector        = AVector(1, 2, 3)
-    val (left, right) = vector.splitAt(-1)
-    left.isEmpty is true
-    right is vector
-  }
-
-  it should "splitAt index greater than length into full left and empty right" in {
-    val vector        = AVector(1, 2, 3)
-    val (left, right) = vector.splitAt(10)
-    left is vector
-    right.isEmpty is true
+  it should "splitAt index greater than length throws error" in {
+    val vector = AVector(1, 2, 3)
+    assertThrows[AssertionError](vector.splitAt(10))
   }
 
   it should "splitBy" in {
@@ -622,21 +604,6 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     vc0.groupBy(identity) is Map(0 -> AVector(0), 1 -> AVector(1), 2 -> AVector(2))
     vc0.groupBy(_ => 1) is Map(1 -> AVector(0, 1, 2))
     vc0.groupBy(_ % 2) is Map(0 -> AVector(0, 2), 1 -> AVector(1))
-  }
-
-  it should "groupByOrdered" in {
-    val emptyVec = AVector.empty[Int]
-    emptyVec.groupByOrdered(_ % 2) is AVector.empty[(Int, AVector[Int])]
-    val alphaVec = AVector("apple", "banana", "apricot", "cherry", "blueberry")
-    alphaVec.groupByOrdered(_.head) is AVector(
-      ('a', AVector("apple", "apricot")),
-      ('b', AVector("banana", "blueberry")),
-      ('c', AVector("cherry"))
-    )
-    val numVec = AVector(0, 1, 2)
-    numVec.groupByOrdered(identity) is AVector(0 -> AVector(0), 1 -> AVector(1), 2 -> AVector(2))
-    numVec.groupByOrdered(_ => 1) is AVector(1 -> AVector(0, 1, 2))
-    numVec.groupByOrdered(_ % 2) is AVector(0 -> AVector(0, 2), 1 -> AVector(1))
   }
 
   it should "create matrix using tabulate" in new Fixture {
