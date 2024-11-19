@@ -671,8 +671,13 @@ object BuiltIn {
     def getReturnType[C <: StatelessContext](
         inputType: Seq[Type],
         state: Compiler.State[C]
-    ): Seq[Type] =
-      Seq(Type.ByteVec)
+    ): Seq[Type] = {
+      if (inputType.exists(t => !t.isPrimitive)) {
+        throw Error(s"Invalid args type ${quote(inputType)} for builtin func $name, only primitive types are supported", None)
+      } else {
+        Seq(Type.ByteVec)
+      }
+    }
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(Encode)
 

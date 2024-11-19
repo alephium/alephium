@@ -3926,16 +3926,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val fooId = createContract(foo)._1
-    val main: String =
-      s"""
-         |TxScript Main {
-         |  Foo(#${fooId.toHexString}).foo()
-         |}
-         |
-         |$foo
-         |""".stripMargin
-    testSimpleScript(main)
+    Compiler.compileContract(foo).leftValue.getMessage is
+      """Invalid args type "List(Bar)" for builtin func encodeToByteVec, only primitive types are supported"""
   }
 
   it should "test Contract.encodeFields" in new ContractFixture {
