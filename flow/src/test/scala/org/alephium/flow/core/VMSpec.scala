@@ -3907,7 +3907,7 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main)
   }
 
-  it should "return invalid value when encoding struct" in new ContractFixture {
+  it should "return compilation error when encoding struct" in new ContractFixture {
     val foo =
       s"""
          |struct Bar {
@@ -3928,6 +3928,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     Compiler.compileContract(foo).leftValue.getMessage is
       """Invalid args type "List(Bar)" for builtin func encodeToByteVec, only primitive types are supported"""
+  }
+
+  it should "return compilation error when encoding nothing" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes = encodeToByteVec!()
+         |    assert!(bytes == #00, 0)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(foo).leftValue.getMessage is
+      "Builtin func encodeToByteVec expects at least one argument"
   }
 
   it should "test Contract.encodeFields" in new ContractFixture {

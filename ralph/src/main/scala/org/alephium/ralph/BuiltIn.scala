@@ -672,8 +672,13 @@ object BuiltIn {
         inputType: Seq[Type],
         state: Compiler.State[C]
     ): Seq[Type] = {
-      if (inputType.exists(t => !t.isPrimitive)) {
-        throw Error(s"Invalid args type ${quote(inputType)} for builtin func $name, only primitive types are supported", None)
+      if (inputType.isEmpty) {
+        throw Error(s"Builtin func $name expects at least one argument", None)
+      } else if (inputType.exists(t => !t.isPrimitive)) {
+        throw Error(
+          s"Invalid args type ${quote(inputType)} for builtin func $name, only primitive types are supported",
+          None
+        )
       } else {
         Seq(Type.ByteVec)
       }
