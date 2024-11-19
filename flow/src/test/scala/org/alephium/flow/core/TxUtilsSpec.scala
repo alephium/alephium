@@ -1815,6 +1815,25 @@ class TxUtilsSpec extends AlephiumSpec {
     )
   }
 
+  "TxUtils.countOutputs" should "count outputs including tokens" in new AlephiumConfigFixture {
+    def tokens(n: Int): AVector[(TokenId, U256)] =
+      AVector.tabulate(n)(n => TokenId.hash(s"tokenId_$n") -> U256.unsafe(10))
+    def outputs(outputsCount: Int, tokensPerOutput: Int): AVector[TxOutputInfo] =
+      AVector.fill(outputsCount) {
+        TxOutputInfo(
+          Address.p2pkh(genesisKeys(0)._2).lockupScript,
+          ALPH.oneAlph,
+          tokens(tokensPerOutput),
+          None
+        )
+      }
+    TxUtils.countResultingOutputs(AVector.empty) is 0
+    TxUtils.countResultingOutputs(outputs(2, 2)) is 6 // 2 outputs with 2 tokens each
+    TxUtils.countResultingOutputs(outputs(1, 1)) is 2
+    TxUtils.countResultingOutputs(outputs(1, 0)) is 1
+
+  }
+
   "multi-transfer" should "build multi group transactions from just single genesis utxo" in new MultiTransferFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
     testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(1), outputs)(

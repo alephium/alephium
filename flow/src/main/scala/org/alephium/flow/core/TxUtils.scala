@@ -613,7 +613,7 @@ trait TxUtils { Self: FlowUtils =>
         gasBox <- GasEstimation.estimateWithInputScript(
           fromUnlockScript,
           inputs.length,
-          outputs.fold(0) { case (outputCount, output) => outputCount + 1 + output.tokens.length },
+          countResultingOutputs(outputs),
           AssetScriptGasEstimator.Default(blockFlow)
         )
         alphRemainder <- UnsignedTransaction.calculateAlphRemainder(
@@ -1556,6 +1556,12 @@ object TxUtils {
       assets: AVector[AssetOutputInfo],
       gas: GasBox
   )
+
+  // each token will turn into a dedicated output
+  def countResultingOutputs(outputs: AVector[TxOutputInfo]): Int =
+    outputs.fold(0) { case (outputsCount, output) =>
+      outputsCount + 1 + output.tokens.length
+    }
 
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
