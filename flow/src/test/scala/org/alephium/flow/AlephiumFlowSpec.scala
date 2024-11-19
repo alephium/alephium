@@ -130,33 +130,32 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
   }
 
-  def changeUtxosWithTxFee(
+  def prepareUtxos(
       fromPrivateKey: PrivateKey,
       fromPublicKey: PublicKey,
       outputsLimitOpt: Option[Int] = None
   ): (AVector[AssetOutputInfo], U256) = {
-    val lockupScript = Address.p2pkh(fromPublicKey).lockupScript
-    val initialUtxos = blockFlow
+    lazy val lockupScript = Address.p2pkh(fromPublicKey).lockupScript
+    lazy val initialUtxos = blockFlow
       .getUTXOs(lockupScript, Int.MaxValue, true)
       .rightValue
       .asUnsafe[AssetOutputInfo]
+    def getBalance =
+      blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
     outputsLimitOpt match {
-      case None => initialUtxos -> U256.Zero
+      case None => initialUtxos -> getBalance
       case Some(outputsLimit) =>
         require(outputsLimit < ALPH.MaxTxOutputNum, "Number of outputs must fit in a transaction")
         if (initialUtxos.length >= outputsLimit) {
-          initialUtxos.take(outputsLimit) -> U256.Zero
+          initialUtxos.take(outputsLimit) -> getBalance
+        } else if (outputsLimit == 0) {
+          AVector.empty[AssetOutputInfo] -> getBalance
         } else {
           require(outputsLimit > 0, "Number of outputs must be greater than 0")
           val amountPerOutput =
             getAlphBalance(blockFlow, lockupScript).divUnsafe(U256.unsafe(outputsLimit))
           val outputs = AVector.fill(outputsLimit - initialUtxos.length) {
-            TxOutputInfo(
-              lockupScript,
-              amountPerOutput,
-              AVector.empty,
-              None
-            )
+            TxOutputInfo(lockupScript, amountPerOutput, AVector.empty, None)
           }
           val unsignedTx = blockFlow
             .transfer(
@@ -177,7 +176,7 @@ trait FlowFixture
             .rightValue
             .asUnsafe[AssetOutputInfo]
           assume(utxos.length == outputsLimit)
-          utxos -> tx.gasFeeUnsafe
+          utxos -> getBalance
         }
     }
   }

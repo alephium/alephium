@@ -597,16 +597,16 @@ final class AVector[@sp A](
     minA
   }
 
-  def splitAt(index: Int): (AVector[A], AVector[A]) = {
-    assume(index >= 0 && index < this.length)
+  def splitAt(n: Int): (AVector[A], AVector[A]) = {
+    assume(n >= 0 && n <= this.length)
     if (this.isEmpty) {
       (AVector.empty, AVector.empty)
-    } else if (index <= 0) {
+    } else if (n == 0) {
       (AVector.empty, this)
-    } else if (index >= this.length) {
+    } else if (n == this.length) {
       (this, AVector.empty)
     } else {
-      (this.take(index), this.drop(index))
+      (this.take(n), this.drop(n))
     }
   }
 

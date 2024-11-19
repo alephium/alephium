@@ -464,27 +464,43 @@ trait TxUtils { Self: FlowUtils =>
   def buildMultiGroupTransactions(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      inputs: AVector[AssetOutputInfo],
-      outputs: AVector[TxOutputInfo],
-      gasPrice: GasPrice
+      targetBlockHash: Option[BlockHash],
+      outputRefs: AVector[AssetOutputRef],
+      outputInfos: AVector[TxOutputInfo],
+      gasPrice: GasPrice,
+      defaultUtxosLimit: Int
   )(implicit
       networkConfig: NetworkConfig
   ): Either[String, AVector[UnsignedTransaction]] = {
-    TxUtils
-      .weightLimitedGroupBy(outputs, groups, ALPH.MaxTxOutputNum - 1)(
-        _.lockupScript.groupIndex.value,
-        _.tokens.length + 1
-      )
-      .flatMap { outputGroups =>
-        buildMultiGroupTransactions(
+    for {
+      inputSelection <- blockFlow
+        .getSelectedUtxoOrArbitrary(
+          targetBlockHash,
           fromLockupScript,
-          fromUnlockScript,
-          inputs,
-          outputGroups,
-          gasPrice,
-          AVector.empty
+          outputRefs,
+          defaultUtxosLimit
         )
-      }
+      _ <- blockFlow
+        .getAssetRemainders(
+          fromUnlockScript,
+          inputSelection,
+          outputInfos,
+          gasPrice
+        )
+      outputGroups <- TxUtils
+        .weightLimitedGroupBy(outputInfos, groups, ALPH.MaxTxOutputNum - 1)(
+          _.lockupScript.groupIndex.value,
+          _.tokens.length + 1
+        )
+      txs <- buildMultiGroupTransactions(
+        fromLockupScript,
+        fromUnlockScript,
+        inputSelection,
+        outputGroups,
+        gasPrice,
+        AVector.empty
+      )
+    } yield txs
   }
 
   @tailrec
@@ -605,7 +621,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getUtxoSelectionOrArbitrary(
+  def getSelectedUtxoOrArbitrary(
       targetBlockHashOpt: Option[BlockHash],
       lockupScript: LockupScript.Asset,
       inputSelection: AVector[AssetOutputRef],
@@ -1604,15 +1620,15 @@ object TxUtils {
       elems: AVector[E],
       groupCount: Int,
       weightLimit: Int
-  )(groupByFn: E => Int, weightFn: E => Int): Either[String, AVector[AVector[E]]] = {
-    assert(groupCount > 0, "groupCount must be positive")
-    assert(weightLimit > 0, "weightLimit must be positive")
+  )(groupFn: E => Int, weightFn: E => Int): Either[String, AVector[AVector[E]]] = {
+    assume(groupCount > 0, "groupCount must be positive")
+    assume(weightLimit > 0, "weightLimit must be positive")
 
     val outputGroups        = Array.fill(groupCount)(mutable.ArrayBuffer[mutable.ArrayBuffer[E]]())
     val currentGroupWeights = Array.fill(groupCount)(0)
 
     elems.collectFirst { elem =>
-      val groupIndex = groupByFn(elem)
+      val groupIndex = groupFn(elem)
       val elemWeight = weightFn(elem)
 
       if (groupIndex >= groupCount || groupIndex < 0) {

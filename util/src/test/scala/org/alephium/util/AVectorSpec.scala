@@ -561,26 +561,36 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     }
   }
 
-  it should "splitAt the middle into two valid parts" in {
-    val vector        = AVector(1, 2, 3, 4, 5)
-    val (left, right) = vector.splitAt(2)
-    left is AVector(1, 2)
-    right is AVector(3, 4, 5)
+  it should "splitAt into two valid parts" in {
+    val vector          = AVector(1, 2, 3, 4, 5)
+    val (left1, right1) = vector.splitAt(2)
+    left1 is AVector(1, 2)
+    right1 is AVector(3, 4, 5)
+    val (left2, right2) = vector.splitAt(4)
+    left2 is AVector(1, 2, 3, 4)
+    right2 is AVector(5)
   }
 
-  it should "splitAt zero index into empty left and full right" in {
+  it should "splitAt first into empty left and full right" in {
     val vector        = AVector(1, 2, 3, 4, 5)
     val (left, right) = vector.splitAt(0)
     left.isEmpty is true
     right is vector
   }
 
-  it should "splitAt negative index throws error" in {
+  it should "splitAt last into full left and empty right" in {
+    val vector        = AVector(1, 2, 3, 4, 5)
+    val (left, right) = vector.splitAt(5)
+    left is vector
+    right.isEmpty is true
+  }
+
+  it should "splitAt negative throws error" in {
     val vector = AVector(1, 2, 3)
     assertThrows[AssertionError](vector.splitAt(-1))
   }
 
-  it should "splitAt index greater than length throws error" in {
+  it should "splitAt greater than length throws error" in {
     val vector = AVector(1, 2, 3)
     assertThrows[AssertionError](vector.splitAt(10))
   }

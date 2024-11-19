@@ -97,15 +97,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         expectedDestBalance: U256,
         expectedTxsCount: Int
     ): Assertion = {
-      val senderBalance =
-        blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
-      val (inputs, initialSenderBalance) = senderInputsCount match {
-        case x if x < 1 =>
-          (None, senderBalance)
-        case x =>
-          val (initialUtxos, fee) = changeUtxosWithTxFee(fromPrivateKey, fromPublicKey, Some(x))
-          (Some(initialUtxos), senderBalance - fee)
-      }
+      val (inputs, initialSenderBalance) =
+        prepareUtxos(fromPrivateKey, fromPublicKey, Some(senderInputsCount))
+      val outputRefs =
+        Option(inputs).filter(_.nonEmpty).map(_.map(output => OutputRef.from(output.ref)))
       val transactionResults = serverUtils
         .buildMultiTransferUnsignedTransactions(
           blockFlow,
@@ -113,7 +108,7 @@ class ServerUtilsSpec extends AlephiumSpec {
             fromPublicKey.bytes,
             None,
             destinations,
-            inputs.map(_.map(output => OutputRef.from(output.ref)))
+            outputRefs
           )
         )
         .rightValue

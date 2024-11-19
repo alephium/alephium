@@ -233,7 +233,6 @@ class ServerUtils(implicit
     Right(result)
   }
 
-  // scalastyle:off method.length
   def buildMultiTransferUnsignedTransactions(
       blockFlow: BlockFlow,
       query: BuildTransferTx
@@ -256,39 +255,22 @@ class ServerUtils(implicit
         (),
         badRequest(s"This node cannot serve request for Group ${lockPair._1.groupIndex}")
       )
-      inputSelection <- blockFlow
-        .getUtxoSelectionOrArbitrary(
-          query.targetBlockHash,
-          lockPair._1,
-          assetOutputRefs,
-          apiConfig.defaultUtxosLimit
-        )
-        .left
-        .map(badRequest)
       outputInfos = prepareOutputInfos(query.destinations)
       gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
-      _ <- blockFlow
-        .getAssetRemainders(
-          lockPair._2,
-          inputSelection,
-          outputInfos,
-          gasPrice
-        )
-        .left
-        .map(badRequest)
       unsignedTxs <- blockFlow
         .buildMultiGroupTransactions(
           lockPair._1,
           lockPair._2,
-          inputSelection,
+          query.targetBlockHash,
+          assetOutputRefs,
           outputInfos,
-          gasPrice
+          gasPrice,
+          apiConfig.defaultUtxosLimit
         )
         .left
         .map(failed)
       txs <- unsignedTxs.mapE(validateUnsignedTransaction)
     } yield txs.map(BuildTransferTxResult.from)
-  // scalastyle:on method.length
 
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,

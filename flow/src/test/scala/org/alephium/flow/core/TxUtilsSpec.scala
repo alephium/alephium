@@ -1412,23 +1412,17 @@ class TxUtilsSpec extends AlephiumSpec {
         expectedDestBalance: U256,
         expectedTxsCount: Int
     ): Either[String, Assertion] = {
-      val senderBalance =
-        blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
-      val (inputs, initialSenderBalance) = initialInputsCount match {
-        case Some(inputsCount) if inputsCount < 1 =>
-          (AVector.empty[AssetOutputInfo], senderBalance)
-        case inputsCountOpt =>
-          val (initialUtxos, fee) =
-            changeUtxosWithTxFee(fromPrivateKey, fromPublicKey, inputsCountOpt)
-          (initialUtxos, senderBalance - fee)
-      }
+      val (inputs, initialSenderBalance) =
+        prepareUtxos(fromPrivateKey, fromPublicKey, initialInputsCount)
       blockFlow
         .buildMultiGroupTransactions(
           LockupScript.p2pkh(fromPublicKey),
           UnlockScript.p2pkh(fromPublicKey),
-          inputs,
+          targetBlockHash = None,
+          inputs.map(_.ref),
           outputs,
-          gasPrice
+          gasPrice,
+          Int.MaxValue
         )
         .map { unsignedTxs =>
           val confirmedBlocks =
@@ -1641,7 +1635,7 @@ class TxUtilsSpec extends AlephiumSpec {
         Some(TokenIssuance.Info(Val.U256(2), Some(LockupScript.p2pkh(genesisPublicKey_0))))
     )
 
-    val (genesisUtxos, _)   = changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, None)
+    val (genesisUtxos, _)   = prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0, None)
     val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
     val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
 
@@ -1673,7 +1667,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   "getAssetRemainders" should "fail unless conditions are met" in new MultiTransferFixture {
-    val (genesisUtxos, _)   = changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, None)
+    val (genesisUtxos, _)   = prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0, None)
     val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
     val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
 
@@ -1876,7 +1870,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .buildMultiGroupTransactions(
         LockupScript.p2pkh(genesisPublicKey_0),
         UnlockScript.p2pkh(genesisPublicKey_0),
-        changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0, None)._1,
+        prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0, None)._1,
         AVector(outputs),
         nonCoinbaseMinGasPrice,
         AVector.empty
@@ -1969,15 +1963,15 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get utxo selection if non-empty or arbitrary utxos" in new MultiTransferFixture {
-    val utxos = changeUtxosWithTxFee(genesisPrivateKey_0, genesisPublicKey_0)._1
-    blockFlow.getUtxoSelectionOrArbitrary(
+    val utxos = prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0)._1
+    blockFlow.getSelectedUtxoOrArbitrary(
       None,
       LockupScript.p2pkh(genesisPublicKey_0),
       utxos.map(_.ref),
       100
     ) isE utxos
 
-    blockFlow.getUtxoSelectionOrArbitrary(
+    blockFlow.getSelectedUtxoOrArbitrary(
       None,
       LockupScript.p2pkh(genesisPublicKey_0),
       AVector.empty,
@@ -1991,7 +1985,7 @@ class TxUtilsSpec extends AlephiumSpec {
       AssetOutputRef.from(new ScriptHint(2), TxOutputRef.unsafeKey(nonExistingHash))
 
     blockFlow
-      .getUtxoSelectionOrArbitrary(
+      .getSelectedUtxoOrArbitrary(
         None,
         LockupScript.p2pkh(genesisPublicKey_0),
         AVector(nonExistingUtxo),
@@ -2000,10 +1994,10 @@ class TxUtilsSpec extends AlephiumSpec {
       .leftValue is s"Selected input UTXOs are not available: ${nonExistingHash.toHexString}"
 
     blockFlow
-      .getUtxoSelectionOrArbitrary(
+      .getSelectedUtxoOrArbitrary(
         None,
         LockupScript.p2pkh(genesisPublicKey_0),
-        AVector(nonExistingUtxo) ++ changeUtxosWithTxFee(
+        AVector(nonExistingUtxo) ++ prepareUtxos(
           genesisPrivateKey_0,
           genesisPublicKey_0
         )._1
