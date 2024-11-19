@@ -1831,7 +1831,6 @@ class TxUtilsSpec extends AlephiumSpec {
     TxUtils.countResultingOutputs(outputs(2, 2)) is 6 // 2 outputs with 2 tokens each
     TxUtils.countResultingOutputs(outputs(1, 1)) is 2
     TxUtils.countResultingOutputs(outputs(1, 0)) is 1
-
   }
 
   "multi-transfer" should "build multi group transactions from just single genesis utxo" in new MultiTransferFixture {
@@ -1844,18 +1843,27 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "fail with no inputs" in new MultiTransferFixture {
-    val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
+  "multi-transfer" should "fail with no inputs or outputs" in new MultiTransferFixture {
     blockFlow
       .buildMultiGroupTransactions(
         LockupScript.p2pkh(genesisPublicKey_0),
         UnlockScript.p2pkh(genesisPublicKey_0),
         AVector.empty,
-        AVector(outputs),
+        AVector(buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))),
         nonCoinbaseMinGasPrice,
         AVector.empty
       )
       .leftValue is "Not enough inputs to build multi-group transaction"
+    blockFlow
+      .buildMultiGroupTransactions(
+        LockupScript.p2pkh(genesisPublicKey_0),
+        UnlockScript.p2pkh(genesisPublicKey_0),
+        AVector.empty,
+        AVector.empty,
+        nonCoinbaseMinGasPrice,
+        AVector.empty
+      )
+      .leftValue is "Outputs cannot be empty"
   }
 
   "multi-transfer" should "build multi group transactions from multiple utxos" in new MultiTransferFixture {
