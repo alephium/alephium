@@ -3907,6 +3907,37 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main)
   }
 
+  it should "return invalid value when encoding struct" in new ContractFixture {
+    val foo =
+      s"""
+         |struct Bar {
+         |  a: Bool,
+         |  b: U256,
+         |  c: Bool
+         |}
+         |
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes1 = encodeToByteVec!(true)
+         |    assert!(bytes1 == #010000, 0)
+         |    let bar = Bar { a: true, b: 1, c: false }
+         |    let bytes2 = encodeToByteVec!(bar)
+         |    assert!(bytes2 == #010000, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo)._1
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooId.toHexString}).foo()
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    testSimpleScript(main)
+  }
+
   it should "test Contract.encodeFields" in new ContractFixture {
     def test(stdAnnotation: String, fields: String, immFields: String, mutFields: String) = {
       val foo = s"""
