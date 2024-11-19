@@ -481,7 +481,7 @@ trait TxUtils { Self: FlowUtils =>
           defaultUtxosLimit
         )
       _ <- blockFlow
-        .getAssetRemainders(
+        .sanityCheckBalance(
           fromUnlockScript,
           inputSelection,
           outputInfos,
@@ -592,6 +592,14 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  def sanityCheckBalance(
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  ): Either[String, Unit] =
+    getAssetRemainders(fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
+
   def getAssetRemainders(
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
@@ -605,7 +613,7 @@ trait TxUtils { Self: FlowUtils =>
         gasBox <- GasEstimation.estimateWithInputScript(
           fromUnlockScript,
           inputs.length,
-          outputs.length + 1, // + 1 is for change utxo
+          outputs.fold(0) { case (outputCount, output) => outputCount + 1 + output.tokens.length },
           AssetScriptGasEstimator.Default(blockFlow)
         )
         alphRemainder <- UnsignedTransaction.calculateAlphRemainder(

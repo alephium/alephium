@@ -599,9 +599,7 @@ final class AVector[@sp A](
 
   def splitAt(n: Int): (AVector[A], AVector[A]) = {
     assume(n >= 0 && n <= this.length)
-    if (this.isEmpty) {
-      (AVector.empty, AVector.empty)
-    } else if (n == 0) {
+    if (n == 0) {
       (AVector.empty, this)
     } else if (n == this.length) {
       (this, AVector.empty)
