@@ -39,7 +39,7 @@ object IntraCliqueManager {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent]
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
       new IntraCliqueManager(
@@ -75,7 +75,7 @@ class IntraCliqueManager(
     blockflow: BlockFlow,
     allHandlers: AllHandlers,
     cliqueManager: ActorRefT[CliqueManager.Command],
-    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent]
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor
     with EventStream.Subscriber {

@@ -378,7 +378,7 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "get chain state" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
 
-    val tips0 = blockFlow.getChainStateUnsafe()
+    val tips0 = blockFlow.getChainTipsUnsafe()
     tips0 is brokerConfig.chainIndexes.map { chainIndex =>
       val blockChain = blockFlow.getBlockChain(chainIndex)
       ChainTip(blockChain.genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)
@@ -391,7 +391,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val weight = blockFlow.getWeightUnsafe(block1.hash)
       ChainTip(block1.hash, 2, weight)
     }
-    blockFlow.getChainStateUnsafe() is tips1
+    blockFlow.getChainTipsUnsafe() is tips1
   }
 
   behavior of "Mining"

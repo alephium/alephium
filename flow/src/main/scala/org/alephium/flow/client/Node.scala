@@ -113,7 +113,7 @@ object Node {
     val allHandlers: AllHandlers =
       AllHandlers.build(system, blockFlow, eventBus, storages)
 
-    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent] =
       ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
     lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(

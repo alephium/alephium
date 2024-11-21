@@ -160,7 +160,7 @@ object TestBrokerHandler {
       blockFlow: BlockFlow,
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
     Props(
@@ -185,7 +185,7 @@ class TestBrokerHandler(
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
-    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
     override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseInboundBrokerHandler

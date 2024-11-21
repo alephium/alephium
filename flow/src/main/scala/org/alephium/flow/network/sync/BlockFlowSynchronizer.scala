@@ -43,20 +43,20 @@ object BlockFlowSynchronizer {
   ): Props =
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
-  sealed trait Command
-  case object Sync                                                      extends Command
-  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
-  case object CleanDownloading                                          extends Command
-  final case class BlockAnnouncement(hash: BlockHash)                   extends Command
-  final case class ChainState(tips: AVector[ChainTip])                  extends Command
-  final case class Ancestors(chains: AVector[(ChainIndex, Int)])        extends Command
+  sealed trait CommandOrEvent
+  case object Sync                                                      extends CommandOrEvent
+  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends CommandOrEvent
+  case object CleanDownloading                                          extends CommandOrEvent
+  final case class BlockAnnouncement(hash: BlockHash)                   extends CommandOrEvent
+  final case class ChainState(tips: AVector[ChainTip])                  extends CommandOrEvent
+  final case class Ancestors(chains: AVector[(ChainIndex, Int)])        extends CommandOrEvent
   final case class Skeletons(
       requests: AVector[(ChainIndex, AVector[Int])],
       responses: AVector[AVector[BlockHeader]]
-  ) extends Command
+  ) extends CommandOrEvent
   final case class BlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
-  ) extends Command
+  ) extends CommandOrEvent
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -342,8 +342,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
       mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, AVector[Int])]]
     syncingChains.foreachEntry { case (chainIndex, state) =>
       state.tryMoveOn() match {
-        case Some(heights) => addToMap(requests, state.originBroker, (chainIndex, heights))
-        case None          => ()
+        case Some(heights) =>
+          assume(heights.nonEmpty, "Skeleton heights must not be empty")
+          addToMap(requests, state.originBroker, (chainIndex, heights))
+        case None => ()
       }
     }
     requests.foreachEntry { case (broker, requestsPerActor) =>
@@ -407,8 +409,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
     ancestors.foreach { case (chainIndex, height) =>
       syncingChains.get(chainIndex).foreach { state =>
         state.initSkeletonHeights(brokerActor, height + 1) match {
-          case Some(heights) => requests.addOne((chainIndex, heights))
-          case None          => ()
+          case Some(heights) =>
+            assume(heights.nonEmpty, "Skeleton heights must not be empty")
+            requests.addOne((chainIndex, heights))
+          case None => ()
         }
       }
     }
@@ -498,11 +502,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
     if (tipsFromBroker.nonEmpty) {
       tipsFromBroker.foreachEntry { case (chainIndex, _) =>
         val selected = brokers.view
-          .map { case (newBroker, status) =>
-            (newBroker, status.getChainTip(chainIndex))
-          }
-          .collect { case (newBroker, Some(chainTip)) =>
-            (newBroker, chainTip)
+          .flatMap { case (newBroker, status) =>
+            status.getChainTip(chainIndex).map(chainTip => (newBroker, chainTip))
           }
           .maxByOption(_._2.weight)
         selected match {
@@ -551,25 +552,10 @@ object SyncState {
   val MaxQueueSize: Int           = SkeletonSize * BatchSize
   val FallbackThreshold: Duration = Duration.ofMinutesUnsafe(2)
 
-  final case class Skeleton(from: Int, to: Int, step: Int) {
-    lazy val heights: AVector[Int] = AVector.from(from.to(to, step))
-  }
-
   def addToMap[K, V](map: mutable.HashMap[K, mutable.ArrayBuffer[V]], key: K, value: V): Unit = {
     map.get(key) match {
       case Some(acc) => acc.addOne(value)
       case None      => map(key) = mutable.ArrayBuffer(value)
-    }
-  }
-
-  def addToMap[K, V](
-      map: mutable.HashMap[K, mutable.ArrayBuffer[V]],
-      key: K,
-      values: Iterable[V]
-  ): Unit = {
-    map.get(key) match {
-      case Some(acc) => acc.addAll(values)
-      case None      => map(key) = mutable.ArrayBuffer.from(values)
     }
   }
 
@@ -583,13 +569,13 @@ object SyncState {
 
   final case class BlockDownloadTask(
       chainIndex: ChainIndex,
-      from: Int,
-      to: Int,
+      fromHeight: Int,
+      toHeight: Int,
       toHeader: Option[BlockHeader]
   ) {
-    def heights: AVector[Int] = AVector.from(from to to)
-    def size: Int             = to - from + 1
-    def id: TaskId            = TaskId(from, to)
+    def heights: AVector[Int] = AVector.from(fromHeight to toHeight)
+    def size: Int             = toHeight - fromHeight + 1
+    def id: TaskId            = TaskId(fromHeight, toHeight)
 
     override def toString: String = s"${chainIndex.from.value}->${chainIndex.to.value}:$id"
   }

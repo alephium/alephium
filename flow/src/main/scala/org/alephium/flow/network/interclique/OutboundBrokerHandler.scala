@@ -39,7 +39,7 @@ object OutboundBrokerHandler {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent]
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
       new OutboundBrokerHandler(
@@ -60,7 +60,7 @@ class OutboundBrokerHandler(
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
-    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent]
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseOutboundBrokerHandler
     with BrokerHandler {

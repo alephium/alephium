@@ -46,7 +46,7 @@ object InterCliqueManager {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       discoveryServer: ActorRefT[DiscoveryServer.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
       numBootstrapNodes: Int
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
@@ -154,7 +154,7 @@ class InterCliqueManager(
     blockflow: BlockFlow,
     allHandlers: AllHandlers,
     discoveryServer: ActorRefT[DiscoveryServer.Command],
-    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
     numBootstrapNodes: Int
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseActor

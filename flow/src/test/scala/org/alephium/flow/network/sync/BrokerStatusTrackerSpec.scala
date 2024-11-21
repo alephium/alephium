@@ -114,14 +114,14 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.clearMissedBlocks(task.chainIndex)
 
     status.canDownload(task) is true
-    status.canDownload(task.copy(to = 6)) is false
+    status.canDownload(task.copy(toHeight = 6)) is false
     status.canDownload(task.copy(chainIndex = ChainIndex.unsafe(1, 1))) is false
   }
 
   it should "add/get/remove pending requests" in new BrokerStatusFixture {
     val task0 = BlockDownloadTask(ChainIndex.unsafe(0, 0), 1, 5, None)
-    val task1 = task0.copy(from = 6, to = 10)
-    val task2 = task0.copy(from = 11, to = 15)
+    val task1 = task0.copy(fromHeight = 6, toHeight = 10)
+    val task2 = task0.copy(fromHeight = 11, toHeight = 15)
 
     status.pendingTasks.contains(task0) is false
     status.pendingTasks.contains(task1) is false
@@ -150,6 +150,8 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.pendingTasks.contains(task0) is false
     status.pendingTasks.contains(task1) is false
     status.pendingTasks.contains(task2) is false
+    status.pendingTasks.isEmpty is true
+    status.requestNum is 0
   }
 
   it should "add/contains/clear missed blocks" in new BrokerStatusFixture {

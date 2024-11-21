@@ -440,8 +440,9 @@ trait SyncV2Handler { _: BrokerHandler =>
               tasks.length == blockss.length &&
                 tasks.forallWithIndex { case (task, index) =>
                   val blocks = blockss(index)
-                  blocks.nonEmpty && blocks.length >= task.size &&
-                  blocks.forall(b => checkWork(b.hash) && b.chainIndex == task.chainIndex)
+                  blocks.length >= task.size && blocks.forall(b =>
+                    checkWork(b.hash) && b.chainIndex == task.chainIndex
+                  )
                 }
             if (isValid) {
               val result = tasks.mapWithIndex { case (task, index) =>
@@ -461,7 +462,7 @@ trait SyncV2Handler { _: BrokerHandler =>
             context.stop(self)
         }
       case None =>
-        log.warning(s"Ignore unknown BlocksByHeightsRespons from $remoteAddress, request id: $id")
+        log.warning(s"Ignore unknown BlocksByHeightsResponse from $remoteAddress, request id: $id")
     }
   }
 
@@ -481,7 +482,7 @@ trait SyncV2Handler { _: BrokerHandler =>
     } else {
       val flowData = mutable.ArrayBuffer.empty[AVector[T]]
       heights.foreach { case (chainIndex, heightsPerChain) =>
-        escapeIOError(func(chainIndex, heightsPerChain), "Get flow data by heights")(
+        escapeIOError(func(chainIndex, heightsPerChain), s"handling $name request")(
           flowData.addOne
         )
       }
@@ -554,7 +555,7 @@ trait SyncV2Handler { _: BrokerHandler =>
                   )
                 }
             if (isValid) {
-              if (this.states.isEmpty) {
+              if (!isFindingAncestor) {
                 handleSkeletonResponse(chains, headerss)
               } else {
                 handleAncestorResponse(headerss)
@@ -705,8 +706,10 @@ trait SyncV2Handler { _: BrokerHandler =>
     states.flatMap(_.find(s => s.chainIndex == chainIndex))
   }
 
+  private def isFindingAncestor: Boolean = states.isDefined
+
   private def isAncestorFound: Boolean =
-    states.isDefined && states.forall(_.forall(_.isAncestorFound))
+    isFindingAncestor && states.forall(_.forall(_.isAncestorFound))
 }
 
 object SyncV2Handler {
@@ -781,6 +784,7 @@ object SyncV2Handler {
   }
 
   def calculateRequestSpan(remoteHeight: Int, localHeight: Int): AVector[Int] = {
+    assume(remoteHeight >= 0 && localHeight >= 0)
     val maxCount      = 12
     val requestHead   = math.max(remoteHeight - 1, ALPH.GenesisHeight)
     val requestBottom = math.max(localHeight - 1, ALPH.GenesisHeight)
@@ -788,7 +792,9 @@ object SyncV2Handler {
     val span          = calcInRange(1 + totalSpan / maxCount, 2, 16)
     val count         = calcInRange(1 + totalSpan / span, 2, maxCount)
     val from          = math.max(requestHead - (count - 1) * span, ALPH.GenesisHeight)
-    AVector.from(from.to(from + (count - 1) * span, span))
+    val result        = AVector.from(from.to(from + (count - 1) * span, span))
+    assume(result.nonEmpty, "Resulting span must not be empty")
+    result
   }
 
   def validateBlocks(

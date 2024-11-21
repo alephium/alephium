@@ -552,6 +552,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       HeadersByHeightsResponse(defaultRequestId, AVector(blocks.map(_.header)))
     )
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 4))))
+    brokerHandlerActor.pendingRequests.isEmpty is true
     brokerHandlerActor.states.isEmpty is true
   }
 
@@ -633,6 +634,23 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       HeadersByHeightsResponse(requestId4, AVector(AVector(headers(11))))
     )
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 12))))
+    connectionHandler.expectNoMessage()
+    brokerHandlerActor.states.isEmpty is true
+  }
+
+  it should "work when receiving genesis header" in new GetAncestorsFixture {
+    import SyncV2Handler.RequestInfo
+    prepare(chainIndex, 2)
+    val request = HeadersByHeightsRequest(defaultRequestId, AVector((chainIndex, AVector(0, 2))))
+    brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(request, None)
+
+    val header        = emptyBlock(blockFlow, chainIndex).header
+    val blockchain    = blockFlow.getBlockChain(chainIndex)
+    val genesisHeader = blockFlow.getBlockHeaderUnsafe(blockchain.genesisHash)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(AVector(genesisHeader, header)))
+    )
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 0))))
     connectionHandler.expectNoMessage()
     brokerHandlerActor.states.isEmpty is true
   }
@@ -950,7 +968,7 @@ object TestBrokerHandler {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
       seenTxExpiryDuration: Duration
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
@@ -976,7 +994,7 @@ class TestBrokerHandler(
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
-    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
     override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
     override val seenTxExpiryDuration: Duration
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)

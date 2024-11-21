@@ -79,6 +79,6 @@ class FlowHandler(blockFlow: BlockFlow) extends IOBaseActor with Stash {
         sender() ! SyncInventories(None, inventories)
       }
     case GetChainState =>
-      escapeIOError(blockFlow.getChainState()) { tips => sender() ! ChainState(tips) }
+      escapeIOError(blockFlow.getChainTips()) { tips => sender() ! ChainState(tips) }
   }
 }

@@ -84,13 +84,13 @@ class TestOutboundBrokerHandler(
     extends OutboundBrokerHandler {
   override def selfCliqueInfo: CliqueInfo =
     Generators.cliqueInfoGen(1).sample.get
-  override def exchangingV1: Receive                                           = exchangingCommon
-  override def exchangingV2: Receive                                           = exchangingV1
-  override def dataOrigin: DataOrigin                                          = ???
-  override def allHandlers: AllHandlers                                        = ???
-  override def blockflow: BlockFlow                                            = ???
-  override def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] = ???
-  override def cliqueManager: ActorRefT[CliqueManager.Command]                 = ???
+  override def exchangingV1: Receive    = exchangingCommon
+  override def exchangingV2: Receive    = exchangingV1
+  override def dataOrigin: DataOrigin   = ???
+  override def allHandlers: AllHandlers = ???
+  override def blockflow: BlockFlow     = ???
+  override def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent] = ???
+  override def cliqueManager: ActorRefT[CliqueManager.Command]                        = ???
 
   def handleHandshakeInfo(
       _remoteBrokerInfo: BrokerInfo,

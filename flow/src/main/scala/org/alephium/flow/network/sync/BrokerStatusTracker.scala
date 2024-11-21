@@ -56,7 +56,7 @@ object BrokerStatusTracker {
     def canDownload(task: BlockDownloadTask)(implicit brokerConfig: BrokerConfig): Boolean = {
       requestNum < MaxRequestNum &&
       !containsMissedBlocks(task.chainIndex, task.id) &&
-      getChainTip(task.chainIndex).exists(_.height >= task.to)
+      getChainTip(task.chainIndex).exists(_.height >= task.toHeight)
     }
     def getRequestNum: Int = requestNum
     def addPendingTask(task: BlockDownloadTask): Unit = {

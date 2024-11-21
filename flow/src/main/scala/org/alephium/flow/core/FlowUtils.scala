@@ -650,8 +650,8 @@ trait SyncUtils {
   ): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators, peerBrokerInfo))
 
-  def getChainState(): IOResult[AVector[ChainTip]] =
-    IOUtils.tryExecute(getChainStateUnsafe())
+  def getChainTips(): IOResult[AVector[ChainTip]] =
+    IOUtils.tryExecute(getChainTipsUnsafe())
 
   protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]]
 
@@ -662,5 +662,5 @@ trait SyncUtils {
       peerBrokerInfo: BrokerGroupInfo
   ): AVector[AVector[BlockHash]]
 
-  protected def getChainStateUnsafe(): AVector[ChainTip]
+  protected def getChainTipsUnsafe(): AVector[ChainTip]
 }

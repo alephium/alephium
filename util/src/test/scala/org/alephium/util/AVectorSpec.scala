@@ -386,6 +386,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   it should "findE" in new Fixture {
     forAll(vectorGen) { vc =>
       vc.findE(_ => Right(true)).isRight is true
+      vc.findE(_ => Right(false)) isE None
       vc.findE(_ => Left(())).isLeft is true
     }
   }

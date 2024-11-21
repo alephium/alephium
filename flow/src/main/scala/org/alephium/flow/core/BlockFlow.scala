@@ -95,7 +95,7 @@ trait BlockFlow
     }
   }
 
-  def getChainStateUnsafe(): AVector[ChainTip] = {
+  def getChainTipsUnsafe(): AVector[ChainTip] = {
     brokerConfig.chainIndexes.map { chainIndex =>
       val chain    = getBlockChain(chainIndex)
       val tipState = chain.maxWeightTipStateUnsafe

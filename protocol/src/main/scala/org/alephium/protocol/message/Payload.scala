@@ -471,7 +471,7 @@ final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId]
 }
 
 object NewTxHashes extends IndexedSerding[TransactionId, NewTxHashes] with Payload.Code {
-  def name: String = "NewTxHashes"
+  def name: String = codeName
 
   def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
 
@@ -487,7 +487,7 @@ final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[
 }
 
 object TxsRequest extends IndexedSerding[TransactionId, TxsRequest] with Payload.Code {
-  def name: String = "TxsRequest"
+  def name: String = codeName
 
   def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
 
@@ -536,7 +536,7 @@ object HeadersByHeightsRequest
     extends IndexedSerding[Int, HeadersByHeightsRequest]
     with Payload.Code {
   import IndexedSerding.dataSerde
-  def name: String = "HeadersByHeightsRequest"
+  def name: String = codeName
   implicit val serde: Serde[HeadersByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
@@ -570,7 +570,7 @@ object BlocksByHeightsRequest
     extends IndexedSerding[Int, BlocksByHeightsRequest]
     with Payload.Code {
   import IndexedSerding.dataSerde
-  def name: String = "BlocksByHeightsRequest"
+  def name: String = codeName
   implicit val serde: Serde[BlocksByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
   def checkDataPerChain(values: AVector[Int]): Boolean = values.forall(_ >= 0)

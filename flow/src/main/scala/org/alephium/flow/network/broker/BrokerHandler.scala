@@ -42,7 +42,6 @@ object BrokerHandler {
   final case class Received(payload: Payload)                                   extends Command
   case object SendPing                                                          extends Command
   final case class SyncLocators(hashes: AVector[AVector[BlockHash]])            extends Command
-  final case class DownloadHeaders(fromHashes: AVector[BlockHash])              extends Command
   final case class DownloadBlocks(hashes: AVector[BlockHash])                   extends Command
   final case class RelayBlock(hash: BlockHash)                                  extends Command
   final case class RelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]) extends Command
@@ -53,8 +52,6 @@ object BrokerHandler {
   final case class GetSkeletons(chains: AVector[(ChainIndex, AVector[Int])])       extends Command
   final case object CheckPendingRequest                                            extends Command
   final case class DownloadBlockTasks(tasks: AVector[BlockDownloadTask])           extends Command
-
-  final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }
 
 trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataHandler {
@@ -74,7 +71,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def allHandlers: AllHandlers
 
   def brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
-  def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent]
 
   override def receive: Receive = handShaking
 
