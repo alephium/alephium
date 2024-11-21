@@ -962,6 +962,30 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     }
   }
 
+  it should "parse compound assign statement" in {
+    val stats: List[(String, Ast.Statement[StatelessContext])] = List(
+      "a += b" -> Ast
+        .AddAssign(Seq(AssignmentSimpleTarget(Ident("a"))), Ast.Variable(Ast.Ident("b"))),
+      "a[0] += b" -> Ast.AddAssign(
+        Seq(AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0))))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a.b[0] += c" -> Ast.AddAssign(
+        Seq(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      )
+    )
+
+    stats.foreach { case (str, ast) =>
+      checkParseStat(str, ast)
+    }
+  }
+
   it should "parse assign statement" in {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
       "a[0] = b" -> Assign(

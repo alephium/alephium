@@ -1287,6 +1287,11 @@ object Ast {
             case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
             case _                                  => false
           }
+        case AddAssign(targets, _) =>
+          targets.exists {
+            case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
+            case _                                  => false
+          }
         case _ => false
       }
     }
@@ -1464,6 +1469,7 @@ object Ast {
 
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
+    def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
@@ -1489,6 +1495,7 @@ object Ast {
       }
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
+    def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]       = state.genLoadCode(ident)
   }
   sealed trait DataSelector extends Positioned {
     def reset(): Unit = this match {
@@ -1606,6 +1613,21 @@ object Ast {
           subRef.genStoreCode(state, selectors.last)
       }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val variable = state.getVariable(ident)
+      variable.tpe match {
+        case map: Type.Map =>
+          val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
+          MapOps.genLoad(state, map.value, getType(state), pathCodes, selectors.tail)
+        case _ =>
+          val ref    = state.getVariablesRef(ident)
+          val subRef = ref.subRef(state, selectors.init)
+          subRef.genLoadCode(state, selectors.last)
+      }
+    }
+
     override def reset(): Unit = {
       selectors.foreach(_.reset())
       super.reset()
@@ -1710,6 +1732,34 @@ object Ast {
       rhs.reset()
     }
   }
+
+  final case class AddAssign[Ctx <: StatelessContext](
+      targets: Seq[AssignmentTarget[Ctx]],
+      rhs: Expr[Ctx]
+  ) extends Statement[Ctx] {
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      // Check types are I256 and U256
+      val leftTypes  = targets.map(_.getType(state))
+      val rightTypes = rhs.getType(state)
+      if (leftTypes != rightTypes) {
+        throw Compiler.Error(
+          s"Cannot assign ${quoteTypes(rightTypes)} to ${quoteTypes(leftTypes)}",
+          sourceIndex
+        )
+      }
+      targets.foreach(_.checkMutable(state, sourceIndex))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      targets.flatMap(_.genLoad(state)) ++ rhs
+        .genCode(state) ++ Seq(U256Add) ++ targets.flatMap(_.genStore(state)).reverse.flatten
+    }
+    def reset(): Unit = {
+      targets.foreach(_.reset())
+      rhs.reset()
+    }
+  }
+
   sealed trait CallStatement[Ctx <: StatelessContext] extends Statement[Ctx] {
     def checkReturnValueUsed(
         state: Compiler.State[Ctx],

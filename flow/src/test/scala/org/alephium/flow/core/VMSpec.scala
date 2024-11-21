@@ -6721,6 +6721,34 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(script)
   }
 
+  it should "work for compound assignment" in new ContractFixture {
+    def testContract =
+      s"""
+         |Contract TestContract(mut x: U256) {
+         |  @using(updateFields = true)
+         |  pub fn addAssign() -> () {
+         |    let y = x
+         |    x += 1
+         |    assert!(x == y + 1, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    val testContractId =
+      createContract(testContract, initialMutState = AVector(Val.U256(U256.Zero)))._1
+    testSimpleScript(
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  TestContract(#${testContractId.toHexString}).addAssign()
+         |}
+         |
+         |$testContract
+         |""".stripMargin,
+      gas = 2000000
+    )
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
