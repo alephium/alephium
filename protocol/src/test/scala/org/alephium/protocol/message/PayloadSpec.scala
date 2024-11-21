@@ -220,6 +220,21 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         // tip 2
         serialize(tips(1))
     }
+
+    Payload
+      .deserialize(
+        // code id
+        hex"10" ++
+          // number of tips
+          hex"02" ++
+          // tip 1
+          serialize(tips(0)) ++
+          // tip 2
+          serialize(tips(1).copy(height = -1))
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid height in ChainState payload"
+    )
   }
 
   it should "serialize/deserialize the HeadersByHeightsRequest/HeadersByHeightsResponse payload" in {

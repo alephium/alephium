@@ -512,8 +512,16 @@ final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited
   def measure(): Unit = ChainState.payloadLabeled.inc()
 }
 
-object ChainState extends Payload.Serding[ChainState] with Payload.Code {
+object ChainState extends Payload.ValidatedSerding[ChainState] with Payload.Code {
   implicit val serde: Serde[ChainState] = Serde.forProduct1(ChainState.apply, c => c.tips)
+
+  override def validate(t: ChainState)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (t.tips.forall(_.height >= 0)) {
+      Right(())
+    } else {
+      Left("Invalid height in ChainState payload")
+    }
+  }
 }
 
 final case class HeadersByHeightsRequest(
