@@ -488,7 +488,7 @@ trait TxUtils { Self: FlowUtils =>
           gasPrice
         )
       outputGroups <- TxUtils
-        .weightLimitedGroupBy(outputInfos, groups, ALPH.MaxTxOutputNum - 1)(
+        .weightLimitedGroupBy(outputInfos, groups, ALPH.MaxTxOutputNum - 1)( // - change utxo
           _.lockupScript.groupIndex.value,
           _.tokens.length + 1
         )
@@ -613,7 +613,7 @@ trait TxUtils { Self: FlowUtils =>
         gasBox <- GasEstimation.estimateWithInputScript(
           fromUnlockScript,
           inputs.length,
-          countResultingOutputs(outputs),
+          countResultingTxOutputs(outputs),
           AssetScriptGasEstimator.Default(blockFlow)
         )
         alphRemainder <- UnsignedTransaction.calculateAlphRemainder(
@@ -1557,11 +1557,17 @@ object TxUtils {
       gas: GasBox
   )
 
-  // each token will turn into a dedicated output
-  def countResultingOutputs(outputs: AVector[TxOutputInfo]): Int =
-    outputs.fold(0) { case (outputsCount, output) =>
-      outputsCount + 1 + output.tokens.length
+  def countResultingTxOutputs(outputs: AVector[TxOutputInfo]): Int = {
+    if (outputs.isEmpty) {
+      0
+    } else {
+      // we include Change Utxo at the beginning
+      outputs.fold(1) { case (outputsCount, output) =>
+        // each token will become dedicated utxo regardless of TokenId
+        outputsCount + 1 + output.tokens.length
+      }
     }
+  }
 
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))

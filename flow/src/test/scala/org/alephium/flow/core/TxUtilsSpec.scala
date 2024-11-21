@@ -1815,22 +1815,29 @@ class TxUtilsSpec extends AlephiumSpec {
     )
   }
 
-  "TxUtils.countOutputs" should "count outputs including tokens" in new AlephiumConfigFixture {
-    def tokens(n: Int): AVector[(TokenId, U256)] =
+  "TxUtils.countResultingTxOutputs" should "count outputs including tokens and change utxo" in new AlephiumConfigFixture {
+    def tokensOfSameId(n: Int): AVector[(TokenId, U256)] =
+      AVector.fill(n)(TokenId.hash("tokenId") -> U256.unsafe(10))
+
+    def tokensOfUniqueId(n: Int): AVector[(TokenId, U256)] =
       AVector.tabulate(n)(n => TokenId.hash(s"tokenId_$n") -> U256.unsafe(10))
-    def outputs(outputsCount: Int, tokensPerOutput: Int): AVector[TxOutputInfo] =
+
+    def outputs(outputsCount: Int, tokens: AVector[(TokenId, U256)]): AVector[TxOutputInfo] =
       AVector.fill(outputsCount) {
         TxOutputInfo(
           Address.p2pkh(genesisKeys(0)._2).lockupScript,
           ALPH.oneAlph,
-          tokens(tokensPerOutput),
+          tokens,
           None
         )
       }
-    TxUtils.countResultingOutputs(AVector.empty) is 0
-    TxUtils.countResultingOutputs(outputs(2, 2)) is 6 // 2 outputs with 2 tokens each
-    TxUtils.countResultingOutputs(outputs(1, 1)) is 2
-    TxUtils.countResultingOutputs(outputs(1, 0)) is 1
+    // accounts for Change output and tokens which turn into dedicated outputs regardless of ID
+    TxUtils.countResultingTxOutputs(AVector.empty) is 0
+    TxUtils.countResultingTxOutputs(outputs(2, tokensOfSameId(2))) is 7
+    TxUtils.countResultingTxOutputs(outputs(2, tokensOfUniqueId(2))) is 7
+    TxUtils.countResultingTxOutputs(outputs(1, tokensOfSameId(1))) is 3
+    TxUtils.countResultingTxOutputs(outputs(1, tokensOfUniqueId(1))) is 3
+    TxUtils.countResultingTxOutputs(outputs(1, AVector.empty)) is 2
   }
 
   "multi-transfer" should "build multi group transactions from just single genesis utxo" in new MultiTransferFixture {
