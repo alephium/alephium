@@ -1356,7 +1356,7 @@ class TxUtilsSpec extends AlephiumSpec {
     sweep().leftValue is "Not enough ALPH for gas fee in sweeping"
   }
 
-  trait MultiTransferFixture extends FlowFixture with UnsignedTxFixture {
+  trait TransferFromOneToManyGroupsFixture extends FlowFixture with UnsignedTxFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
@@ -1400,7 +1400,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     // scalastyle:off parameter.number
-    def testMultiTransferTxsBuilding(
+    def testTransferFromOneToManyGroups(
         fromPrivateKey: PrivateKey,
         fromPublicKey: PublicKey,
         initialInputsCount: Option[Int],
@@ -1415,7 +1415,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val (inputs, initialSenderBalance) =
         prepareUtxos(fromPrivateKey, fromPublicKey, initialInputsCount)
       blockFlow
-        .buildMultiGroupTransactions(
+        .buildTransferFromOneToManyGroups(
           LockupScript.p2pkh(fromPublicKey),
           UnlockScript.p2pkh(fromPublicKey),
           targetBlockHash = None,
@@ -1617,7 +1617,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  "getAssetRemainders" should "return alph and token remainder" in new MultiTransferFixture {
+  "getAssetRemainders" should "return alph and token remainder" in new TransferFromOneToManyGroupsFixture {
     val contract =
       s"""
          |Contract Foo() {
@@ -1666,7 +1666,7 @@ class TxUtilsSpec extends AlephiumSpec {
     tokenRemainder is halfOfInputTokens
   }
 
-  "getAssetRemainders" should "fail unless conditions are met" in new MultiTransferFixture {
+  "getAssetRemainders" should "fail unless conditions are met" in new TransferFromOneToManyGroupsFixture {
     val (genesisUtxos, _)   = prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0, None)
     val genesisUnlockScript = UnlockScript.p2pkh(genesisPublicKey_0)
     val genesisLockupScript = LockupScript.p2pkh(genesisPublicKey_0)
@@ -1840,9 +1840,9 @@ class TxUtilsSpec extends AlephiumSpec {
     TxUtils.countResultingTxOutputs(outputs(1, AVector.empty)) is 2
   }
 
-  "multi-transfer" should "build multi group transactions from just single genesis utxo" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "build txs from single genesis utxo" in new TransferFromOneToManyGroupsFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
-    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(1), outputs)(
+    testTransferFromOneToManyGroups(genesisPrivateKey_0, genesisPublicKey_0, Some(1), outputs)(
       expectedSenderUtxosCount = 1,
       expectedDestUtxosCount = 2,
       expectedDestBalance = ALPH.oneAlph * 2,
@@ -1850,9 +1850,9 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "fail with no inputs or outputs" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "fail with no inputs or outputs" in new TransferFromOneToManyGroupsFixture {
     blockFlow
-      .buildMultiGroupTransactions(
+      .buildTransferFromOneToManyGroups(
         LockupScript.p2pkh(genesisPublicKey_0),
         UnlockScript.p2pkh(genesisPublicKey_0),
         AVector.empty,
@@ -1860,9 +1860,9 @@ class TxUtilsSpec extends AlephiumSpec {
         nonCoinbaseMinGasPrice,
         AVector.empty
       )
-      .leftValue is "Not enough inputs to build multi-group transaction"
+      .leftValue is "Not enough inputs to build transfer-from-one-to-many-groups"
     blockFlow
-      .buildMultiGroupTransactions(
+      .buildTransferFromOneToManyGroups(
         LockupScript.p2pkh(genesisPublicKey_0),
         UnlockScript.p2pkh(genesisPublicKey_0),
         AVector.empty,
@@ -1873,9 +1873,9 @@ class TxUtilsSpec extends AlephiumSpec {
       .leftValue is "Outputs cannot be empty"
   }
 
-  "multi-transfer" should "build multi group transactions from multiple utxos" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "build txs from multiple utxos" in new TransferFromOneToManyGroupsFixture {
     val outputs = buildOutputs(AVector(GroupIndex.unsafe(1), GroupIndex.unsafe(2)))
-    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, Some(2), outputs)(
+    testTransferFromOneToManyGroups(genesisPrivateKey_0, genesisPublicKey_0, Some(2), outputs)(
       expectedSenderUtxosCount = 2,
       expectedDestUtxosCount = 2,
       expectedDestBalance = ALPH.oneAlph * 2,
@@ -1883,9 +1883,9 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "support building more transactions for a group" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "build more txs for a group" in new TransferFromOneToManyGroupsFixture {
     val outputsToGroup1 = buildOutputs(AVector.fill(257)(GroupIndex.unsafe(1)))
-    testMultiTransferTxsBuilding(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       Some(2),
@@ -1898,10 +1898,10 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "fail with too many outputs in a single group" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "fail with too many outputs in a single group" in new TransferFromOneToManyGroupsFixture {
     val outputs = buildOutputs(AVector.fill(257)(GroupIndex.unsafe(1)))
     blockFlow
-      .buildMultiGroupTransactions(
+      .buildTransferFromOneToManyGroups(
         LockupScript.p2pkh(genesisPublicKey_0),
         UnlockScript.p2pkh(genesisPublicKey_0),
         prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0, None)._1,
@@ -1912,7 +1912,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .leftValue is "Too many transaction outputs, maximal value: 256"
   }
 
-  "multi-transfer" should "build multi group transactions with tokens" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "build txs with tokens" in new TransferFromOneToManyGroupsFixture {
     val contract =
       s"""
          |Contract Foo() {
@@ -1923,7 +1923,12 @@ class TxUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val tokens = AVector.fill(10)(issueToken(contract, LockupScript.p2pkh(genesisPublicKey_0)))
     val outputsWithTokens = buildOutputs(AVector(GroupIndex.unsafe(0)), ALPH.oneAlph, tokens)
-    testMultiTransferTxsBuilding(genesisPrivateKey_0, genesisPublicKey_0, None, outputsWithTokens)(
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      None,
+      outputsWithTokens
+    )(
       expectedSenderUtxosCount = 1,
       expectedDestUtxosCount = 11,
       expectedDestBalance = ALPH.oneAlph,
@@ -1931,9 +1936,9 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "build multi group transaction with max inputs/outputs and high gasPrice" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "build txs with max inputs/outputs and high gasPrice" in new TransferFromOneToManyGroupsFixture {
     val outputs = buildOutputs(AVector.fill(255)(GroupIndex.unsafe(1)))
-    testMultiTransferTxsBuilding(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       Some(255),
@@ -1947,7 +1952,7 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE Succeeded
   }
 
-  "multi-transfer" should "build multi group transactions across all groups" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "build txs across all groups" in new TransferFromOneToManyGroupsFixture {
     val outputs =
       AVector(0, 1, 2).map { groupIndex =>
         TxOutputInfo(
@@ -1958,7 +1963,7 @@ class TxUtilsSpec extends AlephiumSpec {
         )
       }
 
-    testMultiTransferTxsBuilding(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       Some(1),
@@ -1970,7 +1975,7 @@ class TxUtilsSpec extends AlephiumSpec {
       expectedTxsCount = 3
     ) isE Succeeded
 
-    testMultiTransferTxsBuilding(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_1,
       genesisPublicKey_1,
       Some(1),
@@ -1982,7 +1987,7 @@ class TxUtilsSpec extends AlephiumSpec {
       expectedTxsCount = 3
     ) isE Succeeded
 
-    testMultiTransferTxsBuilding(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_2,
       genesisPublicKey_2,
       Some(1),
@@ -1996,7 +2001,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   }
 
-  it should "get utxo selection if non-empty or arbitrary utxos" in new MultiTransferFixture {
+  it should "get utxo selection if non-empty or arbitrary utxos" in new TransferFromOneToManyGroupsFixture {
     val utxos = prepareUtxos(genesisPrivateKey_0, genesisPublicKey_0)._1
     blockFlow.getSelectedUtxoOrArbitrary(
       None,
@@ -2013,7 +2018,7 @@ class TxUtilsSpec extends AlephiumSpec {
     ) isE utxos
   }
 
-  it should "fail if any of the input utxos does not exist" in new MultiTransferFixture {
+  it should "fail if any of the input utxos does not exist" in new TransferFromOneToManyGroupsFixture {
     val nonExistingHash = Hash.hash("0")
     val nonExistingUtxo =
       AssetOutputRef.from(new ScriptHint(2), TxOutputRef.unsafeKey(nonExistingHash))

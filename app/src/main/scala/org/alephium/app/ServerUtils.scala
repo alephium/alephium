@@ -233,35 +233,35 @@ class ServerUtils(implicit
     Right(result)
   }
 
-  def buildMultiTransferUnsignedTransactions(
+  def buildTransferFromOneToManyGroups(
       blockFlow: BlockFlow,
-      query: BuildTransferTx
+      transferRequest: BuildTransferTx
   ): Try[AVector[BuildTransferTxResult]] =
     for {
       _ <- Either.cond(
-        query.gasAmount.isEmpty,
+        transferRequest.gasAmount.isEmpty,
         (),
         badRequest(
-          "Explicit gas amount is not permitted. Gas estimation for multi-transfer is sufficiently accurate."
+          "Explicit gas amount is not permitted, transfer-from-one-to-many-groups requires gas estimation."
         )
       )
-      assetOutputRefs <- query.utxos match {
+      assetOutputRefs <- transferRequest.utxos match {
         case Some(outputRefs) => prepareOutputRefs(outputRefs).left.map(badRequest)
         case None             => Right(AVector.empty[AssetOutputRef])
       }
-      lockPair <- query.getLockPair()
+      lockPair <- transferRequest.getLockPair()
       _ <- Either.cond(
         brokerConfig.contains(lockPair._1.groupIndex),
         (),
         badRequest(s"This node cannot serve request for Group ${lockPair._1.groupIndex}")
       )
-      outputInfos = prepareOutputInfos(query.destinations)
-      gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      outputInfos = prepareOutputInfos(transferRequest.destinations)
+      gasPrice    = transferRequest.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
       unsignedTxs <- blockFlow
-        .buildMultiGroupTransactions(
+        .buildTransferFromOneToManyGroups(
           lockPair._1,
           lockPair._2,
-          query.targetBlockHash,
+          transferRequest.targetBlockHash,
           assetOutputRefs,
           outputInfos,
           gasPrice,

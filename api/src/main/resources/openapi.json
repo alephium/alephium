@@ -6153,13 +6153,13 @@
         }
       }
     },
-    "/transactions/build-multi-transfer": {
+    "/transactions/build-transfer-from-one-to-many-groups": {
       "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Build as many unsigned transactions as many unique groups is among given destinations",
-        "operationId": "postTransactionsBuild-multi-transfer",
+        "summary": "Build unsigned transfer transactions from an address of one group to addresses of many groups. Each target group requires a dedicated transaction or more in case large number of outputs needed to be split.",
+        "operationId": "postTransactionsBuild-transfer-from-one-to-many-groups",
         "requestBody": {
           "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
           "content": {
@@ -6219,6 +6219,7 @@
         },
         "responses": {
           "200": {
+            "description": "Ok",
             "content": {
               "application/json": {
                 "schema": {

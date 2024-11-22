@@ -461,7 +461,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def buildMultiGroupTransactions(
+  def buildTransferFromOneToManyGroups(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       targetBlockHash: Option[BlockHash],
@@ -492,7 +492,7 @@ trait TxUtils { Self: FlowUtils =>
           _.lockupScript.groupIndex.value,
           _.tokens.length + 1
         )
-      txs <- buildMultiGroupTransactions(
+      txs <- buildTransferFromOneToManyGroups(
         fromLockupScript,
         fromUnlockScript,
         inputSelection,
@@ -504,7 +504,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   @tailrec
-  final def buildMultiGroupTransactions(
+  final def buildTransferFromOneToManyGroups(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
@@ -521,7 +521,7 @@ trait TxUtils { Self: FlowUtils =>
         Right(acc)
       }
     } else if (inputs.isEmpty) {
-      Left("Not enough inputs to build multi-group transaction")
+      Left("Not enough inputs to build transfer-from-one-to-many-groups")
     } else {
       val currentOutputs = outputGroups.head
       val selectedResult = for {
@@ -546,13 +546,14 @@ trait TxUtils { Self: FlowUtils =>
         case Right(selected) =>
           if (selected.gas > getMaximalGasPerTx()) {
             if (currentOutputs.length <= 1) {
+              val inputsCount = selected.assets.length
               Left(
-                "Unable to build multi-group transactions due to exceeding gas per tx most likely due to dusty input utxos"
+                s"Unable to build transfer-from-one-to-many-groups from $inputsCount inputs due to exceeding gas per tx"
               )
             } else {
               val (firstOutputs, secondOutputs) = currentOutputs.splitAt(currentOutputs.length / 2)
               val smallerOutputGroups           = firstOutputs +: secondOutputs +: outputGroups.tail
-              buildMultiGroupTransactions(
+              buildTransferFromOneToManyGroups(
                 fromLockupScript,
                 fromUnlockScript,
                 inputs,
@@ -578,7 +579,7 @@ trait TxUtils { Self: FlowUtils =>
                 }
                 val remainingInputs =
                   inputs.filterNot(out => selected.assets.exists(_.ref == out.ref))
-                buildMultiGroupTransactions(
+                buildTransferFromOneToManyGroups(
                   fromLockupScript,
                   fromUnlockScript,
                   remainingInputs ++ changeInputs,

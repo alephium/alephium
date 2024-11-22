@@ -338,13 +338,15 @@ trait Endpoints
       .out(jsonBody[BuildTransferTxResult])
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
-  val buildMultiTransfer: BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
+  val buildTransferFromOneToManyGroups
+      : BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
     transactionsEndpoint.post
-      .in("build-multi-transfer")
+      .in("build-transfer-from-one-to-many-groups")
       .in(jsonBodyWithAlph[BuildTransferTx])
       .out(jsonBody[AVector[BuildTransferTxResult]])
       .summary(
-        "Build as many unsigned transactions as many unique groups is among given destinations"
+        "Build unsigned transfer transactions from an address of one group to addresses of many groups. " +
+          "Each target group requires a dedicated transaction or more in case large number of outputs needed to be split."
       )
 
   val buildMultiAddressesTransaction

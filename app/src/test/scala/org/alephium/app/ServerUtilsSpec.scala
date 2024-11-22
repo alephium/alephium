@@ -74,7 +74,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
 
-  trait MultiTransferFixture extends FlowFixtureWithApi with GetTxFixture {
+  trait TransferFromOneToManyGroupsFixture extends FlowFixtureWithApi with GetTxFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils: ServerUtils = new ServerUtils
@@ -86,7 +86,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (genesisPrivateKey_2, genesisPublicKey_2, _) = genesisKeys(2)
 
     // scalastyle:off method.length
-    def testMultiTransfer(
+    def testTransferFromOneToManyGroups(
         fromPrivateKey: PrivateKey,
         fromPublicKey: PublicKey,
         senderInputsCount: Int,
@@ -102,7 +102,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val outputRefs =
         Option(inputs).filter(_.nonEmpty).map(_.map(output => OutputRef.from(output.ref)))
       val transactionResults = serverUtils
-        .buildMultiTransferUnsignedTransactions(
+        .buildTransferFromOneToManyGroups(
           blockFlow,
           BuildTransferTx(
             fromPublicKey.bytes,
@@ -336,10 +336,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  "multi-transfer" should "support inputs auto-selection" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "support inputs auto-selection" in new TransferFromOneToManyGroupsFixture {
     val destinations =
       AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       senderInputsCount = 0,
@@ -352,10 +352,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  "multi-transfer" should "support providing inputs" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "support providing inputs" in new TransferFromOneToManyGroupsFixture {
     val destinations =
       AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       senderInputsCount = 2,
@@ -368,10 +368,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  "multi-transfer" should "support fewer inputs than provided outputs" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "support fewer inputs than provided outputs" in new TransferFromOneToManyGroupsFixture {
     val destinations =
       AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       senderInputsCount = 1,
@@ -384,10 +384,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  "multi-transfer" should "split too many destinations into more transactions" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "split too many destinations into more txs" in new TransferFromOneToManyGroupsFixture {
     val destinations_1 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 1)))
     val destinations_2 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 2)))
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       senderInputsCount = 2,
@@ -400,9 +400,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  "multi-transfer" should "fail in case gas amount is passed by user" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "fail in case gas amount is passed by user" in new TransferFromOneToManyGroupsFixture {
     serverUtils
-      .buildMultiTransferUnsignedTransactions(
+      .buildTransferFromOneToManyGroups(
         blockFlow,
         BuildTransferTx(
           genesisPublicKey_0.bytes,
@@ -416,10 +416,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .leftValue
-      .detail is "Explicit gas amount is not permitted. Gas estimation for multi-transfer is sufficiently accurate."
+      .detail is "Explicit gas amount is not permitted, transfer-from-one-to-many-groups requires gas estimation."
   }
 
-  "multi-transfer" should "work across all groups" in new MultiTransferFixture {
+  "transfer-from-one-to-many-groups" should "work across all groups" in new TransferFromOneToManyGroupsFixture {
     val destinations =
       AVector(0, 1, 2).map { groupIndex =>
         Destination(
@@ -428,7 +428,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       }
 
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_0,
       genesisPublicKey_0,
       senderInputsCount = 1,
@@ -440,7 +440,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       expectedTxsCount = 3
     )
 
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_1,
       genesisPublicKey_1,
       senderInputsCount = 1,
@@ -452,7 +452,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       expectedTxsCount = 3
     )
 
-    testMultiTransfer(
+    testTransferFromOneToManyGroups(
       genesisPrivateKey_2,
       genesisPublicKey_2,
       senderInputsCount = 1,

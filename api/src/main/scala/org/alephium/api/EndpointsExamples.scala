@@ -549,7 +549,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildMultiTransferResultsExamples: List[Example[AVector[BuildTransferTxResult]]] =
+  implicit val buildTransferFromOneToManyGroupsResultsExamples
+      : List[Example[AVector[BuildTransferTxResult]]] =
     simpleExample(
       AVector(
         BuildTransferTxResult(
