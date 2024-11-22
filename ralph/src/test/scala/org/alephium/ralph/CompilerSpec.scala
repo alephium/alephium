@@ -8887,6 +8887,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         )
       )
     }
+
+    {
+      info("Return an error if there are conflict variable names")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @inline fn f0() -> () {
+           |    let a = 1
+           |    f1(a)
+           |    let $$a$$ = 2
+           |  }
+           |
+           |  @inline fn f1(v: U256) -> () {
+           |    let a = v
+           |    let _ = a
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Local variables have the same name: a")
+    }
   }
 
   it should "generate code for inline func calls" in new Fixture {
