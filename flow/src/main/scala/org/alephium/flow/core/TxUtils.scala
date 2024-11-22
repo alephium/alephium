@@ -112,7 +112,7 @@ trait TxUtils { Self: FlowUtils =>
             txOutputLength,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
-            TxScriptGasEstimator.NotImplemented
+            TxScriptEmulator.NotImplemented
           )
       }
   }
@@ -274,7 +274,7 @@ trait TxUtils { Self: FlowUtils =>
             rewardOutputs.length + 1,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
-            TxScriptGasEstimator.NotImplemented
+            TxScriptEmulator.NotImplemented
           )
       }
       .map(

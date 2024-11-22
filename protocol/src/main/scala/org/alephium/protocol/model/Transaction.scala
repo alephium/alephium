@@ -25,7 +25,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
-import org.alephium.util.{AVector, Duration, Math, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Hex, Math, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
@@ -364,6 +364,7 @@ final case class TransactionTemplate(
 
   override def getOutput(index: Int): TxOutput = unsigned.fixedOutputs(index)
 
+  def hex: String = Hex.toHexString(serialize(this))
 }
 
 object TransactionTemplate {

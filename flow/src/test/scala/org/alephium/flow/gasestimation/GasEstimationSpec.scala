@@ -263,7 +263,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |  assert!(1 == 2, 0)
            |}
            |""".stripMargin
-      ).leftValue is "Execution error when estimating gas for tx script or contract: Assertion Failed in TxScript, Error Code: 0"
+      ).leftValue is "Execution error when emulating tx script or contract: Assertion Failed in TxScript, Error Code: 0"
       // scalastyle:on no.equal
     }
 
@@ -430,7 +430,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       TxInputWithAsset(TxInput(utxo.ref, unlock), utxo)
     }
 
-    val estimator = TxScriptGasEstimator.Default(blockFlow)
+    val estimator = TxScriptEmulator.Default(blockFlow)
 
     GasEstimation.estimate(inputs, script, estimator)
   }

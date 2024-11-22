@@ -22,6 +22,7 @@ import org.alephium.flow.setting.NodeSetting
 import org.alephium.io.RocksDBSource
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.util.AlephiumSpec
 
 trait StoragesFixture {
   def storages: Storages
@@ -41,6 +42,7 @@ object StoragesFixture {
     val dbFolders = s"db-$postFix"
     val storages: Storages =
       Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.ProdSettings.syncWrite)
+    AlephiumSpec.addCleanTask(() => storages.dESTROYUnsafe())
     storages
   }
 

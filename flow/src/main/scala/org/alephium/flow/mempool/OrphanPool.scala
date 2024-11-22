@@ -17,21 +17,20 @@
 package org.alephium.flow.mempool
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionTemplate}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
 import org.alephium.util.{AVector, TimeStamp}
 
-class TxHandlerBuffer private (
-    val pool: MemPool
-) {
+class OrphanPool private (val pool: MemPool) {
   def size: Int = pool.size
 
-  def add(transaction: TransactionTemplate, timeStamp: TimeStamp): Unit = {
-    pool.add(TxHandlerBuffer.bufferChainIndex, transaction, timeStamp)
-    ()
+  def add(tx: TransactionTemplate, timeStamp: TimeStamp): MemPool.NewTxCategory = {
+    pool.add(OrphanPool.bufferChainIndex, tx, timeStamp)
   }
 
+  def contains(txId: TransactionId): Boolean = pool.contains(txId)
+
   def getRootTxs(): AVector[TransactionTemplate] = {
-    pool.collectNonSequentialTxs(TxHandlerBuffer.bufferChainIndex, Int.MaxValue)
+    pool.collectNonSequentialTxs(OrphanPool.bufferChainIndex, Int.MaxValue)
   }
 
   def removeInvalidTx(tx: TransactionTemplate): Unit = {
@@ -55,7 +54,7 @@ class TxHandlerBuffer private (
   }
 }
 
-object TxHandlerBuffer {
+object OrphanPool {
   // The buffer will be used to handle cross-group transactions, so the number of groups is set to 1
   private val bufferGroupConfig = new GroupConfig {
     override def groups: Int = 1
@@ -64,11 +63,11 @@ object TxHandlerBuffer {
   private val bufferGroupIndex = GroupIndex.unsafe(0)(bufferGroupConfig)
 
   // scalastyle:off magic.number
-  def default(): TxHandlerBuffer = ofCapacity(500)
+  def default(): OrphanPool = ofCapacity(500)
   // scalastyle:on magic.number
 
-  def ofCapacity(capacity: Int): TxHandlerBuffer = {
+  def ofCapacity(capacity: Int): OrphanPool = {
     val pool = MemPool.ofCapacity(bufferGroupIndex, capacity)(bufferGroupConfig)
-    new TxHandlerBuffer(pool)
+    new OrphanPool(pool)
   }
 }

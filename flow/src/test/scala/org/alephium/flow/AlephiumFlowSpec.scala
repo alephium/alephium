@@ -21,7 +21,7 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 
 import akka.util.ByteString
-import org.scalatest.{Assertion, BeforeAndAfterAll}
+import org.scalatest.Assertion
 
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
@@ -55,8 +55,7 @@ trait FlowFixture
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   def isolatedBlockFlow(): BlockFlow = {
-    val newStorages =
-      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    val newStorages = StoragesFixture.buildStorages(rootPath.resolve(Hash.generate.toHexString))
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
@@ -1021,16 +1020,6 @@ trait FlowFixture
   }
 }
 
-trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {
-  override def afterAll(): Unit = {
-    super.afterAll()
-    cleanStorages()
-  }
-}
+trait AlephiumFlowSpec extends AlephiumSpec with FlowFixture
 
-class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec {
-  override def afterAll(): Unit = {
-    super.afterAll()
-    cleanStorages()
-  }
-}
+class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec
