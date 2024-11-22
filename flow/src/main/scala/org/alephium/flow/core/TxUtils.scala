@@ -537,7 +537,7 @@ trait TxUtils { Self: FlowUtils =>
             amountTokensOutputCount._3,
             txScriptOpt = None,
             AssetScriptGasEstimator.Default(Self.blockFlow),
-            TxScriptGasEstimator.NotImplemented
+            TxScriptEmulator.NotImplemented
           )
       } yield selected
 
