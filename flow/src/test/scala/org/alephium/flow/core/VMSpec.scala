@@ -6721,32 +6721,95 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(script)
   }
 
-  it should "work for compound assignment" in new ContractFixture {
-    def testContract =
-      s"""
-         |Contract TestContract(mut x: U256) {
-         |  @using(updateFields = true)
-         |  pub fn addAssign() -> () {
-         |    let y = x
-         |    x += 1
-         |    assert!(x == y + 1, 0)
-         |  }
-         |}
-         |""".stripMargin
+  it should "work for add assign" in new ContractFixture {
+    def verify(contract: String) = {
+      val contractId = createContract(contract)._1
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  TestContract(#${contractId.toHexString}).addAssign()
+           |}
+           |
+           |$contract
+           |""".stripMargin
+      )
+    }
 
-    val testContractId =
-      createContract(testContract, initialMutState = AVector(Val.U256(U256.Zero)))._1
-    testSimpleScript(
-      s"""
-         |@using(preapprovedAssets = false)
-         |TxScript Main {
-         |  TestContract(#${testContractId.toHexString}).addAssign()
-         |}
-         |
-         |$testContract
-         |""".stripMargin,
-      gas = 2000000
-    )
+    {
+      info("Verify U256")
+      verify(
+        s"""
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn addAssign() -> () {
+           |    let mut x = 0
+           |    x += 1
+           |    assert!(x == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("Verify Array")
+      verify(
+        s"""
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn addAssign() -> () {
+           |    let mut x = [0; 2]
+           |    x[0] += 1
+           |    assert!(x[0] == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("Verify Struct")
+      verify(
+        s"""
+           |struct TestStruct {
+           |  mut x: U256,
+           |  y: U256
+           |}
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn addAssign() -> () {
+           |    let mut testStruct = TestStruct{x: 0, y: 0}
+           |    testStruct.x += 1
+           |    assert!(testStruct.x == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
+
+    {
+      info("Verify nested Struct with Array")
+      verify(
+        s"""
+           |struct TestStruct0 {
+           |  mut x: [U256; 2],
+           |  y: U256
+           |}
+           |struct TestStruct1 {
+           |  mut testStruct0: TestStruct0
+           |}
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn addAssign() -> () {
+           |    let mut testStruct1 = TestStruct1{testStruct0: TestStruct0{x: [0, 0], y: 0}}
+           |    testStruct1.testStruct0.x[0] += 1
+           |    assert!(testStruct1.testStruct0.x[0] == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
   }
 
   private def getEvents(
