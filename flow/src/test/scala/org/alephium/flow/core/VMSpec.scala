@@ -34,7 +34,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
-import org.alephium.ralph.Compiler
+import org.alephium.ralph.{Compiler, CompoundAssignmentOperator}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -6836,6 +6836,25 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
       )
     }
+
+    def verifySingleTarget(op: String, initValue: String) = {
+      val valueType = getValueType(initValue)
+      verify(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssign() -> () {
+           |    let mut x = $initValue
+           |    let mut y = $initValue
+           |    x, y $op getValues()
+           |  }
+           |
+           |  fn getValues() -> ($valueType, $valueType) {
+           |    return $initValue, $initValue
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
   }
 
   it should "work for compound assignment" in new CompoundAssignmentFixture {
@@ -6855,6 +6874,18 @@ class VMSpec extends AlephiumSpec with Generators {
     testCases.foreach(verifyArray.tupled)
     testCases.foreach(verifySimpleStruct.tupled)
     testCases.foreach(verifyNestedStruct.tupled)
+
+    intercept[AssertionError] {
+      CompoundAssignmentOperator.values.foreach { op =>
+        verifySingleTarget(op.operatorName, "1u")
+      }
+    }.getCause.getMessage is "Compound assignment requires single value on both sides"
+
+    intercept[AssertionError] {
+      CompoundAssignmentOperator.values.foreach { op =>
+        verifySimpleNumber(op.operatorName, "1u", "1i", "1i")
+      }
+    }.getCause.getMessage is """Cannot assign "I256" to "U256""""
   }
 
   private def getEvents(
