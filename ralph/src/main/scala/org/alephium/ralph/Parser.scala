@@ -308,10 +308,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.Assign(targets, expr).atSourceIndex(sourceIndex)
     }
 
-  def addAndAssign[Unknown: P]: P[Ast.AddAssign[Ctx]] =
-    P(assignmentTarget.rep(1, ",") ~ "+=" ~ expr).map { case (targets, expr) =>
-      val sourceIndex = SourceIndex(targets.headOption.flatMap(_.sourceIndex), expr.sourceIndex)
-      Ast.AddAssign(targets, expr).atSourceIndex(sourceIndex)
+  def compoundAssignOperator[Unknown: P]: P[CompoundAssignmentOperator] =
+    Lexer.opAddAssign | Lexer.opSubAssign | Lexer.opMulAssign | Lexer.opDivAssign
+  def compoundAssign[Unknown: P]: P[Ast.CompoundAssign[Ctx]] =
+    P(assignmentTarget.rep(1, ",") ~ compoundAssignOperator ~ expr).map {
+      case (targets, op, expr) =>
+        val sourceIndex = SourceIndex(targets.headOption.flatMap(_.sourceIndex), expr.sourceIndex)
+        Ast.CompoundAssign(targets, op, expr).atSourceIndex(sourceIndex)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -875,7 +878,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(
-      varDef | structDestruction | assign | addAndAssign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
+      varDef | structDestruction | assign | compoundAssign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
     )
 
   private def globalDefinitions[Unknown: P]: P[Ast.GlobalDefinition] = P(
@@ -981,7 +984,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | structDestruction | assign | addAndAssign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =

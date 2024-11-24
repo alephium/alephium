@@ -963,27 +963,32 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse compound assign statement" in {
-    val stats: List[(String, Ast.Statement[StatelessContext])] = List(
-      "a += b" -> Ast
-        .AddAssign(Seq(AssignmentSimpleTarget(Ident("a"))), Ast.Variable(Ast.Ident("b"))),
-      "a[0] += b" -> Ast.AddAssign(
-        Seq(AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0))))),
-        Ast.Variable(Ast.Ident("b"))
-      ),
-      "a.b[0] += c" -> Ast.AddAssign(
-        Seq(
-          AssignmentSelectedTarget(
-            Ident("a"),
-            Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
-          )
+    def stats(op: CompoundAssignmentOperator): List[(String, Ast.Statement[StatelessContext])] =
+      List(
+        s"a ${op.operatorName} b" -> Ast
+          .CompoundAssign(
+            Seq(AssignmentSimpleTarget(Ident("a"))),
+            op,
+            Ast.Variable(Ast.Ident("b"))
+          ),
+        s"a[0] ${op.operatorName} b" -> Ast.CompoundAssign(
+          Seq(AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0))))),
+          op,
+          Ast.Variable(Ast.Ident("b"))
         ),
-        Ast.Variable(Ast.Ident("c"))
+        s"a.b[0] ${op.operatorName} c" -> Ast.CompoundAssign(
+          Seq(
+            AssignmentSelectedTarget(
+              Ident("a"),
+              Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
+            )
+          ),
+          op,
+          Ast.Variable(Ast.Ident("c"))
+        )
       )
-    )
 
-    stats.foreach { case (str, ast) =>
-      checkParseStat(str, ast)
-    }
+    CompoundAssignmentOperator.values.foreach { stats(_).foreach(checkParseStat.tupled) }
   }
 
   it should "parse assign statement" in {

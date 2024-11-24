@@ -6721,14 +6721,14 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(script)
   }
 
-  it should "work for add assign" in new ContractFixture {
+  trait CompoundAssignmentFixture extends ContractFixture {
     def verify(contract: String) = {
       val contractId = createContract(contract)._1
       testSimpleScript(
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
-           |  TestContract(#${contractId.toHexString}).addAssign()
+           |  TestContract(#${contractId.toHexString}).compoundAssign()
            |}
            |
            |$contract
@@ -6736,80 +6736,125 @@ class VMSpec extends AlephiumSpec with Generators {
       )
     }
 
-    {
-      info("Verify U256")
+    def getValueType(value: String): String = {
+      value.last match {
+        case 'u' => "U256"
+        case 'i' => "I256"
+        case _   => fail(s"Invalid value type: $value")
+      }
+    }
+
+    def verifySimpleNumber(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
       verify(
         s"""
            |Contract TestContract() {
            |  @using(updateFields = true)
-           |  pub fn addAssign() -> () {
-           |    let mut x = 0
-           |    x += 1
-           |    assert!(x == 1, 0)
+           |  pub fn compoundAssign() -> () {
+           |    let mut x = $initValue
+           |    x $op $operationValue
+           |    assert!(x == $assertValue, 0)
            |  }
            |}
            |""".stripMargin
       )
     }
 
-    {
-      info("Verify Array")
+    def verifyArray(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
       verify(
         s"""
            |Contract TestContract() {
            |  @using(updateFields = true)
-           |  pub fn addAssign() -> () {
-           |    let mut x = [0; 2]
-           |    x[0] += 1
-           |    assert!(x[0] == 1, 0)
+           |  pub fn compoundAssign() -> () {
+           |    let mut x = [$initValue; 2]
+           |    x[0] $op $operationValue
+           |    assert!(x[0] == $assertValue, 0)
            |  }
            |}
            |""".stripMargin
       )
     }
 
-    {
-      info("Verify Struct")
+    def verifySimpleStruct(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
       verify(
         s"""
            |struct TestStruct {
-           |  mut x: U256,
-           |  y: U256
+           |  mut x: $valueType,
+           |  y: $valueType
            |}
            |Contract TestContract() {
            |  @using(updateFields = true)
-           |  pub fn addAssign() -> () {
-           |    let mut testStruct = TestStruct{x: 0, y: 0}
-           |    testStruct.x += 1
-           |    assert!(testStruct.x == 1, 0)
+           |  pub fn compoundAssign() -> () {
+           |    let mut testStruct = TestStruct{x: $initValue, y: $initValue}
+           |    testStruct.x $op $operationValue
+           |    assert!(testStruct.x == $assertValue, 0)
            |  }
            |}
            |""".stripMargin
       )
     }
 
-    {
-      info("Verify nested Struct with Array")
+    def verifyNestedStruct(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
       verify(
         s"""
            |struct TestStruct0 {
-           |  mut x: [U256; 2],
-           |  y: U256
+           |  mut x: [$valueType; 2],
+           |  y: $valueType
            |}
            |struct TestStruct1 {
            |  mut testStruct0: TestStruct0
            |}
            |Contract TestContract() {
            |  @using(updateFields = true)
-           |  pub fn addAssign() -> () {
-           |    let mut testStruct1 = TestStruct1{testStruct0: TestStruct0{x: [0, 0], y: 0}}
-           |    testStruct1.testStruct0.x[0] += 1
-           |    assert!(testStruct1.testStruct0.x[0] == 1, 0)
+           |  pub fn compoundAssign() -> () {
+           |    let mut testStruct1 = TestStruct1{testStruct0: TestStruct0{x: [$initValue, $initValue], y: $initValue}}
+           |    testStruct1.testStruct0.x[0] $op $operationValue
+           |    assert!(testStruct1.testStruct0.x[0] == $assertValue, 0)
            |  }
            |}
            |""".stripMargin
       )
     }
+  }
+
+  it should "work for compound assignment" in new CompoundAssignmentFixture {
+    val testCases = Seq(
+      ("+=", "0u", "1u", "1u"),
+      ("-=", "10u", "1u", "9u"),
+      ("*=", "2u", "2u", "4u"),
+      ("/=", "10u", "1u", "10u"),
+      ("+=", "0i", "1i", "1i"),
+      ("-=", "10i", "1i + 2i", "7i"),
+      ("-=", "1i", "10i", "-9i"),
+      ("*=", "2i", "2i * 3i", "12i"),
+      ("/=", "10i", "1i", "10i")
+    )
+
+    testCases.foreach(verifySimpleNumber.tupled)
+    testCases.foreach(verifyArray.tupled)
+    testCases.foreach(verifySimpleStruct.tupled)
+    testCases.foreach(verifyNestedStruct.tupled)
   }
 
   private def getEvents(
