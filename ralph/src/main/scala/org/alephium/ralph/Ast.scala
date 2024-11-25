@@ -1744,7 +1744,7 @@ object Ast {
 
       if (rightTypes.length != 1) {
         throw Compiler.Error(
-          s"Compound assignment requires single value on both sides",
+          s"Compound assignment ${quote(op.operatorName)} requires single value on both sides",
           sourceIndex
         )
       }

@@ -6911,11 +6911,11 @@ class VMSpec extends AlephiumSpec with Generators {
     testCases.foreach(verifySimpleStruct.tupled)
     testCases.foreach(verifyNestedStruct.tupled)
 
-    intercept[AssertionError] {
-      CompoundAssignmentOperator.values.foreach { op =>
+    CompoundAssignmentOperator.values.foreach { op =>
+      intercept[AssertionError] {
         verifySingleTarget(op.operatorName, "1u")
-      }
-    }.getCause.getMessage is "Compound assignment requires single value on both sides"
+      }.getCause.getMessage is s"""Compound assignment "${op.operatorName}" requires single value on both sides"""
+    }
 
     intercept[AssertionError] {
       CompoundAssignmentOperator.values.foreach { op =>
