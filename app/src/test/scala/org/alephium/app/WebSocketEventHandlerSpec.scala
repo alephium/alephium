@@ -17,7 +17,7 @@
 package org.alephium.app
 
 import org.alephium.api.model.BlockEntry
-import org.alephium.app.WebSocketServer.{EventHandler, WsSubscription}
+import org.alephium.app.WebSocketServer.{EventHandler, WsMethod, WsCommand, WsEvent}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
@@ -34,26 +34,21 @@ class WebSocketEventHandlerSpec extends AlephiumSpec with ServerFixture {
   }
 
   it should "parse subscription EventType" in {
-    WsSubscription.parseSubscription("subscribe:block").get is WsSubscription.Block
-    WsSubscription.parseSubscription("subscribe:tx").get is WsSubscription.Tx
+    WsEvent.parseEvent("subscribe:block").get is WsEvent(WsCommand.Subscribe, WsMethod.Block)
+    WsEvent.parseEvent("subscribe:tx").get is WsEvent(WsCommand.Subscribe, WsMethod.Tx)
     // let's be strict
-    WsSubscription.parseSubscription("subscribe:xxx:block").isEmpty is true
-    WsSubscription.parseSubscription("subscribe : block").isEmpty is true
-    WsSubscription.parseSubscription("subscribe,block").isEmpty is true
-    WsSubscription.parseSubscription("subscribe block").isEmpty is true
-    WsSubscription.parseSubscription("subscribe:gandalf").isEmpty is true
-    WsSubscription.parseSubscription("nonsense:frodo").isEmpty is true
-  }
-
-  it should "build subscription message" in {
-    WsSubscription.buildSubscribeMsg(WsSubscription.Block) is "subscribe:block"
-    WsSubscription.buildSubscribeMsg(WsSubscription.Tx) is "subscribe:tx"
+    WsEvent.parseEvent("subscribe:xxx:block").isEmpty is true
+    WsEvent.parseEvent("subscribe : block").isEmpty is true
+    WsEvent.parseEvent("subscribe,block").isEmpty is true
+    WsEvent.parseEvent("subscribe block").isEmpty is true
+    WsEvent.parseEvent("subscribe:gandalf").isEmpty is true
+    WsEvent.parseEvent("nonsense:frodo").isEmpty is true
   }
 
   it should "build Notification from Event" in {
     val notification = EventHandler.buildNotification(BlockNotify(dummyBlock, 0)).rightValue
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    notification.method is WsSubscription.Block.method
+    notification.method is WsMethod.Block.name
     show(notification.params) is write(blockEntry)
   }
 }

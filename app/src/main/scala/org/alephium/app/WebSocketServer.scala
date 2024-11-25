@@ -25,7 +25,7 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.app.WebSocketServer.WsSubscription
+import org.alephium.app.WebSocketServer.{SubscriberId, SubscriptionTime}
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
@@ -48,10 +48,12 @@ object SimpleHttpServer {
 final case class WebSocketServer(
     underlying: HttpServer,
     eventHandler: ActorRef,
-    subscribers: ConcurrentHashMap[WsSubscription.SubscriberId, WsSubscription.SubscriptionTime]
+    subscribers: ConcurrentHashMap[SubscriberId, SubscriptionTime]
 ) extends HttpServerLike
 
 object WebSocketServer extends StrictLogging {
+  type SubscriberId     = String
+  type SubscriptionTime = Long
 
   def apply(
       flowSystem: ActorSystem,
@@ -63,7 +65,7 @@ object WebSocketServer extends StrictLogging {
     val eventHandlerRef =
       EventHandler.getSubscribedEventHandlerRef(vertx.eventBus(), node.eventBus, flowSystem)
     val subscribers =
-      ConcurrentHashMap.empty[WsSubscription.SubscriberId, WsSubscription.SubscriptionTime]
+      ConcurrentHashMap.empty[SubscriberId, SubscriptionTime]
     val server = vertx.createHttpServer(httpOptions)
     server.webSocketHandler { webSocket =>
       if (subscribers.size >= maxConnections) {
@@ -76,9 +78,11 @@ object WebSocketServer extends StrictLogging {
 
         // Receive subscription messages from the client
         webSocket.textMessageHandler { message =>
-          WsSubscription.parseSubscription(message) match {
-            case Some(subscription) =>
-              EventHandler.subscribeToEvents(vertx, webSocket, subscription)
+          WsEvent.parseEvent(message) match {
+            case Some(WsEvent(WsCommand.Subscribe, method)) =>
+              EventHandler.subscribeToEvents(vertx, webSocket, method)
+            case Some(WsEvent(WsCommand.Unsubscribe, _)) =>
+              webSocket.reject(HttpResponseStatus.BAD_REQUEST.code()) // TODO
             case None =>
               webSocket.reject(HttpResponseStatus.BAD_REQUEST.code())
           }
@@ -93,33 +97,49 @@ object WebSocketServer extends StrictLogging {
     WebSocketServer(server, eventHandlerRef, subscribers)
   }
 
-  sealed trait WsSubscription {
-    def method: String
+  sealed trait WsMethod {
+    def name: String
   }
-
-  object WsSubscription {
-    private val SubscribeCmd = "subscribe"
-    type SubscriberId     = String
-    type SubscriptionTime = Long
-
-    case object Block extends WsSubscription { val method = "block" }
-    case object Tx    extends WsSubscription { val method = "tx"    }
-
-    def fromString(name: String): Option[WsSubscription] = name match {
-      case Block.`method` => Some(Block)
-      case Tx.`method`    => Some(Tx)
-      case _              => None
+  object WsMethod {
+    case object Block extends WsMethod { val name = "block" }
+    case object Tx    extends WsMethod { val name = "tx"    }
+    def fromString(name: String): Option[WsMethod] = name match {
+      case Block.name => Some(Block)
+      case Tx.name    => Some(Tx)
+      case _          => None
+    }
+  }
+  sealed trait WsCommand {
+    def name: String
+  }
+  object WsCommand {
+    case object Subscribe   extends WsCommand { val name = "subscribe"   }
+    case object Unsubscribe extends WsCommand { val name = "unsubscribe" }
+    def fromString(name: String): Option[WsCommand] = name match {
+      case Subscribe.name   => Some(Subscribe)
+      case Unsubscribe.name => Some(Unsubscribe)
+      case _                => None
     }
 
-    def buildSubscribeMsg(eventType: WsSubscription): String = s"$SubscribeCmd:${eventType.method}"
-
-    def parseSubscription(message: String): Option[WsSubscription] = {
-      message.split(":").toList match {
-        case SubscribeCmd :: event :: Nil =>
-          WsSubscription.fromString(event)
+  }
+  final case class WsEvent(command: WsCommand, method: WsMethod) {
+    override def toString: String = s"${command.name}:${method.name}"
+  }
+  object WsEvent {
+    def parseEvent(event: String): Option[WsEvent] = {
+      event.split(":").toList match {
+        case commandStr :: methodStr :: Nil =>
+          for {
+            command <- WsCommand.fromString(commandStr)
+            method  <- WsMethod.fromString(methodStr)
+          } yield WsEvent(command, method)
         case _ => None
       }
     }
+  }
+
+  sealed trait WsSubscription {
+    def method: String
   }
 
   object EventHandler extends ApiModelCodec {
@@ -128,12 +148,12 @@ object WebSocketServer extends StrictLogging {
     def subscribeToEvents(
         vertx: Vertx,
         ws: ServerWebSocket,
-        subscription: WsSubscription
+        method: WsMethod
     ): MessageConsumer[String] = {
       vertx
         .eventBus()
         .consumer[String](
-          subscription.method,
+          method.name,
           new io.vertx.core.Handler[Message[String]] {
             override def handle(message: Message[String]): Unit = {
               if (!ws.isClosed) {
@@ -151,7 +171,7 @@ object WebSocketServer extends StrictLogging {
       event match {
         case BlockNotify(block, height) =>
           BlockEntry.from(block, height).map { blockEntry =>
-            Notification(WsSubscription.Block.method, writeJs(blockEntry))
+            Notification(WsMethod.Block.name, writeJs(blockEntry))
           }
       }
     }
