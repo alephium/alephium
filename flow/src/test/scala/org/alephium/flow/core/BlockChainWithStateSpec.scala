@@ -17,8 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.io.Storages
-import org.alephium.io.RocksDBSource.ProdSettings
+import org.alephium.flow.io.StoragesFixture
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
 import org.alephium.util.AVector
@@ -35,8 +34,7 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     var updateCount = 0
 
     def buildGenesis(): BlockChainWithState = {
-      val dbFolder = "db-" + Hash.random.toHexString
-      val storages = Storages.createUnsafe(rootPath, dbFolder, ProdSettings.syncWrite)
+      val storages = StoragesFixture.buildStorages(rootPath)
       BlockChainWithState.createUnsafe(
         genesis,
         storages,

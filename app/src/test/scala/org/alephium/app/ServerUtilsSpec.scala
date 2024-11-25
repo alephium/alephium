@@ -22,6 +22,7 @@ import scala.util.Random
 
 import akka.util.ByteString
 import org.scalacheck.Gen
+import org.scalatest.Assertion
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
@@ -37,6 +38,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
@@ -72,6 +74,96 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
+
+  trait TransferFromOneToManyGroupsFixture extends FlowFixtureWithApi with GetTxFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils: ServerUtils = new ServerUtils
+
+    implicit lazy val bf: BlockFlow = blockFlow
+
+    val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
+    val (genesisPrivateKey_1, genesisPublicKey_1, _) = genesisKeys(1)
+    val (genesisPrivateKey_2, genesisPublicKey_2, _) = genesisKeys(2)
+
+    // scalastyle:off method.length
+    def testTransferFromOneToManyGroups(
+        fromPrivateKey: PrivateKey,
+        fromPublicKey: PublicKey,
+        senderInputsCount: Int,
+        destinations: AVector[Destination]
+    )(
+        expectedSenderUtxosCount: Int,
+        expectedDestUtxosCount: Int,
+        expectedDestBalance: U256,
+        expectedTxsCount: Int
+    ): Assertion = {
+      val (inputs, initialSenderBalance) =
+        prepareUtxos(fromPrivateKey, fromPublicKey, Some(senderInputsCount))
+      val outputRefs =
+        Option(inputs).filter(_.nonEmpty).map(_.map(output => OutputRef.from(output.ref)))
+      val transactionResults = serverUtils
+        .buildTransferFromOneToManyGroups(
+          blockFlow,
+          BuildTransferTx(
+            fromPublicKey.bytes,
+            None,
+            destinations,
+            outputRefs
+          )
+        )
+        .rightValue
+
+      val confirmedBlocks =
+        transactionResults.map { txResult =>
+          val chainIndex = txResult.chainIndex().get
+          val template =
+            signAndAddToMemPool(
+              txResult.txId,
+              txResult.unsignedTx,
+              chainIndex,
+              fromPrivateKey
+            )
+          val block = mineFromMemPool(blockFlow, chainIndex)
+          addAndCheck(blockFlow, block)
+          if (!chainIndex.isIntraGroup) {
+            // To confirm the transaction so its cross-chain output can be used
+            addAndCheck(
+              blockFlow,
+              emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
+            )
+          }
+          val txStatus =
+            serverUtils.getTransactionStatus(blockFlow, template.id, chainIndex).rightValue
+          txStatus.isInstanceOf[Confirmed] is true
+          block.transactions.foreach(checkTx(blockFlow, _, chainIndex))
+          block
+        }
+
+      val txs = confirmedBlocks.flatMap(_.nonCoinbase)
+      txs.length is expectedTxsCount
+      txs.map(_.outputsLength - 1).sum is destinations.length
+      val outputs =
+        destinations.map(d =>
+          TxOutputInfo(d.address.lockupScript, d.attoAlphAmount.value, AVector.empty, Option.empty)
+        )
+
+      val (actualUtxoCount, actualBalance) = getTotalUtxoCountsAndBalance(blockFlow, outputs)
+      actualUtxoCount is expectedDestUtxosCount
+      actualBalance is expectedDestBalance
+
+      val txsFee = txs.map(_.gasFeeUnsafe.v).sum
+      val senderHasSpent =
+        U256.from(destinations.map(_.attoAlphAmount.value.v).sum).get + U256.from(txsFee).get
+      val expectedSenderBalanceWithGas = initialSenderBalance - senderHasSpent
+      checkAddressBalance(
+        Address.p2pkh(fromPublicKey),
+        expectedSenderBalanceWithGas,
+        expectedSenderUtxosCount
+      )
+    }
+  }
+  // scalastyle:on method.length
 
   trait GetTxFixture {
     def brokerConfig: BrokerConfig
@@ -243,6 +335,135 @@ class ServerUtilsSpec extends AlephiumSpec {
       checkDestinationBalance(destination1)
       checkDestinationBalance(destination2)
     }
+  }
+
+  "transfer-from-one-to-many-groups" should "support inputs auto-selection" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 0,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "support providing inputs" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 2,
+      destinations
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "support fewer inputs than provided outputs" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "split too many destinations into more txs" in new TransferFromOneToManyGroupsFixture {
+    val destinations_1 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 1)))
+    val destinations_2 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 2)))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 2,
+      destinations_1 ++ destinations_2
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 514,
+      expectedDestBalance = ALPH.oneAlph * 514,
+      expectedTxsCount = 4
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "fail in case gas amount is passed by user" in new TransferFromOneToManyGroupsFixture {
+    serverUtils
+      .buildTransferFromOneToManyGroups(
+        blockFlow,
+        BuildTransferTx(
+          genesisPublicKey_0.bytes,
+          None,
+          AVector(
+            generateDestination(ChainIndex.unsafe(0, 0))
+          ),
+          None,
+          Some(GasBox.unsafe(1)),
+          Some(GasPrice(1))
+        )
+      )
+      .leftValue
+      .detail is "Explicit gas amount is not permitted, transfer-from-one-to-many-groups requires gas estimation."
+  }
+
+  "transfer-from-one-to-many-groups" should "work across all groups" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(0, 1, 2).map { groupIndex =>
+        Destination(
+          Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2),
+          Amount(ALPH.oneAlph)
+        )
+      }
+
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 3,
+      expectedDestBalance = ALPH.oneAlph * 3,
+      expectedTxsCount = 3
+    )
+
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_1,
+      genesisPublicKey_1,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 6,
+      expectedDestBalance = ALPH.oneAlph * 6,
+      expectedTxsCount = 3
+    )
+
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_2,
+      genesisPublicKey_2,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 9,
+      expectedDestBalance = ALPH.oneAlph * 9,
+      expectedTxsCount = 3
+    )
   }
 
   it should "support Schnorr address" in new Fixture {
@@ -681,7 +902,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  it should "validate unsigned transaction" in new Fixture with TxInputGenerators {
+  it should "validate unsigned transactions" in new Fixture with TxInputGenerators {
 
     val tooMuchGasFee = UnsignedTransaction(
       DefaultTxVersion,

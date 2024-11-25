@@ -21,9 +21,10 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 
 import akka.util.ByteString
-import org.scalatest.{Assertion, BeforeAndAfterAll}
+import org.scalatest.Assertion
 
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -54,8 +55,7 @@ trait FlowFixture
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   def isolatedBlockFlow(): BlockFlow = {
-    val newStorages =
-      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    val newStorages = StoragesFixture.buildStorages(rootPath.resolve(Hash.generate.toHexString))
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
@@ -127,6 +127,57 @@ trait FlowFixture
       invoker -> txScripts(index)
     }
     mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
+  }
+
+  def prepareUtxos(
+      fromPrivateKey: PrivateKey,
+      fromPublicKey: PublicKey,
+      outputsLimitOpt: Option[Int] = None
+  ): (AVector[AssetOutputInfo], U256) = {
+    lazy val lockupScript = Address.p2pkh(fromPublicKey).lockupScript
+    lazy val initialUtxos = blockFlow
+      .getUTXOs(lockupScript, Int.MaxValue, true)
+      .rightValue
+      .asUnsafe[AssetOutputInfo]
+    def getBalance =
+      blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
+    outputsLimitOpt match {
+      case None => initialUtxos -> getBalance
+      case Some(outputsLimit) =>
+        require(outputsLimit < ALPH.MaxTxOutputNum, "Number of outputs must fit in a transaction")
+        if (initialUtxos.length >= outputsLimit) {
+          initialUtxos.take(outputsLimit) -> getBalance
+        } else if (outputsLimit == 0) {
+          AVector.empty[AssetOutputInfo] -> getBalance
+        } else {
+          require(outputsLimit > 0, "Number of outputs must be greater than 0")
+          val amountPerOutput =
+            getAlphBalance(blockFlow, lockupScript).divUnsafe(U256.unsafe(outputsLimit))
+          val outputs = AVector.fill(outputsLimit - initialUtxos.length) {
+            TxOutputInfo(lockupScript, amountPerOutput, AVector.empty, None)
+          }
+          val unsignedTx = blockFlow
+            .transfer(
+              fromPublicKey,
+              outputs,
+              None,
+              nonCoinbaseMinGasPrice,
+              Int.MaxValue,
+              ExtraUtxosInfo.empty
+            )
+            .rightValue
+            .rightValue
+          val tx    = Transaction.from(unsignedTx, fromPrivateKey)
+          val block = mineWithTxs(blockFlow, tx.chainIndex)((_, _) => AVector(tx))
+          addAndCheck(blockFlow, block)
+          val utxos = blockFlow
+            .getUTXOs(lockupScript, Int.MaxValue, true)
+            .rightValue
+            .asUnsafe[AssetOutputInfo]
+          assume(utxos.length == outputsLimit)
+          utxos -> getBalance
+        }
+    }
   }
 
   def transfer(
@@ -699,6 +750,17 @@ trait FlowFixture
     U256.unsafe(query.rightValue.sumBy(_.output.amount.v: BigInt).underlying())
   }
 
+  def getTotalUtxoCountsAndBalance(
+      blockFlow: BlockFlow,
+      outs: AVector[TxOutputInfo]
+  ): (Int, U256) = {
+    outs.fold((0, U256.Zero)) { case ((utxoCount, balance), output) =>
+      val balanceInfo =
+        blockFlow.getBalance(output.lockupScript, Int.MaxValue, false).rightValue
+      (utxoCount + balanceInfo._5, balance + balanceInfo._1)
+    }
+  }
+
   def showBalances(blockFlow: BlockFlow): Unit = {
     def show(txOutput: TxOutput): String = {
       s"${txOutput.hint}:${txOutput.amount}"
@@ -958,16 +1020,6 @@ trait FlowFixture
   }
 }
 
-trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {
-  override def afterAll(): Unit = {
-    super.afterAll()
-    cleanStorages()
-  }
-}
+trait AlephiumFlowSpec extends AlephiumSpec with FlowFixture
 
-class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec {
-  override def afterAll(): Unit = {
-    super.afterAll()
-    cleanStorages()
-  }
-}
+class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec

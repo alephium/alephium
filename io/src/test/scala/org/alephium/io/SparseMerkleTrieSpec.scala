@@ -152,20 +152,12 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       )
   }
 
-  def withTrieFixture[T](f: TrieFixture => T): TrieFixture =
-    new TrieFixture {
-      f(this)
-      postTest()
-    }
-
-  it should "be able to create a trie" in withTrieFixture { fixture =>
+  it should "be able to create a trie" in new TrieFixture { fixture =>
     fixture.trie.rootHash is genesisNode.hash
     fixture.trie.getOpt(genesisKey).map(_.nonEmpty) isE true
   }
 
-  it should "branch well" in withTrieFixture { fixture =>
-    import fixture.trie
-
+  it should "branch well" in new TrieFixture {
     val keys = (0 until 16).flatMap { i =>
       if (i equals genesisNode.path.head.toInt) {
         None
@@ -288,11 +280,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     }
   }
 
-  it should "work for random insertions" in withTrieFixture { fixture =>
+  it should "work for random insertions" in new TrieFixture { fixture =>
     testRandomInsertions(fixture.trie)
   }
 
-  it should "work for random insertions with in memory trie" in withTrieFixture { fixture =>
+  it should "work for random insertions with in memory trie" in new TrieFixture { fixture =>
     testRandomInsertions(fixture.inMemTrie)
   }
 
@@ -324,9 +316,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     trie6.rootHash is trie0.rootHash
   }
 
-  it should "write in batch" in withTrieFixture { fixture =>
-    import fixture.{inMemTrie, trie}
-
+  it should "write in batch" in new TrieFixture {
     trie.rootHash is inMemTrie.rootHash
 
     info("Insert 2000 random key-value pairs")
@@ -359,11 +349,11 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
     persisted.getAll(ByteString.empty, Int.MaxValue).rightValue.length is 1501
   }
 
-  it should "persist empty trie" in withTrieFixture { fixture =>
+  it should "persist empty trie" in new TrieFixture { fixture =>
     fixture.inMemTrie.persistInBatch().rightValue.rootHash is fixture.trie.rootHash
   }
 
-  it should "return an error if it exceeds the maximum max nodes" in withTrieFixture { fixture =>
+  it should "return an error if it exceeds the maximum max nodes" in new TrieFixture { fixture =>
     (0 until 100).foreach { _ =>
       val (key, value) = generateKV()
       fixture.trie = fixture.trie.put(key, value).rightValue

@@ -18,6 +18,7 @@ package org.alephium.flow.core
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import TxUtils._
 import akka.util.ByteString
@@ -459,6 +460,206 @@ trait TxUtils { Self: FlowUtils =>
       }
     }
   }
+
+  def buildTransferFromOneToManyGroups(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      targetBlockHash: Option[BlockHash],
+      outputRefs: AVector[AssetOutputRef],
+      outputInfos: AVector[TxOutputInfo],
+      gasPrice: GasPrice,
+      defaultUtxosLimit: Int
+  )(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, AVector[UnsignedTransaction]] = {
+    for {
+      inputSelection <- blockFlow
+        .getSelectedUtxoOrArbitrary(
+          targetBlockHash,
+          fromLockupScript,
+          outputRefs,
+          defaultUtxosLimit
+        )
+      _ <- blockFlow
+        .sanityCheckBalance(
+          fromUnlockScript,
+          inputSelection,
+          outputInfos,
+          gasPrice
+        )
+      outputGroups <- TxUtils
+        .weightLimitedGroupBy(outputInfos, groups, ALPH.MaxTxOutputNum - 1)( // - change utxo
+          _.lockupScript.groupIndex.value,
+          _.tokens.length + 1
+        )
+      txs <- buildTransferFromOneToManyGroups(
+        fromLockupScript,
+        fromUnlockScript,
+        inputSelection,
+        outputGroups,
+        gasPrice,
+        AVector.empty
+      )
+    } yield txs
+  }
+
+  @tailrec
+  final def buildTransferFromOneToManyGroups(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputGroups: AVector[AVector[TxOutputInfo]],
+      gasPrice: GasPrice,
+      acc: AVector[UnsignedTransaction]
+  )(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, AVector[UnsignedTransaction]] = {
+    if (outputGroups.isEmpty) {
+      if (acc.isEmpty) {
+        Left("Outputs cannot be empty")
+      } else {
+        Right(acc)
+      }
+    } else if (inputs.isEmpty) {
+      Left("Not enough inputs to build transfer-from-one-to-many-groups")
+    } else {
+      val currentOutputs = outputGroups.head
+      val selectedResult = for {
+        _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
+        _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
+        amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
+        selected <- UtxoSelectionAlgo
+          .Build(ProvidedGas(None, gasPrice, None))
+          .select(
+            AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
+            fromUnlockScript,
+            inputs,
+            amountTokensOutputCount._3,
+            txScriptOpt = None,
+            AssetScriptGasEstimator.Default(Self.blockFlow),
+            TxScriptEmulator.NotImplemented
+          )
+      } yield selected
+
+      selectedResult match {
+        case Left(error) => Left(error)
+        case Right(selected) =>
+          if (selected.gas > getMaximalGasPerTx()) {
+            if (currentOutputs.length <= 1) {
+              val inputsCount = selected.assets.length
+              Left(
+                s"Unable to build transfer-from-one-to-many-groups from $inputsCount inputs due to exceeding gas per tx"
+              )
+            } else {
+              val (firstOutputs, secondOutputs) = currentOutputs.splitAt(currentOutputs.length / 2)
+              val smallerOutputGroups           = firstOutputs +: secondOutputs +: outputGroups.tail
+              buildTransferFromOneToManyGroups(
+                fromLockupScript,
+                fromUnlockScript,
+                inputs,
+                smallerOutputGroups,
+                gasPrice,
+                acc
+              )
+            }
+          } else {
+            UnsignedTransaction
+              .buildTransferTxAndReturnChange(
+                fromLockupScript,
+                fromUnlockScript,
+                selected.assets.map(a => a.ref -> a.output),
+                currentOutputs,
+                selected.gas,
+                gasPrice
+              ) match {
+              case Left(error) => Left(error)
+              case Right((tx, change)) =>
+                val changeInputs = change.map { case (oRef, output) =>
+                  AssetOutputInfo(oRef, output, MemPoolOutput)
+                }
+                val remainingInputs =
+                  inputs.filterNot(out => selected.assets.exists(_.ref == out.ref))
+                buildTransferFromOneToManyGroups(
+                  fromLockupScript,
+                  fromUnlockScript,
+                  remainingInputs ++ changeInputs,
+                  outputGroups.tail,
+                  gasPrice,
+                  acc :+ tx
+                )
+            }
+          }
+      }
+    }
+  }
+
+  def sanityCheckBalance(
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  ): Either[String, Unit] =
+    getAssetRemainders(fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
+
+  def getAssetRemainders(
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[AssetOutputInfo],
+      outputs: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  )(implicit networkConfig: NetworkConfig): Either[String, (U256, AVector[(TokenId, U256)])] = {
+    if (inputs.isEmpty || outputs.isEmpty) {
+      Left("Both inputs and outputs must be specified")
+    } else {
+      for {
+        gasBox <- GasEstimation.estimateWithInputScript(
+          fromUnlockScript,
+          inputs.length,
+          countResultingTxOutputs(outputs),
+          AssetScriptGasEstimator.Default(blockFlow)
+        )
+        alphRemainder <- UnsignedTransaction.calculateAlphRemainder(
+          inputs.map(_.output.amount),
+          outputs.map(_.attoAlphAmount),
+          gasPrice * gasBox
+        )
+        tokenRemainder <- UnsignedTransaction.calculateTokensRemainder(
+          inputs.flatMap(_.output.tokens),
+          outputs.flatMap(_.tokens)
+        )
+      } yield (alphRemainder, tokenRemainder)
+    }
+  }
+
+  def getSelectedUtxoOrArbitrary(
+      targetBlockHashOpt: Option[BlockHash],
+      lockupScript: LockupScript.Asset,
+      inputSelection: AVector[AssetOutputRef],
+      utxosLimit: Int
+  ): Either[String, AVector[AssetOutputInfo]] =
+    if (inputSelection.isEmpty) {
+      getUsableUtxos(
+        targetBlockHashOpt,
+        lockupScript,
+        maxUtxosToRead = utxosLimit
+      ).left.map(_.getMessage)
+    } else {
+      for {
+        _ <- checkUTXOsInSameGroup(inputSelection)
+        groupView <- getImmutableGroupViewIncludePool(
+          lockupScript.groupIndex,
+          targetBlockHashOpt
+        ).left.map(_.getMessage)
+        utxoOpts <- inputSelection.mapE(groupView.getPreAssetOutputInfo).left.map(_.getMessage)
+        existingUtxos    = utxoOpts.collect(identity)
+        existingUtxoRefs = existingUtxos.map(_.ref)
+        _ <- Either.cond(
+          inputSelection.length == existingUtxos.length,
+          (),
+          s"Selected input UTXOs are not available: " +
+            s"${inputSelection.filterNot(existingUtxoRefs.contains).map(_.key.value.toHexString).mkString(", ")}"
+        )
+      } yield existingUtxos
+    }
 
   def transferMultiInputs(
       inputs: AVector[InputData],
@@ -1200,14 +1401,6 @@ trait TxUtils { Self: FlowUtils =>
     Self.blockFlow.getMemPool(chainIndex).contains(txId)
   }
 
-  def checkTxChainIndex(chainIndex: ChainIndex, tx: TransactionId): Either[String, Unit] = {
-    if (brokerConfig.contains(chainIndex.from)) {
-      Right(())
-    } else {
-      Left(s"${tx.toHexString} belongs to other groups")
-    }
-  }
-
   private def checkProvidedGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {
     for {
       _ <- checkProvidedGasAmount(gasOpt)
@@ -1365,6 +1558,18 @@ object TxUtils {
       gas: GasBox
   )
 
+  def countResultingTxOutputs(outputs: AVector[TxOutputInfo]): Int = {
+    if (outputs.isEmpty) {
+      0
+    } else {
+      // we include Change Utxo at the beginning
+      outputs.fold(1) { case (outputsCount, output) =>
+        // each token will become dedicated utxo regardless of TokenId
+        outputsCount + 1 + output.tokens.length
+      }
+    }
+  }
+
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
   }
@@ -1429,6 +1634,46 @@ object TxUtils {
           Right(newAmount)
         }
       }
+    }
+  }
+
+  def weightLimitedGroupBy[E: ClassTag](
+      elems: AVector[E],
+      groupCount: Int,
+      weightLimit: Int
+  )(groupFn: E => Int, weightFn: E => Int): Either[String, AVector[AVector[E]]] = {
+    assume(groupCount > 0, "groupCount must be positive")
+    assume(weightLimit > 0, "weightLimit must be positive")
+
+    val outputGroups        = Array.fill(groupCount)(mutable.ArrayBuffer[mutable.ArrayBuffer[E]]())
+    val currentGroupWeights = Array.fill(groupCount)(0)
+
+    elems.collectFirst { elem =>
+      val groupIndex = groupFn(elem)
+      val elemWeight = weightFn(elem)
+
+      if (groupIndex >= groupCount || groupIndex < 0) {
+        Some(s"Unexpected group index $groupIndex for element $elem")
+      } else if (elemWeight <= 0) {
+        Some(s"Element weight $elemWeight was not positive for element $elem")
+      } else {
+        val groupWeight = currentGroupWeights(groupIndex)
+        val groupList   = outputGroups(groupIndex)
+
+        if (groupList.isEmpty || groupWeight + elemWeight > weightLimit) {
+          groupList.append(mutable.ArrayBuffer(elem))
+          currentGroupWeights(groupIndex) = elemWeight
+        } else {
+          groupList(groupList.length - 1).append(elem)
+          currentGroupWeights(groupIndex) += elemWeight
+        }
+        None
+      }
+    } match {
+      case Some(errorMessage) =>
+        Left(errorMessage)
+      case None =>
+        Right(AVector.from(outputGroups.iterator.flatMap(_.iterator.map(AVector.from))))
     }
   }
 }

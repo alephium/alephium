@@ -244,7 +244,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     emptyBlock.coinbaseReward is consensusConfigs.mainnet.emission
       .reward(emptyBlock.header)
       .miningReward
-    emptyBlock.coinbaseReward is ALPH.alph(30) / 9
+    emptyBlock.coinbaseReward is consensusConfigs.mainnet.emission
+      .rewardWrtTime(emptyBlock.timestamp, ALPH.LaunchTimestamp)
     addAndCheck(blockFlow, emptyBlock)
 
     val transferBlock = newTransferBlock()
