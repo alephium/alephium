@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-
 package org.alephium.ralph
 
 import org.alephium.protocol.vm._
@@ -24,8 +23,8 @@ trait CompoundAssignmentOperator {
   def i256Instr: BinaryArithmeticInstr[Val.I256]
   def u256Instr: BinaryArithmeticInstr[Val.U256]
 
-  def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
-    argsType(0) match {
+  def genCode(tpe: Type): Seq[Instr[StatelessContext]] = {
+    tpe match {
       case Type.I256 => Seq(i256Instr)
       case Type.U256 => Seq(u256Instr)
       case _         => throw Compiler.Error(s"Expect I256/U256 for $operatorName operator", None)
@@ -35,25 +34,25 @@ trait CompoundAssignmentOperator {
 
 object CompoundAssignmentOperator {
   val AddAssign: CompoundAssignmentOperator = new CompoundAssignmentOperator {
-    def operatorName: String = "+="
+    def operatorName: String                       = "+="
     def i256Instr: BinaryArithmeticInstr[Val.I256] = I256Add
     def u256Instr: BinaryArithmeticInstr[Val.U256] = U256Add
   }
 
   val SubAssign: CompoundAssignmentOperator = new CompoundAssignmentOperator {
-    def operatorName: String = "-="
+    def operatorName: String                       = "-="
     def i256Instr: BinaryArithmeticInstr[Val.I256] = I256Sub
     def u256Instr: BinaryArithmeticInstr[Val.U256] = U256Sub
   }
 
   val MulAssign: CompoundAssignmentOperator = new CompoundAssignmentOperator {
-    def operatorName: String = "*="
+    def operatorName: String                       = "*="
     def i256Instr: BinaryArithmeticInstr[Val.I256] = I256Mul
     def u256Instr: BinaryArithmeticInstr[Val.U256] = U256Mul
   }
 
   val DivAssign: CompoundAssignmentOperator = new CompoundAssignmentOperator {
-    def operatorName: String = "/="
+    def operatorName: String                       = "/="
     def i256Instr: BinaryArithmeticInstr[Val.I256] = I256Div
     def u256Instr: BinaryArithmeticInstr[Val.U256] = U256Div
   }

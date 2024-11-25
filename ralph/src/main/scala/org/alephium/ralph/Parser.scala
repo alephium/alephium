@@ -311,10 +311,9 @@ abstract class Parser[Ctx <: StatelessContext] {
   def compoundAssignOperator[Unknown: P]: P[CompoundAssignmentOperator] =
     Lexer.opAddAssign | Lexer.opSubAssign | Lexer.opMulAssign | Lexer.opDivAssign
   def compoundAssign[Unknown: P]: P[Ast.CompoundAssign[Ctx]] =
-    P(assignmentTarget.rep(1, ",") ~ compoundAssignOperator ~ expr).map {
-      case (targets, op, expr) =>
-        val sourceIndex = SourceIndex(targets.headOption.flatMap(_.sourceIndex), expr.sourceIndex)
-        Ast.CompoundAssign(targets, op, expr).atSourceIndex(sourceIndex)
+    P(assignmentTarget ~ compoundAssignOperator ~ expr).map { case (target, op, expr) =>
+      val sourceIndex = SourceIndex(target.sourceIndex, expr.sourceIndex)
+      Ast.CompoundAssign(target, op, expr).atSourceIndex(sourceIndex)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

@@ -6837,6 +6837,42 @@ class VMSpec extends AlephiumSpec with Generators {
       )
     }
 
+    def verifyMapping(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      val contractCode =
+        s"""
+           |Contract TestContract() {
+           |  mapping[U256, $valueType] map
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn compoundAssign() -> () {
+           |    map.insert!(@$genesisAddress, 0, $initValue)
+           |    map[0] $op $operationValue
+           |    assert!(map[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      val contractId = createContract(contractCode)._1
+      val scriptCode =
+        s"""
+           |@using(preapprovedAssets = true)
+           |TxScript Main {
+           |  TestContract(#${contractId.toHexString}).compoundAssign{
+           |    @$genesisAddress -> ALPH: minimalContractDeposit!()
+           |}()
+           |}
+           |
+           |$contractCode
+           |""".stripMargin
+      val script = Compiler.compileTxScript(scriptCode).rightValue
+      payableCall(blockFlow, chainIndex, script)
+    }
+
     def verifySingleTarget(op: String, initValue: String) = {
       val valueType = getValueType(initValue)
       verify(
@@ -6844,8 +6880,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |Contract TestContract() {
            |  pub fn compoundAssign() -> () {
            |    let mut x = $initValue
-           |    let mut y = $initValue
-           |    x, y $op getValues()
+           |    x $op getValues()
            |  }
            |
            |  fn getValues() -> ($valueType, $valueType) {
@@ -6872,6 +6907,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
     testCases.foreach(verifySimpleNumber.tupled)
     testCases.foreach(verifyArray.tupled)
+    testCases.foreach(verifyMapping.tupled)
     testCases.foreach(verifySimpleStruct.tupled)
     testCases.foreach(verifyNestedStruct.tupled)
 

@@ -967,21 +967,19 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       List(
         s"a ${op.operatorName} b" -> Ast
           .CompoundAssign(
-            Seq(AssignmentSimpleTarget(Ident("a"))),
+            AssignmentSimpleTarget(Ident("a")),
             op,
             Ast.Variable(Ast.Ident("b"))
           ),
         s"a[0] ${op.operatorName} b" -> Ast.CompoundAssign(
-          Seq(AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0))))),
+          AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0)))),
           op,
           Ast.Variable(Ast.Ident("b"))
         ),
         s"a.b[0] ${op.operatorName} c" -> Ast.CompoundAssign(
-          Seq(
-            AssignmentSelectedTarget(
-              Ident("a"),
-              Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
-            )
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
           ),
           op,
           Ast.Variable(Ast.Ident("c"))

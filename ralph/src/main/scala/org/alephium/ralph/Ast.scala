@@ -1287,8 +1287,8 @@ object Ast {
             case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
             case _                                  => false
           }
-        case CompoundAssign(targets, _, _) =>
-          targets.exists {
+        case CompoundAssign(target, _, _) =>
+          target match {
             case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
             case _                                  => false
           }
@@ -1734,22 +1734,22 @@ object Ast {
   }
 
   final case class CompoundAssign[Ctx <: StatelessContext](
-      targets: Seq[AssignmentTarget[Ctx]],
+      target: AssignmentTarget[Ctx],
       op: CompoundAssignmentOperator,
       rhs: Expr[Ctx]
   ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
-      val leftTypes  = targets.map(_.getType(state))
+      val leftType   = target.getType(state)
       val rightTypes = rhs.getType(state)
 
-      if (leftTypes.length != 1 || rightTypes.length != 1) {
+      if (rightTypes.length != 1) {
         throw Compiler.Error(
           s"Compound assignment requires single value on both sides",
           sourceIndex
         )
       }
 
-      val (leftType, rightType) = (leftTypes(0), rightTypes(0))
+      val rightType = rightTypes(0)
       if (leftType != rightType) {
         throw Compiler.Error(
           s"Cannot assign ${quote(rightType)} to ${quote(leftType)}",
@@ -1759,13 +1759,13 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val types = targets.map(_.getType(state))
-      targets.flatMap(_.genLoad(state)) ++ rhs
-        .genCode(state) ++ op.genCode(types) ++ targets.flatMap(_.genStore(state)).reverse.flatten
+      val tpe = target.getType(state)
+      target.genLoad(state) ++ rhs.genCode(state) ++ op
+        .genCode(tpe) ++ target.genStore(state).reverse.flatten
     }
 
     def reset(): Unit = {
-      targets.foreach(_.reset())
+      target.reset()
       rhs.reset()
     }
   }
