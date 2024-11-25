@@ -19,9 +19,8 @@ package org.alephium.app
 import akka.testkit.TestProbe
 import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
-import org.scalatest.exceptions.TestFailedException
 
-import org.alephium.app.WebSocketServer.{EventHandler, WsMethod, WsCommand, WsEvent}
+import org.alephium.app.WebSocketServer.{EventHandler, WsCommand, WsEvent, WsMethod}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC._
@@ -64,13 +63,13 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
       }
 
     val wsSpec = WebSocketSpec(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
-    checkWS(AVector.fill(3)(wsSpec))
+    checkWS(AVector.fill(3)(wsSpec), subscribersCount = 3, openWebsocketsCount = 3)
   }
 
   it should "not spin ws connections over limit" in new RouteWS {
     override def maxConnections: Int = 2
     val wsSpec = WebSocketSpec((ws, clientProbe) => (ws, clientProbe), _ => (), _ => true is true)
-    assertThrows[TestFailedException](checkWS(AVector.fill(3)(wsSpec)))
+    checkWS(AVector.fill(3)(wsSpec), subscribersCount = 0, openWebsocketsCount = 3)
   }
 
   it should "connect and not subscribe multiple ws clients to any event" in new RouteWS {
@@ -86,7 +85,7 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
       _ ! BlockNotify(blockGen.sample.get, height = 0),
       _.expectNoMessage()
     )
-    checkWS(AVector.fill(3)(wsSpec))
+    checkWS(AVector.fill(3)(wsSpec), subscribersCount = 0, openWebsocketsCount = 3)
   }
 
   it should "handle invalid messages gracefully" in new RouteWS {
@@ -100,11 +99,29 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
       clientProbe.expectMsgPF() { case msg: String =>
-        msg is s"Unsupported message : invalid_msg"
+        msg is "Unsupported message : invalid_msg"
       }
 
     val wsSpec = WebSocketSpec(clientInitBehavior, _ => (), clientAssertionOnMsg)
-    checkWS(AVector.fill(1)(wsSpec))
+    checkWS(AVector.fill(1)(wsSpec), subscribersCount = 0, openWebsocketsCount = 1)
+  }
+
+  it should "handle unsubscribing from events" in new RouteWS {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
+      ws.textMessageHandler { message =>
+        clientProbe.ref ! message
+      }
+      ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString)
+      ws.writeTextMessage(WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString)
+      ws -> clientProbe
+    }
+
+    val wsSpec = WebSocketSpec(
+      clientInitBehavior,
+      _ ! BlockNotify(blockGen.sample.get, height = 0),
+      _.expectNoMessage()
+    )
+    checkWS(AVector.fill(1)(wsSpec), subscribersCount = 0, openWebsocketsCount = 1)
   }
 
 }

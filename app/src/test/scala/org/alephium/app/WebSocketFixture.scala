@@ -79,7 +79,11 @@ trait RouteWS
   private def newWebSocketClient =
     vertx.createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
 
-  def checkWS(behaviorCauseEffectList: AVector[WebSocketSpec]) = {
+  def checkWS(
+      behaviorCauseEffectList: AVector[WebSocketSpec],
+      subscribersCount: Int,
+      openWebsocketsCount: Int
+  ) = {
     val binding =
       httpServer.listen(port, apiConfig.networkInterface.getHostAddress).asScala.futureValue
 
@@ -106,7 +110,8 @@ trait RouteWS
         .futureValue
 
     eventually {
-      subscribers.entries().map(_.getKey).size is probedSockets.length
+      probedSockets.length is openWebsocketsCount
+      subscribers.size is subscribersCount
     }
 
     // run defined Cause of websocket server with Effect on websocket client

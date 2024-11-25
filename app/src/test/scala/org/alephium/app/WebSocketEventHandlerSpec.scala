@@ -17,7 +17,7 @@
 package org.alephium.app
 
 import org.alephium.api.model.BlockEntry
-import org.alephium.app.WebSocketServer.{EventHandler, WsMethod, WsCommand, WsEvent}
+import org.alephium.app.WebSocketServer.{EventHandler, WsCommand, WsEvent, WsMethod}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
