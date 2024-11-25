@@ -84,7 +84,7 @@ object WebSocketServer extends StrictLogging {
             case Some(WsEvent(WsCommand.Unsubscribe, _)) =>
               webSocket.reject(HttpResponseStatus.BAD_REQUEST.code()) // TODO
             case None =>
-              webSocket.reject(HttpResponseStatus.BAD_REQUEST.code())
+              webSocket.writeTextMessage(s"Unsupported message : $message")
           }
           ()
         }

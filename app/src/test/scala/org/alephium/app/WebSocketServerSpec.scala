@@ -88,4 +88,23 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
     )
     checkWS(AVector.fill(3)(wsSpec))
   }
+
+  it should "handle invalid messages gracefully" in new RouteWS {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
+      ws.textMessageHandler { message =>
+        clientProbe.ref ! message
+      }
+      ws.writeTextMessage("invalid_msg")
+      ws -> clientProbe
+    }
+
+    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
+      clientProbe.expectMsgPF() { case msg: String =>
+        msg is s"Unsupported message : invalid_msg"
+      }
+
+    val wsSpec = WebSocketSpec(clientInitBehavior, _ => (), clientAssertionOnMsg)
+    checkWS(AVector.fill(1)(wsSpec))
+  }
+
 }
