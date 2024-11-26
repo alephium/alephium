@@ -21,54 +21,37 @@ import scala.util.Failure
 
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
-import io.vertx.core.{Handler, Vertx}
+import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.ServerWebSocket
 
-import org.alephium.app.VertxFutureConverter._
-import org.alephium.app.WebSocketServer.{Subscriber, SubscriberId, WsCommand, WsEvent, WsMethod}
-import org.alephium.app.WsSubscriptionHandler.{Connect, GetSubscriptions, SubscriptionResponse}
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.app.WebSocketServer.{Subscriber, SubscriberId}
+import org.alephium.util.{AVector, BaseActor}
 
 object WsSubscriptionHandler extends StrictLogging {
 
+  sealed trait WsSubscription {
+    def method: String
+  }
+
   sealed trait SubscriptionMsg
-  sealed trait Command                              extends SubscriptionMsg
-  sealed trait Response                             extends SubscriptionMsg
-  final case class Connect(socket: ServerWebSocket) extends Command
-  final case object GetSubscriptions                extends Command
+  sealed trait Command                                          extends SubscriptionMsg
+  sealed trait Response                                         extends SubscriptionMsg
+  final case class ConnectAndSubscribe(socket: ServerWebSocket) extends Command
+  final case object GetSubscriptions                            extends Command
   final case class SubscriptionResponse(
       subscriptions: AVector[(SubscriberId, AVector[(WsMethod, Subscriber)])]
   ) extends Response
-
-  def handler(handler: ActorRefT[SubscriptionMsg]): Handler[ServerWebSocket] =
-    new Handler[ServerWebSocket] {
-      override def handle(webSocket: ServerWebSocket): Unit = {
-        handler ! Connect(webSocket)
-      }
-    }
-
-  implicit class RichMap[K, V](val underlying: mutable.Map[K, V]) extends AnyVal {
-    def updateWith(k: K)(f: Option[V] => Option[V]): Option[V] = {
-      val updatedValue = f(underlying.get(k))
-      updatedValue match {
-        case Some(v) =>
-          underlying.update(k, v)
-          Some(v)
-        case None =>
-          underlying.remove(k)
-          None
-      }
-    }
-  }
 }
 
-class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor {
+class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor with WsUtils {
+  import org.alephium.app.WsSubscriptionHandler._
+
   // subscriber with empty subscriptions is connected but not subscribed to any events
   private val subscribers = mutable.Map.empty[SubscriberId, AVector[(WsMethod, Subscriber)]]
 
   override def receive: Receive = {
-    case Connect(ws) =>
+    case ConnectAndSubscribe(ws) =>
       if (subscribers.size >= maxConnections) {
         log.warning(s"WebSocket connections reached max limit ${subscribers.size}")
         ws.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
@@ -76,16 +59,7 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
         ws.closeHandler { _ =>
           val _ = unSubscribeAll(ws.textHandlerID())
         }
-        val _ = ws.textMessageHandler { message =>
-          WsEvent.parseEvent(message) match {
-            case Some(WsEvent(WsCommand.Subscribe, method)) =>
-              val _ = subscribe(ws, method)
-            case Some(WsEvent(WsCommand.Unsubscribe, method)) =>
-              val _ = unSubscribe(ws.textHandlerID(), method)
-            case None =>
-              respondWith(ws, s"Unsupported message : $message")
-          }
-        }
+        val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
       } else {
         ws.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
@@ -93,13 +67,15 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
       sender() ! SubscriptionResponse(AVector.from(subscribers))
   }
 
-  private def respondWith(ws: ServerWebSocket, message: String): Unit = {
-    val _ = ws
-      .writeTextMessage(message)
-      .asScala
-      .andThen { case Failure(exception) =>
-        log.warning(exception, s"Failed to write message: $message")
-      }(context.dispatcher)
+  private def handleMessage(ws: ServerWebSocket, message: String): Unit = {
+    WsEvent.parseEvent(message) match {
+      case Some(WsEvent(WsCommand.Subscribe, method)) =>
+        val _ = subscribe(ws, method)
+      case Some(WsEvent(WsCommand.Unsubscribe, method)) =>
+        val _ = unSubscribe(ws.textHandlerID(), method)
+      case None =>
+        respondWith(ws, s"Unsupported message : $message")
+    }
   }
 
   private def subscribe(
@@ -131,6 +107,15 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
         Some(toKeep)
       case None => None
     }
+  }
+
+  private def respondWith(ws: ServerWebSocket, message: String): Unit = {
+    val _ = ws
+      .writeTextMessage(message)
+      .asScala
+      .andThen { case Failure(exception) =>
+        log.warning(exception, s"Failed to write message: $message")
+      }(context.dispatcher)
   }
 
   private def subscribeToEvents(

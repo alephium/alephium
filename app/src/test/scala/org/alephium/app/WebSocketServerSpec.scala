@@ -16,33 +16,24 @@
 
 package org.alephium.app
 
-import scala.collection.mutable
 import scala.concurrent.Future
 
 import akka.testkit.TestProbe
 import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
 
-import org.alephium.app.VertxFutureConverter._
-import org.alephium.app.WebSocketServer.{EventHandler, WsCommand, WsEvent, WsMethod}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
-class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
+class WebSocketServerSpec
+    extends AlephiumFutureSpec
+    with EitherValues
+    with NumericHelpers
+    with WsUtils {
 
   behavior of "WebSocketServer"
-
-  it should "subscribe event handler into event bus" in new WebSocketServerFixture {
-    val newHandler = EventHandler.getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
-    node.eventBus
-      .ask(EventBus.ListSubscribers)
-      .mapTo[EventBus.Subscribers]
-      .futureValue
-      .value
-      .contains(newHandler.ref) is true
-  }
 
   it should "connect and subscribe multiple ws clients to multiple events" in new RouteWS {
     def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
@@ -157,26 +148,6 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
       expectedSubscriptions = 0,
       openWebsocketsCount = 1
     )
-  }
-
-  "richMap" should "handle" in {
-    val richMap = mutable.Map("a" -> 0, "b" -> 0)
-
-    // Increment value of existing key "a"
-    richMap.updateWith("a") { case Some(v) => Some(v + 1); case None => None } is Some(1)
-    richMap is mutable.Map("a" -> 1, "b" -> 0)
-
-    // Add new key "c" with value 1
-    richMap.updateWith("c") { case None => Some(1); case Some(_) => None } is Some(1)
-    richMap is mutable.Map("a" -> 1, "b" -> 0, "c" -> 1)
-
-    // No change for non-existent key "d" with None returned
-    richMap.updateWith("d") { case None => None; case Some(_) => None } is None
-    richMap is mutable.Map("a" -> 1, "b" -> 0, "c" -> 1)
-
-    // Remove existing key "c"
-    richMap.updateWith("c") { case Some(_) => None; case None => None } is None
-    richMap is mutable.Map("a" -> 1, "b" -> 0)
   }
 
 }

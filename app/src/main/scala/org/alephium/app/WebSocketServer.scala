@@ -18,19 +18,17 @@ package org.alephium.app
 
 import java.util.concurrent.Executors
 
-import scala.concurrent.{Future => ScalaFuture, Promise}
 import scala.concurrent.ExecutionContext
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
-import io.vertx.core.{Future => VertxFuture}
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{EventBus => VertxEventBus, MessageConsumer}
 import io.vertx.core.http.{HttpServer, HttpServerOptions}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.app.WebSocketServer.EventHandler.getSubscribedEventHandler
+import org.alephium.app.WebSocketServer.WsEventHandler.getSubscribedEventHandler
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
@@ -48,22 +46,6 @@ object SimpleHttpServer {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def apply(httpOptions: HttpServerOptions = new HttpServerOptions): SimpleHttpServer =
     SimpleHttpServer(Vertx.vertx().createHttpServer(httpOptions))
-}
-
-object VertxFutureConverter {
-
-  implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) extends AnyVal {
-    def asScala: ScalaFuture[T] = {
-      val promise = Promise[T]()
-      vertxFuture.onComplete {
-        case handler if handler.succeeded() =>
-          promise.success(handler.result())
-        case handler if handler.failed() =>
-          promise.failure(handler.cause())
-      }
-      promise.future
-    }
-  }
 }
 
 final case class WebSocketServer(
@@ -93,58 +75,12 @@ object WebSocketServer extends StrictLogging {
           Props(new WsSubscriptionHandler(vertx, maxConnections))
         )
     server.webSocketHandler { webSocket =>
-      subscriptionHandler ! WsSubscriptionHandler.Connect(webSocket)
+      subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
     }
     WebSocketServer(server, eventHandler, subscriptionHandler)
   }
 
-  sealed trait WsMethod {
-    def index: Int
-    def name: String
-  }
-  object WsMethod {
-    case object Block extends WsMethod { val name = "block"; val index = 0 }
-    case object Tx    extends WsMethod { val name = "tx"; val index = 1    }
-    def fromString(name: String): Option[WsMethod] = name match {
-      case Block.name => Some(Block)
-      case Tx.name    => Some(Tx)
-      case _          => None
-    }
-  }
-  sealed trait WsCommand {
-    def name: String
-  }
-  object WsCommand {
-    case object Subscribe   extends WsCommand { val name = "subscribe"   }
-    case object Unsubscribe extends WsCommand { val name = "unsubscribe" }
-    def fromString(name: String): Option[WsCommand] = name match {
-      case Subscribe.name   => Some(Subscribe)
-      case Unsubscribe.name => Some(Unsubscribe)
-      case _                => None
-    }
-
-  }
-  final case class WsEvent(command: WsCommand, method: WsMethod) {
-    override def toString: String = s"${command.name}:${method.name}"
-  }
-  object WsEvent {
-    def parseEvent(event: String): Option[WsEvent] = {
-      event.split(":").toList match {
-        case commandStr :: methodStr :: Nil =>
-          for {
-            command <- WsCommand.fromString(commandStr)
-            method  <- WsMethod.fromString(methodStr)
-          } yield WsEvent(command, method)
-        case _ => None
-      }
-    }
-  }
-
-  sealed trait WsSubscription {
-    def method: String
-  }
-
-  object EventHandler extends ApiModelCodec {
+  object WsEventHandler extends ApiModelCodec {
 
     def buildNotification(
         event: EventBus.Event
@@ -165,18 +101,18 @@ object WebSocketServer extends StrictLogging {
         networkConfig: NetworkConfig
     ): ActorRefT[EventBus.Message] = {
       val eventHandlerRef =
-        ActorRefT.build[EventBus.Message](system, Props(new EventHandler(vertxEventBus)))
+        ActorRefT.build[EventBus.Message](system, Props(new WsEventHandler(vertxEventBus)))
       eventBusRef.tell(EventBus.Subscribe, eventHandlerRef.ref)
       eventHandlerRef
     }
   }
 
-  class EventHandler(vertxEventBus: VertxEventBus)(implicit val networkConfig: NetworkConfig)
+  class WsEventHandler(vertxEventBus: VertxEventBus)(implicit val networkConfig: NetworkConfig)
       extends BaseActor
       with ApiModelCodec {
 
     def receive: Receive = { case event: EventBus.Event =>
-      EventHandler.buildNotification(event) match {
+      WsEventHandler.buildNotification(event) match {
         case Right(notification) =>
           val _ = vertxEventBus.publish(notification.method, write(notification))
         case Left(error) =>
