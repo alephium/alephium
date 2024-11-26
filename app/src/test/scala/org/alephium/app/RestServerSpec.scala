@@ -1578,7 +1578,8 @@ trait RestServerFixture
       apiConfig.apiKey,
       ALPH.oneAlph,
       utxosLimit,
-      maxFormBufferedBytes
+      maxFormBufferedBytes,
+      enableHttpMetrics = true
     )
 
     (peer, peerConf)

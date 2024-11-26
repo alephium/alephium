@@ -42,7 +42,7 @@ class WalletServer(
     with WalletDocumentation
     with VertxFutureServerInterpreter {
 
-  override val vertxFutureServerOptions = ServerOptions.serverOptions
+  override val vertxFutureServerOptions = ServerOptions.serverOptions(enableMetrics = false)
 
   val routes: AVector[Router => Route] = AVector(
     createWalletLogic,
