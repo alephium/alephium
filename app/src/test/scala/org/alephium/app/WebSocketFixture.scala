@@ -27,6 +27,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.app.ServerFixture.NodeDummy
+import org.alephium.app.WsSubscriptionHandler.{GetSubscriptions, SubscriptionResponse}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.util._
 
@@ -53,7 +54,7 @@ trait WebSocketServerFixture extends ServerFixture {
 
   def maxConnections: Int = 10
 
-  lazy val WebSocketServer(httpServer, eventHandler, subscribers) =
+  lazy val WebSocketServer(httpServer, eventHandler, subscriptionHandler) =
     WebSocketServer(
       system,
       node,
@@ -64,8 +65,13 @@ trait WebSocketServerFixture extends ServerFixture {
     )
 }
 
-final case class WebSocketSpec(
-    clientInitBehavior: (WebSocket, TestProbe) => (WebSocket, TestProbe),
+final case class WsStartBehavior(
+    clientInitBehavior: (WebSocket, TestProbe) => Future[Unit],
+    serverBehavior: ActorRefT[EventBus.Message] => Unit,
+    clientAssertionOnMsg: TestProbe => Any
+)
+final case class WsBehavior(
+    clientInitBehavior: WebSocket => Future[Unit],
     serverBehavior: ActorRefT[EventBus.Message] => Unit,
     clientAssertionOnMsg: TestProbe => Any
 )
@@ -79,49 +85,63 @@ trait RouteWS
   private def newWebSocketClient =
     vertx.createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
 
+  private def assertEventHandlerSubscribed = {
+    node.eventBus
+      .ask(EventBus.ListSubscribers)
+      .mapTo[EventBus.Subscribers]
+      .futureValue
+      .value
+      .contains(eventHandler.ref) is true
+  }
+
   def checkWS(
-      behaviorCauseEffectList: AVector[WebSocketSpec],
-      subscribersCount: Int,
+      initBehaviors: AVector[WsStartBehavior],
+      nextBehaviors: AVector[WsBehavior],
+      expectedSubscriptions: Int,
       openWebsocketsCount: Int
   ) = {
     val binding =
       httpServer.listen(port, apiConfig.networkInterface.getHostAddress).asScala.futureValue
-
-    eventually {
-      node.eventBus
-        .ask(EventBus.ListSubscribers)
-        .mapTo[EventBus.Subscribers]
-        .futureValue
-        .value
-        .contains(eventHandler) is true
-    }
-
-    // run defined Behavior of websocket clients like : Connecting and Subscribing
+    eventually(assertEventHandlerSubscribed)
     val probedSockets =
       Future
         .sequence(
-          behaviorCauseEffectList.map { case WebSocketSpec(clientInitBehavior, _, _) =>
+          initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
             newWebSocketClient
               .connect(port, "127.0.0.1", "/ws")
               .asScala
-              .map(ws => clientInitBehavior(ws, TestProbe()))
+              .map { ws =>
+                val clientProbe = TestProbe()
+                startBehavior(ws, clientProbe)
+                ws -> clientProbe
+              }
           }.toSeq
         )
         .futureValue
 
-    eventually {
-      probedSockets.length is openWebsocketsCount
-      subscribers.size is subscribersCount
-    }
-
-    // run defined Cause of websocket server with Effect on websocket client
-    behaviorCauseEffectList.foreach { case WebSocketSpec(_, serverBehavior, clientAssertionOnMsg) =>
+    initBehaviors.foreach { case WsStartBehavior(_, serverBehavior, clientAssertionOnMsg) =>
       serverBehavior(node.eventBus)
       probedSockets.foreach { case (_, clientProbe) =>
         clientAssertionOnMsg(clientProbe)
       }
     }
-
+    probedSockets.foreach { case (ws, clientProbe) =>
+      nextBehaviors.foreach { case WsBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
+        behavior(ws)
+        serverBehavior(node.eventBus)
+        clientAssertionOnMsg(clientProbe)
+      }
+    }
+    eventually {
+      probedSockets.filterNot(_._1.isClosed).length is openWebsocketsCount
+      subscriptionHandler
+        .ask(GetSubscriptions)
+        .mapTo[SubscriptionResponse]
+        .futureValue
+        .subscriptions
+        .map(_._2.length)
+        .sum is expectedSubscriptions
+    }
     probedSockets.foreach(_._1.close().asScala.futureValue)
     binding.close().asScala.futureValue
   }

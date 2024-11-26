@@ -18,33 +18,25 @@ package org.alephium.app
 
 import java.util.concurrent.Executors
 
-import scala.collection.concurrent
 import scala.concurrent.{Future => ScalaFuture, Promise}
 import scala.concurrent.ExecutionContext
-import scala.util.Failure
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
-import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.{Future => VertxFuture}
 import io.vertx.core.Vertx
-import io.vertx.core.eventbus.{EventBus => VertxEventBus, Message, MessageConsumer}
-import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
+import io.vertx.core.eventbus.{EventBus => VertxEventBus, MessageConsumer}
+import io.vertx.core.http.{HttpServer, HttpServerOptions}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.app.WebSocketServer.{Subscriber, SubscriberId, WsMethod}
-import org.alephium.app.WebSocketServer.EventHandler.{
-  getSubscribedEventHandlerRef,
-  subscribeToEvents,
-  unSubscribeToEvents
-}
+import org.alephium.app.WebSocketServer.EventHandler.getSubscribedEventHandler
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{ActorRefT, AVector, BaseActor, EventBus}
+import org.alephium.util.{ActorRefT, BaseActor, EventBus}
 
 trait HttpServerLike {
   def underlying: HttpServer
@@ -58,82 +50,52 @@ object SimpleHttpServer {
     SimpleHttpServer(Vertx.vertx().createHttpServer(httpOptions))
 }
 
-sealed trait WsSupport {
-  def toScalaFut[T](vertxFuture: VertxFuture[T]): ScalaFuture[T] = {
-    val promise = Promise[T]()
-    vertxFuture.onComplete {
-      case handler if handler.succeeded() =>
-        promise.success(handler.result())
-      case handler if handler.failed() =>
-        promise.failure(handler.cause())
+object VertxFutureConverter {
+
+  implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) extends AnyVal {
+    def asScala: ScalaFuture[T] = {
+      val promise = Promise[T]()
+      vertxFuture.onComplete {
+        case handler if handler.succeeded() =>
+          promise.success(handler.result())
+        case handler if handler.failed() =>
+          promise.failure(handler.cause())
+      }
+      promise.future
     }
-    promise.future
   }
 }
 
 final case class WebSocketServer(
     underlying: HttpServer,
-    eventHandler: ActorRef,
-    subscribers: concurrent.TrieMap[SubscriberId, AVector[(WsMethod, Subscriber)]]
+    eventHandler: ActorRefT[EventBus.Message],
+    subscribers: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
 ) extends HttpServerLike
 
-object WebSocketServer extends WsSupport with StrictLogging {
+object WebSocketServer extends StrictLogging {
+
   type SubscriberId = String
   type Subscriber   = MessageConsumer[String]
 
   implicit val wsExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
 
-  def apply(
-      flowSystem: ActorSystem,
-      node: Node,
-      maxConnections: Int,
-      httpOptions: HttpServerOptions
-  )(implicit networkConfig: NetworkConfig): WebSocketServer = {
-    val vertx           = Vertx.vertx()
-    val eventHandlerRef = getSubscribedEventHandlerRef(vertx.eventBus(), node.eventBus, flowSystem)
-    val subscribers     = concurrent.TrieMap.empty[SubscriberId, AVector[(WsMethod, Subscriber)]]
-    val server          = vertx.createHttpServer(httpOptions)
+  def apply(system: ActorSystem, node: Node, maxConnections: Int, options: HttpServerOptions)(
+      implicit networkConfig: NetworkConfig
+  ): WebSocketServer = {
+    val vertx        = Vertx.vertx()
+    val server       = vertx.createHttpServer(options)
+    val eventHandler = getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
+    val subscriptionHandler =
+      ActorRefT
+        .build[WsSubscriptionHandler.SubscriptionMsg](
+          system,
+          Props(new WsSubscriptionHandler(vertx, maxConnections))
+        )
     server.webSocketHandler { webSocket =>
-      if (subscribers.size >= maxConnections) {
-        logger.warn(s"WebSocket connections reached max limit ${subscribers.size}")
-        webSocket.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
-      } else if (webSocket.path().equals("/ws")) {
-        webSocket.closeHandler { _ =>
-          subscribers.get(webSocket.textHandlerID()).foreach { consumers =>
-            consumers.foreach { case (_, consumer) => unSubscribeToEvents(consumer) }
-          }
-          val _ = subscribers.remove(webSocket.textHandlerID())
-        }
-        val _ = webSocket.textMessageHandler { message =>
-          WsEvent.parseEvent(message) match {
-            case Some(WsEvent(WsCommand.Subscribe, method)) =>
-              val consumer = subscribeToEvents(vertx, webSocket, method)
-              val _ = subscribers.updateWith(webSocket.textHandlerID()) {
-                case Some(ss) if ss.exists(_._1 == method) => Some(ss)
-                case Some(ss)                              => Some(ss :+ (method -> consumer))
-                case None                                  => Some(AVector(method -> consumer))
-              }
-            case Some(WsEvent(WsCommand.Unsubscribe, method)) =>
-              val _ = subscribers.updateWith(webSocket.textHandlerID()) {
-                case Some(ss) =>
-                  val (toRemove, toKeep) = ss.partition(_._1 == method)
-                  toRemove.foreach { case (_, c) => unSubscribeToEvents(c) }
-                  Some(toKeep)
-                case None => None
-              }
-            case None =>
-              val _ = toScalaFut(webSocket.writeTextMessage(s"Unsupported message : $message"))
-                .andThen { case Failure(exception) =>
-                  logger.warn(s"Failed to write message: $message", exception)
-                }
-          }
-        }
-      } else {
-        webSocket.reject(HttpResponseStatus.BAD_REQUEST.code())
-      }
+      subscriptionHandler ! WsSubscriptionHandler.Connect(webSocket)
     }
-    WebSocketServer(server, eventHandlerRef, subscribers)
+    WebSocketServer(server, eventHandler, subscriptionHandler)
   }
 
   sealed trait WsMethod {
@@ -182,36 +144,7 @@ object WebSocketServer extends WsSupport with StrictLogging {
     def method: String
   }
 
-  object EventHandler extends WsSupport with ApiModelCodec {
-
-    def subscribeToEvents(
-        vertx: Vertx,
-        ws: ServerWebSocket,
-        method: WsMethod
-    ): MessageConsumer[String] = {
-      vertx
-        .eventBus()
-        .consumer[String](
-          method.name,
-          new io.vertx.core.Handler[Message[String]] {
-            override def handle(message: Message[String]): Unit = {
-              if (!ws.isClosed) {
-                val _ = toScalaFut(ws.writeTextMessage(message.body()))
-                  .andThen { case Failure(exception) =>
-                    logger.warn(s"Failed to write message: $message", exception)
-                  }
-              }
-            }
-          }
-        )
-    }
-
-    def unSubscribeToEvents(consumer: MessageConsumer[String]): Unit = {
-      val _ = toScalaFut(consumer.unregister())
-        .andThen { case Failure(exception) =>
-          logger.warn(s"Failed to unsubscribe event consumer", exception)
-        }
-    }
+  object EventHandler extends ApiModelCodec {
 
     def buildNotification(
         event: EventBus.Event
@@ -224,15 +157,16 @@ object WebSocketServer extends WsSupport with StrictLogging {
       }
     }
 
-    def getSubscribedEventHandlerRef(
+    def getSubscribedEventHandler(
         vertxEventBus: VertxEventBus,
         eventBusRef: ActorRefT[EventBus.Message],
-        flowSystem: ActorSystem
+        system: ActorSystem
     )(implicit
         networkConfig: NetworkConfig
-    ): ActorRef = {
-      val eventHandlerRef = flowSystem.actorOf(Props(new EventHandler(vertxEventBus)))
-      eventBusRef.tell(EventBus.Subscribe, eventHandlerRef)
+    ): ActorRefT[EventBus.Message] = {
+      val eventHandlerRef =
+        ActorRefT.build[EventBus.Message](system, Props(new EventHandler(vertxEventBus)))
+      eventBusRef.tell(EventBus.Subscribe, eventHandlerRef.ref)
       eventHandlerRef
     }
   }

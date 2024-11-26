@@ -16,10 +16,14 @@
 
 package org.alephium.app
 
+import scala.collection.mutable
+import scala.concurrent.Future
+
 import akka.testkit.TestProbe
 import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
 
+import org.alephium.app.VertxFutureConverter._
 import org.alephium.app.WebSocketServer.{EventHandler, WsCommand, WsEvent, WsMethod}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
@@ -28,27 +32,25 @@ import org.alephium.util._
 
 class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
 
-  behavior of "ws"
+  behavior of "WebSocketServer"
 
-  it should "subscribe" in new WebSocketServerFixture {
-    val eventHandlerRef =
-      EventHandler.getSubscribedEventHandlerRef(vertx.eventBus(), node.eventBus, system)
+  it should "subscribe event handler into event bus" in new WebSocketServerFixture {
+    val newHandler = EventHandler.getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
     node.eventBus
       .ask(EventBus.ListSubscribers)
       .mapTo[EventBus.Subscribers]
       .futureValue
       .value
-      .contains(eventHandlerRef) is true
+      .contains(newHandler.ref) is true
   }
 
   it should "connect and subscribe multiple ws clients to multiple events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
-      ws.textMessageHandler { message =>
-        clientProbe.ref ! message
-      }
-      ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString)
-      ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Tx).toString)
-      ws -> clientProbe
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+      ws.textMessageHandler(message => clientProbe.ref ! message)
+      for {
+        _ <- ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString).asScala
+        _ <- ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Tx).toString).asScala
+      } yield ()
     }
 
     def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
@@ -62,39 +64,49 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
         ).asNotification.rightValue.method is WsMethod.Block.name
       }
 
-    val wsSpec = WebSocketSpec(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
-    checkWS(AVector.fill(3)(wsSpec), subscribersCount = 3, openWebsocketsCount = 3)
+    val wsInitBehavior = WsStartBehavior(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
+    checkWS(
+      initBehaviors = AVector.fill(3)(wsInitBehavior),
+      nextBehaviors = AVector.empty,
+      expectedSubscriptions = 3 * 2, // 3 clients, 2 subscriptions each
+      openWebsocketsCount = 3
+    )
   }
 
   it should "not spin ws connections over limit" in new RouteWS {
     override def maxConnections: Int = 2
-    val wsSpec = WebSocketSpec((ws, clientProbe) => (ws, clientProbe), _ => (), _ => true is true)
-    checkWS(AVector.fill(3)(wsSpec), subscribersCount = 0, openWebsocketsCount = 3)
+    val wsSpec = WsStartBehavior((_, _) => Future.successful(()), _ => (), _ => true is true)
+    checkWS(
+      initBehaviors = AVector.fill(3)(wsSpec),
+      nextBehaviors = AVector.empty,
+      expectedSubscriptions = 0,
+      openWebsocketsCount = 3
+    )
   }
 
   it should "connect and not subscribe multiple ws clients to any event" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
-      ws.textMessageHandler { message =>
-        clientProbe.ref ! message
-      }
-      ws -> clientProbe
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+      ws.textMessageHandler(message => clientProbe.ref ! message)
+      Future.successful(())
     }
 
-    val wsSpec = WebSocketSpec(
+    val wsInitBehavior = WsStartBehavior(
       clientInitBehavior,
       _ ! BlockNotify(blockGen.sample.get, height = 0),
       _.expectNoMessage()
     )
-    checkWS(AVector.fill(3)(wsSpec), subscribersCount = 0, openWebsocketsCount = 3)
+    checkWS(
+      initBehaviors = AVector.fill(3)(wsInitBehavior),
+      nextBehaviors = AVector.empty,
+      expectedSubscriptions = 0,
+      openWebsocketsCount = 3
+    )
   }
 
   it should "handle invalid messages gracefully" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
-      ws.textMessageHandler { message =>
-        clientProbe.ref ! message
-      }
-      ws.writeTextMessage("invalid_msg")
-      ws -> clientProbe
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+      ws.textMessageHandler(message => clientProbe.ref ! message)
+      ws.writeTextMessage("invalid_msg").asScala.map(_ => ())
     }
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
@@ -102,26 +114,69 @@ class WebSocketServerSpec extends AlephiumFutureSpec with EitherValues with Nume
         msg is "Unsupported message : invalid_msg"
       }
 
-    val wsSpec = WebSocketSpec(clientInitBehavior, _ => (), clientAssertionOnMsg)
-    checkWS(AVector.fill(1)(wsSpec), subscribersCount = 0, openWebsocketsCount = 1)
+    val wsInitBehavior = WsStartBehavior(clientInitBehavior, _ => (), clientAssertionOnMsg)
+    checkWS(
+      initBehaviors = AVector.fill(1)(wsInitBehavior),
+      nextBehaviors = AVector.empty,
+      expectedSubscriptions = 0,
+      openWebsocketsCount = 1
+    )
   }
 
   it should "handle unsubscribing from events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): (WebSocket, TestProbe) = {
-      ws.textMessageHandler { message =>
-        clientProbe.ref ! message
-      }
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+      ws.textMessageHandler(message => clientProbe.ref ! message)
       ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString)
-      ws.writeTextMessage(WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString)
-      ws -> clientProbe
+        .asScala
+        .map(_ => ())
     }
-
-    val wsSpec = WebSocketSpec(
+    def clientInitAssertionOnMsg(clientProbe: TestProbe): Assertion =
+      clientProbe.expectMsgPF() { case msg: String =>
+        read[NotificationUnsafe](
+          msg
+        ).asNotification.rightValue.method is WsMethod.Block.name
+      }
+    def clientNextBehavior(ws: WebSocket): Future[Unit] = {
+      ws.writeTextMessage(WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString)
+        .asScala
+        .map(_ => ())
+    }
+    val wsInitBehavior = WsStartBehavior(
       clientInitBehavior,
       _ ! BlockNotify(blockGen.sample.get, height = 0),
+      clientInitAssertionOnMsg
+    )
+    val wsNextBehavior = WsBehavior(
+      clientNextBehavior,
+      _ ! BlockNotify(blockGen.sample.get, height = 1),
       _.expectNoMessage()
     )
-    checkWS(AVector.fill(1)(wsSpec), subscribersCount = 0, openWebsocketsCount = 1)
+    checkWS(
+      initBehaviors = AVector.fill(1)(wsInitBehavior),
+      nextBehaviors = AVector.fill(1)(wsNextBehavior),
+      expectedSubscriptions = 0,
+      openWebsocketsCount = 1
+    )
+  }
+
+  "richMap" should "handle" in {
+    val richMap = mutable.Map("a" -> 0, "b" -> 0)
+
+    // Increment value of existing key "a"
+    richMap.updateWith("a") { case Some(v) => Some(v + 1); case None => None } is Some(1)
+    richMap is mutable.Map("a" -> 1, "b" -> 0)
+
+    // Add new key "c" with value 1
+    richMap.updateWith("c") { case None => Some(1); case Some(_) => None } is Some(1)
+    richMap is mutable.Map("a" -> 1, "b" -> 0, "c" -> 1)
+
+    // No change for non-existent key "d" with None returned
+    richMap.updateWith("d") { case None => None; case Some(_) => None } is None
+    richMap is mutable.Map("a" -> 1, "b" -> 0, "c" -> 1)
+
+    // Remove existing key "c"
+    richMap.updateWith("c") { case Some(_) => None; case None => None } is None
+    richMap is mutable.Map("a" -> 1, "b" -> 0)
   }
 
 }
