@@ -16,12 +16,14 @@
 
 package org.alephium.app
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext.Implicits
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
+import akka.testkit.TestProbe
 import io.vertx.core.{Future => VertxFuture}
-import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
+import org.scalatest.concurrent.IntegrationPatience
 
 import org.alephium.api.model.BlockEntry
 import org.alephium.app.WebSocketServer.WsEventHandler
@@ -74,7 +76,7 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
         value is "Success Result"
       case Failure(_) =>
         fail("The future should not fail in this test case")
-    }
+    }(Implicits.global)
 
     val exception                              = new RuntimeException("Test Failure")
     val failedVertxFuture: VertxFuture[String] = VertxFuture.failedFuture(exception)
@@ -85,6 +87,51 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
         fail("The future should not succeed in this test case")
       case Failure(ex) =>
         ex is exception // Expected exception is thrown
+    }(Implicits.global)
+  }
+
+  "WsSubscriptionHandler" should "handle high load fast" in new WebSocketServerFixture
+    with IntegrationPatience {
+    val numberOfConnections     = 500
+    override def maxConnections = numberOfConnections
+    val clientProbe             = TestProbe()
+    httpServer.webSocketHandler { webSocket =>
+      subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
     }
+    val httpBinding         = bindAndListen()
+    val blockSubscribeMsg   = WsEvent(WsCommand.Subscribe, WsMethod.Block).toString
+    val blockUnsubscribeMsg = WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString
+
+    // let's measure sequential connection, subscription, notification and unsubscription time on local env
+    val websockets =
+      Future
+        .sequence(
+          AVector
+            .fill(numberOfConnections) {
+              for {
+                ws <- connectWebsocketClient
+                _ = ws.textMessageHandler(message => clientProbe.ref ! message)
+              } yield ws
+            }
+            .toSeq
+        )
+        .futureValue // connection takes 1500 millis
+
+    // subscription take 100 millis
+    Future.sequence(websockets.map(_.writeTextMessage(blockSubscribeMsg).asScala)).futureValue
+    node.eventBus ! BlockNotify(dummyBlock, 0)
+    // notification take 400 millis
+    clientProbe.receiveN(numberOfConnections, 10.seconds)
+    Future.sequence(websockets.map(_.writeTextMessage(blockUnsubscribeMsg).asScala)).futureValue
+    node.eventBus ! BlockNotify(dummyBlock, 1)
+    // unsubscription take 100 millis
+    clientProbe.expectNoMessage()
+    httpBinding.close().asScala.futureValue
+    // current measure times :
+    // 500 takes 1.5 seconds
+    // 1000 takes 2 seconds
+    // 2000 takes 2.3 seconds
+    // 5000 takes 3.3 seconds
+    // 10000 takes 10 seconds due to increasing notifications time (Blocks are big)
   }
 }

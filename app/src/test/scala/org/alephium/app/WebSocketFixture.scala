@@ -22,7 +22,7 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServerOptions, WebSocket, WebSocketClientOptions}
+import io.vertx.core.http.{HttpServer, HttpServerOptions, WebSocket, WebSocketClientOptions}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
@@ -31,7 +31,7 @@ import org.alephium.app.WsSubscriptionHandler.{GetSubscriptions, SubscriptionRes
 import org.alephium.flow.handler.TestUtils
 import org.alephium.util._
 
-trait WebSocketServerFixture extends ServerFixture {
+trait WebSocketServerFixture extends ServerFixture with ScalaFutures {
 
   implicit lazy val apiConfig: ApiConfig          = ApiConfig.load(newConfig)
   implicit val timeout: Timeout                   = Timeout(Duration.ofSecondsUnsafe(5).asScala)
@@ -40,7 +40,7 @@ trait WebSocketServerFixture extends ServerFixture {
   implicit val executionContext: ExecutionContext = system.dispatcher
   lazy val vertx                                  = Vertx.vertx()
   lazy val blockFlowProbe                         = TestProbe()
-  val (allHandlers, _)                            = TestUtils.createAllHandlersProbe
+  lazy val (allHandlers, _)                       = TestUtils.createAllHandlersProbe
   lazy val node = new NodeDummy(
     dummyIntraCliqueInfo,
     dummyNeighborPeers,
@@ -52,17 +52,31 @@ trait WebSocketServerFixture extends ServerFixture {
     storages
   )
 
+  def connectWebsocketClient: Future[WebSocket] =
+    vertx
+      .createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
+      .connect(node.config.network.restPort, "127.0.0.1", "/ws")
+      .asScala
+
   def maxConnections: Int = 10
+
+  lazy val wsOptions =
+    new HttpServerOptions()
+      .setMaxWebSocketFrameSize(1024 * 1024)
+      .setRegisterWebSocketWriteHandlers(true)
 
   lazy val WebSocketServer(httpServer, eventHandler, subscriptionHandler) =
     WebSocketServer(
       system,
       node,
       maxConnections,
-      new HttpServerOptions()
-        .setMaxWebSocketFrameSize(1024 * 1024)
-        .setRegisterWebSocketWriteHandlers(true)
+      wsOptions
     )
+
+  def bindAndListen(): HttpServer = httpServer
+    .listen(node.config.network.restPort, apiConfig.networkInterface.getHostAddress)
+    .asScala
+    .futureValue
 }
 
 final case class WsStartBehavior(
@@ -75,15 +89,7 @@ final case class WsBehavior(
     serverBehavior: ActorRefT[EventBus.Message] => Unit,
     clientAssertionOnMsg: TestProbe => Any
 )
-trait RouteWS
-    extends WebSocketServerFixture
-    with Eventually
-    with ScalaFutures
-    with IntegrationPatience {
-  private val port = node.config.network.restPort
-
-  private def newWebSocketClient =
-    vertx.createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
+trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPatience {
 
   private def assertEventHandlerSubscribed = {
     node.eventBus
@@ -100,16 +106,13 @@ trait RouteWS
       expectedSubscriptions: Int,
       openWebsocketsCount: Int
   ) = {
-    val binding =
-      httpServer.listen(port, apiConfig.networkInterface.getHostAddress).asScala.futureValue
+    val httpBinding = bindAndListen()
     eventually(assertEventHandlerSubscribed)
     val probedSockets =
       Future
         .sequence(
           initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
-            newWebSocketClient
-              .connect(port, "127.0.0.1", "/ws")
-              .asScala
+            connectWebsocketClient
               .map { ws =>
                 val clientProbe = TestProbe()
                 startBehavior(ws, clientProbe)
@@ -143,6 +146,6 @@ trait RouteWS
         .sum is expectedSubscriptions
     }
     probedSockets.foreach(_._1.close().asScala.futureValue)
-    binding.close().asScala.futureValue
+    httpBinding.close().asScala.futureValue
   }
 }
