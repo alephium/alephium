@@ -2147,6 +2147,7 @@ object Ast {
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
     def nonInlineFuncs: Seq[FuncDef[Ctx]] = funcs.filterNot(_.inline)
+    def inlineFuncs: Seq[FuncDef[Ctx]]    = funcs.filter(_.inline)
 
     def name: String = ident.name
 
@@ -2515,7 +2516,13 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods = genMethods(state)
+      val nonInlineMethods = genMethods(state)
+      val methods = if (state.allowDebug) {
+        val inlineMethods = inlineFuncs.map(_.genMethod(state))
+        nonInlineMethods ++ AVector.from(inlineMethods)
+      } else {
+        nonInlineMethods
+      }
       val fieldsLength =
         state.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
       StatefulContract(fieldsLength, methods)
@@ -2893,10 +2900,11 @@ object Ast {
       val warnings = checkUnusedDefsInParentContract(states)
       val compiled = statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
         val statefulContract = genReleaseCode(contract, statefulDebugContract, state)
-        StaticAnalysis.checkMethods(contract, statefulDebugContract, state)
+        StaticAnalysis.checkMethods(contract, statefulContract, state)
+        val orderedFuncs = contract.nonInlineFuncs ++ contract.inlineFuncs
         CompiledContract(
           statefulContract,
-          contract,
+          contract.copy(funcs = orderedFuncs),
           state.getWarnings,
           statefulDebugContract
         ) -> index
@@ -2909,7 +2917,11 @@ object Ast {
         debugCode: StatefulContract,
         state: Compiler.State[StatefulContext]
     ): StatefulContract = {
-      if (debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))) {
+      val needToGenReleaseCode =
+        contract.inlineFuncs.nonEmpty || debugCode.methods.exists(
+          _.instrs.exists(_.isInstanceOf[DEBUG])
+        )
+      if (needToGenReleaseCode) {
         state.allowDebug = false
         contract.genCode(state)
       } else {

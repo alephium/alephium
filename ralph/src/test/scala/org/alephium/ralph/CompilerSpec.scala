@@ -568,7 +568,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         contractIndex: Int = 0
     ): Assertion = {
       val compiled = compileContractFull(input, contractIndex).rightValue
-      compiled.code is compiled.debugCode
+      if (compiled.ast.inlineFuncs.isEmpty) {
+        compiled.code is compiled.debugCode
+      } else {
+        compiled.code.methods is compiled.debugCode.methods.slice(0, compiled.code.methods.length)
+      }
       val contract = compiled.code
 
       deserialize[StatefulContract](serialize(contract)) isE contract
@@ -8860,7 +8864,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val compiled = compileContractFull(code).rightValue
       compiled.warnings is AVector(
-        Warning("Found unused private function in Foo: foo", compiled.ast.funcs.head.id.sourceIndex)
+        Warning(
+          "Found unused private function in Foo: foo",
+          compiled.ast.funcs.find(_.name == "foo").flatMap(_.id.sourceIndex)
+        )
       )
     }
 
@@ -8883,7 +8890,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.warnings is AVector(
         Warning(
           s"""Function "Foo.bar" updates fields. Please use "@using(updateFields = true)" for the function.""",
-          compiled.ast.funcs(1).id.sourceIndex
+          compiled.ast.funcs.find(_.name == "bar").flatMap(_.id.sourceIndex)
         )
       )
     }
@@ -8910,9 +8917,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "generate code for inline func calls" in new Fixture {
-    def check(code: String, expected: AVector[Instr[StatefulContext]], methodLength: Int = 1) = {
-      val methods = Compiler.compileContract(code).rightValue.methods
-      methods.length is methodLength
+    def check(code: String, expected: AVector[Instr[StatefulContext]]) = {
+      val compiled = Compiler.compileContractFull(code).rightValue
+      val ast      = compiled.ast
+      compiled.debugCode.methods.length is ast.funcs.length
+      ast.funcs.slice(0, ast.nonInlineFuncs.length).foreach(_.inline is false)
+      ast.funcs.slice(ast.nonInlineFuncs.length, ast.funcs.length).foreach(_.inline is true)
+
+      val methods = compiled.code.methods
+      methods.length is compiled.ast.nonInlineFuncs.length
       val instrs = methods.head.instrs
       instrs.head.isInstanceOf[MethodSelector] is true
       instrs.tail is expected
@@ -9159,7 +9172,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       // format: off
-      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), CallLocal(1), Return), 2)
+      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), CallLocal(1), Return))
       // format: on
       testContract(code, AVector.empty, AVector(Val.U256(3)))
     }
