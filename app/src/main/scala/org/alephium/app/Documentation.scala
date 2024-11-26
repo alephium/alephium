@@ -58,6 +58,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getBlockHeaderEntry,
     buildTransferTransaction,
     getRawBlock,
+    buildTransferFromOneToManyGroups,
     buildMultiAddressesTransaction,
     buildSweepAddressTransactions,
     submitTransaction,

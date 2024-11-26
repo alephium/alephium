@@ -549,6 +549,21 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val buildTransferFromOneToManyGroupsResultsExamples
+      : List[Example[AVector[BuildTransferTxResult]]] =
+    simpleExample(
+      AVector(
+        BuildTransferTxResult(
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId,
+          fromGroup = 2,
+          toGroup = 1
+        )
+      )
+    )
+
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(

@@ -234,6 +234,45 @@ class ServerUtils(implicit
     Right(result)
   }
 
+  def buildTransferFromOneToManyGroups(
+      blockFlow: BlockFlow,
+      transferRequest: BuildTransferTx
+  ): Try[AVector[BuildTransferTxResult]] =
+    for {
+      _ <- Either.cond(
+        transferRequest.gasAmount.isEmpty,
+        (),
+        badRequest(
+          "Explicit gas amount is not permitted, transfer-from-one-to-many-groups requires gas estimation."
+        )
+      )
+      assetOutputRefs <- transferRequest.utxos match {
+        case Some(outputRefs) => prepareOutputRefs(outputRefs).left.map(badRequest)
+        case None             => Right(AVector.empty[AssetOutputRef])
+      }
+      lockPair <- transferRequest.getLockPair()
+      _ <- Either.cond(
+        brokerConfig.contains(lockPair._1.groupIndex),
+        (),
+        badRequest(s"This node cannot serve request for Group ${lockPair._1.groupIndex}")
+      )
+      outputInfos = prepareOutputInfos(transferRequest.destinations)
+      gasPrice    = transferRequest.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      unsignedTxs <- blockFlow
+        .buildTransferFromOneToManyGroups(
+          lockPair._1,
+          lockPair._2,
+          transferRequest.targetBlockHash,
+          assetOutputRefs,
+          outputInfos,
+          gasPrice,
+          apiConfig.defaultUtxosLimit
+        )
+        .left
+        .map(failed)
+      txs <- unsignedTxs.mapE(validateUnsignedTransaction)
+    } yield txs.map(BuildTransferTxResult.from)
+
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
       query: BuildTransferTx,

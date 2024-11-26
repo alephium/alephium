@@ -98,6 +98,7 @@ class RestServer(
       getBlockHeaderEntryLogic,
       getRawBlockLogic,
       buildTransactionLogic,
+      buildTransferFromOneToManyGroupsLogic,
       buildSweepAddressTransactionsLogic,
       submitTransactionLogic,
       buildMultisigAddressLogic,
