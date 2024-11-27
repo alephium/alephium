@@ -50,9 +50,7 @@ class WebSocketServerSpec
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
       clientProbe.expectMsgPF() { case msg: String =>
-        read[NotificationUnsafe](
-          msg
-        ).asNotification.rightValue.method is WsMethod.Block.name
+        read[NotificationUnsafe](msg).asNotification.rightValue.method is WsMethod.Block.name
       }
 
     val wsInitBehavior = WsStartBehavior(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
@@ -97,7 +95,7 @@ class WebSocketServerSpec
   it should "handle invalid messages gracefully" in new RouteWS {
     def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage("invalid_msg").asScala.map(_ => ())
+      ws.writeTextMessage("invalid_msg").asScala.mapTo[Unit]
     }
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
@@ -114,12 +112,16 @@ class WebSocketServerSpec
     )
   }
 
+  it should "be idempotent on subscribing and unsubscribing" in {}
+
+  it should "acknowledge subscriptions/unsubscriptions" in {}
+
   it should "handle unsubscribing from events" in new RouteWS {
     def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
       ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString)
         .asScala
-        .map(_ => ())
+        .mapTo[Unit]
     }
     def clientInitAssertionOnMsg(clientProbe: TestProbe): Assertion =
       clientProbe.expectMsgPF() { case msg: String =>
@@ -130,7 +132,7 @@ class WebSocketServerSpec
     def clientNextBehavior(ws: WebSocket): Future[Unit] = {
       ws.writeTextMessage(WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString)
         .asScala
-        .map(_ => ())
+        .mapTo[Unit]
     }
     val wsInitBehavior = WsStartBehavior(
       clientInitBehavior,

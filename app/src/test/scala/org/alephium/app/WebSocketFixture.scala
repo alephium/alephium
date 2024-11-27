@@ -27,7 +27,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.app.WsSubscriptionHandler.{GetSubscriptions, SubscriptionResponse}
+import org.alephium.app.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.util._
 
@@ -139,7 +139,7 @@ trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPat
       probedSockets.filterNot(_._1.isClosed).length is openWebsocketsCount
       subscriptionHandler
         .ask(GetSubscriptions)
-        .mapTo[SubscriptionResponse]
+        .mapTo[SubscriptionsResponse]
         .futureValue
         .subscriptions
         .map(_._2.length)

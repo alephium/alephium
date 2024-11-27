@@ -115,16 +115,16 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
             }
             .toSeq
         )
-        .futureValue // connection takes 1500 millis
+        .futureValue // 500 connections in 1500 millis
 
-    // subscription take 100 millis
+    // 500 subscriptions in 100 millis
     Future.sequence(websockets.map(_.writeTextMessage(blockSubscribeMsg).asScala)).futureValue
     node.eventBus ! BlockNotify(dummyBlock, 0)
-    // notification take 400 millis
+    // 500 notifications in 400 millis
     clientProbe.receiveN(numberOfConnections, 10.seconds)
     Future.sequence(websockets.map(_.writeTextMessage(blockUnsubscribeMsg).asScala)).futureValue
     node.eventBus ! BlockNotify(dummyBlock, 1)
-    // unsubscription take 100 millis
+    // 500 unsubscriptions in 100 millis
     clientProbe.expectNoMessage()
     httpBinding.close().asScala.futureValue
     // current measure times :

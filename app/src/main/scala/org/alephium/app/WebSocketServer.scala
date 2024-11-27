@@ -17,15 +17,13 @@
 package org.alephium.app
 
 import java.util.concurrent.Executors
-
 import scala.concurrent.ExecutionContext
-
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
+import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
-import io.vertx.core.eventbus.{EventBus => VertxEventBus, MessageConsumer}
+import io.vertx.core.eventbus.{MessageConsumer, EventBus => VertxEventBus}
 import io.vertx.core.http.{HttpServer, HttpServerOptions}
-
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.app.WebSocketServer.WsEventHandler.getSubscribedEventHandler
@@ -57,7 +55,7 @@ final case class WebSocketServer(
 object WebSocketServer extends StrictLogging {
 
   type SubscriberId = String
-  type Subscriber   = MessageConsumer[String]
+  type Subscription = MessageConsumer[String]
 
   implicit val wsExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
@@ -74,8 +72,12 @@ object WebSocketServer extends StrictLogging {
           system,
           Props(new WsSubscriptionHandler(vertx, maxConnections))
         )
-    server.webSocketHandler { webSocket =>
-      subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
+    server.webSocketHandler { ws =>
+      if (ws.path().equals("/ws")) {
+        subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(ws)
+      } else {
+        ws.reject(HttpResponseStatus.BAD_REQUEST.code())
+      }
     }
     WebSocketServer(server, eventHandler, subscriptionHandler)
   }
