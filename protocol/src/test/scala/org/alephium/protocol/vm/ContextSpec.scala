@@ -114,8 +114,9 @@ class ContextSpec
     context.generatedOutputs.size is 2
   }
 
-  it should "not generate contract output when the contract is loaded from Rhone upgrade" in new Fixture {
-    context.getHardFork() is HardFork.Rhone
+  it should "not generate contract output when the contract is loaded from Rhone upgrade" in new Fixture
+    with NetworkConfigFixture.SinceRhoneT {
+    Seq(HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
     val contractId = createContract()
     context.loadContractObj(contractId).isRight is true
     context.useContractAssets(contractId, 0).leftValue.rightValue is ContractAssetAlreadyFlushed
@@ -129,8 +130,9 @@ class ContextSpec
     context.contractPool.contains(contractId) is false
   }
 
-  it should "cache new contract from Rhone upgrade" in new Fixture {
-    context.getHardFork() is HardFork.Rhone
+  it should "cache new contract from Rhone upgrade" in new Fixture
+    with NetworkConfigFixture.SinceRhoneT {
+    Seq(HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
     val contractId = createContract(unblock = false)
     context.contractBlockList.contains(contractId) is true
     context.contractPool.contains(contractId) is true
@@ -193,7 +195,7 @@ class ContextSpec
 
   it should "charge gas based on leman hardfork" in new Fixture
     with NetworkConfigFixture.SinceLemanT {
-    Seq(HardFork.Leman, HardFork.Rhone).contains(context.getHardFork()) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
     val expected0 = initialGas.use(GasBox.unsafe(4)).rightValue
@@ -262,7 +264,7 @@ class ContextSpec
   trait LemanContractOutputFixture
       extends ContractOutputFixture
       with NetworkConfigFixture.SinceLemanT {
-    Seq(HardFork.Leman, HardFork.Rhone).contains(context.getHardFork()) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
   }
 
   it should "generate output when the output is the same as input for Mainnet hardfork" in new MainnetContractOutputFixture {
@@ -316,7 +318,7 @@ class ContextSpec
   }
 
   trait LemanAssetOutputFixture extends AssetOutputFixture with NetworkConfigFixture.SinceLemanT {
-    Seq(HardFork.Leman, HardFork.Rhone).contains(context.getHardFork()) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
   }
 
   it should "generate single output when token number <= maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
@@ -360,7 +362,9 @@ class ContextSpec
 
   it should "output remaining contract assets since Rhone" in new OutputRemainingContractAssetsFixture
     with NetworkConfigFixture.SinceRhoneT {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    Seq(HardFork.Rhone, HardFork.Danube).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
 
     prepare()
     context.outputRemainingContractAssetsForRhone() isE ()

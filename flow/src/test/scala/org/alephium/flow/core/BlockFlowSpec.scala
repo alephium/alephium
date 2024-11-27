@@ -680,7 +680,8 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "handle sequential txs: pre-rhone" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
+      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
+      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
@@ -929,22 +930,22 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "not include new block as dependency when dependency gap time is large for pre-rhone hardfork" in new DependencyGapTimeFixture {
-    override val configValues =
-      Map(
-        ("alephium.consensus.mainnet.uncle-dependency-gap-time", "5 seconds"),
-        ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-        ("alephium.broker.broker-num", 1)
-      )
+    override val configValues = Map(
+      ("alephium.consensus.mainnet.uncle-dependency-gap-time", "5 seconds"),
+      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
+      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis),
+      ("alephium.broker.broker-num", 1)
+    )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     test()
   }
 
   it should "not include new block as dependency when dependency gap time is large for rhone hardfork" in new DependencyGapTimeFixture {
-    override val configValues =
-      Map(
-        ("alephium.consensus.rhone.uncle-dependency-gap-time", "5 seconds"),
-        ("alephium.broker.broker-num", 1)
-      )
+    override val configValues = Map(
+      ("alephium.consensus.rhone.uncle-dependency-gap-time", "5 seconds"),
+      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis),
+      ("alephium.broker.broker-num", 1)
+    )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
     test()
   }

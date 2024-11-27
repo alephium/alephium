@@ -798,7 +798,7 @@ object TxValidation {
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
           checkP2SH(blockEnv, txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.PoLW) if isCoinbase =>
-          assume(blockEnv.getHardFork() == HardFork.Rhone)
+          assume(blockEnv.getHardFork() >= HardFork.Rhone)
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
