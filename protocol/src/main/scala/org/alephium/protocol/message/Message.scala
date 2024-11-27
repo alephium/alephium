@@ -18,7 +18,7 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
-import org.alephium.protocol.WireVersion
+import org.alephium.protocol.{Checksum, WireVersion}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.serde
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
@@ -43,7 +43,7 @@ object Message {
     val header   = serde.serialize[Header](message.header)
     val payload  = Payload.serialize(message.payload)
     val data     = header ++ payload
-    val checksum = MessageSerde.checksum(data)
+    val checksum = serde.serialize(Checksum.calc(data))
     val length   = MessageSerde.length(data)
 
     magic ++ checksum ++ length ++ data
@@ -60,7 +60,7 @@ object Message {
     MessageSerde.unwrap(input).flatMap { case (checksum, length, rest) =>
       for {
         messageRest <- MessageSerde.extractMessageBytes(length, rest)
-        _           <- MessageSerde.checkChecksum(checksum, messageRest.value)
+        _           <- checksum.check(messageRest.value)
         headerRest  <- serde._deserialize[Header](messageRest.value)
         payload     <- Payload.deserialize(headerRest.rest)
       } yield {
