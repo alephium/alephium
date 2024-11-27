@@ -51,10 +51,11 @@ class ReleaseVersionSpec extends AlephiumSpec {
   it should "check client id" in {
     def buildNetworkConfig(_networkId: NetworkId, rhoneActivationTS: TimeStamp): NetworkConfig = {
       new NetworkConfig {
-        override def networkId              = _networkId
-        override def noPreMineProof         = ByteString.empty
-        override def lemanHardForkTimestamp = TimeStamp.zero
-        override def rhoneHardForkTimestamp = rhoneActivationTS
+        override def networkId               = _networkId
+        override def noPreMineProof          = ByteString.empty
+        override def lemanHardForkTimestamp  = TimeStamp.zero
+        override def rhoneHardForkTimestamp  = rhoneActivationTS
+        override def danubeHardForkTimestamp = TimeStamp.Max
       }
     }
 

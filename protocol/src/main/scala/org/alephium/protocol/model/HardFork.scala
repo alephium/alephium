@@ -22,17 +22,19 @@ import scala.util.Random
 sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
 
-  def isLemanEnabled(): Boolean = this >= HardFork.Leman
-  def isRhoneEnabled(): Boolean = this >= HardFork.Rhone
+  def isLemanEnabled(): Boolean  = this >= HardFork.Leman
+  def isRhoneEnabled(): Boolean  = this >= HardFork.Rhone
+  def isDanubeEnabled(): Boolean = this >= HardFork.Danube
 }
 object HardFork {
   object Mainnet extends HardFork(0)
   object Leman   extends HardFork(1)
   object Rhone   extends HardFork(2)
+  object Danube  extends HardFork(3)
 
-  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman, Rhone)
+  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman, Rhone, Danube)
 
   // TestOnly
-  def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(2))
+  def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(3))
   def PreRhoneForTest: HardFork   = All.take(2).apply(Random.nextInt(2))
 }

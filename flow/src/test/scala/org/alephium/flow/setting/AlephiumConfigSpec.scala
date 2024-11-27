@@ -128,6 +128,17 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "Invalid timestamp for rhone hard fork"
   }
 
+  it should "check danube hardfork timestamp" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.network.danube-hard-fork-timestamp", 0)
+    )
+    intercept[RuntimeException](
+      AlephiumConfig.load(buildNewConfig(), "alephium")
+    ).getMessage is
+      "Invalid timestamp for danube hard fork"
+  }
+
   it should "load bootstrap config" in {
 
     case class Bootstrap(addresses: ArraySeq[InetSocketAddress])

@@ -129,6 +129,7 @@ final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
     rhoneHardForkTimestamp: TimeStamp,
+    danubeHardForkTimestamp: TimeStamp,
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
@@ -289,6 +290,7 @@ object AlephiumConfig {
       networkId: NetworkId,
       lemanHardForkTimestamp: TimeStamp,
       rhoneHardForkTimestamp: TimeStamp,
+      danubeHardForkTimestamp: TimeStamp,
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
@@ -325,6 +327,7 @@ object AlephiumConfig {
         networkId,
         lemanHardForkTimestamp,
         rhoneHardForkTimestamp,
+        danubeHardForkTimestamp,
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
@@ -453,18 +456,19 @@ object AlephiumConfig {
   def load(config: Config): AlephiumConfig = load(config, "alephium")
 
   def sanityCheck(config: AlephiumConfig): AlephiumConfig = {
-    if (
-      config.network.networkId == NetworkId.AlephiumMainNet &&
-      config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)
-    ) {
+    val isMainNet = config.network.networkId == NetworkId.AlephiumMainNet
+    if (isMainNet && config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
     }
 
-    if (
-      config.network.networkId == NetworkId.AlephiumMainNet &&
-      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(1718186400000L)
-    ) {
+    if (isMainNet && config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(1718186400000L)) {
       throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
+    }
+
+    if (
+      isMainNet && config.network.danubeHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+    ) {
+      throw new IllegalArgumentException("Invalid timestamp for danube hard fork")
     }
 
     config
