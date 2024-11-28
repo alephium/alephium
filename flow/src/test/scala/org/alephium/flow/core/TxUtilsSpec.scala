@@ -2891,6 +2891,54 @@ class TxUtilsSpec extends AlephiumSpec {
     tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy)
   }
 
+  it should "test p2pk lockup script" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Danube
+
+    val priKey = PrivateKey.generate
+    val pubKey = PublicKeyType.SecP256K1(priKey.publicKey)
+    (0 until groupConfig.groups).foreach { group =>
+      val genesisKey     = genesisKeys(group)._1
+      val toLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))
+      val block = transfer(
+        blockFlow,
+        genesisKey,
+        toLockupScript,
+        AVector.empty[(TokenId, U256)],
+        ALPH.alph(2)
+      )
+      addAndCheck(blockFlow, block)
+      blockFlow.getBalance(toLockupScript, Int.MaxValue, true).rightValue._1 is ALPH.alph(2)
+    }
+
+    (0 until groupConfig.groups).foreach { group =>
+      val fromLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))
+      val fromUnlockScript = UnlockScript.P2PK
+      val toLockupScript   = LockupScript.p2pkh(genesisKeys(group)._2)
+      val outputInfos = AVector(TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None))
+      val unsignedTx = blockFlow
+        .transfer(
+          None,
+          fromLockupScript,
+          fromUnlockScript,
+          outputInfos,
+          Some(minimalGas),
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          ExtraUtxosInfo.empty
+        )
+        .rightValue
+        .rightValue
+      val signature = SignatureSchema.sign(unsignedTx.id, priKey)
+      val tx        = Transaction.from(unsignedTx, AVector(signature))
+      val block     = mineWithTxs(blockFlow, ChainIndex.unsafe(group, group))((_, _) => AVector(tx))
+      addAndCheck(blockFlow, block)
+
+      val balance = ALPH.alph(2).subUnsafe(ALPH.oneAlph).subUnsafe(tx.gasFeeUnsafe)
+      blockFlow.getBalance(fromLockupScript, Int.MaxValue, true).rightValue._1 is balance
+    }
+  }
+
   private def input(
       name: String,
       amount: U256,

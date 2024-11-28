@@ -486,6 +486,7 @@ object TxValidation {
       for {
         _ <- checkOutputAmount(output, hardFork)
         _ <- checkP2MPKStat(output, hardFork)
+        _ <- checkP2PKStat(output, hardFork)
         _ <- checkOutputDataState(output)
       } yield ()
     }
@@ -521,6 +522,20 @@ object TxValidation {
         output.tokens.length <= deprecatedMaxTokenPerUtxo &&
         output.tokens.forall(_._2.nonZero)
       if (validated) Right(()) else invalidTx(InvalidOutputStats)
+    }
+
+    @inline private def checkP2PKStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      if (hardFork.isDanubeEnabled()) {
+        Right(())
+      } else {
+        output.lockupScript match {
+          case _: LockupScript.P2PK => invalidTx(InvalidLockupScriptPreDanue)
+          case _                    => Right(())
+        }
+      }
     }
 
     @inline private def checkP2MPKStat(
@@ -802,8 +817,22 @@ object TxValidation {
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
+        case (lock: LockupScript.P2PK, UnlockScript.P2PK)
+            if blockEnv.getHardFork().isDanubeEnabled() =>
+          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
+      }
+    }
+
+    protected[validation] def checkP2pk(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2PK
+    ): TxValidationResult[GasBox] = {
+      lock.publicKey match {
+        case PublicKeyType.SecP256K1(key) => checkSignature(txEnv, preImage, gasRemaining, key)
       }
     }
 

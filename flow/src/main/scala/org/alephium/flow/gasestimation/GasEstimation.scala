@@ -111,6 +111,8 @@ object GasEstimation extends StrictLogging {
           .map(GasSchedule.txInputBaseGas.addUnsafe(_))
       case UnlockScript.SameAsPrevious =>
         Right(GasSchedule.txInputBaseGas)
+      case UnlockScript.P2PK =>
+        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
     }
   }
 }
