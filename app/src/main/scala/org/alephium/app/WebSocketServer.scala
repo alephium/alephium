@@ -17,13 +17,16 @@
 package org.alephium.app
 
 import java.util.concurrent.Executors
+
 import scala.concurrent.ExecutionContext
+
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
-import io.vertx.core.eventbus.{MessageConsumer, EventBus => VertxEventBus}
+import io.vertx.core.eventbus.{EventBus => VertxEventBus, MessageConsumer}
 import io.vertx.core.http.{HttpServer, HttpServerOptions}
+
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.app.WebSocketServer.WsEventHandler.getSubscribedEventHandler
@@ -54,8 +57,11 @@ final case class WebSocketServer(
 
 object WebSocketServer extends StrictLogging {
 
-  type SubscriberId = String
-  type Subscription = MessageConsumer[String]
+  final case class Correlation(id: CorrelationId) extends WithId
+  type WebsocketId    = String
+  type CorrelationId  = Long
+  type SubscriptionId = String
+  type Subscription   = MessageConsumer[String]
 
   implicit val wsExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
@@ -90,7 +96,7 @@ object WebSocketServer extends StrictLogging {
       event match {
         case BlockNotify(block, height) =>
           BlockEntry.from(block, height).map { blockEntry =>
-            Notification(WsMethod.Block.name, writeJs(blockEntry))
+            Notification(WsParams.Block.name, writeJs(blockEntry))
           }
       }
     }

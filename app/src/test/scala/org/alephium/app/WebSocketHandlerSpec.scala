@@ -26,9 +26,10 @@ import io.vertx.core.{Future => VertxFuture}
 import org.scalatest.concurrent.IntegrationPatience
 
 import org.alephium.api.model.BlockEntry
-import org.alephium.app.WebSocketServer.WsEventHandler
+import org.alephium.app.WebSocketServer.{Correlation, WsEventHandler}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
+import org.alephium.rpc.model.JsonRPC.Request
 import org.alephium.util._
 
 class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils {
@@ -50,20 +51,30 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
   it should "build Notification from Event" in {
     val notification = WsEventHandler.buildNotification(BlockNotify(dummyBlock, 0)).rightValue
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    notification.method is WsMethod.Block.name
+    notification.method is WsParams.Block.name
     show(notification.params) is write(blockEntry)
   }
 
   "WsProtocol" should "parse websocket event for subscription and unsubscription" in {
-    WsMethod.values.foreach { method =>
-      WsCommand.values.foreach { command =>
-        WsEvent.parseEvent(s"$command:$method").get is WsEvent(command, method)
-        WsEvent.parseEvent(s"$command:xxx:$method").isEmpty is true
-        WsEvent.parseEvent(s"$command : $method").isEmpty is true
-        WsEvent.parseEvent(s"$command,$method").isEmpty is true
-        WsEvent.parseEvent(s"$command $method").isEmpty is true
-        WsEvent.parseEvent(s"$command:gandalf").isEmpty is true
-        WsEvent.parseEvent("nonsense:frodo").isEmpty is true
+    WsMethod.values.foreach { wsMethod =>
+      WsParams.values.foreach { wsParams =>
+        val method       = wsMethod.name
+        val params       = wsParams.name
+        val notification = WsRequest(Correlation(0), wsMethod, wsParams)
+        WsRequest
+          .fromJsonString(
+            s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$params"]}"""
+          )
+          .rightValue is notification
+        WsRequest.fromJsonString(s"""{"method": "$method", "params": ["$params"]}""").isLeft is true
+        WsRequest.fromJsonString(s"""{"method": "$method"""").isLeft is true
+        WsRequest
+          .fromJsonString(s"""{"method2": "$method", "params": ["$params"]}""")
+          .isLeft is true
+        WsRequest
+          .fromJsonString(s"""{"method": "$method", "params2": ["$params"]}""")
+          .isLeft is true
+        WsRequest.fromJsonString(s"""{"method": "$method", "params": "$params"}""").isLeft is true
       }
     }
   }
@@ -92,15 +103,15 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
 
   "WsSubscriptionHandler" should "handle high load fast" in new WebSocketServerFixture
     with IntegrationPatience {
-    val numberOfConnections     = 500
+    val numberOfConnections     = 10000
     override def maxConnections = numberOfConnections
     val clientProbe             = TestProbe()
     httpServer.webSocketHandler { webSocket =>
       subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
     }
-    val httpBinding         = bindAndListen()
-    val blockSubscribeMsg   = WsEvent(WsCommand.Subscribe, WsMethod.Block).toString
-    val blockUnsubscribeMsg = WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString
+    val httpBinding    = bindAndListen()
+    val subscribeReq   = Request(WsMethod.Subscribe.name, ujson.Arr(WsParams.Block.name), 0)
+    val unsubscribeReq = Request(WsMethod.Unsubscribe.name, ujson.Arr(WsParams.Block.name), 0)
 
     // let's measure sequential connection, subscription, notification and unsubscription time on local env
     val websockets =
@@ -115,23 +126,27 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
             }
             .toSeq
         )
-        .futureValue // 500 connections in 1500 millis
+        .futureValue // 500 connections in 800 millis
 
-    // 500 subscriptions in 100 millis
-    Future.sequence(websockets.map(_.writeTextMessage(blockSubscribeMsg).asScala)).futureValue
+    // 500 subscription requests in 25 millis
+    Future.sequence(websockets.map(_.writeTextMessage(write(subscribeReq)).asScala)).futureValue
+    // 500 subscription responses in 25 millis
+    clientProbe.receiveN(numberOfConnections, 3.seconds)
     node.eventBus ! BlockNotify(dummyBlock, 0)
-    // 500 notifications in 400 millis
+    // 500 notifications in 400 millis (Blocks are big, IO + serialization/deserialization time)
     clientProbe.receiveN(numberOfConnections, 10.seconds)
-    Future.sequence(websockets.map(_.writeTextMessage(blockUnsubscribeMsg).asScala)).futureValue
+    // 500 unsubscription requests in 25 millis
+    Future.sequence(websockets.map(_.writeTextMessage(write(unsubscribeReq)).asScala)).futureValue
+    // 500 unsubscription responses in 25 millis
+    clientProbe.receiveN(numberOfConnections, 3.seconds)
     node.eventBus ! BlockNotify(dummyBlock, 1)
-    // 500 unsubscriptions in 100 millis
     clientProbe.expectNoMessage()
     httpBinding.close().asScala.futureValue
     // current measure times :
-    // 500 takes 1.5 seconds
-    // 1000 takes 2 seconds
-    // 2000 takes 2.3 seconds
-    // 5000 takes 3.3 seconds
-    // 10000 takes 10 seconds due to increasing notifications time (Blocks are big)
+    // 500 takes 1.4 seconds
+    // 1000 takes 1.8 seconds
+    // 2000 takes 2.2 seconds
+    // 5000 takes 3 seconds
+    // 10000 takes 5 seconds
   }
 }

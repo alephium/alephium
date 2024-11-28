@@ -80,12 +80,12 @@ trait WebSocketServerFixture extends ServerFixture with ScalaFutures {
 }
 
 final case class WsStartBehavior(
-    clientInitBehavior: (WebSocket, TestProbe) => Future[Unit],
+    clientInitBehavior: (WebSocket, TestProbe) => Unit,
     serverBehavior: ActorRefT[EventBus.Message] => Unit,
     clientAssertionOnMsg: TestProbe => Any
 )
 final case class WsBehavior(
-    clientInitBehavior: WebSocket => Future[Unit],
+    clientInitBehavior: WebSocket => Unit,
     serverBehavior: ActorRefT[EventBus.Message] => Unit,
     clientAssertionOnMsg: TestProbe => Any
 )
@@ -109,18 +109,12 @@ trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPat
     val httpBinding = bindAndListen()
     eventually(assertEventHandlerSubscribed)
     val probedSockets =
-      Future
-        .sequence(
-          initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
-            connectWebsocketClient
-              .map { ws =>
-                val clientProbe = TestProbe()
-                startBehavior(ws, clientProbe)
-                ws -> clientProbe
-              }
-          }.toSeq
-        )
-        .futureValue
+      initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
+        val ws          = connectWebsocketClient.futureValue
+        val clientProbe = TestProbe()
+        startBehavior(ws, clientProbe)
+        ws -> clientProbe
+      }
 
     initBehaviors.foreach { case WsStartBehavior(_, serverBehavior, clientAssertionOnMsg) =>
       serverBehavior(node.eventBus)
@@ -146,6 +140,6 @@ trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPat
         .sum is expectedSubscriptions
     }
     probedSockets.foreach(_._1.close().asScala.futureValue)
-    httpBinding.close().asScala.futureValue
+    httpBinding.close().asScala.mapTo[Unit].futureValue
   }
 }

@@ -81,15 +81,23 @@ object JsonRPC extends StrictLogging {
       Error(code, message, None)
     }
 
-    // scalastyle:off magic.number
-    val ParseError: Error        = Error(-32700, "Parse error")
-    val InvalidRequest: Error    = Error(-32600, "Invalid Request")
-    val MethodNotFound: Error    = Error(-32601, "Method not found")
-    val InvalidParams: Error     = Error(-32602, "Invalid params")
-    val InternalError: Error     = Error(-32603, "Internal error")
-    val UnauthorizedError: Error = Error(-32604, "Unauthorized")
+    val ParseErrorCode: Int        = -32700
+    val InvalidRequestCode: Int    = -32600
+    val MethodNotFoundCode: Int    = -32601
+    val InvalidParamsCode: Int     = -32602
+    val InternalErrorCode: Int     = -32603
+    val UnauthorizedErrorCode: Int = -32604
+    val ServerErrorCode: Int       = -32000
 
-    def server(error: String): Error = Error(-32000, "Server error", Some(error))
+    // scalastyle:off magic.number
+    val ParseError: Error        = Error(ParseErrorCode, "Parse error")
+    val InvalidRequest: Error    = Error(InvalidRequestCode, "Invalid Request")
+    val MethodNotFound: Error    = Error(MethodNotFoundCode, "Method not found")
+    val InvalidParams: Error     = Error(InvalidParamsCode, "Invalid params")
+    val InternalError: Error     = Error(InternalErrorCode, "Internal error")
+    val UnauthorizedError: Error = Error(UnauthorizedErrorCode, "Unauthorized")
+
+    def server(error: String): Error = Error(ServerErrorCode, "Server error", Some(error))
     // scalastyle:on
   }
 

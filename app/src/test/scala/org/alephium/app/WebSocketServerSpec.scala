@@ -16,14 +16,15 @@
 
 package org.alephium.app
 
-import scala.concurrent.Future
-
 import akka.testkit.TestProbe
 import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
+import org.scalatest.Inside.inside
 
+import org.alephium.app.WsMethod.{Subscribe, Unsubscribe}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
@@ -36,22 +37,39 @@ class WebSocketServerSpec
   behavior of "WebSocketServer"
 
   it should "connect and subscribe multiple ws clients to multiple events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
-      for {
-        _ <- ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString).asScala
-        _ <- ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Tx).toString).asScala
-      } yield ()
+      (for {
+        _ <- ws
+          .writeTextMessage(write(Request(Subscribe.name, ujson.Arr(WsParams.Block.name), 0)))
+          .asScala
+        _ <- ws
+          .writeTextMessage(write(Request(Subscribe.name, ujson.Arr(WsParams.Tx.name), 1)))
+          .asScala
+      } yield ()).futureValue
+      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Success(result, id) =>
+          result is ujson.True
+          id is 0
+      }
+      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Success(result, id) =>
+          result is ujson.True
+          id is 1
+      }
+      ()
     }
 
     def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
       eventBusRef ! BlockNotify(blockGen.sample.get, height = 0)
     }
 
-    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
-      clientProbe.expectMsgPF() { case msg: String =>
-        read[NotificationUnsafe](msg).asNotification.rightValue.method is WsMethod.Block.name
-      }
+    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion = {
+      read[NotificationUnsafe](
+        clientProbe.expectMsgClass(classOf[String])
+      ).asNotification.rightValue.method is WsParams.Block.name
+      1 is 1
+    }
 
     val wsInitBehavior = WsStartBehavior(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
     checkWS(
@@ -64,7 +82,7 @@ class WebSocketServerSpec
 
   it should "not spin ws connections over limit" in new RouteWS {
     override def maxConnections: Int = 2
-    val wsSpec = WsStartBehavior((_, _) => Future.successful(()), _ => (), _ => true is true)
+    val wsSpec                       = WsStartBehavior((_, _) => (), _ => (), _ => true is true)
     checkWS(
       initBehaviors = AVector.fill(3)(wsSpec),
       nextBehaviors = AVector.empty,
@@ -74,9 +92,8 @@ class WebSocketServerSpec
   }
 
   it should "connect and not subscribe multiple ws clients to any event" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      Future.successful(())
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
+      val _ = ws.textMessageHandler(message => clientProbe.ref ! message)
     }
 
     val wsInitBehavior = WsStartBehavior(
@@ -93,15 +110,15 @@ class WebSocketServerSpec
   }
 
   it should "handle invalid messages gracefully" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage("invalid_msg").asScala.mapTo[Unit]
+      ws.writeTextMessage("invalid_msg").asScala.mapTo[Unit].futureValue
     }
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
-      clientProbe.expectMsgPF() { case msg: String =>
-        msg is "Unsupported message : invalid_msg"
-      }
+      clientProbe
+        .expectMsgClass(classOf[String])
+        .contains(Error.ParseErrorCode.toString) is true
 
     val wsInitBehavior = WsStartBehavior(clientInitBehavior, _ => (), clientAssertionOnMsg)
     checkWS(
@@ -117,23 +134,38 @@ class WebSocketServerSpec
   it should "acknowledge subscriptions/unsubscriptions" in {}
 
   it should "handle unsubscribing from events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Future[Unit] = {
+    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage(WsEvent(WsCommand.Subscribe, WsMethod.Block).toString)
+      ws.writeTextMessage(write(Request(Subscribe.name, ujson.Arr(WsParams.Block.name), 0)))
         .asScala
         .mapTo[Unit]
+        .futureValue
     }
-    def clientInitAssertionOnMsg(clientProbe: TestProbe): Assertion =
-      clientProbe.expectMsgPF() { case msg: String =>
-        read[NotificationUnsafe](
-          msg
-        ).asNotification.rightValue.method is WsMethod.Block.name
+    def clientInitAssertionOnMsg(clientProbe: TestProbe): Assertion = {
+      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Success(result, id) =>
+          result is ujson.True
+          id is 0
       }
-    def clientNextBehavior(ws: WebSocket): Future[Unit] = {
-      ws.writeTextMessage(WsEvent(WsCommand.Unsubscribe, WsMethod.Block).toString)
+      read[NotificationUnsafe](
+        clientProbe.expectMsgClass(classOf[String])
+      ).asNotification.rightValue.method is WsParams.Block.name
+    }
+
+    def clientNextBehavior(ws: WebSocket): Unit = {
+      ws.writeTextMessage(write(Request(Unsubscribe.name, ujson.Arr(WsParams.Block.name), 1)))
         .asScala
         .mapTo[Unit]
+        .futureValue
     }
+    def clientNextAssertionOnMsg(clientProbe: TestProbe): Assertion = {
+      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Success(result, id) =>
+          result is ujson.True
+          id is 1
+      }
+    }
+
     val wsInitBehavior = WsStartBehavior(
       clientInitBehavior,
       _ ! BlockNotify(blockGen.sample.get, height = 0),
@@ -142,7 +174,7 @@ class WebSocketServerSpec
     val wsNextBehavior = WsBehavior(
       clientNextBehavior,
       _ ! BlockNotify(blockGen.sample.get, height = 1),
-      _.expectNoMessage()
+      clientNextAssertionOnMsg
     )
     checkWS(
       initBehaviors = AVector.fill(1)(wsInitBehavior),
