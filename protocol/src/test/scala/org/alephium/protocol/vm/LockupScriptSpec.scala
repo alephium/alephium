@@ -16,10 +16,10 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, NoIndexModelGenerators}
+import org.alephium.protocol.{Checksum, Hash}
+import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
@@ -74,5 +74,29 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val lock4 = Hex.unsafe(s"010000")
     deserialize[LockupScript](lock4).leftValue.getMessage
       .startsWith(s"Invalid m in m-of-n multisig") is true
+  }
+
+  it should "validate p2pk" in {
+    val lockupScript = p2pkLockupGen(GroupIndex.unsafe(1)).sample.get
+    lockupScript.groupIndex is lockupScript.publicKey.scriptHint.groupIndex
+    val publicKeyBytes = serialize(lockupScript.publicKey)
+    val checksum       = Checksum.calc(publicKeyBytes)
+    val hintBytes      = Bytes.from(lockupScript.scriptHint.value)
+    val bytes =
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum.bytes ++ hintBytes)}")
+    serialize[LockupScript](lockupScript) is bytes
+    deserialize[LockupScript](bytes) isE lockupScript
+
+    (0 until groupConfig.groups).foreach { value =>
+      val groupIndex = GroupIndex.unsafe(value)
+      val p2pk       = LockupScript.P2PK.from(lockupScript.publicKey, Some(groupIndex))
+      p2pk.groupIndex is groupIndex
+    }
+
+    val invalidChecksum = bytesGen(Checksum.checksumLength).sample.get
+    val invalidBytes =
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ invalidChecksum ++ hintBytes)}")
+    deserialize[LockupScript](invalidBytes).leftValue.getMessage
+      .startsWith("Wrong checksum") is true
   }
 }

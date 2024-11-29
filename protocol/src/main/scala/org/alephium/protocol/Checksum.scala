@@ -32,6 +32,8 @@ final case class Checksum private (bytes: ByteString) extends AnyVal {
       )
     )
   }
+
+  def toHexString: String = Hex.toHexString(bytes)
 }
 
 object Checksum {

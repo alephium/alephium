@@ -19,9 +19,15 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.crypto.SecP256K1PublicKey
+import org.alephium.protocol.model.ScriptHint
 import org.alephium.serde._
+import org.alephium.util.DjbHash
 
-sealed trait PublicKeyType
+sealed trait PublicKeyType {
+  def bytes: ByteString
+
+  lazy val scriptHint: ScriptHint = ScriptHint.fromHash(DjbHash.intHash(bytes))
+}
 
 object PublicKeyType {
   implicit val serde: Serde[PublicKeyType] = new Serde[PublicKeyType] {
@@ -39,5 +45,7 @@ object PublicKeyType {
     }
   }
 
-  final case class SecP256K1(publicKey: SecP256K1PublicKey) extends PublicKeyType
+  final case class SecP256K1(publicKey: SecP256K1PublicKey) extends PublicKeyType {
+    def bytes: ByteString = publicKey.bytes
+  }
 }

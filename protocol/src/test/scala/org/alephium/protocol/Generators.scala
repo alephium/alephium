@@ -20,6 +20,8 @@ import java.net.InetSocketAddress
 
 import scala.language.implicitConversions
 
+import akka.util.ByteString
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, GroupConfig}
@@ -164,6 +166,9 @@ trait Generators extends NumericHelpers {
     Gen.choose[java.math.BigInteger](I256.MinValue.v, I256.MaxValue.v).map(I256.unsafe)
   val u256Gen: Gen[U256] =
     Gen.choose[java.math.BigInteger](U256.MinValue.v, U256.MaxValue.v).map(U256.unsafe)
+
+  def bytesGen(size: Int): Gen[ByteString] =
+    Gen.listOfN(size, arbitrary[Byte].sample.get).map(ByteString.apply)
 }
 
 trait DefaultGenerators extends Generators {

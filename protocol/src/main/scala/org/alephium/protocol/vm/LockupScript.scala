@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{Checksum, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
@@ -42,6 +42,7 @@ object LockupScript {
         case s: P2MPKH => ByteString(1) ++ P2MPKH.serde.serialize(s)
         case s: P2SH   => ByteString(2) ++ serdeImpl[Hash].serialize(s.scriptHash)
         case s: P2C    => ByteString(3) ++ serdeImpl[Hash].serialize(s.contractId.value)
+        case s: P2PK   => ByteString(4) ++ P2PK.serde.serialize(s)
       }
     }
 
@@ -55,6 +56,8 @@ object LockupScript {
           serdeImpl[Hash]._deserialize(content).map(_.mapValue(P2SH.apply))
         case Staging(3, content) =>
           P2C.serde._deserialize(content)
+        case Staging(4, content) =>
+          P2PK.serde._deserialize(content)
         case Staging(n, _) =>
           Left(SerdeError.wrongFormat(s"Invalid lockupScript prefix $n"))
       }
@@ -91,6 +94,11 @@ object LockupScript {
       case e: LockupScript.P2C => Some(e)
       case _                   => None
     }
+  }
+  def p2pk(key: PublicKeyType, groupIndexOpt: Option[GroupIndex])(implicit
+      groupConfig: GroupConfig
+  ): P2PK = {
+    P2PK.from(key, groupIndexOpt)
   }
 
   sealed trait Asset extends LockupScript {
@@ -152,6 +160,63 @@ object LockupScript {
   }
   object P2C {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)
+  }
+
+  final case class P2PK private (publicKey: PublicKeyType, scriptHint: ScriptHint) extends Asset
+
+  object P2PK {
+    def from(publicKey: PublicKeyType)(implicit groupConfig: GroupConfig): P2PK =
+      from(publicKey, None)
+
+    def from(publicKey: PublicKeyType, groupIndexOpt: Option[GroupIndex])(implicit
+        groupConfig: GroupConfig
+    ): P2PK = {
+      groupIndexOpt match {
+        case Some(groupIndex) => P2PK(publicKey, findScriptHint(publicKey.scriptHint, groupIndex))
+        case None             => P2PK(publicKey, publicKey.scriptHint)
+      }
+    }
+
+    @scala.annotation.tailrec
+    private def findScriptHint(hint: ScriptHint, group: GroupIndex)(implicit
+        config: GroupConfig
+    ): ScriptHint = {
+      if (hint.groupIndex == group) {
+        hint
+      } else {
+        findScriptHint(ScriptHint.fromHash(hint.value + 1), group)
+      }
+    }
+
+    implicit val serde: Serde[P2PK] = {
+      val scriptHintSerde: Serde[ScriptHint] =
+        Serde
+          .bytesSerde(4)
+          .xmap(
+            (bs: ByteString) => new ScriptHint(Bytes.toIntUnsafe(bs)),
+            (hint: ScriptHint) => Bytes.from(hint.value)
+          )
+
+      new Serde[P2PK] {
+        override def serialize(input: P2PK): ByteString = {
+          val publicKey = serdeImpl[PublicKeyType].serialize(input.publicKey)
+          val checksum  = serdeImpl[Checksum].serialize(Checksum.calc(publicKey))
+          publicKey ++ checksum ++ scriptHintSerde.serialize(input.scriptHint)
+        }
+
+        override def _deserialize(input: ByteString): SerdeResult[Staging[P2PK]] = {
+          for {
+            publicKeyResult <- serdeImpl[PublicKeyType]._deserialize(input)
+            data = input.take(input.length - publicKeyResult.rest.length)
+            checksumResult   <- serdeImpl[Checksum]._deserialize(publicKeyResult.rest)
+            _                <- checksumResult.value.check(data)
+            scriptHintResult <- scriptHintSerde._deserialize(checksumResult.rest)
+          } yield {
+            Staging(P2PK(publicKeyResult.value, scriptHintResult.value), scriptHintResult.rest)
+          }
+        }
+      }
+    }
   }
 
   def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
