@@ -5158,7 +5158,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val statefulContract = Compiler.compileContract(code).rightValue
     val codeHash         = statefulContract.hash
     serverUtils.getContractCode(blockFlow, codeHash).leftValue.detail is
-      s"Contract code ${codeHash.toHexString} not found"
+      s"Contract code hash: ${codeHash.toHexString} not found"
     createContract(code, AVector.empty, AVector.empty)._2
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
   }

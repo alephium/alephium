@@ -1617,7 +1617,7 @@ class ServerUtils(implicit
     for {
       worldState <- wrapResult(blockFlow.getBestPersistedWorldState(groupIndex))
       code <- wrapResult(worldState.getContractCode(codeHash)) match {
-        case Right(None)       => Left(notFound(s"Contract code ${codeHash.toHexString}"))
+        case Right(None)       => Left(notFound(s"Contract code hash: ${codeHash.toHexString}"))
         case Right(Some(code)) => Right(code)
         case Left(error)       => Left(error)
       }
