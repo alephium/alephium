@@ -968,6 +968,9 @@ trait EndpointsExamples extends ErrorExamples {
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
 
+  implicit lazy val contractCodeExamples: List[Example[StatefulContract]] =
+    simpleExample(existingContract.bytecode)
+
   private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),
     AVector(Token(id = TokenId.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
