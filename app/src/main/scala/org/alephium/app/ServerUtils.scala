@@ -1609,6 +1609,21 @@ class ServerUtils(implicit
     } yield state
   }
 
+  def getContractCode(blockFlow: BlockFlow, codeHash: Hash): Try[StatefulContract] = {
+    // Since the contract code is not stored in the trie,
+    // and all the groups share the same storage,
+    // we only need to get the world state from any one group
+    val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(0))
+    for {
+      worldState <- wrapResult(blockFlow.getBestPersistedWorldState(groupIndex))
+      code <- wrapResult(worldState.getContractCode(codeHash)) match {
+        case Right(None)       => Left(notFound(s"Contract code hash: ${codeHash.toHexString}"))
+        case Right(Some(code)) => Right(code)
+        case Left(error)       => Left(error)
+      }
+    } yield code
+  }
+
   def getParentContract(
       blockFlow: BlockFlow,
       contractAddress: Address.Contract

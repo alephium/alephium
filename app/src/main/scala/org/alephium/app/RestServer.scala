@@ -127,6 +127,7 @@ class RestServer(
       buildDeployContractTxLogic,
       buildChainedTransactionsLogic,
       contractStateLogic,
+      contractCodeLogic,
       testContractLogic,
       callContractLogic,
       multipleCallContractLogic,
