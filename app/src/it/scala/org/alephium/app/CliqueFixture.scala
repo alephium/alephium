@@ -394,7 +394,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       .connect(port, "127.0.0.1", "/ws")
       .asScala
       .map { ws =>
-        ws.writeTextMessage(write(WsRequest.subscribe(0, Subscription.Block).toJsonRPC))
+        ws.writeTextMessage(write(WsRequest.subscribe(0, Subscription.Block)))
         ws.textMessageHandler { blockNotify =>
           blockNotifyProbe.ref ! blockNotify
         }

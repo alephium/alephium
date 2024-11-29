@@ -27,7 +27,7 @@ import org.scalatest.concurrent.IntegrationPatience
 
 import org.alephium.api.model.BlockEntry
 import org.alephium.app.WebSocketServer.WsEventHandler
-import org.alephium.app.WsParams.{Subscription}
+import org.alephium.app.WsParams.Subscription
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
@@ -53,27 +53,6 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
     notification.method is Subscription.BlockEvent
     show(notification.params) is write(blockEntry)
-  }
-
-  "WsProtocol" should "parse websocket event for subscription and unsubscription" in {
-    WsParams.methodTypes.foreach { method =>
-      Subscription.eventTypes.foreach { params =>
-        WsRequest
-          .fromJsonString(
-            s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$params"]}"""
-          )
-          .isRight is true
-        WsRequest.fromJsonString(s"""{"method": "$method", "params": ["$params"]}""").isLeft is true
-        WsRequest.fromJsonString(s"""{"method": "$method"""").isLeft is true
-        WsRequest
-          .fromJsonString(s"""{"method2": "$method", "params": ["$params"]}""")
-          .isLeft is true
-        WsRequest
-          .fromJsonString(s"""{"method": "$method", "params2": ["$params"]}""")
-          .isLeft is true
-        WsRequest.fromJsonString(s"""{"method": "$method", "params": "$params"}""").isLeft is true
-      }
-    }
   }
 
   "WsUtils" should "convert VertxFuture to Scala Future" in {
@@ -107,8 +86,8 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
       subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
     }
     val httpBinding    = bindAndListen()
-    val subscribeReq   = WsRequest.subscribe(0, Subscription.Block).toJsonRPC
-    val unsubscribeReq = WsRequest.unsubscribe(1, Subscription.Block.subscriptionId).toJsonRPC
+    val subscribeReq   = WsRequest.subscribe(0, Subscription.Block)
+    val unsubscribeReq = WsRequest.unsubscribe(1, Subscription.Block.subscriptionId)
 
     // let's measure sequential connection, subscription, notification and unsubscription time on local env
     val websockets =

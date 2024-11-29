@@ -42,12 +42,12 @@ class WebSocketServerSpec
       (for {
         _ <- ws
           .writeTextMessage(
-            write(WsRequest.subscribe(0, Subscription.Block).toJsonRPC)
+            write(WsRequest.subscribe(0, Subscription.Block))
           )
           .asScala
         _ <- ws
           .writeTextMessage(
-            write(WsRequest.subscribe(1, Subscription.Tx).toJsonRPC)
+            write(WsRequest.subscribe(1, Subscription.Tx))
           )
           .asScala
       } yield ()).futureValue
@@ -140,7 +140,7 @@ class WebSocketServerSpec
   it should "handle unsubscribing from events" in new RouteWS {
     def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage(write(WsRequest.subscribe(0, Subscription.Block).toJsonRPC))
+      ws.writeTextMessage(write(WsRequest.subscribe(0, Subscription.Block)))
         .asScala
         .mapTo[Unit]
         .futureValue
@@ -158,7 +158,7 @@ class WebSocketServerSpec
 
     def clientNextBehavior(ws: WebSocket): Unit = {
       ws.writeTextMessage(
-        write(WsRequest.unsubscribe(1, Subscription.Block.subscriptionId).toJsonRPC)
+        write(WsRequest.unsubscribe(1, Subscription.Block.subscriptionId))
       ).asScala
         .mapTo[Unit]
         .futureValue
