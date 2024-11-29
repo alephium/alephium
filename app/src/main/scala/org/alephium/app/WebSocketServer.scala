@@ -35,6 +35,7 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.protocol.config.NetworkConfig
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{ActorRefT, BaseActor, EventBus}
 
@@ -86,11 +87,11 @@ object WebSocketServer extends StrictLogging {
 
     def buildNotification(
         event: EventBus.Event
-    )(implicit networkConfig: NetworkConfig): Either[String, Notification] = {
+    )(implicit networkConfig: NetworkConfig): Either[String, NotificationUnsafe] = {
       event match {
         case BlockNotify(block, height) =>
           BlockEntry.from(block, height).map { blockEntry =>
-            Notification(Subscription.BlockEvent, writeJs(blockEntry))
+            NotificationUnsafe(JsonRPC.version, Subscription.BlockEvent, Some(writeJs(blockEntry)))
           }
       }
     }

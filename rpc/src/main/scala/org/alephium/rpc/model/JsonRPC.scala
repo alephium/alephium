@@ -170,6 +170,16 @@ object JsonRPC extends StrictLogging {
     def apply(jsonrpc: String, method: String, params: Option[ujson.Value]): NotificationUnsafe = {
       new NotificationUnsafe(jsonrpc, method, params.map(dropNullValues))
     }
+    implicit val notificationWriter: Writer[NotificationUnsafe] =
+      writer[ujson.Value].comap[NotificationUnsafe] {
+        case NotificationUnsafe(jsonrpc, method, params) =>
+          ujson.Obj.from(
+            Vector(
+              "jsonrpc" -> ujson.Str(jsonrpc),
+              "method"  -> ujson.Str(method)
+            ) ++ params.map("params" -> _)
+          )
+      }
     implicit val notificationUnsafeReader: Reader[NotificationUnsafe] =
       reader[ujson.Value].map[NotificationUnsafe] { json =>
         NotificationUnsafe(
