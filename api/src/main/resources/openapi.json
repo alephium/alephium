@@ -9348,16 +9348,16 @@
         }
       }
     },
-    "/contracts/{code-hash}/code": {
+    "/contracts/{codeHash}/code": {
       "get": {
         "tags": [
           "Contracts"
         ],
         "summary": "Get contract code by code hash",
-        "operationId": "getContractsCode-hashCode",
+        "operationId": "getContractsCodehashCode",
         "parameters": [
           {
-            "name": "code-hash",
+            "name": "codeHash",
             "in": "path",
             "required": true,
             "schema": {
