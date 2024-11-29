@@ -31,7 +31,7 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{
   Address,
@@ -161,7 +161,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ) is ArraySeq.empty
   }
 
-  it should "load genesis config" in {
+  it should "load genesis config" in new GroupConfigFixture.Default {
     val amount = ALPH.oneAlph
     val addresses = AVector(
       "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",

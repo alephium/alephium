@@ -20,13 +20,16 @@ import fastparse.{EagerOps, Parsed}
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.Val
 import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
-abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
+abstract class LexerSpec(fileURI: Option[java.net.URI])
+    extends AlephiumSpec
+    with GroupConfigFixture.Default {
   val Lexer           = new Lexer(fileURI)
   val StatelessParser = new StatelessParser(fileURI)
 

@@ -66,11 +66,29 @@ object LockupScript {
 
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
-  def fromBase58(input: String): Option[LockupScript] = {
-    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption)
+  def fromBase58(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript] = {
+    if (input.length > 2 && input(input.length - 2) == '@') {
+      input.takeRight(1).toIntOption.flatMap(GroupIndex.from) match {
+        case Some(groupIndex) =>
+          Base58.decode(input.dropRight(2)) match {
+            case Some(bytes) if bytes.startsWith(ByteString(4)) =>
+              P2PK.fromDecodedBase58(bytes.drop(1), Some(groupIndex))
+            case _ => None
+          }
+        case None => None
+      }
+    } else {
+      Base58.decode(input).flatMap { bytes =>
+        if (bytes.startsWith(ByteString(4))) {
+          P2PK.fromDecodedBase58(bytes.drop(1), None)
+        } else {
+          deserialize[LockupScript](bytes).toOption
+        }
+      }
+    }
   }
 
-  def asset(input: String): Option[LockupScript.Asset] = {
+  def asset(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript.Asset] = {
     fromBase58(input).flatMap {
       case e: LockupScript.Asset => Some(e)
       case _                     => None
@@ -89,7 +107,7 @@ object LockupScript {
     P2SH(Hash.hash(serdeImpl[StatelessScript].serialize(script)))
   def p2sh(scriptHash: Hash): P2SH     = P2SH(scriptHash)
   def p2c(contractId: ContractId): P2C = P2C(contractId)
-  def p2c(input: String): Option[LockupScript.P2C] = {
+  def p2c(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript.P2C] = {
     fromBase58(input).flatMap {
       case e: LockupScript.P2C => Some(e)
       case _                   => None
@@ -162,9 +180,16 @@ object LockupScript {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)
   }
 
-  final case class P2PK private (publicKey: PublicKeyType, scriptHint: ScriptHint) extends Asset
+  final case class P2PK private (publicKey: PublicKeyType, scriptHint: ScriptHint) extends Asset {
+    def toBase58: String = {
+      val bytes = serialize[LockupScript](this).dropRight(P2PK.scriptHintLength)
+      Base58.encode(bytes)
+    }
+  }
 
   object P2PK {
+    private val scriptHintLength: Int = 4
+
     def from(publicKey: PublicKeyType)(implicit groupConfig: GroupConfig): P2PK =
       from(publicKey, None)
 
@@ -188,34 +213,51 @@ object LockupScript {
       }
     }
 
-    implicit val serde: Serde[P2PK] = {
-      val scriptHintSerde: Serde[ScriptHint] =
-        Serde
-          .bytesSerde(4)
-          .xmap(
-            (bs: ByteString) => new ScriptHint(Bytes.toIntUnsafe(bs)),
-            (hint: ScriptHint) => Bytes.from(hint.value)
-          )
-
-      new Serde[P2PK] {
-        override def serialize(input: P2PK): ByteString = {
-          val publicKey = serdeImpl[PublicKeyType].serialize(input.publicKey)
-          val checksum  = serdeImpl[Checksum].serialize(Checksum.calc(publicKey))
-          publicKey ++ checksum ++ scriptHintSerde.serialize(input.scriptHint)
-        }
-
-        override def _deserialize(input: ByteString): SerdeResult[Staging[P2PK]] = {
-          for {
-            publicKeyResult <- serdeImpl[PublicKeyType]._deserialize(input)
-            data = input.take(input.length - publicKeyResult.rest.length)
-            checksumResult   <- serdeImpl[Checksum]._deserialize(publicKeyResult.rest)
-            _                <- checksumResult.value.check(data)
-            scriptHintResult <- scriptHintSerde._deserialize(checksumResult.rest)
-          } yield {
-            Staging(P2PK(publicKeyResult.value, scriptHintResult.value), scriptHintResult.rest)
+    def fromDecodedBase58(bytes: ByteString, groupIndexOpt: Option[GroupIndex])(implicit
+        groupConfig: GroupConfig
+    ): Option[P2PK] = {
+      safePublicKeySerde._deserialize(bytes).toOption match {
+        case Some(key) if key.rest.isEmpty => Some(from(key.value, groupIndexOpt))
+        case Some(key) =>
+          scriptHintSerde.deserialize(key.rest).toOption match {
+            case Some(hint) if groupIndexOpt.forall(_ == hint.groupIndex) =>
+              Some(P2PK(key.value, hint))
+            case _ => None
           }
-        }
+        case None => None
       }
+    }
+
+    private val safePublicKeySerde: Serde[PublicKeyType] = new Serde[PublicKeyType] {
+      override def serialize(input: PublicKeyType): ByteString = {
+        val publicKey = PublicKeyType.serde.serialize(input)
+        val checksum  = Checksum.serde.serialize(Checksum.calc(publicKey))
+        publicKey ++ checksum
+      }
+
+      override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyType]] = {
+        for {
+          publicKeyResult <- PublicKeyType.serde._deserialize(input)
+          data = input.take(input.length - publicKeyResult.rest.length)
+          checksumResult <- Checksum.serde._deserialize(publicKeyResult.rest)
+          _              <- checksumResult.value.check(data)
+        } yield Staging(publicKeyResult.value, checksumResult.rest)
+      }
+    }
+
+    private val scriptHintSerde: Serde[ScriptHint] =
+      Serde
+        .bytesSerde(scriptHintLength)
+        .xmap(
+          (bs: ByteString) => new ScriptHint(Bytes.toIntUnsafe(bs)),
+          (hint: ScriptHint) => Bytes.from(hint.value)
+        )
+
+    implicit val serde: Serde[P2PK] = {
+      Serde.forProduct2(P2PK.apply, (p: P2PK) => (p.publicKey, p.scriptHint))(
+        safePublicKeySerde,
+        scriptHintSerde
+      )
     }
   }
 

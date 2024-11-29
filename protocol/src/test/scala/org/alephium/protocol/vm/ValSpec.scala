@@ -18,10 +18,11 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.Address
 import org.alephium.util.{AlephiumSpec, I256, U256}
 
-class ValSpec extends AlephiumSpec {
+class ValSpec extends AlephiumSpec with GroupConfigFixture.Default {
   it should "convert to debug messages" in {
     Val.True.toDebugString() is ByteString.fromString("true")
     Val.False.toDebugString() is ByteString.fromString("false")

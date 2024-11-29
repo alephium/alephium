@@ -23,6 +23,7 @@ import scala.collection.{immutable, mutable}
 import akka.util.ByteString
 import fastparse.Parsed
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.{Ident, MultiContract}
 import org.alephium.ralph.error.CompilerError
@@ -51,7 +52,7 @@ object Compiler {
   def compileAssetScript(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (StatelessScript, AVector[Warning])] =
+  )(implicit groupConfig: GroupConfig): Either[Error, (StatelessScript, AVector[Warning])] =
     try {
       fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
         case Parsed.Success((script, globalState), _) =>
@@ -68,31 +69,33 @@ object Compiler {
       input: String,
       index: Int = 0,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, StatefulScript] =
+  )(implicit groupConfig: GroupConfig): Either[Error, StatefulScript] =
     compileTxScriptFull(input, index, compilerOptions).map(_.debugCode)
 
   def compileTxScriptFull(
       input: String,
       index: Int = 0,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, CompiledScript] =
+  )(implicit groupConfig: GroupConfig): Either[Error, CompiledScript] =
     compileStateful(input, _.genStatefulScript(index)(compilerOptions))
 
   def compileContract(
       input: String,
       index: Int = 0,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, StatefulContract] =
+  )(implicit groupConfig: GroupConfig): Either[Error, StatefulContract] =
     compileContractFull(input, index, compilerOptions).map(_.debugCode)
 
   def compileContractFull(
       input: String,
       index: Int = 0,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, CompiledContract] =
+  )(implicit groupConfig: GroupConfig): Either[Error, CompiledContract] =
     compileStateful(input, _.genStatefulContract(index)(compilerOptions))
 
-  private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
+  private def compileStateful[T](input: String, genCode: MultiContract => T)(implicit
+      groupConfig: GroupConfig
+  ): Either[Error, T] = {
     try {
       compileMultiContract(input).map(genCode)
     } catch {
@@ -110,7 +113,7 @@ object Compiler {
   def compileProject(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, CompileProjectResult] = {
+  )(implicit groupConfig: GroupConfig): Either[Error, CompileProjectResult] = {
     try {
       compileMultiContract(input).map { multiContract =>
         val (warnings0, compiled) = multiContract.genStatefulContracts()(compilerOptions)
@@ -132,7 +135,9 @@ object Compiler {
     }
   }
 
-  def compileMultiContract(input: String): Either[Error, MultiContract] = {
+  def compileMultiContract(
+      input: String
+  )(implicit groupConfig: GroupConfig): Either[Error, MultiContract] = {
     try {
       fastparse.parse(input, new StatefulParser(None).multiContract(_)) match {
         case Parsed.Success(multiContract, _) =>

@@ -58,6 +58,8 @@ object ApiModel {
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ApiModelCodec {
 
+  implicit def groupConfig: GroupConfig
+
   implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
   implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
 

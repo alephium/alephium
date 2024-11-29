@@ -19,7 +19,9 @@ package org.alephium.protocol
 import java.text.{DecimalFormat, DecimalFormatSymbols}
 
 import org.alephium.protocol.model.{Address, ChainIndex, HardFork, Weight}
-import org.alephium.util.{AVector, Duration, Number, TimeStamp, U256}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.serde.deserialize
+import org.alephium.util.{AVector, Base58, Duration, Number, TimeStamp, U256}
 
 object ALPH {
   // scalastyle:off magic.number
@@ -123,7 +125,7 @@ object ALPH {
   lazy val testnetWhitelistedMiners = {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def miner(address: String) = {
-      Address.fromBase58(address).get.lockupScript
+      Base58.decode(address).flatMap(deserialize[LockupScript](_).toOption).get
     }
     Set(
       miner("1AuWeE5Cwt2ES3473qnpKFV96z57CYL6mbTY7hva9Xz3h"),

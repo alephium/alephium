@@ -21,6 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import fastparse._
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
@@ -35,7 +36,7 @@ import org.alephium.util.AVector
     "org.wartremover.warts.Serializable"
   )
 )
-abstract class Parser[Ctx <: StatelessContext] {
+abstract class Parser[Ctx <: StatelessContext](implicit groupConfig: GroupConfig) {
   implicit object RalphWhitespace extends Whitespace {
     def apply(ctx: fastparse.ParsingRun[_]): P[Unit] = {
       Lexer.emptyChars(ctx)
@@ -851,7 +852,8 @@ object Parser {
     "org.wartremover.warts.Serializable"
   )
 )
-class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[StatelessContext] {
+class StatelessParser(val fileURI: Option[java.net.URI])(implicit groupConfig: GroupConfig)
+    extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | loadData | callExpr | contractConv |
@@ -896,7 +898,8 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     "org.wartremover.warts.Serializable"
   )
 )
-class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
+class StatefulParser(val fileURI: Option[java.net.URI])(implicit groupConfig: GroupConfig)
+    extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |

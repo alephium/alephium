@@ -24,6 +24,7 @@ import fastparse._
 import fastparse.NoWhitespace._
 
 import org.alephium.protocol.ALPH
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{LockupScript, StatelessContext, Val}
 import org.alephium.protocol.vm.Val.ByteVec
@@ -34,7 +35,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-class Lexer(fileURI: Option[java.net.URI]) {
+class Lexer(fileURI: Option[java.net.URI])(implicit groupConfig: GroupConfig) {
   def lowercase[Unknown: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[Unknown: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[Unknown: P]: P[Unit]     = P(CharIn("0-9"))

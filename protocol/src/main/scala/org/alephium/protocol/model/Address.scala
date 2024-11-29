@@ -29,7 +29,12 @@ sealed trait Address {
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 
-  def toBase58: String = Base58.encode(serialize(lockupScript))
+  def toBase58: String = {
+    lockupScript match {
+      case script: LockupScript.P2PK => script.toBase58
+      case _                         => Base58.encode(serialize(lockupScript))
+    }
+  }
 
   override def toString: String = toBase58
 }
@@ -51,20 +56,29 @@ object Address {
     Contract(LockupScript.p2c(contractId))
   }
 
-  def fromBase58(input: String): Option[Address] = {
+  def contract(input: String): Option[Address.Contract] = {
+    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption) match {
+      case Some(lockupScript: LockupScript.P2C) => Some(Address.Contract(lockupScript))
+      case _                                    => None
+    }
+  }
+
+  def fromBase58(input: String)(implicit groupConfig: GroupConfig): Option[Address] = {
     for {
       lockupScript <- LockupScript.fromBase58(input)
     } yield from(lockupScript)
   }
 
-  def asset(input: String): Option[Address.Asset] = {
+  def asset(input: String)(implicit groupConfig: GroupConfig): Option[Address.Asset] = {
     fromBase58(input) match {
       case Some(address: Asset) => Some(address)
       case _                    => None
     }
   }
 
-  def extractLockupScript(address: String): Option[LockupScript] = {
+  def extractLockupScript(
+      address: String
+  )(implicit groupConfig: GroupConfig): Option[LockupScript] = {
     for {
       lockupScript <- LockupScript.fromBase58(address)
     } yield lockupScript

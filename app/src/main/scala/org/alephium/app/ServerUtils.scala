@@ -2253,7 +2253,7 @@ object ServerUtils {
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
-  ): Try[StatefulScript] = {
+  )(implicit groupConfig: GroupConfig): Try[StatefulScript] = {
     buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
@@ -2315,7 +2315,7 @@ object ServerUtils {
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
-  ): Try[StatefulScript] = {
+  )(implicit groupConfig: GroupConfig): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
       address,

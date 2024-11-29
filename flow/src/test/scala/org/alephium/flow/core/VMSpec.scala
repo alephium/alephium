@@ -3421,9 +3421,9 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val subContractInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
-    val subContract             = Compiler.compileContract(subContractRaw).rightValue
-    val subContractByteCode     = Hex.toHexString(serialize(subContract))
+    val subContractInitialState  = Hex.toHexString(serialize(AVector.empty[Val]))
+    lazy val subContract         = Compiler.compileContract(subContractRaw).rightValue
+    lazy val subContractByteCode = Hex.toHexString(serialize(subContract))
 
     // scalastyle:off method.length
     def verify(

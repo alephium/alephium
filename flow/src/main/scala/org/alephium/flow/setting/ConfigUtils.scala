@@ -58,7 +58,9 @@ object ConfigUtils {
     }
   }
 
-  private def parseAddress(rawAddress: String): Either[ConfigException, Address.Asset] = {
+  private def parseAddress(
+      rawAddress: String
+  )(implicit groupConfig: GroupConfig): Either[ConfigException, Address.Asset] = {
     Address.fromBase58(rawAddress) match {
       case Some(address: Address.Asset) => Right(address)
       case Some(_: Address.Contract) =>
