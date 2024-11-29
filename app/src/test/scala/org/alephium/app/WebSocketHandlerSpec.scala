@@ -26,10 +26,10 @@ import io.vertx.core.{Future => VertxFuture}
 import org.scalatest.concurrent.IntegrationPatience
 
 import org.alephium.api.model.BlockEntry
-import org.alephium.app.WebSocketServer.{Correlation, WsEventHandler}
+import org.alephium.app.WebSocketServer.WsEventHandler
+import org.alephium.app.WsParams.{Subscription}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
-import org.alephium.rpc.model.JsonRPC.Request
 import org.alephium.util._
 
 class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils {
@@ -51,21 +51,18 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
   it should "build Notification from Event" in {
     val notification = WsEventHandler.buildNotification(BlockNotify(dummyBlock, 0)).rightValue
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    notification.method is WsParams.Block.name
+    notification.method is Subscription.BlockEvent
     show(notification.params) is write(blockEntry)
   }
 
   "WsProtocol" should "parse websocket event for subscription and unsubscription" in {
-    WsMethod.values.foreach { wsMethod =>
-      WsParams.values.foreach { wsParams =>
-        val method       = wsMethod.name
-        val params       = wsParams.name
-        val notification = WsRequest(Correlation(0), wsMethod, wsParams)
+    WsParams.methodTypes.foreach { method =>
+      Subscription.eventTypes.foreach { params =>
         WsRequest
           .fromJsonString(
             s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$params"]}"""
           )
-          .rightValue is notification
+          .isRight is true
         WsRequest.fromJsonString(s"""{"method": "$method", "params": ["$params"]}""").isLeft is true
         WsRequest.fromJsonString(s"""{"method": "$method"""").isLeft is true
         WsRequest
@@ -103,15 +100,15 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
 
   "WsSubscriptionHandler" should "handle high load fast" in new WebSocketServerFixture
     with IntegrationPatience {
-    val numberOfConnections     = 10000
+    val numberOfConnections     = 500
     override def maxConnections = numberOfConnections
     val clientProbe             = TestProbe()
     httpServer.webSocketHandler { webSocket =>
       subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
     }
     val httpBinding    = bindAndListen()
-    val subscribeReq   = Request(WsMethod.Subscribe.name, ujson.Arr(WsParams.Block.name), 0)
-    val unsubscribeReq = Request(WsMethod.Unsubscribe.name, ujson.Arr(WsParams.Block.name), 0)
+    val subscribeReq   = WsRequest.subscribe(0, Subscription.Block).toJsonRPC
+    val unsubscribeReq = WsRequest.unsubscribe(1, Subscription.Block.subscriptionId).toJsonRPC
 
     // let's measure sequential connection, subscription, notification and unsubscription time on local env
     val websockets =

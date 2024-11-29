@@ -16,90 +16,174 @@
 
 package org.alephium.app
 
+import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 import com.typesafe.scalalogging.LazyLogging
 import io.vertx.core.{Future => VertxFuture}
+import io.vertx.core.eventbus.MessageConsumer
 import io.vertx.core.http.ServerWebSocket
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.app.WebSocketServer.{Correlation, SubscriptionId}
+import org.alephium.app.WsRequest.Correlation
+import org.alephium.crypto.Sha256
 import org.alephium.json.Json.{read, write}
-import org.alephium.rpc.model.JsonRPC.{Error, RequestUnsafe, Response}
-import org.alephium.util.{AVector, Hex}
+import org.alephium.rpc.model.JsonRPC.{Error, Request, RequestUnsafe, Response, WithId}
+import org.alephium.util.AVector
 
 object WsProtocol {
   object Code {
-    val AlreadySubscribed: Int = -32010
+    val AlreadySubscribed: Int   = -32010
+    val AlreadyUnsubscribed: Int = -32011
   }
 }
 
-sealed trait WsMethod {
-  def name: String
-}
-object WsMethod {
-  val values: AVector[WsMethod] = AVector(Subscribe, Unsubscribe)
-  case object Subscribe   extends WsMethod { val name = "subscribe"   }
-  case object Unsubscribe extends WsMethod { val name = "unsubscribe" }
-  def fromString(name: String): Either[Error, WsMethod] = name match {
-    case Subscribe.name   => Right(Subscribe)
-    case Unsubscribe.name => Right(Unsubscribe)
-    case unknown =>
-      Left(
-        Error(
-          Error.MethodNotFoundCode,
-          s"Invalid method $unknown, expected: ${values.mkString(", ")}"
-        )
-      )
-  }
-}
-sealed trait WsParams {
-  def name: String
-  def data: Option[String]           = None
-  def subscriptionId: SubscriptionId = Hex.unsafe(name + data.getOrElse("")).toString()
-}
+sealed trait WsParams
 object WsParams {
-  val values: AVector[WsParams] = AVector(Block, Tx)
-  case object Block extends WsParams { val name = "block" }
-  case object Tx    extends WsParams { val name = "tx"    }
-  private def fromString(name: String): Either[Error, WsParams] = name match {
-    case Block.name => Right(Block)
-    case Tx.name    => Right(Tx)
-    case unknown =>
-      Left(
-        Error(
-          Error.InvalidParamsCode,
-          s"Invalid params $unknown, expected: ${values.mkString(", ")}"
-        )
+  private type WsMethodType = String
+  private type WsEventType  = String
+
+  type WsId            = String
+  type WsCorrelationId = Long
+
+  type WsSubscription   = MessageConsumer[String]
+  type WsSubscriptionId = String
+
+  val methodTypes: AVector[WsMethodType] =
+    AVector(Subscription.MethodType, Unsubscription.MethodType)
+
+  final case class Subscription(eventType: WsEventType) extends WsParams {
+    def subscriptionId: WsSubscriptionId = Sha256.hash(eventType).toHexString
+  }
+  object Subscription {
+    val MethodType: WsMethodType = "subscribe"
+
+    val BlockEvent: WsEventType = "block"
+    val TxEvent: WsEventType    = "tx"
+
+    val eventTypes: AVector[WsEventType] = AVector(BlockEvent, TxEvent)
+
+    val Block: Subscription = Subscription(BlockEvent)
+    val Tx: Subscription    = Subscription(TxEvent)
+
+    def parse(json: ujson.Value, method: WsMethodType): Either[Error, WsParams] = {
+      json match {
+        case ujson.Str(eventTypeOrSubscriptionId) =>
+          method match {
+            case "subscribe" =>
+              eventTypeOrSubscriptionId match {
+                case BlockEvent | TxEvent => Right(Subscription(eventTypeOrSubscriptionId))
+                case unknown              => Left(invalidSimpleParamsError(unknown))
+              }
+            case "unsubscribe" => Right(Unsubscription(eventTypeOrSubscriptionId))
+            case unsupported   => Left(invalidMethodError(unsupported))
+          }
+        case unsupported => Left(invalidSimpleParamsJsonError(unsupported))
+      }
+    }
+    private def invalidMethodError(method: WsMethodType): Error =
+      Error(
+        Error.InvalidParamsCode,
+        s"Invalid method type: $method, expected array with one of: ${methodTypes.mkString(", ")}"
+      )
+    private def invalidSimpleParamsError(eventType: WsEventType): Error =
+      Error(
+        Error.InvalidParamsCode,
+        s"Invalid event type: $eventType, expected array with one of: ${eventTypes.mkString(", ")}"
+      )
+    private def invalidSimpleParamsJsonError(json: ujson.Value): Error =
+      Error(
+        Error.InvalidParamsCode,
+        s"Invalid event type json: $json, expected array with one of: ${eventTypes.mkString(", ")}"
       )
   }
-  def fromJson(params: ujson.Value): Either[Error, WsParams] = {
+  final case class FilteredSubscription(eventType: WsEventType, filter: SortedMap[String, String])
+      extends WsParams {
+    def subscriptionId: String = Sha256
+      .hash(eventType + "?" + filter.map { case (k, v) => s"$k=$v" }.mkString("&"))
+      .toHexString
+  }
+  object FilteredSubscription {
+    val Contract: WsEventType        = "contract"
+    val values: AVector[WsEventType] = AVector(Contract)
+    def parse(eventTypeJson: ujson.Value, filterJson: ujson.Value): Either[Error, WsParams] = {
+      (eventTypeJson, filterJson) match {
+        case (ujson.Str(eventType), ujson.Obj(filter)) =>
+          eventType match {
+            case Contract =>
+              val sortedFilter = TreeMap(filter.toSeq.map { case (k, v) => (k, v.str) }*)
+              Right(FilteredSubscription(eventType, sortedFilter))
+            case unknown => Left(invalidFilteredParamsError(unknown))
+          }
+        case unsupported => Left(invalidFilteredParamsJsonError(unsupported))
+      }
+    }
+    private def invalidFilteredParamsError(eventType: WsEventType): Error =
+      Error(
+        Error.InvalidParamsCode,
+        s"Invalid event type: $eventType, expected array with one of: ${values.mkString(", ")} and filter object"
+      )
+    private def invalidFilteredParamsJsonError(json: (ujson.Value, ujson.Value)): Error =
+      Error(
+        Error.InvalidParamsCode,
+        s"Invalid event type json: $json, expected array with one of: ${values.mkString(", ")} and filter object"
+      )
+
+  }
+
+  final case class Unsubscription(subscriptionId: WsSubscriptionId) extends WsParams
+  object Unsubscription {
+    val MethodType: WsMethodType = "unsubscribe"
+  }
+
+  def fromJson(params: ujson.Value, method: WsMethodType): Either[Error, WsParams] = {
     params match {
       case ujson.Arr(arr) if arr.length == 1 =>
-        arr(0) match {
-          case ujson.Str(name) => fromString(name)
-          case unsupported =>
-            Left(
-              Error(
-                Error.InvalidParamsCode,
-                s"Invalid params format: $unsupported, expected array of : ${values.mkString(", ")}"
-              )
-            )
-        }
+        Subscription.parse(arr(0), method)
+      case ujson.Arr(arr) if arr.length == 2 =>
+        FilteredSubscription.parse(arr(0), arr(1))
       case unsupported =>
         Left(
           Error(
             Error.InvalidParamsCode,
-            s"Invalid params format: $unsupported, expected array of : ${values.mkString(", ")}"
+            s"Invalid params format: $unsupported, expected array of size 1 or 2"
           )
         )
     }
   }
 }
 
-final case class WsRequest(id: Correlation, method: WsMethod, params: WsParams)
+final case class WsRequest(id: Correlation, params: WsParams) {
+  import WsParams._
+  def toJsonRPC: Request = params match {
+    case Subscription(eventType) =>
+      Request(Subscription.MethodType, ujson.Arr(ujson.Str(eventType)), id.id)
+    case Unsubscription(subscriptionId) =>
+      Request(Unsubscription.MethodType, ujson.Arr(ujson.Str(subscriptionId)), id.id)
+    case FilteredSubscription(eventType, filter) =>
+      Request(
+        Subscription.MethodType,
+        ujson.Arr(
+          ujson.Str(eventType),
+          ujson.Obj.from(filter.map { case (k, v) => (k, ujson.Str(v)) })
+        ),
+        id.id
+      )
+  }
+}
+
 object WsRequest extends ApiModelCodec {
+  import WsParams._
+
+  final case class Correlation(id: WsCorrelationId) extends WithId
+
+  private def fromJsonRpc(r: RequestUnsafe): Either[Error, WsRequest] = {
+    for {
+      params <- WsParams.fromJson(r.params, r.method)
+    } yield WsRequest(Correlation(r.id), params)
+  }
+
   def fromJsonString(msg: String): Either[Error, WsRequest] = {
     Try(read[RequestUnsafe](msg)) match {
       case Success(r)  => fromJsonRpc(r)
@@ -107,12 +191,14 @@ object WsRequest extends ApiModelCodec {
     }
   }
 
-  def fromJsonRpc(r: RequestUnsafe): Either[Error, WsRequest] = {
-    for {
-      params <- WsParams.fromJson(r.params)
-      method <- WsMethod.fromString(r.method)
-    } yield WsRequest(Correlation(r.id), method, params)
-  }
+  def subscribe(id: WsCorrelationId, subscription: Subscription): WsRequest =
+    WsRequest(Correlation(id), subscription)
+
+  def unsubscribe(id: WsCorrelationId, subscriptionId: WsSubscriptionId): WsRequest =
+    WsRequest(Correlation(id), Unsubscription(subscriptionId))
+
+  def subscribeWithFilter(id: WsCorrelationId, subscription: FilteredSubscription): WsRequest =
+    WsRequest(Correlation(id), subscription)
 }
 
 trait WsUtils extends LazyLogging {

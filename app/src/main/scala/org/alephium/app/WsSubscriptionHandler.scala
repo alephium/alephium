@@ -22,19 +22,16 @@ import scala.util.{Failure, Success, Try}
 
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
-import io.vertx.core.eventbus.Message
+import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.ServerWebSocket
 
-import org.alephium.app.WebSocketServer.{Correlation, Subscription, WebsocketId}
+import org.alephium.app.WsParams._
 import org.alephium.app.WsProtocol.Code
+import org.alephium.app.WsRequest.Correlation
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util.{AVector, BaseActor}
 
 object WsSubscriptionHandler {
-
-  sealed trait WsSubscription {
-    def method: String
-  }
 
   sealed trait SubscriptionMsg
   sealed trait Command         extends SubscriptionMsg
@@ -47,43 +44,44 @@ object WsSubscriptionHandler {
   final private case class Subscribed(
       id: Correlation,
       ws: ServerWebSocket,
-      params: WsParams,
-      consumer: Subscription
+      subscriptionId: WsSubscriptionId,
+      consumer: MessageConsumer[String]
   ) extends Event
   final private case class AlreadySubscribed(
       id: Correlation,
       ws: ServerWebSocket,
-      params: WsParams
+      subscriptionId: WsSubscriptionId
   ) extends Event
   final private case class SubscriptionFailed(
       id: Correlation,
       ws: ServerWebSocket,
-      params: WsParams,
       err: String
   ) extends Event
-  final private case class Unsubscribed(id: Correlation, ws: ServerWebSocket, params: WsParams)
-      extends Event
+  final private case class Unsubscribed(
+      id: Correlation,
+      ws: ServerWebSocket,
+      subscriptionId: WsSubscriptionId
+  ) extends Event
   final private case class AlreadyUnSubscribed(
       id: Correlation,
       ws: ServerWebSocket,
-      params: WsParams
+      subscriptionId: WsSubscriptionId
   ) extends Event
   final private case class UnsubscriptionFailed(
       id: Correlation,
       ws: ServerWebSocket,
-      params: WsParams,
       err: String
   ) extends Event
   final private case class NotificationFailed(
       id: Correlation,
       ws: ServerWebSocket,
-      params: WsParams,
+      subscriptionId: WsSubscriptionId,
       msg: String
   ) extends Event
-  final private case class Unregistered(id: WebsocketId) extends Event
+  final private case class Unregistered(id: WsId) extends Event
 
   final case class SubscriptionsResponse(
-      subscriptions: AVector[(WebsocketId, AVector[(WsParams, Subscription)])]
+      subscriptions: AVector[(WsId, AVector[(WsSubscriptionId, MessageConsumer[String])])]
   ) extends CommandResponse
 }
 
@@ -92,7 +90,8 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
   // subscriber with empty subscriptions is connected but not subscribed to any events
-  private val subscribers = mutable.Map.empty[WebsocketId, AVector[(WsParams, Subscription)]]
+  private val subscribers =
+    mutable.Map.empty[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]]
 
   // scalastyle:off method.length
   override def receive: Receive = {
@@ -104,32 +103,35 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
         ws.closeHandler(_ => unregister(ws.textHandlerID()))
         val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
       }
-    case Subscribed(id, ws, method, consumer) =>
+    case Subscribed(id, ws, subscriptionId, consumer) =>
       subscribers.updateWith(ws.textHandlerID()) {
-        case Some(ss) if ss.exists(_._1 == method) =>
+        case Some(ss) if ss.exists(_._1 == subscriptionId) =>
           Some(ss)
         case Some(ss) =>
-          Some(ss :+ (method -> consumer))
+          Some(ss :+ (subscriptionId -> consumer))
         case None =>
-          Some(AVector(method -> consumer))
+          Some(AVector(subscriptionId -> consumer))
       }
-      respondAsyncAndForget(ws, Response.successful(id))
-    case AlreadySubscribed(id, ws, params) =>
+      respondAsyncAndForget(ws, Response.successful(id, subscriptionId))
+    case AlreadySubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
         ws,
-        Response.failed(id, Error(Code.AlreadySubscribed, s"Already subscribed to $params"))
+        Response.failed(id, Error(Code.AlreadySubscribed, subscriptionId))
       )
-    case SubscriptionFailed(id, ws, _, reason) =>
+    case SubscriptionFailed(id, ws, reason) =>
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
-    case Unsubscribed(id, ws, params) =>
-      subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == params)))
+    case Unsubscribed(id, ws, subscriptionId) =>
+      subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == subscriptionId)))
       respondAsyncAndForget(ws, Response.successful(id))
-    case AlreadyUnSubscribed(id, ws, params) =>
+    case AlreadyUnSubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
         ws,
-        Response.failed(id, Error(Code.AlreadySubscribed, s"Already unsubscribed from $params"))
+        Response.failed(
+          id,
+          Error(Code.AlreadyUnsubscribed, s"Already unsubscribed from $subscriptionId subscription")
+        )
       )
-    case UnsubscriptionFailed(id, ws, _, reason) =>
+    case UnsubscriptionFailed(id, ws, reason) =>
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
     case NotificationFailed(_, _, _, _) =>
     // TODO can we do something about failing notification to client which is not closed ?
@@ -144,61 +146,72 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
       ec: ExecutionContext
   ): Unit = {
     WsRequest.fromJsonString(msg) match {
-      case Right(WsRequest(id, WsMethod.Subscribe, params)) =>
-        val _ = subscribe(id, ws, params)
-      case Right(WsRequest(id, WsMethod.Unsubscribe, params)) =>
-        val _ = unSubscribe(id, ws, params)
+      case Right(WsRequest(id, subscription: Subscription)) =>
+        val _ = subscribe(id, ws, subscription)
+      case Right(WsRequest(_, FilteredSubscription(_, _))) =>
+      // TODO implement events for particular address etc.
+      case Right(WsRequest(id, Unsubscription(subscriptionId))) =>
+        val _ = unSubscribe(id, ws, subscriptionId)
       case Left(error) => respondAsyncAndForget(ws, Response.failed(error))
     }
   }
 
-  private def subscribe(id: Correlation, ws: ServerWebSocket, params: WsParams)(implicit
+  private def subscribe(
+      id: Correlation,
+      ws: ServerWebSocket,
+      subscription: Subscription
+  )(implicit
       ec: ExecutionContext
   ): Unit = {
+    val subscriptionId = subscription.subscriptionId
     subscribers.get(ws.textHandlerID()) match {
-      case Some(ss) if ss.exists(_._1 == params) =>
-        self ! AlreadySubscribed(id, ws, params)
+      case Some(ss) if ss.exists(_._1 == subscriptionId) =>
+        self ! AlreadySubscribed(id, ws, subscriptionId)
       case _ =>
-        subscribeToEvents(id, ws, params) match {
+        subscribeToEvents(id, ws, subscription) match {
           case Success(consumer) =>
-            self ! Subscribed(id, ws, params, consumer)
+            self ! Subscribed(id, ws, subscriptionId, consumer)
           case Failure(ex) =>
-            self ! SubscriptionFailed(id, ws, params, ex.getMessage)
+            self ! SubscriptionFailed(id, ws, ex.getMessage)
         }
     }
   }
 
-  private def unSubscribe(id: Correlation, ws: ServerWebSocket, params: WsParams): Unit = {
-    subscribers.get(ws.textHandlerID()).map(_.filter(_._1 == params)) match {
+  private def unSubscribe(
+      id: Correlation,
+      ws: ServerWebSocket,
+      subscriptionId: WsSubscriptionId
+  ): Unit = {
+    subscribers.get(ws.textHandlerID()).map(_.filter(_._1 == subscriptionId)) match {
       case Some(subscriptions) if subscriptions.nonEmpty =>
-        subscriptions.foreach { case (method, consumer) =>
+        subscriptions.foreach { case (subscriptionId, consumer) =>
           unSubscribeToEvents(consumer)
             .andThen {
               case Success(_) =>
-                self ! Unsubscribed(id, ws, method)
+                self ! Unsubscribed(id, ws, subscriptionId)
               case Failure(ex) =>
-                self ! UnsubscriptionFailed(id, ws, method, ex.getMessage)
+                self ! UnsubscriptionFailed(id, ws, ex.getMessage)
             }(context.dispatcher)
         }
       case _ =>
-        self ! UnsubscriptionFailed(id, ws, params, s"Not subscribed to $params subscription")
+        self ! UnsubscriptionFailed(id, ws, s"Not subscribed to $subscriptionId subscription")
     }
   }
 
-  private def subscribeToEvents(id: Correlation, ws: ServerWebSocket, params: WsParams)(implicit
-      ec: ExecutionContext
-  ): Try[Subscription] = Try {
+  private def subscribeToEvents(id: Correlation, ws: ServerWebSocket, subscription: Subscription)(
+      implicit ec: ExecutionContext
+  ): Try[MessageConsumer[String]] = Try {
     vertx
       .eventBus()
       .consumer[String](
-        params.name,
+        subscription.eventType,
         new io.vertx.core.Handler[Message[String]] {
           override def handle(message: Message[String]): Unit = {
             if (!ws.isClosed) {
               val _ =
                 ws.writeTextMessage(message.body()).asScala.andThen { case Failure(ex) =>
                   if (!ws.isClosed) {
-                    self ! NotificationFailed(id, ws, params, ex.getMessage)
+                    self ! NotificationFailed(id, ws, subscription.subscriptionId, ex.getMessage)
                   }
                 }
             }
@@ -207,14 +220,14 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
       )
   }
 
-  private def unSubscribeToEvents(subscription: Subscription): Future[Unit] = {
+  private def unSubscribeToEvents(subscription: MessageConsumer[String]): Future[Unit] = {
     subscription
       .unregister()
       .asScala
       .mapTo[Unit]
   }
 
-  private def unregister(id: WebsocketId)(implicit ec: ExecutionContext): Unit = {
+  private def unregister(id: WsId)(implicit ec: ExecutionContext): Unit = {
     Future.sequence(
       subscribers.get(id).toList.flatMap { subscriptions =>
         subscriptions.map { case (_, consumer) =>
