@@ -29,8 +29,11 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
-import org.alephium.app.WebSocketServer.WsEventHandler.getSubscribedEventHandler
-import org.alephium.app.WsParams.Subscription
+import org.alephium.app.WebSocketServer.WsEventHandler.{
+  buildJsonRpcNotification,
+  getSubscribedEventHandler
+}
+import org.alephium.app.WsParams.SubscribeParams
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
@@ -85,17 +88,6 @@ object WebSocketServer extends StrictLogging {
 
   object WsEventHandler extends ApiModelCodec {
 
-    def buildNotification(
-        event: EventBus.Event
-    )(implicit networkConfig: NetworkConfig): Either[String, NotificationUnsafe] = {
-      event match {
-        case BlockNotify(block, height) =>
-          BlockEntry.from(block, height).map { blockEntry =>
-            NotificationUnsafe(JsonRPC.version, Subscription.BlockEvent, Some(writeJs(blockEntry)))
-          }
-      }
-    }
-
     def getSubscribedEventHandler(
         vertxEventBus: VertxEventBus,
         eventBusRef: ActorRefT[EventBus.Message],
@@ -108,6 +100,14 @@ object WebSocketServer extends StrictLogging {
       eventBusRef.tell(EventBus.Subscribe, eventHandlerRef.ref)
       eventHandlerRef
     }
+
+    def buildJsonRpcNotification(params: WsNotificationParams): NotificationUnsafe = {
+      NotificationUnsafe(
+        JsonRPC.version,
+        WsMethod.SubscriptionMethod,
+        Some(writeJs(params))
+      )
+    }
   }
 
   class WsEventHandler(vertxEventBus: VertxEventBus)(implicit val networkConfig: NetworkConfig)
@@ -115,11 +115,16 @@ object WebSocketServer extends StrictLogging {
       with ApiModelCodec {
 
     def receive: Receive = { case event: EventBus.Event =>
-      WsEventHandler.buildNotification(event) match {
-        case Right(notification) =>
-          val _ = vertxEventBus.publish(notification.method, write(notification))
-        case Left(error) =>
-          log.error(error)
+      event match {
+        case BlockNotify(block, height) =>
+          BlockEntry.from(block, height) match {
+            case Right(blockEntry) =>
+              val params = WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
+              val _ =
+                vertxEventBus.publish(params.subscription, write(buildJsonRpcNotification(params)))
+            case Left(error) =>
+              log.error(error)
+          }
       }
     }
   }

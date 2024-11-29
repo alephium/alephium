@@ -21,7 +21,7 @@ import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.Inside.inside
 
-import org.alephium.app.WsParams.Subscription
+import org.alephium.app.WsParams.SubscribeParams
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC
@@ -42,23 +42,23 @@ class WebSocketServerSpec
       (for {
         _ <- ws
           .writeTextMessage(
-            write(WsRequest.subscribe(0, Subscription.Block))
+            write(WsRequest.subscribe(0, SubscribeParams.Block))
           )
           .asScala
         _ <- ws
           .writeTextMessage(
-            write(WsRequest.subscribe(1, Subscription.Tx))
+            write(WsRequest.subscribe(1, SubscribeParams.Tx))
           )
           .asScala
       } yield ()).futureValue
       inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
         case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(Subscription.Block.subscriptionId)
+          result is ujson.Str(SubscribeParams.Block.subscriptionId)
           id is 0
       }
       inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
         case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(Subscription.Tx.subscriptionId)
+          result is ujson.Str(SubscribeParams.Tx.subscriptionId)
           id is 1
       }
       ()
@@ -69,10 +69,13 @@ class WebSocketServerSpec
     }
 
     def clientAssertionOnMsg(clientProbe: TestProbe): Assertion = {
-      read[NotificationUnsafe](
-        clientProbe.expectMsgClass(classOf[String])
-      ).asNotification.rightValue.method is Subscription.Block.eventType // TODO should this be subscriptionID ?
-      1 is 1
+      val notification =
+        read[NotificationUnsafe](
+          clientProbe.expectMsgClass(classOf[String])
+        ).asNotification.rightValue
+      notification.method is WsMethod.SubscriptionMethod
+      notification.params.obj.get("result").nonEmpty is true
+      notification.params.obj.get("subscription").nonEmpty is true
     }
 
     val wsInitBehavior = WsStartBehavior(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
@@ -140,7 +143,7 @@ class WebSocketServerSpec
   it should "handle unsubscribing from events" in new RouteWS {
     def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage(write(WsRequest.subscribe(0, Subscription.Block)))
+      ws.writeTextMessage(write(WsRequest.subscribe(0, SubscribeParams.Block)))
         .asScala
         .mapTo[Unit]
         .futureValue
@@ -148,17 +151,21 @@ class WebSocketServerSpec
     def clientInitAssertionOnMsg(clientProbe: TestProbe): Assertion = {
       inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
         case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(Subscription.Block.subscriptionId)
+          result is ujson.Str(SubscribeParams.Block.subscriptionId)
           id is 0
       }
-      read[NotificationUnsafe](
-        clientProbe.expectMsgClass(classOf[String])
-      ).asNotification.rightValue.method is Subscription.Block.eventType // TODO jsonRPC is wrong, it sends eventType as method
+      val notification =
+        read[NotificationUnsafe](
+          clientProbe.expectMsgClass(classOf[String])
+        ).asNotification.rightValue
+      notification.method is WsMethod.SubscriptionMethod
+      notification.params.obj.get("result").nonEmpty is true
+      notification.params.obj.get("subscription").nonEmpty is true
     }
 
     def clientNextBehavior(ws: WebSocket): Unit = {
       ws.writeTextMessage(
-        write(WsRequest.unsubscribe(1, Subscription.Block.subscriptionId))
+        write(WsRequest.unsubscribe(1, SubscribeParams.Block.subscriptionId))
       ).asScala
         .mapTo[Unit]
         .futureValue

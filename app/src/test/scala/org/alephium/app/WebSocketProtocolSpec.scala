@@ -18,15 +18,15 @@ package org.alephium.app
 
 import scala.collection.immutable.TreeMap
 
-import org.alephium.app.WsParams.{FilteredSubscription, Subscription, Unsubscription}
+import org.alephium.app.WsParams.{FilteredSubscribeParams, SubscribeParams}
 import org.alephium.json.Json._
 import org.alephium.util.AlephiumSpec
 
 class WebSocketProtocolSpec extends AlephiumSpec {
 
-  "WebSocketProtocol" should "refuse all requests that are not JsonRPC compliant" in {
-    val method    = Subscription.MethodType
-    val eventType = Subscription.BlockEvent
+  "WebSocketProtocol" should "refuse all WsRequest that are not JsonRPC compliant" in {
+    val method    = WsMethod.SubscribeMethod
+    val eventType = SubscribeParams.BlockEvent
     WsRequest
       .fromJsonString(s"""{"method": "$method", "params": ["$eventType"]}""")
       .isLeft is true
@@ -47,51 +47,56 @@ class WebSocketProtocolSpec extends AlephiumSpec {
   }
 
   "WsRequest" should "pass R/W round-trip for simple subscription" in {
-    Subscription.eventTypes.foreach { eventType =>
-      val method = Subscription.MethodType
-      val validReqJson =
-        s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$eventType"]}"""
-      write(WsRequest.subscribe(0, Subscription(eventType))) is read[WsRequest](validReqJson)
+    SubscribeParams.eventTypes.foreach { eventType =>
+      val method       = WsMethod.SubscribeMethod
+      val validReqJson = s"""{"method":"$method","params":["$eventType"],"id":0,"jsonrpc":"2.0"}"""
+      val expectedRequest = WsRequest.subscribe(0, SubscribeParams(eventType))
+      write(expectedRequest) is validReqJson
+      read[WsRequest](validReqJson) is expectedRequest
     }
   }
 
   "WsRequest" should "pass R/W round-trip for filtered subscription" in {
-    FilteredSubscription.eventTypes.foreach { eventType =>
-      val method = Subscription.MethodType
+    FilteredSubscribeParams.eventTypes.foreach { eventType =>
+      val method = WsMethod.SubscribeMethod
       val validReqJson =
-        s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$eventType", {"address": "xyz"}]}"""
+        s"""{"method":"$method","params":["$eventType",{"address":"xyz"}],"id":0,"jsonrpc":"2.0"}"""
       val expectedRequest = WsRequest.subscribeWithFilter(
         0,
-        FilteredSubscription(eventType, TreeMap("address" -> "xyz"))
+        FilteredSubscribeParams(eventType, TreeMap("address" -> "xyz"))
       )
-      write(expectedRequest) is read[WsRequest](validReqJson)
+      write(expectedRequest) is validReqJson
+      read[WsRequest](validReqJson) is expectedRequest
 
       WsRequest
-        .fromJsonString(
-          s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$eventType"]}"""
-        )
+        .fromJsonString(s"""{"method":"$method","params":["$eventType"],"id":0,"jsonrpc":"2.0"}""")
         .isLeft is true
     }
   }
 
   "WsRequest" should "pass R/W round-trip for unsubscription from event type" in {
-    val method = Unsubscription.MethodType
-    Subscription.eventTypes.foreach { eventType =>
-      val subscriptionId = Subscription(eventType).subscriptionId
+    val method = WsMethod.UnsubscribeMethod
+    SubscribeParams.eventTypes.foreach { eventType =>
+      val subscriptionId = SubscribeParams(eventType).subscriptionId
       val validReqJson =
-        s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$subscriptionId"]}"""
-      write(WsRequest.unsubscribe(0, subscriptionId)) is read[WsRequest](validReqJson)
+        s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""
+      val expectedRequest = WsRequest.unsubscribe(0, subscriptionId)
+      write(expectedRequest) is validReqJson
+      read[WsRequest](validReqJson) is expectedRequest
     }
   }
 
   "WsRequest" should "pass R/W round-trip for unsubscription of filtered event type" in {
-    val method = Unsubscription.MethodType
-    FilteredSubscription.eventTypes.foreach { eventType =>
+    val method = WsMethod.UnsubscribeMethod
+    FilteredSubscribeParams.eventTypes.foreach { eventType =>
       val subscriptionId =
-        FilteredSubscription(eventType, TreeMap("address" -> "xyz")).subscriptionId
+        FilteredSubscribeParams(eventType, TreeMap("address" -> "xyz")).subscriptionId
       val validReqJson =
-        s"""{"jsonrpc": "2.0", "id": 0, "method": "$method", "params": ["$subscriptionId"]}"""
-      write(WsRequest.unsubscribe(0, subscriptionId)) is read[WsRequest](validReqJson)
+        s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""
+      val expectedRequest = WsRequest.unsubscribe(0, subscriptionId)
+      write(expectedRequest) is validReqJson
+      read[WsRequest](validReqJson) is expectedRequest
     }
   }
+
 }

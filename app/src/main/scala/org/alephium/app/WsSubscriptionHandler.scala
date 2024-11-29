@@ -146,11 +146,11 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
       ec: ExecutionContext
   ): Unit = {
     WsRequest.fromJsonString(msg) match {
-      case Right(WsRequest(id, subscription: Subscription)) =>
+      case Right(WsRequest(id, subscription: SubscribeParams)) =>
         val _ = subscribe(id, ws, subscription)
-      case Right(WsRequest(_, FilteredSubscription(_, _))) =>
+      case Right(WsRequest(_, FilteredSubscribeParams(_, _))) =>
       // TODO implement events for particular address etc.
-      case Right(WsRequest(id, Unsubscription(subscriptionId))) =>
+      case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
         val _ = unSubscribe(id, ws, subscriptionId)
       case Left(error) => respondAsyncAndForget(ws, Response.failed(error))
     }
@@ -159,7 +159,7 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
   private def subscribe(
       id: Correlation,
       ws: ServerWebSocket,
-      subscription: Subscription
+      subscription: SubscribeParams
   )(implicit
       ec: ExecutionContext
   ): Unit = {
@@ -168,7 +168,7 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
       case Some(ss) if ss.exists(_._1 == subscriptionId) =>
         self ! AlreadySubscribed(id, ws, subscriptionId)
       case _ =>
-        subscribeToEvents(id, ws, subscription) match {
+        subscribeToEvents(id, ws, subscription.subscriptionId) match {
           case Success(consumer) =>
             self ! Subscribed(id, ws, subscriptionId, consumer)
           case Failure(ex) =>
@@ -198,20 +198,24 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
     }
   }
 
-  private def subscribeToEvents(id: Correlation, ws: ServerWebSocket, subscription: Subscription)(
-      implicit ec: ExecutionContext
+  private def subscribeToEvents(
+      id: Correlation,
+      ws: ServerWebSocket,
+      subscriptionId: WsSubscriptionId
+  )(implicit
+      ec: ExecutionContext
   ): Try[MessageConsumer[String]] = Try {
     vertx
       .eventBus()
       .consumer[String](
-        subscription.eventType,
+        subscriptionId,
         new io.vertx.core.Handler[Message[String]] {
           override def handle(message: Message[String]): Unit = {
             if (!ws.isClosed) {
               val _ =
                 ws.writeTextMessage(message.body()).asScala.andThen { case Failure(ex) =>
                   if (!ws.isClosed) {
-                    self ! NotificationFailed(id, ws, subscription.subscriptionId, ex.getMessage)
+                    self ! NotificationFailed(id, ws, subscriptionId, ex.getMessage)
                   }
                 }
             }

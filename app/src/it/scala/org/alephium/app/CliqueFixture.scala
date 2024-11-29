@@ -38,7 +38,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.app.WsParams.Subscription
+import org.alephium.app.WsParams.SubscribeParams
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -394,7 +394,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       .connect(port, "127.0.0.1", "/ws")
       .asScala
       .map { ws =>
-        ws.writeTextMessage(write(WsRequest.subscribe(0, Subscription.Block)))
+        ws.writeTextMessage(write(WsRequest.subscribe(0, SubscribeParams.Block)))
         ws.textMessageHandler { blockNotify =>
           blockNotifyProbe.ref ! blockNotify
         }

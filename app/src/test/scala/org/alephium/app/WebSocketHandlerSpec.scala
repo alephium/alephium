@@ -27,7 +27,7 @@ import org.scalatest.concurrent.IntegrationPatience
 
 import org.alephium.api.model.BlockEntry
 import org.alephium.app.WebSocketServer.WsEventHandler
-import org.alephium.app.WsParams.Subscription
+import org.alephium.app.WsParams.SubscribeParams
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
@@ -49,10 +49,12 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
   }
 
   it should "build Notification from Event" in {
-    val notification = WsEventHandler.buildNotification(BlockNotify(dummyBlock, 0)).rightValue
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    notification.method is Subscription.BlockEvent
-    show(notification.params) is write(blockEntry)
+    val params       = WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
+    val notification = WsEventHandler.buildJsonRpcNotification(params)
+    show(notification.params) is write(
+      WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
+    )
   }
 
   "WsUtils" should "convert VertxFuture to Scala Future" in {
@@ -86,8 +88,8 @@ class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils 
       subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(webSocket)
     }
     val httpBinding    = bindAndListen()
-    val subscribeReq   = WsRequest.subscribe(0, Subscription.Block)
-    val unsubscribeReq = WsRequest.unsubscribe(1, Subscription.Block.subscriptionId)
+    val subscribeReq   = WsRequest.subscribe(0, SubscribeParams.Block)
+    val unsubscribeReq = WsRequest.unsubscribe(1, SubscribeParams.Block.subscriptionId)
 
     // let's measure sequential connection, subscription, notification and unsubscription time on local env
     val websockets =
