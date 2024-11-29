@@ -77,13 +77,16 @@ trait LockupScriptGenerators extends Generators {
       .retryUntil(_.groupIndex == groupIndex)
   }
 
-  def assetLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
+  def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
     Gen.oneOf(
       p2pkhLockupGen(groupIndex),
       p2mpkhLockupGen(groupIndex),
-      p2shLockupGen(groupIndex),
-      p2pkLockupGen(groupIndex)
+      p2shLockupGen(groupIndex)
     )
+  }
+
+  def assetLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
+    Gen.oneOf(preDanubeLockupGen(groupIndex), p2pkLockupGen(groupIndex))
   }
 
   def p2cLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2C] = {

@@ -61,11 +61,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       prepareWorldState(preOutputs)
       for {
         chainIndex <- getChainIndex(tx)
+        blockEnv = BlockEnv(chainIndex, networkConfig.networkId, headerTs, Target.Max, None)
         _ <- checkStateless(
           chainIndex,
           tx,
           checkDoubleSpending = true,
-          HardFork.Leman,
+          blockEnv.hardFork,
           isCoinbase = false
         )
         _ <- checkStateful(
@@ -74,7 +75,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(chainIndex, networkConfig.networkId, headerTs, Target.Max, None)
+          blockEnv
         )
       } yield ()
     }
@@ -495,7 +496,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check ALPH balance stats" in new Fixture {
-    forAll(transactionGenWithPreOutputs()) { case (tx, _) =>
+    forAll(transactionGenWithPreOutputs(lockupGen = preDanubeLockupGen)) { case (tx, _) =>
       implicit val validator = checkOutputStats(_, HardFork.Leman)
 
       // balance overflow
@@ -524,13 +525,17 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check non-zero token amount for outputs" in new Fixture {
-    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      whenever(tx.unsigned.fixedOutputs.nonEmpty) {
-        implicit val validator = nestedValidator(checkOutputStats(_, HardFork.Leman), preOutputs)
+    def test(lockupGen: IndexLockupScriptGen, hardFork: HardFork) = {
+      forAll(transactionGenWithPreOutputs(lockupGen = lockupGen)) { case (tx, preOutputs) =>
+        whenever(tx.unsigned.fixedOutputs.nonEmpty) {
+          implicit val validator = nestedValidator(checkOutputStats(_, hardFork), preOutputs)
 
-        tx.zeroTokenAmount().fail(InvalidOutputStats)
+          tx.zeroTokenAmount().fail(InvalidOutputStats)
+        }
       }
     }
+    test(preDanubeLockupGen, HardFork.Leman)
+    test(assetLockupGen, HardFork.Danube)
   }
 
   it should "check the number of tokens for asset outputs" in new Fixture {
@@ -538,23 +543,31 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       info("Leman hardfork")
       implicit val validator = checkOutputStats(_, HardFork.Leman)
 
-      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo + 1))(_.fail(InvalidOutputStats))
-      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo))(_.pass())
+      forAll(
+        transactionGen(numTokensGen = maxTokenPerAssetUtxo + 1, lockupGen = preDanubeLockupGen)
+      )(_.fail(InvalidOutputStats))
+      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo, lockupGen = preDanubeLockupGen))(
+        _.pass()
+      )
     }
 
     {
       info("Pre-Leman hardfork")
       implicit val validator = checkOutputStats(_, HardFork.Mainnet)
 
-      forAll(transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo + 1))(
+      forAll(
+        transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo + 1, lockupGen = preDanubeLockupGen)
+      )(
         _.fail(InvalidOutputStats)
       )
-      forAll(transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo))(_.pass())
+      forAll(
+        transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo, lockupGen = preDanubeLockupGen)
+      )(_.pass())
     }
   }
 
   it should "check the number of tokens for contract outputs" in new Fixture {
-    val tx = transactionGen().sample.get
+    val tx = transactionGen(lockupGen = preDanubeLockupGen).sample.get
 
     def update(tokenPerContract: Int): Transaction = {
       val contractOutput =
@@ -584,7 +597,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check the number of public keys in p2mpk for leman fork" in new Fixture {
-    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+    forAll(transactionGenWithPreOutputs(lockupGen = preDanubeLockupGen)) { case (tx, preOutputs) =>
       implicit val validator = nestedValidator(checkOutputStats(_, HardFork.Leman), preOutputs)
 
       val chainIndex = tx.chainIndex
@@ -607,7 +620,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val keys       = AVector.fill(ALPH.MaxKeysInP2MPK)(PublicKey.generate)
     val validP2MPK = LockupScript.p2mpkh(keys, 1).value
     val tx =
-      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = validP2MPK))
+      transactionGen(lockupGen = preDanubeLockupGen).sample.get
+        .updateRandomFixedOutputs(_.copy(lockupScript = validP2MPK))
     checkOutputStats(tx, HardFork.Leman).isRight is true
   }
 
@@ -616,9 +630,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val p2mpkh0     = LockupScript.p2mpkh(tooManyKeys.init, 1).value
     val p2mpkh1     = LockupScript.p2mpkh(tooManyKeys, ALPH.MaxKeysInP2MPK + 1).value
     val tx0 =
-      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh0))
+      transactionGen(lockupGen = preDanubeLockupGen).sample.get
+        .updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh0))
     val tx1 =
-      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh1))
+      transactionGen(lockupGen = preDanubeLockupGen).sample.get
+        .updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh1))
     checkOutputStats(tx0, HardFork.Mainnet).isRight is true
     checkOutputStats(tx1, HardFork.Mainnet).isRight is true
   }
@@ -681,24 +697,27 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     oversizedData.length is ALPH.MaxOutputDataSize + 1
     justEnoughData.length is ALPH.MaxOutputDataSize
 
-    forAll(transactionGenWithPreOutputs(), Gen.oneOf(HardFork.Mainnet, HardFork.Leman)) {
-      case ((tx, preOutputs), hardFork) =>
-        implicit val validator = nestedValidator(checkOutputStats(_, hardFork), preOutputs)
+    forAll(
+      transactionGenWithPreOutputs(lockupGen = preDanubeLockupGen),
+      Gen.oneOf(HardFork.Mainnet, HardFork.Leman)
+    ) { case ((tx, preOutputs), hardFork) =>
+      implicit val validator = nestedValidator(checkOutputStats(_, hardFork), preOutputs)
 
-        val updateFixedOutput = Random.nextInt(tx.outputsLength) < tx.unsigned.fixedOutputs.length
-        val txNew = if (updateFixedOutput) {
-          tx.updateRandomFixedOutputs(_.copy(additionalData = oversizedData))
-        } else {
-          tx.updateRandomGeneratedOutputs {
-            case o: AssetOutput    => o.copy(additionalData = oversizedData)
-            case o: ContractOutput => o
-          }
+      val updateFixedOutput = Random.nextInt(tx.outputsLength) < tx.unsigned.fixedOutputs.length
+      val txNew = if (updateFixedOutput) {
+        tx.updateRandomFixedOutputs(_.copy(additionalData = oversizedData))
+      } else {
+        tx.updateRandomGeneratedOutputs {
+          case o: AssetOutput    => o.copy(additionalData = oversizedData)
+          case o: ContractOutput => o
         }
-        txNew.fail(OutputDataSizeExceeded)
+      }
+      txNew.fail(OutputDataSizeExceeded)
     }
 
     val tx =
-      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(additionalData = justEnoughData))
+      transactionGen(lockupGen = preDanubeLockupGen).sample.get
+        .updateRandomFixedOutputs(_.copy(additionalData = justEnoughData))
     HardFork.All.foreach { hf => checkOutputStats(tx, hf).isRight is true }
   }
 

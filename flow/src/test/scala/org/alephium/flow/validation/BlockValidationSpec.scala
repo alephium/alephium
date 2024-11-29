@@ -1545,7 +1545,7 @@ class BlockValidationSpec extends AlephiumSpec {
         .filter(_.groupIndex == chainIndex.to)
         .head
         .asInstanceOf[LockupScript.Asset]
-    lazy val randomMiner = assetLockupGen(chainIndex.from).sample.get
+    lazy val randomMiner = preDanubeLockupGen(chainIndex.from).sample.get
 
     def newBlock(miner: LockupScript.Asset): Block = {
       val template   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
