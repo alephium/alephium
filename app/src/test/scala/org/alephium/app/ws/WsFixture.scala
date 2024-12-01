@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.app.ws
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,8 +26,9 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, WebSocket, WebSocketCl
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
+import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.app.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
+import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.util._
 
@@ -65,8 +66,8 @@ trait WebSocketServerFixture extends ServerFixture with ScalaFutures {
       .setMaxWebSocketFrameSize(1024 * 1024)
       .setRegisterWebSocketWriteHandlers(true)
 
-  lazy val WebSocketServer(httpServer, eventHandler, subscriptionHandler) =
-    WebSocketServer(
+  lazy val WsServer(httpServer, eventHandler, subscriptionHandler) =
+    WsServer(
       system,
       node,
       maxConnections,

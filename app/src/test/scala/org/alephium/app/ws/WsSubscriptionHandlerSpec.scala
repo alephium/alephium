@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.app.ws
 
 import scala.concurrent.ExecutionContext.Implicits
 import scala.concurrent.Future
@@ -25,37 +25,13 @@ import akka.testkit.TestProbe
 import io.vertx.core.{Future => VertxFuture}
 import org.scalatest.concurrent.IntegrationPatience
 
-import org.alephium.api.model.BlockEntry
-import org.alephium.app.WebSocketServer.WsEventHandler
-import org.alephium.app.WsParams.SubscribeParams
+import org.alephium.app.ServerFixture
+import org.alephium.app.ws.WsParams.SubscribeParams
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.util._
 
-class WebSocketHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils {
-  import ServerFixture._
-
-  behavior of "WsEventHandler"
-
-  it should "subscribe event handler into event bus" in new WebSocketServerFixture {
-    val newHandler =
-      WsEventHandler.getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
-    node.eventBus
-      .ask(EventBus.ListSubscribers)
-      .mapTo[EventBus.Subscribers]
-      .futureValue
-      .value
-      .contains(newHandler.ref) is true
-  }
-
-  it should "build Notification from Event" in {
-    val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    val params       = WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
-    val notification = WsEventHandler.buildJsonRpcNotification(params)
-    show(notification.params) is write(
-      WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
-    )
-  }
+class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils {
 
   "WsUtils" should "convert VertxFuture to Scala Future" in {
     val successfulVertxFuture: VertxFuture[String] = VertxFuture.succeededFuture("Success Result")

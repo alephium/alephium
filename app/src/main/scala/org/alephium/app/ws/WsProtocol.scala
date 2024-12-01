@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.app.ws
 
 import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -26,30 +26,28 @@ import io.vertx.core.http.ServerWebSocket
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.BlockEntry
-import org.alephium.app.WsParams.WsSubscriptionId
-import org.alephium.app.WsRequest.Correlation
+import org.alephium.app.ws.WsParams.WsSubscriptionParams
+import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.crypto.Sha256
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.AVector
 
-object WsProtocol {
-  object Code {
-    val AlreadySubscribed: Int   = -32010
-    val AlreadyUnsubscribed: Int = -32011
-  }
+protected[ws] object WsError {
+  val AlreadySubscribed: Int   = -32010
+  val AlreadyUnsubscribed: Int = -32011
 }
 
-object WsMethod {
-  type WsMethodType = String
+protected[ws] object WsMethod {
+  private type WsMethodType = String
   val SubscribeMethod: WsMethodType    = "subscribe"
   val UnsubscribeMethod: WsMethodType  = "unsubscribe"
   val SubscriptionMethod: WsMethodType = "subscription"
 }
 
-sealed trait WsParams
-sealed trait WsSubscriptionParams extends WsParams
-object WsParams {
+protected[ws] object WsParams {
+  sealed trait WsParams
+  sealed trait WsSubscriptionParams extends WsParams
   private type WsEventType = String
 
   type WsId             = String
@@ -145,11 +143,24 @@ object WsParams {
         s"Invalid subscription json: $json, expected array with subscriptionId"
       )
   }
+
+  final case class WsNotificationParams(subscription: WsSubscriptionId, result: BlockEntry)
+      extends WsParams
+  object WsNotificationParams extends ApiModelCodec {
+    // macroW fails : [wartremover:ToString] trait CharSequence does not override toString and automatic toString is disabled
+    implicit val wsNotificationParamsWriter: Writer[WsNotificationParams] =
+      writer[ujson.Value].comap[WsNotificationParams] {
+        case WsNotificationParams(subscription, result) =>
+          ujson.Obj(
+            "subscription" -> ujson.Str(subscription),
+            "result"       -> write(result)
+          )
+      }
+  }
 }
 
-final case class WsRequest(id: Correlation, params: WsSubscriptionParams)
-
-object WsRequest extends ApiModelCodec {
+final protected[ws] case class WsRequest(id: Correlation, params: WsSubscriptionParams)
+protected[ws] object WsRequest extends ApiModelCodec {
   import WsParams._
 
   final case class Correlation(id: WsCorrelationId) extends WithId
@@ -215,20 +226,7 @@ object WsRequest extends ApiModelCodec {
     WsRequest(Correlation(id), subscription)
 }
 
-final case class WsNotificationParams(subscription: WsSubscriptionId, result: BlockEntry)
-    extends WsParams
-object WsNotificationParams extends ApiModelCodec {
-  // macroW fails : [wartremover:ToString] trait CharSequence does not override toString and automatic toString is disabled
-  implicit val wsNotificationParamsWriter: Writer[WsNotificationParams] =
-    writer[ujson.Value].comap[WsNotificationParams] {
-      case WsNotificationParams(subscription, result) =>
-        ujson.Obj(
-          "subscription" -> ujson.Str(subscription),
-          "result"       -> write(result)
-        )
-    }
-}
-trait WsUtils extends LazyLogging {
+protected[ws] trait WsUtils extends LazyLogging {
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
       val promise = Promise[T]()

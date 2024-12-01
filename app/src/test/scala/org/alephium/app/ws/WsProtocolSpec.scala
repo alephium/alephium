@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.app.ws
 
 import scala.collection.immutable.TreeMap
 
-import org.alephium.app.WsParams.{FilteredSubscribeParams, SubscribeParams}
+import org.alephium.app.ws.WsParams.{FilteredSubscribeParams, SubscribeParams}
 import org.alephium.json.Json._
 import org.alephium.util.AlephiumSpec
 
-class WebSocketProtocolSpec extends AlephiumSpec {
+class WsProtocolSpec extends AlephiumSpec {
 
   "WebSocketProtocol" should "refuse all WsRequest that are not JsonRPC compliant" in {
     val method    = WsMethod.SubscribeMethod

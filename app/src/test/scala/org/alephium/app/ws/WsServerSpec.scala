@@ -14,25 +14,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.app.ws
 
 import akka.testkit.TestProbe
 import io.vertx.core.http.WebSocket
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.Inside.inside
 
-import org.alephium.app.WsParams.SubscribeParams
+import org.alephium.app.ws.WsParams.SubscribeParams
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, NotificationUnsafe, Response}
 import org.alephium.util._
 
-class WebSocketServerSpec
-    extends AlephiumFutureSpec
-    with EitherValues
-    with NumericHelpers
-    with WsUtils {
+class WsServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers with WsUtils {
 
   behavior of "WebSocketServer"
 

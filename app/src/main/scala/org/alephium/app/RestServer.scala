@@ -29,6 +29,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.OpenAPIWriters.openApiJson
+import org.alephium.app.ws.WsServer
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.setting.NetworkSetting
@@ -228,7 +229,7 @@ object RestServer {
         .setRegisterWebSocketWriteHandlers(true)
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
     val webSocketServer =
-      WebSocketServer(flowSystem, node, networkSetting.maxWsConnections, httpOptions)
+      WsServer(flowSystem, node, networkSetting.maxWsConnections, httpOptions)
     new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }

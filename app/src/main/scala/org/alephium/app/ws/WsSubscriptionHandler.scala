@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.app.ws
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -25,13 +25,12 @@ import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.ServerWebSocket
 
-import org.alephium.app.WsParams._
-import org.alephium.app.WsProtocol.Code
-import org.alephium.app.WsRequest.Correlation
+import org.alephium.app.ws.WsParams._
+import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util.{AVector, BaseActor}
 
-object WsSubscriptionHandler {
+protected[ws] object WsSubscriptionHandler {
 
   sealed trait SubscriptionMsg
   sealed trait Command         extends SubscriptionMsg
@@ -85,8 +84,10 @@ object WsSubscriptionHandler {
   ) extends CommandResponse
 }
 
-class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor with WsUtils {
-  import org.alephium.app.WsSubscriptionHandler._
+protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int)
+    extends BaseActor
+    with WsUtils {
+  import org.alephium.app.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
   // subscriber with empty subscriptions is connected but not subscribed to any events
@@ -116,7 +117,7 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
     case AlreadySubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
         ws,
-        Response.failed(id, Error(Code.AlreadySubscribed, subscriptionId))
+        Response.failed(id, Error(WsError.AlreadySubscribed, subscriptionId))
       )
     case SubscriptionFailed(id, ws, reason) =>
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
@@ -128,7 +129,10 @@ class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor
         ws,
         Response.failed(
           id,
-          Error(Code.AlreadyUnsubscribed, s"Already unsubscribed from $subscriptionId subscription")
+          Error(
+            WsError.AlreadyUnsubscribed,
+            s"Already unsubscribed from $subscriptionId subscription"
+          )
         )
       )
     case UnsubscriptionFailed(id, ws, reason) =>
