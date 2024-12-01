@@ -918,6 +918,14 @@ abstract class RestServerSpec(
         )
     }
 
+    Get(s"/contracts/${contractWithParent.toBase58}/sub-contracts?start=0&limit=101") check {
+      response =>
+        response.code is StatusCode.BadRequest
+        response.as[ApiError.BadRequest] is ApiError.BadRequest(
+          s"Invalid value (expected value to pass validation: `limit` must not be larger than 100, but got: CounterRange(0,Some(101)))"
+        )
+    }
+
     Get(s"/contracts/${contractWithoutParent.toBase58}/parent") check { response =>
       response.code is StatusCode.Ok
       response.as[ContractParent] is ContractParent(None)
