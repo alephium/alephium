@@ -13285,6 +13285,10 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "utxosLimit": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
