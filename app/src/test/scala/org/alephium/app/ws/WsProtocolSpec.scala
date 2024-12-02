@@ -17,6 +17,11 @@
 package org.alephium.app.ws
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.ExecutionContext.Implicits
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+
+import io.vertx.core.{Future => VertxFuture}
 
 import org.alephium.app.ws.WsParams.{FilteredSubscribeParams, SubscribeParams}
 import org.alephium.json.Json._
@@ -97,6 +102,29 @@ class WsProtocolSpec extends AlephiumSpec {
       write(expectedRequest) is validReqJson
       read[WsRequest](validReqJson) is expectedRequest
     }
+  }
+
+  "WsUtils" should "convert VertxFuture to Scala Future" in {
+    import WsUtils._
+    val successfulVertxFuture: VertxFuture[String] = VertxFuture.succeededFuture("Success Result")
+    val successfulScalaFuture: Future[String]      = successfulVertxFuture.asScala
+    successfulScalaFuture.onComplete {
+      case Success(value) =>
+        value is "Success Result"
+      case Failure(_) =>
+        fail("The future should not fail in this test case")
+    }(Implicits.global)
+
+    val exception                              = new RuntimeException("Test Failure")
+    val failedVertxFuture: VertxFuture[String] = VertxFuture.failedFuture(exception)
+    val failedScalaFuture: Future[String]      = failedVertxFuture.asScala
+
+    failedScalaFuture.onComplete {
+      case Success(_) =>
+        fail("The future should not succeed in this test case")
+      case Failure(ex) =>
+        ex is exception // Expected exception is thrown
+    }(Implicits.global)
   }
 
 }

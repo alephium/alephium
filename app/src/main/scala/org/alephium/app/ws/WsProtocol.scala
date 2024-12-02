@@ -17,12 +17,10 @@
 package org.alephium.app.ws
 
 import scala.collection.immutable.{SortedMap, TreeMap}
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
-import com.typesafe.scalalogging.LazyLogging
 import io.vertx.core.{Future => VertxFuture}
-import io.vertx.core.http.ServerWebSocket
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.BlockEntry
@@ -226,7 +224,7 @@ protected[ws] object WsRequest extends ApiModelCodec {
     WsRequest(Correlation(id), subscription)
 }
 
-protected[ws] trait WsUtils extends LazyLogging {
+protected[ws] object WsUtils {
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
       val promise = Promise[T]()
@@ -237,22 +235,6 @@ protected[ws] trait WsUtils extends LazyLogging {
           promise.failure(handler.cause())
       }
       promise.future
-    }
-  }
-
-  def respondAsyncAndForget(ws: ServerWebSocket, response: Response)(implicit
-      ec: ExecutionContext
-  ): Unit = {
-    Try(write(response)) match {
-      case Success(_) =>
-        val _ = ws
-          .writeTextMessage(write(response))
-          .asScala
-          .andThen { case Failure(exception) =>
-            logger.warn(s"Failed to respond with: $response", exception)
-          }
-      case Failure(ex) =>
-        logger.warn(s"Failed to serialize response: $response", ex)
     }
   }
 

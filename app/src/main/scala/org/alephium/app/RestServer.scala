@@ -187,7 +187,7 @@ class RestServer(
   protected def startSelfOnce(): Future[Unit] = {
     val address = apiConfig.networkInterface.getHostAddress
     for {
-      httpBinding <- httpServer.underlying
+      httpBinding <- httpServer.httpServer
         .requestHandler(router)
         .listen(port, address)
         .asScala

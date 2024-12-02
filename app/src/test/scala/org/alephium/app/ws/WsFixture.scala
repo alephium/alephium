@@ -22,17 +22,23 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServer, HttpServerOptions, WebSocket, WebSocketClientOptions}
+import io.vertx.core.http.{HttpServerOptions, WebSocket, WebSocketClientOptions}
+import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
+import org.alephium.app.ws.WsParams.{WsId, WsSubscriptionId}
+import org.alephium.app.ws.WsSubscriptionHandler.{
+  GetSubscriptions,
+  SubscriptionMsg,
+  SubscriptionsResponse
+}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.util._
 
-trait WebSocketServerFixture extends ServerFixture with ScalaFutures {
+trait WsServerFixture extends ServerFixture with ScalaFutures {
 
   implicit lazy val apiConfig: ApiConfig          = ApiConfig.load(newConfig)
   implicit val timeout: Timeout                   = Timeout(Duration.ofSecondsUnsafe(5).asScala)
@@ -53,46 +59,60 @@ trait WebSocketServerFixture extends ServerFixture with ScalaFutures {
     storages
   )
 
-  def connectWebsocketClient: Future[WebSocket] =
+  def connectWebsocketClient(
+      port: Int = node.config.network.restPort,
+      host: String = "127.0.0.1",
+      uri: String = "/ws"
+  ): Future[WebSocket] =
     vertx
       .createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
-      .connect(node.config.network.restPort, "127.0.0.1", "/ws")
+      .connect(port, host, uri)
       .asScala
-
-  def maxConnections: Int = 10
 
   lazy val wsOptions =
     new HttpServerOptions()
       .setMaxWebSocketFrameSize(1024 * 1024)
       .setRegisterWebSocketWriteHandlers(true)
 
-  lazy val WsServer(httpServer, eventHandler, subscriptionHandler) =
-    WsServer(
-      system,
-      node,
-      maxConnections,
-      wsOptions
-    )
+  def maxConnections: Int = 10
 
-  def bindAndListen(): HttpServer = httpServer
-    .listen(node.config.network.restPort, apiConfig.networkInterface.getHostAddress)
-    .asScala
-    .futureValue
-}
+  def bindAndListen(): WsServer = {
+    val wsServer =
+      WsServer(
+        system,
+        node,
+        maxConnections,
+        wsOptions
+      )
+    wsServer.httpServer
+      .listen(node.config.network.restPort, apiConfig.networkInterface.getHostAddress)
+      .asScala
+      .futureValue
+    wsServer
+  }
 
-final case class WsStartBehavior(
-    clientInitBehavior: (WebSocket, TestProbe) => Unit,
-    serverBehavior: ActorRefT[EventBus.Message] => Unit,
-    clientAssertionOnMsg: TestProbe => Any
-)
-final case class WsBehavior(
-    clientInitBehavior: WebSocket => Unit,
-    serverBehavior: ActorRefT[EventBus.Message] => Unit,
-    clientAssertionOnMsg: TestProbe => Any
-)
-trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPatience {
+  def dummyServerWs(id: String): ServerWsLike = new ServerWsLike {
+    override def textHandlerID(): WsId                                     = id
+    override def isClosed: Boolean                                         = false
+    override def reject(statusCode: Int): Unit                             = ()
+    override def closeHandler(handler: () => Unit): ServerWsLike           = this
+    override def textMessageHandler(handler: String => Unit): ServerWsLike = this
+    override def writeTextMessage(msg: String)(implicit ec: ExecutionContext): Future[Unit] =
+      Future.successful(())
+  }
 
-  private def assertEventHandlerSubscribed = {
+  def testSubscriptionHandlerInitialized(
+      subscriptionHandler: ActorRefT[SubscriptionMsg]
+  ): Assertion = {
+    subscriptionHandler
+      .ask(GetSubscriptions)
+      .mapTo[SubscriptionsResponse]
+      .futureValue
+      .subscriptions
+      .length is 0
+  }
+
+  def testEventHandlerInitialized(eventHandler: ActorRefT[EventBus.Message]): Assertion = {
     node.eventBus
       .ask(EventBus.ListSubscribers)
       .mapTo[EventBus.Subscribers]
@@ -101,17 +121,66 @@ trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPat
       .contains(eventHandler.ref) is true
   }
 
+}
+
+trait WsSubscriptionFixture extends WsServerFixture with Eventually {
+  def getSubscriptions(
+      subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
+  ): SubscriptionsResponse =
+    subscriptionHandler
+      .ask(GetSubscriptions)
+      .mapTo[SubscriptionsResponse]
+      .futureValue
+
+  def assertSubscribed(
+      wsId: WsId,
+      subscriptionId: WsSubscriptionId,
+      subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
+  ): Assertion = {
+    getSubscriptions(subscriptionHandler).subscriptions
+      .find(_._1 == wsId)
+      .exists(_._2.filter(_._1 == subscriptionId).length == 1) is true
+  }
+
+  def assertConnectedButNotSubscribed(
+      wsId: WsId,
+      subscriptionId: WsSubscriptionId,
+      subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
+  ): Assertion = {
+    getSubscriptions(subscriptionHandler).subscriptions
+      .find(_._1 == wsId)
+      .exists(_._2.filter(_._1 == subscriptionId).length == 0) is true
+  }
+
+  def assertNotConnected(
+      wsId: WsId,
+      subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
+  ): Assertion = {
+    getSubscriptions(subscriptionHandler).subscriptions
+      .find(_._1 == wsId)
+      .isEmpty is true
+  }
+
+}
+
+trait WsBehaviorFixture extends WsServerFixture with Eventually with IntegrationPatience {
+  import org.alephium.app.ws.WsSubscriptionHandler._
+  import org.alephium.app.ws.WsBehaviorFixture._
+
   def checkWS(
       initBehaviors: AVector[WsStartBehavior],
-      nextBehaviors: AVector[WsBehavior],
+      nextBehaviors: AVector[WsNextBehavior],
       expectedSubscriptions: Int,
       openWebsocketsCount: Int
-  ) = {
-    val httpBinding = bindAndListen()
-    eventually(assertEventHandlerSubscribed)
+  ): Unit = {
+    val WsServer(httpServer, eventHandler, subscriptionHandler) = bindAndListen()
+
+    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(testEventHandlerInitialized(eventHandler))
+
     val probedSockets =
       initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
-        val ws          = connectWebsocketClient.futureValue
+        val ws          = connectWebsocketClient().futureValue
         val clientProbe = TestProbe()
         startBehavior(ws, clientProbe)
         ws -> clientProbe
@@ -124,7 +193,7 @@ trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPat
       }
     }
     probedSockets.foreach { case (ws, clientProbe) =>
-      nextBehaviors.foreach { case WsBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
+      nextBehaviors.foreach { case WsNextBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
         behavior(ws)
         serverBehavior(node.eventBus)
         clientAssertionOnMsg(clientProbe)
@@ -141,6 +210,23 @@ trait RouteWS extends WebSocketServerFixture with Eventually with IntegrationPat
         .sum is expectedSubscriptions
     }
     probedSockets.foreach(_._1.close().asScala.futureValue)
-    httpBinding.close().asScala.mapTo[Unit].futureValue
+    httpServer.close().asScala.mapTo[Unit].futureValue
   }
+}
+
+object WsBehaviorFixture {
+
+  sealed trait WsBehavior
+  final case class WsStartBehavior(
+      clientInitBehavior: (WebSocket, TestProbe) => Unit,
+      serverBehavior: ActorRefT[EventBus.Message] => Unit,
+      clientAssertionOnMsg: TestProbe => Any
+  ) extends WsBehavior
+
+  final case class WsNextBehavior(
+      clientInitBehavior: WebSocket => Unit,
+      serverBehavior: ActorRefT[EventBus.Message] => Unit,
+      clientAssertionOnMsg: TestProbe => Any
+  ) extends WsBehavior
+
 }

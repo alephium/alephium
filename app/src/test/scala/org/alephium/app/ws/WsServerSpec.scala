@@ -16,180 +16,105 @@
 
 package org.alephium.app.ws
 
-import akka.testkit.TestProbe
-import io.vertx.core.http.WebSocket
-import org.scalatest.{Assertion, EitherValues}
-import org.scalatest.Inside.inside
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
-import org.alephium.app.ws.WsParams.SubscribeParams
+import akka.testkit.TestProbe
+import org.scalatest.EitherValues
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.exceptions.TestFailedException
+
+import org.alephium.app.ws.WsParams.SubscribeParams.Block
+import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
-import org.alephium.rpc.model.JsonRPC
-import org.alephium.rpc.model.JsonRPC.{Error, NotificationUnsafe, Response}
+import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util._
 
-class WsServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers with WsUtils {
-
+class WsServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
+  import WsUtils._
   behavior of "WebSocketServer"
 
-  it should "connect and subscribe multiple ws clients to multiple events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      (for {
-        _ <- ws
-          .writeTextMessage(
-            write(WsRequest.subscribe(0, SubscribeParams.Block))
-          )
-          .asScala
-        _ <- ws
-          .writeTextMessage(
-            write(WsRequest.subscribe(1, SubscribeParams.Tx))
-          )
-          .asScala
-      } yield ()).futureValue
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SubscribeParams.Block.subscriptionId)
-          id is 0
-      }
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SubscribeParams.Tx.subscriptionId)
-          id is 1
-      }
-      ()
-    }
-
-    def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
-      eventBusRef ! BlockNotify(blockGen.sample.get, height = 0)
-    }
-
-    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion = {
-      val notification =
-        read[NotificationUnsafe](
-          clientProbe.expectMsgClass(classOf[String])
-        ).asNotification.rightValue
-      notification.method is WsMethod.SubscriptionMethod
-      notification.params.obj.get("result").nonEmpty is true
-      notification.params.obj.get("subscription").nonEmpty is true
-    }
-
-    val wsInitBehavior = WsStartBehavior(clientInitBehavior, serverBehavior, clientAssertionOnMsg)
-    checkWS(
-      initBehaviors = AVector.fill(3)(wsInitBehavior),
-      nextBehaviors = AVector.empty,
-      expectedSubscriptions = 3 * 2, // 3 clients, 2 subscriptions each
-      openWebsocketsCount = 3
+  it should "reject request to any endpoint besides /ws" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    assertThrows[TestFailedException](
+      connectWebsocketClient(uri = "/wrong").futureValue
     )
+    connectWebsocketClient().futureValue.isClosed is false
+    wsServer.httpServer.close().asScala.futureValue
   }
 
-  it should "not spin ws connections over limit" in new RouteWS {
-    override def maxConnections: Int = 2
-    val wsSpec                       = WsStartBehavior((_, _) => (), _ => (), _ => true is true)
-    checkWS(
-      initBehaviors = AVector.fill(3)(wsSpec),
-      nextBehaviors = AVector.empty,
-      expectedSubscriptions = 0,
-      openWebsocketsCount = 3
-    )
+  it should "initialize subscription and event handler" in new WsServerFixture with Eventually {
+    val WsServer(httpServer, eventHandler, subscriptionHandler) = bindAndListen()
+    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(testEventHandlerInitialized(eventHandler))
+    httpServer.close().asScala.futureValue
   }
 
-  it should "connect and not subscribe multiple ws clients to any event" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
-      val _ = ws.textMessageHandler(message => clientProbe.ref ! message)
-    }
+  it should "acknowledge subscriptions and unsubscriptions" in new WsServerFixture {
+    val wsServer    = bindAndListen()
+    val ws          = connectWebsocketClient().futureValue
+    val clientProbe = TestProbe()
+    ws.textMessageHandler(message => clientProbe.ref ! message)
+    val subscribeReq              = WsRequest.subscribe(0, Block)
+    val unsubscribeReq            = WsRequest.unsubscribe(1, Block.subscriptionId)
+    val subscribeResp: Response   = Response.successful(Correlation(0), Block.subscriptionId)
+    val unsubscribeResp: Response = Response.successful(Correlation(1))
 
-    val wsInitBehavior = WsStartBehavior(
-      clientInitBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 0),
-      _.expectNoMessage()
-    )
-    checkWS(
-      initBehaviors = AVector.fill(3)(wsInitBehavior),
-      nextBehaviors = AVector.empty,
-      expectedSubscriptions = 0,
-      openWebsocketsCount = 3
-    )
+    ws.writeTextMessage(write(subscribeReq)).asScala.futureValue
+    clientProbe.expectMsgType[String] is write(subscribeResp)
+
+    ws.writeTextMessage(write(unsubscribeReq)).asScala.futureValue
+    clientProbe.expectMsgType[String] is write(unsubscribeResp)
+
+    ws.close().asScala.futureValue
+    clientProbe.expectNoMessage()
+    wsServer.httpServer.close().asScala.futureValue
   }
 
-  it should "handle invalid messages gracefully" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage("invalid_msg").asScala.mapTo[Unit].futureValue
-    }
+  it should "handle high load fast" in new WsServerFixture with IntegrationPatience {
+    val numberOfConnections     = 500
+    override def maxConnections = numberOfConnections
+    val clientProbe             = TestProbe()
+    val wsServer                = bindAndListen()
+    val subscribeReq            = WsRequest.subscribe(0, Block)
+    val unsubscribeReq          = WsRequest.unsubscribe(1, Block.subscriptionId)
 
-    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
-      clientProbe
-        .expectMsgClass(classOf[String])
-        .contains(Error.ParseErrorCode.toString) is true
+    // let's measure sequential connection, subscription, notification and unsubscription time on local env
+    val websockets =
+      Future
+        .sequence(
+          AVector
+            .fill(numberOfConnections) {
+              for {
+                ws <- connectWebsocketClient()
+                _ = ws.textMessageHandler(message => clientProbe.ref ! message)
+              } yield ws
+            }
+            .toSeq
+        )
+        .futureValue // 500 connections in 800 millis
 
-    val wsInitBehavior = WsStartBehavior(clientInitBehavior, _ => (), clientAssertionOnMsg)
-    checkWS(
-      initBehaviors = AVector.fill(1)(wsInitBehavior),
-      nextBehaviors = AVector.empty,
-      expectedSubscriptions = 0,
-      openWebsocketsCount = 1
-    )
-  }
-
-  it should "be idempotent on subscribing and unsubscribing" in {}
-
-  it should "acknowledge subscriptions/unsubscriptions" in {}
-
-  it should "handle unsubscribing from events" in new RouteWS {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage(write(WsRequest.subscribe(0, SubscribeParams.Block)))
-        .asScala
-        .mapTo[Unit]
-        .futureValue
-    }
-    def clientInitAssertionOnMsg(clientProbe: TestProbe): Assertion = {
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SubscribeParams.Block.subscriptionId)
-          id is 0
-      }
-      val notification =
-        read[NotificationUnsafe](
-          clientProbe.expectMsgClass(classOf[String])
-        ).asNotification.rightValue
-      notification.method is WsMethod.SubscriptionMethod
-      notification.params.obj.get("result").nonEmpty is true
-      notification.params.obj.get("subscription").nonEmpty is true
-    }
-
-    def clientNextBehavior(ws: WebSocket): Unit = {
-      ws.writeTextMessage(
-        write(WsRequest.unsubscribe(1, SubscribeParams.Block.subscriptionId))
-      ).asScala
-        .mapTo[Unit]
-        .futureValue
-    }
-    def clientNextAssertionOnMsg(clientProbe: TestProbe): Assertion = {
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
-          result is ujson.True
-          id is 1
-      }
-    }
-
-    val wsInitBehavior = WsStartBehavior(
-      clientInitBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 0),
-      clientInitAssertionOnMsg
-    )
-    val wsNextBehavior = WsBehavior(
-      clientNextBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 1),
-      clientNextAssertionOnMsg
-    )
-    checkWS(
-      initBehaviors = AVector.fill(1)(wsInitBehavior),
-      nextBehaviors = AVector.fill(1)(wsNextBehavior),
-      expectedSubscriptions = 0,
-      openWebsocketsCount = 1
-    )
+    // 500 subscription requests in 25 millis
+    Future.sequence(websockets.map(_.writeTextMessage(write(subscribeReq)).asScala)).futureValue
+    // 500 subscription responses in 25 millis
+    clientProbe.receiveN(numberOfConnections, 3.seconds)
+    node.eventBus ! BlockNotify(dummyBlock, 0)
+    // 500 notifications in 400 millis (Blocks are big, IO + serialization/deserialization time)
+    clientProbe.receiveN(numberOfConnections, 10.seconds)
+    // 500 unsubscription requests in 25 millis
+    Future.sequence(websockets.map(_.writeTextMessage(write(unsubscribeReq)).asScala)).futureValue
+    // 500 unsubscription responses in 25 millis
+    clientProbe.receiveN(numberOfConnections, 3.seconds)
+    node.eventBus ! BlockNotify(dummyBlock, 1)
+    clientProbe.expectNoMessage()
+    wsServer.httpServer.close().asScala.futureValue
+    // current measure times :
+    // 500 takes 1.4 seconds
+    // 1000 takes 1.8 seconds
+    // 2000 takes 2.2 seconds
+    // 5000 takes 3 seconds
+    // 10000 takes 5 seconds
   }
 
 }

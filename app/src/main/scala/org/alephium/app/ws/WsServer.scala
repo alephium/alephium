@@ -18,24 +18,25 @@ package org.alephium.app.ws
 
 import java.util.concurrent.Executors
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServer, HttpServerOptions}
+import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 
 import org.alephium.app.HttpServerLike
 import org.alephium.app.ws.WsEventHandler.getSubscribedEventHandler
+import org.alephium.app.ws.WsParams.WsId
 import org.alephium.flow.client.Node
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.util.{ActorRefT, EventBus}
 
 final case class WsServer(
-    underlying: HttpServer,
+    httpServer: HttpServer,
     eventHandler: ActorRefT[EventBus.Message],
-    subscribers: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
+    subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
 ) extends HttpServerLike
 
 object WsServer extends StrictLogging {
@@ -56,11 +57,40 @@ object WsServer extends StrictLogging {
         )
     server.webSocketHandler { ws =>
       if (ws.path().equals("/ws")) {
-        subscriptionHandler ! WsSubscriptionHandler.ConnectAndSubscribe(ws)
+        subscriptionHandler ! WsSubscriptionHandler.Connect(ServerWs(ws))
       } else {
         ws.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
     }
     WsServer(server, eventHandler, subscriptionHandler)
   }
+}
+
+trait ServerWsLike {
+  def textHandlerID(): WsId
+  def isClosed: Boolean
+  def reject(statusCode: Int): Unit
+  def closeHandler(handler: () => Unit): ServerWsLike
+  def textMessageHandler(handler: String => Unit): ServerWsLike
+  def writeTextMessage(msg: String)(implicit ec: ExecutionContext): Future[Unit]
+}
+
+final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
+  import org.alephium.app.ws.WsUtils._
+  def textHandlerID(): WsId         = underlying.textHandlerID()
+  def isClosed: Boolean             = underlying.isClosed
+  def reject(statusCode: Int): Unit = underlying.reject(statusCode)
+  // Improved closeHandler accepting a simple () => Unit
+  def closeHandler(handler: () => Unit): ServerWs = {
+    underlying.closeHandler((_: Void) => handler())
+    this
+  }
+
+  def textMessageHandler(handler: String => Unit): ServerWs = {
+    underlying.textMessageHandler((msg: String) => handler(msg))
+    this
+  }
+
+  def writeTextMessage(msg: String)(implicit ec: ExecutionContext): Future[Unit] =
+    underlying.writeTextMessage(msg).asScala.map(_ => ())
 }

@@ -20,10 +20,10 @@ import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpServer, HttpServerOptions}
 
 trait HttpServerLike {
-  def underlying: HttpServer
+  def httpServer: HttpServer
 }
 
-final case class SimpleHttpServer(underlying: HttpServer) extends HttpServerLike
+final case class SimpleHttpServer(httpServer: HttpServer) extends HttpServerLike
 
 object SimpleHttpServer {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))

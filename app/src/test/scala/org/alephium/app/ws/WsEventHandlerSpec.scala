@@ -22,11 +22,11 @@ import org.alephium.app.ws.WsParams.{SubscribeParams, WsNotificationParams}
 import org.alephium.json.Json._
 import org.alephium.util._
 
-class WsEventHandlerSpec extends AlephiumSpec with ServerFixture with WsUtils {
+class WsEventHandlerSpec extends AlephiumSpec with ServerFixture {
 
   import ServerFixture._
 
-  it should "subscribe event handler into event bus" in new WebSocketServerFixture {
+  it should "subscribe event handler into event bus" in new WsServerFixture {
     val newHandler =
       WsEventHandler.getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
     node.eventBus
