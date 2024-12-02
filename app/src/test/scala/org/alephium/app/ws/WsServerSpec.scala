@@ -28,7 +28,7 @@ import org.alephium.app.ws.WsParams.SubscribeParams.Block
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
-import org.alephium.rpc.model.JsonRPC.Response
+import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util._
 
 class WsServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
@@ -56,16 +56,55 @@ class WsServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelp
     val ws          = connectWebsocketClient().futureValue
     val clientProbe = TestProbe()
     ws.textMessageHandler(message => clientProbe.ref ! message)
-    val subscribeReq              = WsRequest.subscribe(0, Block)
-    val unsubscribeReq            = WsRequest.unsubscribe(1, Block.subscriptionId)
-    val subscribeResp: Response   = Response.successful(Correlation(0), Block.subscriptionId)
-    val unsubscribeResp: Response = Response.successful(Correlation(1))
+
+    val subscribeReq            = WsRequest.subscribe(0, Block)
+    val subscribeResp: Response = Response.successful(Correlation(0), Block.subscriptionId)
 
     ws.writeTextMessage(write(subscribeReq)).asScala.futureValue
     clientProbe.expectMsgType[String] is write(subscribeResp)
 
+    val unsubscribeReq            = WsRequest.unsubscribe(1, Block.subscriptionId)
+    val unsubscribeResp: Response = Response.successful(Correlation(1))
+
     ws.writeTextMessage(write(unsubscribeReq)).asScala.futureValue
     clientProbe.expectMsgType[String] is write(unsubscribeResp)
+
+    ws.close().asScala.futureValue
+    clientProbe.expectNoMessage()
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
+  it should "respond already subscribed or unsubscribed" in new WsServerFixture {
+    val wsServer    = bindAndListen()
+    val ws          = connectWebsocketClient().futureValue
+    val clientProbe = TestProbe()
+    ws.textMessageHandler(message => clientProbe.ref ! message)
+
+    val subscribeReq_1                 = WsRequest.subscribe(0, Block)
+    val subscribeSuccessResp: Response = Response.successful(Correlation(0), Block.subscriptionId)
+
+    ws.writeTextMessage(write(subscribeReq_1)).asScala.futureValue
+    clientProbe.expectMsgType[String] is write(subscribeSuccessResp)
+
+    val subscribeReq_2 = WsRequest.subscribe(1, Block)
+    val alreadySubscribedResp: Response =
+      Response.failed(Correlation(1), Error(WsError.AlreadySubscribed, Block.subscriptionId))
+
+    ws.writeTextMessage(write(subscribeReq_2)).asScala.futureValue
+    clientProbe.expectMsgType[String] is write(alreadySubscribedResp)
+
+    val unsubscribeReq_1                 = WsRequest.unsubscribe(2, Block.subscriptionId)
+    val unsubscribeSuccessResp: Response = Response.successful(Correlation(2))
+
+    ws.writeTextMessage(write(unsubscribeReq_1)).asScala.futureValue
+    clientProbe.expectMsgType[String] is write(unsubscribeSuccessResp)
+
+    val unsubscribeReq_2 = WsRequest.unsubscribe(3, Block.subscriptionId)
+    val alreadyUnsubscribedResp: Response =
+      Response.failed(Correlation(3), Error(WsError.AlreadyUnsubscribed, Block.subscriptionId))
+
+    ws.writeTextMessage(write(unsubscribeReq_2)).asScala.futureValue
+    clientProbe.expectMsgType[String] is write(alreadyUnsubscribedResp)
 
     ws.close().asScala.futureValue
     clientProbe.expectNoMessage()

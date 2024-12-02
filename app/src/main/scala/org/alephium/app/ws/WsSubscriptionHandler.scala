@@ -225,7 +225,7 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
             }(context.dispatcher)
         }
       case _ =>
-        self ! UnsubscriptionFailed(id, ws, s"Not subscribed to $subscriptionId subscription")
+        self ! AlreadyUnSubscribed(id, ws, subscriptionId)
     }
   }
 
