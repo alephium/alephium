@@ -57,13 +57,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     val peerPort             = generatePort()
     val address              = new InetSocketAddress("127.0.0.1", peerPort)
     val blockflowFetchMaxAge = Duration.zero
-    implicit val apiConfig: ApiConfig = ApiConfig(
+
+    def utxosLimitInApiConfig: Int = defaultUtxosLimit
+    implicit lazy val apiConfig: ApiConfig = ApiConfig(
       networkInterface = address.getAddress,
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
       AVector.empty,
       ALPH.oneAlph,
-      defaultUtxosLimit,
+      utxosLimitInApiConfig,
       128,
       enableHttpMetrics = true
     )
@@ -769,12 +771,51 @@ class ServerUtilsSpec extends AlephiumSpec {
           None,
           None,
           nonCoinbaseMinGasPrice,
-          targetBlockHash
+          targetBlockHash,
+          None
         )
         .rightValue
       txs.length is 1
       txs.head
     }
+  }
+
+  it should "respect the `utxosLimit` config" in new FlowFixtureWithApi {
+    override def utxosLimitInApiConfig: Int = 4
+
+    def checkInputSize(rawTx: String, expectedInputSize: Int) = {
+      val unsignedTx = deserialize[UnsignedTransaction](Hex.unsafe(rawTx)).rightValue
+      unsignedTx.inputs.length is expectedInputSize
+    }
+
+    val serverUtils = new ServerUtils
+    val groupIndex  = GroupIndex.unsafe(0)
+    val genesisKey  = genesisKeys(groupIndex.value)._1
+    val pubKey      = groupIndex.generateKey._2
+    (0 until 6).foreach { _ =>
+      val block = transfer(blockFlow, genesisKey, pubKey, ALPH.oneAlph)
+      addAndCheck(blockFlow, block)
+    }
+    val lockupScript = LockupScript.p2pkh(pubKey)
+    blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 6
+
+    val params0 =
+      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(2))
+    val result0 = serverUtils.buildSweepAddressTransactions(blockFlow, params0).rightValue
+    result0.unsignedTxs.length is 1
+    checkInputSize(result0.unsignedTxs.head.unsignedTx, 2)
+
+    val params1 =
+      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = None)
+    val result1 = serverUtils.buildSweepAddressTransactions(blockFlow, params1).rightValue
+    result1.unsignedTxs.length is 1
+    checkInputSize(result1.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
+
+    val params2 =
+      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(6))
+    val result2 = serverUtils.buildSweepAddressTransactions(blockFlow, params2).rightValue
+    result2.unsignedTxs.length is 1
+    checkInputSize(result2.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
   }
 
   "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixtureWithApi {
@@ -1576,6 +1617,14 @@ class ServerUtilsSpec extends AlephiumSpec {
         mutFields: AVector[vm.Val]
     ): (Block, ContractId) = {
       val contract = Compiler.compileContract(code).rightValue
+      createContract(contract, immFields, mutFields)
+    }
+
+    def createContract(
+        contract: vm.StatefulContract,
+        immFields: AVector[vm.Val],
+        mutFields: AVector[vm.Val]
+    ): (Block, ContractId) = {
       val script =
         contractCreation(contract, immFields, mutFields, lockupScript, minimalAlphInContract)
       val block      = executeScript(script, None)
@@ -5139,6 +5188,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     executeScript(s"${Int.MaxValue}").isRight is true
     executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
       "Execution error when emulating tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
+  }
+
+  it should "get contract code" in new ContractFixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val statefulContract = Compiler.compileContract(code).rightValue
+    val codeHash         = statefulContract.hash
+    serverUtils.getContractCode(blockFlow, codeHash).leftValue.detail is
+      s"Contract code hash: ${codeHash.toHexString} not found"
+    createContract(code, AVector.empty, AVector.empty)._2
+    serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
   }
 
   @scala.annotation.tailrec

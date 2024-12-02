@@ -29,5 +29,6 @@ final case class BuildSweepAddressTransactions(
     lockTime: Option[TimeStamp] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
+    targetBlockHash: Option[BlockHash] = None,
+    utxosLimit: Option[Int] = None
 ) extends BuildTxCommon

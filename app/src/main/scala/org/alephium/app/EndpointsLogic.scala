@@ -722,6 +722,10 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
+  val contractCodeLogic = serverLogic(contractCode) { codeHash =>
+    Future.successful(serverUtils.getContractCode(blockFlow, codeHash))
+  }
+
   val testContractLogic = serverLogic(testContract) { (testContract: TestContract) =>
     val (blockFlow, storages) = BlockFlow.emptyAndStoragesUnsafe(node.config)
     Future.successful {

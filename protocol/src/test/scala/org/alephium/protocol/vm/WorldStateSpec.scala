@@ -60,14 +60,16 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       refCount: Int
   ) = {
     if (isLemanFork) {
-      worldState.contractImmutableState.exists(code.hash) isE true
-      worldState.codeState.exists(code.hash) isE false
+      worldState.getContractCode(code.hash).rightValue.isDefined is true
+      worldState.getLegacyContractCode(code.hash).rightValue.isDefined is false
     } else {
       worldState.contractImmutableState.exists(code.hash) isE false
       if (refCount > 0) {
         worldState.codeState.get(code.hash) isE WorldState.CodeRecord(code, refCount)
+        worldState.getContractCode(code.hash).rightValue.isDefined is true
       } else {
-        worldState.codeState.exists(code.hash) isE false
+        worldState.getLegacyContractCode(code.hash).rightValue.isDefined is false
+        worldState.getContractCode(code.hash).rightValue.isDefined is false
       }
     }
   }
