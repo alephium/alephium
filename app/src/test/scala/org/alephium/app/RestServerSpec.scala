@@ -1543,6 +1543,7 @@ trait RestServerFixture
     (new java.io.File("")).toPath,
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
+    apiConfig.enableHttpMetrics,
     WalletConfig.BlockFlow(
       "host",
       0,
