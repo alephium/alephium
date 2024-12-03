@@ -360,7 +360,8 @@ class ServerUtils(implicit
         query.lockTime,
         query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash
+        query.targetBlockHash,
+        query.utxosLimit
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -414,7 +415,8 @@ class ServerUtils(implicit
         query.lockTime,
         query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash
+        query.targetBlockHash,
+        query.utxosLimit
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -1039,6 +1041,14 @@ class ServerUtils(implicit
   }
   // scalastyle:on parameter.number
 
+  private def getUtxosLimit(utxosLimit: Option[Int]): Int = {
+    utxosLimit match {
+      case Some(limit) => math.min(apiConfig.defaultUtxosLimit, limit)
+      case None        => apiConfig.defaultUtxosLimit
+    }
+  }
+
+  // scalastyle:off parameter.number
   def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
@@ -1047,7 +1057,8 @@ class ServerUtils(implicit
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash]
+      targetBlockHashOpt: Option[BlockHash],
+      utxosLimit: Option[Int]
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
       targetBlockHashOpt,
@@ -1057,13 +1068,14 @@ class ServerUtils(implicit
       gasOpt,
       gasPrice,
       maxAttoAlphPerUTXO.map(_.value),
-      Int.MaxValue
+      getUtxosLimit(utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
       case Left(error)               => failed(error)
     }
   }
+  // scalastyle:on parameter.number
 
   // scalastyle:off parameter.number
   def prepareSweepAddressTransactionFromScripts(
@@ -1075,7 +1087,8 @@ class ServerUtils(implicit
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash]
+      targetBlockHashOpt: Option[BlockHash],
+      utxosLimit: Option[Int]
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddressFromScripts(
       targetBlockHashOpt,
@@ -1086,7 +1099,7 @@ class ServerUtils(implicit
       gasOpt,
       gasPrice,
       maxAttoAlphPerUTXO.map(_.value),
-      Int.MaxValue
+      getUtxosLimit(utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
@@ -1607,6 +1620,21 @@ class ServerUtils(implicit
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
       state      <- fetchContractState(worldState, address.contractId)
     } yield state
+  }
+
+  def getContractCode(blockFlow: BlockFlow, codeHash: Hash): Try[StatefulContract] = {
+    // Since the contract code is not stored in the trie,
+    // and all the groups share the same storage,
+    // we only need to get the world state from any one group
+    val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(0))
+    for {
+      worldState <- wrapResult(blockFlow.getBestPersistedWorldState(groupIndex))
+      code <- wrapResult(worldState.getContractCode(codeHash)) match {
+        case Right(None)       => Left(notFound(s"Contract code hash: ${codeHash.toHexString}"))
+        case Right(Some(code)) => Right(code)
+        case Left(error)       => Left(error)
+      }
+    } yield code
   }
 
   def getParentContract(
