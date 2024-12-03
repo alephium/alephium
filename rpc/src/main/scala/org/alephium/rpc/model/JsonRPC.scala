@@ -220,7 +220,9 @@ object JsonRPC extends StrictLogging {
             case Some(id) => ujson.Obj("error" -> writeJs(failure.error), "id" -> writeJs(id))
             case None     => ujson.Obj("error" -> writeJs(failure.error))
           }),
-        json => Failure(read[Error](json("error")), read[Option[Long]](json("id")))
+        json => {
+          Failure(read[Error](json("error")), json.obj.get("id").map(read[Long](_)))
+        }
       )
     }
 

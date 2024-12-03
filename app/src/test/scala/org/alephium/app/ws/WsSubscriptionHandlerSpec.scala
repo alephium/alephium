@@ -23,7 +23,7 @@ import org.scalatest.Inside.inside
 import org.scalatest.concurrent.Eventually
 
 import org.alephium.app.ServerFixture
-import org.alephium.app.ws.WsParams.SubscribeParams
+import org.alephium.app.ws.WsParams.{SubscribeParams, UnsubscribeParams}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler._
 import org.alephium.app.ws.WsUtils._
@@ -116,21 +116,60 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
     )
   }
 
-  it should "handle invalid messages gracefully" in new WsBehaviorFixture {
-    def clientInitBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
+  it should "handle invalid subscription and unsubscription requests with error" in new WsBehaviorFixture {
+    def invalidMessageBehavior(ws: WebSocket, clientProbe: TestProbe): Unit = {
       ws.textMessageHandler(message => clientProbe.ref ! message)
       ws.writeTextMessage("invalid_msg").asScala.mapTo[Unit].futureValue
     }
 
-    def clientAssertionOnMsg(clientProbe: TestProbe): Assertion =
-      clientProbe
-        .expectMsgClass(classOf[String])
-        .contains(Error.ParseErrorCode.toString) is true
+    def assertParsingError(clientProbe: TestProbe): Assertion = {
+      inside(read[Response.Failure](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Failure(error, _) =>
+          error.code is Error.ParseErrorCode
+      }
+    }
 
-    val wsInitBehavior = WsStartBehavior(clientInitBehavior, _ => (), clientAssertionOnMsg)
+    def invalidSubscriptionParamsBehavior(ws: WebSocket): Unit = {
+      ws.writeTextMessage(write(WsRequest.subscribe(1, SubscribeParams(""))))
+        .asScala
+        .mapTo[Unit]
+        .futureValue
+    }
+
+    def assertInvalidSubscription(clientProbe: TestProbe): Assertion = {
+      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Success(_, _) =>
+          fail("Should not receive success response")
+        case JsonRPC.Response.Failure(error, _) =>
+          error.code is Error.InvalidParamsCode
+      }
+    }
+
+    def assertInvalidUnsubscription(clientProbe: TestProbe): Assertion = {
+      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
+        case JsonRPC.Response.Success(_, _) =>
+          fail("Should not receive success response")
+        case JsonRPC.Response.Failure(error, _) =>
+          error.code is Error.InvalidParamsCode
+      }
+    }
+
+    def invalidUnsubscriptionParamsBehavior(ws: WebSocket): Unit = {
+      ws.writeTextMessage(write(WsRequest(Correlation(1), UnsubscribeParams(""))))
+        .asScala
+        .mapTo[Unit]
+        .futureValue
+    }
+
+    val wsInitBehavior = WsStartBehavior(invalidMessageBehavior, _ => (), assertParsingError)
+    val wsNextBehaviors =
+      AVector(
+        WsNextBehavior(invalidSubscriptionParamsBehavior, _ => (), assertInvalidSubscription),
+        WsNextBehavior(invalidUnsubscriptionParamsBehavior, _ => (), assertInvalidUnsubscription)
+      )
     checkWS(
       initBehaviors = AVector.fill(1)(wsInitBehavior),
-      nextBehaviors = AVector.empty,
+      nextBehaviors = wsNextBehaviors,
       expectedSubscriptions = 0,
       openWebsocketsCount = 1
     )

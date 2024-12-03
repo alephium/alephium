@@ -129,7 +129,7 @@ protected[ws] object WsParams {
   object UnsubscribeParams {
     def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
       json match {
-        case ujson.Str(eventTypeOrSubscriptionId) =>
+        case ujson.Str(eventTypeOrSubscriptionId) if eventTypeOrSubscriptionId.nonEmpty =>
           Right(UnsubscribeParams(eventTypeOrSubscriptionId))
         case unsupported =>
           Left(invalidUnsubscriptionJsonError(unsupported))
@@ -214,8 +214,8 @@ protected[ws] object WsRequest extends ApiModelCodec {
     }
   }
 
-  def subscribe(id: WsCorrelationId, subscription: SubscribeParams): WsRequest =
-    WsRequest(Correlation(id), subscription)
+  def subscribe(id: WsCorrelationId, params: SubscribeParams): WsRequest =
+    WsRequest(Correlation(id), params)
 
   def unsubscribe(id: WsCorrelationId, subscriptionId: WsSubscriptionId): WsRequest =
     WsRequest(Correlation(id), UnsubscribeParams(subscriptionId))
