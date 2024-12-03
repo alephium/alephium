@@ -26,8 +26,7 @@ import org.alephium.app.ws.WsParams.{SubscribeParams, WsNotificationParams}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json.{write, writeJs}
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.rpc.model.JsonRPC
-import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
+import org.alephium.rpc.model.JsonRPC.Notification
 import org.alephium.util.{ActorRefT, BaseActor, EventBus}
 
 protected[ws] object WsEventHandler extends ApiModelCodec {
@@ -45,11 +44,10 @@ protected[ws] object WsEventHandler extends ApiModelCodec {
     eventHandlerRef
   }
 
-  def buildJsonRpcNotification(params: WsNotificationParams): NotificationUnsafe = {
-    NotificationUnsafe(
-      JsonRPC.version,
+  def buildJsonRpcNotification(params: WsNotificationParams): Notification = {
+    Notification(
       WsMethod.SubscriptionMethod,
-      Some(writeJs(params))
+      writeJs(params)
     )
   }
 }

@@ -24,8 +24,6 @@ import org.alephium.util._
 
 class WsEventHandlerSpec extends AlephiumSpec with ServerFixture {
 
-  import ServerFixture._
-
   it should "subscribe event handler into event bus" in new WsServerFixture {
     val newHandler =
       WsEventHandler.getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
@@ -41,7 +39,7 @@ class WsEventHandlerSpec extends AlephiumSpec with ServerFixture {
     val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
     val params       = WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
     val notification = WsEventHandler.buildJsonRpcNotification(params)
-    show(notification.params) is write(
+    write(notification.params) is write(
       WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
     )
   }

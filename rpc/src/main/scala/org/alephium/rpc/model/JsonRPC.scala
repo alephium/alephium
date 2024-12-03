@@ -170,16 +170,6 @@ object JsonRPC extends StrictLogging {
     def apply(jsonrpc: String, method: String, params: Option[ujson.Value]): NotificationUnsafe = {
       new NotificationUnsafe(jsonrpc, method, params.map(dropNullValues))
     }
-    implicit val notificationWriter: Writer[NotificationUnsafe] =
-      writer[ujson.Value].comap[NotificationUnsafe] {
-        case NotificationUnsafe(jsonrpc, method, params) =>
-          ujson.Obj.from(
-            Vector(
-              "jsonrpc" -> ujson.Str(jsonrpc),
-              "method"  -> ujson.Str(method)
-            ) ++ params.map("params" -> _)
-          )
-      }
     implicit val notificationUnsafeReader: Reader[NotificationUnsafe] =
       reader[ujson.Value].map[NotificationUnsafe] { json =>
         NotificationUnsafe(
@@ -213,12 +203,12 @@ object JsonRPC extends StrictLogging {
       def apply(result: ujson.Value, id: Long): Success = {
         new Success(dropNullValues(result), id)
       }
-      implicit val succesReadWriter: ReadWriter[Success] = readwriter[ujson.Value].bimap[Success](
+      implicit val successReadWriter: ReadWriter[Success] = readwriter[ujson.Value].bimap[Success](
         success =>
-          success.result match {
+          versionSet(success.result match {
             case ujson.Null => ujson.Obj("id" -> writeJs(success.id))
             case _          => ujson.Obj("result" -> success.result, "id" -> writeJs(success.id))
-          },
+          }),
         json => Success(read[ujson.Value](json("result")), read[Long](json("id")))
       )
     }
@@ -226,10 +216,10 @@ object JsonRPC extends StrictLogging {
     object Failure {
       implicit val failureReadWriter: ReadWriter[Failure] = readwriter[ujson.Value].bimap[Failure](
         failure =>
-          failure.id match {
+          versionSet(failure.id match {
             case Some(id) => ujson.Obj("error" -> writeJs(failure.error), "id" -> writeJs(id))
             case None     => ujson.Obj("error" -> writeJs(failure.error))
-          },
+          }),
         json => Failure(read[Error](json("error")), read[Option[Long]](json("id")))
       )
     }
@@ -248,8 +238,8 @@ object JsonRPC extends StrictLogging {
 
     implicit val responseWriter: Writer[Response] = {
       writer[ujson.Value].comap {
-        case x @ Success(_, _) => versionSet(writeJs(x))
-        case x @ Failure(_, _) => versionSet(writeJs(x))
+        case x @ Success(_, _) => writeJs(x)
+        case x @ Failure(_, _) => writeJs(x)
       }
     }
   }
