@@ -334,7 +334,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     val outputRef = nextContractOutputRef(contractOutput)
     for {
       _ <- chargeGeneratedOutput()
-      _ <- updateContractAsset(contractId, outputRef, contractOutput)
+      _ <- updateContractAsset(contractId, blockEnv.blockId, outputRef, contractOutput)
     } yield {
       generatedOutputs.addOne(contractOutput)
       ()
@@ -439,7 +439,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         outputRef,
         contractOutput,
         getHardFork().isLemanEnabled(),
-        txId
+        txId,
+        blockEnv.blockId
       )
 
     result match {
@@ -484,6 +485,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def updateContractAsset(
       contractId: ContractId,
+      blockHashOpt: Option[BlockHash],
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): ExeResult[Unit] = {
@@ -494,7 +496,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
           contractId,
           outputRef,
           output,
-          txId
+          txId,
+          blockHashOpt
         )
         .left
         .map(e => Left(IOErrorUpdateState(e)))

@@ -28,7 +28,7 @@ import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{BlockHash => ModelBlockHash, _}
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
@@ -48,7 +48,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         cachedWorldState.addAsset(
           inputInfo.txInput.outputRef,
           inputInfo.referredOutput,
-          TransactionId.generate
+          TransactionId.generate,
+          Some(ModelBlockHash.generate)
         ) isE ()
       }
     }

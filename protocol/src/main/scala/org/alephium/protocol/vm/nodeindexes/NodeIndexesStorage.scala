@@ -17,12 +17,26 @@
 package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.KeyValueStorage
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{BlockHash, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
+import org.alephium.serde.{avectorSerde, Serde}
+import org.alephium.util.AVector
 
+// format: off
 final case class NodeIndexesStorage(
     logStorage: LogStorage,
-    txOutputRefIndexStorage: Option[KeyValueStorage[TxOutputRef.Key, TransactionId]],
+    txOutputRefIndexStorage: TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]],
     subContractIndexStorage: Option[SubContractIndexStorage]
 )
+// format: on
+object NodeIndexesStorage {
+  type TxIdBlockHashes = (TransactionId, AVector[BlockHash])
+
+  implicit val txIdBlockHashesSerde: Serde[TxIdBlockHashes] =
+    Serde.tuple2[TransactionId, AVector[BlockHash]](
+      implicitly[Serde[TransactionId]],
+      avectorSerde[BlockHash]
+    )
+}

@@ -25,8 +25,10 @@ import org.alephium.protocol.vm.event.MutableLog
 import org.alephium.protocol.vm.nodeindexes.{
   CachedNodeIndexes,
   NodeIndexesStorage,
-  StagingNodeIndexes
+  StagingNodeIndexes,
+  TxOutputRefIndexStorage
 }
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
 import org.alephium.serde.{intSerde, Serde, SerdeError}
 import org.alephium.util.{AVector, SizedLruCache}
 
@@ -155,9 +157,11 @@ trait WorldState[T, R1, R2, R3] {
   def addAsset(
       outputRef: TxOutputRef,
       output: TxOutput,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHashOpt: Option[BlockHash]
   ): IOResult[T]
 
+  // scalastyle:off parameter.number
   def createContractUnsafe(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
@@ -166,7 +170,8 @@ trait WorldState[T, R1, R2, R3] {
       outputRef: ContractOutputRef,
       output: ContractOutput,
       isLemanActivated: Boolean,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHash: Option[BlockHash]
   ): IOResult[T] = {
     if (isLemanActivated) {
       createContractLemanUnsafe(
@@ -176,13 +181,15 @@ trait WorldState[T, R1, R2, R3] {
         mutFields,
         outputRef,
         output,
-        txId
+        txId,
+        blockHash
       )
     } else {
       assume(immFields.isEmpty)
-      createContractLegacyUnsafe(contractId, code, mutFields, outputRef, output, txId)
+      createContractLegacyUnsafe(contractId, code, mutFields, outputRef, output, txId, blockHash)
     }
   }
+  // scalastyle:on parameter.number
 
   def createContractLegacyUnsafe(
       contractId: ContractId,
@@ -190,7 +197,8 @@ trait WorldState[T, R1, R2, R3] {
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHash: Option[BlockHash]
   ): IOResult[T]
 
   def createContractLemanUnsafe(
@@ -200,7 +208,8 @@ trait WorldState[T, R1, R2, R3] {
       mutFields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHash: Option[BlockHash]
   ): IOResult[T]
 
   def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[T]
@@ -209,7 +218,8 @@ trait WorldState[T, R1, R2, R3] {
       key: ContractId,
       outputRef: ContractOutputRef,
       output: ContractOutput,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHash: Option[BlockHash]
   ): IOResult[T]
 
   protected[vm] def updateContract(key: ContractId, state: ContractStorageState): IOResult[T]
@@ -296,7 +306,8 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
       key: ContractId,
       outputRef: ContractOutputRef,
       output: ContractOutput,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHashOpt: Option[BlockHash]
   ): IOResult[Unit]
 }
 
@@ -383,10 +394,11 @@ object WorldState {
     def addAsset(
         outputRef: TxOutputRef,
         output: TxOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Persisted] = {
       for {
-        updatedOutputState <- updateOutputState(outputRef, output, txId)
+        updatedOutputState <- updateOutputState(outputRef, output, txId, blockHashOpt)
       } yield {
         Persisted(
           updatedOutputState,
@@ -404,11 +416,12 @@ object WorldState {
         fields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHash: Option[BlockHash]
     ): IOResult[Persisted] = {
       val state = ContractLegacyState.unsafe(code, fields, outputRef)
       for {
-        newOutputState   <- updateOutputState(outputRef, output, txId)
+        newOutputState   <- updateOutputState(outputRef, output, txId, blockHash)
         newContractState <- contractState.put(contractId, state)
         recordOpt        <- codeState.getOpt(code.hash)
         newCodeState     <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
@@ -428,11 +441,12 @@ object WorldState {
         mutFields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Persisted] = {
       val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
       for {
-        newOutputState   <- updateOutputState(outputRef, output, txId)
+        newOutputState   <- updateOutputState(outputRef, output, txId, blockHashOpt)
         newContractState <- contractState.put(contractId, state.mutable)
         _ <- contractImmutableState.put(state.mutable.immutableStateHash, Left(state.immutable))
         _ <- contractImmutableState.put(state.codeHash, Right(code))
@@ -466,11 +480,12 @@ object WorldState {
         key: ContractId,
         outputRef: ContractOutputRef,
         output: ContractOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Persisted] = {
       for {
         state            <- getContractState(key)
-        newOutputState   <- updateOutputState(outputRef, output, txId)
+        newOutputState   <- updateOutputState(outputRef, output, txId, blockHashOpt)
         newContractState <- _updateContract(key, state.updateOutputRef(outputRef))
       } yield Persisted(
         newOutputState,
@@ -534,14 +549,16 @@ object WorldState {
     private def updateOutputState(
         outputRef: TxOutputRef,
         output: TxOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[SparseMerkleTrie[TxOutputRef, TxOutput]] = {
       for {
         updateOutputState <- outputState.put(outputRef, output)
-        _ <- nodeIndexesStorage.txOutputRefIndexStorage match {
-          case Some(storage) => storage.put(outputRef.key, txId)
-          case None          => Right(())
-        }
+        _ <- nodeIndexesStorage.txOutputRefIndexStorage.store(
+          outputRef.key,
+          txId,
+          blockHashOpt
+        )
       } yield updateOutputState
     }
   }
@@ -552,19 +569,19 @@ object WorldState {
     def contractImmutableState: MutableKV[Hash, ContractStorageImmutableState, Unit]
     def codeState: MutableKV[Hash, CodeRecord, Unit]
     def logState: MutableLog
-    def txOutputRefIndexState: Option[MutableKV[TxOutputRef.Key, TransactionId, Unit]]
+    def txOutputRefIndexState: TxOutputRefIndexStorage[
+      MutableKV[TxOutputRef.Key, TxIdBlockHashes, Unit]
+    ]
 
     def addAsset(
         outputRef: TxOutputRef,
         output: TxOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Unit] = {
       for {
         _ <- outputState.put(outputRef, output)
-        _ <- txOutputRefIndexState match {
-          case Some(state) => state.put(outputRef.key, txId)
-          case None        => Right(())
-        }
+        _ <- txOutputRefIndexState.store(outputRef.key, txId, blockHashOpt)
       } yield ()
     }
 
@@ -574,11 +591,12 @@ object WorldState {
         mutFields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Unit] = {
       val state = ContractLegacyState.unsafe(code, mutFields, outputRef)
       for {
-        _         <- addAsset(outputRef, output, txId)
+        _         <- addAsset(outputRef, output, txId, blockHashOpt)
         _         <- contractState.put(contractId, state)
         recordOpt <- codeState.getOpt(code.hash)
         _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
@@ -592,11 +610,12 @@ object WorldState {
         mutFields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Unit] = {
       val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
       for {
-        _ <- addAsset(outputRef, output, txId)
+        _ <- addAsset(outputRef, output, txId, blockHashOpt)
         _ <- contractState.put(contractId, state.mutable)
         _ <- contractImmutableState.put(state.mutable.immutableStateHash, Left(state.immutable))
         _ <- contractImmutableState.put(state.codeHash, Right(code))
@@ -611,11 +630,12 @@ object WorldState {
         key: ContractId,
         outputRef: ContractOutputRef,
         output: ContractOutput,
-        txId: TransactionId
+        txId: TransactionId,
+        blockHashOpt: Option[BlockHash]
     ): IOResult[Unit] = {
       for {
         state <- getContractState(key)
-        _     <- addAsset(outputRef, output, txId)
+        _     <- addAsset(outputRef, output, txId, blockHashOpt)
         _     <- updateContract(key, state.updateOutputRef(outputRef))
       } yield ()
     }
@@ -683,7 +703,9 @@ object WorldState {
       nodeIndexesState: CachedNodeIndexes
   ) extends AbstractCached {
     def logState: MutableLog = nodeIndexesState.logStorageCache
-    def txOutputRefIndexState: Option[MutableKV[TxOutputRef.Key, TransactionId, Unit]] =
+    def txOutputRefIndexState: TxOutputRefIndexStorage[
+      CachedKVStorage[TxOutputRef.Key, TxIdBlockHashes]
+    ] =
       nodeIndexesState.txOutputRefIndexCache
 
     def persist(): IOResult[Persisted] = {
@@ -720,7 +742,9 @@ object WorldState {
       nodeIndexesState: StagingNodeIndexes
   ) extends AbstractCached {
     def logState: MutableLog = nodeIndexesState.logState
-    def txOutputRefIndexState: Option[MutableKV[TxOutputRef.Key, TransactionId, Unit]] =
+    def txOutputRefIndexState: TxOutputRefIndexStorage[
+      StagingKVStorage[TxOutputRef.Key, TxIdBlockHashes]
+    ] =
       nodeIndexesState.txOutputRefIndexState
 
     def commit(): Unit = {

@@ -502,7 +502,8 @@ object ServerFixture {
             AVector(vm.Val.U256(U256.Zero)),
             ContractOutputRef.unsafe(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.zero)),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector()),
-            dummyTx.id
+            dummyTx.id,
+            Some(block.hash)
           )
           .map(_.cached())
       } else {
@@ -541,9 +542,9 @@ object ServerFixture {
 
     override def getTxIdFromOutputRef(
         outputRef: TxOutputRef
-    ): IOResult[Option[TransactionId]] = {
+    ): IOResult[Option[(TransactionId, AVector[BlockHash])]] = {
       if (outputRef == dummyAssetOutputRef) {
-        Right(Some(dummyTransactionId))
+        Right(Some((dummyTransactionId, AVector(block.hash))))
       } else {
         Right(None)
       }

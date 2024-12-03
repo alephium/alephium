@@ -618,9 +618,9 @@ class ServerUtils(implicit
       outputRef: TxOutputRef
   ): Try[Option[TxOutput]] = {
     for {
-      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
-      txOutputOpt <- txIdOpt match {
-        case Some(txId) =>
+      resultOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      txOutputOpt <- resultOpt match {
+        case Some((txId, _)) =>
           getTransaction(
             blockFlow,
             txId,
@@ -1684,11 +1684,11 @@ class ServerUtils(implicit
       outputRef: TxOutputRef
   ): Try[TransactionId] = {
     for {
-      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
-      txId <- txIdOpt.toRight(
+      resultOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      result <- resultOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
       )
-    } yield txId
+    } yield result._1
   }
 
   private def call[P <: CallBase](
@@ -1868,8 +1868,10 @@ class ServerUtils(implicit
     for {
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, testContract.txId))
-      _ <- createContract(worldState, contractId, testContract)
+      _ <- testContract.existingContracts.foreachE(
+        createContract(worldState, _, testContract.txId, Some(testContract.blockHash))
+      )
+      _      <- createContract(worldState, contractId, testContract, Some(testContract.blockHash))
       method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       executionResultPair <- executeContractMethod(
         worldState,
@@ -2177,7 +2179,8 @@ class ServerUtils(implicit
   def createContract(
       worldState: WorldState.Staging,
       existingContract: ContractState,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHashOpt: Option[BlockHash]
   ): Try[Unit] = {
     createContract(
       worldState,
@@ -2186,14 +2189,16 @@ class ServerUtils(implicit
       toVmVal(existingContract.immFields),
       toVmVal(existingContract.mutFields),
       existingContract.asset,
-      txId
+      txId,
+      blockHashOpt
     )
   }
 
   def createContract(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      testContract: TestContract.Complete
+      testContract: TestContract.Complete,
+      blockHashOpt: Option[BlockHash]
   ): Try[Unit] = {
     createContract(
       worldState,
@@ -2202,7 +2207,8 @@ class ServerUtils(implicit
       toVmVal(testContract.initialImmFields),
       toVmVal(testContract.initialMutFields),
       testContract.initialAsset,
-      testContract.txId
+      testContract.txId,
+      blockHashOpt
     )
   }
 
@@ -2213,7 +2219,8 @@ class ServerUtils(implicit
       initialImmState: AVector[vm.Val],
       initialMutState: AVector[vm.Val],
       asset: AssetState,
-      txId: TransactionId
+      txId: TransactionId,
+      blockHashOpt: Option[BlockHash]
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
@@ -2226,7 +2233,8 @@ class ServerUtils(implicit
         initialMutState,
         outputRef,
         output,
-        txId
+        txId,
+        blockHashOpt
       )
     )
   }

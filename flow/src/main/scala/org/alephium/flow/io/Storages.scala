@@ -27,10 +27,15 @@ import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
+  txIdBlockHashesSerde,
+  TxIdBlockHashes
+}
+import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex.{
   SubContractIndexState,
   SubContractIndexStateId,
@@ -70,12 +75,18 @@ object Storages {
     val trieImmutableStateStorage =
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
 
-    val txOutputRefIndexStorageOpt = if (nodeSetting.indexesConfig.txOutputRefIndex) {
-      Some(
-        RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
+    val txOutputRefIndexStorage = if (nodeSetting.indexesConfig.txOutputRefIndex) {
+      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]](
+        Some(
+          RocksDBKeyValueStorage[TxOutputRef.Key, (TransactionId, AVector[BlockHash])](
+            db,
+            TxOutputRefIndex,
+            writeOptions
+          )
+        )
       )
     } else {
-      None
+      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]](None)
     }
 
     val subContractIndexStorageOpt = if (nodeSetting.indexesConfig.subcontractIndex) {
@@ -102,7 +113,11 @@ object Storages {
     }
 
     val nodeIndexesStorage =
-      NodeIndexesStorage(logStorage, txOutputRefIndexStorageOpt, subContractIndexStorageOpt)
+      NodeIndexesStorage(
+        logStorage,
+        txOutputRefIndexStorage,
+        subContractIndexStorageOpt
+      )
 
     val worldStateStorage =
       WorldStateRockDBStorage(

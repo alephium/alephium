@@ -74,7 +74,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
           fields(mutFieldLength),
           outputRef,
           output,
-          TransactionId.generate
+          TransactionId.generate,
+          Some(BlockHash.generate)
         ) isE ()
       pool.worldState.getContractObj(contractId) isE
         contract
@@ -237,7 +238,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       AVector.empty,
       outputRef,
       output,
-      TransactionId.generate
+      TransactionId.generate,
+      Some(BlockHash.generate)
     ) isE ()
 
     pool.gasRemaining is initialGas

@@ -1027,7 +1027,9 @@ trait TxOutputRefIndexFixture extends FlowFixture {
     utxos.length is 1
     val txOutputRef = utxos.head.ref
     if (enableTxOutputRefIndex) {
-      blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
+      blockFlow.getTxIdFromOutputRef(txOutputRef).map(_.map(_._1)) isE Some(
+        block.nonCoinbase.head.id
+      )
     } else {
       blockFlow
         .getTxIdFromOutputRef(txOutputRef)

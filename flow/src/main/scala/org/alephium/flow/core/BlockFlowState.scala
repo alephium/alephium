@@ -28,6 +28,8 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
@@ -77,19 +79,10 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ): IOResult[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
+  ): TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]] = {
     getBlockChainWithState(
       groupIndex
-    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
-      case Some(storage) =>
-        Right(storage)
-      case None =>
-        Left(
-          IOError.configError(
-            "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
-          )
-        )
-    }
+    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage
   }
 
   lazy val subContractIndexStorage: IOResult[SubContractIndexStorage] = {
@@ -520,15 +513,15 @@ object BlockFlowState {
     if (chainIndex.isIntraGroup) {
       // note that script execution is already done in validation
       block.transactions.foreachE { tx =>
-        updateStateForInOutBlock(worldState, tx, targetGroup, block.timestamp)
+        updateStateForInOutBlock(worldState, tx, targetGroup, block)
       }
     } else if (chainIndex.from == targetGroup) {
       block.transactions.foreachE(
-        updateStateForOutBlock(worldState, _, targetGroup, block.timestamp)
+        updateStateForOutBlock(worldState, _, targetGroup, block)
       )
     } else if (chainIndex.to == targetGroup) {
       block.transactions.foreachE(
-        updateStateForInBlock(worldState, _, targetGroup, block.timestamp)
+        updateStateForInBlock(worldState, _, targetGroup, block)
       )
     } else {
       // dead branch
@@ -540,11 +533,11 @@ object BlockFlowState {
       worldState: WorldState.Cached,
       tx: Transaction,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+      _ <- updateStateForOutputs(worldState, tx, targetGroup, block)
     } yield ()
   }
 
@@ -552,11 +545,11 @@ object BlockFlowState {
       worldState: WorldState.Cached,
       tx: Transaction,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+      _ <- updateStateForOutputs(worldState, tx, targetGroup, block)
     } yield ()
   }
 
@@ -564,9 +557,9 @@ object BlockFlowState {
       worldState: WorldState.Cached,
       tx: Transaction,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+    updateStateForOutputs(worldState, tx, targetGroup, block)
   }
 
   // Note: contract inputs are updated during the execution of tx script
@@ -578,15 +571,16 @@ object BlockFlowState {
       worldState: WorldState.Cached,
       tx: Transaction,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+    val blockTs = block.timestamp
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id)
+        worldState.addAsset(outputRef, outputUpdated, tx.id, Some(block.hash))
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

@@ -17,26 +17,29 @@
 package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.StagingKVStorage
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.StagingLog
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
 import org.alephium.protocol.vm.subcontractindex.StagingSubContractIndex
 
+// format: off
 final case class StagingNodeIndexes(
     logState: StagingLog,
-    txOutputRefIndexState: Option[StagingKVStorage[TxOutputRef.Key, TransactionId]],
+    txOutputRefIndexState: TxOutputRefIndexStorage[StagingKVStorage[TxOutputRef.Key, TxIdBlockHashes]],
     subContractIndexState: Option[StagingSubContractIndex]
 ) {
   def rollback(): Unit = {
     logState.rollback()
-    txOutputRefIndexState.foreach(_.rollback())
+    txOutputRefIndexState.value.foreach(_.rollback())
     subContractIndexState.foreach(_.rollback())
     ()
   }
 
   def commit(): Unit = {
     logState.commit()
-    txOutputRefIndexState.foreach(_.commit())
+    txOutputRefIndexState.value.foreach(_.commit())
     subContractIndexState.foreach(_.commit())
     ()
   }
 }
+// format: on
