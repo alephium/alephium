@@ -115,7 +115,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
 
   def inputSign(unsignedTx: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
     val signatures = AVector.from(privateKeys).map { privateKey =>
-      SignatureSchema.sign(unsignedTx.id, privateKey)
+      Bytes64.from(SignatureSchema.sign(unsignedTx.id, privateKey))
     }
 
     Transaction(

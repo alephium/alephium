@@ -461,7 +461,7 @@ class ServerUtils(implicit
   ): TransactionTemplate = {
     TransactionTemplate(
       unsignedTx,
-      signatures,
+      signatures.map(Bytes64.from),
       scriptSignatures = AVector.empty
     )
   }
@@ -1747,7 +1747,7 @@ class ServerUtils(implicit
   @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
     TxEnv.mockup(
       txId = txId,
-      signatures = Stack.popOnly(AVector.empty[Signature]),
+      signatures = Stack.popOnly(AVector.empty[Bytes64]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
       gasPrice = nonCoinbaseMinGasPrice,

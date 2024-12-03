@@ -22,7 +22,7 @@ import akka.util.ByteString
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
@@ -61,7 +61,7 @@ class TxOrderBench {
           AVector.empty,
           AVector.empty
         ),
-        AVector.empty[Signature]
+        AVector.empty[Bytes64]
       )
     )
   val block: Block = Block(header, txs)

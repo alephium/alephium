@@ -73,13 +73,13 @@ trait ApiModelFixture
     scriptExecutionOk = true,
     AVector(contractTxOutputRef),
     AVector(assetOutput, contractOutput),
-    AVector(sigature),
+    AVector(Bytes64.from(sigature)),
     AVector(sigature)
   )
 
   val transactionTemplate = TransactionTemplate(
     unsignedTransaction,
-    AVector(sigature),
+    AVector(Bytes64.from(sigature)),
     AVector(sigature)
   )
 }

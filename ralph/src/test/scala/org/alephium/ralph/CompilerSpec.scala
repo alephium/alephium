@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, TokenId}
+import org.alephium.protocol.model.{Address, Bytes64, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -634,9 +634,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args             = AVector[Val](Val.ByteVec.from(pubKey))
-    val statelessContext = genStatelessContext(signatures = AVector(Signature.zero))
-    val signature        = SignatureSchema.sign(statelessContext.txId.bytes, priKey)
-    statelessContext.signatures.pop().rightValue is Signature.zero
+    val statelessContext = genStatelessContext(signatures = AVector(Bytes64.from(Signature.zero)))
+    val signature        = Bytes64.from(SignatureSchema.sign(statelessContext.txId.bytes, priKey))
+    statelessContext.signatures.pop().rightValue is Bytes64.from(Signature.zero)
     statelessContext.signatures.push(signature) isE ()
     StatelessVM.execute(statelessContext, script.toObject, args).isRight is true
     StatelessVM.execute(statelessContext, script.toObject, args) is

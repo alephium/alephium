@@ -96,7 +96,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
               AVector.empty,
               AVector.empty
             ),
-            AVector.empty[Signature]
+            AVector.empty[Bytes64]
           )
         )
       Block(header, txs :+ txs.head) // add a fake coinbase tx
@@ -116,7 +116,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         val scriptOpt  = if (index % 2 == 0) None else Some(StatefulScript.unsafe(AVector.empty))
         val assetInfos = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
         val gen = unsignedTxGen(chainIndex)(assetInfos).map(tx =>
-          Transaction.from(tx.copy(scriptOpt = scriptOpt), AVector.empty[Signature])
+          Transaction.from(tx.copy(scriptOpt = scriptOpt), AVector.empty[Bytes64])
         )
         gen.sample.get
       })
@@ -170,7 +170,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
           AVector.empty,
           AVector.empty
         ),
-        AVector.empty[Signature]
+        AVector.empty[Bytes64]
       )
       val tx1 = Transaction.from(
         UnsignedTransaction(
@@ -180,7 +180,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
           AVector.empty,
           AVector.empty
         ),
-        AVector.empty[Signature]
+        AVector.empty[Bytes64]
       )
       val coinbase = Transaction.powCoinbaseForTest(
         ChainIndex.unsafe(0, 0),

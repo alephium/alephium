@@ -41,7 +41,7 @@ final case class TransactionTemplate(
     } yield {
       protocol.TransactionTemplate(
         unsignedTx,
-        inputSig,
+        inputSig.map(protocol.Bytes64.from),
         scriptSig
       )
     }

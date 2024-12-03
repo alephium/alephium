@@ -63,7 +63,7 @@ object AssetScriptGasEstimator {
         val txEnv = TxEnv(
           txTemplate,
           preOutputs.getOrElse(AVector.empty),
-          Stack.popOnly(AVector.fill(16)(Signature.generate))
+          Stack.popOnly(AVector.fill(16)(Bytes64.from(Signature.generate)))
         )
 
         val result = for {

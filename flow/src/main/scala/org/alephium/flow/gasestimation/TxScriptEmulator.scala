@@ -60,7 +60,7 @@ object TxScriptEmulator {
       ): Either[String, TxScriptExecution] = {
         val txTemplate = TransactionTemplate(
           UnsignedTransaction(Some(script), inputWithAssets.map(_.input), AVector.empty),
-          inputSignatures = AVector.fill(16)(Signature.generate),
+          inputSignatures = AVector.fill(16)(Bytes64.from(Signature.generate)),
           scriptSignatures = AVector.fill(16)(Signature.generate)
         )
 

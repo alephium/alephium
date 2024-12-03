@@ -858,7 +858,7 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(preImage, signature, publicKey)) {
+          if (!SignatureSchema.verify(preImage, signature.toSecP256K1Signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
             fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)

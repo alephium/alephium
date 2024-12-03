@@ -304,7 +304,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           TxEnv(
             tx,
             prevOutputs.map(_.referredOutput.copy(lockTime = txLockTime)),
-            Stack.ofCapacity[Signature](0)
+            Stack.ofCapacity[Bytes64](0)
           )
         )
       )
@@ -1524,8 +1524,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val tx               = transactionGen().sample.get
     val (pubKey, priKey) = keysGen.sample.get
 
-    val signature      = SignatureSchema.sign(tx.id.bytes, priKey)
-    val signatureStack = Stack.ofCapacity[Signature](1)
+    val signature      = Bytes64.from(SignatureSchema.sign(tx.id.bytes, priKey))
+    val signatureStack = Stack.ofCapacity[Bytes64](1)
     signatureStack.push(signature)
 
     override lazy val frame = prepareFrame(
@@ -1721,7 +1721,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     override lazy val frame = prepareFrame(
       AVector.empty,
-      txEnv = Some(TxEnv(tx, AVector.empty, Stack.ofCapacity[Signature](0)))
+      txEnv = Some(TxEnv(tx, AVector.empty, Stack.ofCapacity[Bytes64](0)))
     )
 
     val initialGas = context.gasRemaining
@@ -3242,7 +3242,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         TxEnv(
           tx,
           prevOutputs.map(_.referredOutput),
-          Stack.ofCapacity[Signature](0)
+          Stack.ofCapacity[Bytes64](0)
         )
       ),
       callerFrameOpt = Some(callerFrame)
@@ -3339,7 +3339,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           TxEnv(
             tx,
             prevOutputs.map(_.referredOutput),
-            Stack.ofCapacity[Signature](0)
+            Stack.ofCapacity[Bytes64](0)
           )
         ),
         callerFrameOpt = Some(callerFrame)

@@ -437,7 +437,7 @@ trait TxGenerators
       signatures =
         assetInfos.map(info => SignatureSchema.sign(unsignedTx.id, info.privateKey))
     } yield {
-      val tx = Transaction.from(unsignedTx, signatures)
+      val tx = Transaction.from(unsignedTx, signatures.map(Bytes64.from))
       tx -> assetInfos
     }
 
@@ -475,7 +475,7 @@ trait TxGenerators
     } yield {
       val signatures =
         AVector.from(scriptPairs.map(pair => SignatureSchema.sign(unsignedTx.id, pair.privateKey)))
-      val tx = Transaction.from(unsignedTx, signatures)
+      val tx = Transaction.from(unsignedTx, signatures.map(Bytes64.from))
       tx -> assetInfos
     }
   }

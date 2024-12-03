@@ -396,7 +396,7 @@ class TxUtilsSpec extends AlephiumSpec {
     def validateSubmit(utx: UnsignedTransaction, privateKeys: AVector[PrivateKey]) = {
 
       val signatures = privateKeys.map { privateKey =>
-        SignatureSchema.sign(utx.id.bytes, privateKey)
+        Bytes64.from(SignatureSchema.sign(utx.id.bytes, privateKey))
       }
 
       val template = TransactionTemplate(
@@ -1128,7 +1128,7 @@ class TxUtilsSpec extends AlephiumSpec {
           )
         }
       }
-      val tx = Transaction.from(AVector.empty[TxInput], tokenOutputs, AVector.empty[Signature])
+      val tx = Transaction.from(AVector.empty[TxInput], tokenOutputs, AVector.empty[Bytes64])
       val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val block      = emptyBlock(blockFlow, chainIndex)
       blockFlow.addAndUpdateView(
@@ -2198,7 +2198,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val signature = BIP340Schnorr.sign(unsignedTx.id.bytes, priKey)
     val tx = TransactionTemplate(
       unsignedTx,
-      AVector(Signature.unsafe(signature.bytes)),
+      AVector(Bytes64.from(signature.bytes).value),
       scriptSignatures = AVector.empty
     )
     TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
@@ -2929,7 +2929,7 @@ class TxUtilsSpec extends AlephiumSpec {
         )
         .rightValue
         .rightValue
-      val signature = SignatureSchema.sign(unsignedTx.id, priKey)
+      val signature = Bytes64.from(SignatureSchema.sign(unsignedTx.id, priKey))
       val tx        = Transaction.from(unsignedTx, AVector(signature))
       val block     = mineWithTxs(blockFlow, ChainIndex.unsafe(group, group))((_, _) => AVector(tx))
       addAndCheck(blockFlow, block)

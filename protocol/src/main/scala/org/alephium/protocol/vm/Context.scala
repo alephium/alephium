@@ -19,7 +19,6 @@ package org.alephium.protocol.vm
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOError
-import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
@@ -78,7 +77,7 @@ object BlockEnv {
 
 sealed trait TxEnv {
   def txId: TransactionId
-  def signatures: Stack[Signature]
+  def signatures: Stack[Bytes64]
   def prevOutputs: AVector[AssetOutput]
   def fixedOutputs: AVector[AssetOutput]
   def gasPrice: GasPrice
@@ -92,12 +91,12 @@ object TxEnv {
   def apply(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Signature]
+      signatures: Stack[Bytes64]
   ): TxEnv = Default(tx, prevOutputs, signatures)
 
   def mockup(
       txId: TransactionId,
-      signatures: Stack[Signature],
+      signatures: Stack[Bytes64],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
       gasPrice: GasPrice,
@@ -118,7 +117,7 @@ object TxEnv {
   final case class Default(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Signature]
+      signatures: Stack[Bytes64]
   ) extends TxEnv {
     def txId: TransactionId                = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
@@ -130,7 +129,7 @@ object TxEnv {
 
   final case class Mockup(
       txId: TransactionId,
-      signatures: Stack[Signature],
+      signatures: Stack[Bytes64],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
       gasPrice: GasPrice,
@@ -205,8 +204,8 @@ trait StatelessContext extends CostStrategy {
       systemEvent: Boolean
   ): ExeResult[Unit]
 
-  def txId: TransactionId          = txEnv.txId
-  def signatures: Stack[Signature] = txEnv.signatures
+  def txId: TransactionId        = txEnv.txId
+  def signatures: Stack[Bytes64] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
     indexRaw.v.toInt
@@ -566,7 +565,7 @@ object StatefulContext {
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): StatefulContext = {
-    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures.map(Bytes64.from)))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
   // scalastyle:on parameter.number

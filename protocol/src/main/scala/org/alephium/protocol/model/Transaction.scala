@@ -29,7 +29,7 @@ import org.alephium.util.{AVector, Duration, Hex, Math, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
-  def inputSignatures: AVector[Signature]
+  def inputSignatures: AVector[Bytes64]
   def scriptSignatures: AVector[Signature]
 
   def id: TransactionId = unsigned.id
@@ -62,7 +62,7 @@ final case class Transaction(
     scriptExecutionOk: Boolean,
     contractInputs: AVector[ContractOutputRef],
     generatedOutputs: AVector[TxOutput],
-    inputSignatures: AVector[Signature],
+    inputSignatures: AVector[Bytes64],
     scriptSignatures: AVector[Signature]
 ) extends TransactionAbstract
     with MerkleHashable[Hash]
@@ -171,7 +171,7 @@ object Transaction {
   def from(
       inputs: AVector[TxInput],
       outputs: AVector[AssetOutput],
-      inputSignatures: AVector[Signature]
+      inputSignatures: AVector[Bytes64]
   )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
@@ -187,7 +187,7 @@ object Transaction {
       inputs: AVector[TxInput],
       outputs: AVector[AssetOutput],
       generatedOutputs: AVector[TxOutput],
-      inputSignatures: AVector[Signature]
+      inputSignatures: AVector[Bytes64]
   )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
@@ -214,7 +214,7 @@ object Transaction {
       scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs,
-      AVector(signature),
+      AVector(Bytes64.from(signature)),
       scriptSignatures = AVector.empty
     )
   }
@@ -231,12 +231,12 @@ object Transaction {
       scriptExecutionOk = true,
       contractInputs,
       generatedOutputs,
-      AVector(signature),
+      AVector(Bytes64.from(signature)),
       scriptSignatures = AVector.empty
     )
   }
 
-  def from(unsigned: UnsignedTransaction, inputSignatures: AVector[Signature]): Transaction = {
+  def from(unsigned: UnsignedTransaction, inputSignatures: AVector[Bytes64]): Transaction = {
     Transaction(
       unsigned,
       scriptExecutionOk = true,
@@ -335,7 +335,7 @@ object Transaction {
       scriptExecutionOk: Boolean,
       contractInputs: AVector[ContractOutputRef],
       generatedOutputs: AVector[TxOutput],
-      inputSignatures: AVector[Signature],
+      inputSignatures: AVector[Bytes64],
       scriptSignatures: AVector[Signature]
   )
   object MerkelTx {
@@ -356,7 +356,7 @@ object Transaction {
 
 final case class TransactionTemplate(
     unsigned: UnsignedTransaction,
-    inputSignatures: AVector[Signature],
+    inputSignatures: AVector[Bytes64],
     scriptSignatures: AVector[Signature]
 ) extends TransactionAbstract
     with SerializationCache {
@@ -378,7 +378,7 @@ object TransactionTemplate {
     val signature = SignatureSchema.sign(unsigned.id, privateKey)
     TransactionTemplate(
       unsigned,
-      AVector(signature),
+      AVector(Bytes64.from(signature)),
       scriptSignatures = AVector.empty
     )
   }

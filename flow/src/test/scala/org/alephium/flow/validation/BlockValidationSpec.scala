@@ -137,12 +137,14 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait CoinbaseFormatFixture extends Fixture {
-    val output0         = assetOutputGen.sample.get
-    val emptyOutputs    = AVector.empty[AssetOutput]
-    val emptySignatures = AVector.empty[Signature]
-    val script          = StatefulScript.alwaysFail
-    val testSignatures  = AVector(Signature.generate)
-    val block           = emptyBlock(blockFlow, chainIndex)
+    val output0               = assetOutputGen.sample.get
+    val emptyOutputs          = AVector.empty[AssetOutput]
+    val emptyInputSignatures  = AVector.empty[Bytes64]
+    val emptyScriptSignatures = AVector.empty[Signature]
+    val script                = StatefulScript.alwaysFail
+    val testInputSignatures   = AVector(Bytes64.from(Signature.generate))
+    val testScriptSignatures  = testInputSignatures.map(_.toSecP256K1Signature)
+    val block                 = emptyBlock(blockFlow, chainIndex)
 
     def commonTest(block: Block = block)(implicit
         validator: Block => BlockValidationResult[Unit],
@@ -171,8 +173,8 @@ class BlockValidationSpec extends AlephiumSpec {
       block.Coinbase.tx(_.copy(generatedOutputs = AVector(output0))).fail()
 
       info("contract signature")
-      block.Coinbase.tx(_.copy(scriptSignatures = emptySignatures)).pass()
-      block.Coinbase.tx(_.copy(scriptSignatures = testSignatures)).fail()
+      block.Coinbase.tx(_.copy(scriptSignatures = emptyScriptSignatures)).pass()
+      block.Coinbase.tx(_.copy(scriptSignatures = testScriptSignatures)).fail()
     }
   }
 
@@ -192,8 +194,8 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = emptyOutputs)).fail()
 
     info("input signature")
-    block.Coinbase.tx(_.copy(inputSignatures = emptySignatures)).pass()
-    block.Coinbase.tx(_.copy(inputSignatures = testSignatures)).fail()
+    block.Coinbase.tx(_.copy(inputSignatures = emptyInputSignatures)).pass()
+    block.Coinbase.tx(_.copy(inputSignatures = testInputSignatures)).fail()
   }
 
   it should "validate PoLW coinbase transaction simple format" in new CoinbaseFormatFixture {
@@ -202,7 +204,7 @@ class BlockValidationSpec extends AlephiumSpec {
     implicit val error: InvalidBlockStatus = InvalidPoLWCoinbaseFormat
     val inputs                             = AVector(txInputGen.sample.get)
     override val block = emptyBlock(blockFlow, chainIndex).Coinbase
-      .tx(_.copy(inputSignatures = testSignatures))
+      .tx(_.copy(inputSignatures = testInputSignatures))
       .Coinbase
       .unsignedTx(_.copy(inputs = inputs))
 
@@ -223,9 +225,9 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.unsignedTx(_.copy(inputs = inputs ++ inputs)).pass()
 
     info("input signature")
-    block.Coinbase.tx(_.copy(inputSignatures = emptySignatures)).fail()
-    block.Coinbase.tx(_.copy(inputSignatures = testSignatures)).pass()
-    block.Coinbase.tx(_.copy(inputSignatures = testSignatures ++ testSignatures)).fail()
+    block.Coinbase.tx(_.copy(inputSignatures = emptyInputSignatures)).fail()
+    block.Coinbase.tx(_.copy(inputSignatures = testInputSignatures)).pass()
+    block.Coinbase.tx(_.copy(inputSignatures = testInputSignatures ++ testInputSignatures)).fail()
   }
 
   trait PreRhoneForkFixture extends Fixture {
@@ -1388,7 +1390,7 @@ class BlockValidationSpec extends AlephiumSpec {
           .polwCoinbase(lockupScript, unlockScript, rewardOutputs, reward.burntAmount, utxos, gas)
           .rightValue
       val preImage  = UnlockScript.PoLW.buildPreImage(lockupScript, minerLockupScript)
-      val signature = SignatureSchema.sign(preImage, privateKey)
+      val signature = Bytes64.from(SignatureSchema.sign(preImage, privateKey))
       Transaction.from(unsignedTx, AVector(signature))
     }
 

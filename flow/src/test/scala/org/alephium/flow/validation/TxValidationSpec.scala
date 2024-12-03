@@ -138,7 +138,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
 
     def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
-      val signatures = privateKeys.map(SignatureSchema.sign(unsigned.id, _))
+      val signatures = privateKeys.map(key => Bytes64.from(SignatureSchema.sign(unsigned.id, key)))
       Transaction.from(unsigned, AVector.from(signatures))
     }
 
@@ -977,7 +977,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       tx.updateInput(0, _.copy(unlockScript = unlock)).fail(InvalidPublicKeyHash)
 
       val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
-      val signaturesNew    = tx.inputSignatures.replace(sampleIndex, Signature.generate)
+      val signaturesNew = tx.inputSignatures.replace(sampleIndex, Bytes64.from(Signature.generate))
       tx.copy(inputSignatures = signaturesNew).fail(InvalidSignature)
       tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures)
         .fail(TooManyInputSignatures)
@@ -1081,7 +1081,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unlock: UnlockScript       = UnlockScript.p2sh(script, AVector.empty)
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
-      Transaction.from(unsignedTx, AVector.empty[Signature])
+      Transaction.from(unsignedTx, AVector.empty[Bytes64])
     }
 
     validate()
@@ -1131,7 +1131,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
       tx.pass()
       tx.replaceUnlock(UnlockScript.p2pkh(PublicKey.generate)).fail(InvalidPublicKeyHash)
-      tx.copy(inputSignatures = AVector(Signature.generate)).fail(InvalidSignature)
+      tx.copy(inputSignatures = AVector(Bytes64.from(Signature.generate))).fail(InvalidSignature)
     }
   }
 
@@ -1182,7 +1182,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     implicit val validator: (Transaction) => TxValidationResult[Unit] =
       validateTxOnlyForTest(_, blockFlow, None)
 
-    val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
+    val tx0 = Transaction.from(unsigned, AVector.empty[Bytes64])
     tx0.pass()
 
     val tx1 = tx0.replaceUnlock(UnlockScript.p2sh(script, AVector(Val.U256(50))))
@@ -1210,11 +1210,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val inputs0   = unsignedTx.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(pubKey)))
     val unsigned0 = unsignedTx.copy(inputs = inputs0)
     val preImage  = UnlockScript.PoLW.buildPreImage(lockup, lockup)
-    val signature = SignatureSchema.sign(preImage, priKey)
+    val signature = Bytes64.from(SignatureSchema.sign(preImage, priKey))
     val tx0       = Transaction.from(unsigned0, AVector(signature))
     tx0.pass()
 
-    val tx1 = Transaction.from(unsigned0, AVector(Signature.generate))
+    val tx1 = Transaction.from(unsigned0, AVector(Bytes64.from(Signature.generate)))
     tx1.fail(InvalidSignature)
 
     val invalidPubKey = keypairGen.sample.value._2
@@ -1245,7 +1245,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val inputs    = unsigned0.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(pubKey)))
     val unsigned1 = unsigned0.copy(inputs = inputs)
     val preImage  = UnlockScript.PoLW.buildPreImage(lockup, lockup)
-    val signature = SignatureSchema.sign(preImage, priKey)
+    val signature = Bytes64.from(SignatureSchema.sign(preImage, priKey))
     val tx1       = Transaction.from(unsigned1, AVector(signature))
     tx1.fail(InvalidUnlockScriptType)
   }
@@ -1270,7 +1270,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       .getPreOutputs(tx)
       .rightValue
       .asUnsafe[AssetOutput]
-    lazy val txEnv = TxEnv(tx, prevOutputs, Stack.ofCapacity[Signature](0))
+    lazy val txEnv = TxEnv(tx, prevOutputs, Stack.ofCapacity[Bytes64](0))
   }
 
   it should "charge gas for asset script size" in new GasFixture {
@@ -1287,7 +1287,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val lockup   = LockupScript.p2sh(script)
     val unlock   = UnlockScript.p2sh(script, AVector.empty)
     val unsigned = prepareOutput(lockup, unlock)
-    val tx       = Transaction.from(unsigned, AVector.empty[Signature])
+    val tx       = Transaction.from(unsigned, AVector.empty[Bytes64])
 
     val groupIndex = lockup.groupIndex
     val gasRemaining =
@@ -1440,7 +1440,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       )
       .rightValue
       .rightValue
-    val signature = SignatureSchema.sign(unsignedTx.id.bytes, fromPriKey)
+    val signature = Bytes64.from(SignatureSchema.sign(unsignedTx.id.bytes, fromPriKey))
     val tx        = Transaction.from(unsignedTx, AVector(signature))
     tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
     tx.fail(InvalidLockupScriptPreDanue)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
@@ -1476,7 +1476,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       )
     )
 
-    val signature = SignatureSchema.sign(unsignedTx.id.bytes, priKey)
+    val signature = Bytes64.from(SignatureSchema.sign(unsignedTx.id.bytes, priKey))
     val tx        = Transaction.from(unsignedTx, AVector(signature))
     tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
     tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))

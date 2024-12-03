@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
@@ -37,7 +37,7 @@ class ConflictedBlocksSpec
         Transaction.from(
           AVector.from(txInputs),
           AVector.empty[AssetOutput],
-          AVector.empty[Signature]
+          AVector.empty[Bytes64]
         )
       Block.from(
         AVector.fill(groupConfig.depsNum)(BlockHash.zero),
@@ -51,7 +51,7 @@ class ConflictedBlocksSpec
 
     def blockGen1(txInputs: AVector[TxInput]*): Block = {
       val transactions = txInputs.map(inputs =>
-        Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Signature])
+        Transaction.from(inputs, AVector.empty[AssetOutput], AVector.empty[Bytes64])
       )
       Block.from(
         AVector.fill(groupConfig.depsNum)(BlockHash.zero),
