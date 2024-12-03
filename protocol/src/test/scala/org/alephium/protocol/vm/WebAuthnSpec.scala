@@ -22,11 +22,11 @@ import akka.util.ByteString
 import org.scalacheck.Arbitrary
 
 import org.alephium.crypto.{SecP256R1, SecP256R1PrivateKey, SecP256R1Signature}
-import org.alephium.protocol.{Generators, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.serde.SerdeError
 import org.alephium.util.AlephiumSpec
 
-class WebAuthnSpec extends AlephiumSpec with Generators {
+class WebAuthnSpec extends AlephiumSpec {
   it should "extract value from client data" in {
     val json0 = s"""{"type":"webauthn.get","challenge":"p5aV2uHXr0AO_qUk7HQitvi"}"""
     WebAuthn.extractValueFromClientData(json0, "type") is Right("webauthn.get")

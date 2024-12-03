@@ -20,6 +20,7 @@ import scala.collection.mutable
 
 import akka.util.ByteString
 
+import org.alephium.crypto.SecP256R1PublicKey
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
@@ -817,9 +818,9 @@ object TxValidation {
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
-        case (lock: LockupScript.P2PK, UnlockScript.P2PK)
+        case (lock: LockupScript.P2PK, unlock: UnlockScript.P2PK)
             if blockEnv.getHardFork().isDanubeEnabled() =>
-          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock)
+          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock, unlock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -829,10 +830,40 @@ object TxValidation {
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
-        lock: LockupScript.P2PK
+        lock: LockupScript.P2PK,
+        unlock: UnlockScript.P2PK
     ): TxValidationResult[GasBox] = {
-      lock.publicKey match {
-        case PublicKeyLike.SecP256K1(key) => checkSignature(txEnv, preImage, gasRemaining, key)
+      if (lock.publicKey.keyType != unlock.keyType) {
+        invalidTx(InvalidUnlockScriptType)
+      } else {
+        lock.publicKey match {
+          case PublicKeyLike.SecP256K1(key) => checkSignature(txEnv, preImage, gasRemaining, key)
+          case PublicKeyLike.Passkey(key)   => checkPasskey(txEnv, preImage, gasRemaining, key)
+        }
+      }
+    }
+
+    protected[validation] def checkPasskey(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: SecP256R1PublicKey
+    ): TxValidationResult[GasBox] = {
+      WebAuthn.tryDecode(preImage, () => txEnv.signatures.pop().toOption.map(_.bytes)) match {
+        case Right(webauthn) =>
+          txEnv.signatures.pop() match {
+            case Right(signature) =>
+              if (!webauthn.verify(signature.toSecP256R1Signature, publicKey)) {
+                invalidTx(InvalidSignature)
+              } else {
+                fromOption(
+                  gasRemaining.sub(GasSchedule.passkeyUnlockGas(webauthn.bytesLength)),
+                  OutOfGas
+                )
+              }
+            case Left(_) => invalidTx(NotEnoughSignature)
+          }
+        case Left(error) => invalidTx(InvalidWebauthnPayload(error))
       }
     }
 

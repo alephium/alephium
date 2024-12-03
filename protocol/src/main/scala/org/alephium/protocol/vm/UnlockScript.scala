@@ -43,7 +43,8 @@ object UnlockScript {
           case p2sh: P2SH     => ByteString(2) ++ p2shSerde.serialize(p2sh)
           case SameAsPrevious => ByteString(3)
           case polw: PoLW     => ByteString(4) ++ serdeImpl[PublicKey].serialize(polw.publicKey)
-          case P2PK           => ByteString(5)
+          case p2pk: P2PK =>
+            ByteString(5) ++ serdeImpl[PublicKeyLike.KeyType].serialize(p2pk.keyType)
         }
       }
 
@@ -56,7 +57,8 @@ object UnlockScript {
           case Staging(3, content) => Right(Staging(SameAsPrevious, content))
           case Staging(4, content) =>
             serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(PoLW.apply))
-          case Staging(5, content) => Right(Staging(P2PK, content))
+          case Staging(5, content) =>
+            serdeImpl[PublicKeyLike.KeyType]._deserialize(content).map(_.mapValue(P2PK.apply))
           case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
@@ -89,5 +91,5 @@ object UnlockScript {
       Hash.hash(prefix ++ serialize(from) ++ serialize(to)).bytes
     }
   }
-  final case object P2PK extends UnlockScript
+  final case class P2PK(keyType: PublicKeyLike.KeyType) extends UnlockScript
 }

@@ -23,6 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.{SecP256R1, SecP256R1PrivateKey}
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.io.StoragesFixture
@@ -1017,6 +1018,30 @@ trait FlowFixture
       block.nonCoinbase.head
     }
     AVector.fill(n)(createTx())
+  }
+
+  private def encodeToBytes64(webauthn: WebAuthn): AVector[Bytes64] = {
+    val bytes     = serialize(webauthn)
+    val chunkSize = Bytes64.length
+    AVector.from(bytes.grouped(chunkSize).map { chunk =>
+      val bs = if (chunk.length < chunkSize) {
+        chunk ++ ByteString(Array.fill(chunkSize - chunk.length)(0.toByte))
+      } else {
+        chunk
+      }
+      Bytes64.from(bs).get
+    })
+  }
+
+  def signWithPasskey(unsignedTx: UnsignedTransaction, priKey: SecP256R1PrivateKey): Transaction = {
+    val clientData = WebAuthn.createClientData(WebAuthn.GET, unsignedTx.id.bytes)
+    val bytes      = bytesGen(WebAuthn.AuthenticatorDataMinLength).sample.get.toArray
+    bytes(WebAuthn.FlagIndex) = (bytes(WebAuthn.FlagIndex) | 0x01).toByte
+    val authenticatorData = ByteString.fromArrayUnsafe(bytes)
+    val webauthn          = WebAuthn(authenticatorData, clientData)
+    val messageHash       = webauthn.messageHash
+    val signature         = Bytes64.from(SecP256R1.sign(messageHash, priKey))
+    Transaction.from(unsignedTx, encodeToBytes64(webauthn) :+ signature)
   }
 }
 

@@ -18,16 +18,22 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.crypto.SecP256K1PublicKey
+import org.alephium.crypto.{SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.AlephiumSpec
 
 class PublicKeyLikeSpec extends AlephiumSpec {
   it should "serde correctly" in {
-    val publicKey = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
-    val bytes     = ByteString(0) ++ publicKey.publicKey.bytes
-    serialize[PublicKeyLike](publicKey) is bytes
-    deserialize[PublicKeyLike](bytes) isE publicKey
-    deserialize[PublicKeyLike](ByteString(1)).leftValue.getMessage is "Invalid public key type 1"
+    val publicKey0 = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
+    val bytes0     = ByteString(0) ++ publicKey0.bytes
+    serialize[PublicKeyLike](publicKey0) is bytes0
+    deserialize[PublicKeyLike](bytes0) isE publicKey0
+
+    val publicKey1 = PublicKeyLike.Passkey(SecP256R1PublicKey.generate)
+    val bytes1     = ByteString(1) ++ publicKey1.bytes
+    serialize[PublicKeyLike](publicKey1) is bytes1
+    deserialize[PublicKeyLike](bytes1) isE publicKey1
+
+    deserialize[PublicKeyLike](ByteString(2)).leftValue.getMessage is "Invalid public key type 2"
   }
 }

@@ -22,7 +22,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Succeeded}
 
-import org.alephium.crypto.BIP340Schnorr
+import org.alephium.crypto.{BIP340Schnorr, SecP256K1, SecP256R1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.{
   AssetOutputInfo,
@@ -2891,52 +2891,74 @@ class TxUtilsSpec extends AlephiumSpec {
     tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy)
   }
 
-  it should "test p2pk lockup script" in new FlowFixture {
+  trait P2PKLockupScriptFixture extends FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Danube
 
-    val priKey = PrivateKey.generate
-    val pubKey = PublicKeyLike.SecP256K1(priKey.publicKey)
-    (0 until groupConfig.groups).foreach { group =>
-      val genesisKey     = genesisKeys(group)._1
-      val toLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))
-      val block = transfer(
-        blockFlow,
-        genesisKey,
-        toLockupScript,
-        AVector.empty[(TokenId, U256)],
-        ALPH.alph(2)
-      )
-      addAndCheck(blockFlow, block)
-      blockFlow.getBalance(toLockupScript, Int.MaxValue, true).rightValue._1 is ALPH.alph(2)
-    }
+    def publicKey: PublicKeyLike
+    def sign(unsignedTx: UnsignedTransaction): Transaction
 
-    (0 until groupConfig.groups).foreach { group =>
-      val fromLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))
-      val fromUnlockScript = UnlockScript.P2PK
-      val toLockupScript   = LockupScript.p2pkh(genesisKeys(group)._2)
-      val outputInfos = AVector(TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None))
-      val unsignedTx = blockFlow
-        .transfer(
-          None,
-          fromLockupScript,
-          fromUnlockScript,
-          outputInfos,
-          Some(minimalGas),
-          nonCoinbaseMinGasPrice,
-          Int.MaxValue,
-          ExtraUtxosInfo.empty
+    def lockupScript(group: GroupIndex): LockupScript.P2PK =
+      LockupScript.p2pk(publicKey, Some(group))
+    def unlockScript: UnlockScript.P2PK = UnlockScript.P2PK(publicKey.keyType)
+    def testTransfer() = {
+      (0 until groupConfig.groups).foreach { group =>
+        val genesisKey     = genesisKeys(group)._1
+        val toLockupScript = lockupScript(GroupIndex.unsafe(group))
+        val block = transfer(
+          blockFlow,
+          genesisKey,
+          toLockupScript,
+          AVector.empty[(TokenId, U256)],
+          ALPH.alph(2)
         )
-        .rightValue
-        .rightValue
-      val signature = Bytes64.from(SignatureSchema.sign(unsignedTx.id, priKey))
-      val tx        = Transaction.from(unsignedTx, AVector(signature))
-      val block     = mineWithTxs(blockFlow, ChainIndex.unsafe(group, group))((_, _) => AVector(tx))
-      addAndCheck(blockFlow, block)
+        addAndCheck(blockFlow, block)
+        blockFlow.getBalance(toLockupScript, Int.MaxValue, true).rightValue._1 is ALPH.alph(2)
+      }
 
-      val balance = ALPH.alph(2).subUnsafe(ALPH.oneAlph).subUnsafe(tx.gasFeeUnsafe)
-      blockFlow.getBalance(fromLockupScript, Int.MaxValue, true).rightValue._1 is balance
+      (0 until groupConfig.groups).foreach { group =>
+        val fromLockupScript = lockupScript(GroupIndex.unsafe(group))
+        val toLockupScript   = LockupScript.p2pkh(genesisKeys(group)._2)
+        val outputInfos = AVector(TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None))
+        val unsignedTx = blockFlow
+          .transfer(
+            None,
+            fromLockupScript,
+            unlockScript,
+            outputInfos,
+            Some(minimalGas),
+            nonCoinbaseMinGasPrice,
+            Int.MaxValue,
+            ExtraUtxosInfo.empty
+          )
+          .rightValue
+          .rightValue
+        val tx    = sign(unsignedTx)
+        val block = mineWithTxs(blockFlow, ChainIndex.unsafe(group, group))((_, _) => AVector(tx))
+        addAndCheck(blockFlow, block)
+
+        val balance = ALPH.alph(2).subUnsafe(ALPH.oneAlph).subUnsafe(tx.gasFeeUnsafe)
+        blockFlow.getBalance(fromLockupScript, Int.MaxValue, true).rightValue._1 is balance
+      }
     }
+  }
+
+  it should "test p2pk(secp256k1) lockup script" in new P2PKLockupScriptFixture {
+    val (priKey, pubKey)         = SecP256K1.generatePriPub()
+    val publicKey: PublicKeyLike = PublicKeyLike.SecP256K1(pubKey)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+
+    testTransfer()
+  }
+
+  it should "test p2pk(passkey) lockup script" in new P2PKLockupScriptFixture {
+    val (priKey, pubKey)         = SecP256R1.generatePriPub()
+    val publicKey: PublicKeyLike = PublicKeyLike.Passkey(pubKey)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)
+
+    testTransfer()
   }
 
   private def input(

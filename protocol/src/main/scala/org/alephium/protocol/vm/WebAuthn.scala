@@ -26,6 +26,8 @@ import org.alephium.serde.{bytestringSerde, Serde, SerdeError, SerdeResult}
 import org.alephium.util.Hex
 
 final case class WebAuthn(authenticatorData: ByteString, clientData: ByteString) {
+  def bytesLength: Int = authenticatorData.length + clientData.length
+
   def messageHash: Sha256 = {
     val clientDataHash = Sha256.hash(clientData)
     Sha256.hash(authenticatorData ++ clientDataHash.bytes)

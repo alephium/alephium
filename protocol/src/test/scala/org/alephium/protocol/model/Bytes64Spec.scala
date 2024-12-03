@@ -16,11 +16,11 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.{Generators, Signature}
+import org.alephium.protocol.Signature
 import org.alephium.serde
 import org.alephium.util.AlephiumSpec
 
-class Bytes64Spec extends AlephiumSpec with Generators {
+class Bytes64Spec extends AlephiumSpec {
   it should "test Bytes64" in {
     {
       info("from bytes")

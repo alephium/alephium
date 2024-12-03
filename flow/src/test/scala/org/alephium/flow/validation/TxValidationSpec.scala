@@ -23,6 +23,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
+import org.alephium.crypto.SecP256R1
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
@@ -1425,10 +1426,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "validate p2pk lockup script" in new Fixture {
-    val (_, pubKey) = keypairGen.sample.value
-    val groupIndex  = GroupIndex.unsafe(0)
-    val lockup      = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), Some(groupIndex))
-    val fromPriKey  = genesisKeys(groupIndex.value)._1
+    val groupIndex = GroupIndex.unsafe(0)
+    val lockup     = p2pkLockupGen(groupIndex).sample.get
+    val fromPriKey = genesisKeys(groupIndex.value)._1
     val unsignedTx = blockFlow
       .transfer(
         fromPriKey.publicKey,
@@ -1440,8 +1440,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       )
       .rightValue
       .rightValue
-    val signature = Bytes64.from(SignatureSchema.sign(unsignedTx.id.bytes, fromPriKey))
-    val tx        = Transaction.from(unsignedTx, AVector(signature))
+    val tx = Transaction.from(unsignedTx, fromPriKey)
     tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
     tx.fail(InvalidLockupScriptPreDanue)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
     tx.fail(InvalidLockupScriptPreDanue)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
@@ -1450,37 +1449,71 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     )
   }
 
-  it should "validate p2pk unlock script" in new Fixture {
-    val (priKey, pubKey) = keypairGen.sample.value
-    val groupIndex       = GroupIndex.unsafe(0)
-    val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), Some(groupIndex))
-    val unlock           = UnlockScript.P2PK
-    val fromPriKey       = genesisKeys(groupIndex.value)._1
-    val block =
-      transfer(blockFlow, fromPriKey, lockup, AVector.empty[(TokenId, U256)], ALPH.oneAlph)
-    addAndCheck(blockFlow, block)
+  trait P2PKUnlockScriptFixture extends Fixture {
+    val groupIndex    = GroupIndex.unsafe(0)
+    val genesisPriKey = genesisKeys(groupIndex.value)._1
 
-    val utxos = blockFlow.getUsableUtxos(None, lockup, Int.MaxValue).rightValue
-    utxos.length is 1
-    val gasFee = nonCoinbaseMinGasFee
-    val unsignedTx = UnsignedTransaction(
-      utxos.map(utxo => TxInput(utxo.ref, unlock)),
-      AVector(
-        AssetOutput(
-          ALPH.oneAlph.subUnsafe(gasFee),
-          LockupScript.p2pkh(fromPriKey.publicKey),
-          TimeStamp.zero,
-          AVector.empty,
-          ByteString.empty
+    def lockup: LockupScript.P2PK
+    def sign(unsignedTx: UnsignedTransaction): Transaction
+
+    def prepare(): Unit = {
+      val block =
+        transfer(blockFlow, genesisPriKey, lockup, AVector.empty[(TokenId, U256)], ALPH.oneAlph)
+      addAndCheck(blockFlow, block)
+    }
+
+    def createTx(unlock: UnlockScript.P2PK): Transaction = {
+      val utxos = blockFlow.getUsableUtxos(None, lockup, Int.MaxValue).rightValue
+      utxos.length is 1
+
+      val unsignedTx = UnsignedTransaction(
+        utxos.map(utxo => TxInput(utxo.ref, unlock)),
+        AVector(
+          AssetOutput(
+            ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee),
+            LockupScript.p2pkh(genesisPriKey.publicKey),
+            TimeStamp.zero,
+            AVector.empty,
+            ByteString.empty
+          )
         )
       )
-    )
+      sign(unsignedTx)
+    }
 
-    val signature = Bytes64.from(SignatureSchema.sign(unsignedTx.id.bytes, priKey))
-    val tx        = Transaction.from(unsignedTx, AVector(signature))
-    tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
-    tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-    tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-    tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
+    def checkValidTx(tx: Transaction) = {
+      tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
+    }
+
+    def checkInvalidTx(invalidTx: Transaction) = {
+      invalidTx.fail(InvalidUnlockScriptType)(
+        validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube))
+      )
+    }
+  }
+
+  it should "validate p2pk(secp256k1) unlock script" in new P2PKUnlockScriptFixture {
+    val (priKey, pubKey) = keypairGen.sample.value
+    val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), Some(groupIndex))
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+
+    prepare()
+    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
+    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
+  }
+
+  it should "validate p2pk(passkey) unlock script" in new P2PKUnlockScriptFixture {
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val lockup           = LockupScript.p2pk(PublicKeyLike.Passkey(pubKey), Some(groupIndex))
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)
+
+    prepare()
+    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
+    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
   }
 }

@@ -29,7 +29,7 @@ import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Base58, Hex}
 
-class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default with NoIndexModelGenerators {
+class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
   it should "calculate group index" in {
     def testP2pkh(pubKey: String, expectedGroup: Int) = {
