@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.9.0"
+    "version": "3.9.2"
   },
   "servers": [
     {
@@ -13285,6 +13285,10 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "utxosLimit": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
