@@ -53,7 +53,7 @@ class RestServer(
     with VertxFutureServerInterpreter
     with StrictLogging {
 
-  override val vertxFutureServerOptions = ServerOptions.serverOptions
+  override val vertxFutureServerOptions = ServerOptions.serverOptions(apiConfig.enableHttpMetrics)
   lazy val blockflowFetchMaxAge         = apiConfig.blockflowFetchMaxAge
   val walletEndpoints                   = walletServer.map(_.walletEndpoints).getOrElse(List.empty)
 

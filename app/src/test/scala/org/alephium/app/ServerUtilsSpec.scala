@@ -66,7 +66,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector.empty,
       ALPH.oneAlph,
       utxosLimitInApiConfig,
-      128
+      128,
+      enableHttpMetrics = true
     )
   }
 
