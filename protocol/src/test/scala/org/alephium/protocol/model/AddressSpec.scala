@@ -214,11 +214,11 @@ class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default with NoIn
   case class AddressVerifyP2PK(
       address: String,
       groupedAddress: Option[String] = None,
-      pubKey: Option[PublicKeyType] = None,
+      pubKey: Option[PublicKeyLike] = None,
       groupIndex: Option[GroupIndex] = None
   ) extends AddressVerify {
     def publicKey(key: String) = {
-      copy(pubKey = Some(deserialize[PublicKeyType](Hex.unsafe(key)).rightValue))
+      copy(pubKey = Some(deserialize[PublicKeyLike](Hex.unsafe(key)).rightValue))
     }
 
     def group(index: Int) = copy(

@@ -22,12 +22,12 @@ import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.AlephiumSpec
 
-class PublicKeyTypeSpec extends AlephiumSpec {
+class PublicKeyLikeSpec extends AlephiumSpec {
   it should "serde correctly" in {
-    val publicKey = PublicKeyType.SecP256K1(SecP256K1PublicKey.generate)
+    val publicKey = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
     val bytes     = ByteString(0) ++ publicKey.publicKey.bytes
-    serialize[PublicKeyType](publicKey) is bytes
-    deserialize[PublicKeyType](bytes) isE publicKey
-    deserialize[PublicKeyType](ByteString(1)).leftValue.getMessage is "Invalid public key type 1"
+    serialize[PublicKeyLike](publicKey) is bytes
+    deserialize[PublicKeyLike](bytes) isE publicKey
+    deserialize[PublicKeyLike](ByteString(1)).leftValue.getMessage is "Invalid public key type 1"
   }
 }

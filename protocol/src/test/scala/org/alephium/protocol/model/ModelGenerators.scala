@@ -29,7 +29,7 @@ import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
-import org.alephium.protocol.vm.{LockupScript, PublicKeyType, StatefulContract, UnlockScript, Val}
+import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, StatefulContract, UnlockScript, Val}
 import org.alephium.util._
 
 trait LockupScriptGenerators extends Generators {
@@ -73,7 +73,7 @@ trait LockupScriptGenerators extends Generators {
   def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
     Gen
       .const(())
-      .map(_ => LockupScript.p2pk(PublicKeyType.SecP256K1(SecP256K1PublicKey.generate), None))
+      .map(_ => LockupScript.p2pk(PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate), None))
       .retryUntil(_.groupIndex == groupIndex)
   }
 

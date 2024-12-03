@@ -2896,7 +2896,7 @@ class TxUtilsSpec extends AlephiumSpec {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Danube
 
     val priKey = PrivateKey.generate
-    val pubKey = PublicKeyType.SecP256K1(priKey.publicKey)
+    val pubKey = PublicKeyLike.SecP256K1(priKey.publicKey)
     (0 until groupConfig.groups).foreach { group =>
       val genesisKey     = genesisKeys(group)._1
       val toLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))

@@ -113,7 +113,7 @@ object LockupScript {
       case _                   => None
     }
   }
-  def p2pk(key: PublicKeyType, groupIndexOpt: Option[GroupIndex])(implicit
+  def p2pk(key: PublicKeyLike, groupIndexOpt: Option[GroupIndex])(implicit
       groupConfig: GroupConfig
   ): P2PK = {
     P2PK.from(key, groupIndexOpt)
@@ -180,7 +180,7 @@ object LockupScript {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)
   }
 
-  final case class P2PK private (publicKey: PublicKeyType, scriptHint: ScriptHint) extends Asset {
+  final case class P2PK private (publicKey: PublicKeyLike, scriptHint: ScriptHint) extends Asset {
     def toBase58: String = {
       val bytes = serialize[LockupScript](this).dropRight(P2PK.scriptHintLength)
       Base58.encode(bytes)
@@ -190,10 +190,10 @@ object LockupScript {
   object P2PK {
     private val scriptHintLength: Int = 4
 
-    def from(publicKey: PublicKeyType)(implicit groupConfig: GroupConfig): P2PK =
+    def from(publicKey: PublicKeyLike)(implicit groupConfig: GroupConfig): P2PK =
       from(publicKey, None)
 
-    def from(publicKey: PublicKeyType, groupIndexOpt: Option[GroupIndex])(implicit
+    def from(publicKey: PublicKeyLike, groupIndexOpt: Option[GroupIndex])(implicit
         groupConfig: GroupConfig
     ): P2PK = {
       groupIndexOpt match {
@@ -228,16 +228,16 @@ object LockupScript {
       }
     }
 
-    private val safePublicKeySerde: Serde[PublicKeyType] = new Serde[PublicKeyType] {
-      override def serialize(input: PublicKeyType): ByteString = {
-        val publicKey = PublicKeyType.serde.serialize(input)
+    private val safePublicKeySerde: Serde[PublicKeyLike] = new Serde[PublicKeyLike] {
+      override def serialize(input: PublicKeyLike): ByteString = {
+        val publicKey = PublicKeyLike.serde.serialize(input)
         val checksum  = Checksum.serde.serialize(Checksum.calc(publicKey))
         publicKey ++ checksum
       }
 
-      override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyType]] = {
+      override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyLike]] = {
         for {
-          publicKeyResult <- PublicKeyType.serde._deserialize(input)
+          publicKeyResult <- PublicKeyLike.serde._deserialize(input)
           data = input.take(input.length - publicKeyResult.rest.length)
           checksumResult <- Checksum.serde._deserialize(publicKeyResult.rest)
           _              <- checksumResult.value.check(data)

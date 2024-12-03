@@ -23,20 +23,20 @@ import org.alephium.protocol.model.ScriptHint
 import org.alephium.serde._
 import org.alephium.util.DjbHash
 
-sealed trait PublicKeyType {
+sealed trait PublicKeyLike {
   def bytes: ByteString
 
   lazy val scriptHint: ScriptHint = ScriptHint.fromHash(DjbHash.intHash(bytes))
 }
 
-object PublicKeyType {
-  implicit val serde: Serde[PublicKeyType] = new Serde[PublicKeyType] {
-    override def serialize(input: PublicKeyType): ByteString = input match {
+object PublicKeyLike {
+  implicit val serde: Serde[PublicKeyLike] = new Serde[PublicKeyLike] {
+    override def serialize(input: PublicKeyLike): ByteString = input match {
       case SecP256K1(publicKey) =>
         ByteString(0) ++ serdeImpl[SecP256K1PublicKey].serialize(publicKey)
     }
 
-    override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyType]] = {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyLike]] = {
       byteSerde._deserialize(input).flatMap {
         case Staging(0, rest) =>
           serdeImpl[SecP256K1PublicKey]._deserialize(rest).map(_.mapValue(SecP256K1.apply))
@@ -45,7 +45,7 @@ object PublicKeyType {
     }
   }
 
-  final case class SecP256K1(publicKey: SecP256K1PublicKey) extends PublicKeyType {
+  final case class SecP256K1(publicKey: SecP256K1PublicKey) extends PublicKeyLike {
     def bytes: ByteString = publicKey.bytes
   }
 }

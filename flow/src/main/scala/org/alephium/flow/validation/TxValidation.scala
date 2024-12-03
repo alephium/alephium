@@ -832,7 +832,7 @@ object TxValidation {
         lock: LockupScript.P2PK
     ): TxValidationResult[GasBox] = {
       lock.publicKey match {
-        case PublicKeyType.SecP256K1(key) => checkSignature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.SecP256K1(key) => checkSignature(txEnv, preImage, gasRemaining, key)
       }
     }
 
