@@ -1547,6 +1547,7 @@ trait RestServerFixture
     (new java.io.File("")).toPath,
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
+    apiConfig.enableHttpMetrics,
     WalletConfig.BlockFlow(
       "host",
       0,
@@ -1582,7 +1583,8 @@ trait RestServerFixture
       ALPH.oneAlph,
       utxosLimit,
       maxFormBufferedBytes,
-      maxWebSocketFrameSize
+      maxWebSocketFrameSize,
+      enableHttpMetrics = true
     )
 
     (peer, peerConf)

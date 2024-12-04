@@ -46,7 +46,8 @@ final case class ApiConfig(
     gasFeeCap: U256,
     defaultUtxosLimit: Int,
     maxFormBufferedBytes: Int,
-    maxWebSocketFrameSize: Int
+    maxWebSocketFrameSize: Int,
+    enableHttpMetrics: Boolean
 )
 
 object ApiConfig extends StrictLogging {
@@ -85,7 +86,8 @@ object ApiConfig extends StrictLogging {
         as[U256]("gasFeeCap"),
         as[Int]("defaultUtxosLimit"),
         as[Int]("maxFormBufferedBytes"),
-        as[Int]("maxWebSocketFrameSize")
+        as[Int]("maxWebSocketFrameSize"),
+        as[Option[Boolean]]("enableHttpMetrics").getOrElse(false)
       )
     }
 
