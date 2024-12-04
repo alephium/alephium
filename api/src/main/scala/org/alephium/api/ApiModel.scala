@@ -273,10 +273,12 @@ trait ApiModelCodec {
     {
       case BuildTxCommon.Default       => "default"
       case BuildTxCommon.BIP340Schnorr => "bip340-schnorr"
+      case BuildTxCommon.Passkey       => "passkey"
     },
     {
       case "default"        => BuildTxCommon.Default
       case "bip340-schnorr" => BuildTxCommon.BIP340Schnorr
+      case "passkey"        => BuildTxCommon.Passkey
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
