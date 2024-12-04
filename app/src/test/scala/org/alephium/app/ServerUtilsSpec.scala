@@ -4567,7 +4567,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
     val transactions =
-      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
+      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, None)).rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
         .from(block, 1, transactions)
@@ -4739,7 +4739,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "find rich block when node.indexes.tx-output-ref-index is enabled" in new TxOutputRefIndexFixture {
     val transactions =
-      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
+      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, None)).rightValue
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
@@ -4802,7 +4802,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
-    serverUtils.getRichTransaction(blockFlow, transaction).rightValue is richTransaction
+    serverUtils.getRichTransaction(blockFlow, transaction, None).rightValue is richTransaction
 
     serverUtils
       .getRichTransaction(blockFlow, transaction.id, Some(chainIndex.from), Some(chainIndex.to))
@@ -4880,7 +4880,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val richTransaction =
       RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
 
-    serverUtils.getRichTransaction(blockFlow, scriptTransaction).rightValue is richTransaction
+    serverUtils.getRichTransaction(blockFlow, scriptTransaction, None).rightValue is richTransaction
     serverUtils
       .getRichTransaction(
         blockFlow,
@@ -4892,7 +4892,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx))
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, None))
         .rightValue
       RichBlockAndEvents(
         RichBlockEntry.from(scriptBlock, 3, richTxs).rightValue,

@@ -1390,6 +1390,19 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  def getTransaction(
+      txId: TransactionId,
+      block: Block
+  ): Either[String, Option[Transaction]] = {
+    val chainIndex = ChainIndex.from(block.hash)
+    if (brokerConfig.contains(chainIndex.from)) {
+      val chain = Self.blockFlow.getBlockChain(chainIndex)
+      chain.getTransaction(txId, block).left.map(_.toString)
+    } else {
+      Right(None)
+    }
+  }
+
   def searchTransaction(
       txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
