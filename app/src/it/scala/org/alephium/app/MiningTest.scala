@@ -25,7 +25,7 @@ class MiningTest extends AlephiumActorSpec {
   class Fixture(numNodes: Int) extends CliqueFixture {
     val clique = bootClique(nbOfNodes = numNodes)
     clique.start()
-    clique.startWs()
+    clique.startWs().futureValue is ()
 
     val selfClique = clique.selfClique()
     val restPort   = clique.getRestPort(clique.getGroup(address).group)

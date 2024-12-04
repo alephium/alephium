@@ -224,7 +224,8 @@ protected[ws] object WsRequest extends ApiModelCodec {
     WsRequest(Correlation(id), subscription)
 }
 
-protected[ws] object WsUtils {
+// public interface
+object WsUtils {
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
       val promise = Promise[T]()

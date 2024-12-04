@@ -452,7 +452,7 @@ trait WalletFixture extends CliqueFixture {
   val restPort = clique.masterRestPort
   request[Balance](getBalance(address), restPort) is initialBalance
 
-  startWsClient(defaultRestMasterPort)
+  startWsClient(defaultRestMasterPort).futureValue is ()
   clique.selfClique().nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
 
   val nWallets       = 5

@@ -29,16 +29,15 @@ import akka.io.Tcp
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.WebSocketBase
+import io.vertx.core.http.WebSocketClientOptions
 import org.scalatest.Assertion
 import org.scalatest.time.{Seconds, Span}
 import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.app.WsParams.SubscribeParams
+import org.alephium.app.ws.WsClient
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -69,8 +68,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with HttpFixture { Fixture =>
   implicit val system: ActorSystem = spec.system
 
-  private val vertx           = Vertx.vertx()
-  private val webSocketClient = vertx.createWebSocketClient()
+  private val vertx = Vertx.vertx()
+  private val wsClient =
+    WsClient(vertx, new WebSocketClientOptions().setMaxFrameSize(apiConfig.maxWebSocketFrameSize))
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -389,16 +389,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWsClient(port: Int): Future[WebSocketBase] = {
-    webSocketClient
-      .connect(port, "127.0.0.1", "/ws")
-      .asScala
-      .map { ws =>
-        ws.writeTextMessage(write(WsRequest.subscribe(0, SubscribeParams.Block)))
+  def startWsClient(port: Int): Future[Unit] = {
+    implicit val ec: ExecutionContext = system.dispatcher
+    wsClient
+      .connect(port)
+      .flatMap { ws =>
         ws.textMessageHandler { blockNotify =>
           blockNotifyProbe.ref ! blockNotify
         }
-      }(system.dispatcher)
+        ws.subscribeToBlock(0)
+      }
   }
 
   def jsonRpc(method: String, params: String): String =
@@ -865,10 +865,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       servers.map(_.stop()).foreach(_.futureValue is ())
     }
 
-    def startWs(): Unit = {
-      servers.foreach { server =>
-        startWsClient(server.config.network.restPort)
-      }
+    def startWs(): Future[Unit] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      Future
+        .sequence(
+          servers.map { server =>
+            startWsClient(server.config.network.restPort)
+          }.toSeq
+        )
+        .map(_ => ())
     }
 
     def startMining(): Unit = {

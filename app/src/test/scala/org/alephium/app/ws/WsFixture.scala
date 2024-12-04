@@ -22,7 +22,7 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServerOptions, WebSocket, WebSocketClientOptions}
+import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions}
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -58,30 +58,29 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
     dummyContract,
     storages
   )
-
-  def connectWebsocketClient(
-      port: Int = node.config.network.restPort,
-      host: String = "127.0.0.1",
-      uri: String = "/ws"
-  ): Future[WebSocket] =
-    vertx
-      .createWebSocketClient(new WebSocketClientOptions().setMaxFrameSize(1024 * 1024))
-      .connect(port, host, uri)
-      .asScala
+  lazy val wsPort: Int = node.config.network.restPort
+  lazy val wsClient: WsClient =
+    WsClient(
+      vertx,
+      new WebSocketClientOptions()
+        .setMaxFrameSize(apiConfig.maxWebSocketFrameSize)
+        .setMaxConnections(maxClientConnections)
+    )
 
   lazy val wsOptions =
     new HttpServerOptions()
       .setMaxWebSocketFrameSize(1024 * 1024)
       .setRegisterWebSocketWriteHandlers(true)
 
-  def maxConnections: Int = 10
+  def maxServerConnections: Int = 10
+  def maxClientConnections: Int = 500
 
   def bindAndListen(): WsServer = {
     val wsServer =
       WsServer(
         system,
         node,
-        maxConnections,
+        maxServerConnections,
         wsOptions
       )
     wsServer.httpServer
@@ -180,7 +179,7 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
 
     val probedSockets =
       initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
-        val ws          = connectWebsocketClient().futureValue
+        val ws          = wsClient.connect(wsPort).futureValue
         val clientProbe = TestProbe()
         startBehavior(ws, clientProbe)
         ws -> clientProbe
@@ -209,7 +208,7 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
         .map(_._2.length)
         .sum is expectedSubscriptions
     }
-    probedSockets.foreach(_._1.close().asScala.futureValue)
+    probedSockets.foreach(_._1.close().futureValue)
     httpServer.close().asScala.mapTo[Unit].futureValue
   }
 }
@@ -218,13 +217,13 @@ object WsBehaviorFixture {
 
   sealed trait WsBehavior
   final case class WsStartBehavior(
-      clientInitBehavior: (WebSocket, TestProbe) => Unit,
+      clientInitBehavior: (Ws, TestProbe) => Unit,
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
       clientAssertionOnMsg: TestProbe => Any
   ) extends WsBehavior
 
   final case class WsNextBehavior(
-      clientInitBehavior: WebSocket => Unit,
+      clientInitBehavior: Ws => Unit,
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
       clientAssertionOnMsg: TestProbe => Any
   ) extends WsBehavior

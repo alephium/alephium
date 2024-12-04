@@ -121,7 +121,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       val masterPortClique1 = clique1.masterTcpPort
 
       clique1.start()
-      clique1.startWs()
+      clique1.startWs().futureValue is ()
       val selfClique1 = clique1.selfClique()
 
       clique1.startMining()
