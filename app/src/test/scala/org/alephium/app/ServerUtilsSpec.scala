@@ -28,7 +28,7 @@ import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
-import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
+import org.alephium.crypto.{BIP340Schnorr, SecP256K1, SecP256R1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
@@ -5138,6 +5138,33 @@ class ServerUtilsSpec extends AlephiumSpec {
     executeScript(s"${Int.MaxValue}").isRight is true
     executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
       "Execution error when emulating tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
+  }
+
+  it should "transfer using passkey" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val lockupScript     = LockupScript.P2PK.from(vm.PublicKeyLike.Passkey(pubKey), None)
+    val groupIndex       = lockupScript.groupIndex
+    val genesisKey       = genesisKeys(groupIndex.value)._1
+    val block0 =
+      transfer(blockFlow, genesisKey, lockupScript, AVector.empty[(TokenId, U256)], ALPH.alph(5))
+    addAndCheck(blockFlow, block0)
+    getAlphBalance(blockFlow, lockupScript) is ALPH.alph(5)
+
+    val toAddress = Address.Asset(LockupScript.p2pkh(genesisKey.publicKey))
+    val params = BuildTransferTx(
+      fromPublicKey = pubKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.Passkey),
+      destinations = AVector(Destination(toAddress, Amount(ALPH.oneAlph)))
+    )
+    val serverUtils = new ServerUtils()
+    val result      = serverUtils.buildTransferTransaction(blockFlow, params).rightValue
+    val unsignedTx  = deserialize[UnsignedTransaction](Hex.unsafe(result.unsignedTx)).rightValue
+    val tx          = signWithPasskey(unsignedTx, priKey)
+    val block1 = mineWithTxs(blockFlow, ChainIndex(groupIndex, groupIndex))((_, _) => AVector(tx))
+    addAndCheck(blockFlow, block1)
+    getAlphBalance(blockFlow, lockupScript) is ALPH.alph(4).subUnsafe(tx.gasFeeUnsafe)
   }
 
   @scala.annotation.tailrec

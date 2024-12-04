@@ -19,10 +19,11 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.crypto.BIP340SchnorrPublicKey
+import org.alephium.crypto.{BIP340SchnorrPublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.PublicKey
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId, TransactionId}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, PublicKeyLike, UnlockScript}
 import org.alephium.util.{AVector, Hex, U256}
 
 trait BuildTxCommon {
@@ -35,16 +36,32 @@ trait BuildTxCommon {
 
 object BuildTxCommon {
   sealed trait PublicKeyType
-  object Default       extends PublicKeyType // SecP256K1
-  object BIP340Schnorr extends PublicKeyType
+  case object Default       extends PublicKeyType // SecP256K1
+  case object BIP340Schnorr extends PublicKeyType
+  case object Passkey       extends PublicKeyType // TODO: Support specifying group index
 
   trait FromPublicKey {
     def fromPublicKey: ByteString
     def fromPublicKeyType: Option[PublicKeyType]
 
-    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)] = fromPublicKeyType match {
-      case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
-      case _                                 => p2pkhLockPair(fromPublicKey)
+    def getLockPair()(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] =
+      fromPublicKeyType match {
+        case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
+        case Some(BuildTxCommon.Passkey)       => passkeyLockPair(fromPublicKey)
+        case _                                 => p2pkhLockPair(fromPublicKey)
+      }
+  }
+
+  def passkeyLockPair(
+      fromPublicKey: ByteString
+  )(implicit config: GroupConfig): Try[(LockupScript.P2PK, UnlockScript)] = {
+    SecP256R1PublicKey.from(fromPublicKey) match {
+      case Some(publicKey) =>
+        val lockup = LockupScript.P2PK.from(PublicKeyLike.Passkey(publicKey), None)
+        val unlock = UnlockScript.P2PK(PublicKeyLike.Passkey)
+        Right(lockup -> unlock)
+      case None =>
+        Left(badRequest(s"Invalid SecP256R1 public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 

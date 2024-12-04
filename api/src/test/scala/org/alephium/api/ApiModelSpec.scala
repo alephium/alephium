@@ -26,6 +26,7 @@ import org.scalatest.EitherValues
 import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
+import org.alephium.crypto.SecP256R1PublicKey
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
@@ -551,6 +552,30 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  ],
                        |  "gasAmount": 1,
                        |  "gasPrice": "1"
+                       |}
+        """.stripMargin
+      checkData(transfer, jsonRaw)
+    }
+
+    {
+      val fromPublicKey = SecP256R1PublicKey.generate
+
+      val transfer = BuildTransferTx(
+        fromPublicKey.bytes,
+        Some(BuildTxCommon.Passkey),
+        AVector(Destination(toAddress, Amount(1))),
+        None
+      )
+      val jsonRaw = s"""
+                       |{
+                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "fromPublicKeyType": "passkey",
+                       |  "destinations": [
+                       |    {
+                       |      "address": "${toAddress.toBase58}",
+                       |      "attoAlphAmount": "1"
+                       |    }
+                       |  ]
                        |}
         """.stripMargin
       checkData(transfer, jsonRaw)
