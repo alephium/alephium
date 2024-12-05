@@ -137,8 +137,9 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val newTemplate =
       BlockFlowTemplate.from(newBlock, blockHeight).copy(index = invalidChainIndex)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
+    val cacheKey      = MinerApiController.getCacheKey(newHeaderBlob)
     minerApiController.underlyingActor.jobCache
-      .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
+      .put(cacheKey, newTemplate -> serialize(newTemplate.transactions))
 
     expectErrorMsg("The mined block has invalid chainindex:") {
       connection0 ! Tcp.Write(
@@ -159,8 +160,9 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
     val newTemplate   = BlockFlowTemplate.from(newBlock, blockHeight)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
+    val cacheKey      = MinerApiController.getCacheKey(newHeaderBlob)
     minerApiController.underlyingActor.jobCache
-      .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
+      .put(cacheKey, newTemplate -> serialize(newTemplate.transactions))
 
     expectErrorMsg("The mined block has invalid work:") {
       connection0 ! Tcp.Write(
@@ -186,8 +188,9 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   }
 
   it should "submit block when the job is cached" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
     minerApiController.underlyingActor.jobCache
-      .put(headerBlob, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+      .put(cacheKey, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
 
     val blockBlob = serialize(block.copy(transactions = AVector.empty))
     connection0 ! Tcp.Write(
@@ -209,6 +212,36 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
         SubmitResult(0, 0, block.hash, succeeded)
       )
     }
+  }
+
+  it should "get cache key from header blob" in new SubmissionFixture {
+    import org.alephium.serde.byteSerde
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    cacheKey isnot headerBlob
+
+    val header = blockFlowTemplate.dummyHeader()
+    serialize(header.version) ++
+      serialize(header.blockDeps) ++
+      serialize(header.depStateHash) ++
+      serialize(header.txsHash) ++
+      serialize(header.target) is cacheKey
+  }
+
+  it should "accept the block if the timestamp is changed" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    minerApiController.underlyingActor.jobCache
+      .put(cacheKey, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+
+    val newHeader    = block.header.copy(timestamp = block.header.timestamp.plusMillisUnsafe(1))
+    val newBlock     = block.copy(header = newHeader)
+    val reMinedBlock = reMine(blockFlow, chainIndex, newBlock)
+    val blockBlob    = serialize(reMinedBlock.copy(transactions = AVector.empty))
+    connection0 ! Tcp.Write(
+      ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob)))
+    )
+
+    eventually(minerApiController.underlyingActor.submittingBlocks.contains(block.hash))
+    allHandlerProbes.blockHandlers(chainIndex).expectMsgType[BlockChainHandler.ValidateMinedBlock]
   }
 
   trait ConnectionFixture extends Fixture {
