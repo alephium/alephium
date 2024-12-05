@@ -1643,14 +1643,25 @@ class ServerUtils(implicit
       limit: Int,
       contractAddress: Address.Contract
   ): Try[SubContracts] = {
-    for {
-      result <- wrapResult(
-        blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
-          case (nextStart, contractIds) =>
-            SubContracts(contractIds.map(Address.contract), nextStart)
+    wrapResult(blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit))
+      .flatMap { case (nextStart, contractIds) =>
+        if (contractIds.isEmpty) {
+          wrapResult(blockFlow.getSubContractsCurrentCount(contractAddress.contractId)).flatMap {
+            case None =>
+              Left(notFound(s"Sub-contracts for ${contractAddress}"))
+            case Some(currentCount) if currentCount == start =>
+              Right(SubContracts(AVector.empty, currentCount))
+            case Some(currentCount) =>
+              Left(
+                notFound(
+                  s"Current count for sub-contracts for ${contractAddress} is '$currentCount', sub-contracts start from '$start' with limit '$limit'"
+                )
+              )
+          }
+        } else {
+          Right(SubContracts(contractIds.map(Address.contract), nextStart))
         }
-      )
-    } yield result
+      }
   }
 
   def getSubContractsCurrentCount(
