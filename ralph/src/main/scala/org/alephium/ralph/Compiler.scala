@@ -673,6 +673,7 @@ object Compiler {
 
     @inline private def addVarInfo(name: String, varInfo: VarInfo): VarKey = {
       val varKey = VarKey(name, variableScope)
+      assume(!varTable.contains(varKey))
       varTable(varKey) = varInfo
       varKey
     }

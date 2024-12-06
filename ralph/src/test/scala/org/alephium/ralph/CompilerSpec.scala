@@ -9327,4 +9327,43 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       state.getLocalVarSize(Ast.FuncId("foo", false)) is 7
     }
   }
+
+  it should "get correct local variable size" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let a = 0
+         |    let b = 1
+         |  }
+         |  pub fn fooBar() -> () {
+         |    let a = 0
+         |    let b = 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract0 = Compiler.compileContract(code0).rightValue
+    contract0.methods.foreach(_.localsLength is 2)
+
+    val code1 =
+      s"""
+         |Contract Foo() {
+         |  fn fooBar() -> () {
+         |    let a = 0
+         |    let b = 1
+         |    foo()
+         |  }
+         |  @inline fn foo() -> () {
+         |    let a = 0
+         |    let b = 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract1 = Compiler.compileContractFull(code1).rightValue.debugCode
+    contract1.methods.length is 2
+    contract1.methods(0).localsLength is 4
+    contract1.methods(1).localsLength is 2
+  }
 }
