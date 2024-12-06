@@ -9270,7 +9270,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Inline functions cannot have recursive calls")
+      testContractError(code, "Inline function \"bar\" cannot be recursive")
     }
 
     {
@@ -9290,7 +9290,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Inline functions cannot have recursive calls")
+      testContractError(code, "Inline function \"bar0\" cannot be recursive")
     }
   }
 }

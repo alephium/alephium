@@ -726,7 +726,10 @@ object Compiler {
         callAst: Ast.CallAst[Ctx]
     ): Seq[Instr[Ctx]] = {
       if (inlineFuncStack.contains(funcDef.id)) {
-        throw Error("Inline functions cannot have recursive calls", funcDef.id.sourceIndex)
+        throw Error(
+          s"Inline function ${quote(funcDef.name)} cannot be recursive",
+          funcDef.id.sourceIndex
+        )
       }
 
       assume(funcDef.inline && args.length == funcDef.args.length)

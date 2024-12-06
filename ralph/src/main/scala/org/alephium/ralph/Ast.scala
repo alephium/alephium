@@ -2146,8 +2146,8 @@ object Ast {
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
-    def nonInlineFuncs: Seq[FuncDef[Ctx]] = funcs.filterNot(_.inline)
-    def inlineFuncs: Seq[FuncDef[Ctx]]    = funcs.filter(_.inline)
+    lazy val nonInlineFuncs: Seq[FuncDef[Ctx]] = funcs.filterNot(_.inline)
+    lazy val inlineFuncs: Seq[FuncDef[Ctx]]    = funcs.filter(_.inline)
 
     def name: String = ident.name
 
@@ -2261,7 +2261,7 @@ object Ast {
     def genCodeFull(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
       val script = genCode(state)
-      StaticAnalysis.checkMethodsStateless(this, script.methods, state)
+      StaticAnalysis.checkMethodsStateless(this, state)
       script
     }
   }
@@ -2345,7 +2345,7 @@ object Ast {
     def genCodeFull(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
       val script = genCode(state)
-      StaticAnalysis.checkMethodsStateful(this, script.methods, state)
+      StaticAnalysis.checkTxScript(this, script, state)
       script
     }
   }
@@ -2900,7 +2900,7 @@ object Ast {
       val warnings = checkUnusedDefsInParentContract(states)
       val compiled = statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
         val statefulContract = genReleaseCode(contract, statefulDebugContract, state)
-        StaticAnalysis.checkMethods(contract, statefulContract, state)
+        StaticAnalysis.checkContract(contract, statefulDebugContract, state)
         val orderedFuncs = contract.nonInlineFuncs ++ contract.inlineFuncs
         CompiledContract(
           statefulContract,
@@ -2917,15 +2917,16 @@ object Ast {
         debugCode: StatefulContract,
         state: Compiler.State[StatefulContext]
     ): StatefulContract = {
-      val needToGenReleaseCode =
-        contract.inlineFuncs.nonEmpty || debugCode.methods.exists(
-          _.instrs.exists(_.isInstanceOf[DEBUG])
-        )
-      if (needToGenReleaseCode) {
+      val hasInlineFuncs = contract.inlineFuncs.nonEmpty
+      val hasDebugCode   = debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))
+      if (!hasInlineFuncs && !hasDebugCode) {
+        debugCode
+      } else if (hasInlineFuncs && !hasDebugCode) {
+        val nonInlineMethods = debugCode.methods.dropRight(contract.inlineFuncs.length)
+        debugCode.copy(methods = nonInlineMethods)
+      } else {
         state.allowDebug = false
         contract.genCode(state)
-      } else {
-        debugCode
       }
     }
 
