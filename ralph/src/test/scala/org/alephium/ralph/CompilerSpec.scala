@@ -9292,5 +9292,39 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(code, "Inline function \"bar0\" cannot be recursive")
     }
+
+    {
+      info("Add local variables to the caller function")
+      val code =
+        s"""
+           |Contract Foo(v: U256) {
+           |  pub fn foo() -> () {
+           |    let a = 0
+           |    let b = 1
+           |    bar(a)
+           |  }
+           |  @inline fn bar(a: U256) -> () {
+           |    let b = 0
+           |    if (v > 1) {
+           |      let c = 1
+           |    } else {
+           |      let d = 2
+           |    }
+           |    while (v > 2) {
+           |      let e = 3
+           |      return
+           |    }
+           |    let f = 4
+           |  }
+           |}
+           |""".stripMargin
+
+      val multiContract = Compiler.compileMultiContract(code).rightValue
+      val state         = Compiler.State.buildFor(multiContract, 0)(CompilerOptions.Default)
+      val contract      = multiContract.contracts.head.asInstanceOf[Ast.Contract]
+      contract.check(state)
+      contract.genCode(state)
+      state.getLocalVarSize(Ast.FuncId("foo", false)) is 7
+    }
   }
 }
