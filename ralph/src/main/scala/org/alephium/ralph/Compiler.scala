@@ -736,11 +736,18 @@ object Compiler {
         allowSameVarName = true
         val initCodes = genInitCodeForInlineCall(args, argCodes, funcDef)
         funcDef.body.foreach(_.check(this))
-        val instrs = funcDef.body.flatMap(_.genCode(this))
-        val bodyCodes = if (instrs.lastOption.contains(Return)) {
-          instrs.dropRight(1)
+        val instrs0 = funcDef.body.flatMap(_.genCode(this))
+        val instrs1 = if (instrs0.lastOption.contains(Return)) {
+          instrs0.dropRight(1)
         } else {
-          instrs
+          instrs0
+        }
+        val bodyCodes = mutable.ArrayBuffer.empty[Instr[Ctx]]
+        instrs1.view.zipWithIndex.foreach { case (instr, index) =>
+          instr match {
+            case Return => bodyCodes.addOne(Jump(instrs1.length - index - 1))
+            case _      => bodyCodes.addOne(instr)
+          }
         }
         allowSameVarName = false
         inlineFuncStack.pop()

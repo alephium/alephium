@@ -9069,6 +9069,61 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Handle the while statement properly")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(m: U256, n: U256) -> U256 {
+           |    let v = baz(m, n)
+           |    assert!(v == n || v == m, 0)
+           |    return v
+           |  }
+           |  @inline fn baz(m: U256, n: U256) -> U256 {
+           |    let mut i = 0
+           |    let mut a = 0
+           |    while (i < n) {
+           |      a = a + 1
+           |      i = i + 1
+           |      if (a >= m) {
+           |        return a
+           |      }
+           |    }
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, AVector(Val.U256(2), Val.U256(4)), AVector(Val.U256(2)))
+      testContract(code, AVector(Val.U256(4), Val.U256(2)), AVector(Val.U256(2)))
+    }
+
+    {
+      info("Handle the if-else statement properly")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(m: U256) -> U256 {
+           |    if (isZero(m)) {
+           |      return m + 1
+           |    } else {
+           |      return m
+           |    }
+           |  }
+           |  @inline fn isZero(m: U256) -> Bool {
+           |    if (m == 0) {
+           |      return true
+           |    } else {
+           |      return false
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, AVector(Val.U256(0)), AVector(Val.U256(1)))
+      testContract(code, AVector(Val.U256(1)), AVector(Val.U256(1)))
+    }
+
+    {
       info("Inline function that returns multiple values")
       val code =
         s"""
