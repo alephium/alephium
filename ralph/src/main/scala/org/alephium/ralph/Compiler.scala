@@ -701,6 +701,25 @@ object Compiler {
       trackAndAddVarInfo(sname, varInfo)
     }
 
+    private def genInitCodeForInlineCall(
+        args: Seq[Ast.Expr[Ctx]],
+        argCodes: Seq[Seq[Instr[Ctx]]],
+        funcDef: Ast.FuncDef[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      args.view.zipWithIndex.flatMap { case (argExpr, index) =>
+        val code = argCodes(index)
+        val arg  = funcDef.args(index)
+        argExpr match {
+          case _: Ast.Variable[Ctx @unchecked] | _: Ast.Const[Ctx @unchecked] =>
+            addInlinedArgument(arg.ident, arg.tpe, code)
+            Seq.empty[Instr[Ctx]]
+          case _ =>
+            addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, false)
+            code ++ genStoreCode(arg.ident).flatten
+        }
+      }.toSeq
+    }
+
     def genInlineCode(
         args: Seq[Ast.Expr[Ctx]],
         funcDef: Ast.FuncDef[Ctx],
@@ -715,20 +734,17 @@ object Compiler {
       withScope(callAst) {
         inlineFuncStack.push(funcDef.id)
         allowSameVarName = true
-        argCodes.view.zipWithIndex.foreach { case (code, index) =>
-          val arg = funcDef.args(index)
-          addInlinedArgument(arg.ident, arg.tpe, code)
-        }
+        val initCodes = genInitCodeForInlineCall(args, argCodes, funcDef)
         funcDef.body.foreach(_.check(this))
         val instrs = funcDef.body.flatMap(_.genCode(this))
-        val result = if (instrs.lastOption.contains(Return)) {
+        val bodyCodes = if (instrs.lastOption.contains(Return)) {
           instrs.dropRight(1)
         } else {
           instrs
         }
         allowSameVarName = false
         inlineFuncStack.pop()
-        result
+        initCodes ++ bodyCodes
       }
     }
 

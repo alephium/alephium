@@ -9045,6 +9045,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Using side-effect function call as an inline argument")
+      val code =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  pub fn foo() -> U256 {
+           |    bar(update(), v)
+           |    return v
+           |  }
+           |  fn update() -> U256 {
+           |    v = v + 1
+           |    return v
+           |  }
+           |  @inline fn bar(a: U256, b: U256) -> () {
+           |    assert!(a == v, 0)
+           |    assert!(a == b, 0)
+           |    assert!(b == v, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, output = AVector(Val.U256(1)), mutFields = AVector(Val.U256(0)))
+    }
+
+    {
       info("Inline function that returns multiple values")
       val code =
         s"""
