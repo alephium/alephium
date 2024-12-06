@@ -158,7 +158,7 @@ trait WorldState[T, R1, R2, R3] {
       outputRef: TxOutputRef,
       output: TxOutput,
       txId: TransactionId,
-      blockHashOpt: Option[BlockHash]
+      blockHash: Option[BlockHash]
   ): IOResult[T]
 
   // scalastyle:off parameter.number
@@ -307,7 +307,7 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
       outputRef: ContractOutputRef,
       output: ContractOutput,
       txId: TransactionId,
-      blockHashOpt: Option[BlockHash]
+      blockHash: Option[BlockHash]
   ): IOResult[Unit]
 }
 
@@ -395,10 +395,10 @@ object WorldState {
         outputRef: TxOutputRef,
         output: TxOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Persisted] = {
       for {
-        updatedOutputState <- updateOutputState(outputRef, output, txId, blockHashOpt)
+        updatedOutputState <- updateOutputState(outputRef, output, txId, blockHash)
       } yield {
         Persisted(
           updatedOutputState,
@@ -442,11 +442,11 @@ object WorldState {
         outputRef: ContractOutputRef,
         output: ContractOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Persisted] = {
       val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
       for {
-        newOutputState   <- updateOutputState(outputRef, output, txId, blockHashOpt)
+        newOutputState   <- updateOutputState(outputRef, output, txId, blockHash)
         newContractState <- contractState.put(contractId, state.mutable)
         _ <- contractImmutableState.put(state.mutable.immutableStateHash, Left(state.immutable))
         _ <- contractImmutableState.put(state.codeHash, Right(code))
@@ -481,11 +481,11 @@ object WorldState {
         outputRef: ContractOutputRef,
         output: ContractOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Persisted] = {
       for {
         state            <- getContractState(key)
-        newOutputState   <- updateOutputState(outputRef, output, txId, blockHashOpt)
+        newOutputState   <- updateOutputState(outputRef, output, txId, blockHash)
         newContractState <- _updateContract(key, state.updateOutputRef(outputRef))
       } yield Persisted(
         newOutputState,
@@ -550,14 +550,14 @@ object WorldState {
         outputRef: TxOutputRef,
         output: TxOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[SparseMerkleTrie[TxOutputRef, TxOutput]] = {
       for {
         updateOutputState <- outputState.put(outputRef, output)
         _ <- nodeIndexesStorage.txOutputRefIndexStorage.store(
           outputRef.key,
           txId,
-          blockHashOpt
+          blockHash
         )
       } yield updateOutputState
     }
@@ -577,11 +577,11 @@ object WorldState {
         outputRef: TxOutputRef,
         output: TxOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Unit] = {
       for {
         _ <- outputState.put(outputRef, output)
-        _ <- txOutputRefIndexState.store(outputRef.key, txId, blockHashOpt)
+        _ <- txOutputRefIndexState.store(outputRef.key, txId, blockHash)
       } yield ()
     }
 
@@ -592,11 +592,11 @@ object WorldState {
         outputRef: ContractOutputRef,
         output: ContractOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Unit] = {
       val state = ContractLegacyState.unsafe(code, mutFields, outputRef)
       for {
-        _         <- addAsset(outputRef, output, txId, blockHashOpt)
+        _         <- addAsset(outputRef, output, txId, blockHash)
         _         <- contractState.put(contractId, state)
         recordOpt <- codeState.getOpt(code.hash)
         _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
@@ -611,11 +611,11 @@ object WorldState {
         outputRef: ContractOutputRef,
         output: ContractOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Unit] = {
       val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
       for {
-        _ <- addAsset(outputRef, output, txId, blockHashOpt)
+        _ <- addAsset(outputRef, output, txId, blockHash)
         _ <- contractState.put(contractId, state.mutable)
         _ <- contractImmutableState.put(state.mutable.immutableStateHash, Left(state.immutable))
         _ <- contractImmutableState.put(state.codeHash, Right(code))
@@ -631,11 +631,11 @@ object WorldState {
         outputRef: ContractOutputRef,
         output: ContractOutput,
         txId: TransactionId,
-        blockHashOpt: Option[BlockHash]
+        blockHash: Option[BlockHash]
     ): IOResult[Unit] = {
       for {
         state <- getContractState(key)
-        _     <- addAsset(outputRef, output, txId, blockHashOpt)
+        _     <- addAsset(outputRef, output, txId, blockHash)
         _     <- updateContract(key, state.updateOutputRef(outputRef))
       } yield ()
     }

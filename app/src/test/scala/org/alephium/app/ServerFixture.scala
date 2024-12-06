@@ -46,6 +46,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -542,7 +543,7 @@ object ServerFixture {
 
     override def getTxIdFromOutputRef(
         outputRef: TxOutputRef
-    ): IOResult[Option[(TransactionId, AVector[BlockHash])]] = {
+    ): IOResult[Option[TxIdBlockHashes]] = {
       if (outputRef == dummyAssetOutputRef) {
         Right(Some((dummyTransactionId, AVector(block.hash))))
       } else {

@@ -19,10 +19,13 @@ package org.alephium.protocol.vm
 import org.alephium.crypto.Byte32
 import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{ContractId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.txIdBlockHashesSerde
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
+  txIdBlockHashesSerde,
+  TxIdBlockHashes
+}
 import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex._
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
@@ -41,7 +44,7 @@ trait VMFactory extends StorageFixture {
     val txOutputRefIndexStorage =
       TxOutputRefIndexStorage(
         Some(
-          newDB[TxOutputRef.Key, (TransactionId, AVector[BlockHash])](
+          newDB[TxOutputRef.Key, TxIdBlockHashes](
             storage,
             RocksDBSource.ColumnFamily.TxOutputRefIndex
           )

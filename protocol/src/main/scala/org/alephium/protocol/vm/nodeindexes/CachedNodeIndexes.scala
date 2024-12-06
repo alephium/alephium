@@ -31,9 +31,9 @@ final case class CachedNodeIndexes(
   def persist(): IOResult[NodeIndexesStorage] = {
     for {
       logStorage <- logStorageCache.persist()
-      txOutputRefIndexStorageValue <- txOutputRefIndexCache.value match {
-        case Some(cache) => cache.persist().map(Some(_))
-        case None        => Right(None)
+      txOutputRefIndexStorage <- txOutputRefIndexCache.value match {
+        case Some(cache) => cache.persist().map(storage => TxOutputRefIndexStorage(Some(storage)))
+        case None        => Right(TxOutputRefIndexStorage(None))
       }
       subContractIndexStorage <- subContractIndexCache match {
         case Some(cache) => cache.persist().map(Some(_))
@@ -41,7 +41,7 @@ final case class CachedNodeIndexes(
       }
     } yield NodeIndexesStorage(
       logStorage,
-      TxOutputRefIndexStorage(txOutputRefIndexStorageValue),
+      txOutputRefIndexStorage,
       subContractIndexStorage
     )
   }

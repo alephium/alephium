@@ -4646,7 +4646,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val tx               = block.nonCoinbase.head
       val generatedOutputs = tx.generatedOutputs
       generatedOutputs.length is 2
-      val generatedOutput = generatedOutputs.last.asInstanceOf[ModelContractOutput]
+      val contractOutputIndex = generatedOutputs.indexWhere(_.isContract)
+      val generatedOutput = generatedOutputs(contractOutputIndex).asInstanceOf[ModelContractOutput]
       generatedOutput.tokens.head._2 is tokenAmount
 
       block.copy(
@@ -4654,7 +4655,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           0,
           tx.copy(
             generatedOutputs = generatedOutputs.replace(
-              1,
+              contractOutputIndex,
               generatedOutput.copy(tokens =
                 AVector((generatedOutput.tokens.head._1, newTokenAmount))
               )
