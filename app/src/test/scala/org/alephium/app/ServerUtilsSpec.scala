@@ -4730,6 +4730,25 @@ class ServerUtilsSpec extends AlephiumSpec {
     fork3ContractInput.hint is main4ContractInput.hint
     fork3ContractInput.tokens.head.amount is ALPH.alph(19)
     main4ContractInput.tokens.head.amount is ALPH.alph(15)
+
+    val contractOutputRef = ContractOutputRef.unsafe(
+      Hint.ofContract(LockupScript.p2c(contractId).scriptHint),
+      TxOutputRef.unsafeKey(fork3ContractInput.key)
+    )
+    serverUtils.getTxOutput(blockFlow, contractOutputRef, Some(fork2.hash)) isE Some(
+      ModelContractOutput(
+        amount = minimalAlphInContract,
+        lockupScript = LockupScript.p2c(contractId),
+        tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
+      )
+    )
+    serverUtils.getTxOutput(blockFlow, contractOutputRef, Some(main4.hash)) isE Some(
+      ModelContractOutput(
+        amount = minimalAlphInContract,
+        lockupScript = LockupScript.p2c(contractId),
+        tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
+      )
+    )
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {

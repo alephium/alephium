@@ -379,7 +379,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  private def getTxIndexForBlock(txId: TransactionId, blockHash: BlockHash): Option[TxIndex] = {
+  private[core] def getTxIndexForBlock(
+      txId: TransactionId,
+      blockHash: BlockHash
+  ): Option[TxIndex] = {
     txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
       txIndexes.indexes.find(index => index.hash == blockHash)
     }
