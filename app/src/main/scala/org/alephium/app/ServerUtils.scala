@@ -1660,13 +1660,13 @@ class ServerUtils(implicit
         if (contractIds.isEmpty) {
           wrapResult(blockFlow.getSubContractsCurrentCount(contractAddress.contractId)).flatMap {
             case None =>
-              Left(notFound(s"Sub-contracts for ${contractAddress}"))
+              Left(notFound(s"Sub-contracts of ${contractAddress}"))
             case Some(currentCount) if currentCount == start =>
               Right(SubContracts(AVector.empty, currentCount))
             case Some(currentCount) =>
               Left(
                 notFound(
-                  s"Current count for sub-contracts for ${contractAddress} is '$currentCount', sub-contracts start from '$start' with limit '$limit'"
+                  s"Current count for sub-contracts of ${contractAddress} is '$currentCount', sub-contracts start from '$start' with limit '$limit'"
                 )
               )
           }

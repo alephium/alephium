@@ -4923,10 +4923,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       1
     )
     serverUtils.getSubContracts(blockFlow, 2, 10, parentContractAddr).leftValue.detail is
-      s"Current count for sub-contracts for ${parentContractAddr} is '1', sub-contracts start from '2' with limit '10' not found"
+      s"Current count for sub-contracts of ${parentContractAddr} is '1', sub-contracts start from '2' with limit '10' not found"
 
     serverUtils.getSubContracts(blockFlow, 1, 10, subContractAddr).leftValue.detail is
-      s"Sub-contracts for ${subContractAddr} not found"
+      s"Sub-contracts of ${subContractAddr} not found"
   }
 
   it should "return contract events" in new ContractFixture {
