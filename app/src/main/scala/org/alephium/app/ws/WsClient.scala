@@ -16,70 +16,132 @@
 
 package org.alephium.app.ws
 
-import scala.concurrent.{ExecutionContext, Future}
+import java.util.concurrent.ConcurrentSkipListMap
 
-import io.vertx.core.{Handler, Vertx}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
+
+import com.typesafe.scalalogging.StrictLogging
+import io.vertx.core.Vertx
 import io.vertx.core.http.{WebSocket, WebSocketClient, WebSocketClientOptions}
 
+import org.alephium.app.ws.ClientWs.WsException
 import org.alephium.app.ws.WsParams.{SubscribeParams, WsCorrelationId}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json._
+import org.alephium.rpc.model.JsonRPC
+import org.alephium.rpc.model.JsonRPC.{Notification, Response}
 
-final class Ws(underlying: WebSocket) {
-
-  def isClosed: Boolean = underlying.isClosed
-
-  def close(): Future[Unit] = underlying.close().asScala.mapTo[Unit]
-
-  def writeTextMessage(message: String): Future[Unit] = {
-    underlying.writeTextMessage(message).asScala.mapTo[Unit]
-  }
-
-  def subscribeToBlock(id: WsCorrelationId): Future[Unit] = {
-    writeTextMessage(write(WsRequest.subscribe(id, SubscribeParams.Block)))
-  }
-
-  def subscribeToTx(id: WsCorrelationId): Future[Unit] = {
-    writeTextMessage(write(WsRequest.subscribe(id, SubscribeParams.Tx)))
-  }
-
-  def unsubscribeFromBlock(id: WsCorrelationId): Future[Unit] = {
-    writeTextMessage(write(WsRequest.unsubscribe(id, SubscribeParams.Block.subscriptionId)))
-  }
-
-  def unsubscribeFromTx(id: WsCorrelationId): Future[Unit] = {
-    writeTextMessage(write(WsRequest.unsubscribe(id, SubscribeParams.Tx.subscriptionId)))
-  }
-
-  def textMessageHandler(handler: String => Unit): Unit = {
-    val _ = underlying.textMessageHandler(new Handler[String] {
-      override def handle(message: String): Unit = handler(message)
-    })
-  }
+object ClientWs {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  final case class WsException(message: String, source: Option[Throwable] = None)
+      extends RuntimeException(message, source.orNull)
 }
 
-final class WsClient(underlying: WebSocketClient) {
+final case class WsClient(underlying: WebSocketClient) {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def connect(
       port: Int,
       host: String = "127.0.0.1",
       uri: String = "/ws"
-  )(implicit ec: ExecutionContext): Future[Ws] = {
+  )(notificationHandler: Notification => Unit)(implicit ec: ExecutionContext): Future[ClientWs] = {
     underlying
       .connect(port, host, uri)
       .asScala
-      .map(new Ws(_))
+      .map(underlying => ClientWs(underlying, notificationHandler))
   }
 }
 
 object WsClient {
 
   def apply(vertx: Vertx): WsClient = {
-    new WsClient(vertx.createWebSocketClient())
+    WsClient(vertx.createWebSocketClient())
   }
 
   def apply(vertx: Vertx, options: WebSocketClientOptions): WsClient = {
-    new WsClient(vertx.createWebSocketClient(options))
+    WsClient(vertx.createWebSocketClient(options))
   }
+}
+
+final case class ClientWs(underlying: WebSocket, notificationHandler: Notification => Unit)(implicit
+    ec: ExecutionContext
+) extends StrictLogging {
+
+  underlying.textMessageHandler((message: String) =>
+    Try(ujson.read(message)) match {
+      case Success(jsonMessage) =>
+        if (jsonMessage.obj.contains("method")) {
+          notificationHandler(read[Notification](jsonMessage))
+        } else if (jsonMessage.obj.contains("result") || jsonMessage.obj.contains("error")) {
+          handleResponse(jsonMessage)
+        } else {
+          logger.warn(s"Unsupported message: $message")
+        }
+      case Failure(_) =>
+        logger.warn(s"Unsupported message: $message")
+
+    }
+  )
+
+  private val ongoingRequests =
+    new ConcurrentSkipListMap[WsCorrelationId, Promise[Response]]().asScala
+
+  private def writeRequestToSocket(request: WsRequest): Future[Response] = {
+    if (ongoingRequests.contains(request.id.id)) {
+      Future.failed(WsException(s"Request with id ${request.id.id} already executed."))
+    } else {
+      val promise = Promise[Response]()
+      underlying
+        .writeTextMessage(write(request))
+        .asScala
+        .onComplete {
+          case Success(_) =>
+            ongoingRequests.put(request.id.id, promise)
+          case Failure(exception) =>
+            ongoingRequests.remove(request.id.id).foreach { _ =>
+              promise
+                .failure(
+                  WsException(
+                    s"Failed to write message with id ${request.id.id}: ${exception.getMessage}",
+                    Option(exception)
+                  )
+                )
+            }
+        }
+      promise.future
+    }
+  }
+
+  private def handleResponse(message: ujson.Value): Unit = {
+    read[Response](message) match {
+      case r @ JsonRPC.Response.Success(_, id) =>
+        ongoingRequests.remove(id).foreach(_.success(r))
+      case r @ JsonRPC.Response.Failure(_, Some(id)) =>
+        ongoingRequests.remove(id).foreach(_.success(r))
+      case JsonRPC.Response.Failure(ex, None) =>
+        logger.error(s"Response without id is not supported", ex)
+    }
+  }
+
+  def subscribeToBlock(id: WsCorrelationId): Future[Response] = {
+    writeRequestToSocket(WsRequest.subscribe(id, SubscribeParams.Block))
+  }
+
+  def subscribeToTx(id: WsCorrelationId): Future[Response] = {
+    writeRequestToSocket(WsRequest.subscribe(id, SubscribeParams.Tx))
+  }
+
+  def unsubscribeFromBlock(id: WsCorrelationId): Future[Response] = {
+    writeRequestToSocket(WsRequest.unsubscribe(id, SubscribeParams.Block.subscriptionId))
+  }
+
+  def unsubscribeFromTx(id: WsCorrelationId): Future[Response] = {
+    writeRequestToSocket(WsRequest.unsubscribe(id, SubscribeParams.Tx.subscriptionId))
+  }
+
+  def isClosed: Boolean = underlying.isClosed
+
+  def close(): Future[Unit] = underlying.close().asScala.mapTo[Unit]
 }

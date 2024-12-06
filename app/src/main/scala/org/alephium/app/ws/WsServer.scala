@@ -72,7 +72,7 @@ trait ServerWsLike {
   def reject(statusCode: Int): Unit
   def closeHandler(handler: () => Unit): ServerWsLike
   def textMessageHandler(handler: String => Unit): ServerWsLike
-  def writeTextMessage(msg: String)(implicit ec: ExecutionContext): Future[Unit]
+  def writeTextMessage(msg: String): Future[Unit]
 }
 
 final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
@@ -80,9 +80,8 @@ final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
   def textHandlerID(): WsId         = underlying.textHandlerID()
   def isClosed: Boolean             = underlying.isClosed
   def reject(statusCode: Int): Unit = underlying.reject(statusCode)
-  // Improved closeHandler accepting a simple () => Unit
   def closeHandler(handler: () => Unit): ServerWs = {
-    underlying.closeHandler((_: Void) => handler())
+    underlying.closeHandler(_ => handler())
     this
   }
 
@@ -91,6 +90,6 @@ final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
     this
   }
 
-  def writeTextMessage(msg: String)(implicit ec: ExecutionContext): Future[Unit] =
-    underlying.writeTextMessage(msg).asScala.map(_ => ())
+  def writeTextMessage(msg: String): Future[Unit] =
+    underlying.writeTextMessage(msg).asScala.mapTo[Unit]
 }

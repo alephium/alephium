@@ -16,6 +16,8 @@
 
 package org.alephium.app.ws
 
+import scala.concurrent.Future
+
 import akka.testkit.TestProbe
 import org.scalatest.Assertion
 import org.scalatest.Inside.inside
@@ -29,30 +31,29 @@ import org.alephium.app.ws.WsUtils._
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC
-import org.alephium.rpc.model.JsonRPC.{Error, NotificationUnsafe, Response}
+import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
 
 class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
   import org.alephium.app.ws.WsBehaviorFixture._
 
   it should "connect and subscribe multiple ws clients to multiple events" in new WsBehaviorFixture {
-    def subscribingRequestResponseBehavior(ws: Ws, clientProbe: TestProbe): Unit = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      (for {
-        _ <- ws.subscribeToBlock(0)
-        _ <- ws.subscribeToTx(1)
-      } yield ()).futureValue
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
+    def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+      for {
+        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)
+        blockSubscriptionResponse <- ws.subscribeToBlock(0)
+        txSubscriptionResponse    <- ws.subscribeToTx(1)
+      } yield {
+        inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
           result is ujson.Str(SubscribeParams.Block.subscriptionId)
           id is 0
-      }
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
+        }
+        inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
           result is ujson.Str(SubscribeParams.Tx.subscriptionId)
           id is 1
+        }
+        ws
       }
-      ()
     }
 
     def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
@@ -60,10 +61,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
     }
 
     def assertValidNotification(clientProbe: TestProbe): Assertion = {
-      val notification =
-        read[NotificationUnsafe](
-          clientProbe.expectMsgClass(classOf[String])
-        ).asNotification.rightValue
+      val notification = clientProbe.expectMsgClass(classOf[Notification])
       notification.method is WsMethod.SubscriptionMethod
       notification.params.obj.get("result").nonEmpty is true
       notification.params.obj.get("subscription").nonEmpty is true
@@ -81,7 +79,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
 
   it should "not spin ws connections over limit" in new WsBehaviorFixture {
     override def maxServerConnections: Int = 2
-    val wsSpec = WsStartBehavior((_, _) => (), _ => (), _ => true is true)
+    val wsSpec = WsStartBehavior(
+      _ => wsClient.connect(wsPort)(_ => ()),
+      _ => (),
+      _ => true is true
+    )
     checkWS(
       initBehaviors = AVector.fill(3)(wsSpec),
       nextBehaviors = AVector.empty,
@@ -90,28 +92,15 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
     )
   }
 
-  it should "connect and not subscribe multiple ws clients to any event" in new WsBehaviorFixture {
-    def clientInitBehavior(ws: Ws, clientProbe: TestProbe): Unit = {
-      val _ = ws.textMessageHandler(message => clientProbe.ref ! message)
-    }
-
-    val wsInitBehavior = WsStartBehavior(
-      clientInitBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 0),
-      _.expectNoMessage()
-    )
-    checkWS(
-      initBehaviors = AVector.fill(3)(wsInitBehavior),
-      nextBehaviors = AVector.empty,
-      expectedSubscriptions = 0,
-      openWebsocketsCount = 3
-    )
-  }
-
-  it should "handle invalid subscription and unsubscription requests with error" in new WsBehaviorFixture {
-    def invalidMessageBehavior(ws: Ws, clientProbe: TestProbe): Unit = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.writeTextMessage("invalid_msg").futureValue
+  it should "handle invalid messages with error" in new WsBehaviorFixture {
+    def invalidMessageBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+      for {
+        vertxWs <- wsClient.underlying.connect(wsPort, "127.0.0.1", "/ws").asScala
+        ws = ClientWs(vertxWs, _ => ())
+        // using underlying ws to test unexpected messages, WsClient does not allow that
+        _ = vertxWs.textMessageHandler(clientProbe.ref ! _)
+        _ <- vertxWs.writeTextMessage("invalid_msg").asScala
+      } yield ws
     }
 
     def assertParsingError(clientProbe: TestProbe): Assertion = {
@@ -121,8 +110,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
       }
     }
 
-    def invalidSubscriptionParamsBehavior(ws: Ws): Unit = {
-      ws.writeTextMessage(write(WsRequest.subscribe(1, SubscribeParams("")))).futureValue
+    def invalidSubscriptionParamsBehavior(ws: ClientWs): Future[Unit] = {
+      ws.underlying
+        .writeTextMessage(write(WsRequest.subscribe(1, SubscribeParams(""))))
+        .asScala
+        .mapTo[Unit]
     }
 
     def assertInvalidSubscription(clientProbe: TestProbe): Assertion = {
@@ -143,8 +135,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
       }
     }
 
-    def invalidUnsubscriptionParamsBehavior(ws: Ws): Unit = {
-      ws.writeTextMessage(write(WsRequest(Correlation(1), UnsubscribeParams("")))).futureValue
+    def invalidUnsubscriptionParamsBehavior(ws: ClientWs): Future[Unit] = {
+      ws.underlying
+        .writeTextMessage(write(WsRequest(Correlation(1), UnsubscribeParams(""))))
+        .asScala
+        .mapTo[Unit]
     }
 
     val wsInitBehavior = WsStartBehavior(invalidMessageBehavior, _ => (), assertParsingError)
@@ -162,30 +157,33 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
   }
 
   it should "handle unsubscribing from events" in new WsBehaviorFixture {
-    def subscribingBehavior(ws: Ws, clientProbe: TestProbe): Unit = {
-      ws.textMessageHandler(message => clientProbe.ref ! message)
-      ws.subscribeToBlock(0).futureValue
-    }
-    def assertCorrectSubscribeResponse(clientProbe: TestProbe): Assertion = {
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
+    def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+      for {
+        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)
+        blockSubscriptionResponse <- ws.subscribeToBlock(0)
+      } yield {
+        inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
           result is ujson.Str(SubscribeParams.Block.subscriptionId)
           id is 0
+        }
+        ws
       }
-      val notification =
-        read[NotificationUnsafe](
-          clientProbe.expectMsgClass(classOf[String])
-        ).asNotification.rightValue
+    }
+
+    def assertCorrectSubscribeResponse(clientProbe: TestProbe): Assertion = {
+      val notification = clientProbe.expectMsgClass(classOf[Notification])
       notification.method is WsMethod.SubscriptionMethod
       notification.params.obj.get("result").nonEmpty is true
       notification.params.obj.get("subscription").nonEmpty is true
     }
 
-    def assertCorrectUnsubscribeResponse(clientProbe: TestProbe): Assertion = {
-      inside(read[Response](clientProbe.expectMsgClass(classOf[String]))) {
-        case JsonRPC.Response.Success(result, id) =>
+    def unsubscribingBehavior(ws: ClientWs): Future[Unit] = {
+      ws.unsubscribeFromBlock(1).map { blockSubscriptionResponse =>
+        inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
           result is ujson.True
           id is 1
+        }
+        ()
       }
     }
 
@@ -195,9 +193,9 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
       assertCorrectSubscribeResponse
     )
     val wsNextBehavior = WsNextBehavior(
-      _.unsubscribeFromBlock(1).futureValue,
+      unsubscribingBehavior,
       _ ! BlockNotify(blockGen.sample.get, height = 1),
-      assertCorrectUnsubscribeResponse
+      _.expectNoMessage()
     )
     checkWS(
       initBehaviors = AVector.fill(1)(wsInitBehavior),

@@ -90,14 +90,24 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
     wsServer
   }
 
+  // scalastyle:off regex
+  def measureTime[T](operationName: String)(operation: => T): T = {
+    val startTime      = System.currentTimeMillis()
+    val result         = operation
+    val endTime        = System.currentTimeMillis()
+    val durationMillis = endTime - startTime
+    println(s"It took $durationMillis ms to execute $operationName")
+    result
+  }
+  // scalastyle:on regex
+
   def dummyServerWs(id: String): ServerWsLike = new ServerWsLike {
     override def textHandlerID(): WsId                                     = id
     override def isClosed: Boolean                                         = false
     override def reject(statusCode: Int): Unit                             = ()
     override def closeHandler(handler: () => Unit): ServerWsLike           = this
     override def textMessageHandler(handler: String => Unit): ServerWsLike = this
-    override def writeTextMessage(msg: String)(implicit ec: ExecutionContext): Future[Unit] =
-      Future.successful(())
+    override def writeTextMessage(msg: String): Future[Unit]               = Future.successful(())
   }
 
   def testSubscriptionHandlerInitialized(
@@ -179,9 +189,8 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
 
     val probedSockets =
       initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
-        val ws          = wsClient.connect(wsPort).futureValue
         val clientProbe = TestProbe()
-        startBehavior(ws, clientProbe)
+        val ws          = startBehavior(clientProbe).futureValue
         ws -> clientProbe
       }
 
@@ -193,7 +202,7 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
     }
     probedSockets.foreach { case (ws, clientProbe) =>
       nextBehaviors.foreach { case WsNextBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
-        behavior(ws)
+        behavior(ws).futureValue
         serverBehavior(node.eventBus)
         clientAssertionOnMsg(clientProbe)
       }
@@ -217,13 +226,13 @@ object WsBehaviorFixture {
 
   sealed trait WsBehavior
   final case class WsStartBehavior(
-      clientInitBehavior: (Ws, TestProbe) => Unit,
+      clientInitBehavior: TestProbe => Future[ClientWs],
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
       clientAssertionOnMsg: TestProbe => Any
   ) extends WsBehavior
 
   final case class WsNextBehavior(
-      clientInitBehavior: Ws => Unit,
+      clientInitBehavior: ClientWs => Future[Unit],
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
       clientAssertionOnMsg: TestProbe => Any
   ) extends WsBehavior

@@ -163,11 +163,13 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
   ): Unit = {
     Try(write(response)) match {
       case Success(responseStr) =>
-        val _ = ws
-          .writeTextMessage(responseStr)
-          .andThen { case Failure(exception) =>
-            log.warning(exception, s"Failed to respond with: $responseStr")
-          }
+        if (!ws.isClosed) {
+          val _ = ws
+            .writeTextMessage(responseStr)
+            .andThen { case Failure(exception) =>
+              log.warning(exception, s"Failed to respond with: $responseStr")
+            }
+        }
       case Failure(ex) =>
         log.warning(ex, s"Failed to serialize response: $response")
     }
