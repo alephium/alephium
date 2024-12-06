@@ -1393,8 +1393,8 @@ object Ast {
 
     def genMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
       state.setFuncScope(id)
-      val instrs    = body.flatMap(_.genCode(state))
-      val localVars = state.getLocalVars(id)
+      val instrs       = body.flatMap(_.genCode(state))
+      val localVarSize = state.getLocalVarSize(id)
 
       Method[Ctx](
         isPublic,
@@ -1402,7 +1402,7 @@ object Ast {
         useAssetsInContract != Ast.NotUseContractAssets,
         usePayToContractOnly = usePayToContractOnly,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
-        localsLength = localVars.length,
+        localsLength = localVarSize,
         returnLength = state.flattenTypeLength(rtypes),
         AVector.from(instrs)
       )

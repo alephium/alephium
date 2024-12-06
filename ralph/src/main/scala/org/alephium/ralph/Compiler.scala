@@ -738,7 +738,7 @@ object Compiler {
         inlineFuncStack.push(funcDef.id)
         allowSameVarName = true
         val initCodes = genInitCodeForInlineCall(args, argCodes, funcDef)
-        funcDef.body.foreach(_.check(this))
+        addLocalVarsExceptArgs(funcDef)
         val instrs0 = funcDef.body.flatMap(_.genCode(this))
         val instrs1 = if (instrs0.lastOption.contains(Return)) {
           instrs0.dropRight(1)
@@ -756,6 +756,40 @@ object Compiler {
         inlineFuncStack.pop()
         initCodes ++ bodyCodes
       }
+    }
+
+    private def addLocalVarsExceptArgs(func: Ast.FuncDef[Ctx]): Unit = {
+      val argNames = func.args.map(arg => scopedName(func.id, arg.ident.name))
+      varTable.view
+        .filterKeys(key =>
+          key.name.startsWith(scopedNamePrefix(func.id)) && !argNames.contains(key.name)
+        )
+        .collect { case (key, varInfo: VarInfo.Local) => (key, varInfo) }
+        .toSeq
+        .sortBy(_._2.index)
+        .foreach { case (key, varInfo) =>
+          val scopeRefs = key.scope.getScopeRefPath
+          addLocalVariable(scopeRefs, varInfo)
+        }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def addLocalVariable(scopeRefs: Seq[Ast.Positioned], varInfo: VarInfo.Local): Unit = {
+      if (scopeRefs.isEmpty) {
+        addLocalVariable(varInfo)
+      } else {
+        withScope(scopeRefs(0))(addLocalVariable(scopeRefs.drop(1), varInfo))
+      }
+    }
+
+    private def addLocalVariable(varInfo: VarInfo.Local): Unit = {
+      addLocalVariable(
+        varInfo.ident,
+        varInfo.tpe,
+        varInfo.isMutable,
+        varInfo.isUnused,
+        varInfo.isGenerated
+      )
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
@@ -1067,14 +1101,11 @@ object Compiler {
       }
     }
 
-    def getLocalVars(func: Ast.FuncId): Seq[VarInfo] = {
+    def getLocalVarSize(func: Ast.FuncId): Int = {
       varTable.view
-        .filterKeys(_.name.startsWith(func.name))
+        .filterKeys(_.name.startsWith(scopedNamePrefix(func)))
         .values
-        .filter(_.isInstanceOf[VarInfo.Local])
-        .map(_.asInstanceOf[VarInfo.Local])
-        .toSeq
-        .sortBy(_.index)
+        .count(_.isInstanceOf[VarInfo.Local])
     }
 
     def checkArrayIndexType(index: Ast.Expr[Ctx]): Unit = {
@@ -1267,14 +1298,12 @@ object Compiler {
     }
 
     def checkReturn(returnType: Seq[Type], sourceIndex: Option[SourceIndex]): Unit = {
-      if (phase == Phase.Check) {
-        val rtype = funcIdents(currentScope).returnType
-        if (returnType != resolveTypes(rtype)) {
-          throw Error(
-            s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
-            sourceIndex
-          )
-        }
+      val rtype = funcIdents(currentScope).returnType
+      if (returnType != resolveTypes(rtype)) {
+        throw Error(
+          s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
+          sourceIndex
+        )
       }
     }
   }
