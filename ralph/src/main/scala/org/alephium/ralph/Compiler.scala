@@ -565,6 +565,7 @@ object Compiler {
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]
     var allowDebug: Boolean                                = false
+    var genInlineCode: Boolean                             = false
     private var allowSameVarName: Boolean                  = false
     private val inlineFuncStack: mutable.Stack[Ast.FuncId] = mutable.Stack.empty
 

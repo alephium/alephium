@@ -8799,39 +8799,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Inline functions cannot have asset annotations")
-      def code(annotation: String) =
-        s"""
-           |Contract Foo() {
-           |  $annotation
-           |  @inline fn $$foo$$() -> () {
-           |    return
-           |  }
-           |}
-           |""".stripMargin
-
-      val annotations = Seq(
-        "@using(preapprovedAssets = true)",
-        "@using(preapprovedAssets = false)",
-        "@using(assetsInContract = true)",
-        "@using(assetsInContract = false)",
-        "@using(payToContractOnly = true)",
-        "@using(payToContractOnly = false)",
-        "@using(updateFields = true)",
-        "@using(updateFields = false)",
-        "@using(checkExternalCaller = true)",
-        "@using(checkExternalCaller = false)"
-      )
-      annotations.foreach { annotation =>
-        testContractError(
-          code(annotation),
-          "Inline functions cannot have the `using` annotation. Please add the `using` annotation to the non-inline caller function."
-        )
-      }
-      Compiler.compileContract(replace(code(""))).isRight is true
-    }
-
-    {
       info("Return an error if the inline function signature is inconsistent")
       def code(annotation: String) = {
         s"""
@@ -8872,8 +8839,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Check update fields in non-inline caller")
-      val code =
+      info("Check the updateFields annotation")
+      val code0 =
         s"""
            |Contract Foo(mut v: U256) {
            |  @inline fn foo() -> () {
@@ -8886,13 +8853,220 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      val compiled = compileContractFull(code).rightValue
-      compiled.warnings is AVector(
+      val compiled0 = compileContractFull(code0).rightValue
+      compiled0.warnings is AVector(
         Warning(
-          s"""Function "Foo.bar" updates fields. Please use "@using(updateFields = true)" for the function.""",
-          compiled.ast.funcs.find(_.name == "bar").flatMap(_.id.sourceIndex)
+          s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function.""",
+          compiled0.ast.funcs.find(_.name == "foo").flatMap(_.id.sourceIndex)
         )
       )
+
+      val code1 =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  @using(checkExternalCaller = false, updateFields = true)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled1 = compileContractFull(code1).rightValue
+      compiled1.warnings is AVector(
+        Warning(
+          s"""Function "Foo.bar" does not update fields. Please remove "@using(updateFields = true)" for the function.""",
+          compiled1.ast.funcs.find(_.name == "bar").flatMap(_.id.sourceIndex)
+        )
+      )
+
+      val code2 =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled2 = compileContractFull(code2).rightValue
+      compiled2.warnings.isEmpty is true
+    }
+
+    {
+      info("Check the brace syntax for inline function call")
+      val code: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(preapprovedAssets = true)
+           |  @inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    $$foo()$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Function `foo` needs preapproved assets, please use braces syntax")
+    }
+
+    {
+      info("Check the usePreapprovedAssets annotation")
+      val code0: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  $$@inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }$$
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code0,
+        "Function \"Foo.foo\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+
+      val code1: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(preapprovedAssets = true)
+           |  @inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }
+           |
+           |  $$pub fn bar() -> () {
+           |    foo{callerAddress!() -> ALPH: 1 alph}()
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code1,
+        "Function \"Foo.bar\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+
+      val code2: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(preapprovedAssets = true)
+           |  @inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn bar() -> () {
+           |    foo{callerAddress!() -> ALPH: 1 alph}()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code2).isRight is true
+    }
+
+    {
+      info("Check the assetsInContract annotation")
+      val code0: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  $$@inline fn foo() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }$$
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code0,
+        "Function \"Foo.foo\" uses contract assets, please use annotation `assetsInContract = true`."
+      )
+
+      val code1: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(assetsInContract = true)
+           |  @inline fn foo() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |
+           |  $$@using(assetsInContract = true)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code1,
+        "Function \"Foo.bar\" does not use contract assets, but the annotation `assetsInContract` is enabled. Please remove the `assetsInContract` annotation or set it to `enforced`"
+      )
+
+      val code2: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(assetsInContract = true)
+           |  @inline fn foo() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |
+           |  @using(assetsInContract = enforced)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code2).isRight is true
+    }
+
+    {
+      info("Check the checkExternalCaller annotation")
+      val code0: String =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled0 = compileContractFull(code0).rightValue
+      compiled0.warnings is AVector(
+        Warning(
+          s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)".""",
+          compiled0.ast.funcs.find(_.name == "bar").flatMap(_.id.sourceIndex)
+        )
+      )
+
+      val code1: String =
+        s"""
+           |Contract Foo(mut v: U256, owner: Address) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    checkCaller!(callerAddress!() == owner, 0)
+           |    v = v + 1
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled1 = compileContractFull(code1).rightValue
+      compiled1.warnings.isEmpty is true
     }
 
     {
@@ -9321,7 +9495,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val multiContract = Compiler.compileMultiContract(code).rightValue
       val state         = Compiler.State.buildFor(multiContract, 0)(CompilerOptions.Default)
-      val contract      = multiContract.contracts.head.asInstanceOf[Ast.Contract]
+      state.genInlineCode = true
+      val contract = multiContract.contracts.head.asInstanceOf[Ast.Contract]
       contract.check(state)
       contract.genCode(state)
       state.getLocalVarSize(Ast.FuncId("foo", false)) is 7

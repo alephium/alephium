@@ -642,7 +642,7 @@ object Ast {
           Seq(from, amount).flatMap(_.genCode(state)) :+ TransferAlphToSelf.asInstanceOf[Instr[Ctx]]
         case _ =>
           val func = getFunc(state)
-          if (func.inline) {
+          if (func.inline && state.genInlineCode) {
             func.genInlineCode(args, state, this)
           } else {
             val argsType = args.flatMap(_.getType(state))
@@ -1348,15 +1348,9 @@ object Ast {
       }
     }
 
-    private def checkInline(): Unit = {
+    @inline private def checkInline(): Unit = {
       if (isPublic) {
         throw Compiler.Error("Inline functions cannot be public", id.sourceIndex)
-      }
-      if (annotations.exists(_.id.name == FunctionUsingAnnotation.id)) {
-        throw Compiler.Error(
-          "Inline functions cannot have the `using` annotation. Please add the `using` annotation to the non-inline caller function.",
-          id.sourceIndex
-        )
       }
     }
 
@@ -2893,41 +2887,52 @@ object Ast {
           val state = states(index)
           contract.check(state)
           state.allowDebug = true
+          state.genInlineCode = false
           val statefulDebugContract = contract.genCode(state)
           (statefulDebugContract, contract, state, index)
       })
       StaticAnalysis.checkExternalCalls(this, states)
       val warnings = checkUnusedDefsInParentContract(states)
       val compiled = statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
-        val statefulContract = genReleaseCode(contract, statefulDebugContract, state)
+        val (inlinedDebugCode, inlinedReleaseCode) =
+          genInlineCode(contract, statefulDebugContract, state)
         StaticAnalysis.checkContract(contract, statefulDebugContract, state)
         val orderedFuncs = contract.nonInlineFuncs ++ contract.inlineFuncs
         CompiledContract(
-          statefulContract,
+          inlinedReleaseCode,
           contract.copy(funcs = orderedFuncs),
           state.getWarnings,
-          statefulDebugContract
+          inlinedDebugCode
         ) -> index
       }
       (warnings, compiled)
     }
 
-    def genReleaseCode(
+    def genInlineCode(
         contract: Contract,
         debugCode: StatefulContract,
         state: Compiler.State[StatefulContext]
-    ): StatefulContract = {
+    ): (StatefulContract, StatefulContract) = {
       val hasInlineFuncs = contract.inlineFuncs.nonEmpty
       val hasDebugCode   = debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))
-      if (!hasInlineFuncs && !hasDebugCode) {
+      val inlinedDebugCode = if (hasInlineFuncs) {
+        state.allowDebug = true
+        state.genInlineCode = true
+        contract.genCode(state)
+      } else {
         debugCode
+      }
+      val inlinedReleaseCode = if (!hasInlineFuncs && !hasDebugCode) {
+        inlinedDebugCode
       } else if (hasInlineFuncs && !hasDebugCode) {
-        val nonInlineMethods = debugCode.methods.dropRight(contract.inlineFuncs.length)
-        debugCode.copy(methods = nonInlineMethods)
+        val nonInlineMethods = inlinedDebugCode.methods.dropRight(contract.inlineFuncs.length)
+        inlinedDebugCode.copy(methods = nonInlineMethods)
       } else {
         state.allowDebug = false
+        state.genInlineCode = true
         contract.genCode(state)
       }
+      (inlinedDebugCode, inlinedReleaseCode)
     }
 
     def genStatefulContract(contractIndex: Int)(implicit

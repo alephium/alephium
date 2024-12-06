@@ -36,8 +36,9 @@ object StaticAnalysis {
       methods: AVector[vm.Method[vm.StatefulContext]],
       state: Compiler.State[vm.StatefulContext]
   ): Unit = {
-    assume(ast.nonInlineFuncs.length == methods.length)
-    ast.nonInlineFuncs.zip(methods.toIterable).foreach { case (func, method) =>
+    val funcs = ast.nonInlineFuncs ++ ast.inlineFuncs
+    assume(funcs.length == methods.length)
+    funcs.zip(methods.toIterable).foreach { case (func, method) =>
       checkUpdateFields(state, func, method)
       checkCodeUsingContractAssets(ast.ident, func, method)
       checkCodeUsingPayToContract(ast.ident, func, method)
@@ -60,8 +61,7 @@ object StaticAnalysis {
       state: Compiler.State[vm.StatefulContext]
   ): Unit = {
     checkMethodsStateless(ast, state)
-    val nonInlineMethods = code.methods.dropRight(ast.inlineFuncs.length)
-    checkMethodsStateful(ast, nonInlineMethods, state)
+    checkMethodsStateful(ast, code.methods, state)
   }
 
   def checkIfPrivateMethodsUsed[Ctx <: vm.StatelessContext](
