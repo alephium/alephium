@@ -822,21 +822,33 @@ class ServerUtils(implicit
     )
   }
 
-  def getEventsByContractId(
+  def getEventsByContractAddress(
       blockFlow: BlockFlow,
       start: Int,
       limit: Int,
-      contractId: ContractId
+      contractAddress: Address.Contract
   ): Try[ContractEvents] = {
-    wrapResult(
-      blockFlow
-        .getEvents(contractId, start, start + limit)
-        .map {
-          case (nextStart, logStatesVec) => {
-            ContractEvents.from(logStatesVec, nextStart)
+    wrapResult(blockFlow.getEvents(contractAddress.lockupScript.contractId, start, start + limit))
+      .flatMap {
+        case (nextStart, logStatesVec) => {
+          if (logStatesVec.isEmpty) {
+            wrapResult(blockFlow.getEventsCurrentCount(contractAddress.contractId)).flatMap {
+              case None =>
+                Left(notFound(s"Contract events of ${contractAddress}"))
+              case Some(currentCount) if currentCount == start =>
+                Right(ContractEvents.from(AVector.empty, nextStart))
+              case Some(currentCount) =>
+                Left(
+                  notFound(
+                    s"Current count for events of ${contractAddress} is '$currentCount', events start from '$start' with limit '$limit'"
+                  )
+                )
+            }
+          } else {
+            Right(ContractEvents.from(logStatesVec, nextStart))
           }
         }
-    )
+      }
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
