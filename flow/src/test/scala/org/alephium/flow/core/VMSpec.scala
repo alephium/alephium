@@ -6725,16 +6725,17 @@ class VMSpec extends AlephiumSpec with Generators {
     val foo =
       s"""
          |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
          |  @inline fn transfer() -> () {
          |    let caller = callerAddress!()
          |    assert!(caller == @$genesisAddress, 0)
          |    transferTokenToSelf!(caller, ALPH, 1 alph)
          |  }
          |
-         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    checkCaller!(callerAddress!() == @$genesisAddress, 0)
-         |    transfer()
+         |    transfer{callerAddress!() -> ALPH: 1 alph}()
          |  }
          |}
          |""".stripMargin

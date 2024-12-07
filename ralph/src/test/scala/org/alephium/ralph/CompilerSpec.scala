@@ -9541,4 +9541,65 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     contract1.methods(0).localsLength is 4
     contract1.methods(1).localsLength is 2
   }
+
+  it should "generate correct code for inline function caller" in {
+    val code =
+      s"""
+         |Contract Foo(address: Address) {
+         |  @using(assetsInContract = true)
+         |  @inline fn f0() -> () {
+         |    transferTokenFromSelf!(address, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(checkExternalCaller = false)
+         |  pub fn f1() -> () { f0() }
+         |
+         |  @inline fn f2() -> () { f0() }
+         |
+         |  fn f3() -> () { f2() }
+         |
+         |  @using(checkExternalCaller = false)
+         |  pub fn f4() -> () { f3() }
+         |
+         |  @using(assetsInContract = enforced)
+         |  @inline fn f5() -> () {
+         |    transferTokenFromSelf!(address, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(checkExternalCaller = false)
+         |  pub fn f6() -> () { f5() }
+         |
+         |  @using(payToContractOnly = true, preapprovedAssets = true)
+         |  @inline fn f7() -> () {
+         |    transferTokenToSelf!(address, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(checkExternalCaller = false, preapprovedAssets = true)
+         |  pub fn f8() -> () { f7{address -> ALPH: 1 alph}() }
+         |
+         |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = enforced)
+         |  pub fn f9() -> () { f7{address -> ALPH: 1 alph}() }
+         |}
+         |""".stripMargin
+    val compiled = compileContractFull(code).rightValue
+    compiled.warnings.isEmpty is true
+
+    def checkCompiledCode(methods: AVector[Method[StatefulContext]]) = {
+      methods(0).useContractAssets is true     // f1
+      methods(0).usePayToContractOnly is false // f1
+      methods(1).useContractAssets is true     // f3
+      methods(1).usePayToContractOnly is false // f3
+      methods(2).useContractAssets is false    // f4
+      methods(2).usePayToContractOnly is false // f4
+      methods(3).useContractAssets is true     // f6
+      methods(3).usePayToContractOnly is false // f6
+      methods(4).useContractAssets is false    // f8
+      methods(4).usePayToContractOnly is true  // f8
+      methods(5).useContractAssets is true     // f9
+      methods(5).usePayToContractOnly is false // f9
+    }
+
+    checkCompiledCode(compiled.debugCode.methods.dropRight(compiled.ast.inlineFuncs.length))
+    checkCompiledCode(compiled.code.methods)
+  }
 }

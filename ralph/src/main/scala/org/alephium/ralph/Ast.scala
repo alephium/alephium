@@ -2908,6 +2908,45 @@ object Ast {
       (warnings, compiled)
     }
 
+    private def getFuncUseContractAssetsInfo(
+        contract: Contract,
+        state: Compiler.State[StatefulContext]
+    ) = {
+      val useContractAssetsInfo = mutable.HashMap.empty[Int, Compiler.UseContractAssetsInfo]
+      state.inlineFuncsUseContractAssetsInfo.foreachEntry { case (funcId, info) =>
+        state.internalCallsReversed
+          .get(funcId)
+          .foreach(_.foreach { id =>
+            val func = state.getFunc(id)
+            if (!func.inline && !func.useContractAssetsInfo.useContractAssets) {
+              val index = contract.nonInlineFuncs.indexWhere(_.id == id)
+              assume(index != -1)
+              useContractAssetsInfo.addOne(index -> info)
+            }
+          })
+      }
+      useContractAssetsInfo
+    }
+
+    private def updateUseContractAssetsInfo(
+        code: StatefulContract,
+        infos: mutable.HashMap[Int, Compiler.UseContractAssetsInfo]
+    ) = {
+      val newMethods = code.methods.mapWithIndex { case (method, index) =>
+        infos.get(index) match {
+          case Some(info) =>
+            if (info.usePayToContractOnly) {
+              method.copy(usePayToContractOnly = true)
+            } else {
+              assume(info.useAssetsInContract.assetsEnabled)
+              method.copy(useContractAssets = true)
+            }
+          case _ => method
+        }
+      }
+      code.copy(methods = newMethods)
+    }
+
     def genInlineCode(
         contract: Contract,
         debugCode: StatefulContract,
@@ -2932,7 +2971,15 @@ object Ast {
         state.genInlineCode = true
         contract.genCode(state)
       }
-      (inlinedDebugCode, inlinedReleaseCode)
+      if (hasInlineFuncs) {
+        val infos = getFuncUseContractAssetsInfo(contract, state)
+        (
+          updateUseContractAssetsInfo(inlinedDebugCode, infos),
+          updateUseContractAssetsInfo(inlinedReleaseCode, infos)
+        )
+      } else {
+        (inlinedDebugCode, inlinedReleaseCode)
+      }
     }
 
     def genStatefulContract(contractIndex: Int)(implicit

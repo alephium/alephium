@@ -37,6 +37,8 @@ object BuiltIn {
 
     def isPublic: Boolean        = true
     def useUpdateFields: Boolean = false
+
+    def usePayToContractOnly: Boolean = false
   }
 
   sealed trait Category {
@@ -1918,6 +1920,7 @@ object BuiltIn {
     val usePreapprovedAssets: Boolean                     = false
     val useAssetsInContract: Ast.ContractAssetsAnnotation = Ast.NotUseContractAssets
     val useUpdateFields: Boolean                          = false
+    def usePayToContractOnly: Boolean                     = false
 
     override def isStatic: Boolean = true
 

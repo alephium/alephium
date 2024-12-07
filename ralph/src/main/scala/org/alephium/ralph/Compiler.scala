@@ -150,6 +150,10 @@ object Compiler {
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Ast.ContractAssetsAnnotation
+    def usePayToContractOnly: Boolean
+    def useContractAssetsInfo: UseContractAssetsInfo = {
+      UseContractAssetsInfo(useAssetsInContract, usePayToContractOnly)
+    }
     def useUpdateFields: Boolean
     def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
@@ -275,6 +279,7 @@ object Compiler {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Ast.ContractAssetsAnnotation,
+      usePayToContractOnly: Boolean,
       useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
@@ -348,6 +353,7 @@ object Compiler {
         func.isPublic,
         func.usePreapprovedAssets,
         func.useAssetsInContract,
+        func.usePayToContractOnly,
         func.useUpdateFields,
         func.args.map(_.tpe),
         func.rtypes,
@@ -513,7 +519,6 @@ object Compiler {
 
   trait CallGraph {
     def currentScope: Ast.FuncId
-    def variableScope: VariableScope
 
     // caller -> callees
     val internalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[Ast.FuncId]]
@@ -553,6 +558,13 @@ object Compiler {
   final case class ReadVariable(variable: VarKey)  extends AccessVariable
   final case class WriteVariable(variable: VarKey) extends AccessVariable
 
+  final case class UseContractAssetsInfo(
+      useAssetsInContract: Ast.ContractAssetsAnnotation,
+      usePayToContractOnly: Boolean
+  ) {
+    def useContractAssets: Boolean = useAssetsInContract.assetsEnabled || usePayToContractOnly
+  }
+
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext]
       extends CallGraph
@@ -572,6 +584,30 @@ object Compiler {
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
       hasInterfaceFuncCallSet.addOne(funcId)
+    }
+
+    private[ralph] val inlineFuncsUseContractAssetsInfo =
+      mutable.HashMap.empty[Ast.FuncId, UseContractAssetsInfo]
+
+    override def addInternalCall(callee: Ast.FuncId): Unit = {
+      super.addInternalCall(callee)
+      val infoInCache = inlineFuncsUseContractAssetsInfo.get(callee)
+      val callerFunc  = getFunc(currentScope)
+      infoInCache match {
+        case Some(info) =>
+          if (callerFunc.inline) {
+            inlineFuncsUseContractAssetsInfo.addOne(currentScope -> info)
+          }
+        case None =>
+          val calleeFunc = getFunc(callee)
+          val info       = calleeFunc.useContractAssetsInfo
+          if (calleeFunc.inline && info.useContractAssets) {
+            inlineFuncsUseContractAssetsInfo.addOne(callee -> info)
+            if (callerFunc.inline) {
+              inlineFuncsUseContractAssetsInfo.addOne(currentScope -> info)
+            }
+          }
+      }
     }
 
     def methodSelectorTable: immutable.Map[(Ast.TypeId, Ast.FuncId), Boolean]
