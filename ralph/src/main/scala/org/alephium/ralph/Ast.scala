@@ -2224,8 +2224,18 @@ object Ast {
       }
     }
 
-    def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
+    def genMethodsForNonInlineFuncs(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
       AVector.from(nonInlineFuncs.view.map(_.genMethod(state)))
+    }
+
+    def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
+      val nonInlineMethods = genMethodsForNonInlineFuncs(state)
+      if (state.allowDebug) {
+        val inlineMethods = inlineFuncs.map(_.genMethod(state))
+        nonInlineMethods ++ AVector.from(inlineMethods)
+      } else {
+        nonInlineMethods
+      }
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
@@ -2246,7 +2256,7 @@ object Ast {
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       state.setGenCodePhase()
       StatelessScript
-        .from(genMethods(state))
+        .from(genMethodsForNonInlineFuncs(state))
         .getOrElse(
           throw Compiler.Error(s"No methods found in ${quote(ident.name)}", ident.sourceIndex)
         )
@@ -2318,16 +2328,20 @@ object Ast {
           }
       }
       val newFuncs =
-        funcs.map(func => func.copy(bodyOpt = Some(templateVarDefs ++ func.body)).withOrigin(ident))
+        funcs.map(func =>
+          func
+            .copy(bodyOpt = Some(templateVarDefs ++ func.body))
+            .withOrigin(ident)
+            .atSourceIndex(func.sourceIndex)
+        )
       this.copy(funcs = newFuncs)
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       state.setGenCodePhase()
-      val methods = genMethods(state)
       StatefulScript
-        .from(methods)
+        .from(genMethods(state))
         .getOrElse(
           throw Compiler.Error(
             "Expected the 1st function to be public and the other functions to be private for tx script",
@@ -2336,11 +2350,17 @@ object Ast {
         )
     }
 
-    def genCodeFull(state: Compiler.State[StatefulContext]): StatefulScript = {
+    def genCodeFull(state: Compiler.State[StatefulContext]): (StatefulScript, StatefulScript) = {
       check(state)
-      val script = genCode(state)
-      StaticAnalysis.checkTxScript(this, script, state)
-      script
+      state.setGenDebugCode()
+      val debugCode = genCode(state)
+      StaticAnalysis.checkTxScript(this, debugCode, state)
+      if (inlineFuncs.isEmpty) {
+        (debugCode, debugCode)
+      } else {
+        state.setGenReleaseCode()
+        (debugCode, genCode(state))
+      }
     }
   }
 
@@ -2482,7 +2502,7 @@ object Ast {
       super.check(state)
     }
 
-    override def genMethods(
+    override def genMethodsForNonInlineFuncs(
         state: Compiler.State[StatefulContext]
     ): AVector[Method[StatefulContext]] = {
       val selectors = mutable.Map.empty[Method.Selector, FuncId]
@@ -2510,16 +2530,9 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val nonInlineMethods = genMethods(state)
-      val methods = if (state.allowDebug) {
-        val inlineMethods = inlineFuncs.map(_.genMethod(state))
-        nonInlineMethods ++ AVector.from(inlineMethods)
-      } else {
-        nonInlineMethods
-      }
       val fieldsLength =
         state.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
-      StatefulContract(fieldsLength, methods)
+      StatefulContract(fieldsLength, genMethods(state))
     }
 
     // the state must have been updated in the check pass
@@ -2740,11 +2753,9 @@ object Ast {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case script: TxScript =>
-          val statefulScript = script.genCodeFull(state)
-          val warnings       = state.getWarnings
-          state.allowDebug = true
-          val statefulDebugScript = script.genCode(state)
-          CompiledScript(statefulScript, script, warnings, statefulDebugScript)
+          val (debugCode, releaseCode) = script.genCodeFull(state)
+          val warnings                 = state.getWarnings
+          CompiledScript(releaseCode, script, warnings, debugCode)
         case c: Contract =>
           throw Compiler.Error(s"The code is for Contract, not for TxScript", c.sourceIndex)
         case ci: ContractInterface =>
@@ -2886,8 +2897,7 @@ object Ast {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state = states(index)
           contract.check(state)
-          state.allowDebug = true
-          state.genInlineCode = false
+          state.setGenDebugCode()
           val statefulDebugContract = contract.genCode(state)
           (statefulDebugContract, contract, state, index)
       })
@@ -2967,8 +2977,7 @@ object Ast {
         val nonInlineMethods = inlinedDebugCode.methods.dropRight(contract.inlineFuncs.length)
         inlinedDebugCode.copy(methods = nonInlineMethods)
       } else {
-        state.allowDebug = false
-        state.genInlineCode = true
+        state.setGenReleaseCode()
         contract.genCode(state)
       }
       if (hasInlineFuncs) {

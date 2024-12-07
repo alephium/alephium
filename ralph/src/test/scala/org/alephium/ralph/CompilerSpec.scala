@@ -7371,7 +7371,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     foo.funcs(0).methodSelector = Some(foo.funcs(1).getMethodSelector(multiContracts.globalState))
 
     val state = Compiler.State.buildFor(multiContracts, 0)(CompilerOptions.Default)
-    val error = intercept[Compiler.Error](foo.genMethods(state))
+    val error = intercept[Compiler.Error](foo.genMethodsForNonInlineFuncs(state))
     error.message is "Function bar's method selector conflicts with function foo's method selector. Please use a new function name."
     error.position is code.indexOf("$")
   }
@@ -9500,6 +9500,40 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract.check(state)
       contract.genCode(state)
       state.getLocalVarSize(Ast.FuncId("foo", false)) is 7
+    }
+
+    {
+      info("TxScript")
+      val code0 =
+        s"""
+           |TxScript Main(from: Address, to: Address) {
+           |  transfer()
+           |
+           |  $$@inline fn transfer() -> () {
+           |    transferToken!(from, to, ALPH, 1 alph)
+           |  }$$
+           |}
+           |""".stripMargin
+
+      testTxScriptError(
+        code0,
+        "Function \"Main.transfer\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+
+      val code1 =
+        s"""
+           |TxScript Main(from: Address, to: Address) {
+           |  transfer{from -> ALPH: 1 alph}()
+           |
+           |  @using(preapprovedAssets = true)
+           |  @inline fn transfer() -> () {
+           |    transferToken!(from, to, ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      val result = Compiler.compileTxScriptFull(code1).rightValue
+      result.debugCode.methods.length is 2
+      result.code.methods.length is 1
     }
   }
 

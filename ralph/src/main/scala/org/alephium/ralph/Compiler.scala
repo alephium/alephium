@@ -577,9 +577,19 @@ object Compiler {
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]
     var allowDebug: Boolean                                = false
-    var genInlineCode: Boolean                             = false
+    var genInlineCode: Boolean                             = true
     private var allowSameVarName: Boolean                  = false
     private val inlineFuncStack: mutable.Stack[Ast.FuncId] = mutable.Stack.empty
+
+    def setGenDebugCode(): Unit = {
+      allowDebug = true
+      genInlineCode = false
+    }
+
+    def setGenReleaseCode(): Unit = {
+      allowDebug = false
+      genInlineCode = true
+    }
 
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
