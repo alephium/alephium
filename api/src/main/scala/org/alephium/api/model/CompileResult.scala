@@ -52,7 +52,7 @@ object CompileScriptResult {
       bytecodeTemplate,
       CompileProjectResult.diffPatch(bytecodeTemplate, bytecodeDebugTemplate),
       fields = fields,
-      functions = AVector.from(scriptAst.nonInlineFuncs.view.map(CompileResult.FunctionSig.from)),
+      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
       warnings = compiled.warnings.map(_.message)
     )
   }

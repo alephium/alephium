@@ -2965,7 +2965,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "not return inline functions" in new Fixture {
+  it should "return inline functions" in new Fixture {
     val serverUtils = new ServerUtils()
     val rawCode =
       s"""
@@ -2988,9 +2988,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val query  = Compile.Project(rawCode)
     val result = serverUtils.compileProject(query).rightValue
     result.contracts.length is 1
-    result.contracts.head.functions.length is 1
+    result.contracts.head.functions.length is 2
     result.scripts.length is 1
-    result.scripts.head.functions.length is 1
+    result.scripts.head.functions.length is 2
   }
 
   it should "compile contract and return the std id field" in new Fixture {
