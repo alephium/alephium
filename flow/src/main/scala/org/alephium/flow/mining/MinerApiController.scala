@@ -31,9 +31,9 @@ import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce, Target}
 import org.alephium.serde.{avectorSerde, serialize, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex, TimeStamp}
 
 object MinerApiController {
   def props(allHandlers: AllHandlers)(implicit
@@ -65,6 +65,13 @@ object MinerApiController {
     override def handleNewMessage(message: ClientMessage): Unit = {
       context.parent ! Received(message)
     }
+  }
+
+  private[mining] def getCacheKey(headerBlob: ByteString): ByteString = {
+    val length = TimeStamp.byteLength + Target.byteLength
+    assume(headerBlob.length > length)
+    val targetBytes = headerBlob.takeRight(Target.byteLength)
+    headerBlob.dropRight(length) ++ targetBytes
   }
 }
 
@@ -161,7 +168,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     jobs.foreachWithIndex { case (job, index) =>
       val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
       val txsBlob  = serialize(template.transactions)
-      jobCache.put(job.headerBlob, template -> txsBlob)
+      jobCache.put(MinerApiController.getCacheKey(job.headerBlob), template -> txsBlob)
     }
   }
 
@@ -170,7 +177,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
       val blockHash = PoW.hash(header)
       val headerKey = header.drop(Nonce.byteLength)
-      jobCache.get(headerKey) match {
+      jobCache.get(MinerApiController.getCacheKey(headerKey)) match {
         case Some((template, txBlob)) =>
           val blockBytes = header ++ txBlob
           if (ChainIndex.from(blockHash) != template.index) {

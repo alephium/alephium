@@ -27,6 +27,7 @@ import io.prometheus.client.CollectorRegistry
 import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
+import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
 
 import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
@@ -40,7 +41,7 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
-import org.alephium.http.EndpointSender
+import org.alephium.http.{EndpointSender, Metrics}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
@@ -394,6 +395,20 @@ trait EndpointsLogic extends Endpoints {
     bt => bt.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
+  val buildTransferFromOneToManyGroupsLogic = serverLogicRedirect(buildTransferFromOneToManyGroups)(
+    transferRequest =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils
+            .buildTransferFromOneToManyGroups(
+              blockFlow,
+              transferRequest
+            )
+        )
+      },
+    bt => bt.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
+  )
+
   val buildMultisigLogic = serverLogicRedirect(buildMultisig)(
     buildMultisig =>
       withSyncedClique {
@@ -707,6 +722,10 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
+  val contractCodeLogic = serverLogic(contractCode) { codeHash =>
+    Future.successful(serverUtils.getContractCode(blockFlow, codeHash))
+  }
+
   val testContractLogic = serverLogic(testContract) { (testContract: TestContract) =>
     val (blockFlow, storages) = BlockFlow.emptyAndStoragesUnsafe(node.config)
     Future.successful {
@@ -809,11 +828,11 @@ trait EndpointsLogic extends Endpoints {
     {
       case (contractAddress, counterRange, _) => {
         Future.successful {
-          serverUtils.getEventsByContractId(
+          serverUtils.getEventsByContractAddress(
             blockFlow,
             counterRange.start,
             counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
-            contractAddress.lockupScript.contractId
+            contractAddress
           )
         }
       }
@@ -864,6 +883,7 @@ trait EndpointsLogic extends Endpoints {
       val writer: Writer = new StringWriter()
       try {
         TextFormat.write004(writer, CollectorRegistry.defaultRegistry.metricFamilySamples())
+        writer.write(prometheusRegistryCodec.encode(Metrics.defaultRegistry))
         Right(writer.toString)
       } catch {
         case error: Throwable =>

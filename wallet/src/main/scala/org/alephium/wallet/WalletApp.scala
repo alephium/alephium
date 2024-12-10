@@ -65,6 +65,7 @@ class WalletApp(config: WalletConfig)(implicit
     new WalletServer(
       walletService,
       config.blockflow.blockflowFetchMaxAge,
+      config.enableHttpMetrics,
       config.apiKey
     )
 

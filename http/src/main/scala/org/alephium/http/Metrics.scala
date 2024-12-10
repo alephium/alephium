@@ -16,22 +16,22 @@
 
 package org.alephium.http
 
-import sttp.tapir.server.vertx.VertxFutureServerOptions
+import scala.concurrent.Future
 
-import org.alephium.api.DecodeFailureHandler
+import io.prometheus.metrics.model.registry.PrometheusRegistry
+import sttp.tapir.server.metrics.MetricLabels
+import sttp.tapir.server.metrics.prometheus.PrometheusMetrics
 
-object ServerOptions extends DecodeFailureHandler {
-  def serverOptions(enableMetrics: Boolean): VertxFutureServerOptions = {
-    val customiseInterceptors = VertxFutureServerOptions.customiseInterceptors
-      .decodeFailureHandler(
-        myDecodeFailureHandler
-      )
-    if (enableMetrics) {
-      customiseInterceptors
-        .metricsInterceptor(Metrics.prometheus.metricsInterceptor())
-        .options
-    } else {
-      customiseInterceptors.options
-    }
-  }
+object Metrics {
+  val defaultRegistry: PrometheusRegistry = PrometheusRegistry.defaultRegistry
+  val namespace                           = "alephium"
+  val prometheus: PrometheusMetrics[Future] = PrometheusMetrics[Future](
+    namespace = namespace,
+    registry = defaultRegistry,
+    metrics = List(
+      PrometheusMetrics.requestTotal(defaultRegistry, namespace, MetricLabels.Default),
+      PrometheusMetrics.requestDuration(defaultRegistry, namespace, MetricLabels.Default),
+      PrometheusMetrics.requestActive(defaultRegistry, namespace, MetricLabels.Default)
+    )
+  )
 }

@@ -45,7 +45,8 @@ final case class ApiConfig(
     apiKey: AVector[ApiKey],
     gasFeeCap: U256,
     defaultUtxosLimit: Int,
-    maxFormBufferedBytes: Int
+    maxFormBufferedBytes: Int,
+    enableHttpMetrics: Boolean
 )
 
 object ApiConfig extends StrictLogging {
@@ -83,7 +84,8 @@ object ApiConfig extends StrictLogging {
         apiKeys,
         as[U256]("gasFeeCap"),
         as[Int]("defaultUtxosLimit"),
-        as[Int]("maxFormBufferedBytes")
+        as[Int]("maxFormBufferedBytes"),
+        as[Option[Boolean]]("enableHttpMetrics").getOrElse(false)
       )
     }
 

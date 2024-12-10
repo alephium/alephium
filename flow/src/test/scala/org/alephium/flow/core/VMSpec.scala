@@ -6672,12 +6672,13 @@ class VMSpec extends AlephiumSpec with Generators {
     subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
     blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
     blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
-
-    blockFlow
-      .getSubContractIds(parentContractId, 0, 5)
-      .leftValue
-      .reason
-      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
+    blockFlow.getSubContractIds(parentContractId, 0, 5) isE (4, AVector.from(subContracts))
+    blockFlow.getSubContractIds(parentContractId, 2, 5) isE (4, AVector.from(
+      subContractId5 +: subContracts678
+    ))
+    blockFlow.getSubContractIds(parentContractId, 3, 10) isE (4, AVector.from(subContracts678))
+    blockFlow.getSubContractIds(parentContractId, 4, 10) isE (4, AVector.empty)
+    blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
   // Inactive instrs check will be enabled in future upgrades
@@ -6764,6 +6765,84 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     testSimpleScript(script)
+  }
+
+  it should "be able to use assets in the inline function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @inline fn transfer() -> () {
+         |    let caller = callerAddress!()
+         |    assert!(caller == @$genesisAddress, 0)
+         |    transferTokenToSelf!(caller, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> () {
+         |    checkCaller!(callerAddress!() == @$genesisAddress, 0)
+         |    transfer{callerAddress!() -> ALPH: 1 alph}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val fooId = createCompiledContract(compiled.code)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo{@$genesisAddress -> ALPH: 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is ALPH.oneAlph.addUnsafe(minimalAlphInContract)
+  }
+
+  it should "call multiple inline functions that use contract assets" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(checkExternalCaller = false, preapprovedAssets = true)
+         |  pub fn f0() -> () {
+         |    f1{callerAddress!() -> ALPH: 2 alph}()
+         |    f2()
+         |  }
+         |
+         |  @using(payToContractOnly = true, preapprovedAssets = true)
+         |  @inline fn f1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 2 alph)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  @inline fn f2() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val initialAlphAmount = ALPH.alph(2)
+    val fooId = createCompiledContract(compiled.code, initialAttoAlphAmount = initialAlphAmount)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.f0{@$genesisAddress -> ALPH: 2 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
   }
 
   private def getEvents(
