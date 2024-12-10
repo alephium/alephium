@@ -669,8 +669,13 @@ object BuiltIn {
     def getReturnType[C <: StatelessContext](
         inputType: Seq[Type],
         state: Compiler.State[C]
-    ): Seq[Type] =
-      Seq(Type.ByteVec)
+    ): Seq[Type] = {
+      if (inputType.isEmpty) {
+        throw Error(s"Builtin func $name expects at least one argument", None)
+      } else {
+        Seq(Type.ByteVec)
+      }
+    }
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(Encode)
 

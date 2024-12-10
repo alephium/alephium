@@ -647,7 +647,7 @@ object Ast {
           } else {
             val argsType = args.flatMap(_.getType(state))
             val variadicInstrs = if (func.isVariadic) {
-              Seq(U256Const(Val.U256.unsafe(args.length)))
+              Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
             } else {
               Seq.empty
             }
