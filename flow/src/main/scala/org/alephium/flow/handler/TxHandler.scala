@@ -23,7 +23,7 @@ import akka.actor.Props
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.flow.handler.TxHandler.{AddToMemPoolResult, FailedValidation}
 import org.alephium.flow.io.PendingTxStorage
 import org.alephium.flow.mempool.MemPool
@@ -227,12 +227,12 @@ final class TxHandler(
     case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing, isLocalTx) =>
       if (!memPoolSetting.autoMineForDev) {
         if (isIntraCliqueSyncing) {
-          txs.foreach(handleIntraCliqueSyncingTx(_, acknowledge = true))
+          txs.foreach(handleIntraCliqueSyncingTx)
         } else {
           txs.foreach(handleInterCliqueTx(_, acknowledge = true, cacheOrphanTx = !isLocalTx))
         }
       } else {
-        mineTxsForDev(txs, acknowledge = true)
+        mineTxsForDev(txs)
       }
     case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
     case TxHandler.BroadcastTxs         => broadcastTxs()
@@ -287,7 +287,7 @@ trait TxCoreHandler extends TxHandlerUtils {
   def blockFlow: BlockFlow
   implicit def brokerConfig: BrokerConfig
   def outgoingTxBuffer: Cache[TransactionTemplate, Unit]
-
+  def eventBus: ActorRefT[EventBus.Message]
   def cleanOrphanTxFrequency: Duration
   def orphanTxExpiryDuration: Duration
 
@@ -330,6 +330,7 @@ trait TxCoreHandler extends TxHandlerUtils {
   }
 
   private def handleValidTx(tx: TransactionTemplate): Unit = {
+    eventBus ! TxNotify(tx)
     outgoingTxBuffer.put(tx, ())
     val orphanPool = blockFlow.getGrandPool().orphanPool
     if (orphanPool.contains(tx.id)) {
@@ -338,16 +339,10 @@ trait TxCoreHandler extends TxHandlerUtils {
     }
   }
 
-  def handleIntraCliqueSyncingTx(tx: TransactionTemplate, acknowledge: Boolean): Unit = {
+  def handleIntraCliqueSyncingTx(tx: TransactionTemplate): Unit = {
     val chainIndex = tx.chainIndex
     assume(brokerConfig.isIncomingChain(chainIndex))
-    val addedToMemPool =
-      blockFlow.getMemPool(chainIndex.to).addXGroupTx(chainIndex, tx, TimeStamp.now())
-    if (addedToMemPool) {
-      sendResponse(acknowledge, TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool))
-    } else {
-      sendResponse(acknowledge, TxHandler.ProcessedByMemPool(tx, MemPool.AlreadyExisted))
-    }
+    blockFlow.getMemPool(chainIndex.to).addXGroupTx(chainIndex, tx, TimeStamp.now())
   }
 
 }
@@ -417,22 +412,22 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
 
 trait AutoMineHandler extends TxCoreHandler {
   def blockFlow: BlockFlow
-  def eventBus: ActorRefT[EventBus.Message]
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
-  def mineTxsForDev(txs: AVector[TransactionTemplate], acknowledge: Boolean): Unit = {
+  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(error) =>
-          sendResponse(acknowledge, FailedValidation(tx, error))
+          sendResponse(acknowledge = true, FailedValidation(tx, error))
         case Right(_) =>
           TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
             case Left(error) =>
-              sendResponse(acknowledge, TxHandler.FailedInternally(tx, error))
+              sendResponse(acknowledge = true, TxHandler.FailedInternally(tx, error))
             case Right(_) =>
+              eventBus ! TxNotify(tx)
               sendResponse(
-                acknowledge,
+                acknowledge = true,
                 TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool)
               )
           }

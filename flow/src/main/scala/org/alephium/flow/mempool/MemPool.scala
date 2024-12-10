@@ -149,16 +149,13 @@ class MemPool private (
       index: ChainIndex,
       tx: TransactionTemplate,
       timestamp: TimeStamp
-  ): Boolean =
+  ): Unit =
     writeOnly {
       if (!_contains(tx.id)) {
         assume(index.from != group)
         val children = sharedTxIndexes.addXGroupTx(tx, tx => flow.unsafe(tx.id))
         flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, None, children))
         timestamps.put(tx.id, timestamp)
-        true
-      } else {
-        false
       }
     }
 

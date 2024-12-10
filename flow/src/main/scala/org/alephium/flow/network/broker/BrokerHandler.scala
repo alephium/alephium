@@ -210,7 +210,6 @@ trait BrokerHandler extends FlowDataHandler {
       log.debug(s"Invalid header received ${hash.shortHex}")
       handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
     case cmdResponse: AddToMemPoolResult =>
-      // TODO place to add jsonRPC notifications for AddedToMemPool
       log.debug(s"${cmdResponse.message}")
   }
 
