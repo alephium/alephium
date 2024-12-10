@@ -824,21 +824,33 @@ class ServerUtils(implicit
     )
   }
 
-  def getEventsByContractId(
+  def getEventsByContractAddress(
       blockFlow: BlockFlow,
       start: Int,
       limit: Int,
-      contractId: ContractId
+      contractAddress: Address.Contract
   ): Try[ContractEvents] = {
-    wrapResult(
-      blockFlow
-        .getEvents(contractId, start, start + limit)
-        .map {
-          case (nextStart, logStatesVec) => {
-            ContractEvents.from(logStatesVec, nextStart)
+    wrapResult(blockFlow.getEvents(contractAddress.lockupScript.contractId, start, start + limit))
+      .flatMap {
+        case (nextStart, logStatesVec) => {
+          if (logStatesVec.isEmpty) {
+            wrapResult(blockFlow.getEventsCurrentCount(contractAddress.contractId)).flatMap {
+              case None =>
+                Left(notFound(s"Contract events of ${contractAddress}"))
+              case Some(currentCount) if currentCount == start =>
+                Right(ContractEvents.from(AVector.empty, nextStart))
+              case Some(currentCount) =>
+                Left(
+                  notFound(
+                    s"Current count for events of ${contractAddress} is '$currentCount', events start from '$start' with limit '$limit'"
+                  )
+                )
+            }
+          } else {
+            Right(ContractEvents.from(logStatesVec, nextStart))
           }
         }
-    )
+      }
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
@@ -1656,14 +1668,25 @@ class ServerUtils(implicit
       limit: Int,
       contractAddress: Address.Contract
   ): Try[SubContracts] = {
-    for {
-      result <- wrapResult(
-        blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
-          case (nextStart, contractIds) =>
-            SubContracts(contractIds.map(Address.contract), nextStart)
+    wrapResult(blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit))
+      .flatMap { case (nextStart, contractIds) =>
+        if (contractIds.isEmpty) {
+          wrapResult(blockFlow.getSubContractsCurrentCount(contractAddress.contractId)).flatMap {
+            case None =>
+              Left(notFound(s"Sub-contracts of ${contractAddress}"))
+            case Some(currentCount) if currentCount == start =>
+              Right(SubContracts(AVector.empty, currentCount))
+            case Some(currentCount) =>
+              Left(
+                notFound(
+                  s"Current count for sub-contracts of ${contractAddress} is '$currentCount', sub-contracts start from '$start' with limit '$limit'"
+                )
+              )
+          }
+        } else {
+          Right(SubContracts(contractIds.map(Address.contract), nextStart))
         }
-      )
-    } yield result
+      }
   }
 
   def getSubContractsCurrentCount(

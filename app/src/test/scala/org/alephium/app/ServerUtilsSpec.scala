@@ -4988,13 +4988,60 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(subContractAddr),
       1
     )
-    serverUtils
-      .getSubContracts(blockFlow, 1, 2, parentContractAddr)
-      .leftValue
-      .detail
-      .contains(
-        s"Can not find sub-contracts for ${parentContractId.toHexString} at count 1"
-      ) is true
+    serverUtils.getSubContracts(blockFlow, 1, 100, parentContractAddr) isE SubContracts(
+      AVector.empty,
+      1
+    )
+    serverUtils.getSubContracts(blockFlow, 2, 10, parentContractAddr).leftValue.detail is
+      s"Current count for sub-contracts of ${parentContractAddr} is '1', sub-contracts start from '2' with limit '10' not found"
+
+    serverUtils.getSubContracts(blockFlow, 1, 10, subContractAddr).leftValue.detail is
+      s"Sub-contracts of ${subContractAddr} not found"
+  }
+
+  it should "return contract events" in new ContractFixture {
+    val contractCode: String =
+      s"""
+         |Contract Foo() {
+         |  event TestEvent(a: U256)
+         |
+         |  pub fn testEvent() -> () {
+         |    emit TestEvent(5)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId      = createContract(contractCode)._1
+    val contractAddress = Address.contract(contractId)
+
+    val scriptCode: String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.testEvent()
+         |}
+         |$contractCode
+         |""".stripMargin
+
+    val block = executeScript(scriptCode)
+    val txId  = block.nonCoinbase.head.id
+
+    serverUtils.getEventsForContractCurrentCount(blockFlow, contractAddress) isE 1
+    serverUtils.getEventsByContractAddress(blockFlow, 0, 1, contractAddress) isE ContractEvents(
+      AVector(ContractEvent(block.hash, txId, 0, AVector(ValU256(U256.unsafe(5))))),
+      1
+    )
+    serverUtils.getEventsByContractAddress(blockFlow, 0, 10, contractAddress) isE ContractEvents(
+      AVector(ContractEvent(block.hash, txId, 0, AVector(ValU256(U256.unsafe(5))))),
+      1
+    )
+    serverUtils.getEventsByContractAddress(blockFlow, 2, 10, contractAddress).leftValue.detail is
+      s"Current count for events of ${contractAddress} is '1', events start from '2' with limit '10' not found"
+
+    val randomAddress = Address.contract(ContractId.random)
+    serverUtils.getEventsByContractAddress(blockFlow, 2, 10, randomAddress).leftValue.detail is
+      s"Contract events of ${randomAddress} not found"
   }
 
   it should "return error when node.indexes.subcontract-index is not enabled" in new SubContractIndexesFixture {
