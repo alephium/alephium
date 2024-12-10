@@ -16,22 +16,24 @@
 
 package org.alephium.http
 
-import sttp.tapir.server.vertx.VertxFutureServerOptions
+import scala.concurrent.Future
 
-import org.alephium.api.DecodeFailureHandler
+import sttp.tapir.server.interceptor.metrics.MetricsRequestInterceptor
 
-object ServerOptions extends DecodeFailureHandler {
-  def serverOptions(enableMetrics: Boolean): VertxFutureServerOptions = {
-    val customiseInterceptors = VertxFutureServerOptions.customiseInterceptors
-      .decodeFailureHandler(
-        myDecodeFailureHandler
-      )
-    if (enableMetrics) {
-      customiseInterceptors
-        .metricsInterceptor(Metrics.prometheus.metricsInterceptor())
-        .options
-    } else {
-      customiseInterceptors.options
+import org.alephium.util.AlephiumSpec
+
+class ServerOptionsSpec extends AlephiumSpec {
+  "ServerOptions" should "enable metrics based on the config" in {
+    def checkMetrics(enableMetrics: Boolean) = {
+      ServerOptions
+        .serverOptions(enableMetrics)
+        .interceptors
+        .exists(
+          _.isInstanceOf[MetricsRequestInterceptor[Future]]
+        ) is enableMetrics
     }
+
+    checkMetrics(true)
+    checkMetrics(false)
   }
 }

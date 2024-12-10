@@ -227,6 +227,22 @@ object UnsignedTransaction {
     } yield gasPrice * gas
   }
 
+  def buildTxOutputs(
+      fromLockupScript: LockupScript.Asset,
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputInfos: AVector[TxOutputInfo],
+      gas: GasBox,
+      gasPrice: GasPrice
+  ): Either[String, (AVector[AssetOutput], AVector[AssetOutput])] = {
+    for {
+      gasFee <- preCheckBuildTx(inputs, gas, gasPrice)
+      _      <- checkMinimalAlphPerOutput(outputInfos)
+      _      <- checkTokenValuesNonZero(outputInfos)
+      txOutputs = buildOutputs(outputInfos)
+      changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
+    } yield txOutputs -> changeOutputs
+  }
+
   def buildTransferTx(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
@@ -235,21 +251,50 @@ object UnsignedTransaction {
       gas: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
-    for {
-      gasFee <- preCheckBuildTx(inputs, gas, gasPrice)
-      _      <- checkMinimalAlphPerOutput(outputInfos)
-      _      <- checkTokenValuesNonZero(outputInfos)
-      txOutputs = buildOutputs(outputInfos)
-      changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
-    } yield {
-      UnsignedTransaction(
-        None,
-        gas,
-        gasPrice,
-        buildInputs(fromUnlockScript, inputs),
-        txOutputs ++ changeOutputs
-      )
-    }
+    buildTxOutputs(fromLockupScript, inputs, outputInfos, gas, gasPrice)
+      .map { case (txOutputs, changeOutputs) =>
+        UnsignedTransaction(
+          None,
+          gas,
+          gasPrice,
+          buildInputs(fromUnlockScript, inputs),
+          txOutputs ++ changeOutputs
+        )
+      }
+  }
+
+  def buildTransferTxAndReturnChange(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      outputInfos: AVector[TxOutputInfo],
+      gas: GasBox,
+      gasPrice: GasPrice
+  )(implicit
+      networkConfig: NetworkConfig
+  ): Either[String, (UnsignedTransaction, AVector[(AssetOutputRef, AssetOutput)])] = {
+    buildTxOutputs(fromLockupScript, inputs, outputInfos, gas, gasPrice)
+      .map { case (txOutputs, changeOutputs) =>
+        val outputs = txOutputs ++ changeOutputs
+        val tx =
+          UnsignedTransaction(
+            None,
+            gas,
+            gasPrice,
+            buildInputs(fromUnlockScript, inputs),
+            outputs
+          )
+        var changeOutputIndex = txOutputs.length
+        val changeOutputsRefs = changeOutputs.map { changeOutput =>
+          val ref = AssetOutputRef.from(
+            changeOutput,
+            TxOutputRef.key(tx.id, changeOutputIndex)
+          )
+          changeOutputIndex += 1
+          ref -> changeOutput
+        }
+        tx -> changeOutputsRefs
+      }
   }
 
   def buildOutputs(outputInfos: AVector[TxOutputInfo]): AVector[AssetOutput] = {
@@ -442,7 +487,7 @@ object UnsignedTransaction {
       failCondition = outputs.exists { output =>
         output.attoAlphAmount < dustUtxoAmount
       },
-      "Not enough ALPH for transaction output"
+      "Tx output value is too small, avoid spreading dust"
     )
   }
 

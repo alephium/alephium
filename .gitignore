@@ -5,6 +5,10 @@ hs_err_*
 
 .bloop
 .metals
+.idea
+.bsp
+.ralph-lsp/
+.vscode/
 project/.bloop
 project/project
 project/metals.sbt

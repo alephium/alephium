@@ -22,6 +22,7 @@ import scala.util.Random
 
 import akka.util.ByteString
 import org.scalacheck.Gen
+import org.scalatest.Assertion
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
@@ -37,6 +38,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
@@ -55,14 +57,17 @@ class ServerUtilsSpec extends AlephiumSpec {
     val peerPort             = generatePort()
     val address              = new InetSocketAddress("127.0.0.1", peerPort)
     val blockflowFetchMaxAge = Duration.zero
-    implicit val apiConfig: ApiConfig = ApiConfig(
+
+    def utxosLimitInApiConfig: Int = defaultUtxosLimit
+    implicit lazy val apiConfig: ApiConfig = ApiConfig(
       networkInterface = address.getAddress,
       blockflowFetchMaxAge = blockflowFetchMaxAge,
       askTimeout = Duration.ofMinutesUnsafe(1),
       AVector.empty,
       ALPH.oneAlph,
-      defaultUtxosLimit,
-      128
+      utxosLimitInApiConfig,
+      128,
+      enableHttpMetrics = true
     )
   }
 
@@ -71,6 +76,96 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
+
+  trait TransferFromOneToManyGroupsFixture extends FlowFixtureWithApi with GetTxFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils: ServerUtils = new ServerUtils
+
+    implicit lazy val bf: BlockFlow = blockFlow
+
+    val (genesisPrivateKey_0, genesisPublicKey_0, _) = genesisKeys(0)
+    val (genesisPrivateKey_1, genesisPublicKey_1, _) = genesisKeys(1)
+    val (genesisPrivateKey_2, genesisPublicKey_2, _) = genesisKeys(2)
+
+    // scalastyle:off method.length
+    def testTransferFromOneToManyGroups(
+        fromPrivateKey: PrivateKey,
+        fromPublicKey: PublicKey,
+        senderInputsCount: Int,
+        destinations: AVector[Destination]
+    )(
+        expectedSenderUtxosCount: Int,
+        expectedDestUtxosCount: Int,
+        expectedDestBalance: U256,
+        expectedTxsCount: Int
+    ): Assertion = {
+      val (inputs, initialSenderBalance) =
+        prepareUtxos(fromPrivateKey, fromPublicKey, Some(senderInputsCount))
+      val outputRefs =
+        Option(inputs).filter(_.nonEmpty).map(_.map(output => OutputRef.from(output.ref)))
+      val transactionResults = serverUtils
+        .buildTransferFromOneToManyGroups(
+          blockFlow,
+          BuildTransferTx(
+            fromPublicKey.bytes,
+            None,
+            destinations,
+            outputRefs
+          )
+        )
+        .rightValue
+
+      val confirmedBlocks =
+        transactionResults.map { txResult =>
+          val chainIndex = txResult.chainIndex().get
+          val template =
+            signAndAddToMemPool(
+              txResult.txId,
+              txResult.unsignedTx,
+              chainIndex,
+              fromPrivateKey
+            )
+          val block = mineFromMemPool(blockFlow, chainIndex)
+          addAndCheck(blockFlow, block)
+          if (!chainIndex.isIntraGroup) {
+            // To confirm the transaction so its cross-chain output can be used
+            addAndCheck(
+              blockFlow,
+              emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
+            )
+          }
+          val txStatus =
+            serverUtils.getTransactionStatus(blockFlow, template.id, chainIndex).rightValue
+          txStatus.isInstanceOf[Confirmed] is true
+          block.transactions.foreach(checkTx(blockFlow, _, chainIndex))
+          block
+        }
+
+      val txs = confirmedBlocks.flatMap(_.nonCoinbase)
+      txs.length is expectedTxsCount
+      txs.map(_.outputsLength - 1).sum is destinations.length
+      val outputs =
+        destinations.map(d =>
+          TxOutputInfo(d.address.lockupScript, d.attoAlphAmount.value, AVector.empty, Option.empty)
+        )
+
+      val (actualUtxoCount, actualBalance) = getTotalUtxoCountsAndBalance(blockFlow, outputs)
+      actualUtxoCount is expectedDestUtxosCount
+      actualBalance is expectedDestBalance
+
+      val txsFee = txs.map(_.gasFeeUnsafe.v).sum
+      val senderHasSpent =
+        U256.from(destinations.map(_.attoAlphAmount.value.v).sum).get + U256.from(txsFee).get
+      val expectedSenderBalanceWithGas = initialSenderBalance - senderHasSpent
+      checkAddressBalance(
+        Address.p2pkh(fromPublicKey),
+        expectedSenderBalanceWithGas,
+        expectedSenderUtxosCount
+      )
+    }
+  }
+  // scalastyle:on method.length
 
   trait GetTxFixture {
     def brokerConfig: BrokerConfig
@@ -242,6 +337,135 @@ class ServerUtilsSpec extends AlephiumSpec {
       checkDestinationBalance(destination1)
       checkDestinationBalance(destination2)
     }
+  }
+
+  "transfer-from-one-to-many-groups" should "support inputs auto-selection" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 0,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "support providing inputs" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 2,
+      destinations
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "support fewer inputs than provided outputs" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(ChainIndex.unsafe(0, 1), ChainIndex.unsafe(0, 2)).map(generateDestination(_))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 2,
+      expectedDestBalance = ALPH.oneAlph * 2,
+      expectedTxsCount = 2
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "split too many destinations into more txs" in new TransferFromOneToManyGroupsFixture {
+    val destinations_1 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 1)))
+    val destinations_2 = AVector.fill(257)(generateDestination(ChainIndex.unsafe(0, 2)))
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 2,
+      destinations_1 ++ destinations_2
+    )(
+      expectedSenderUtxosCount = 2,
+      expectedDestUtxosCount = 514,
+      expectedDestBalance = ALPH.oneAlph * 514,
+      expectedTxsCount = 4
+    )
+  }
+
+  "transfer-from-one-to-many-groups" should "fail in case gas amount is passed by user" in new TransferFromOneToManyGroupsFixture {
+    serverUtils
+      .buildTransferFromOneToManyGroups(
+        blockFlow,
+        BuildTransferTx(
+          genesisPublicKey_0.bytes,
+          None,
+          AVector(
+            generateDestination(ChainIndex.unsafe(0, 0))
+          ),
+          None,
+          Some(GasBox.unsafe(1)),
+          Some(GasPrice(1))
+        )
+      )
+      .leftValue
+      .detail is "Explicit gas amount is not permitted, transfer-from-one-to-many-groups requires gas estimation."
+  }
+
+  "transfer-from-one-to-many-groups" should "work across all groups" in new TransferFromOneToManyGroupsFixture {
+    val destinations =
+      AVector(0, 1, 2).map { groupIndex =>
+        Destination(
+          Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2),
+          Amount(ALPH.oneAlph)
+        )
+      }
+
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_0,
+      genesisPublicKey_0,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 3,
+      expectedDestBalance = ALPH.oneAlph * 3,
+      expectedTxsCount = 3
+    )
+
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_1,
+      genesisPublicKey_1,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 6,
+      expectedDestBalance = ALPH.oneAlph * 6,
+      expectedTxsCount = 3
+    )
+
+    testTransferFromOneToManyGroups(
+      genesisPrivateKey_2,
+      genesisPublicKey_2,
+      senderInputsCount = 1,
+      destinations
+    )(
+      expectedSenderUtxosCount = 1,
+      expectedDestUtxosCount = 9,
+      expectedDestBalance = ALPH.oneAlph * 9,
+      expectedTxsCount = 3
+    )
   }
 
   it should "support Schnorr address" in new Fixture {
@@ -547,12 +771,51 @@ class ServerUtilsSpec extends AlephiumSpec {
           None,
           None,
           nonCoinbaseMinGasPrice,
-          targetBlockHash
+          targetBlockHash,
+          None
         )
         .rightValue
       txs.length is 1
       txs.head
     }
+  }
+
+  it should "respect the `utxosLimit` config" in new FlowFixtureWithApi {
+    override def utxosLimitInApiConfig: Int = 4
+
+    def checkInputSize(rawTx: String, expectedInputSize: Int) = {
+      val unsignedTx = deserialize[UnsignedTransaction](Hex.unsafe(rawTx)).rightValue
+      unsignedTx.inputs.length is expectedInputSize
+    }
+
+    val serverUtils = new ServerUtils
+    val groupIndex  = GroupIndex.unsafe(0)
+    val genesisKey  = genesisKeys(groupIndex.value)._1
+    val pubKey      = groupIndex.generateKey._2
+    (0 until 6).foreach { _ =>
+      val block = transfer(blockFlow, genesisKey, pubKey, ALPH.oneAlph)
+      addAndCheck(blockFlow, block)
+    }
+    val lockupScript = LockupScript.p2pkh(pubKey)
+    blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 6
+
+    val params0 =
+      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(2))
+    val result0 = serverUtils.buildSweepAddressTransactions(blockFlow, params0).rightValue
+    result0.unsignedTxs.length is 1
+    checkInputSize(result0.unsignedTxs.head.unsignedTx, 2)
+
+    val params1 =
+      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = None)
+    val result1 = serverUtils.buildSweepAddressTransactions(blockFlow, params1).rightValue
+    result1.unsignedTxs.length is 1
+    checkInputSize(result1.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
+
+    val params2 =
+      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(6))
+    val result2 = serverUtils.buildSweepAddressTransactions(blockFlow, params2).rightValue
+    result2.unsignedTxs.length is 1
+    checkInputSize(result2.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
   }
 
   "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixtureWithApi {
@@ -680,7 +943,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
-  it should "validate unsigned transaction" in new Fixture with TxInputGenerators {
+  it should "validate unsigned transactions" in new Fixture with TxInputGenerators {
 
     val tooMuchGasFee = UnsignedTransaction(
       DefaultTxVersion,
@@ -1354,6 +1617,14 @@ class ServerUtilsSpec extends AlephiumSpec {
         mutFields: AVector[vm.Val]
     ): (Block, ContractId) = {
       val contract = Compiler.compileContract(code).rightValue
+      createContract(contract, immFields, mutFields)
+    }
+
+    def createContract(
+        contract: vm.StatefulContract,
+        immFields: AVector[vm.Val],
+        mutFields: AVector[vm.Val]
+    ): (Block, ContractId) = {
       val script =
         contractCreation(contract, immFields, mutFields, lockupScript, minimalAlphInContract)
       val block      = executeScript(script, None)
@@ -2692,6 +2963,34 @@ class ServerUtilsSpec extends AlephiumSpec {
         serverUtils.compileScript(query.copy(compilerOptions = Some(compilerOptions))).rightValue
       newResult.warnings.isEmpty is true
     }
+  }
+
+  it should "return inline functions" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val rawCode =
+      s"""
+         |Contract Foo() {
+         |  @inline fn foo() -> U256 {
+         |    return 0
+         |  }
+         |  pub fn bar() -> U256 {
+         |    return foo()
+         |  }
+         |}
+         |TxScript Main(foo: Foo) {
+         |  baz()
+         |  foo.bar()
+         |
+         |  @inline fn baz() -> () {}
+         |}
+         |""".stripMargin
+
+    val query  = Compile.Project(rawCode)
+    val result = serverUtils.compileProject(query).rightValue
+    result.contracts.length is 1
+    result.contracts.head.functions.length is 2
+    result.scripts.length is 1
+    result.scripts.head.functions.length is 2
   }
 
   it should "compile contract and return the std id field" in new Fixture {
@@ -4689,13 +4988,60 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(subContractAddr),
       1
     )
-    serverUtils
-      .getSubContracts(blockFlow, 1, 2, parentContractAddr)
-      .leftValue
-      .detail
-      .contains(
-        s"Can not find sub-contracts for ${parentContractId.toHexString} at count 1"
-      ) is true
+    serverUtils.getSubContracts(blockFlow, 1, 100, parentContractAddr) isE SubContracts(
+      AVector.empty,
+      1
+    )
+    serverUtils.getSubContracts(blockFlow, 2, 10, parentContractAddr).leftValue.detail is
+      s"Current count for sub-contracts of ${parentContractAddr} is '1', sub-contracts start from '2' with limit '10' not found"
+
+    serverUtils.getSubContracts(blockFlow, 1, 10, subContractAddr).leftValue.detail is
+      s"Sub-contracts of ${subContractAddr} not found"
+  }
+
+  it should "return contract events" in new ContractFixture {
+    val contractCode: String =
+      s"""
+         |Contract Foo() {
+         |  event TestEvent(a: U256)
+         |
+         |  pub fn testEvent() -> () {
+         |    emit TestEvent(5)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId      = createContract(contractCode)._1
+    val contractAddress = Address.contract(contractId)
+
+    val scriptCode: String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.testEvent()
+         |}
+         |$contractCode
+         |""".stripMargin
+
+    val block = executeScript(scriptCode)
+    val txId  = block.nonCoinbase.head.id
+
+    serverUtils.getEventsForContractCurrentCount(blockFlow, contractAddress) isE 1
+    serverUtils.getEventsByContractAddress(blockFlow, 0, 1, contractAddress) isE ContractEvents(
+      AVector(ContractEvent(block.hash, txId, 0, AVector(ValU256(U256.unsafe(5))))),
+      1
+    )
+    serverUtils.getEventsByContractAddress(blockFlow, 0, 10, contractAddress) isE ContractEvents(
+      AVector(ContractEvent(block.hash, txId, 0, AVector(ValU256(U256.unsafe(5))))),
+      1
+    )
+    serverUtils.getEventsByContractAddress(blockFlow, 2, 10, contractAddress).leftValue.detail is
+      s"Current count for events of ${contractAddress} is '1', events start from '2' with limit '10' not found"
+
+    val randomAddress = Address.contract(ContractId.random)
+    serverUtils.getEventsByContractAddress(blockFlow, 2, 10, randomAddress).leftValue.detail is
+      s"Contract events of ${randomAddress} not found"
   }
 
   it should "return error when node.indexes.subcontract-index is not enabled" in new SubContractIndexesFixture {
@@ -4917,6 +5263,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     executeScript(s"${Int.MaxValue}").isRight is true
     executeScript(s"${Int.MaxValue.toLong + 1L}").leftValue.detail is
       "Execution error when emulating tx script or contract: Invalid error code 2147483648: The error code cannot exceed the maximum value for int32 (2147483647)"
+  }
+
+  it should "get contract code" in new ContractFixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val statefulContract = Compiler.compileContract(code).rightValue
+    val codeHash         = statefulContract.hash
+    serverUtils.getContractCode(blockFlow, codeHash).leftValue.detail is
+      s"Contract code hash: ${codeHash.toHexString} not found"
+    createContract(code, AVector.empty, AVector.empty)._2
+    serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
   }
 
   @scala.annotation.tailrec
