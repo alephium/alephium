@@ -9094,9 +9094,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def check(code: String, expected: AVector[Instr[StatefulContext]]) = {
       val compiled = Compiler.compileContractFull(code).rightValue
       val ast      = compiled.ast
-      compiled.debugCode.methods.length is ast.funcs.length
-      ast.funcs.slice(0, ast.nonInlineFuncs.length).foreach(_.inline is false)
-      ast.funcs.slice(ast.nonInlineFuncs.length, ast.funcs.length).foreach(_.inline is true)
+      compiled.debugCode.methods.length is ast.orderedFuncs.length
+      ast.orderedFuncs.slice(0, ast.nonInlineFuncs.length).foreach(_.inline is false)
+      ast.orderedFuncs
+        .slice(ast.nonInlineFuncs.length, ast.orderedFuncs.length)
+        .foreach(_.inline is true)
 
       val methods = compiled.code.methods
       methods.length is compiled.ast.nonInlineFuncs.length

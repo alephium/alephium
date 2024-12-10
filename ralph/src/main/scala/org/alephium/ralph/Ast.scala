@@ -2142,6 +2142,7 @@ object Ast {
     def funcs: Seq[FuncDef[Ctx]]
     lazy val nonInlineFuncs: Seq[FuncDef[Ctx]] = funcs.filterNot(_.inline)
     lazy val inlineFuncs: Seq[FuncDef[Ctx]]    = funcs.filter(_.inline)
+    lazy val orderedFuncs: Seq[FuncDef[Ctx]]   = nonInlineFuncs ++ inlineFuncs
 
     def name: String = ident.name
 
@@ -2355,7 +2356,9 @@ object Ast {
       state.setGenDebugCode()
       val debugCode = genCode(state)
       StaticAnalysis.checkTxScript(this, debugCode, state)
-      if (inlineFuncs.isEmpty) {
+      if (
+        inlineFuncs.isEmpty && !debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))
+      ) {
         (debugCode, debugCode)
       } else {
         state.setGenReleaseCode()
@@ -2907,10 +2910,9 @@ object Ast {
         val (inlinedDebugCode, inlinedReleaseCode) =
           genInlineCode(contract, statefulDebugContract, state)
         StaticAnalysis.checkContract(contract, statefulDebugContract, state)
-        val orderedFuncs = contract.nonInlineFuncs ++ contract.inlineFuncs
         CompiledContract(
           inlinedReleaseCode,
-          contract.copy(funcs = orderedFuncs),
+          contract,
           state.getWarnings,
           inlinedDebugCode
         ) -> index
