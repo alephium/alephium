@@ -3887,10 +3887,41 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "encode values" in new ContractFixture {
     val foo: String =
       s"""
+         |struct Struct1 {
+         |  a: Bool,
+         |  b: U256,
+         |  c: Bool
+         |}
+         |
+         |struct Struct2 {
+         |  a: Bool,
+         |  b: [U256; 2]
+         |}
+         |
+         |struct Struct3 {
+         |  a: Bool,
+         |  b: Struct2
+         |}
+         |
          |Contract Foo() {
          |  pub fn foo() -> () {
-         |    let bytes = encodeToByteVec!(true, 1, false)
-         |    assert!(bytes == #03000102010000, 0)
+         |    let struct1 = Struct1 { a: true, b: 1, c: false }
+         |    let struct1Bytes = encodeToByteVec!(struct1)
+         |    assert!(struct1Bytes == #03000102010000, 0)
+         |
+         |    let struct2 = Struct2 { a: true, b: [1, 2] }
+         |    let struct2Bytes = encodeToByteVec!(struct2)
+         |    assert!(struct2Bytes == #03000102010202, 1)
+         |
+         |    let struct3 = Struct3 { a: true, b: struct2 }
+         |    let struct3Bytes = encodeToByteVec!(struct3)
+         |    assert!(struct3Bytes == #040001000102010202, 3)
+         |
+         |    let allStructs = encodeToByteVec!(struct1, struct2, struct3)
+         |    assert!(allStructs == #0a0001020100000001020102020001000102010202, 4)
+         |
+         |    let bytes = encodeToByteVec!(true, 1, false, [1, 2], struct3)
+         |    assert!(bytes == #09000102010000020102020001000102010202, 5)
          |  }
          |}
          |""".stripMargin
@@ -3905,29 +3936,6 @@ class VMSpec extends AlephiumSpec with Generators {
          |$foo
          |""".stripMargin
     testSimpleScript(main)
-  }
-
-  it should "return compilation error when encoding struct" in new ContractFixture {
-    val foo =
-      s"""
-         |struct Bar {
-         |  a: Bool,
-         |  b: U256,
-         |  c: Bool
-         |}
-         |
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    let bytes1 = encodeToByteVec!(true)
-         |    assert!(bytes1 == #010000, 0)
-         |    let bar = Bar { a: true, b: 1, c: false }
-         |    let bytes2 = encodeToByteVec!(bar)
-         |    assert!(bytes2 == #010000, 0)
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileContract(foo).leftValue.getMessage is
-      """Invalid args type "List(Bar)" for builtin func encodeToByteVec, only primitive types are supported"""
   }
 
   it should "return compilation error when encoding nothing" in new ContractFixture {
