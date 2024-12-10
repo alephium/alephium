@@ -2965,6 +2965,34 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "return inline functions" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val rawCode =
+      s"""
+         |Contract Foo() {
+         |  @inline fn foo() -> U256 {
+         |    return 0
+         |  }
+         |  pub fn bar() -> U256 {
+         |    return foo()
+         |  }
+         |}
+         |TxScript Main(foo: Foo) {
+         |  baz()
+         |  foo.bar()
+         |
+         |  @inline fn baz() -> () {}
+         |}
+         |""".stripMargin
+
+    val query  = Compile.Project(rawCode)
+    val result = serverUtils.compileProject(query).rightValue
+    result.contracts.length is 1
+    result.contracts.head.functions.length is 2
+    result.scripts.length is 1
+    result.scripts.head.functions.length is 2
+  }
+
   it should "compile contract and return the std id field" in new Fixture {
     def code(contractAnnotation: String, interfaceAnnotation: String) =
       s"""
