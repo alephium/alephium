@@ -1654,7 +1654,7 @@ object Ast {
     def validateAsFirstField(): EnumField[Ctx] = {
       value match {
         case Some(v) =>
-          EnumField(ident, v)
+          EnumField(ident, v).atSourceIndex(sourceIndex)
         case None =>
           throw Compiler.Error(
             s"Enum field ${ident.name} must have explicit value",

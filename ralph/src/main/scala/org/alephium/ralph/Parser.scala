@@ -620,14 +620,14 @@ abstract class Parser[Ctx <: StatelessContext] {
         rawFields.tail.foreach(_.validate(id.name, firstField.value.v))
 
         val fields = if (firstField.value.v.tpe != Val.U256) {
-          rawFields.map { case Ast.RawEnumField(ident, valueOpt) =>
-            Ast.EnumField(ident, valueOpt.get)
+          rawFields.map { case rawField @ Ast.RawEnumField(ident, valueOpt) =>
+            Ast.EnumField(ident, valueOpt.get).atSourceIndex(rawField.sourceIndex)
           }
         } else {
           val (_, allFields) =
             rawFields.tail.foldLeft(
               (firstField.value.v.asInstanceOf[Val.U256].v, Seq(firstField))
-            ) { case ((currentValue, fields), Ast.RawEnumField(ident, valueOpt)) =>
+            ) { case ((currentValue, fields), rawField @ Ast.RawEnumField(ident, valueOpt)) =>
               val (newValue, value) = valueOpt match {
                 case Some(v) => (v.v.asInstanceOf[Val.U256].v, v)
                 case None =>
@@ -644,7 +644,7 @@ abstract class Parser[Ctx <: StatelessContext] {
                     Ast.Const[Ctx](Val.U256(nextValue)).atSourceIndex(ident.sourceIndex)
                   )
               }
-              (newValue, fields :+ Ast.EnumField(ident, value))
+              (newValue, fields :+ Ast.EnumField(ident, value).atSourceIndex(rawField.sourceIndex))
             }
           allFields
         }
