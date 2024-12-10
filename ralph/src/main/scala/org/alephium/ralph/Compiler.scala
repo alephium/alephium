@@ -149,11 +149,10 @@ object Compiler {
     def isPublic: Boolean
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
-    def useAssetsInContract: Ast.ContractAssetsAnnotation
-    def usePayToContractOnly: Boolean
-    def useContractAssetsInfo: UseContractAssetsInfo = {
-      UseContractAssetsInfo(useAssetsInContract, usePayToContractOnly)
-    }
+    def useAssetsInContract: Ast.ContractAssetsAnnotation =
+      useContractAssetsInfo.useAssetsInContract
+    def usePayToContractOnly: Boolean = useContractAssetsInfo.usePayToContractOnly
+    def useContractAssetsInfo: UseContractAssetsInfo
     def useUpdateFields: Boolean
     def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
@@ -278,8 +277,7 @@ object Compiler {
       funcDef: Ast.FuncDef[Ctx],
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Ast.ContractAssetsAnnotation,
-      usePayToContractOnly: Boolean,
+      useContractAssetsInfo: UseContractAssetsInfo,
       useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
@@ -352,8 +350,7 @@ object Compiler {
         func,
         func.isPublic,
         func.usePreapprovedAssets,
-        func.useAssetsInContract,
-        func.usePayToContractOnly,
+        UseContractAssetsInfo(func.useAssetsInContract, func.usePayToContractOnly),
         func.useUpdateFields,
         func.args.map(_.tpe),
         func.rtypes,
