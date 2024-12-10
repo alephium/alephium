@@ -2922,29 +2922,25 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def calcUseContractAssetsInfo(
-        cache: mutable.HashMap[FuncId, Option[Compiler.UseContractAssetsInfo]],
+        cacheForInlineFuncs: mutable.HashMap[FuncId, Compiler.UseContractAssetsInfo],
         funcId: FuncId,
         state: Compiler.State[StatefulContext]
-    ): Option[Compiler.UseContractAssetsInfo] = {
-      cache.get(funcId) match {
-        case None =>
-          val info = state.getFunc(funcId).useContractAssetsInfo
-          val result = if (info.useContractAssets) {
-            Some(info)
-          } else {
-            state.internalCalls.get(funcId).flatMap { callees =>
-              callees.view
-                .filter(id => state.getFunc(id).inline)
-                .map(id => calcUseContractAssetsInfo(cache, id, state))
-                .collect { case Some(info) => info }
-                .foldLeft[Option[Compiler.UseContractAssetsInfo]](None)((acc, info) => {
-                  acc.map(_.merge(info)).orElse(Some(info))
-                })
-            }
-          }
-          cache.addOne(funcId -> result)
-          result
-        case Some(info) => info
+    ): Compiler.UseContractAssetsInfo = {
+      val info = state.getFunc(funcId).useContractAssetsInfo
+      if (info.useContractAssets) {
+        info
+      } else {
+        state.internalCalls.get(funcId) match {
+          case Some(callees) =>
+            callees.view
+              .filter(id => state.getFunc(id).inline)
+              .map(id =>
+                cacheForInlineFuncs
+                  .getOrElseUpdate(id, calcUseContractAssetsInfo(cacheForInlineFuncs, id, state))
+              )
+              .foldLeft(info)(_ merge _)
+          case None => info
+        }
       }
     }
 
@@ -2952,17 +2948,18 @@ object Ast {
         contract: Contract,
         state: Compiler.State[StatefulContext]
     ) = {
-      val cache = mutable.HashMap.empty[FuncId, Option[Compiler.UseContractAssetsInfo]]
-      contract.nonInlineFuncs.view
-        .map(func => calcUseContractAssetsInfo(cache, func.id, state))
-        .zipWithIndex
-        .collect { case (Some(info), index) => (index, info) }
-        .toMap
+      val cacheForInlineFuncs = mutable.HashMap.empty[FuncId, Compiler.UseContractAssetsInfo]
+      val result              = mutable.HashMap.empty[Int, Compiler.UseContractAssetsInfo]
+      contract.nonInlineFuncs.view.zipWithIndex.foreach { case (func, index) =>
+        val info = calcUseContractAssetsInfo(cacheForInlineFuncs, func.id, state)
+        if (info.useContractAssets) result.addOne(index -> info)
+      }
+      result
     }
 
     private def updateUseContractAssetsInfo(
         code: StatefulContract,
-        infos: Map[Int, Compiler.UseContractAssetsInfo]
+        infos: mutable.HashMap[Int, Compiler.UseContractAssetsInfo]
     ) = {
       val newMethods = code.methods.mapWithIndex { case (method, index) =>
         infos.get(index) match {
