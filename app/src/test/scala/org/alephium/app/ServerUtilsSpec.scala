@@ -3918,16 +3918,6 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait ChainedTransactionsFixture extends ExecuteScriptFixture with ContractFixture {
-    val contract =
-      s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-    val contractCode = Compiler.compileContract(contract).toOption.get
-
     def checkAlphBalance(
         lockupScript: LockupScript,
         expectedAlphBalance: U256
@@ -4247,11 +4237,21 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "build a transfer transaction followed by a deploy contract transactions" in new ChainedTransactionsFixture {
+    val contractCode =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(contractCode).toOption.get
+
     def buildDeployContract(publicKey: PublicKey, initialAttoAlphAmount: Option[Amount] = None) =
       BuildDeployContractTx(
         fromPublicKey = publicKey.bytes,
         initialAttoAlphAmount = initialAttoAlphAmount,
-        bytecode = serialize(contractCode) ++ ByteString(0, 0)
+        bytecode = serialize(contract) ++ ByteString(0, 0)
       )
 
     failedDeployContract(
@@ -4593,7 +4593,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
   }
 
-  trait RichBlockFixture extends ContractFixture {
+  trait TxContractOutputRefIndexInForkedChainFixture
+      extends ContractFixture
+      with ChainedTransactionsFixture {
     val testKeyPair = chainIndex.to.generateKey
 
     val contractCode =
@@ -4602,6 +4604,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  @using(assetsInContract = true)
          |  pub fn burn() -> () {
          |    burnToken!(selfAddress!(), selfTokenId!(), burnAmount)
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
          |  }
          |
          |  @using(updateFields = true)
@@ -4614,6 +4617,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractId = createContract(
       contractCode,
       initialMutState = AVector(vm.Val.U256(ALPH.oneAlph)),
+      initialAttoAlphAmount = ALPH.alph(100),
       tokenIssuanceInfo = Some(TokenIssuance.Info(ALPH.alph(20)))
     )._1
 
@@ -4672,9 +4676,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       richBlockAndEvents.block.transactions.head.contractInputs.length is 1
       richBlockAndEvents.block.transactions.head.contractInputs.head
     }
-  }
 
-  it should "return correct transaction output info for rich block in forked chain" in new RichBlockFixture {
     // main0  -> main1 -> main2 (update burn amount to 5)  -> main3 (genesis calls burn) -> main4 (genesis calls burn)
     //        -> fork1 -> fork2 (genesis calls burn)       -> fork3 (genesis calls burn)
     val main0 = transfer(blockFlow, genesisKeys(0)._1, testKeyPair._2, ALPH.alph(2))
@@ -4684,11 +4686,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     val block2 = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block1, block2)
 
-    val height3Hashes = blockFlow.getHashes(chainIndex, 3).rightValue
-    height3Hashes.toSet is Set(block1.hash, block2.hash)
+    val height4Hashes = blockFlow.getHashes(chainIndex, 4).rightValue
+    height4Hashes.toSet is Set(block1.hash, block2.hash)
 
-    val main1 = blockFlow.getBlockUnsafe(height3Hashes(0))
-    val fork1 = blockFlow.getBlockUnsafe(height3Hashes(1))
+    val main1 = blockFlow.getBlockUnsafe(height4Hashes(0))
+    val fork1 = blockFlow.getBlockUnsafe(height4Hashes(1))
     main1.parentHash is main0.hash
     fork1.parentHash is main0.hash
 
@@ -4701,6 +4703,44 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, main2)
     main2.parentHash is main1.hash
 
+    def main3: Block
+    def fork2: Block
+    def main4: Block
+    def fork3: Block
+
+    def verifyForkedChain(): Assertion = {
+      // Same tx in both main3 and fork2
+      main3.nonCoinbase.head.id is fork2.nonCoinbase.head.id
+
+      val fork3ContractInput = getContractInput(fork3)
+      val main4ContractInput = getContractInput(main4)
+      fork3ContractInput.key is main4ContractInput.key
+      fork3ContractInput.hint is main4ContractInput.hint
+      fork3ContractInput.tokens.head.amount is ALPH.alph(19)
+      main4ContractInput.tokens.head.amount is ALPH.alph(15)
+
+      val contractOutputRef = ContractOutputRef.unsafe(
+        Hint.ofContract(LockupScript.p2c(contractId).scriptHint),
+        TxOutputRef.unsafeKey(fork3ContractInput.key)
+      )
+      serverUtils.getTxOutput(blockFlow, contractOutputRef, Some(fork2.hash)) isE Some(
+        ModelContractOutput(
+          amount = ALPH.alph(99),
+          lockupScript = LockupScript.p2c(contractId),
+          tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
+        )
+      )
+      serverUtils.getTxOutput(blockFlow, contractOutputRef, Some(main4.hash)) isE Some(
+        ModelContractOutput(
+          amount = ALPH.alph(99),
+          lockupScript = LockupScript.p2c(contractId),
+          tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
+        )
+      )
+    }
+  }
+
+  it should "return correct transaction output info in forked chain, build transactions one by one" in new TxContractOutputRefIndexInForkedChainFixture {
     val main3 = payableCall(blockFlow, chainIndex, burnTokenScript)
     addAndCheck(blockFlow, main3)
     main3.parentHash is main2.hash
@@ -4721,34 +4761,36 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, fork3)
     fork3.parentHash is fork2.hash
 
-    // Same tx in both main3 and fork2
-    main3.nonCoinbase.head.id is fork2.nonCoinbase.head.id
+    verifyForkedChain()
+  }
 
-    val fork3ContractInput = getContractInput(fork3)
-    val main4ContractInput = getContractInput(main4)
-    fork3ContractInput.key is main4ContractInput.key
-    fork3ContractInput.hint is main4ContractInput.hint
-    fork3ContractInput.tokens.head.amount is ALPH.alph(19)
-    main4ContractInput.tokens.head.amount is ALPH.alph(15)
+  it should "return correct transaction output info in forked chain, with chained transactions" in new TxContractOutputRefIndexInForkedChainFixture {
+    val burnTokenScriptTx = BuildChainedExecuteScriptTx(
+      BuildExecuteScriptTx(genesisPublicKey.bytes, bytecode = serialize(burnTokenScript))
+    )
+    val burnTokenTxsResults = buildChainedTransactions(burnTokenScriptTx, burnTokenScriptTx)
+    burnTokenTxsResults.length is 2
+    val burnTokenTx0 = burnTokenTxsResults(0).value
+    val burnTokenTx1 = burnTokenTxsResults(1).value
+    signAndAddToMemPool(burnTokenTx0.txId, burnTokenTx0.unsignedTx, chainIndex, genesisPrivateKey)
+    val main3 = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck(blockFlow, main3)
 
-    val contractOutputRef = ContractOutputRef.unsafe(
-      Hint.ofContract(LockupScript.p2c(contractId).scriptHint),
-      TxOutputRef.unsafeKey(fork3ContractInput.key)
-    )
-    serverUtils.getTxOutput(blockFlow, contractOutputRef, Some(fork2.hash)) isE Some(
-      ModelContractOutput(
-        amount = minimalAlphInContract,
-        lockupScript = LockupScript.p2c(contractId),
-        tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
-      )
-    )
-    serverUtils.getTxOutput(blockFlow, contractOutputRef, Some(main4.hash)) isE Some(
-      ModelContractOutput(
-        amount = minimalAlphInContract,
-        lockupScript = LockupScript.p2c(contractId),
-        tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
-      )
-    )
+    val main3Updated = verifyAndUpdateContractGeneratedOutput(main3, ALPH.alph(15), ALPH.alph(19))
+    val fork2        = mineBlock(fork1.hash, main3Updated, 4)
+    addAndCheck(blockFlow, fork2)
+    fork2.parentHash is fork1.hash
+
+    signAndAddToMemPool(burnTokenTx1.txId, burnTokenTx1.unsignedTx, chainIndex, genesisPrivateKey)
+    val main4 = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck(blockFlow, main4)
+
+    val main4Updated = verifyAndUpdateContractGeneratedOutput(main4, ALPH.alph(10), ALPH.alph(18))
+    val fork3        = mineBlock(fork2.hash, main4Updated, 5)
+    addAndCheck(blockFlow, fork3)
+    fork3.parentHash is fork2.hash
+
+    verifyForkedChain()
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
