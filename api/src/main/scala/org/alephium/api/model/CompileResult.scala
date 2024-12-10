@@ -52,7 +52,7 @@ object CompileScriptResult {
       bytecodeTemplate,
       CompileProjectResult.diffPatch(bytecodeTemplate, bytecodeDebugTemplate),
       fields = fields,
-      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      functions = AVector.from(scriptAst.orderedFuncs.view.map(CompileResult.FunctionSig.from)),
       warnings = compiled.warnings.map(_.message)
     )
   }
@@ -95,7 +95,7 @@ object CompileContractResult {
       compiled.code.hash,
       compiled.debugCode.hash,
       fields,
-      functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      functions = AVector.from(contractAst.orderedFuncs.view.map(CompileResult.FunctionSig.from)),
       maps = CompileResult.MapsSig.from(contractAst.maps),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
       constants =
