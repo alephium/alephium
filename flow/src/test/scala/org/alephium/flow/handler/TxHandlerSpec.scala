@@ -24,9 +24,11 @@ import org.scalacheck.Gen
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
 import org.alephium.flow.core.BlockFlowState.MemPooled
+import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.handler.TxHandler.FailedValidation
 import org.alephium.flow.mempool.MemPool.{
   AddedToMemPool,
+  AddedToOrphanPool,
   AlreadyExisted,
   DoubleSpending,
   MemPoolIsFull
@@ -56,6 +58,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     setSynced()
 
     txHandler ! addTx(tx, isIntraCliqueSyncing = true)
+    expectNoMessage()          // expect no response for isIntraCliqueSyncing
+    eventBus.expectNoMessage() // expect no notification for isIntraCliqueSyncing
     val mempool = blockFlow.getMemPool(GroupIndex.unsafe(0))
     eventually {
       mempool.contains(tx.id) is true
@@ -113,7 +117,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txs.length is 3
     txHandler.underlyingActor.outgoingTxBuffer.isEmpty is true
     txs.foreach(txHandler ! addTx(_))
-    txs.foreach(tx => expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool)))
+    txs.foreach { tx =>
+      val txTemplate = tx.toTemplate
+      expectMsg(TxHandler.ProcessedByMemPool(txTemplate, AddedToMemPool))
+      eventBus.expectMsg(AllHandlers.TxNotify(txTemplate))
+    }
     txHandler.underlyingActor.outgoingTxBuffer.keys().toSeq is txs.map(_.toTemplate).toSeq
   }
 
@@ -122,6 +130,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx)
     expectMsg(FailedValidation(tx.toTemplate, Right(NonExistInput)))
+    eventBus.expectNoMessage()
     interCliqueProbe.expectNoMessage()
   }
 
@@ -146,6 +155,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx, isLocalTx = false)
+    eventBus.expectNoMessage()
     orphanPool.getRootTxs() willBe AVector(tx.toTemplate)
     interCliqueProbe.expectNoMessage()
 
@@ -160,11 +170,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val tx = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
     orphanPool.add(tx, TimeStamp.now())
+    eventBus.expectNoMessage()
     orphanPool.getRootTxs() is AVector(tx)
 
     txHandler ! TxHandler.CleanOrphanPool
     txHandler.underlyingActor.outgoingTxBuffer.contains(tx) willBe true
     orphanPool.getRootTxs().isEmpty willBe true
+    eventBus.expectMsg(AllHandlers.TxNotify(tx))
 
     setSynced()
     interCliqueProbe.expectMsg(
@@ -254,6 +266,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     setSynced()
     txHandler ! addTx(tx)
+    eventBus.expectMsg(AllHandlers.TxNotify(tx.toTemplate))
     expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool))
     interCliqueProbe.expectMsg(
       InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx.id))))
@@ -261,6 +274,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
+      eventBus.expectNoMessage()
       expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AlreadyExisted))
       interCliqueProbe.expectNoMessage()
     }
@@ -275,6 +289,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     setSynced()
     txHandler ! addTx(tx0)
+    eventBus.expectMsg(AllHandlers.TxNotify(tx0.toTemplate))
     expectMsg(TxHandler.ProcessedByMemPool(tx0.toTemplate, AddedToMemPool))
     interCliqueProbe.expectMsg(
       InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx0.id))))
@@ -282,6 +297,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*double spending.*").intercept {
       txHandler ! addTx(tx1)
+      eventBus.expectNoMessage()
       expectMsg(TxHandler.ProcessedByMemPool(tx1.toTemplate, DoubleSpending))
       interCliqueProbe.expectNoMessage()
     }
@@ -402,6 +418,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = coinbaseGasPrice))
 
     txHandler ! addTx(lowGasPriceTx)
+    eventBus.expectNoMessage()
     val response = expectMsg(FailedValidation(lowGasPriceTx.toTemplate, Right(InvalidGasPrice)))
     response.message.contains("InvalidGasPrice") is true
   }
@@ -413,7 +430,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val block = transfer(blockFlow, chainIndex)
     val tx    = block.transactions.head
     txHandler ! addTx(tx)
-    expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool))
+    val txTemplate = tx.toTemplate
+    expectMsg(TxHandler.ProcessedByMemPool(txTemplate, AddedToMemPool))
+    eventBus.expectMsgType[BlockNotify] // automined block for intra-group tx
+    eventBus.expectMsg(AllHandlers.TxNotify(txTemplate))
     eventually(blockFlow.getMemPool(chainIndex).size is 0)
 
     val status = blockFlow.getTransactionStatus(tx.id, chainIndex).rightValue.get
@@ -431,6 +451,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     config.mempool.autoMineForDev is true
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
     txHandler ! addTx(tx)
+    eventBus.expectNoMessage()
     expectMsg(FailedValidation(tx.toTemplate, Right(NonExistInput)))
   }
 
@@ -484,6 +505,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val tx    = block.transactions.head
     txHandler ! addTx(tx)
     expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool))
+    val blockNotification1 =
+      eventBus.expectMsgType[BlockNotify] // automined block for inter-group tx
+    val blockNotification2 =
+      eventBus.expectMsgType[BlockNotify] // automined empty intra-group block
+    blockNotification1.block.hash isnot blockNotification2.block.hash
+    eventBus.expectMsg(AllHandlers.TxNotify(tx.toTemplate))
+    eventBus.expectNoMessage()
     eventually(blockFlow.getMemPool(index).size is 0)
 
     val status = blockFlow.getTransactionStatus(tx.id, index).rightValue.get
@@ -494,8 +522,6 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.toGroupConfirmations is 0
     val blockHash = confirmed.index.hash
     blockFlow.getBestDeps(index.from).deps.contains(blockHash) is true
-    val autoMinedBlock = blockFlow.getBlock(blockHash).rightValue
-    eventBus.expectMsg(AllHandlers.BlockNotify(autoMinedBlock, 1))
 
     val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
     val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
@@ -519,6 +545,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler ! addTx(tx2, isLocalTx = false)
     txHandler ! addTx(tx3, isLocalTx = false)
     txHandler ! addTx(tx4, isLocalTx = false)
+    eventBus.expectNoMessage()
 
     eventually(orphanPool.contains(tx1.id) is false)
     eventually(orphanPool.contains(tx2.id) is true)
@@ -528,6 +555,12 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val mempool = blockFlow.getMemPool(chainIndex)
     txHandler ! addTx(tx1, isLocalTx = false)
     txHandler ! addTx(tx2, isLocalTx = false)
+    eventBus.expectMsg(AllHandlers.TxNotify(tx1.toTemplate))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx2.toTemplate))
+
+    txHandler ! TxHandler.CleanOrphanPool
+    eventBus.expectMsg(AllHandlers.TxNotify(tx3.toTemplate))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx4.toTemplate))
 
     eventually(mempool.contains(tx1.id) is true)
     eventually(mempool.contains(tx2.id) is true)
@@ -548,13 +581,17 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val Seq(tx1, tx2, tx3, tx4, tx5, tx6) = sequentialTxs.toSeq
 
     val orphanTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
-    orphanTxs.foreach(tx => txHandler ! addTx(tx, isLocalTx = false))
+    orphanTxs.foreach { tx =>
+      txHandler ! addTx(tx, isLocalTx = false)
+      eventBus.expectNoMessage()
+    }
     orphanTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is true))
 
     setSynced()
 
     val mempool = blockFlow.getMemPool(chainIndex)
     txHandler ! addTx(tx1)
+    eventBus.expectMsg(AllHandlers.TxNotify(tx1.toTemplate))
     eventually(mempool.contains(tx1.id) is true)
     eventually(mempool.contains(tx2.id) is true)
     eventually(mempool.contains(tx3.id) is true)
@@ -566,6 +603,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler ! addTx(tx4)
     sequentialTxs.foreach(tx => eventually(mempool.contains(tx.id) is true))
     sequentialTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is false))
+
+    txHandler ! TxHandler.CleanOrphanPool
+    eventBus.expectMsg(AllHandlers.TxNotify(tx2.toTemplate))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx3.toTemplate))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx4.toTemplate))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx5.toTemplate))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx6.toTemplate))
   }
 
   it should "remove unconfirmed txs based on expiry duration" in new Fixture {
@@ -612,13 +656,16 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         gasPrice
       ).nonCoinbase.head
       txHandler ! addTx(tx)
-      expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool))
+      val txTemplate = tx.toTemplate
+      expectMsg(TxHandler.ProcessedByMemPool(txTemplate, AddedToMemPool))
+      eventBus.expectMsg(AllHandlers.TxNotify(txTemplate))
       eventually(mempool.contains(tx.id) is true)
     }
     mempool.isFull() is true
 
     val tx = transfer(blockFlow, chainIndex).nonCoinbase.head
     txHandler ! addTx(tx)
+    eventBus.expectNoMessage()
     eventually(mempool.contains(tx.id) is false)
 
     val txString = Hex.toHexString(serialize(tx.toTemplate))
@@ -638,6 +685,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val mempool     = blockFlow.grandPool.getMemPool(chainIndex.from)
     val tx0         = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(5)).nonCoinbase.head
     txHandler ! addTx(tx0)
+    expectMsg(TxHandler.ProcessedByMemPool(tx0.toTemplate, AddedToMemPool))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx0.toTemplate))
     eventually(mempool.contains(tx0.id) is true)
 
     val tx1 = transfer(blockFlow, privateKey, toPublicKey, ALPH.alph(5)).nonCoinbase.head
@@ -648,10 +697,16 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     mempool.clear()
     txHandler ! addTx(tx2, false, false)
+    expectMsg(TxHandler.ProcessedByMemPool(tx2.toTemplate, AddedToOrphanPool))
+    eventBus.expectNoMessage()
     eventually(orphanPool.contains(tx2.id) is true)
     txHandler ! addTx(tx1)
+    expectMsg(TxHandler.ProcessedByMemPool(tx1.toTemplate, AddedToMemPool))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx1.toTemplate))
     eventually(mempool.contains(tx1.id) is true)
     txHandler ! addTx(tx0)
+    expectMsg(TxHandler.ProcessedByMemPool(tx0.toTemplate, AddedToMemPool))
+    eventBus.expectMsg(AllHandlers.TxNotify(tx0.toTemplate))
     eventually {
       mempool.contains(tx0.id) is true
       mempool.contains(tx1.id) is true
@@ -694,7 +749,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def checkInterCliqueBroadcast(txs: AVector[Transaction]) = {
       txs.foreach(txHandler ! addTx(_))
-      txs.foreach(tx => expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool)))
+      txs.foreach { tx =>
+        val txTemplate = tx.toTemplate
+        expectMsg(TxHandler.ProcessedByMemPool(txTemplate, AddedToMemPool))
+        eventBus.expectMsg(AllHandlers.TxNotify(txTemplate))
+      }
       interCliqueProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(indexedHashes) =>
         val hashes = indexedHashes.flatMap(_._2)
         hashes.length is txs.length
