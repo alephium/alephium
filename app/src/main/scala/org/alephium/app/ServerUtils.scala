@@ -35,6 +35,7 @@ import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
+import org.alephium.flow.mempool.MemPool._
 import org.alephium.io.IOError
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
@@ -840,18 +841,23 @@ class ServerUtils(implicit
         }
     )
   }
-
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
     val message =
       TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
-    txHandler.ask(message).mapTo[TxHandler.Event].map {
-      case _: TxHandler.AddSucceeded =>
+    txHandler.ask(message).mapTo[TxHandler.AddToMemPoolResult].map {
+      case TxHandler.ProcessedByMemPool(_, AddedToMemPool) =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
-      case TxHandler.AddFailed(_, reason) =>
-        logger.warn(s"Failed in adding tx: $reason")
-        Left(failed(reason))
+      case TxHandler.ProcessedByMemPool(_, AlreadyExisted) =>
+        // succeed for idempotency reasons due to clients retrying submission
+        Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
+      case processed: TxHandler.ProcessedByMemPool =>
+        Left(failed(processed.message))
+      case invalid: TxHandler.FailedValidation =>
+        Left(failed(invalid.message))
+      case TxHandler.FailedInternally(_, error) =>
+        Left(failed(error))
     }
   }
 

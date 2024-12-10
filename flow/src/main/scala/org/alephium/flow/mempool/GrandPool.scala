@@ -17,6 +17,9 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.TxHandler
+import org.alephium.flow.handler.TxHandler.{AddToMemPoolResult, FailedInternally, FailedValidation}
+import org.alephium.flow.mempool.MemPool.{AlreadyExisted, DoubleSpending}
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.flow.validation._
 import org.alephium.protocol.config.BrokerConfig
@@ -66,23 +69,26 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
       txValidation: TxValidation,
       tx: TransactionTemplate,
       cacheOrphanTx: Boolean
-  ): Either[TxValidationError, MemPool.NewTxCategory] = {
+  ): AddToMemPoolResult = {
     val chainIndex = tx.chainIndex
-    assume(!brokerConfig.isIncomingChain(chainIndex))
-    val mempool = getMemPool(chainIndex.from)
-    if (mempool.contains(tx)) {
-      Right(MemPool.AlreadyExisted)
-    } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      Right(MemPool.DoubleSpending)
+    if (brokerConfig.isIncomingChain(chainIndex)) {
+      FailedInternally(tx, s"Tx from incoming chain ${tx.chainIndex} is illegal")
     } else {
-      txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case Left(Right(NonExistInput)) if cacheOrphanTx =>
-          orphanPool.add(tx, TimeStamp.now()) match {
-            case MemPool.AddedToMemPool => Right(MemPool.AddedToOrphanPool)
-            case result                 => Right(result)
-          }
-        case Right(_)    => Right(add(chainIndex, tx, TimeStamp.now()))
-        case Left(error) => Left(error)
+      val mempool = getMemPool(chainIndex.from)
+      if (mempool.contains(tx)) {
+        TxHandler.ProcessedByMemPool(tx, AlreadyExisted)
+      } else if (mempool.isDoubleSpending(chainIndex, tx)) {
+        TxHandler.ProcessedByMemPool(tx, DoubleSpending)
+      } else {
+        txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+          case Left(Right(NonExistInput)) if cacheOrphanTx =>
+            orphanPool.add(tx, TimeStamp.now()) match {
+              case MemPool.AddedToMemPool => TxHandler.ProcessedByMemPool(tx, MemPool.AddedToOrphanPool)
+              case result                 => TxHandler.ProcessedByMemPool(tx, result)
+            }
+          case Right(_)    => TxHandler.ProcessedByMemPool(tx, add(chainIndex, tx, TimeStamp.now()))
+          case Left(error) => FailedValidation(tx, error)
+        }
       }
     }
   }

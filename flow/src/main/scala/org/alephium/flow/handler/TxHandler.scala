@@ -24,8 +24,10 @@ import akka.actor.Props
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.TxHandler.{AddToMemPoolResult, FailedValidation}
 import org.alephium.flow.io.PendingTxStorage
 import org.alephium.flow.mempool.MemPool
+import org.alephium.flow.mempool.MemPool._
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.{DataOrigin, PersistedTxId}
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
@@ -67,9 +69,39 @@ object TxHandler {
   private[handler] case object DownloadTxs              extends Command
   case object ClearMemPool                              extends Command
 
-  sealed trait Event
-  final case class AddSucceeded(txId: TransactionId)              extends Event
-  final case class AddFailed(txId: TransactionId, reason: String) extends Event
+  sealed trait AddToMemPoolResult {
+    def message: String
+  }
+  final case class ProcessedByMemPool(tx: TransactionTemplate, result: NewTxCategory)
+      extends AddToMemPoolResult {
+
+    override def message: String = result match {
+      case AddedToMemPool =>
+        s"Tx ${tx.id.shortHex} successfully included into mempool"
+      case MemPoolIsFull =>
+        s"the mempool is full when trying to add the tx ${tx.id.shortHex}: ${tx.hex}"
+      case DoubleSpending =>
+        s"Tx ${tx.id.shortHex} is double spending: ${tx.hex}"
+      case AlreadyExisted =>
+        s"Tx ${tx.id.toHexString} is already included"
+      case AddedToOrphanPool =>
+        s"Tx ${tx.id.toHexString} is added to orphan pool"
+
+    }
+  }
+  final case class FailedValidation(tx: TransactionTemplate, error: TxValidationError)
+      extends AddToMemPoolResult {
+    override def message: String = error match {
+      case Right(s: InvalidTxStatus) =>
+        s"Failed in validating tx ${tx.id.toHexString} due to $s: ${tx.hex}"
+      case Left(e) =>
+        s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${tx.hex}"
+    }
+  }
+  final case class FailedInternally(tx: TransactionTemplate, error: String)
+      extends AddToMemPoolResult {
+    override def message: String = s"Internal error wile processing tx ${tx.id.toHexString}: $error"
+  }
 
   final case class Announcement(
       brokerHandler: ActorRefT[BrokerHandler.Command],
@@ -195,12 +227,12 @@ final class TxHandler(
     case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing, isLocalTx) =>
       if (!memPoolSetting.autoMineForDev) {
         if (isIntraCliqueSyncing) {
-          txs.foreach(handleIntraCliqueSyncingTx)
+          txs.foreach(handleIntraCliqueSyncingTx(_, acknowledge = true))
         } else {
           txs.foreach(handleInterCliqueTx(_, acknowledge = true, cacheOrphanTx = !isLocalTx))
         }
       } else {
-        mineTxsForDev(txs)
+        mineTxsForDev(txs, acknowledge = true)
       }
     case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
     case TxHandler.BroadcastTxs         => broadcastTxs()
@@ -266,23 +298,15 @@ trait TxCoreHandler extends TxHandlerUtils {
       acknowledge: Boolean,
       cacheOrphanTx: Boolean
   ): Unit = {
-    val grandPool = blockFlow.getGrandPool()
-    grandPool.validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, cacheOrphanTx) match {
-      case Right(MemPool.AddedToMemPool) =>
+    blockFlow
+      .getGrandPool()
+      .validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, cacheOrphanTx) match {
+      case result @ TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool) =>
         handleValidTx(tx)
-        addSucceeded(tx, acknowledge)
-      case Right(MemPool.AlreadyExisted) =>
-        log.debug(s"Tx ${tx.id.toHexString} is already included")
-        addSucceeded(tx, acknowledge)
-      case Right(MemPool.DoubleSpending) =>
-        val reason = s"tx ${tx.id.shortHex} is double spending: ${tx.hex}"
-        addFailed(tx, reason, acknowledge)
-      case Right(MemPool.MemPoolIsFull) =>
-        val reason = s"the mempool is full when trying to add the tx ${tx.id.shortHex}: ${tx.hex}"
-        addFailed(tx, reason, acknowledge)
-      case Right(MemPool.AddedToOrphanPool) =>
-        log.debug(s"Tx ${tx.id.toHexString} is added to orphan pool")
-      case Left(error) => handleInvalidTx(tx, acknowledge, error)
+        sendResponse(acknowledge, result)
+      case result: TxHandler.AddToMemPoolResult =>
+        log.debug(result.message)
+        sendResponse(acknowledge, result)
     }
   }
 
@@ -296,12 +320,12 @@ trait TxCoreHandler extends TxHandlerUtils {
   private[handler] def validateOrphanTx(tx: TransactionTemplate): Unit = {
     val grandPool = blockFlow.getGrandPool()
     grandPool.validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, false) match {
-      case Left(Right(NonExistInput)) => ()
-      case Left(_) | Right(MemPool.DoubleSpending) =>
+      case FailedValidation(_, Right(NonExistInput)) => ()
+      case FailedValidation(_, _) | TxHandler.ProcessedByMemPool(_, MemPool.DoubleSpending) =>
         grandPool.orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid orphan tx ${tx.id.toHexString}: ${tx.hex}")
-      case Right(MemPool.AddedToMemPool) => handleValidTx(tx)
-      case Right(_)                      => ()
+      case TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool) => handleValidTx(tx)
+      case _: TxHandler.AddToMemPoolResult                          => ()
     }
   }
 
@@ -314,32 +338,18 @@ trait TxCoreHandler extends TxHandlerUtils {
     }
   }
 
-  def handleIntraCliqueSyncingTx(tx: TransactionTemplate): Unit = {
+  def handleIntraCliqueSyncingTx(tx: TransactionTemplate, acknowledge: Boolean): Unit = {
     val chainIndex = tx.chainIndex
     assume(brokerConfig.isIncomingChain(chainIndex))
-    blockFlow.getMemPool(chainIndex.to).addXGroupTx(chainIndex, tx, TimeStamp.now())
-  }
-
-  protected def handleInvalidTx(
-      tx: TransactionTemplate,
-      acknowledge: Boolean,
-      error: TxValidationError
-  ): Unit = {
-    error match {
-      case Right(s: InvalidTxStatus) =>
-        addFailed(
-          tx,
-          s"Failed in validating tx ${tx.id.toHexString} due to $s: ${tx.hex}",
-          acknowledge
-        )
-      case Left(e) =>
-        addFailed(
-          tx,
-          s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${tx.hex}",
-          acknowledge
-        )
+    val addedToMemPool =
+      blockFlow.getMemPool(chainIndex.to).addXGroupTx(chainIndex, tx, TimeStamp.now())
+    if (addedToMemPool) {
+      sendResponse(acknowledge, TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool))
+    } else {
+      sendResponse(acknowledge, TxHandler.ProcessedByMemPool(tx, MemPool.AlreadyExisted))
     }
   }
+
 }
 
 trait DownloadTxsHandler extends TxHandlerUtils {
@@ -411,16 +421,20 @@ trait AutoMineHandler extends TxCoreHandler {
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
-  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
+  def mineTxsForDev(txs: AVector[TransactionTemplate], acknowledge: Boolean): Unit = {
     txs.foreach { tx =>
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(error) =>
-          handleInvalidTx(tx, true, error)
-
+          sendResponse(acknowledge, FailedValidation(tx, error))
         case Right(_) =>
           TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
-            case Left(error) => addFailed(tx, error, acknowledge = true)
-            case Right(_)    => addSucceeded(tx, acknowledge = true)
+            case Left(error) =>
+              sendResponse(acknowledge, TxHandler.FailedInternally(tx, error))
+            case Right(_) =>
+              sendResponse(
+                acknowledge,
+                TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool)
+              )
           }
       }
     }
@@ -513,19 +527,9 @@ trait TxHandlerUtils extends IOBaseActor with EventStream.Publisher {
     }
   }
 
-  @inline protected def addSucceeded(tx: TransactionTemplate, acknowledge: Boolean): Unit = {
+  @inline protected def sendResponse(acknowledge: Boolean, response: AddToMemPoolResult): Unit = {
     if (acknowledge) {
-      sender() ! TxHandler.AddSucceeded(tx.id)
-    }
-  }
-
-  @inline protected def addFailed(
-      tx: TransactionTemplate,
-      reason: => String,
-      acknowledge: Boolean
-  ): Unit = {
-    if (acknowledge) {
-      sender() ! TxHandler.AddFailed(tx.id, reason: String)
+      sender() ! response
     }
   }
 }

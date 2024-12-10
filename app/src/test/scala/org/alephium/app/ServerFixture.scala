@@ -35,6 +35,7 @@ import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, OutputInfo}
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
+import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.network._
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -240,7 +241,9 @@ object ServerFixture {
     }
 
     val txHandlerRef =
-      system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
+      system.actorOf(
+        AlephiumTestActors.const(TxHandler.ProcessedByMemPool(dummyTx.toTemplate, AddedToMemPool))
+      )
     val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
     val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)
 
