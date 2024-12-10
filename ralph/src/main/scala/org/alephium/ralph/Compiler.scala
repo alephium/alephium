@@ -563,6 +563,8 @@ object Compiler {
       usePayToContractOnly: Boolean
   ) {
     def useContractAssets: Boolean = useAssetsInContract.assetsEnabled || usePayToContractOnly
+    def merge(other: UseContractAssetsInfo): UseContractAssetsInfo =
+      if (useAssetsInContract.assetsEnabled) this else other
   }
 
   // scalastyle:off number.of.methods
@@ -594,30 +596,6 @@ object Compiler {
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
       hasInterfaceFuncCallSet.addOne(funcId)
-    }
-
-    private[ralph] val inlineFuncsUseContractAssetsInfo =
-      mutable.HashMap.empty[Ast.FuncId, UseContractAssetsInfo]
-
-    override def addInternalCall(callee: Ast.FuncId): Unit = {
-      super.addInternalCall(callee)
-      val infoInCache = inlineFuncsUseContractAssetsInfo.get(callee)
-      val callerFunc  = getFunc(currentScope)
-      infoInCache match {
-        case Some(info) =>
-          if (callerFunc.inline) {
-            inlineFuncsUseContractAssetsInfo.addOne(currentScope -> info)
-          }
-        case None =>
-          val calleeFunc = getFunc(callee)
-          val info       = calleeFunc.useContractAssetsInfo
-          if (calleeFunc.inline && info.useContractAssets) {
-            inlineFuncsUseContractAssetsInfo.addOne(callee -> info)
-            if (callerFunc.inline) {
-              inlineFuncsUseContractAssetsInfo.addOne(currentScope -> info)
-            }
-          }
-      }
     }
 
     def methodSelectorTable: immutable.Map[(Ast.TypeId, Ast.FuncId), Boolean]

@@ -6758,6 +6758,47 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is ALPH.oneAlph.addUnsafe(minimalAlphInContract)
   }
 
+  it should "call multiple inline functions that use contract assets" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(checkExternalCaller = false, preapprovedAssets = true)
+         |  pub fn f0() -> () {
+         |    f1{callerAddress!() -> ALPH: 2 alph}()
+         |    f2()
+         |  }
+         |
+         |  @using(payToContractOnly = true, preapprovedAssets = true)
+         |  @inline fn f1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 2 alph)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  @inline fn f2() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val initialAlphAmount = ALPH.alph(2)
+    val fooId = createCompiledContract(compiled.code, initialAttoAlphAmount = initialAlphAmount)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.f0{@$genesisAddress -> ALPH: 2 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

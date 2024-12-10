@@ -2918,29 +2918,49 @@ object Ast {
       (warnings, compiled)
     }
 
-    private def getFuncUseContractAssetsInfo(
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def calcUseContractAssetsInfo(
+        cache: mutable.HashMap[FuncId, Option[Compiler.UseContractAssetsInfo]],
+        funcId: FuncId,
+        state: Compiler.State[StatefulContext]
+    ): Option[Compiler.UseContractAssetsInfo] = {
+      cache.get(funcId) match {
+        case None =>
+          val info = state.getFunc(funcId).useContractAssetsInfo
+          val result = if (info.useContractAssets) {
+            Some(info)
+          } else {
+            state.internalCalls.get(funcId).flatMap { callees =>
+              callees.view
+                .filter(id => state.getFunc(id).inline)
+                .map(id => calcUseContractAssetsInfo(cache, id, state))
+                .collect { case Some(info) => info }
+                .foldLeft[Option[Compiler.UseContractAssetsInfo]](None)((acc, info) => {
+                  acc.map(_.merge(info)).orElse(Some(info))
+                })
+            }
+          }
+          cache.addOne(funcId -> result)
+          result
+        case Some(info) => info
+      }
+    }
+
+    private def getUseContractAssetsInfo(
         contract: Contract,
         state: Compiler.State[StatefulContext]
     ) = {
-      val useContractAssetsInfo = mutable.HashMap.empty[Int, Compiler.UseContractAssetsInfo]
-      state.inlineFuncsUseContractAssetsInfo.foreachEntry { case (funcId, info) =>
-        state.internalCallsReversed
-          .get(funcId)
-          .foreach(_.foreach { id =>
-            val func = state.getFunc(id)
-            if (!func.inline && !func.useContractAssetsInfo.useContractAssets) {
-              val index = contract.nonInlineFuncs.indexWhere(_.id == id)
-              assume(index != -1)
-              useContractAssetsInfo.addOne(index -> info)
-            }
-          })
-      }
-      useContractAssetsInfo
+      val cache = mutable.HashMap.empty[FuncId, Option[Compiler.UseContractAssetsInfo]]
+      contract.nonInlineFuncs.view
+        .map(func => calcUseContractAssetsInfo(cache, func.id, state))
+        .zipWithIndex
+        .collect { case (Some(info), index) => (index, info) }
+        .toMap
     }
 
     private def updateUseContractAssetsInfo(
         code: StatefulContract,
-        infos: mutable.HashMap[Int, Compiler.UseContractAssetsInfo]
+        infos: Map[Int, Compiler.UseContractAssetsInfo]
     ) = {
       val newMethods = code.methods.mapWithIndex { case (method, index) =>
         infos.get(index) match {
@@ -2981,7 +3001,7 @@ object Ast {
         contract.genCode(state)
       }
       if (hasInlineFuncs) {
-        val infos = getFuncUseContractAssetsInfo(contract, state)
+        val infos = getUseContractAssetsInfo(contract, state)
         (
           updateUseContractAssetsInfo(inlinedDebugCode, infos),
           updateUseContractAssetsInfo(inlinedReleaseCode, infos)
