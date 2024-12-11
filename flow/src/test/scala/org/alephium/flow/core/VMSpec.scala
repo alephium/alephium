@@ -6970,6 +6970,41 @@ class VMSpec extends AlephiumSpec with Generators {
     }.getCause.getMessage is """Cannot assign "I256" to "U256""""
   }
 
+  it should "work when compound assignment selectors have side effect" in new CompoundAssignmentFixture {
+    val contract =
+      s"""
+           |Contract TestContract(mut index: U256) {  // set init value is 0
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let mut array = [0; 2]
+           |    array[1] = 1
+           |    assert!(index == 0, 0)
+           |    array[updateAndGetIndex()] += 1
+           |    assert!(array[0] == 0, 1)
+           |    assert!(array[1] == 1, 2)
+           |  }
+           |
+           |  pub fn updateAndGetIndex() -> U256 {
+           |    let originIndex = index
+           |    index = index + 1
+           |    return originIndex
+           |  }
+           |}
+           |""".stripMargin
+    val contractId = createContract(contract, initialMutState = AVector(Val.U256(U256.Zero)))._1
+
+    testSimpleScript(
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  TestContract(#${contractId.toHexString}).compoundAssign()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    )
+  }
+
   it should "be able to use assets in the inline function" in new ContractFixture {
     val foo =
       s"""
