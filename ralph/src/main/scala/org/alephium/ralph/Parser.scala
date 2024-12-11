@@ -380,6 +380,9 @@ abstract class Parser[Ctx <: StatelessContext] {
           )
         } else {
           val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
+          val validAnnotationIds =
+            AVector(Parser.FunctionUsingAnnotation.id, Parser.FunctionInlineAnnotation.id)
+          Parser.checkAnnotations(annotations, validAnnotationIds, "function")
           val usingAnnotation = Parser.FunctionUsingAnnotation.extractFields(
             annotations,
             Parser.FunctionUsingAnnotationFields(
@@ -400,6 +403,7 @@ abstract class Parser[Ctx <: StatelessContext] {
               )
             )
           }
+          val inline = Parser.FunctionInlineAnnotation.extractFields(annotations, false)
           FuncDefTmp(
             annotations,
             funcId,
@@ -410,6 +414,7 @@ abstract class Parser[Ctx <: StatelessContext] {
             usingAnnotation.checkExternalCaller,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
+            inline,
             params,
             returnType,
             statements
@@ -434,6 +439,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         f.useCheckExternalCaller,
         f.useUpdateFields,
         f.useMethodIndex,
+        f.inline,
         f.args,
         f.rtypes,
         f.body
@@ -635,6 +641,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
+    inline: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -654,8 +661,8 @@ object Parser {
     def validate[Ctx <: StatelessContext](
         annotations: Seq[Ast.Annotation[Ctx]]
     ): Option[Annotation[Ctx]] = {
-      annotations.find(_.id.name == id) match {
-        case result @ Some(annotation) =>
+      annotations.filter(_.id.name == id) match {
+        case Seq(result @ annotation) =>
           val duplicateKeys = keys.filter(key => annotation.fields.count(_.ident.name == key) > 1)
           if (duplicateKeys.nonEmpty) {
             throw Compiler.Error(
@@ -670,8 +677,13 @@ object Parser {
               annotation.sourceIndex
             )
           }
-          result
-        case None => None
+          Some(result)
+        case Nil => None
+        case list =>
+          throw Compiler.Error(
+            s"There are duplicate annotations: $id",
+            list.headOption.flatMap(_.sourceIndex)
+          )
       }
     }
 
@@ -779,6 +791,18 @@ object Parser {
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
         methodIndex
       )
+    }
+  }
+
+  object FunctionInlineAnnotation extends RalphAnnotation[Boolean] {
+    val id: String            = "inline"
+    val keys: AVector[String] = AVector.empty
+
+    def extractFields[Ctx <: StatelessContext](
+        annotation: Annotation[Ctx],
+        default: Boolean
+    ): Boolean = {
+      true
     }
   }
 
@@ -1208,6 +1232,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               f.useCheckExternalCaller,
               f.useUpdateFields,
               f.useMethodIndex,
+              f.inline,
               f.args,
               f.rtypes,
               None

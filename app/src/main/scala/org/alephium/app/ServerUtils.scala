@@ -234,6 +234,45 @@ class ServerUtils(implicit
     Right(result)
   }
 
+  def buildTransferFromOneToManyGroups(
+      blockFlow: BlockFlow,
+      transferRequest: BuildTransferTx
+  ): Try[AVector[BuildTransferTxResult]] =
+    for {
+      _ <- Either.cond(
+        transferRequest.gasAmount.isEmpty,
+        (),
+        badRequest(
+          "Explicit gas amount is not permitted, transfer-from-one-to-many-groups requires gas estimation."
+        )
+      )
+      assetOutputRefs <- transferRequest.utxos match {
+        case Some(outputRefs) => prepareOutputRefs(outputRefs).left.map(badRequest)
+        case None             => Right(AVector.empty[AssetOutputRef])
+      }
+      lockPair <- transferRequest.getLockPair()
+      _ <- Either.cond(
+        brokerConfig.contains(lockPair._1.groupIndex),
+        (),
+        badRequest(s"This node cannot serve request for Group ${lockPair._1.groupIndex}")
+      )
+      outputInfos = prepareOutputInfos(transferRequest.destinations)
+      gasPrice    = transferRequest.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      unsignedTxs <- blockFlow
+        .buildTransferFromOneToManyGroups(
+          lockPair._1,
+          lockPair._2,
+          transferRequest.targetBlockHash,
+          assetOutputRefs,
+          outputInfos,
+          gasPrice,
+          apiConfig.defaultUtxosLimit
+        )
+        .left
+        .map(failed)
+      txs <- unsignedTxs.mapE(validateUnsignedTransaction)
+    } yield txs.map(BuildTransferTxResult.from)
+
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
       query: BuildTransferTx,
@@ -321,7 +360,8 @@ class ServerUtils(implicit
         query.lockTime,
         query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash
+        query.targetBlockHash,
+        query.utxosLimit
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -375,7 +415,8 @@ class ServerUtils(implicit
         query.lockTime,
         query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash
+        query.targetBlockHash,
+        query.utxosLimit
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -783,21 +824,33 @@ class ServerUtils(implicit
     )
   }
 
-  def getEventsByContractId(
+  def getEventsByContractAddress(
       blockFlow: BlockFlow,
       start: Int,
       limit: Int,
-      contractId: ContractId
+      contractAddress: Address.Contract
   ): Try[ContractEvents] = {
-    wrapResult(
-      blockFlow
-        .getEvents(contractId, start, start + limit)
-        .map {
-          case (nextStart, logStatesVec) => {
-            ContractEvents.from(logStatesVec, nextStart)
+    wrapResult(blockFlow.getEvents(contractAddress.lockupScript.contractId, start, start + limit))
+      .flatMap {
+        case (nextStart, logStatesVec) => {
+          if (logStatesVec.isEmpty) {
+            wrapResult(blockFlow.getEventsCurrentCount(contractAddress.contractId)).flatMap {
+              case None =>
+                Left(notFound(s"Contract events of ${contractAddress}"))
+              case Some(currentCount) if currentCount == start =>
+                Right(ContractEvents.from(AVector.empty, nextStart))
+              case Some(currentCount) =>
+                Left(
+                  notFound(
+                    s"Current count for events of ${contractAddress} is '$currentCount', events start from '$start' with limit '$limit'"
+                  )
+                )
+            }
+          } else {
+            Right(ContractEvents.from(logStatesVec, nextStart))
           }
         }
-    )
+      }
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
@@ -1000,6 +1053,14 @@ class ServerUtils(implicit
   }
   // scalastyle:on parameter.number
 
+  private def getUtxosLimit(utxosLimit: Option[Int]): Int = {
+    utxosLimit match {
+      case Some(limit) => math.min(apiConfig.defaultUtxosLimit, limit)
+      case None        => apiConfig.defaultUtxosLimit
+    }
+  }
+
+  // scalastyle:off parameter.number
   def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
@@ -1008,7 +1069,8 @@ class ServerUtils(implicit
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash]
+      targetBlockHashOpt: Option[BlockHash],
+      utxosLimit: Option[Int]
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
       targetBlockHashOpt,
@@ -1018,13 +1080,14 @@ class ServerUtils(implicit
       gasOpt,
       gasPrice,
       maxAttoAlphPerUTXO.map(_.value),
-      Int.MaxValue
+      getUtxosLimit(utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
       case Left(error)               => failed(error)
     }
   }
+  // scalastyle:on parameter.number
 
   // scalastyle:off parameter.number
   def prepareSweepAddressTransactionFromScripts(
@@ -1036,7 +1099,8 @@ class ServerUtils(implicit
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash]
+      targetBlockHashOpt: Option[BlockHash],
+      utxosLimit: Option[Int]
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddressFromScripts(
       targetBlockHashOpt,
@@ -1047,7 +1111,7 @@ class ServerUtils(implicit
       gasOpt,
       gasPrice,
       maxAttoAlphPerUTXO.map(_.value),
-      Int.MaxValue
+      getUtxosLimit(utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
@@ -1570,6 +1634,21 @@ class ServerUtils(implicit
     } yield state
   }
 
+  def getContractCode(blockFlow: BlockFlow, codeHash: Hash): Try[StatefulContract] = {
+    // Since the contract code is not stored in the trie,
+    // and all the groups share the same storage,
+    // we only need to get the world state from any one group
+    val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(0))
+    for {
+      worldState <- wrapResult(blockFlow.getBestPersistedWorldState(groupIndex))
+      code <- wrapResult(worldState.getContractCode(codeHash)) match {
+        case Right(None)       => Left(notFound(s"Contract code hash: ${codeHash.toHexString}"))
+        case Right(Some(code)) => Right(code)
+        case Left(error)       => Left(error)
+      }
+    } yield code
+  }
+
   def getParentContract(
       blockFlow: BlockFlow,
       contractAddress: Address.Contract
@@ -1589,14 +1668,25 @@ class ServerUtils(implicit
       limit: Int,
       contractAddress: Address.Contract
   ): Try[SubContracts] = {
-    for {
-      result <- wrapResult(
-        blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
-          case (nextStart, contractIds) =>
-            SubContracts(contractIds.map(Address.contract), nextStart)
+    wrapResult(blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit))
+      .flatMap { case (nextStart, contractIds) =>
+        if (contractIds.isEmpty) {
+          wrapResult(blockFlow.getSubContractsCurrentCount(contractAddress.contractId)).flatMap {
+            case None =>
+              Left(notFound(s"Sub-contracts of ${contractAddress}"))
+            case Some(currentCount) if currentCount == start =>
+              Right(SubContracts(AVector.empty, currentCount))
+            case Some(currentCount) =>
+              Left(
+                notFound(
+                  s"Current count for sub-contracts of ${contractAddress} is '$currentCount', sub-contracts start from '$start' with limit '$limit'"
+                )
+              )
+          }
+        } else {
+          Right(SubContracts(contractIds.map(Address.contract), nextStart))
         }
-      )
-    } yield result
+      }
   }
 
   def getSubContractsCurrentCount(

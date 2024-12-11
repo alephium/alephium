@@ -301,7 +301,9 @@ class MemPool private (
   }
 
   def measureTransactionsTotalInc(index: Int): Unit = {
-    transactionsTotalLabeled(index).inc()
+    if (ChainIndex.checkFromGroup(index, group)) {
+      transactionsTotalLabeled(index).inc()
+    }
   }
 
   def measureTransactionsTotalDec(index: Int): Unit = {

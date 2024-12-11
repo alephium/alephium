@@ -102,6 +102,22 @@ trait WorldState[T, R1, R2, R3] {
     }
   }
 
+  private[vm] def getLegacyContractCode(codeHash: Hash): IOResult[Option[StatefulContract]] = {
+    codeState.getOpt(codeHash).flatMap {
+      case Some(record) => record.code.toContract().map(Some.apply).left.map(IOError.Serde.apply)
+      case None         => Right(None)
+    }
+  }
+
+  def getContractCode(codeHash: Hash): IOResult[Option[StatefulContract]] = {
+    contractImmutableState.getOpt(codeHash).flatMap {
+      case Some(Right(code)) => code.toContract().map(Some.apply).left.map(IOError.Serde.apply)
+      case Some(Left(_)) =>
+        Left(IOError.Other(new IllegalArgumentException("Invalid contract code hash")))
+      case None => getLegacyContractCode(codeHash)
+    }
+  }
+
   def getContractAsset(id: ContractId): IOResult[ContractOutput] = {
     for {
       state  <- getContractState(id)

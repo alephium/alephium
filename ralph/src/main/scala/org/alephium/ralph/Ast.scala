@@ -641,22 +641,26 @@ object Ast {
         case (BuiltIn.transferTokenToSelf.funcId, Seq(from, ALPHTokenId(), amount)) =>
           Seq(from, amount).flatMap(_.genCode(state)) :+ TransferAlphToSelf.asInstanceOf[Instr[Ctx]]
         case _ =>
-          val func     = getFunc(state)
-          val argsType = args.flatMap(_.getType(state))
-          val variadicInstrs = if (func.isVariadic) {
-            Seq(U256Const(Val.U256.unsafe(args.length)))
+          val func = getFunc(state)
+          if (func.inline && state.genInlineCode) {
+            func.genInlineCode(args, state, this)
           } else {
-            Seq.empty
-          }
-          val instrs = genApproveCode(state, func) ++
-            func.genCodeForArgs(args, state) ++
-            variadicInstrs ++
-            func.genCode(argsType)
-          if (ignoreReturn) {
-            val returnType = positionedError(func.getReturnType(argsType, state))
-            instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
-          } else {
-            instrs
+            val argsType = args.flatMap(_.getType(state))
+            val variadicInstrs = if (func.isVariadic) {
+              Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
+            } else {
+              Seq.empty
+            }
+            val instrs = genApproveCode(state, func) ++
+              func.genCodeForArgs(args, state) ++
+              variadicInstrs ++
+              func.genCode(argsType)
+            if (ignoreReturn) {
+              val returnType = positionedError(func.getReturnType(argsType, state))
+              instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
+            } else {
+              instrs
+            }
           }
       }
     }
@@ -1227,6 +1231,7 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
+      inline: Boolean,
       args: Seq[(Type, Boolean)],
       rtypes: Seq[Type]
   )
@@ -1241,6 +1246,7 @@ object Ast {
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
+      inline: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -1314,6 +1320,7 @@ object Ast {
       id,
       isPublic,
       usePreapprovedAssets,
+      inline,
       args.map(arg => (arg.tpe, arg.isMutable)),
       rtypes
     )
@@ -1346,6 +1353,12 @@ object Ast {
       }
     }
 
+    @inline private def checkInline(): Unit = {
+      if (isPublic) {
+        throw Compiler.Error("Inline functions cannot be public", id.sourceIndex)
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setFuncScope(id)
       state.checkArguments(args)
@@ -1359,6 +1372,7 @@ object Ast {
           isGenerated = false
         )
       }
+      if (inline) checkInline()
       if (bodyOpt.isDefined) {
         funcAccessedVarsCache match {
           case Some(vars) => // the function has been compiled before
@@ -1378,8 +1392,8 @@ object Ast {
 
     def genMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
       state.setFuncScope(id)
-      val instrs    = body.flatMap(_.genCode(state))
-      val localVars = state.getLocalVars(id)
+      val instrs       = body.flatMap(_.genCode(state))
+      val localVarSize = state.getLocalVarSize(id)
 
       Method[Ctx](
         isPublic,
@@ -1387,7 +1401,7 @@ object Ast {
         useAssetsInContract != Ast.NotUseContractAssets,
         usePayToContractOnly = usePayToContractOnly,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
-        localsLength = localVars.length,
+        localsLength = localVarSize,
         returnLength = state.flattenTypeLength(rtypes),
         AVector.from(instrs)
       )
@@ -1417,6 +1431,7 @@ object Ast {
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         useMethodIndex = None,
+        inline = false,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)
@@ -2185,6 +2200,9 @@ object Ast {
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
+    lazy val nonInlineFuncs: Seq[FuncDef[Ctx]] = funcs.filterNot(_.inline)
+    lazy val inlineFuncs: Seq[FuncDef[Ctx]]    = funcs.filter(_.inline)
+    lazy val orderedFuncs: Seq[FuncDef[Ctx]]   = nonInlineFuncs ++ inlineFuncs
 
     def name: String = ident.name
 
@@ -2267,8 +2285,18 @@ object Ast {
       }
     }
 
+    def genMethodsForNonInlineFuncs(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
+      AVector.from(nonInlineFuncs.view.map(_.genMethod(state)))
+    }
+
     def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
-      AVector.from(funcs.view.map(_.genMethod(state)))
+      val nonInlineMethods = genMethodsForNonInlineFuncs(state)
+      if (state.allowDebug) {
+        val inlineMethods = inlineFuncs.map(_.genMethod(state))
+        nonInlineMethods ++ AVector.from(inlineMethods)
+      } else {
+        nonInlineMethods
+      }
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
@@ -2289,7 +2317,7 @@ object Ast {
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       state.setGenCodePhase()
       StatelessScript
-        .from(genMethods(state))
+        .from(genMethodsForNonInlineFuncs(state))
         .getOrElse(
           throw Compiler.Error(s"No methods found in ${quote(ident.name)}", ident.sourceIndex)
         )
@@ -2298,7 +2326,7 @@ object Ast {
     def genCodeFull(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
       val script = genCode(state)
-      StaticAnalysis.checkMethodsStateless(this, script.methods, state)
+      StaticAnalysis.checkMethodsStateless(this, state)
       script
     }
   }
@@ -2361,16 +2389,20 @@ object Ast {
           }
       }
       val newFuncs =
-        funcs.map(func => func.copy(bodyOpt = Some(templateVarDefs ++ func.body)).withOrigin(ident))
+        funcs.map(func =>
+          func
+            .copy(bodyOpt = Some(templateVarDefs ++ func.body))
+            .withOrigin(ident)
+            .atSourceIndex(func.sourceIndex)
+        )
       this.copy(funcs = newFuncs)
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       state.setGenCodePhase()
-      val methods = genMethods(state)
       StatefulScript
-        .from(methods)
+        .from(genMethods(state))
         .getOrElse(
           throw Compiler.Error(
             "Expected the 1st function to be public and the other functions to be private for tx script",
@@ -2379,11 +2411,19 @@ object Ast {
         )
     }
 
-    def genCodeFull(state: Compiler.State[StatefulContext]): StatefulScript = {
+    def genCodeFull(state: Compiler.State[StatefulContext]): (StatefulScript, StatefulScript) = {
       check(state)
-      val script = genCode(state)
-      StaticAnalysis.checkMethodsStateful(this, script.methods, state)
-      script
+      state.setGenDebugCode()
+      val debugCode = genCode(state)
+      StaticAnalysis.checkTxScript(this, debugCode, state)
+      if (
+        inlineFuncs.isEmpty && !debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))
+      ) {
+        (debugCode, debugCode)
+      } else {
+        state.setGenReleaseCode()
+        (debugCode, genCode(state))
+      }
     }
   }
 
@@ -2525,11 +2565,11 @@ object Ast {
       super.check(state)
     }
 
-    override def genMethods(
+    override def genMethodsForNonInlineFuncs(
         state: Compiler.State[StatefulContext]
     ): AVector[Method[StatefulContext]] = {
       val selectors = mutable.Map.empty[Method.Selector, FuncId]
-      AVector.from(funcs.view.map { func =>
+      AVector.from(nonInlineFuncs.view.map { func =>
         val method = func.genMethod(state)
         if (func.isPublic && state.isUseMethodSelector(ident, func.id)) {
           val methodSelector = func.getMethodSelector(state.globalState)
@@ -2553,10 +2593,9 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods = genMethods(state)
       val fieldsLength =
         state.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
-      StatefulContract(fieldsLength, methods)
+      StatefulContract(fieldsLength, genMethods(state))
     }
 
     // the state must have been updated in the check pass
@@ -2777,11 +2816,9 @@ object Ast {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case script: TxScript =>
-          val statefulScript = script.genCodeFull(state)
-          val warnings       = state.getWarnings
-          state.allowDebug = true
-          val statefulDebugScript = script.genCode(state)
-          CompiledScript(statefulScript, script, warnings, statefulDebugScript)
+          val (debugCode, releaseCode) = script.genCodeFull(state)
+          val warnings                 = state.getWarnings
+          CompiledScript(releaseCode, script, warnings, debugCode)
         case c: Contract =>
           throw Compiler.Error(s"The code is for Contract, not for TxScript", c.sourceIndex)
         case ci: ContractInterface =>
@@ -2923,35 +2960,113 @@ object Ast {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state = states(index)
           contract.check(state)
-          state.allowDebug = true
+          state.setGenDebugCode()
           val statefulDebugContract = contract.genCode(state)
           (statefulDebugContract, contract, state, index)
       })
       StaticAnalysis.checkExternalCalls(this, states)
       val warnings = checkUnusedDefsInParentContract(states)
       val compiled = statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
-        val statefulContract = genReleaseCode(contract, statefulDebugContract, state)
-        StaticAnalysis.checkMethods(contract, statefulDebugContract, state)
+        val (inlinedDebugCode, inlinedReleaseCode) =
+          genInlineCode(contract, statefulDebugContract, state)
+        StaticAnalysis.checkContract(contract, statefulDebugContract, state)
         CompiledContract(
-          statefulContract,
+          inlinedReleaseCode,
           contract,
           state.getWarnings,
-          statefulDebugContract
+          inlinedDebugCode
         ) -> index
       }
       (warnings, compiled)
     }
 
-    def genReleaseCode(
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def calcUseContractAssetsInfo(
+        cacheForInlineFuncs: mutable.HashMap[FuncId, Compiler.UseContractAssetsInfo],
+        funcId: FuncId,
+        state: Compiler.State[StatefulContext]
+    ): Compiler.UseContractAssetsInfo = {
+      val info = state.getFunc(funcId).useContractAssetsInfo
+      if (info.useContractAssets) {
+        info
+      } else {
+        state.internalCalls.get(funcId) match {
+          case Some(callees) =>
+            callees.view
+              .filter(id => state.getFunc(id).inline)
+              .map(id =>
+                cacheForInlineFuncs
+                  .getOrElseUpdate(id, calcUseContractAssetsInfo(cacheForInlineFuncs, id, state))
+              )
+              .foldLeft(info)(_ merge _)
+          case None => info
+        }
+      }
+    }
+
+    private def getUseContractAssetsInfo(
+        contract: Contract,
+        state: Compiler.State[StatefulContext]
+    ) = {
+      val cacheForInlineFuncs = mutable.HashMap.empty[FuncId, Compiler.UseContractAssetsInfo]
+      val result              = mutable.HashMap.empty[Int, Compiler.UseContractAssetsInfo]
+      contract.nonInlineFuncs.view.zipWithIndex.foreach { case (func, index) =>
+        val info = calcUseContractAssetsInfo(cacheForInlineFuncs, func.id, state)
+        if (info.useContractAssets) result.addOne(index -> info)
+      }
+      result
+    }
+
+    private def updateUseContractAssetsInfo(
+        code: StatefulContract,
+        infos: mutable.HashMap[Int, Compiler.UseContractAssetsInfo]
+    ) = {
+      val newMethods = code.methods.mapWithIndex { case (method, index) =>
+        infos.get(index) match {
+          case Some(info) =>
+            if (info.usePayToContractOnly) {
+              method.copy(usePayToContractOnly = true)
+            } else {
+              assume(info.useAssetsInContract.assetsEnabled)
+              method.copy(useContractAssets = true)
+            }
+          case _ => method
+        }
+      }
+      code.copy(methods = newMethods)
+    }
+
+    def genInlineCode(
         contract: Contract,
         debugCode: StatefulContract,
         state: Compiler.State[StatefulContext]
-    ): StatefulContract = {
-      if (debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))) {
-        state.allowDebug = false
+    ): (StatefulContract, StatefulContract) = {
+      val hasInlineFuncs = contract.inlineFuncs.nonEmpty
+      val hasDebugCode   = debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))
+      val inlinedDebugCode = if (hasInlineFuncs) {
+        state.allowDebug = true
+        state.genInlineCode = true
         contract.genCode(state)
       } else {
         debugCode
+      }
+      val inlinedReleaseCode = if (!hasInlineFuncs && !hasDebugCode) {
+        inlinedDebugCode
+      } else if (hasInlineFuncs && !hasDebugCode) {
+        val nonInlineMethods = inlinedDebugCode.methods.dropRight(contract.inlineFuncs.length)
+        inlinedDebugCode.copy(methods = nonInlineMethods)
+      } else {
+        state.setGenReleaseCode()
+        contract.genCode(state)
+      }
+      if (hasInlineFuncs) {
+        val infos = getUseContractAssetsInfo(contract, state)
+        (
+          updateUseContractAssetsInfo(inlinedDebugCode, infos),
+          updateUseContractAssetsInfo(inlinedReleaseCode, infos)
+        )
+      } else {
+        (inlinedDebugCode, inlinedReleaseCode)
       }
     }
 
