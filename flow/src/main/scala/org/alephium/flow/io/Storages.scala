@@ -27,7 +27,7 @@ import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{ContractId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
@@ -78,7 +78,7 @@ object Storages {
     val txOutputRefIndexStorage = if (nodeSetting.indexesConfig.txOutputRefIndex) {
       TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]](
         Some(
-          RocksDBKeyValueStorage[TxOutputRef.Key, (TransactionId, AVector[BlockHash])](
+          RocksDBKeyValueStorage[TxOutputRef.Key, TxIdBlockHashes](
             db,
             TxOutputRefIndex,
             writeOptions

@@ -541,7 +541,7 @@ object ServerFixture {
       }
     }
 
-    override def getTxIdFromOutputRef(
+    override def getTxIdBlockHashesFromOutputRef(
         outputRef: TxOutputRef
     ): IOResult[Option[TxIdBlockHashes]] = {
       if (outputRef == dummyAssetOutputRef) {

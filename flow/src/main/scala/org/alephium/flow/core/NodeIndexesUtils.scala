@@ -26,7 +26,7 @@ import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
 
 trait NodeIndexesUtils { Self: FlowUtils =>
-  def getTxIdFromOutputRef(
+  def getTxIdBlockHashesFromOutputRef(
       outputRef: TxOutputRef
   ): IOResult[Option[TxIdBlockHashes]] = {
     txOutputRefIndexStorage(outputRef.hint.groupIndex).getOpt(outputRef.key)

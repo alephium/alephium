@@ -624,26 +624,22 @@ class ServerUtils(implicit
       blockHashOpt: Option[BlockHash]
   ): Try[Option[TxOutput]] = {
     for {
-      resultOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      resultOpt <- wrapResult(blockFlow.getTxIdBlockHashesFromOutputRef(outputRef))
       txOutputOpt <- resultOpt match {
         case Some((txId, blockHashes)) =>
-          val previousBlockHashOpt = blockHashOpt.flatMap { blockHash =>
-            val headerChain = blockFlow.getHeaderChain(blockHash)
-            blockHashes.find(headerChain.isBeforeUnsafe(_, blockHash))
-          }
-          previousBlockHashOpt match {
-            case Some(previousBlockHash) =>
-              wrapResult(blockFlow.getBlock(previousBlockHash)).flatMap { block =>
-                getTransaction(blockFlow, txId, block, _.getOutput(outputRef))
+          blockHashOpt match {
+            case Some(blockHash) =>
+              val headerChain = blockFlow.getHeaderChain(blockHash)
+              wrapResult(blockHashes.findE(headerChain.isBefore(_, blockHash))).flatMap {
+                case Some(previousBlockHash) =>
+                  wrapResult(blockFlow.getBlock(previousBlockHash)).flatMap { block =>
+                    getTransaction(blockFlow, txId, block, _.getOutput(outputRef))
+                  }
+                case None =>
+                  getTransaction(blockFlow, txId, None, None, _.getOutput(outputRef))
               }
             case None =>
-              getTransaction(
-                blockFlow,
-                txId,
-                None,
-                None,
-                _.getOutput(outputRef)
-              )
+              getTransaction(blockFlow, txId, None, None, _.getOutput(outputRef))
           }
         case None =>
           Right(None)
@@ -1737,7 +1733,7 @@ class ServerUtils(implicit
       outputRef: TxOutputRef
   ): Try[TransactionId] = {
     for {
-      resultOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
+      resultOpt <- wrapResult(blockFlow.getTxIdBlockHashesFromOutputRef(outputRef))
       result <- resultOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
       )
