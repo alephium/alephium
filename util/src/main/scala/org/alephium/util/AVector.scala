@@ -530,6 +530,17 @@ final class AVector[@sp A](
     None
   }
 
+  def findE[L](f: A => Either[L, Boolean]): Either[L, Option[A]] = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      val elem = elems(i)
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(b) => if (b) return Right(Some(elem))
+      }
+    }
+    Right(None)
+  }
+
   def indexWhere(f: A => Boolean): Int = {
     cfor(start)(_ < end, _ + 1) { i => if (f(elems(i))) return i - start }
     -1

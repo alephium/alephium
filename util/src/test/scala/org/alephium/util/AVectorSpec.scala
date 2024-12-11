@@ -383,6 +383,17 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "findE" in new Fixture {
+    forAll(vectorGen) { vc =>
+      val arr = vc.toArray
+      arr.foreach { elem =>
+        vc.findE(e => Right(e == elem)) isE arr.find(_ == elem)
+        vc.findE(_ => Right(false)) isE arr.find(_ => false)
+        vc.findE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
