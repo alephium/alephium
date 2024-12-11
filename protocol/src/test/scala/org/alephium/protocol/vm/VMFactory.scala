@@ -24,7 +24,7 @@ import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
   txIdBlockHashesSerde,
-  TxIdBlockHashes
+  TxIdTxOutputLocators
 }
 import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex._
@@ -44,7 +44,7 @@ trait VMFactory extends StorageFixture {
     val txOutputRefIndexStorage =
       TxOutputRefIndexStorage(
         Some(
-          newDB[TxOutputRef.Key, TxIdBlockHashes](
+          newDB[TxOutputRef.Key, TxIdTxOutputLocators](
             storage,
             RocksDBSource.ColumnFamily.TxOutputRefIndex
           )

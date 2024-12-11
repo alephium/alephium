@@ -73,7 +73,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         contractOutputRef,
         contractOutput,
         txId,
-        Some(BlockHash.generate)
+        Some((BlockHash.generate, 0, 0))
       )
       contractId
     }

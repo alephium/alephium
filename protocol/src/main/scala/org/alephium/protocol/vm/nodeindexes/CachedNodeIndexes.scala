@@ -19,13 +19,13 @@ package org.alephium.protocol.vm.nodeindexes
 import org.alephium.io.{CachedKVStorage, IOResult}
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.CachedLog
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.CachedSubContractIndex
 
 // format: off
 final case class CachedNodeIndexes(
     logStorageCache: CachedLog,
-    txOutputRefIndexCache: TxOutputRefIndexStorage[CachedKVStorage[TxOutputRef.Key, TxIdBlockHashes]],
+    txOutputRefIndexCache: TxOutputRefIndexStorage[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexCache: Option[CachedSubContractIndex]
 ) {
   def persist(): IOResult[NodeIndexesStorage] = {

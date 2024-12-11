@@ -116,7 +116,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       contractOutput,
       _networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled(),
       transactionEnv.txId,
-      generatedBlockEnv.blockId
+      generatedBlockEnv.getTxOutputLocator(0)
     ) isE ()
 
     val obj          = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)

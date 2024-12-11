@@ -21,14 +21,14 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{ContractId, TxOutputRef}
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
 
 trait NodeIndexesUtils { Self: FlowUtils =>
   def getTxIdBlockHashesFromOutputRef(
       outputRef: TxOutputRef
-  ): IOResult[Option[TxIdBlockHashes]] = {
+  ): IOResult[Option[TxIdTxOutputLocators]] = {
     txOutputRefIndexStorage(outputRef.hint.groupIndex).getOpt(outputRef.key)
   }
 

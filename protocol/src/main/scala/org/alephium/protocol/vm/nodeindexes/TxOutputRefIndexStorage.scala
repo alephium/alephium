@@ -17,31 +17,36 @@
 package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.{IOError, IOResult, MutableKV}
-import org.alephium.protocol.model.{BlockHash, TransactionId, TxOutputRef}
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
+  TxIdTxOutputLocators,
+  TxOutputLocator
+}
 import org.alephium.util.AVector
 
-final case class TxOutputRefIndexStorage[+T <: MutableKV[TxOutputRef.Key, TxIdBlockHashes, Unit]](
+// format: off
+final case class TxOutputRefIndexStorage[+T <: MutableKV[TxOutputRef.Key, TxIdTxOutputLocators, Unit]](
     value: Option[T]
 ) {
+// format: on
   def store(
       outputRef: TxOutputRef.Key,
       txId: TransactionId,
-      blockHashOpt: Option[BlockHash]
+      txOutputLocatorOpt: Option[TxOutputLocator]
   ): IOResult[Unit] = {
-    (value, blockHashOpt) match {
-      case (Some(storage), Some(blockHash)) =>
+    (value, txOutputLocatorOpt) match {
+      case (Some(storage), Some(txOutputLocator)) =>
         storage.getOpt(outputRef).flatMap {
-          case Some((txId, blockHashes)) =>
-            storage.put(outputRef, (txId, blockHashes :+ blockHash))
+          case Some((txId, txOutputLocators)) =>
+            storage.put(outputRef, (txId, txOutputLocators :+ txOutputLocator))
           case None =>
-            storage.put(outputRef, (txId, AVector(blockHash)))
+            storage.put(outputRef, (txId, AVector(txOutputLocator)))
         }
       case _ => Right(())
     }
   }
 
-  def getOpt(outputRef: TxOutputRef.Key): IOResult[Option[TxIdBlockHashes]] = {
+  def getOpt(outputRef: TxOutputRef.Key): IOResult[Option[TxIdTxOutputLocators]] = {
     value match {
       case Some(storage) =>
         storage.getOpt(outputRef)

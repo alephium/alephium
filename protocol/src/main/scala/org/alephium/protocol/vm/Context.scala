@@ -22,6 +22,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxOutputLocator
 import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(
@@ -31,7 +32,8 @@ final case class BlockEnv(
     target: Target,
     blockId: Option[BlockHash],
     hardFork: HardFork,
-    newOutputRefCache: Option[scala.collection.mutable.HashMap[AssetOutputRef, AssetOutput]]
+    newOutputRefCache: Option[scala.collection.mutable.HashMap[AssetOutputRef, AssetOutput]],
+    var currentTxIndex: Option[Int]
 ) {
   @inline def getHardFork(): HardFork = hardFork
 
@@ -42,6 +44,17 @@ final case class BlockEnv(
         cache.addOne(outputRef -> unsignedTx.fixedOutputs(outputIndex))
       }
     }
+  }
+
+  def updateCurrentTxIndex(txIndex: Int): Unit = {
+    currentTxIndex = Some(txIndex)
+  }
+
+  def getTxOutputLocator(txOutputIndex: Int): Option[TxOutputLocator] = {
+    for {
+      blockId <- blockId
+      txIndex <- currentTxIndex
+    } yield (blockId, txIndex, txOutputIndex)
   }
 }
 object BlockEnv {
@@ -59,6 +72,7 @@ object BlockEnv {
       target,
       blockId,
       networkConfig.getHardFork(timeStamp),
+      None,
       None
     )
 
@@ -72,7 +86,8 @@ object BlockEnv {
       header.target,
       Some(header.hash),
       networkConfig.getHardFork(header.timestamp),
-      Some(scala.collection.mutable.HashMap.empty)
+      Some(scala.collection.mutable.HashMap.empty),
+      None
     )
 }
 
@@ -331,10 +346,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId: ContractId,
       contractOutput: ContractOutput
   ): ExeResult[Unit] = {
-    val outputRef = nextContractOutputRef(contractOutput)
+    val outputRef       = nextContractOutputRef(contractOutput)
+    val txOutputLocator = blockEnv.getTxOutputLocator(nextOutputIndex)
     for {
       _ <- chargeGeneratedOutput()
-      _ <- updateContractAsset(contractId, blockEnv.blockId, outputRef, contractOutput)
+      _ <- updateContractAsset(contractId, outputRef, contractOutput, txOutputLocator)
     } yield {
       generatedOutputs.addOne(contractOutput)
       ()
@@ -395,7 +411,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
-    val outputRef = nextContractOutputRef(contractOutput)
+    val outputRef       = nextContractOutputRef(contractOutput)
+    val txOutputLocator = blockEnv.getTxOutputLocator(nextOutputIndex)
 
     for {
       _ <-
@@ -414,7 +431,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         initialImmFields,
         initialMutFields,
         outputRef,
-        contractOutput
+        contractOutput,
+        txOutputLocator
       )
       _ <- cacheNewContractIfNecessary(contractId)
     } yield {
@@ -428,7 +446,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
       initialImmFields: AVector[Val],
       initialMutFields: AVector[Val],
       outputRef: ContractOutputRef,
-      contractOutput: ContractOutput
+      contractOutput: ContractOutput,
+      txOutputLocator: Option[TxOutputLocator]
   ): ExeResult[Unit] = {
     val result = worldState
       .createContractUnsafe(
@@ -440,7 +459,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         contractOutput,
         getHardFork().isLemanEnabled(),
         txId,
-        blockEnv.blockId
+        txOutputLocator
       )
 
     result match {
@@ -485,9 +504,9 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def updateContractAsset(
       contractId: ContractId,
-      blockHashOpt: Option[BlockHash],
       outputRef: ContractOutputRef,
-      output: ContractOutput
+      output: ContractOutput,
+      txOutputLocator: Option[TxOutputLocator]
   ): ExeResult[Unit] = {
     for {
       _ <- markAssetFlushed(contractId)
@@ -497,7 +516,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
           outputRef,
           output,
           txId,
-          blockHashOpt
+          txOutputLocator
         )
         .left
         .map(e => Left(IOErrorUpdateState(e)))

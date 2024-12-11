@@ -19,13 +19,13 @@ package org.alephium.protocol.vm.nodeindexes
 import org.alephium.io.StagingKVStorage
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.StagingLog
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.StagingSubContractIndex
 
 // format: off
 final case class StagingNodeIndexes(
     logState: StagingLog,
-    txOutputRefIndexState: TxOutputRefIndexStorage[StagingKVStorage[TxOutputRef.Key, TxIdBlockHashes]],
+    txOutputRefIndexState: TxOutputRefIndexStorage[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexState: Option[StagingSubContractIndex]
 ) {
   def rollback(): Unit = {

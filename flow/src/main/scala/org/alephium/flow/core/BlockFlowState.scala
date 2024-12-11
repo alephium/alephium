@@ -28,7 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
@@ -79,7 +79,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ): TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]] = {
+  ): TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
     getBlockChainWithState(
       groupIndex
     ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage
@@ -573,14 +573,16 @@ object BlockFlowState {
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    val blockTs = block.timestamp
+    val blockTs    = block.timestamp
+    val txIndex    = block.transactions.indexWhere(_.id == tx.id)
+    val txIndexOpt = if (txIndex == -1) None else Some(txIndex)
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id, Some(block.hash))
+        worldState.addAsset(outputRef, outputUpdated, tx.id, txIndexOpt.map((block.hash, _, index)))
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

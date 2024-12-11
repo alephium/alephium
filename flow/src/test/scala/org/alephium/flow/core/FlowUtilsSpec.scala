@@ -52,9 +52,14 @@ class FlowUtilsSpec extends AlephiumSpec {
       val blockEnv = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
-      assets.foreach { asset =>
+      assets.foreachWithIndex { case (asset, index) =>
         worldState
-          .addAsset(asset.txInput.outputRef, asset.referredOutput, tx.id, blockEnv.blockId)
+          .addAsset(
+            asset.txInput.outputRef,
+            asset.referredOutput,
+            tx.id,
+            blockEnv.getTxOutputLocator(index)
+          )
           .isRight is true
       }
       val firstInput = assets.head.referredOutput

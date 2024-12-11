@@ -19,24 +19,26 @@ package org.alephium.protocol.vm.nodeindexes
 import org.alephium.io.KeyValueStorage
 import org.alephium.protocol.model.{BlockHash, TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdBlockHashes
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
-import org.alephium.serde.{avectorSerde, Serde}
+import org.alephium.serde.{avectorSerde, intSerde, Serde}
 import org.alephium.util.AVector
-
 // format: off
 final case class NodeIndexesStorage(
     logStorage: LogStorage,
-    txOutputRefIndexStorage: TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]],
+    txOutputRefIndexStorage: TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexStorage: Option[SubContractIndexStorage]
 )
 // format: on
 object NodeIndexesStorage {
-  type TxIdBlockHashes = (TransactionId, AVector[BlockHash])
+  type TxIndex              = Int
+  type TxOutputIndex        = Int
+  type TxOutputLocator      = (BlockHash, TxIndex, TxOutputIndex)
+  type TxIdTxOutputLocators = (TransactionId, AVector[TxOutputLocator])
 
-  implicit val txIdBlockHashesSerde: Serde[TxIdBlockHashes] =
-    Serde.tuple2[TransactionId, AVector[BlockHash]](
-      implicitly[Serde[TransactionId]],
-      avectorSerde[BlockHash]
-    )
+  implicit val txOutputLocatorSerde: Serde[TxOutputLocator] =
+    Serde.tuple3[BlockHash, Int, Int]
+
+  implicit val txIdBlockHashesSerde: Serde[TxIdTxOutputLocators] =
+    Serde.tuple2[TransactionId, AVector[TxOutputLocator]]
 }

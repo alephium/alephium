@@ -665,6 +665,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase, hardFork)
     EitherF.foreachTry(executionOrder) { index =>
       val tx = block.transactions(index)
+      blockEnv.updateCurrentTxIndex(index)
       val txValidationResult = nonCoinbaseValidation.checkBlockTx(
         chainIndex,
         tx,

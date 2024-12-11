@@ -49,7 +49,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           inputInfo.txInput.outputRef,
           inputInfo.referredOutput,
           TransactionId.generate,
-          Some(ModelBlockHash.generate)
+          Some((ModelBlockHash.generate, 0, 0))
         ) isE ()
       }
     }

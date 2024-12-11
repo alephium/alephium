@@ -218,6 +218,7 @@ trait FlowUtils
       order
         .foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
+          blockEnv.updateCurrentTxIndex(scriptTxIndex)
           generateFullTx(chainIndex, groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
@@ -320,9 +321,18 @@ trait FlowUtils
   ): IOResult[BlockFlowTemplate] = {
     val blockEnv = if (hardFork.isRhoneEnabled()) {
       val refCache = Some(mutable.HashMap.empty[AssetOutputRef, AssetOutput])
-      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, refCache)
+      BlockEnv(
+        chainIndex,
+        networkConfig.networkId,
+        templateTs,
+        target,
+        None,
+        hardFork,
+        refCache,
+        None
+      )
     } else {
-      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None)
+      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None, None)
     }
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)

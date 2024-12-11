@@ -33,7 +33,7 @@ import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
   txIdBlockHashesSerde,
-  TxIdBlockHashes
+  TxIdTxOutputLocators
 }
 import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex.{
@@ -76,9 +76,9 @@ object Storages {
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
 
     val txOutputRefIndexStorage = if (nodeSetting.indexesConfig.txOutputRefIndex) {
-      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]](
+      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]](
         Some(
-          RocksDBKeyValueStorage[TxOutputRef.Key, TxIdBlockHashes](
+          RocksDBKeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators](
             db,
             TxOutputRefIndex,
             writeOptions
@@ -86,7 +86,7 @@ object Storages {
         )
       )
     } else {
-      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdBlockHashes]](None)
+      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]](None)
     }
 
     val subContractIndexStorageOpt = if (nodeSetting.indexesConfig.subcontractIndex) {
