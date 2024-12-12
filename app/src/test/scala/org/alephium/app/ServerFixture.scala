@@ -541,7 +541,7 @@ object ServerFixture {
       }
     }
 
-    override def getTxIdBlockHashesFromOutputRef(
+    override def getTxIdTxOutputLocatorsFromOutputRef(
         outputRef: TxOutputRef
     ): IOResult[Option[TxIdTxOutputLocators]] = {
       if (outputRef == dummyAssetOutputRef) {

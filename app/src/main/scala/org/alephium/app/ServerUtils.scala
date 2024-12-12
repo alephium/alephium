@@ -624,7 +624,7 @@ class ServerUtils(implicit
       blockHashOpt: Option[BlockHash]
   ): Try[Option[TxOutput]] = {
     for {
-      resultOpt <- wrapResult(blockFlow.getTxIdBlockHashesFromOutputRef(outputRef))
+      resultOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
       txOutputOpt <- resultOpt match {
         case Some((txId, txOutputLocators)) =>
           blockHashOpt match {
@@ -1735,7 +1735,7 @@ class ServerUtils(implicit
       outputRef: TxOutputRef
   ): Try[TransactionId] = {
     for {
-      resultOpt <- wrapResult(blockFlow.getTxIdBlockHashesFromOutputRef(outputRef))
+      resultOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
       result <- resultOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
       )
