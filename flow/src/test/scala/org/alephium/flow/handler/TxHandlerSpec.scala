@@ -25,7 +25,8 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
 import org.alephium.flow.core.BlockFlowState.MemPooled
 import org.alephium.flow.handler.AllHandlers.BlockNotify
-import org.alephium.flow.handler.TxHandler.FailedValidation
+import org.alephium.flow.handler.TxHandler.{FailedValidation, ProcessedByMemPool}
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.mempool.MemPool.{
   AddedToMemPool,
   AddedToOrphanPool,
@@ -36,7 +37,7 @@ import org.alephium.flow.mempool.MemPool.{
 import org.alephium.flow.model.PersistedTxId
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.flow.validation.{InvalidGasPrice, NonExistInput}
+import org.alephium.flow.validation.{InvalidGasPrice, NonExistInput, TxValidation}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
@@ -72,6 +73,25 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         }
       }
     }
+  }
+
+  it should "validate and add txs to mempool" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    val txValidation                            = TxValidation.build
+    def addTx(tx: Transaction, cacheOrphanTx: Boolean) = {
+      TxHandler.validateAndAddTxToMemPool(blockFlow, txValidation, tx.toTemplate, cacheOrphanTx)
+    }
+    val tx0 = transfer(blockFlow, chainIndex).nonCoinbase.head
+    val tx1 = transfer(blockFlow, chainIndex).nonCoinbase.head
+
+    addTx(tx0, true) is ProcessedByMemPool(tx0.toTemplate, MemPool.AddedToMemPool)
+    addTx(tx0, true) is ProcessedByMemPool(tx0.toTemplate, MemPool.AlreadyExisted)
+    addTx(tx1, true) is ProcessedByMemPool(tx1.toTemplate, MemPool.DoubleSpending)
+
+    val orphanTx = prepareRandomSequentialTxs(2).last
+    addTx(orphanTx, true) is ProcessedByMemPool(orphanTx.toTemplate, MemPool.AddedToOrphanPool)
+    addTx(orphanTx, true) is ProcessedByMemPool(orphanTx.toTemplate, MemPool.AlreadyExisted)
+    addTx(orphanTx, false) is FailedValidation(orphanTx.toTemplate, Right(NonExistInput))
   }
 
   it should "broadcast valid transactions for single-broker clique" in new Fixture {

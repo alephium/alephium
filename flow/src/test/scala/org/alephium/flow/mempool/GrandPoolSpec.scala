@@ -19,9 +19,7 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.handler.TxHandler.{FailedValidation, ProcessedByMemPool}
-import org.alephium.flow.validation.{NonExistInput, TxValidation}
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, ModelGenerators, Transaction}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, ModelGenerators}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class GrandPoolSpec extends AlephiumSpec {
@@ -103,29 +101,6 @@ class GrandPoolSpec extends AlephiumSpec {
       }
     }
     checkMetrics(AVector.empty)
-  }
-
-  it should "validate and add txs to mempool" in new Fixture {
-    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
-
-    val txValidation = TxValidation.build
-    def addTx(tx: Transaction, cacheOrphanTx: Boolean) = {
-      pool.validateAndAddTx(blockFlow, txValidation, tx.toTemplate, cacheOrphanTx)
-    }
-
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val tx0        = transfer(blockFlow, chainIndex).nonCoinbase.head
-    val tx1        = transfer(blockFlow, chainIndex).nonCoinbase.head
-
-    addTx(tx0, true) is ProcessedByMemPool(tx0.toTemplate, MemPool.AddedToMemPool)
-    addTx(tx0, true) is ProcessedByMemPool(tx0.toTemplate, MemPool.AlreadyExisted)
-    addTx(tx1, true) is ProcessedByMemPool(tx1.toTemplate, MemPool.DoubleSpending)
-    pool.clear()
-
-    val orphanTx = prepareRandomSequentialTxs(2).last
-    addTx(orphanTx, true) is ProcessedByMemPool(orphanTx.toTemplate, MemPool.AddedToOrphanPool)
-    addTx(orphanTx, true) is ProcessedByMemPool(orphanTx.toTemplate, MemPool.AlreadyExisted)
-    addTx(orphanTx, false) is FailedValidation(orphanTx.toTemplate, Right(NonExistInput))
   }
 
   it should "clean mempool" in new Fixture {

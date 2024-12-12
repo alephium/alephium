@@ -17,11 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.TxHandler
-import org.alephium.flow.handler.TxHandler.{FailedValidation, SubmitToMemPoolResult}
-import org.alephium.flow.mempool.MemPool.{AlreadyExisted, DoubleSpending}
 import org.alephium.flow.setting.MemPoolSetting
-import org.alephium.flow.validation._
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
 import org.alephium.util.{AVector, OptionF, TimeStamp}
@@ -61,33 +57,6 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
         getMemPool(index.to).addXGroupTx(index, tx, timestamp)
       }
       result
-    }
-  }
-
-  def validateAndAddTx(
-      blockFlow: BlockFlow,
-      txValidation: TxValidation,
-      tx: TransactionTemplate,
-      cacheOrphanTx: Boolean
-  ): SubmitToMemPoolResult = {
-    val chainIndex = tx.chainIndex
-    assume(!brokerConfig.isIncomingChain(chainIndex))
-    val mempool = getMemPool(chainIndex.from)
-    if (mempool.contains(tx)) {
-      TxHandler.ProcessedByMemPool(tx, AlreadyExisted)
-    } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      TxHandler.ProcessedByMemPool(tx, DoubleSpending)
-    } else {
-      txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case Left(Right(NonExistInput)) if cacheOrphanTx =>
-          orphanPool.add(tx, TimeStamp.now()) match {
-            case MemPool.AddedToMemPool =>
-              TxHandler.ProcessedByMemPool(tx, MemPool.AddedToOrphanPool)
-            case result => TxHandler.ProcessedByMemPool(tx, result)
-          }
-        case Right(_)    => TxHandler.ProcessedByMemPool(tx, add(chainIndex, tx, TimeStamp.now()))
-        case Left(error) => FailedValidation(tx, error)
-      }
     }
   }
 

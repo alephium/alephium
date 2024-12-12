@@ -123,16 +123,45 @@ object TxHandler {
       case MemPool.AddedToMemPool =>
         for {
           _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
-          category <-
+          addToMemPoolResult <-
             if (!chainIndex.isIntraGroup) {
               mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from), publishBlock)
                 .map(_ => MemPool.AddedToMemPool)
             } else {
               Right(MemPool.AddedToMemPool)
             }
-        } yield category
-      case failed: AddTxFailed =>
+        } yield addToMemPoolResult
+      case failed: MemPool.AddTxFailed =>
         Right(failed)
+    }
+  }
+
+  private[handler] def validateAndAddTxToMemPool(
+      blockFlow: BlockFlow,
+      txValidation: TxValidation,
+      tx: TransactionTemplate,
+      cacheOrphanTx: Boolean
+  )(implicit brokerConfig: BrokerConfig): TxHandler.SubmitToMemPoolResult = {
+    val chainIndex = tx.chainIndex
+    assume(!brokerConfig.isIncomingChain(chainIndex))
+    val grandPool = blockFlow.getGrandPool()
+    val mempool   = grandPool.getMemPool(chainIndex.from)
+    if (mempool.contains(tx)) {
+      TxHandler.ProcessedByMemPool(tx, AlreadyExisted)
+    } else if (mempool.isDoubleSpending(chainIndex, tx)) {
+      TxHandler.ProcessedByMemPool(tx, DoubleSpending)
+    } else {
+      txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+        case Left(Right(NonExistInput)) if cacheOrphanTx =>
+          grandPool.orphanPool.add(tx, TimeStamp.now()) match {
+            case MemPool.AddedToMemPool =>
+              TxHandler.ProcessedByMemPool(tx, MemPool.AddedToOrphanPool)
+            case result => TxHandler.ProcessedByMemPool(tx, result)
+          }
+        case Right(_) =>
+          TxHandler.ProcessedByMemPool(tx, grandPool.add(chainIndex, tx, TimeStamp.now()))
+        case Left(error) => TxHandler.FailedValidation(tx, error)
+      }
     }
   }
 
@@ -297,9 +326,7 @@ trait TxCoreHandler extends TxHandlerUtils {
       acknowledge: Boolean,
       cacheOrphanTx: Boolean
   ): Unit = {
-    blockFlow
-      .getGrandPool()
-      .validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, cacheOrphanTx) match {
+    TxHandler.validateAndAddTxToMemPool(blockFlow, nonCoinbaseValidation, tx, cacheOrphanTx) match {
       case result @ TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool) =>
         handleValidTx(tx)
         sendResponse(acknowledge, result)
@@ -317,11 +344,10 @@ trait TxCoreHandler extends TxHandlerUtils {
   }
 
   private[handler] def validateOrphanTx(tx: TransactionTemplate): Unit = {
-    val grandPool = blockFlow.getGrandPool()
-    grandPool.validateAndAddTx(blockFlow, nonCoinbaseValidation, tx, false) match {
+    TxHandler.validateAndAddTxToMemPool(blockFlow, nonCoinbaseValidation, tx, false) match {
       case FailedValidation(_, Right(NonExistInput)) => ()
       case FailedValidation(_, _) | TxHandler.ProcessedByMemPool(_, MemPool.DoubleSpending) =>
-        grandPool.orphanPool.removeInvalidTx(tx)
+        blockFlow.getGrandPool().orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid orphan tx ${tx.id.toHexString}: ${tx.hex}")
       case TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool) => handleValidTx(tx)
       case _: TxHandler.SubmitToMemPoolResult                       => ()
