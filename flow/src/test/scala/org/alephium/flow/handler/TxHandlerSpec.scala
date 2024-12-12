@@ -595,7 +595,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),
-      ("alephium.mempool.clean-orphan-tx-frequency", "500 ms")
+      ("alephium.mempool.clean-orphan-tx-frequency", "700 ms")
     )
     val sequentialTxs                     = prepareRandomSequentialTxs(6)
     val Seq(tx1, tx2, tx3, tx4, tx5, tx6) = sequentialTxs.toSeq
