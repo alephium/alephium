@@ -287,7 +287,7 @@ object Ast {
   }
 
   sealed trait AccessDataT[Ctx <: StatelessContext] { self: Positioned =>
-    def selectors: Seq[DataSelector]
+    def selectors: Seq[DataSelector[Ctx]]
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     protected def mapKeyIndex: Expr[Ctx] = {
       selectors(0).asInstanceOf[IndexSelector[Ctx]].index
@@ -314,7 +314,7 @@ object Ast {
                 s"Expected array or map type, got ${quote(tpe)}",
                 SourceIndex(this.sourceIndex, sourceIndex)
               )
-            case (tpe, _: IdentSelector) =>
+            case (tpe, _: IdentSelector[Ctx @unchecked]) =>
               throw Compiler.Error(
                 s"Expected struct type, got ${quote(tpe)}",
                 SourceIndex(this.sourceIndex, sourceIndex)
@@ -362,7 +362,7 @@ object Ast {
     private def calcDataOffset(
         state: Compiler.State[StatefulContext],
         tpe: Type,
-        selectors: Seq[DataSelector],
+        selectors: Seq[DataSelector[StatefulContext]],
         isMutable: Boolean,
         dataOffset: DataRefOffset[StatefulContext]
     ): (DataRefOffset[StatefulContext], Boolean) = {
@@ -388,7 +388,7 @@ object Ast {
     private def calcDataOffset(
         state: Compiler.State[StatefulContext],
         rootType: Type,
-        selectors: Seq[DataSelector]
+        selectors: Seq[DataSelector[StatefulContext]]
     ): (VarOffset[StatefulContext], VarOffset[StatefulContext], Boolean) = {
       val initOffset = DataRefOffset[StatefulContext](ConstantVarOffset(0), ConstantVarOffset(0))
       val (offset, isMutable) = calcDataOffset(
@@ -420,10 +420,12 @@ object Ast {
         rootType: Type,
         selectedDataType: Type,
         pathCodes: Seq[Instr[Ctx]],
-        selectors: Seq[DataSelector]
+        selectors: Seq[DataSelector[Ctx]]
     ): Seq[Instr[Ctx]] = {
-      val statefulState                     = state.asInstanceOf[Compiler.State[StatefulContext]]
-      val (immOffset, mutOffset, isMutable) = calcDataOffset(statefulState, rootType, selectors)
+      val statefulState     = state.asInstanceOf[Compiler.State[StatefulContext]]
+      val statefulSelectors = selectors.asInstanceOf[Seq[DataSelector[StatefulContext]]]
+      val (immOffset, mutOffset, isMutable) =
+        calcDataOffset(statefulState, rootType, statefulSelectors)
       val mutability = state.flattenTypeMutability(selectedDataType, isMutable)
       val (initCodes, subContractIdCodes) = genSubContractId(
         statefulState,
@@ -456,10 +458,11 @@ object Ast {
         rootType: Type,
         selectedDataType: Type,
         pathCodes: Seq[Instr[Ctx]],
-        selectors: Seq[DataSelector]
+        selectors: Seq[DataSelector[Ctx]]
     ): Seq[Seq[Instr[Ctx]]] = {
       val statefulState     = state.asInstanceOf[Compiler.State[StatefulContext]]
-      val (_, mutOffset, _) = calcDataOffset(statefulState, rootType, selectors)
+      val statefulSelectors = selectors.asInstanceOf[Seq[DataSelector[StatefulContext]]]
+      val (_, mutOffset, _) = calcDataOffset(statefulState, rootType, statefulSelectors)
       val length            = state.flattenTypeLength(Seq(selectedDataType))
       val (initCodes, subContractIdCodes) = genSubContractId(
         statefulState,
@@ -481,7 +484,7 @@ object Ast {
 
   final case class LoadDataBySelectors[Ctx <: StatelessContext](
       base: Expr[Ctx],
-      selectors: Seq[DataSelector]
+      selectors: Seq[DataSelector[Ctx]]
   ) extends Expr[Ctx]
       with AccessDataT[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
@@ -1485,6 +1488,7 @@ object Ast {
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
     def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+    def genInit(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
@@ -1511,25 +1515,30 @@ object Ast {
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
     def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]       = state.genLoadCode(ident)
+    def genInit(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]       = Seq.empty
   }
-  sealed trait DataSelector extends Positioned {
+  sealed trait DataSelector[Ctx <: StatelessContext] extends Positioned {
     def reset(): Unit = this match {
-      case IndexSelector(expr) => expr.reset()
-      case _: IdentSelector    => ()
+      case IndexSelector(expr)   => expr.reset()
+      case _: IdentSelector[Ctx] => ()
     }
   }
-  final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx]) extends DataSelector
-  final case class IdentSelector(ident: Ident)                              extends DataSelector
+  final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx])
+      extends DataSelector[Ctx]
+  final case class IdentSelector[Ctx <: StatelessContext](ident: Ident) extends DataSelector[Ctx]
   final case class AssignmentSelectedTarget[Ctx <: StatelessContext](
       ident: Ident,
-      selectors: Seq[DataSelector]
+      selectors: Seq[DataSelector[Ctx]]
   ) extends AssignmentTarget[Ctx]
       with AccessDataT[Ctx] {
+
+    val selectorIndexIdent: mutable.HashMap[Int, Ident] = mutable.HashMap.empty
+
     // scalastyle:off method.length
     private def checkMap(
         state: Compiler.State[Ctx],
         mapType: Type.Map,
-        selectors: Seq[DataSelector],
+        selectors: Seq[DataSelector[Ctx]],
         sourceIndex: Option[SourceIndex]
     ): Unit = {
       if (selectors.isEmpty) {
@@ -1555,7 +1564,7 @@ object Ast {
     private def checkMutable(
         state: Compiler.State[Ctx],
         rootType: Type,
-        selectors: Seq[DataSelector],
+        selectors: Seq[DataSelector[Ctx]],
         lastField: Ident,
         structId: Option[TypeId],
         sourceIndex: Option[SourceIndex]
@@ -1623,10 +1632,42 @@ object Ast {
           val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
           MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
-          val ref    = state.getVariablesRef(ident)
-          val subRef = ref.subRef(state, selectors.init)
-          subRef.genStoreCode(state, selectors.last)
+          val ref = state.getVariablesRef(ident)
+          val updatedSelectors: Seq[DataSelector[Ctx]] = selectors.zipWithIndex.map {
+            case (IndexSelector(expr), index) =>
+              selectorIndexIdent.get(index) match {
+                case Some(ident) =>
+                  IndexSelector(Variable(ident))
+                case None =>
+                  IndexSelector(expr)
+              }
+            case (selector, _) =>
+              selector
+          }
+          val subRef = ref.subRef(state, updatedSelectors.init) // What does subRef do?
+          subRef.genStoreCode(state, updatedSelectors.last)
       }
+    }
+
+    def genInit(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val initCodes = mutable.ArrayBuffer.empty[Instr[Ctx]]
+      selectors.zipWithIndex.foreach {
+        case (IndexSelector(expr), index) =>
+          val indexVarIdent = Ident(s"${ident.name}[${index}]") // maybe better name
+          state.addLocalVariable(
+            indexVarIdent,
+            Type.U256,
+            isMutable = true,
+            isUnused = false,
+            isGenerated = true
+          )
+          initCodes ++= (expr.genCode(state) ++ state.genStoreCode(indexVarIdent).flatten)
+          selectorIndexIdent(index) = indexVarIdent
+        case _ =>
+          ()
+      }
+
+      initCodes.toSeq
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -1637,9 +1678,20 @@ object Ast {
           val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
           MapOps.genLoad(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
-          val ref    = state.getVariablesRef(ident)
-          val subRef = ref.subRef(state, selectors.init)
-          subRef.genLoadCode(state, selectors.last)
+          val ref = state.getVariablesRef(ident)
+          val updatedSelectors: Seq[DataSelector[Ctx]] = selectors.zipWithIndex.map {
+            case (IndexSelector(expr), index) =>
+              selectorIndexIdent.get(index) match {
+                case Some(ident) =>
+                  IndexSelector(Variable(ident))
+                case None =>
+                  IndexSelector(expr)
+              }
+            case (selector, _) =>
+              selector
+          }
+          val subRef = ref.subRef(state, updatedSelectors.init)
+          subRef.genLoadCode(state, updatedSelectors.last)
       }
     }
 
@@ -1775,8 +1827,9 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val tpe = target.getType(state)
-      target.genLoad(state) ++ rhs.genCode(state) ++ op
-        .genCode(tpe) ++ target.genStore(state).reverse.flatten
+      target.genInit(state) ++
+        target.genLoad(state) ++ rhs.genCode(state) ++ op
+          .genCode(tpe) ++ target.genStore(state).reverse.flatten
     }
 
     def reset(): Unit = {
