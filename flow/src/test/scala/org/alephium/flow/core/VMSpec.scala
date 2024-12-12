@@ -3887,10 +3887,41 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "encode values" in new ContractFixture {
     val foo: String =
       s"""
+         |struct Struct1 {
+         |  a: Bool,
+         |  b: U256,
+         |  c: Bool
+         |}
+         |
+         |struct Struct2 {
+         |  a: Bool,
+         |  b: [U256; 2]
+         |}
+         |
+         |struct Struct3 {
+         |  a: Bool,
+         |  b: Struct2
+         |}
+         |
          |Contract Foo() {
          |  pub fn foo() -> () {
-         |    let bytes = encodeToByteVec!(true, 1, false)
-         |    assert!(bytes == #03000102010000, 0)
+         |    let struct1 = Struct1 { a: true, b: 1, c: false }
+         |    let struct1Bytes = encodeToByteVec!(struct1)
+         |    assert!(struct1Bytes == #03000102010000, 0)
+         |
+         |    let struct2 = Struct2 { a: true, b: [1, 2] }
+         |    let struct2Bytes = encodeToByteVec!(struct2)
+         |    assert!(struct2Bytes == #03000102010202, 1)
+         |
+         |    let struct3 = Struct3 { a: true, b: struct2 }
+         |    let struct3Bytes = encodeToByteVec!(struct3)
+         |    assert!(struct3Bytes == #040001000102010202, 3)
+         |
+         |    let allStructs = encodeToByteVec!(struct1, struct2, struct3)
+         |    assert!(allStructs == #0a0001020100000001020102020001000102010202, 4)
+         |
+         |    let bytes = encodeToByteVec!(true, 1, false, [1, 2], struct3)
+         |    assert!(bytes == #09000102010000020102020001000102010202, 5)
          |  }
          |}
          |""".stripMargin
@@ -3905,6 +3936,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |$foo
          |""".stripMargin
     testSimpleScript(main)
+  }
+
+  it should "return compilation error when encoding nothing" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes = encodeToByteVec!()
+         |    assert!(bytes == #00, 0)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(foo).leftValue.getMessage is
+      "Builtin func encodeToByteVec expects at least one argument"
   }
 
   it should "test Contract.encodeFields" in new ContractFixture {
@@ -6627,12 +6672,13 @@ class VMSpec extends AlephiumSpec with Generators {
     subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
     blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
     blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
-
-    blockFlow
-      .getSubContractIds(parentContractId, 0, 5)
-      .leftValue
-      .reason
-      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
+    blockFlow.getSubContractIds(parentContractId, 0, 5) isE (4, AVector.from(subContracts))
+    blockFlow.getSubContractIds(parentContractId, 2, 5) isE (4, AVector.from(
+      subContractId5 +: subContracts678
+    ))
+    blockFlow.getSubContractIds(parentContractId, 3, 10) isE (4, AVector.from(subContracts678))
+    blockFlow.getSubContractIds(parentContractId, 4, 10) isE (4, AVector.empty)
+    blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
   // Inactive instrs check will be enabled in future upgrades
@@ -6719,6 +6765,84 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     testSimpleScript(script)
+  }
+
+  it should "be able to use assets in the inline function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @inline fn transfer() -> () {
+         |    let caller = callerAddress!()
+         |    assert!(caller == @$genesisAddress, 0)
+         |    transferTokenToSelf!(caller, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> () {
+         |    checkCaller!(callerAddress!() == @$genesisAddress, 0)
+         |    transfer{callerAddress!() -> ALPH: 1 alph}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val fooId = createCompiledContract(compiled.code)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo{@$genesisAddress -> ALPH: 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is ALPH.oneAlph.addUnsafe(minimalAlphInContract)
+  }
+
+  it should "call multiple inline functions that use contract assets" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(checkExternalCaller = false, preapprovedAssets = true)
+         |  pub fn f0() -> () {
+         |    f1{callerAddress!() -> ALPH: 2 alph}()
+         |    f2()
+         |  }
+         |
+         |  @using(payToContractOnly = true, preapprovedAssets = true)
+         |  @inline fn f1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 2 alph)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  @inline fn f2() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val initialAlphAmount = ALPH.alph(2)
+    val fooId = createCompiledContract(compiled.code, initialAttoAlphAmount = initialAlphAmount)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.f0{@$genesisAddress -> ALPH: 2 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
   }
 
   private def getEvents(

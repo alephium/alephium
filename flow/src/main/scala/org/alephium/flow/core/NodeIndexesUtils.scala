@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.IOResult
 import org.alephium.protocol.model.{TransactionId, TxOutputRef}
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
@@ -61,11 +61,7 @@ trait NodeIndexesUtils { Self: FlowUtils =>
                 Right(())
               }
             case Right(None) =>
-              Left(
-                IOError.keyNotFound(
-                  s"Can not find sub-contracts for ${subContractIndexStateId.contractId.toHexString} at count ${subContractIndexStateId.counter}"
-                )
-              )
+              Right(())
             case Left(error) =>
               Left(error)
 
