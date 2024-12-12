@@ -841,23 +841,20 @@ class ServerUtils(implicit
         }
     )
   }
+
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
     val message =
       TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
-    txHandler.ask(message).mapTo[TxHandler.AddToMemPoolResult].map {
+    txHandler.ask(message).mapTo[TxHandler.SubmitToMemPoolResult].map {
       case TxHandler.ProcessedByMemPool(_, AddedToMemPool) =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case TxHandler.ProcessedByMemPool(_, AlreadyExisted) =>
         // succeed for idempotency reasons due to clients retrying submission
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
-      case processed: TxHandler.ProcessedByMemPool =>
-        Left(failed(processed.message))
-      case invalid: TxHandler.FailedValidation =>
-        Left(failed(invalid.message))
-      case TxHandler.FailedInternally(_, error) =>
-        Left(failed(error))
+      case failedResult =>
+        Left(failed(failedResult.message))
     }
   }
 
