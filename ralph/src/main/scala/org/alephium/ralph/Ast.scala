@@ -1532,7 +1532,7 @@ object Ast {
   ) extends AssignmentTarget[Ctx]
       with AccessDataT[Ctx] {
 
-    val selectorIndexIdent: mutable.HashMap[Int, Ident] = mutable.HashMap.empty
+    val selectorIndexVariables: mutable.HashMap[Int, Variable[Ctx]] = mutable.HashMap.empty
 
     // scalastyle:off method.length
     private def checkMap(
@@ -1632,19 +1632,9 @@ object Ast {
           val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
           MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
-          val ref = state.getVariablesRef(ident)
-          val updatedSelectors: Seq[DataSelector[Ctx]] = selectors.zipWithIndex.map {
-            case (IndexSelector(expr), index) =>
-              selectorIndexIdent.get(index) match {
-                case Some(ident) =>
-                  IndexSelector(Variable(ident))
-                case None =>
-                  IndexSelector(expr)
-              }
-            case (selector, _) =>
-              selector
-          }
-          val subRef = ref.subRef(state, updatedSelectors.init) // What does subRef do?
+          val ref              = state.getVariablesRef(ident)
+          val updatedSelectors = updateSelectorsWithVariables(selectors)
+          val subRef           = ref.subRef(state, updatedSelectors.init)
           subRef.genStoreCode(state, updatedSelectors.last)
       }
     }
@@ -1653,16 +1643,21 @@ object Ast {
       val initCodes = mutable.ArrayBuffer.empty[Instr[Ctx]]
       selectors.zipWithIndex.foreach {
         case (IndexSelector(expr), index) =>
-          val indexVarIdent = Ident(s"${ident.name}[${index}]") // maybe better name
-          state.addLocalVariable(
-            indexVarIdent,
-            Type.U256,
-            isMutable = true,
-            isUnused = false,
-            isGenerated = true
-          )
-          initCodes ++= (expr.genCode(state) ++ state.genStoreCode(indexVarIdent).flatten)
-          selectorIndexIdent(index) = indexVarIdent
+          expr match {
+            case _: Variable[Ctx @unchecked] | _: Const[Ctx @unchecked] =>
+              ()
+            case _ =>
+              val indexVarIdent = Ident(state.freshName())
+              state.addLocalVariable(
+                indexVarIdent,
+                Type.U256,
+                isMutable = false,
+                isUnused = false,
+                isGenerated = true
+              )
+              initCodes ++= (expr.genCode(state) ++ state.genStoreCode(indexVarIdent).flatten)
+              selectorIndexVariables(index) = Variable(indexVarIdent)
+          }
         case _ =>
           ()
       }
@@ -1678,19 +1673,9 @@ object Ast {
           val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
           MapOps.genLoad(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
-          val ref = state.getVariablesRef(ident)
-          val updatedSelectors: Seq[DataSelector[Ctx]] = selectors.zipWithIndex.map {
-            case (IndexSelector(expr), index) =>
-              selectorIndexIdent.get(index) match {
-                case Some(ident) =>
-                  IndexSelector(Variable(ident))
-                case None =>
-                  IndexSelector(expr)
-              }
-            case (selector, _) =>
-              selector
-          }
-          val subRef = ref.subRef(state, updatedSelectors.init)
+          val ref              = state.getVariablesRef(ident)
+          val updatedSelectors = updateSelectorsWithVariables(selectors)
+          val subRef           = ref.subRef(state, updatedSelectors.init)
           subRef.genLoadCode(state, updatedSelectors.last)
       }
     }
@@ -1698,6 +1683,20 @@ object Ast {
     override def reset(): Unit = {
       selectors.foreach(_.reset())
       super.reset()
+    }
+
+    def updateSelectorsWithVariables(selectors: Seq[DataSelector[Ctx]]): Seq[DataSelector[Ctx]] = {
+      selectors.zipWithIndex.map {
+        case (IndexSelector(expr), index) =>
+          selectorIndexVariables.get(index) match {
+            case Some(variable) =>
+              IndexSelector(variable)
+            case None =>
+              IndexSelector(expr)
+          }
+        case (selector, _) =>
+          selector
+      }
     }
   }
 

@@ -6982,6 +6982,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |    array[updateAndGetIndex()] += 1
          |    assert!(array[0] == 1, 1)
          |    assert!(array[1] == 1, 2)
+         |    assert!(index == 1, 3)
+         |    array[updateAndGetIndex()] += 1
+         |    assert!(array[0] == 1, 4)
+         |    assert!(array[1] == 2, 5)
          |  }
          |
          |  pub fn updateAndGetIndex() -> U256 {
