@@ -22,7 +22,6 @@ import org.alephium.protocol.vm.event.StagingLog
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.StagingSubContractIndex
 
-// format: off
 final case class StagingNodeIndexes(
     logState: StagingLog,
     txOutputRefIndexState: Option[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
@@ -42,4 +41,3 @@ final case class StagingNodeIndexes(
     ()
   }
 }
-// format: on

@@ -24,13 +24,13 @@ import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocat
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.serde.{avectorSerde, intSerde, Serde}
 import org.alephium.util.AVector
-// format: off
+
 final case class NodeIndexesStorage(
     logStorage: LogStorage,
     txOutputRefIndexStorage: Option[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexStorage: Option[SubContractIndexStorage]
 )
-// format: on
+
 object NodeIndexesStorage {
   type TxIndex              = Int
   type TxOutputIndex        = Int

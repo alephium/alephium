@@ -112,7 +112,7 @@ object TxEnv {
       fixedOutputs: AVector[AssetOutput],
       gasPrice: GasPrice,
       gasAmount: GasBox,
-      isEntryMethodPayable: Boolean,
+      isEntryMethodPayable: Boolean
   ): TxEnv =
     Mockup(
       txId,
@@ -344,10 +344,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId: ContractId,
       contractOutput: ContractOutput
   ): ExeResult[Unit] = {
-    val outputRef = nextContractOutputRef(contractOutput)
-    val txOutputLocator = for {
-      blockId <- blockEnv.blockId
-    } yield (blockId, txEnv.txIndex, nextOutputIndex)
+    val outputRef       = nextContractOutputRef(contractOutput)
+    val txOutputLocator = TxOutputLocator.from(blockEnv, txEnv, nextOutputIndex)
     for {
       _ <- chargeGeneratedOutput()
       _ <- updateContractAsset(contractId, outputRef, contractOutput, txOutputLocator)
@@ -389,7 +387,6 @@ trait StatefulContext extends StatelessContext with ContractPool {
       .flatMap(error => ioFailed(IOErrorLoadContract(error)))
   }
 
-  // scalastyle:off method.length
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
@@ -438,7 +435,6 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId
     }
   }
-  // scalastyle:on method.length
 
   private def createContract(
       contractId: ContractId,

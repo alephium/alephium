@@ -24,7 +24,6 @@ import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
 }
 import org.alephium.util.AVector
 
-// format: off
 object TxOutputRefIndexStorage {
   def store(
       storage: MutableKV[TxOutputRef.Key, TxIdTxOutputLocators, Unit],
@@ -45,4 +44,3 @@ object TxOutputRefIndexStorage {
     }
   }
 }
-
