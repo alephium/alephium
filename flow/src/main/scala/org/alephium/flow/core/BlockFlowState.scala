@@ -79,10 +79,19 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ): TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
+  ):  IOResult[TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]]] = {
     getBlockChainWithState(
       groupIndex
-    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage
+    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+      case Some(storage) =>
+        Right(storage)
+      case None =>
+        Left(
+          IOError.configError(
+            "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
+          )
+        )
+    }
   }
 
   lazy val subContractIndexStorage: IOResult[SubContractIndexStorage] = {
@@ -512,17 +521,17 @@ object BlockFlowState {
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
       // note that script execution is already done in validation
-      block.transactions.foreachE { tx =>
-        updateStateForInOutBlock(worldState, tx, targetGroup, block)
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForInOutBlock(worldState, tx, txIndex, targetGroup, block)
       }
     } else if (chainIndex.from == targetGroup) {
-      block.transactions.foreachE(
-        updateStateForOutBlock(worldState, _, targetGroup, block)
-      )
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForOutBlock(worldState, tx, txIndex, targetGroup, block)
+      }
     } else if (chainIndex.to == targetGroup) {
-      block.transactions.foreachE(
-        updateStateForInBlock(worldState, _, targetGroup, block)
-      )
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForInBlock(worldState, tx, txIndex, targetGroup, block)
+      }
     } else {
       // dead branch
       Right(())
@@ -532,34 +541,37 @@ object BlockFlowState {
   def updateStateForInOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, block)
+      _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
     } yield ()
   }
 
   def updateStateForOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, block)
+      _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
     } yield ()
   }
 
   def updateStateForInBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    updateStateForOutputs(worldState, tx, targetGroup, block)
+    updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
   }
 
   // Note: contract inputs are updated during the execution of tx script
@@ -570,11 +582,11 @@ object BlockFlowState {
   private def updateStateForOutputs(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     val blockTs    = block.timestamp
-    val txIndex    = block.transactions.indexWhere(_.id == tx.id)
     val txIndexOpt = if (txIndex == -1) None else Some(txIndex)
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>

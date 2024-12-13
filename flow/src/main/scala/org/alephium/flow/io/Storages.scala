@@ -76,8 +76,8 @@ object Storages {
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
 
     val txOutputRefIndexStorage = if (nodeSetting.indexesConfig.txOutputRefIndex) {
-      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]](
-        Some(
+      Some(
+        TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]](
           RocksDBKeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators](
             db,
             TxOutputRefIndex,
@@ -86,7 +86,7 @@ object Storages {
         )
       )
     } else {
-      TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]](None)
+      None
     }
 
     val subContractIndexStorageOpt = if (nodeSetting.indexesConfig.subcontractIndex) {

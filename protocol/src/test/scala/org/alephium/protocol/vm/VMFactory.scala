@@ -42,14 +42,12 @@ trait VMFactory extends StorageFixture {
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
     val txOutputRefIndexStorage =
-      TxOutputRefIndexStorage(
-        Some(
+      Some(TxOutputRefIndexStorage(
           newDB[TxOutputRef.Key, TxIdTxOutputLocators](
             storage,
             RocksDBSource.ColumnFamily.TxOutputRefIndex
           )
-        )
-      )
+      ))
     val parentContractIndexStorage =
       newDB[ContractId, ContractId](storage, RocksDBSource.ColumnFamily.ParentContract)
     val subContractIndexStateStorage = newDB[SubContractIndexStateId, SubContractIndexState](

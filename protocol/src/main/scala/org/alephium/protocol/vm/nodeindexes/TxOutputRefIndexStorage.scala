@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm.nodeindexes
 
-import org.alephium.io.{IOError, IOResult, MutableKV}
+import org.alephium.io.{IOResult, MutableKV}
 import org.alephium.protocol.model.{TransactionId, TxOutputRef}
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
   TxIdTxOutputLocators,
@@ -26,7 +26,7 @@ import org.alephium.util.AVector
 
 // format: off
 final case class TxOutputRefIndexStorage[+T <: MutableKV[TxOutputRef.Key, TxIdTxOutputLocators, Unit]](
-    value: Option[T]
+    storage: T
 ) {
 // format: on
   def store(
@@ -34,28 +34,20 @@ final case class TxOutputRefIndexStorage[+T <: MutableKV[TxOutputRef.Key, TxIdTx
       txId: TransactionId,
       txOutputLocatorOpt: Option[TxOutputLocator]
   ): IOResult[Unit] = {
-    (value, txOutputLocatorOpt) match {
-      case (Some(storage), Some(txOutputLocator)) =>
+    txOutputLocatorOpt match {
+      case Some(txOutputLocator) =>
         storage.getOpt(outputRef).flatMap {
           case Some((txId, txOutputLocators)) =>
             storage.put(outputRef, (txId, txOutputLocators :+ txOutputLocator))
           case None =>
             storage.put(outputRef, (txId, AVector(txOutputLocator)))
         }
-      case _ => Right(())
+      case None =>
+        Right(())
     }
   }
 
   def getOpt(outputRef: TxOutputRef.Key): IOResult[Option[TxIdTxOutputLocators]] = {
-    value match {
-      case Some(storage) =>
-        storage.getOpt(outputRef)
-      case None =>
-        Left(
-          IOError.configError(
-            "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"
-          )
-        )
-    }
+    storage.getOpt(outputRef)
   }
 }

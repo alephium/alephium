@@ -180,7 +180,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(storage, RocksDBSource.ColumnFamily.All),
       NodeIndexesStorage(
         newLogStorage(storage),
-        TxOutputRefIndexStorage(Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex))),
+        Some(TxOutputRefIndexStorage(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex))),
         Some(newSubContractIndexStorage(storage))
       )
     )
@@ -312,7 +312,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(storage, RocksDBSource.ColumnFamily.All),
       NodeIndexesStorage(
         newLogStorage(storage),
-        TxOutputRefIndexStorage(Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex))),
+        Some(TxOutputRefIndexStorage(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex))),
         Some(newSubContractIndexStorage(storage))
       )
     )

@@ -570,11 +570,11 @@ class ServerUtils(implicit
   private[app] def getRichTransaction(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      blockHash: Option[BlockHash]
+      spentBlockHashOpt: Option[BlockHash]
   ): Try[RichTransaction] = {
     for {
-      assetInputs    <- getRichAssetInputs(blockFlow, transaction, blockHash)
-      contractInputs <- getRichContractInputs(blockFlow, transaction, blockHash)
+      assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHashOpt)
+      contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHashOpt)
     } yield {
       RichTransaction.from(transaction, assetInputs, contractInputs)
     }
@@ -584,11 +584,11 @@ class ServerUtils(implicit
   private[app] def getRichContractInputs(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      blockHash: Option[BlockHash]
+      spentBlockHashOpt: Option[BlockHash]
   ): Try[AVector[RichContractInput]] = {
     transaction.contractInputs.mapE { contractOutputRef =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef, blockHash)
+        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef, spentBlockHashOpt)
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
@@ -603,11 +603,11 @@ class ServerUtils(implicit
   private[app] def getRichAssetInputs(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      blockHash: Option[BlockHash]
+      spentBlockHashOpt: Option[BlockHash]
   ): Try[AVector[RichAssetInput]] = {
     transaction.unsigned.inputs.mapE { assetInput =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef, blockHash)
+        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef, spentBlockHashOpt)
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
@@ -621,27 +621,27 @@ class ServerUtils(implicit
   private[app] def getTxOutput(
       blockFlow: BlockFlow,
       outputRef: TxOutputRef,
-      blockHashOpt: Option[BlockHash]
+      spentBlockHashOpt: Option[BlockHash]
   ): Try[Option[TxOutput]] = {
     for {
       resultOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
       txOutputOpt <- resultOpt match {
         case Some((txId, txOutputLocators)) =>
-          blockHashOpt match {
-            case Some(blockHash) =>
-              val headerChain = blockFlow.getHeaderChain(blockHash)
+          spentBlockHashOpt match {
+            case Some(spentBlockHash) =>
+              val headerChain = blockFlow.getHeaderChain(spentBlockHash)
               wrapResult(
-                txOutputLocators.findE(locator => headerChain.isBefore(locator._1, blockHash))
+                txOutputLocators.findE(locator => headerChain.isBefore(locator._1, spentBlockHash))
               ).flatMap {
                 case Some((blockHash, txIndex, outputIndex)) =>
                   wrapResult(blockFlow.getBlock(blockHash)).flatMap { block =>
                     Right(Some(block.getTransaction(txIndex).getOutput(outputIndex)))
                   }
                 case None =>
-                  getTransaction(blockFlow, txId, None, None, _.getOutput(outputRef))
+                  getTransactionAndConvert(blockFlow, txId, None, None, _.getOutput(outputRef))
               }
             case None =>
-              getTransaction(blockFlow, txId, None, None, _.getOutput(outputRef))
+              getTransactionAndConvert(blockFlow, txId, None, None, _.getOutput(outputRef))
           }
         case None =>
           Right(None)
@@ -752,7 +752,13 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
-    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => model.Transaction.fromProtocol(tx))
+    getTransactionAndConvert(
+      blockFlow,
+      txId,
+      fromGroup,
+      toGroup,
+      tx => model.Transaction.fromProtocol(tx)
+    )
   }
 
   def getRichTransaction(
@@ -762,7 +768,7 @@ class ServerUtils(implicit
       toGroup: Option[GroupIndex]
   ): Try[model.RichTransaction] = {
     for {
-      transaction     <- getTransaction(blockFlow, txId, fromGroup, toGroup, identity)
+      transaction     <- getTransactionAndConvert(blockFlow, txId, fromGroup, toGroup, identity)
       richTransaction <- getRichTransaction(blockFlow, transaction, None)
     } yield richTransaction
   }
@@ -773,10 +779,16 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.RawTransaction] = {
-    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => RawTransaction(serialize(tx)))
+    getTransactionAndConvert(
+      blockFlow,
+      txId,
+      fromGroup,
+      toGroup,
+      tx => RawTransaction(serialize(tx))
+    )
   }
 
-  def getTransaction[T](
+  def getTransactionAndConvert[T](
       blockFlow: BlockFlow,
       txId: TransactionId,
       fromGroup: Option[GroupIndex],

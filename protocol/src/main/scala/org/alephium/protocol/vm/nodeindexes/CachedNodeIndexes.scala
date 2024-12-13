@@ -25,15 +25,16 @@ import org.alephium.protocol.vm.subcontractindex.CachedSubContractIndex
 // format: off
 final case class CachedNodeIndexes(
     logStorageCache: CachedLog,
-    txOutputRefIndexCache: TxOutputRefIndexStorage[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
+    txOutputRefIndexCache: Option[TxOutputRefIndexStorage[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]]],
     subContractIndexCache: Option[CachedSubContractIndex]
 ) {
   def persist(): IOResult[NodeIndexesStorage] = {
     for {
       logStorage <- logStorageCache.persist()
-      txOutputRefIndexStorage <- txOutputRefIndexCache.value match {
-        case Some(cache) => cache.persist().map(storage => TxOutputRefIndexStorage(Some(storage)))
-        case None        => Right(TxOutputRefIndexStorage(None))
+      //txOutputRefIndexStorage <- txOutputRefIndexCache.persist().map(storage => TxOutputRefIndexStorage(storage))
+      txOutputRefIndexStorage <- txOutputRefIndexCache match {
+        case Some(cache) => cache.storage.persist().map(storage => Some(TxOutputRefIndexStorage(storage)))
+        case None        => Right(None)
       }
       subContractIndexStorage <- subContractIndexCache match {
         case Some(cache) => cache.persist().map(Some(_))
@@ -49,7 +50,7 @@ final case class CachedNodeIndexes(
   def staging(): StagingNodeIndexes = {
     new StagingNodeIndexes(
       logStorageCache.staging(),
-      TxOutputRefIndexStorage(txOutputRefIndexCache.value.map(_.staging())),
+      txOutputRefIndexCache.map(cache => TxOutputRefIndexStorage(cache.storage.staging())),
       subContractIndexCache.map(_.staging())
     )
   }
@@ -59,9 +60,7 @@ object CachedNodeIndexes {
   @inline def from(nodeIndexesStorage: NodeIndexesStorage): CachedNodeIndexes = {
     new CachedNodeIndexes(
       CachedLog.from(nodeIndexesStorage.logStorage),
-      TxOutputRefIndexStorage(
-        nodeIndexesStorage.txOutputRefIndexStorage.value.map(CachedKVStorage.from)
-      ),
+      nodeIndexesStorage.txOutputRefIndexStorage.map(v => TxOutputRefIndexStorage(CachedKVStorage.from(v.storage))),
       nodeIndexesStorage.subContractIndexStorage.map(CachedSubContractIndex.from)
     )
   }

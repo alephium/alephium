@@ -570,11 +570,16 @@ object WorldState {
     ): IOResult[SparseMerkleTrie[TxOutputRef, TxOutput]] = {
       for {
         updateOutputState <- outputState.put(outputRef, output)
-        _ <- nodeIndexesStorage.txOutputRefIndexStorage.store(
-          outputRef.key,
-          txId,
-          txOutputLocatorOpt
-        )
+        _ <- nodeIndexesStorage.txOutputRefIndexStorage match {
+          case Some(storage) =>
+            storage.store(
+              outputRef.key,
+              txId,
+              txOutputLocatorOpt
+            )
+          case None =>
+            Right(())
+        }
       } yield updateOutputState
     }
   }
@@ -585,9 +590,9 @@ object WorldState {
     def contractImmutableState: MutableKV[Hash, ContractStorageImmutableState, Unit]
     def codeState: MutableKV[Hash, CodeRecord, Unit]
     def logState: MutableLog
-    def txOutputRefIndexState: TxOutputRefIndexStorage[
+    def txOutputRefIndexState: Option[TxOutputRefIndexStorage[
       MutableKV[TxOutputRef.Key, TxIdTxOutputLocators, Unit]
-    ]
+    ]]
 
     def addAsset(
         outputRef: TxOutputRef,
@@ -597,7 +602,10 @@ object WorldState {
     ): IOResult[Unit] = {
       for {
         _ <- outputState.put(outputRef, output)
-        _ <- txOutputRefIndexState.store(outputRef.key, txId, txOutputLocatorOpt)
+        _ <- txOutputRefIndexState match {
+          case Some(state) => state.store(outputRef.key, txId, txOutputLocatorOpt)
+          case None         => Right(())
+        }
       } yield ()
     }
 
@@ -719,9 +727,7 @@ object WorldState {
       nodeIndexesState: CachedNodeIndexes
   ) extends AbstractCached {
     def logState: MutableLog = nodeIndexesState.logStorageCache
-    def txOutputRefIndexState: TxOutputRefIndexStorage[
-      CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]
-    ] =
+    def txOutputRefIndexState: Option[TxOutputRefIndexStorage[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]]] =
       nodeIndexesState.txOutputRefIndexCache
 
     def persist(): IOResult[Persisted] = {
@@ -758,10 +764,8 @@ object WorldState {
       nodeIndexesState: StagingNodeIndexes
   ) extends AbstractCached {
     def logState: MutableLog = nodeIndexesState.logState
-    def txOutputRefIndexState: TxOutputRefIndexStorage[
-      StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]
-    ] =
-      nodeIndexesState.txOutputRefIndexState
+    def txOutputRefIndexState: Option[TxOutputRefIndexStorage[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]]] =
+       nodeIndexesState.txOutputRefIndexState
 
     def commit(): Unit = {
       outputState.commit()
