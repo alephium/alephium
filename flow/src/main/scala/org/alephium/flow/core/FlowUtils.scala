@@ -218,8 +218,14 @@ trait FlowUtils
       order
         .foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
-          blockEnv.updateCurrentTxIndex(scriptTxIndex)
-          generateFullTx(chainIndex, groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
+          generateFullTx(
+            chainIndex,
+            groupView,
+            blockEnv,
+            tx,
+            tx.unsigned.scriptOpt.get,
+            scriptTxIndex
+          )
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
         .map { _ =>
@@ -328,11 +334,10 @@ trait FlowUtils
         target,
         None,
         hardFork,
-        refCache,
-        None
+        refCache
       )
     } else {
-      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None, None)
+      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None)
     }
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
@@ -453,7 +458,8 @@ trait FlowUtils
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       tx: TransactionTemplate,
-      script: StatefulScript
+      script: StatefulScript,
+      txIndex: Int
   ): IOResult[Transaction] = {
     val validator = TxValidation.build
     for {
@@ -472,7 +478,8 @@ trait FlowUtils
           chainIndex,
           groupView,
           blockEnv,
-          preOutputs
+          preOutputs,
+          Some(txIndex)
         )
         result match {
           case Right(successfulTx) => Right(successfulTx)

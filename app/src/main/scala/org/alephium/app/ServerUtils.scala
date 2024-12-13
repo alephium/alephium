@@ -1843,7 +1843,8 @@ class ServerUtils(implicit
       fixedOutputs = AVector.empty[AssetOutput],
       gasPrice = nonCoinbaseMinGasPrice,
       gasAmount = maximalGasPerTx,
-      isEntryMethodPayable = true
+      isEntryMethodPayable = true,
+      None
     )
   }
 

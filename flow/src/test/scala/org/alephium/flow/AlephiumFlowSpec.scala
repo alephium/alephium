@@ -676,7 +676,8 @@ trait FlowFixture
         tx,
         preOutputs,
         txScript,
-        tx.unsigned.gasAmount
+        tx.unsigned.gasAmount,
+        None
       )
       .rightValue
     result.contractInputs -> result.generatedOutputs
@@ -861,7 +862,8 @@ trait FlowFixture
       None
     )
     val txValidation = TxValidation.build
-    val gasLeft = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false).rightValue
+    val gasLeft =
+      txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false, None).rightValue
     val gasUsed = initialGas.use(gasLeft).rightValue
     print(s"length: ${tx0.unsigned.inputs.length}\n")
     print(s"gasUsed $gasUsed\n")

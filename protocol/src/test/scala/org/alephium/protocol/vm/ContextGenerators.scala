@@ -39,7 +39,11 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
       tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> prevOutputs
     }
-    TxEnv(tx, prevOutputs.map(_.referredOutput), Stack.popOnly(signatures))
+    TxEnv(
+      tx,
+      prevOutputs.map(_.referredOutput),
+      Stack.popOnly(signatures)
+    )
   }
 
   def genStatelessContext(
@@ -116,7 +120,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       contractOutput,
       _networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled(),
       transactionEnv.txId,
-      generatedBlockEnv.getTxOutputLocator(0)
+      None
     ) isE ()
 
     val obj          = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)

@@ -32,8 +32,7 @@ final case class BlockEnv(
     target: Target,
     blockId: Option[BlockHash],
     hardFork: HardFork,
-    newOutputRefCache: Option[scala.collection.mutable.HashMap[AssetOutputRef, AssetOutput]],
-    var currentTxIndex: Option[Int]
+    newOutputRefCache: Option[scala.collection.mutable.HashMap[AssetOutputRef, AssetOutput]]
 ) {
   @inline def getHardFork(): HardFork = hardFork
 
@@ -44,17 +43,6 @@ final case class BlockEnv(
         cache.addOne(outputRef -> unsignedTx.fixedOutputs(outputIndex))
       }
     }
-  }
-
-  def updateCurrentTxIndex(txIndex: Int): Unit = {
-    currentTxIndex = Some(txIndex)
-  }
-
-  def getTxOutputLocator(txOutputIndex: Int): Option[TxOutputLocator] = {
-    for {
-      blockId <- blockId
-      txIndex <- currentTxIndex
-    } yield (blockId, txIndex, txOutputIndex)
   }
 }
 object BlockEnv {
@@ -72,7 +60,6 @@ object BlockEnv {
       target,
       blockId,
       networkConfig.getHardFork(timeStamp),
-      None,
       None
     )
 
@@ -86,8 +73,7 @@ object BlockEnv {
       header.target,
       Some(header.hash),
       networkConfig.getHardFork(header.timestamp),
-      Some(scala.collection.mutable.HashMap.empty),
-      None
+      Some(scala.collection.mutable.HashMap.empty)
     )
 }
 
@@ -101,14 +87,17 @@ sealed trait TxEnv {
   def gasFeeUnsafe: U256
 
   def isEntryMethodPayable: Boolean
+  def txIndex: Option[Int]
 }
 
 object TxEnv {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def apply(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Signature]
-  ): TxEnv = Default(tx, prevOutputs, signatures)
+      signatures: Stack[Signature],
+      txIndex: Option[Int] = None
+  ): TxEnv = Default(tx, prevOutputs, signatures, txIndex)
 
   def mockup(
       txId: TransactionId,
@@ -117,7 +106,8 @@ object TxEnv {
       fixedOutputs: AVector[AssetOutput],
       gasPrice: GasPrice,
       gasAmount: GasBox,
-      isEntryMethodPayable: Boolean
+      isEntryMethodPayable: Boolean,
+      txIndex: Option[Int]
   ): TxEnv =
     Mockup(
       txId,
@@ -127,13 +117,15 @@ object TxEnv {
       gasPrice,
       gasAmount,
       gasPrice * gasAmount,
-      isEntryMethodPayable
+      isEntryMethodPayable,
+      txIndex
     )
 
   final case class Default(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Signature]
+      signatures: Stack[Signature],
+      txIndex: Option[Int]
   ) extends TxEnv {
     def txId: TransactionId                = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
@@ -151,7 +143,8 @@ object TxEnv {
       gasPrice: GasPrice,
       gasAmount: GasBox,
       gasFeeUnsafe: U256,
-      isEntryMethodPayable: Boolean
+      isEntryMethodPayable: Boolean,
+      txIndex: Option[Int]
   ) extends TxEnv
 }
 
@@ -346,8 +339,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId: ContractId,
       contractOutput: ContractOutput
   ): ExeResult[Unit] = {
-    val outputRef       = nextContractOutputRef(contractOutput)
-    val txOutputLocator = blockEnv.getTxOutputLocator(nextOutputIndex)
+    val outputRef = nextContractOutputRef(contractOutput)
+    val txOutputLocator = for {
+      blockId <- blockEnv.blockId
+      txIndex <- txEnv.txIndex
+    } yield (blockId, txIndex, nextOutputIndex)
     for {
       _ <- chargeGeneratedOutput()
       _ <- updateContractAsset(contractId, outputRef, contractOutput, txOutputLocator)
@@ -389,6 +385,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       .flatMap(error => ioFailed(IOErrorLoadContract(error)))
   }
 
+  // scalastyle:off method.length
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
@@ -411,8 +408,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
-    val outputRef       = nextContractOutputRef(contractOutput)
-    val txOutputLocator = blockEnv.getTxOutputLocator(nextOutputIndex)
+    val outputRef = nextContractOutputRef(contractOutput)
+    val txOutputLocator = for {
+      blockId <- blockEnv.blockId
+      txIndex <- txEnv.txIndex
+    } yield (blockId, txIndex, nextOutputIndex)
 
     for {
       _ <-
@@ -439,6 +439,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId
     }
   }
+  // scalastyle:on method.length
 
   private def createContract(
       contractId: ContractId,
@@ -582,13 +583,14 @@ object StatefulContext {
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
-      preOutputs: AVector[AssetOutput]
+      preOutputs: AVector[AssetOutput],
+      txIndex: Option[Int]
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): StatefulContext = {
-    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures), txIndex)
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
   // scalastyle:on parameter.number

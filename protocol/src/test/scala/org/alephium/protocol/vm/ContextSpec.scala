@@ -232,7 +232,7 @@ class ContextSpec
         outputRef,
         output,
         context.txId,
-        context.blockEnv.getTxOutputLocator(0)
+        None
       )
       context
     }

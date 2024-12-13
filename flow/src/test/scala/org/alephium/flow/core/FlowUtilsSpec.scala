@@ -52,13 +52,13 @@ class FlowUtilsSpec extends AlephiumSpec {
       val blockEnv = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
-      assets.foreachWithIndex { case (asset, index) =>
+      assets.foreach { asset =>
         worldState
           .addAsset(
             asset.txInput.outputRef,
             asset.referredOutput,
             tx.id,
-            blockEnv.getTxOutputLocator(index)
+            None
           )
           .isRight is true
       }
@@ -69,7 +69,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       )
       val bestDeps  = blockFlow.getBestDeps(groupIndex)
       val groupView = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
-      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script).rightValue is
+      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script, 0).rightValue is
         Transaction(
           unsignedTx,
           scriptExecutionOk = false,

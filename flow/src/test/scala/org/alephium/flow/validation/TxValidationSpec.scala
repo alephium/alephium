@@ -75,7 +75,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(chainIndex, networkConfig.networkId, headerTs, Target.Max, None)
+          BlockEnv(chainIndex, networkConfig.networkId, headerTs, Target.Max, None),
+          None
         )
       } yield ()
     }
@@ -94,7 +95,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     ): TxValidationResult[GasBox] = {
       val blockEnv =
         BlockEnv(tx.chainIndex, networkConfig.networkId, timestamp, Target.Max, None)
-      checkGasAndWitnesses(tx, preOutputs, blockEnv, false)
+      checkGasAndWitnesses(tx, preOutputs, blockEnv, false, None)
     }
 
     def prepareOutputs(lockup: LockupScript.Asset, unlock: UnlockScript, outputsNum: Int) = {
@@ -932,7 +933,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val prevOutputs = worldState.getPreOutputs(tx).rightValue
 
     val initialGas = tx.unsigned.gasAmount
-    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false).rightValue
+    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, None).rightValue
     val gasUsed    = initialGas.use(gasLeft).rightValue
 
     tx.unsigned.inputs.length is 1
@@ -1182,7 +1183,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
       val hardFork   = networkConfig.getHardFork(TimeStamp.now())
       val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue.copy(hardFork = hardFork)
-      validateTx(tx, chainIndex, groupView, blockEnv, Some(U256.Zero), true)
+      validateTx(
+        tx,
+        chainIndex,
+        groupView,
+        blockEnv,
+        Some(U256.Zero),
+        true,
+        None
+      )
     }
 
     val (priKey, pubKey) = keypairGen.sample.value
@@ -1252,7 +1261,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       .getPreOutputs(tx)
       .rightValue
       .asUnsafe[AssetOutput]
-    lazy val txEnv = TxEnv(tx, prevOutputs, Stack.ofCapacity[Signature](0))
+    lazy val txEnv =
+      TxEnv(tx, prevOutputs, Stack.ofCapacity[Signature](0))
   }
 
   it should "charge gas for asset script size" in new GasFixture {
@@ -1303,7 +1313,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |""".stripMargin
 
     val gasRemaining =
-      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv).rightValue
+      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv, None).rightValue
     initialGas is gasRemaining.addUnsafe(script.bytes.size + GasSchedule.callGas.value)
 
     val noScriptTx = tx.copy(unsigned = tx.unsigned.copy(scriptOpt = None))
@@ -1313,7 +1323,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       initialGas,
       worldState,
       prevOutputs,
-      blockEnv
+      blockEnv,
+      None
     ).rightValue is initialGas
   }
 
@@ -1327,7 +1338,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |""".stripMargin
 
     implicit val validator: (Transaction) => TxValidationResult[GasBox] = (tx: Transaction) => {
-      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
+      checkTxScript(
+        chainIndex,
+        tx,
+        initialGas,
+        worldState,
+        prevOutputs,
+        blockEnv,
+        None
+      )
     }
 
     tx.generatedOutputs.length is 0
@@ -1352,7 +1371,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |""".stripMargin
 
     implicit val validator: (Transaction) => TxValidationResult[GasBox] = (tx: Transaction) => {
-      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv)
+      checkTxScript(
+        chainIndex,
+        tx,
+        initialGas,
+        worldState,
+        prevOutputs,
+        blockEnv,
+        None
+      )
     }
 
     tx.scriptExecutionOk is true
@@ -1388,7 +1415,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |""".stripMargin
 
     implicit val validator: (Transaction) => TxValidationResult[GasBox] = (tx: Transaction) => {
-      checkTxScript(ChainIndex.unsafe(0, 1), tx, initialGas, worldState, prevOutputs, blockEnv)
+      checkTxScript(
+        ChainIndex.unsafe(0, 1),
+        tx,
+        initialGas,
+        worldState,
+        prevOutputs,
+        blockEnv,
+        None
+      )
     }
 
     tx.scriptExecutionOk is true

@@ -1743,7 +1743,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector.empty,
       gasPriceGen.sample.get,
       gasAmountGen.sample.get,
-      isEntryMethodPayable = false
+      isEntryMethodPayable = false,
+      None
     )
 
     override lazy val frame = prepareFrame(AVector.empty, txEnv = Some(txEnv))
@@ -1773,9 +1774,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val prevOutputs0  = prevOut.map(_.referredOutput)
     val prevOutputs1  = AVector.fill(3)(prevOutputs0.head)
 
-    val txEnvWithRandomAddresses = TxEnv(tx, prevOutputs0, Stack.ofCapacity(0))
-    val txEnvWithUniqueAddress   = TxEnv(tx, prevOutputs1, Stack.ofCapacity(0))
-    val uniqueAddress            = Val.Address(prevOutputs0.head.lockupScript)
+    val txEnvWithRandomAddresses =
+      TxEnv(tx, prevOutputs0, Stack.ofCapacity(0))
+    val txEnvWithUniqueAddress =
+      TxEnv(tx, prevOutputs1, Stack.ofCapacity(0))
+    val uniqueAddress = Val.Address(prevOutputs0.head.lockupScript)
   }
 
   it should "TxInputAddressAt" in new TxEnvFixture {

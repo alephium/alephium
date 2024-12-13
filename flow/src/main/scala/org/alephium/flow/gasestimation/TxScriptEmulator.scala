@@ -73,7 +73,8 @@ object TxScriptEmulator {
                 txTemplate,
                 preOutputs,
                 script.mockup(),
-                remainingGas
+                remainingGas,
+                None
               )
           }
 
