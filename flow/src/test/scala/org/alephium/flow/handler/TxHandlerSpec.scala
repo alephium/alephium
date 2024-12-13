@@ -603,8 +603,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val orphanTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
     orphanTxs.foreach { tx =>
       txHandler ! addTx(tx, isLocalTx = false)
-      eventBus.expectNoMessage()
     }
+    eventBus.expectNoMessage()
     orphanTxs.foreach(tx => eventually(orphanPool.contains(tx.id) is true))
 
     setSynced()
