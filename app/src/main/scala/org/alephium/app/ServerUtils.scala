@@ -40,7 +40,7 @@ import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSch
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
+import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -105,7 +105,7 @@ class ServerUtils(implicit
         .mapE(_._2.mapE { case (block, height) =>
           for {
             transactions <- block.transactions.mapE(tx =>
-              getRichTransaction(blockFlow, tx, Some(block.hash))
+              getRichTransaction(blockFlow, tx, block.hash)
             )
             blockEntry <- RichBlockEntry.from(block, height, transactions).left.map(failed)
             events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
@@ -562,7 +562,7 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, Some(hash)))
+      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, hash))
       blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
       contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
     } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
@@ -570,11 +570,11 @@ class ServerUtils(implicit
   private[app] def getRichTransaction(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      spentBlockHashOpt: Option[BlockHash]
+      spentBlockHash: BlockHash
   ): Try[RichTransaction] = {
     for {
-      assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHashOpt)
-      contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHashOpt)
+      assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHash)
+      contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHash)
     } yield {
       RichTransaction.from(transaction, assetInputs, contractInputs)
     }
@@ -584,11 +584,11 @@ class ServerUtils(implicit
   private[app] def getRichContractInputs(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      spentBlockHashOpt: Option[BlockHash]
+      spentBlockHash: BlockHash
   ): Try[AVector[RichContractInput]] = {
     transaction.contractInputs.mapE { contractOutputRef =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef, spentBlockHashOpt)
+        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef, spentBlockHash)
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
@@ -603,11 +603,11 @@ class ServerUtils(implicit
   private[app] def getRichAssetInputs(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      spentBlockHashOpt: Option[BlockHash]
+      spentBlockHash: BlockHash
   ): Try[AVector[RichAssetInput]] = {
     transaction.unsigned.inputs.mapE { assetInput =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef, spentBlockHashOpt)
+        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef, spentBlockHash)
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
@@ -621,24 +621,19 @@ class ServerUtils(implicit
   private[app] def getTxOutput(
       blockFlow: BlockFlow,
       outputRef: TxOutputRef,
-      spentBlockHashOpt: Option[BlockHash]
+      spentBlockHash: BlockHash
   ): Try[Option[TxOutput]] = {
     for {
       resultOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
       txOutputOpt <- resultOpt match {
         case Some((txId, txOutputLocators)) =>
-          spentBlockHashOpt match {
-            case Some(spentBlockHash) =>
-              val headerChain = blockFlow.getHeaderChain(spentBlockHash)
-              wrapResult(
-                txOutputLocators.findE(locator => headerChain.isBefore(locator._1, spentBlockHash))
-              ).flatMap {
-                case Some((blockHash, txIndex, outputIndex)) =>
-                  wrapResult(blockFlow.getBlock(blockHash)).flatMap { block =>
-                    Right(Some(block.getTransaction(txIndex).getOutput(outputIndex)))
-                  }
-                case None =>
-                  getTransactionAndConvert(blockFlow, txId, None, None, _.getOutput(outputRef))
+          val headerChain = blockFlow.getHeaderChain(spentBlockHash)
+          wrapResult(
+            txOutputLocators.findE(locator => headerChain.isBefore(locator._1, spentBlockHash))
+          ).flatMap {
+            case Some((blockHash, txIndex, outputIndex)) =>
+              wrapResult(blockFlow.getBlock(blockHash)).flatMap { block =>
+                Right(Some(block.getTransaction(txIndex).getOutput(outputIndex)))
               }
             case None =>
               getTransactionAndConvert(blockFlow, txId, None, None, _.getOutput(outputRef))
@@ -769,7 +764,7 @@ class ServerUtils(implicit
   ): Try[model.RichTransaction] = {
     for {
       transaction     <- getTransactionAndConvert(blockFlow, txId, fromGroup, toGroup, identity)
-      richTransaction <- getRichTransaction(blockFlow, transaction, None)
+      richTransaction <- getRichTransaction(blockFlow, transaction, BlockHash.generate)
     } yield richTransaction
   }
 
