@@ -25,7 +25,6 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.txIdBlockHashesSerde
-import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.{AlephiumSpec, AVector}
@@ -180,7 +179,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(storage, RocksDBSource.ColumnFamily.All),
       NodeIndexesStorage(
         newLogStorage(storage),
-        Some(TxOutputRefIndexStorage(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex))),
+        Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)),
         Some(newSubContractIndexStorage(storage))
       )
     )
@@ -312,7 +311,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(storage, RocksDBSource.ColumnFamily.All),
       NodeIndexesStorage(
         newLogStorage(storage),
-        Some(TxOutputRefIndexStorage(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex))),
+        Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)),
         Some(newSubContractIndexStorage(storage))
       )
     )

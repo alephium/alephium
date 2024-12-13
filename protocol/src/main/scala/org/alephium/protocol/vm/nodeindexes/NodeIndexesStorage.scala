@@ -26,7 +26,7 @@ import org.alephium.util.AVector
 // format: off
 final case class NodeIndexesStorage(
     logStorage: LogStorage,
-    txOutputRefIndexStorage: Option[TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]]],
+    txOutputRefIndexStorage: Option[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexStorage: Option[SubContractIndexStorage]
 )
 // format: on

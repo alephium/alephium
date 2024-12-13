@@ -29,7 +29,6 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
-import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
@@ -79,7 +78,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def txOutputRefIndexStorage(
       groupIndex: GroupIndex
-  ):  IOResult[TxOutputRefIndexStorage[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]]] = {
+  ): IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
     getBlockChainWithState(
       groupIndex
     ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {

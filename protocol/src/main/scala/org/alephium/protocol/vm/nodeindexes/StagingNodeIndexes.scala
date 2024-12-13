@@ -25,19 +25,19 @@ import org.alephium.protocol.vm.subcontractindex.StagingSubContractIndex
 // format: off
 final case class StagingNodeIndexes(
     logState: StagingLog,
-    txOutputRefIndexState: Option[TxOutputRefIndexStorage[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]]],
+    txOutputRefIndexState: Option[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexState: Option[StagingSubContractIndex]
 ) {
   def rollback(): Unit = {
     logState.rollback()
-    txOutputRefIndexState.foreach(_.storage.rollback())
+    txOutputRefIndexState.foreach(_.rollback())
     subContractIndexState.foreach(_.rollback())
     ()
   }
 
   def commit(): Unit = {
     logState.commit()
-    txOutputRefIndexState.foreach(_.storage.commit())
+    txOutputRefIndexState.foreach(_.commit())
     subContractIndexState.foreach(_.commit())
     ()
   }

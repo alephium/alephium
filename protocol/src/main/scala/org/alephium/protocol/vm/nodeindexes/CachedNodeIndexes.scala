@@ -25,15 +25,14 @@ import org.alephium.protocol.vm.subcontractindex.CachedSubContractIndex
 // format: off
 final case class CachedNodeIndexes(
     logStorageCache: CachedLog,
-    txOutputRefIndexCache: Option[TxOutputRefIndexStorage[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]]],
+    txOutputRefIndexCache: Option[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexCache: Option[CachedSubContractIndex]
 ) {
   def persist(): IOResult[NodeIndexesStorage] = {
     for {
       logStorage <- logStorageCache.persist()
-      //txOutputRefIndexStorage <- txOutputRefIndexCache.persist().map(storage => TxOutputRefIndexStorage(storage))
       txOutputRefIndexStorage <- txOutputRefIndexCache match {
-        case Some(cache) => cache.storage.persist().map(storage => Some(TxOutputRefIndexStorage(storage)))
+        case Some(cache) => cache.persist().map(Some(_))
         case None        => Right(None)
       }
       subContractIndexStorage <- subContractIndexCache match {
@@ -50,7 +49,7 @@ final case class CachedNodeIndexes(
   def staging(): StagingNodeIndexes = {
     new StagingNodeIndexes(
       logStorageCache.staging(),
-      txOutputRefIndexCache.map(cache => TxOutputRefIndexStorage(cache.storage.staging())),
+      txOutputRefIndexCache.map(_.staging()),
       subContractIndexCache.map(_.staging())
     )
   }
@@ -60,7 +59,7 @@ object CachedNodeIndexes {
   @inline def from(nodeIndexesStorage: NodeIndexesStorage): CachedNodeIndexes = {
     new CachedNodeIndexes(
       CachedLog.from(nodeIndexesStorage.logStorage),
-      nodeIndexesStorage.txOutputRefIndexStorage.map(v => TxOutputRefIndexStorage(CachedKVStorage.from(v.storage))),
+      nodeIndexesStorage.txOutputRefIndexStorage.map(CachedKVStorage.from),
       nodeIndexesStorage.subContractIndexStorage.map(CachedSubContractIndex.from)
     )
   }

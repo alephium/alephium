@@ -25,11 +25,9 @@ import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
 import org.alephium.util.AVector
 
 // format: off
-final case class TxOutputRefIndexStorage[+T <: MutableKV[TxOutputRef.Key, TxIdTxOutputLocators, Unit]](
-    storage: T
-) {
-// format: on
+object TxOutputRefIndexStorage {
   def store(
+      storage: MutableKV[TxOutputRef.Key, TxIdTxOutputLocators, Unit],
       outputRef: TxOutputRef.Key,
       txId: TransactionId,
       txOutputLocatorOpt: Option[TxOutputLocator]
@@ -46,8 +44,5 @@ final case class TxOutputRefIndexStorage[+T <: MutableKV[TxOutputRef.Key, TxIdTx
         Right(())
     }
   }
-
-  def getOpt(outputRef: TxOutputRef.Key): IOResult[Option[TxIdTxOutputLocators]] = {
-    storage.getOpt(outputRef)
-  }
 }
+

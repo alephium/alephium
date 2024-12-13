@@ -26,7 +26,6 @@ import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
   txIdBlockHashesSerde,
   TxIdTxOutputLocators
 }
-import org.alephium.protocol.vm.nodeindexes.TxOutputRefIndexStorage
 import org.alephium.protocol.vm.subcontractindex._
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.AVector
@@ -42,12 +41,12 @@ trait VMFactory extends StorageFixture {
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
     val txOutputRefIndexStorage =
-      Some(TxOutputRefIndexStorage(
-          newDB[TxOutputRef.Key, TxIdTxOutputLocators](
-            storage,
-            RocksDBSource.ColumnFamily.TxOutputRefIndex
-          )
-      ))
+      Some(
+        newDB[TxOutputRef.Key, TxIdTxOutputLocators](
+          storage,
+          RocksDBSource.ColumnFamily.TxOutputRefIndex
+        )
+      )
     val parentContractIndexStorage =
       newDB[ContractId, ContractId](storage, RocksDBSource.ColumnFamily.ParentContract)
     val subContractIndexStateStorage = newDB[SubContractIndexStateId, SubContractIndexState](
