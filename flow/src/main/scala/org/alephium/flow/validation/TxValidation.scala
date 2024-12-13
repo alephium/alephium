@@ -41,14 +41,13 @@ trait TxValidation {
       tx: TransactionTemplate,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      blockEnv: BlockEnv,
-      txIndex: Option[Int]
+      blockEnv: BlockEnv
   ): TxValidationResult[Unit] = {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
-        validateScriptTxTemplate(tx, script, chainIndex, groupView, blockEnv, txIndex)
+        validateScriptTxTemplate(tx, script, chainIndex, groupView, blockEnv)
       case None =>
-        validateNonScriptTxTemplate(tx, chainIndex, groupView, blockEnv, txIndex)
+        validateNonScriptTxTemplate(tx, chainIndex, groupView, blockEnv)
     }
   }
 
@@ -57,9 +56,9 @@ trait TxValidation {
       script: StatefulScript,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      blockEnv: BlockEnv,
-      txIndex: Option[Int]
+      blockEnv: BlockEnv
   ): TxValidationResult[Unit] = {
+    val txIndex = 0 // Always 0 for tx template validation
     for {
       preOutputs <- fromGetPreOutputs(groupView.getPreAssetOutputs(tx.unsigned.inputs))
       // the tx might fail afterwards
@@ -94,7 +93,7 @@ trait TxValidation {
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       preOutputs: AVector[AssetOutput],
-      txIndex: Option[Int]
+      txIndex: Int
   ): TxValidationResult[Transaction] = {
     val stagingWorldState = groupView.worldState.staging()
     val scriptBaseGas     = GasCall.scriptBaseGas(script.bytes.length)
@@ -140,8 +139,7 @@ trait TxValidation {
       tx: TransactionTemplate,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      blockEnv: BlockEnv,
-      txIndex: Option[Int]
+      blockEnv: BlockEnv
   ): TxValidationResult[Unit] = {
     assume(tx.unsigned.scriptOpt.isEmpty)
     val fullTx = FlowUtils.convertNonScriptTx(tx)
@@ -161,7 +159,7 @@ trait TxValidation {
         preOutputs.as[TxOutput],
         None,
         blockEnv,
-        txIndex
+        0 // Always 0 for tx template validation
       )
     } yield ()
   }
@@ -178,8 +176,7 @@ trait TxValidation {
         tx,
         chainIndex,
         groupView,
-        blockEnv,
-        None
+        blockEnv
       )
     } yield ()
   }
@@ -201,7 +198,7 @@ trait TxValidation {
         hardForkOpt.map(hardFork => blockEnv.copy(hardFork = hardFork)).getOrElse(blockEnv),
         None,
         checkDoubleSpending = true,
-        None
+        0 // Always 0 for tx template validation
       )
     } yield ()
   }
@@ -213,7 +210,7 @@ trait TxValidation {
       blockEnv: BlockEnv,
       coinbaseNetReward: Option[U256],
       checkDoubleSpending: Boolean, // for block txs, this has been checked in block validation
-      txIndex: Option[Int]
+      txIndex: Int
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkStateless(
@@ -252,7 +249,7 @@ trait TxValidation {
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       coinbaseNetReward: Option[U256],
-      txIndex: Option[Int]
+      txIndex: Int
   ): TxValidationResult[Unit] = {
     for {
       _ <- validateTx(
@@ -294,7 +291,7 @@ trait TxValidation {
       preOutputs: AVector[TxOutput],
       coinbaseNetReward: Option[U256],
       blockEnv: BlockEnv,
-      txIndex: Option[Int]
+      txIndex: Int
   ): TxValidationResult[Unit] = {
     for {
       gasRemaining <- checkStatefulExceptTxScript(
@@ -321,7 +318,7 @@ trait TxValidation {
       blockEnv: BlockEnv,
       preOutputs: AVector[TxOutput],
       coinbaseNetReward: Option[U256],
-      txIndex: Option[Int]
+      txIndex: Int
   ): TxValidationResult[GasBox] = {
     for {
       _ <- checkLockTime(preOutputs, blockEnv.timeStamp)
@@ -365,7 +362,7 @@ trait TxValidation {
     preOutputs: AVector[TxOutput],
     blockEnv: BlockEnv,
     isCoinbase: Boolean,
-    txIndex: Option[Int]
+    txIndex: Int
   ): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
       chainIndex: ChainIndex,
@@ -374,7 +371,7 @@ trait TxValidation {
       worldState: WorldState.Cached,
       preOutputs: AVector[AssetOutput],
       blockEnv: BlockEnv,
-      txIndex: Option[Int]
+      txIndex: Int
     ): TxValidationResult[GasBox]
   // format: on
 }
@@ -762,7 +759,7 @@ object TxValidation {
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv,
         isCoinbase: Boolean,
-        txIndex: Option[Int]
+        txIndex: Int
     ): TxValidationResult[GasBox] = {
       for {
         gasRemaining0 <- checkBasicGas(tx, tx.unsigned.gasAmount)
@@ -806,7 +803,7 @@ object TxValidation {
         blockEnv: BlockEnv,
         gasRemaining: GasBox,
         isCoinbase: Boolean,
-        txIndex: Option[Int]
+        txIndex: Int
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
@@ -969,7 +966,7 @@ object TxValidation {
         worldState: WorldState.Cached,
         preAssetOutputs: AVector[AssetOutput],
         blockEnv: BlockEnv,
-        txIndex: Option[Int]
+        txIndex: Int
     ): TxValidationResult[GasBox] = {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
@@ -1030,7 +1027,7 @@ object TxValidation {
         worldState: WorldState.Staging,
         preAssetOutputs: AVector[AssetOutput],
         blockEnv: BlockEnv,
-        txIndex: Option[Int]
+        txIndex: Int
     ): ExeResult[StatefulVM.TxScriptExecution] = {
       for {
         remaining <- VM.checkCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())

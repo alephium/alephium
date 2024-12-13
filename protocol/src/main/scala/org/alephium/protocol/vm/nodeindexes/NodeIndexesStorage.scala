@@ -18,6 +18,7 @@ package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.KeyValueStorage
 import org.alephium.protocol.model.{BlockHash, TransactionId, TxOutputRef}
+import org.alephium.protocol.vm.{BlockEnv, TxEnv}
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
@@ -41,4 +42,16 @@ object NodeIndexesStorage {
 
   implicit val txIdBlockHashesSerde: Serde[TxIdTxOutputLocators] =
     Serde.tuple2[TransactionId, AVector[TxOutputLocator]]
+
+  object TxOutputLocator {
+    def from(
+        blockEnv: BlockEnv,
+        txEnv: TxEnv,
+        txOutputIndex: TxOutputIndex
+    ): Option[TxOutputLocator] = {
+      for {
+        blockHash <- blockEnv.blockId
+      } yield (blockHash, txEnv.txIndex, txOutputIndex)
+    }
+  }
 }

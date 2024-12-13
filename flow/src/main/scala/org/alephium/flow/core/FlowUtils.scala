@@ -479,7 +479,7 @@ trait FlowUtils
           groupView,
           blockEnv,
           preOutputs,
-          Some(txIndex)
+          txIndex
         )
         result match {
           case Right(successfulTx) => Right(successfulTx)

@@ -1809,8 +1809,7 @@ class ServerUtils(implicit
       fixedOutputs = AVector.empty[AssetOutput],
       gasPrice = nonCoinbaseMinGasPrice,
       gasAmount = maximalGasPerTx,
-      isEntryMethodPayable = true,
-      None
+      isEntryMethodPayable = true
     )
   }
 
@@ -1899,7 +1898,7 @@ class ServerUtils(implicit
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
       _ <- testContract.existingContracts.foreachE(
-        createContract(worldState, _, testContract.txId)
+        createContract(worldState, _, testContract.blockHash, testContract.txId)
       )
       _      <- createContract(worldState, contractId, testContract)
       method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
@@ -2209,6 +2208,7 @@ class ServerUtils(implicit
   def createContract(
       worldState: WorldState.Staging,
       existingContract: ContractState,
+      blockHash: BlockHash,
       txId: TransactionId
   ): Try[Unit] = {
     createContract(
@@ -2218,6 +2218,7 @@ class ServerUtils(implicit
       toVmVal(existingContract.immFields),
       toVmVal(existingContract.mutFields),
       existingContract.asset,
+      blockHash,
       txId
     )
   }
@@ -2234,6 +2235,7 @@ class ServerUtils(implicit
       toVmVal(testContract.initialImmFields),
       toVmVal(testContract.initialMutFields),
       testContract.initialAsset,
+      testContract.blockHash,
       testContract.txId
     )
   }
@@ -2245,6 +2247,7 @@ class ServerUtils(implicit
       initialImmState: AVector[vm.Val],
       initialMutState: AVector[vm.Val],
       asset: AssetState,
+      blockHash: BlockHash,
       txId: TransactionId
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
@@ -2259,7 +2262,7 @@ class ServerUtils(implicit
         outputRef,
         output,
         txId,
-        None
+        Some((blockHash, 0, 0))
       )
     )
   }
