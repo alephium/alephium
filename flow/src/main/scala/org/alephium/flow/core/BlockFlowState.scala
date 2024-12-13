@@ -586,14 +586,13 @@ object BlockFlowState {
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     val blockTs    = block.timestamp
-    val txIndexOpt = if (txIndex == -1) None else Some(txIndex)
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id, txIndexOpt.map((block.hash, _, index)))
+        worldState.addAsset(outputRef, outputUpdated, tx.id, Some((block.hash, txIndex, index)))
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }
