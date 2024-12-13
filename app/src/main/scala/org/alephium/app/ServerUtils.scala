@@ -806,35 +806,6 @@ class ServerUtils(implicit
     }
   }
 
-  def getTransaction[T](
-      blockFlow: BlockFlow,
-      txId: TransactionId,
-      block: Block,
-      convert: Transaction => T
-  ): Try[T] = {
-    val result = blockFlow.getTransaction(txId, block).left.map(failed)
-    result.flatMap {
-      case Some(tx) => Right(convert(tx))
-      case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
-    }
-  }
-
-  def getChainIndexForTx(
-      blockFlow: BlockFlow,
-      txId: TransactionId
-  ): Try[ChainIndex] = {
-    searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
-      case Right(Confirmed(blockHash, _, _, _, _)) =>
-        Right(ChainIndex.from(blockHash))
-      case Right(TxNotFound()) =>
-        Left(notFound(s"Transaction ${txId.toHexString}"))
-      case Right(MemPooled()) =>
-        Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
-      case Left(error) =>
-        Left(error)
-    }
-  }
-
   def getEventsByTxId(
       blockFlow: BlockFlow,
       txId: TransactionId
