@@ -6796,18 +6796,23 @@ class VMSpec extends AlephiumSpec with Generators {
         operationValue: String,
         assertValue: String
     ) = {
-      verify(
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
         s"""
            |Contract TestContract() {
            |  @using(updateFields = true)
            |  pub fn compoundAssign() -> () {
-           |    let mut x = $initValue
+           |    let $mutKeyword x = $initValue
            |    x $op $operationValue
            |    assert!(x == $assertValue, 0)
            |  }
            |}
            |""".stripMargin
-      )
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable variable x."
     }
 
     def verifyArray(
@@ -6816,18 +6821,23 @@ class VMSpec extends AlephiumSpec with Generators {
         operationValue: String,
         assertValue: String
     ) = {
-      verify(
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
         s"""
            |Contract TestContract() {
            |  @using(updateFields = true)
            |  pub fn compoundAssign() -> () {
-           |    let mut x = [$initValue; 2]
+           |    let $mutKeyword x = [$initValue; 2]
            |    x[0] $op $operationValue
            |    assert!(x[0] == $assertValue, 0)
            |  }
            |}
            |""".stripMargin
-      )
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable variable x."
     }
 
     def verifySimpleStruct(
@@ -6837,10 +6847,11 @@ class VMSpec extends AlephiumSpec with Generators {
         assertValue: String
     ) = {
       val valueType = getValueType(initValue)
-      verify(
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
         s"""
            |struct TestStruct {
-           |  mut x: $valueType,
+           |  $mutKeyword x: $valueType,
            |  y: $valueType
            |}
            |Contract TestContract() {
@@ -6852,7 +6863,11 @@ class VMSpec extends AlephiumSpec with Generators {
            |  }
            |}
            |""".stripMargin
-      )
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable field x in struct TestStruct."
     }
 
     def verifyNestedStruct(
@@ -6862,14 +6877,15 @@ class VMSpec extends AlephiumSpec with Generators {
         assertValue: String
     ) = {
       val valueType = getValueType(initValue)
-      verify(
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
         s"""
            |struct TestStruct0 {
-           |  mut x: [$valueType; 2],
+           |  $mutKeyword x: [$valueType; 2],
            |  y: $valueType
            |}
            |struct TestStruct1 {
-           |  mut testStruct0: TestStruct0
+           |  $mutKeyword testStruct0: TestStruct0
            |}
            |Contract TestContract() {
            |  @using(updateFields = true)
@@ -6880,7 +6896,11 @@ class VMSpec extends AlephiumSpec with Generators {
            |  }
            |}
            |""".stripMargin
-      )
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable field testStruct0 in struct TestStruct1."
     }
 
     def verifyMapping(

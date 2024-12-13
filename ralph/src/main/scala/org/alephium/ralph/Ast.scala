@@ -1822,6 +1822,8 @@ object Ast {
           sourceIndex
         )
       }
+
+      target.checkMutable(state, sourceIndex)
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
