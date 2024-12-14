@@ -29,7 +29,13 @@ trait NodeIndexesUtils { Self: FlowUtils =>
   def getTxIdTxOutputLocatorsFromOutputRef(
       outputRef: TxOutputRef
   ): IOResult[Option[TxIdTxOutputLocators]] = {
-    txOutputRefIndexStorage(outputRef.hint.groupIndex).flatMap(_.getOpt(outputRef.key))
+    getTxIdTxOutputLocatorsFromOutputRef(outputRef.key)
+  }
+
+  def getTxIdTxOutputLocatorsFromOutputRef(
+      outputRefKey: TxOutputRef.Key
+  ): IOResult[Option[TxIdTxOutputLocators]] = {
+    txOutputRefIndexStorage.flatMap(_.getOpt(outputRefKey))
   }
 
   def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {

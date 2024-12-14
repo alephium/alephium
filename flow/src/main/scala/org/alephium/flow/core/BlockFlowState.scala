@@ -76,12 +76,11 @@ trait BlockFlowState extends FlowTipsUtil {
     intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.logStorage
   }
 
-  def txOutputRefIndexStorage(
-      groupIndex: GroupIndex
-  ): IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
-    getBlockChainWithState(
-      groupIndex
-    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+  lazy val txOutputRefIndexStorage
+      : IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
       case Some(storage) =>
         Right(storage)
       case None =>
@@ -585,7 +584,7 @@ object BlockFlowState {
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    val blockTs    = block.timestamp
+    val blockTs = block.timestamp
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)

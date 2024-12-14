@@ -41,6 +41,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -763,9 +764,33 @@ class ServerUtils(implicit
       toGroup: Option[GroupIndex]
   ): Try[model.RichTransaction] = {
     for {
+      blockHash       <- getBlockHashForTransaction(blockFlow, txId)
       transaction     <- getTransactionAndConvert(blockFlow, txId, fromGroup, toGroup, identity)
-      richTransaction <- getRichTransaction(blockFlow, transaction, BlockHash.generate)
+      richTransaction <- getRichTransaction(blockFlow, transaction, blockHash)
     } yield richTransaction
+  }
+
+  def getBlockHashForTransaction(blockFlow: BlockFlow, txId: TransactionId): Try[BlockHash] = {
+    val outputRef = TxOutputRef.key(txId, 0)
+    for {
+      locatorsOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
+      locators <- locatorsOpt.toRight(
+        notFound(s"Transaction id for output ref ${outputRef.value.toHexString}")
+      )
+      mainchainBlockHash <- getMainChainBlockHashFromOutputLocators(blockFlow, locators)
+    } yield mainchainBlockHash
+  }
+
+  def getMainChainBlockHashFromOutputLocators(
+      blockFlow: BlockFlow,
+      locators: TxIdTxOutputLocators
+  ): Try[BlockHash] = {
+    for {
+      locatorOpt <- locators._2.findE(locator => isBlockInMainChain(blockFlow, locator._1))
+      locator <- locatorOpt.toRight(
+        notFound(s"Main chain block hash for ${locators._1}")
+      )
+    } yield locator._1
   }
 
   def getRawTransaction(
