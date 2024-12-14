@@ -515,7 +515,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           groupView,
           blockEnv,
           Some(netReward),
-          None
+          Some(block.transactions.length - 1)
         )
       )
     } else {
