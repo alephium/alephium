@@ -589,7 +589,7 @@ class ServerUtils(implicit
   ): Try[AVector[RichContractInput]] = {
     transaction.contractInputs.mapE { contractOutputRef =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef, spentBlockHash)
+        txOutputOpt <- wrapResult(blockFlow.getTxOutput(contractOutputRef, spentBlockHash))
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
@@ -608,7 +608,7 @@ class ServerUtils(implicit
   ): Try[AVector[RichAssetInput]] = {
     transaction.unsigned.inputs.mapE { assetInput =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef, spentBlockHash)
+        txOutputOpt <- wrapResult(blockFlow.getTxOutput(assetInput.outputRef, spentBlockHash))
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
@@ -616,34 +616,6 @@ class ServerUtils(implicit
             Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
         }
       } yield richInput
-    }
-  }
-
-  private[app] def getTxOutput(
-      blockFlow: BlockFlow,
-      outputRef: TxOutputRef,
-      spentBlockHash: BlockHash
-  ): Try[Option[TxOutput]] = {
-    for {
-      resultOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
-      txOutputOpt <- resultOpt match {
-        case Some((txId, txOutputLocators)) =>
-          val headerChain = blockFlow.getHeaderChain(spentBlockHash)
-          wrapResult(
-            txOutputLocators.findE(locator => headerChain.isBefore(locator._1, spentBlockHash))
-          ).flatMap {
-            case Some((blockHash, txIndex, outputIndex)) =>
-              wrapResult(blockFlow.getBlock(blockHash)).flatMap { block =>
-                Right(Some(block.getTransaction(txIndex).getOutput(outputIndex)))
-              }
-            case None =>
-              getTransactionAndConvert(blockFlow, txId, None, None, _.getOutput(outputRef))
-          }
-        case None =>
-          Right(None)
-      }
-    } yield {
-      txOutputOpt
     }
   }
 
@@ -681,16 +653,7 @@ class ServerUtils(implicit
     } yield BlockAndEvents(block, events.events)
 
   def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
-    for {
-      height <- blockFlow
-        .getHeight(blockHash)
-        .left
-        .map(handleBlockError(blockHash, _))
-      hashes <- blockFlow
-        .getHashes(ChainIndex.from(blockHash), height)
-        .left
-        .map(failedInIO)
-    } yield hashes.headOption.contains(blockHash)
+    blockFlow.isBlockInMainChain(blockHash).left.map(handleBlockError(blockHash, _))
   }
 
   def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =

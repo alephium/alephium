@@ -19,9 +19,12 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.IOResult
-import org.alephium.protocol.model.{ContractId, TxOutputRef}
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.io.{IOError, IOResult}
+import org.alephium.protocol.model.{BlockHash, ContractId, TxOutput, TxOutputRef}
+import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
+  TxIdTxOutputLocators,
+  TxOutputLocator
+}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
 
@@ -84,5 +87,82 @@ trait NodeIndexesUtils { Self: FlowUtils =>
 
   def getSubContractsCurrentCount(parentContractId: ContractId): IOResult[Option[Int]] = {
     subContractIndexStorage.flatMap(_.subContractIndexCounterState.getOpt(parentContractId))
+  }
+
+  def getTxOutput(outputRef: TxOutputRef, spentBlockHash: BlockHash): IOResult[Option[TxOutput]] = {
+    getTxOutput(outputRef, spentBlockHash, maxForkDepth)
+  }
+
+  // TODO: unit test this one
+  def getTxOutput(
+      outputRef: TxOutputRef,
+      spentBlockHash: BlockHash,
+      maxForkDepth: Int
+  ): IOResult[Option[TxOutput]] = {
+    for {
+      resultOpt <- getTxIdTxOutputLocatorsFromOutputRef(outputRef)
+      txOutputOpt <- resultOpt match {
+        case Some((_, txOutputLocators)) =>
+          for {
+            locator <- getOutputLocator(blockFlow, spentBlockHash, txOutputLocators, maxForkDepth)
+            block   <- blockFlow.getBlock(locator._1)
+          } yield Some(block.getTransaction(locator._2).getOutput(locator._3))
+        case None =>
+          Right(None)
+      }
+    } yield {
+      txOutputOpt
+    }
+  }
+
+  private def getOutputLocator(
+      blockFlow: BlockFlow,
+      spentBlockHash: BlockHash,
+      locators: AVector[TxOutputLocator],
+      maxForkDepth: Int
+  ): IOResult[TxOutputLocator] = {
+    assume(locators.nonEmpty)
+
+    // There is only one locator, must be it!
+    if (locators.length == 1) {
+      Right(locators(0))
+    } else {
+      val partitionedE = for {
+        spentBlockHeight <- blockFlow.getHeight(spentBlockHash)
+        partitioned <- locators.partitionE(locator =>
+          blockFlow.getHeight(locator._1).map(spentBlockHeight - _ > maxForkDepth)
+        )
+      } yield partitioned
+
+      for {
+        partitioned <- partitionedE
+        (deepLocators, shallowLocators) = partitioned
+        deepMainchainLocators <- deepLocators.filterE(p => isBlockInMainChain(p._1))
+        locator <-
+          if (deepMainchainLocators.nonEmpty) {
+            // When there are deep locators, we only take the mainchain locator
+            Right(deepMainchainLocators.head)
+          } else if (shallowLocators.length == 1) {
+            Right(shallowLocators.head)
+          } else {
+            getOutputLocatorSlowly(blockFlow, spentBlockHash, shallowLocators)
+          }
+      } yield locator
+    }
+  }
+
+  private def getOutputLocatorSlowly(
+      blockFlow: BlockFlow,
+      spentBlockHash: BlockHash,
+      locators: AVector[TxOutputLocator]
+  ): IOResult[TxOutputLocator] = {
+    val headerChain = blockFlow.getHeaderChain(spentBlockHash)
+
+    locators
+      .findE(locator => headerChain.isBefore(locator._1, spentBlockHash))
+      .flatMap {
+        case Some(locator) => Right(locator)
+        case None          => Left(IOError.keyNotFound("Cannot find the input info for the TX"))
+      }
   }
 }

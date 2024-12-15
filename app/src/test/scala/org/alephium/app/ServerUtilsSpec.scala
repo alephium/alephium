@@ -4595,7 +4595,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
     val transactions =
-      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash)).rightValue
+      block.transactions
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
+        .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
         .from(block, 1, transactions)
@@ -4967,7 +4969,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "find rich block when node.indexes.tx-output-ref-index is enabled" in new TxOutputRefIndexFixture {
     val transactions =
-      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash)).rightValue
+      block.transactions
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
+        .rightValue
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
@@ -5030,7 +5034,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
-    serverUtils.getRichTransaction(blockFlow, transaction, block1.hash).rightValue is richTransaction
+    serverUtils
+      .getRichTransaction(blockFlow, transaction, block1.hash)
+      .rightValue is richTransaction
 
     serverUtils
       .getRichTransaction(blockFlow, transaction.id, Some(chainIndex.from), Some(chainIndex.to))
@@ -5108,7 +5114,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val richTransaction =
       RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
 
-    serverUtils.getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash).rightValue is richTransaction
+    serverUtils
+      .getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash)
+      .rightValue is richTransaction
     serverUtils
       .getRichTransaction(
         blockFlow,
