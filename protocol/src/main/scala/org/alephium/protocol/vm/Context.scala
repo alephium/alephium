@@ -22,7 +22,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxOutputLocator
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(

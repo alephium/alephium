@@ -32,6 +32,7 @@ import org.alephium.protocol.model.{BlockHash => ModelBlockHash, _}
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.ralph.Compiler
 import org.alephium.util.{AVector, Duration, TimeStamp, U256}
 
@@ -49,7 +50,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           inputInfo.txInput.outputRef,
           inputInfo.referredOutput,
           TransactionId.generate,
-          Some((ModelBlockHash.generate, 0, 0))
+          Some(TxOutputLocator(ModelBlockHash.generate, 0, 0))
         ) isE ()
       }
     }

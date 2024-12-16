@@ -28,10 +28,7 @@ import org.alephium.protocol.vm.nodeindexes.{
   StagingNodeIndexes,
   TxOutputRefIndexStorage
 }
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
-  TxIdTxOutputLocators,
-  TxOutputLocator
-}
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.serde.{intSerde, Serde, SerdeError}
 import org.alephium.util.{AVector, SizedLruCache}
 

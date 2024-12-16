@@ -30,7 +30,7 @@ import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
+import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
@@ -4753,14 +4753,14 @@ class ServerUtilsSpec extends AlephiumSpec {
         Hint.ofContract(LockupScript.p2c(contractId).scriptHint),
         TxOutputRef.unsafeKey(fork3ContractInput.key)
       )
-      serverUtils.getTxOutput(blockFlow, contractOutputRef, fork2.hash) isE Some(
+      blockFlow.getTxOutput(contractOutputRef, fork2.hash, maxForkDepth) isE Some(
         ModelContractOutput(
           amount = ALPH.alph(99),
           lockupScript = LockupScript.p2c(contractId),
           tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
         )
       )
-      serverUtils.getTxOutput(blockFlow, contractOutputRef, main4.hash) isE Some(
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, maxForkDepth) isE Some(
         ModelContractOutput(
           amount = ALPH.alph(99),
           lockupScript = LockupScript.p2c(contractId),

@@ -18,10 +18,7 @@ package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.{IOResult, MutableKV}
 import org.alephium.protocol.model.{TransactionId, TxOutputRef}
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
-  TxIdTxOutputLocators,
-  TxOutputLocator
-}
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.util.AVector
 
 object TxOutputRefIndexStorage {
@@ -34,10 +31,10 @@ object TxOutputRefIndexStorage {
     txOutputLocatorOpt match {
       case Some(txOutputLocator) =>
         storage.getOpt(outputRef).flatMap {
-          case Some((txId, txOutputLocators)) =>
-            storage.put(outputRef, (txId, txOutputLocators :+ txOutputLocator))
+          case Some(TxIdTxOutputLocators(txId, txOutputLocators)) =>
+            storage.put(outputRef, TxIdTxOutputLocators(txId, txOutputLocators :+ txOutputLocator))
           case None =>
-            storage.put(outputRef, (txId, AVector(txOutputLocator)))
+            storage.put(outputRef, TxIdTxOutputLocators(txId, AVector(txOutputLocator)))
         }
       case None =>
         Right(())

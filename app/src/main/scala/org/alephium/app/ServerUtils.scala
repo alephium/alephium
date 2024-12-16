@@ -41,7 +41,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -749,11 +749,13 @@ class ServerUtils(implicit
       locators: TxIdTxOutputLocators
   ): Try[BlockHash] = {
     for {
-      locatorOpt <- locators._2.findE(locator => isBlockInMainChain(blockFlow, locator._1))
-      locator <- locatorOpt.toRight(
-        notFound(s"Main chain block hash for ${locators._1}")
+      locatorOpt <- locators.txOutputLocators.findE(locator =>
+        isBlockInMainChain(blockFlow, locator.blockHash)
       )
-    } yield locator._1
+      locator <- locatorOpt.toRight(
+        notFound(s"Main chain block hash for ${locators.txId}")
+      )
+    } yield locator.blockHash
   }
 
   def getRawTransaction(
@@ -1705,7 +1707,7 @@ class ServerUtils(implicit
       result <- resultOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
       )
-    } yield result._1
+    } yield result.txId
   }
 
   private def call[P <: CallBase](
@@ -2250,7 +2252,7 @@ class ServerUtils(implicit
         outputRef,
         output,
         txId,
-        Some((blockHash, 0, 0))
+        Some(TxOutputLocator(blockHash, 0, 0))
       )
     )
   }

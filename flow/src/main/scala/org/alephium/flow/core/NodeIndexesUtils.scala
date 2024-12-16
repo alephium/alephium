@@ -21,10 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.model.{BlockHash, ContractId, TxOutput, TxOutputRef}
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
-  TxIdTxOutputLocators,
-  TxOutputLocator
-}
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
 
@@ -102,11 +99,11 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     for {
       resultOpt <- getTxIdTxOutputLocatorsFromOutputRef(outputRef)
       txOutputOpt <- resultOpt match {
-        case Some((_, txOutputLocators)) =>
+        case Some(TxIdTxOutputLocators(_, txOutputLocators)) =>
           for {
             locator <- getOutputLocator(blockFlow, spentBlockHash, txOutputLocators, maxForkDepth)
-            block   <- blockFlow.getBlock(locator._1)
-          } yield Some(block.getTransaction(locator._2).getOutput(locator._3))
+            block   <- blockFlow.getBlock(locator.blockHash)
+          } yield Some(block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
         case None =>
           Right(None)
       }
@@ -127,17 +124,13 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     if (locators.length == 1) {
       Right(locators(0))
     } else {
-      val partitionedE = for {
+      for {
         spentBlockHeight <- blockFlow.getHeight(spentBlockHash)
         partitioned <- locators.partitionE(locator =>
-          blockFlow.getHeight(locator._1).map(spentBlockHeight - _ > maxForkDepth)
+          blockFlow.getHeight(locator.blockHash).map(spentBlockHeight - _ > maxForkDepth)
         )
-      } yield partitioned
-
-      for {
-        partitioned <- partitionedE
         (deepLocators, shallowLocators) = partitioned
-        deepMainchainLocators <- deepLocators.filterE(p => isBlockInMainChain(p._1))
+        deepMainchainLocators <- deepLocators.filterE(p => isBlockInMainChain(p.blockHash))
         locator <-
           if (deepMainchainLocators.nonEmpty) {
             // When there are deep locators, we only take the mainchain locator
@@ -159,7 +152,7 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     val headerChain = blockFlow.getHeaderChain(spentBlockHash)
 
     locators
-      .findE(locator => headerChain.isBefore(locator._1, spentBlockHash))
+      .findE(locator => headerChain.isBefore(locator.blockHash, spentBlockHash))
       .flatMap {
         case Some(locator) => Right(locator)
         case None          => Left(IOError.keyNotFound("Cannot find the input info for the TX"))

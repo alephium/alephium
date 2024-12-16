@@ -28,7 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
@@ -591,7 +591,12 @@ object BlockFlowState {
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id, Some((block.hash, txIndex, index)))
+        worldState.addAsset(
+          outputRef,
+          outputUpdated,
+          tx.id,
+          Some(TxOutputLocator(block.hash, txIndex, index))
+        )
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

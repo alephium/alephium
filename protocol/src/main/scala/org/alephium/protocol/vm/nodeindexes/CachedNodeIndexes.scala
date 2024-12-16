@@ -19,7 +19,7 @@ package org.alephium.protocol.vm.nodeindexes
 import org.alephium.io.{CachedKVStorage, IOResult}
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.CachedLog
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.CachedSubContractIndex
 
 final case class CachedNodeIndexes(
