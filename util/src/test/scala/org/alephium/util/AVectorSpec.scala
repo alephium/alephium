@@ -747,6 +747,36 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     test(Gen.negNum[Int])
     test(Gen.chooseNum[Int](-100000, 100000))
   }
+
+  it should "partitionE" in new Fixture {
+    AVector.empty[Int].partitionE[String](x => Right(x % 2 == 0)) isE (AVector.empty, AVector.empty)
+    AVector(0, 1, 2, 3, 4, 5)
+      .partitionE[String](x => Right(x % 2 == 0)) isE (AVector(0, 2, 4), AVector(1, 3, 5))
+
+    def test(intGen: Gen[Int]) = {
+      forAll(Gen.listOf(intGen)) { nums =>
+        val numsAVector = AVector.from(nums)
+        val result = numsAVector.partitionE[String] { x =>
+          if (x == 0) {
+            Left("zero")
+          } else {
+            Right(x % 2 == 0)
+          }
+        }
+        if (nums.contains(0)) {
+          result is Left("zero")
+        } else {
+          val even = numsAVector.filter(_ % 2 == 0)
+          val odd  = numsAVector.filterNot(_ % 2 == 0)
+          result is Right((even, odd))
+        }
+      }
+    }
+
+    test(Gen.posNum[Int])
+    test(Gen.negNum[Int])
+    test(Gen.chooseNum[Int](-100000, 100000))
+  }
 }
 
 class SpecialAVectorSpec extends AlephiumSpec {
