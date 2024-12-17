@@ -877,7 +877,7 @@ class ServerUtils(implicit
 
       if (simpleDests.nonEmpty) {
         for {
-          amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.attoAlphAmount.value))
+          amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.getAttoAlphAmount().value))
           tokens <- UnsignedTransaction
             .calculateTotalAmountPerToken(
               simpleDests.flatMap(
@@ -908,7 +908,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        Math.max(destination.attoAlphAmount.value, tokensDustAmount),
+        Math.max(destination.getAttoAlphAmount().value, tokensDustAmount),
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -929,7 +929,7 @@ class ServerUtils(implicit
           lockUnlock <- in.getLockPair()
           utxos      <- prepareOutputRefsOpt(in.utxos).left.map(failed)
           amount <- TxUtils
-            .checkTotalAttoAlphAmount(in.destinations.map(_.attoAlphAmount.value))
+            .checkTotalAttoAlphAmount(in.destinations.map(_.getAttoAlphAmount().value))
             .left
             .map(failed)
           tokens <- UnsignedTransaction

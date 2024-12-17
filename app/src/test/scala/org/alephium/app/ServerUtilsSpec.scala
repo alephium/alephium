@@ -147,7 +147,12 @@ class ServerUtilsSpec extends AlephiumSpec {
       txs.map(_.outputsLength - 1).sum is destinations.length
       val outputs =
         destinations.map(d =>
-          TxOutputInfo(d.address.lockupScript, d.attoAlphAmount.value, AVector.empty, Option.empty)
+          TxOutputInfo(
+            d.address.lockupScript,
+            d.getAttoAlphAmount().value,
+            AVector.empty,
+            Option.empty
+          )
         )
 
       val (actualUtxoCount, actualBalance) = getTotalUtxoCountsAndBalance(blockFlow, outputs)
@@ -156,7 +161,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       val txsFee = txs.map(_.gasFeeUnsafe.v).sum
       val senderHasSpent =
-        U256.from(destinations.map(_.attoAlphAmount.value.v).sum).get + U256.from(txsFee).get
+        U256.from(destinations.map(_.getAttoAlphAmount().value.v).sum).get + U256.from(txsFee).get
       val expectedSenderBalanceWithGas = initialSenderBalance - senderHasSpent
       checkAddressBalance(
         Address.p2pkh(fromPublicKey),
@@ -245,7 +250,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
+        genesisBalance - destination1.getAttoAlphAmount().value - destination2
+          .getAttoAlphAmount()
+          .value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkDestinationBalance(destination1)
@@ -305,7 +312,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
+        genesisBalance - destination1.getAttoAlphAmount().value - destination2
+          .getAttoAlphAmount()
+          .value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkAddressBalance(destination1.address, ALPH.oneAlph, 1)
@@ -427,7 +436,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(0, 1, 2).map { groupIndex =>
         Destination(
           Address.p2pkh(GroupIndex.unsafe(groupIndex).generateKey._2),
-          Amount(ALPH.oneAlph)
+          Some(Amount(ALPH.oneAlph))
         )
       }
 
@@ -491,7 +500,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, confirmBlock)
 
     implicit val serverUtils: ServerUtils = new ServerUtils
-    val destination = Destination(Address.p2pkh(genesisPubKey), Amount(ALPH.oneAlph))
+    val destination = Destination(Address.p2pkh(genesisPubKey), Some(Amount(ALPH.oneAlph)))
     val buildTransferTransaction = serverUtils
       .buildTransferTransaction(
         blockFlow,
@@ -531,7 +540,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val fromGroup                          = chainIndex.from
       val (fromPrivateKey, fromPublicKey, _) = genesisKeys(fromGroup.value)
       val fromAddress                        = Address.p2pkh(fromPublicKey)
-      val selfDestination                    = Destination(fromAddress, Amount(ALPH.oneAlph), None)
+      val selfDestination = Destination(fromAddress, Some(Amount(ALPH.oneAlph)), None)
 
       info("Sending some coins to itself twice, creating 3 UTXOs in total for the same public key")
       val destinations = AVector(selfDestination, selfDestination)
@@ -613,7 +622,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val toGroup                            = chainIndex.to
       val (toPrivateKey, toPublicKey, _)     = genesisKeys(toGroup.value)
       val toAddress                          = Address.p2pkh(toPublicKey)
-      val destination                        = Destination(toAddress, Amount(ALPH.oneAlph))
+      val destination                        = Destination(toAddress, Some(Amount(ALPH.oneAlph)))
 
       info("Sending some coins to an address, resulting 10 UTXOs for its corresponding public key")
       val destinations = AVector.fill(10)(destination)
@@ -860,7 +869,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex                         = ChainIndex.unsafe(0, 0)
     val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
     val fromAddress                        = Address.p2pkh(fromPublicKey)
-    val selfDestination                    = Destination(fromAddress, Amount(ALPH.cent(50)))
+    val selfDestination                    = Destination(fromAddress, Some(Amount(ALPH.cent(50))))
 
     info("Sending some coins to itself, creating 2 UTXOs in total for the same public key")
     val selfDestinations = AVector(selfDestination)
@@ -1118,7 +1127,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "not create transaction with overflowing ALPH amount" in new MultipleUtxos {
     val attoAlphAmountOverflowDestinations = AVector(
       destination1,
-      destination2.copy(attoAlphAmount = Amount(ALPH.MaxALPHValue))
+      destination2.copy(attoAlphAmount = Some(Amount(ALPH.MaxALPHValue)))
     )
     serverUtils
       .prepareUnsignedTransaction(
@@ -1293,7 +1302,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
     val amount                = Amount(ALPH.oneAlph)
-    val destination           = Destination(generateAddress(chainIndex), amount)
+    val destination           = Destination(generateAddress(chainIndex), Some(amount))
 
     val source = BuildMultiAddressesTransaction.Source(
       fromPublicKey.bytes,
@@ -1321,7 +1330,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex             = ChainIndex.unsafe(0, 0)
     val (fromPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
     val amount                 = ALPH.alph(10)
-    val destination            = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+    val destination = Destination(generateAddress(chainIndex), Some(Amount(ALPH.oneAlph)))
 
     val inputPubKeys = AVector.fill(10)(chainIndex.to.generateKey._2)
 
@@ -1383,7 +1392,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val chainIndex = ChainIndex.unsafe(0, 0)
 
-    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+    val destination = Destination(generateAddress(chainIndex), Some(Amount(ALPH.oneAlph)))
 
     forAll(Gen.choose(1, 20)) { i =>
       val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
@@ -1392,7 +1401,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       outputs(0).tokens is AVector.empty[(TokenId, U256)]
     }
 
-    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)))
+    val destination2 = Destination(generateAddress(chainIndex), Some(Amount(ALPH.alph(2))))
 
     forAll(Gen.choose(1, 20)) { i =>
       val outputs = serverUtils
@@ -1418,7 +1427,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val tokens = AVector(Token(tokenId1, U256.One), Token(tokenId2, U256.Two))
 
-    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph), Some(tokens))
+    val destination =
+      Destination(generateAddress(chainIndex), Some(Amount(ALPH.oneAlph)), Some(tokens))
 
     forAll(Gen.choose(1, 20)) { i =>
       val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
@@ -1430,7 +1440,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     }
 
-    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)), Some(tokens))
+    val destination2 =
+      Destination(generateAddress(chainIndex), Some(Amount(ALPH.alph(2))), Some(tokens))
 
     forAll(Gen.choose(1, 20)) { i =>
       val outputs = serverUtils
@@ -1458,14 +1469,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex = ChainIndex.unsafe(0, 0)
 
     val destAddress = generateAddress(chainIndex)
-    val destination = Destination(destAddress, Amount(ALPH.oneAlph))
+    val destination = Destination(destAddress, Some(Amount(ALPH.oneAlph)))
     val destinationLockTime =
-      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+      Destination(destAddress, Some(Amount(ALPH.oneAlph)), lockTime = Some(TimeStamp.now()))
     val destinationMessage =
-      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+      Destination(destAddress, Some(Amount(ALPH.oneAlph)), message = Some(ByteString.empty))
     val destinationBoth = Destination(
       destAddress,
-      Amount(ALPH.oneAlph),
+      Some(Amount(ALPH.oneAlph)),
       lockTime = Some(TimeStamp.now()),
       message = Some(ByteString.empty)
     )
@@ -1502,12 +1513,12 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val destAddress = generateAddress(chainIndex)
     val destinationLockTime =
-      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+      Destination(destAddress, Some(Amount(ALPH.oneAlph)), lockTime = Some(TimeStamp.now()))
     val destinationMessage =
-      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+      Destination(destAddress, Some(Amount(ALPH.oneAlph)), message = Some(ByteString.empty))
     val destinationBoth = Destination(
       destAddress,
-      Amount(ALPH.oneAlph),
+      Some(Amount(ALPH.oneAlph)),
       lockTime = Some(TimeStamp.now()),
       message = Some(ByteString.empty)
     )
@@ -4035,7 +4046,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val privateKey: PrivateKey
       val publicKey: PublicKey
       val address                  = Address.p2pkh(publicKey)
-      def destination(value: U256) = Destination(address, Amount(value))
+      def destination(value: U256) = Destination(address, Some(Amount(value)))
     }
 
     def groupInfo(group: Int): GroupInfo = {
@@ -5151,7 +5162,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           destinations = AVector(
             Destination(
               address = Address.Asset(testLockupScript),
-              attoAlphAmount = Amount(alphAmount),
+              attoAlphAmount = Some(Amount(alphAmount)),
               tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
             )
           ),
@@ -5296,7 +5307,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = Amount(ALPH.oneAlph)
-    Destination(address, amount, None, None, Some(message))
+    Destination(address, Some(amount), None, None, Some(message))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit
@@ -5347,6 +5358,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    checkAddressBalance(destination.address, destination.attoAlphAmount.value, utxoNum)
+    checkAddressBalance(destination.address, destination.getAttoAlphAmount().value, utxoNum)
   }
 }
