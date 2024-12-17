@@ -14303,8 +14303,7 @@
         "title": "Destination",
         "type": "object",
         "required": [
-          "address",
-          "attoAlphAmount"
+          "address"
         ],
         "properties": {
           "address": {

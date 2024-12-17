@@ -45,7 +45,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     val destAmount = amount
 
     val destinations = AVector(
-      Destination(Address.asset(address2).get, Amount(destAmount))
+      Destination(Address.asset(address2).get, Some(Amount(destAmount)))
     )
 
     val inputs: AVector[BuildMultiAddressesTransaction.Source] = AVector(
@@ -116,7 +116,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     ) = AVector(
       Destination(
         Address.asset(destAddress).get,
-        Amount(amount),
+        Some(Amount(amount)),
         lockTime = lockTime,
         message = message
       )

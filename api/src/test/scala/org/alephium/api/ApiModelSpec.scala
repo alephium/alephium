@@ -381,7 +381,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         BuildTransferTx(
           fromPublicKey.bytes,
           None,
-          AVector(Destination(toAddress, Amount(1)))
+          AVector(Destination(toAddress, Some(Amount(1))))
         )
       val jsonRaw = s"""
                        |{
@@ -402,7 +402,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val transfer = BuildTransferTx(
         fromPublicKey.bytes,
         None,
-        AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
+        AVector(Destination(toAddress, Some(Amount(1)), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
@@ -433,7 +433,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AVector(
           Destination(
             toAddress,
-            Amount(1),
+            Some(Amount(1)),
             Some(AVector(Token(tokenId1, U256.Ten))),
             Some(TimeStamp.unsafe(1234))
           )
@@ -474,7 +474,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AVector(
           Destination(
             toAddress,
-            Amount(1),
+            Some(Amount(1)),
             Some(AVector(Token(tokenId1, U256.Ten))),
             Some(TimeStamp.unsafe(1234))
           )
@@ -517,7 +517,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AVector(
           Destination(
             toAddress,
-            Amount(1),
+            Some(Amount(1)),
             Some(AVector(Token(tokenId1, U256.Ten))),
             Some(TimeStamp.unsafe(1234))
           )
@@ -566,7 +566,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       BuildTransferTx(
         fromPublicKey.bytes,
         None,
-        AVector(Destination(toAddress, Amount(1)))
+        AVector(Destination(toAddress, Some(Amount(1))))
       )
     )
     val transferJson = s"""
@@ -760,7 +760,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
         // `Destination` is already well tested, so we use simple data
         val destinations = toAddresses.map { toAddress =>
-          Destination(toAddress, Amount(1))
+          Destination(toAddress, Some(Amount(1)))
         }
 
         val sources = fromPublicKeys.map { publicKey =>
