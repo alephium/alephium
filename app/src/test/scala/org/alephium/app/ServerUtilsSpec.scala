@@ -5152,7 +5152,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "consider dustUtxoAmount for outputs when building transfer tx" in new VerifyTxOutputFixture {
-    def verifyBuildTransferTx(alphAmount: U256) = {
+    def verifyBuildTransferTx(alphAmount: Option[U256]) = {
       val unsignedTx = serverUtils
         .prepareUnsignedTransaction(
           blockFlow,
@@ -5162,7 +5162,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           destinations = AVector(
             Destination(
               address = Address.Asset(testLockupScript),
-              attoAlphAmount = Some(Amount(alphAmount)),
+              attoAlphAmount = alphAmount.map(Amount(_)),
               tokens = Some(AVector(Token(tokenId, U256.unsafe(10))))
             )
           ),
@@ -5191,11 +5191,31 @@ class ServerUtilsSpec extends AlephiumSpec {
       ).forall(unsignedTx.fixedOutputs.contains) is true
     }
 
-    verifyBuildTransferTx(U256.Zero)
-    verifyBuildTransferTx(dustUtxoAmount.subUnsafe(1))
-    verifyBuildTransferTx(dustUtxoAmount)
-    verifyBuildTransferTx(dustUtxoAmount.addUnsafe(1))
-    verifyBuildTransferTx(dustUtxoAmount.mulUnsafe(10))
+    verifyBuildTransferTx(Some(U256.Zero))
+    verifyBuildTransferTx(Some(dustUtxoAmount.subUnsafe(1)))
+    verifyBuildTransferTx(Some(dustUtxoAmount))
+    verifyBuildTransferTx(Some(dustUtxoAmount.addUnsafe(1)))
+    verifyBuildTransferTx(Some(dustUtxoAmount.mulUnsafe(10)))
+    verifyBuildTransferTx(None)
+  }
+
+  it should "not allow destination with no tokens and no attoAlphAmount" in new VerifyTxOutputFixture {
+    serverUtils
+      .prepareUnsignedTransaction(
+        blockFlow,
+        LockupScript.p2pkh(genesisPublicKey),
+        UnlockScript.p2pkh(genesisPublicKey),
+        outputRefsOpt = None,
+        destinations = AVector(
+          Destination(address = Address.Asset(testLockupScript))
+        ),
+        gasOpt = None,
+        gasPrice = nonCoinbaseMinGasPrice,
+        targetBlockHashOpt = None,
+        ExtraUtxosInfo.empty
+      )
+      .leftValue
+      .detail is "Tx output value is too small, avoid spreading dust"
   }
 
   it should "return an error if there are too many utxos" in new Fixture {
