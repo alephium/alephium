@@ -90,7 +90,6 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     getTxOutput(outputRef, spentBlockHash, maxForkDepth)
   }
 
-  // TODO: unit test this one
   def getTxOutput(
       outputRef: TxOutputRef,
       spentBlockHash: BlockHash,
@@ -119,7 +118,6 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       maxForkDepth: Int
   ): IOResult[TxOutputLocator] = {
     assume(locators.nonEmpty)
-
     // There is only one locator, must be it!
     if (locators.length == 1) {
       Right(locators(0))
@@ -130,11 +128,11 @@ trait NodeIndexesUtils { Self: FlowUtils =>
           blockFlow.getHeight(locator.blockHash).map(spentBlockHeight - _ > maxForkDepth)
         )
         (deepLocators, shallowLocators) = partitioned
-        deepMainchainLocators <- deepLocators.filterE(p => isBlockInMainChain(p.blockHash))
+        deepMainChainLocators <- deepLocators.filterE(p => isBlockInMainChain(p.blockHash))
         locator <-
-          if (deepMainchainLocators.nonEmpty) {
+          if (deepMainChainLocators.nonEmpty) {
             // When there are deep locators, we only take the mainchain locator
-            Right(deepMainchainLocators.head)
+            Right(deepMainChainLocators.head)
           } else if (shallowLocators.length == 1) {
             Right(shallowLocators.head)
           } else {

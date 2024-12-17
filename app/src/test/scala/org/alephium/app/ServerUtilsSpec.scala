@@ -4739,6 +4739,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     def fork3: Block
 
     def verifyForkedChain(): Assertion = {
+      main2.nonCoinbase.length is 1
+      main2.nonCoinbase.head.inputsLength is 1
+      val testKeyTxOutputRef = main2.nonCoinbase.head.unsigned.inputs(0).outputRef
+      val testKeyTxOutput    = main0.nonCoinbase.head.unsigned.fixedOutputs(0)
+      blockFlow.getTxOutput(testKeyTxOutputRef, main2.hash, maxForkDepth) isE Some(testKeyTxOutput)
+
       // Same tx in both main3 and fork2
       main3.nonCoinbase.head.id is fork2.nonCoinbase.head.id
 
@@ -4753,19 +4759,27 @@ class ServerUtilsSpec extends AlephiumSpec {
         Hint.ofContract(LockupScript.p2c(contractId).scriptHint),
         TxOutputRef.unsafeKey(fork3ContractInput.key)
       )
-      blockFlow.getTxOutput(contractOutputRef, fork2.hash, maxForkDepth) isE Some(
-        ModelContractOutput(
-          amount = ALPH.alph(99),
-          lockupScript = LockupScript.p2c(contractId),
-          tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
-        )
+
+      val contractOutputMain3 = ModelContractOutput(
+        amount = ALPH.alph(99),
+        lockupScript = LockupScript.p2c(contractId),
+        tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
       )
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 0) isE Some(contractOutputMain3)
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 1) isE Some(contractOutputMain3)
       blockFlow.getTxOutput(contractOutputRef, main4.hash, maxForkDepth) isE Some(
-        ModelContractOutput(
-          amount = ALPH.alph(99),
-          lockupScript = LockupScript.p2c(contractId),
-          tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
-        )
+        contractOutputMain3
+      )
+
+      val contractOutputFork2 = ModelContractOutput(
+        amount = ALPH.alph(99),
+        lockupScript = LockupScript.p2c(contractId),
+        tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
+      )
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 0) isE Some(contractOutputMain3)
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 1) isE Some(contractOutputFork2)
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, maxForkDepth) isE Some(
+        contractOutputFork2
       )
     }
   }
@@ -4821,6 +4835,33 @@ class ServerUtilsSpec extends AlephiumSpec {
     fork3.parentHash is fork2.hash
 
     verifyForkedChain()
+  }
+
+  it should "return correct transaction output for coinbase transactions" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    val chainIndex                      = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, fromPublicKey) = chainIndex.to.generateKey
+    val (_, toPublicKey)                = chainIndex.to.generateKey
+    val lockupScript                    = LockupScript.p2pkh(fromPublicKey)
+    val block0 = mine(
+      blockFlow,
+      chainIndex,
+      AVector.empty[Transaction],
+      lockupScript,
+      Some(ALPH.LaunchTimestamp.plusMillisUnsafe(1))
+    )
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, ALPH.oneAlph)
+    addAndCheck(blockFlow, block1)
+
+    block1.nonCoinbase.length is 1
+    block1.nonCoinbase.head.inputsLength is 1
+    val txOutputRef    = block1.nonCoinbase.head.unsigned.inputs(0).outputRef
+    val coinbaseOutput = block0.coinbase.unsigned.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some(coinbaseOutput)
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
