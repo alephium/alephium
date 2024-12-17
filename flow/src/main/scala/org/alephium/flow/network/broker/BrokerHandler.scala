@@ -24,6 +24,7 @@ import akka.util.ByteString
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
+import org.alephium.flow.handler.TxHandler.SubmitToMemPoolResult
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
@@ -208,10 +209,8 @@ trait BrokerHandler extends FlowDataHandler {
     case HeaderChainHandler.InvalidHeader(hash) =>
       log.debug(s"Invalid header received ${hash.shortHex}")
       handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
-    case TxHandler.AddSucceeded(hash) =>
-      log.debug(s"Tx ${hash.shortHex} was added successfully")
-    case TxHandler.AddFailed(hash, reason) =>
-      log.debug(s"Failed in adding new TX ${hash.shortHex}. Reason: ${reason}")
+    case cmdResponse: SubmitToMemPoolResult =>
+      log.debug(s"${cmdResponse.message}")
   }
 
   def dataOrigin: DataOrigin
