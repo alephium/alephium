@@ -263,10 +263,11 @@ class FlowUtilsSpec extends AlephiumSpec {
   it should "prepare block with correct coinbase reward for rhone hardfork" in new CoinbaseRewardFixture {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
-    val miningReward = consensusConfigs.rhone.emission
+    val emission   = consensusConfigs.rhone.emission
+    val miningReward = emission
       .reward(emptyBlock.header)
       .miningReward
-    miningReward is (ALPH.alph(30) / 9 / 4)
+    miningReward is emission.rewardWrtTime(emptyBlock.header.timestamp, ALPH.LaunchTimestamp)
     emptyBlock.coinbase.unsigned.fixedOutputs.length is 1
     val mainChainReward = Coinbase.calcMainChainReward(miningReward)
     emptyBlock.coinbaseReward is mainChainReward
