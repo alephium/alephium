@@ -25,7 +25,7 @@ import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.FastParseExtension._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 @SuppressWarnings(
@@ -600,26 +600,62 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.EnumFieldSelector(enumId, field)
     }
 
-  def enumField[Unknown: P]: P[Ast.EnumField[Ctx]] =
-    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
-      Ast.EnumField(ident, value)
+  def enumField[Unknown: P]: P[Ast.RawEnumField[Ctx]] =
+    PP(Lexer.constantIdent ~ ("=" ~ (const | stringLiteral)).?) { case (ident, valueOpt) =>
+      Ast.RawEnumField(ident, valueOpt)
     }
+
+  @SuppressWarnings(
+    Array("org.wartremover.warts.OptionPartial", "org.wartremover.warts.IterableOps")
+  )
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
-      case (enumIndex, id, fields) =>
-        if (fields.isEmpty) {
+      case (enumIndex, id, rawFields) =>
+        if (rawFields.isEmpty) {
           val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
           throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
         }
-        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.v.tpe).size != 1) {
-          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
+
+        val firstField = rawFields.head.validateAsFirstField()
+        rawFields.tail.foreach(_.validate(id.name, firstField.value.v))
+
+        val fields = if (firstField.value.v.tpe != Val.U256) {
+          rawFields.map { case rawField @ Ast.RawEnumField(ident, valueOpt) =>
+            Ast.EnumField(ident, valueOpt.get).atSourceIndex(rawField.sourceIndex)
+          }
+        } else {
+          val (_, allFields) =
+            rawFields.tail.foldLeft(
+              (firstField.value.v.asInstanceOf[Val.U256].v, Seq(firstField))
+            ) { case ((currentValue, fields), rawField @ Ast.RawEnumField(ident, valueOpt)) =>
+              val (newValue, value) = valueOpt match {
+                case Some(v) => (v.v.asInstanceOf[Val.U256].v, v)
+                case None =>
+                  val nextValue = currentValue
+                    .add(U256.One)
+                    .getOrElse(
+                      throw Compiler.Error(
+                        s"Enum field ${ident.name} value overflows, it must not exceed ${U256.MaxValue}",
+                        ident.sourceIndex
+                      )
+                    )
+                  (
+                    nextValue,
+                    Ast.Const[Ctx](Val.U256(nextValue)).atSourceIndex(ident.sourceIndex)
+                  )
+              }
+              (newValue, fields :+ Ast.EnumField(ident, value).atSourceIndex(rawField.sourceIndex))
+            }
+          allFields
         }
+
+        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
         if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
         Ast.EnumDef(id, fields)
     }
+
   def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }
 

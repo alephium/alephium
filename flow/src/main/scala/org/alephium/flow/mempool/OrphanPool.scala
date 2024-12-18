@@ -23,7 +23,7 @@ import org.alephium.util.{AVector, TimeStamp}
 class OrphanPool private (val pool: MemPool) {
   def size: Int = pool.size
 
-  def add(tx: TransactionTemplate, timeStamp: TimeStamp): MemPool.NewTxCategory = {
+  def add(tx: TransactionTemplate, timeStamp: TimeStamp): MemPool.AddToMemPoolResult = {
     pool.add(OrphanPool.bufferChainIndex, tx, timeStamp)
   }
 
