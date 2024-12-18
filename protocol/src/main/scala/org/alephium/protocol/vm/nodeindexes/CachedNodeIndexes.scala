@@ -19,10 +19,9 @@ package org.alephium.protocol.vm.nodeindexes
 import org.alephium.io.{CachedKVStorage, IOResult}
 import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.CachedLog
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.CachedSubContractIndex
 
-// format: off
 final case class CachedNodeIndexes(
     logStorageCache: CachedLog,
     txOutputRefIndexCache: Option[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
@@ -54,7 +53,7 @@ final case class CachedNodeIndexes(
     )
   }
 }
-// format: on
+
 object CachedNodeIndexes {
   @inline def from(nodeIndexesStorage: NodeIndexesStorage): CachedNodeIndexes = {
     new CachedNodeIndexes(

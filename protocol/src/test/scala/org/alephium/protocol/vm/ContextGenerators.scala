@@ -39,7 +39,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
       tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> prevOutputs
     }
-    TxEnv(
+    TxEnv.dryrun(
       tx,
       prevOutputs.map(_.referredOutput),
       Stack.popOnly(signatures)

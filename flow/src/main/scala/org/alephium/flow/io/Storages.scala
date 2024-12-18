@@ -30,11 +30,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
-  txIdBlockHashesSerde,
-  TxIdTxOutputLocators
-}
+import org.alephium.protocol.vm.nodeindexes.{NodeIndexesStorage, TxIdTxOutputLocators}
 import org.alephium.protocol.vm.subcontractindex.{
   SubContractIndexState,
   SubContractIndexStateId,

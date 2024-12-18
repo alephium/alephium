@@ -46,7 +46,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -504,7 +504,7 @@ object ServerFixture {
             ContractOutputRef.unsafe(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.zero)),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector()),
             dummyTx.id,
-            Some((block.hash, 0, 0))
+            Some(TxOutputLocator(block.hash, 0, 0))
           )
           .map(_.cached())
       } else {
@@ -545,7 +545,9 @@ object ServerFixture {
         outputRef: TxOutputRef
     ): IOResult[Option[TxIdTxOutputLocators]] = {
       if (outputRef == dummyAssetOutputRef) {
-        Right(Some((dummyTransactionId, AVector((block.hash, 0, 0)))))
+        Right(
+          Some(TxIdTxOutputLocators(dummyTransactionId, AVector(TxOutputLocator(block.hash, 0, 0))))
+        )
       } else {
         Right(None)
       }

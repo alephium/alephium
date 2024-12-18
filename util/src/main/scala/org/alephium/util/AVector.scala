@@ -654,6 +654,18 @@ final class AVector[@sp A](
     }
   }
 
+  def partitionE[L](f: A => Either[L, Boolean]): Either[L, (AVector[A], AVector[A])] = {
+    foldE((AVector.empty, AVector.empty)) { case ((left, right), elem) =>
+      f(elem).map { bool =>
+        if (bool) {
+          (left :+ elem, right)
+        } else {
+          (left, right :+ elem)
+        }
+      }
+    }
+  }
+
   def groupBy[K](f: A => K): Map[K, AVector[A]] = {
     fold(Map.empty[K, AVector[A]]) { case (acc, elem) =>
       val key = f(elem)

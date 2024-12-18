@@ -25,6 +25,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.ContractPool.ContractAssetInUsing
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class FrameSpec extends AlephiumSpec with FrameFixture {
@@ -73,7 +74,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         contractOutputRef,
         contractOutput,
         txId,
-        Some((BlockHash.generate, 0, 0))
+        Some(TxOutputLocator(BlockHash.generate, 0, 0))
       )
       contractId
     }

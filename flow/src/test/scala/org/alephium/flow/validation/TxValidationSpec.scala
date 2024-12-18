@@ -32,6 +32,7 @@ import org.alephium.protocol.model.{BlockHash => ModelBlockHash, _}
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.ralph.Compiler
 import org.alephium.util.{AVector, Duration, TimeStamp, U256}
 
@@ -49,7 +50,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           inputInfo.txInput.outputRef,
           inputInfo.referredOutput,
           TransactionId.generate,
-          Some((ModelBlockHash.generate, 0, 0))
+          Some(TxOutputLocator(ModelBlockHash.generate, 0, 0))
         ) isE ()
       }
     }
@@ -76,7 +77,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           preOutputs.map(_.referredOutput),
           None,
           BlockEnv(chainIndex, networkConfig.networkId, headerTs, Target.Max, None),
-          None
+          0
         )
       } yield ()
     }
@@ -95,7 +96,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     ): TxValidationResult[GasBox] = {
       val blockEnv =
         BlockEnv(tx.chainIndex, networkConfig.networkId, timestamp, Target.Max, None)
-      checkGasAndWitnesses(tx, preOutputs, blockEnv, false, None)
+      checkGasAndWitnesses(tx, preOutputs, blockEnv, false, 0)
     }
 
     def prepareOutputs(lockup: LockupScript.Asset, unlock: UnlockScript, outputsNum: Int) = {
@@ -933,7 +934,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val prevOutputs = worldState.getPreOutputs(tx).rightValue
 
     val initialGas = tx.unsigned.gasAmount
-    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, None).rightValue
+    val gasLeft    = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, 0).rightValue
     val gasUsed    = initialGas.use(gasLeft).rightValue
 
     tx.unsigned.inputs.length is 1
@@ -1190,7 +1191,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         blockEnv,
         Some(U256.Zero),
         true,
-        None
+        0
       )
     }
 
@@ -1262,7 +1263,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       .rightValue
       .asUnsafe[AssetOutput]
     lazy val txEnv =
-      TxEnv(tx, prevOutputs, Stack.ofCapacity[Signature](0))
+      TxEnv.dryrun(tx, prevOutputs, Stack.ofCapacity[Signature](0))
   }
 
   it should "charge gas for asset script size" in new GasFixture {
@@ -1313,7 +1314,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |""".stripMargin
 
     val gasRemaining =
-      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv, None).rightValue
+      checkTxScript(chainIndex, tx, initialGas, worldState, prevOutputs, blockEnv, 0).rightValue
     initialGas is gasRemaining.addUnsafe(script.bytes.size + GasSchedule.callGas.value)
 
     val noScriptTx = tx.copy(unsigned = tx.unsigned.copy(scriptOpt = None))
@@ -1324,7 +1325,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       worldState,
       prevOutputs,
       blockEnv,
-      None
+      0
     ).rightValue is initialGas
   }
 
@@ -1345,7 +1346,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         worldState,
         prevOutputs,
         blockEnv,
-        None
+        0
       )
     }
 
@@ -1378,7 +1379,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         worldState,
         prevOutputs,
         blockEnv,
-        None
+        0
       )
     }
 
@@ -1422,7 +1423,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         worldState,
         prevOutputs,
         blockEnv,
-        None
+        0
       )
     }
 

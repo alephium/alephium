@@ -515,7 +515,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           groupView,
           blockEnv,
           Some(netReward),
-          None
+          block.transactions.length - 1
         )
       )
     } else {
@@ -672,7 +672,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         groupView,
         blockEnv,
         None,
-        Some(index)
+        index
       )
       if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
         blockEnv.addOutputRefFromTx(tx.unsigned)

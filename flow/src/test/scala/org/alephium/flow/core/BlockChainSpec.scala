@@ -936,29 +936,4 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getSyncDataFromHeightUnsafe(from) is fork0.slice(from - 1, maxHeight).map(_.hash)
     }
   }
-
-  it should "get transaction correctly" in new Fixture {
-    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
-
-    val chain  = buildBlockChain()
-    val block0 = blockGen0.sample.get
-    chain.add(block0, Weight(1)).isRight is true
-    val tx       = block0.transactions.head
-    val txIndex0 = TxIndex(block0.hash, 0)
-    chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0))
-
-    val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.secureRandom()))
-    chain.add(block1, Weight(1)).isRight is true
-    val txIndex1 = TxIndex(block1.hash, 0)
-    chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0, txIndex1))
-
-    chain.getTransaction(tx.id) isE Some(tx)
-    chain.getTransaction(tx.id, block0) isE Some(tx)
-    chain.getTransaction(tx.id, block1) isE Some(tx)
-    chain.getTransaction(tx.id, blockGen0.sample.get) isE None
-
-    chain.getTxIndexForBlock(tx.id, block0.hash) is Some(txIndex0)
-    chain.getTxIndexForBlock(tx.id, block1.hash) is Some(txIndex1)
-    chain.getTxIndexForBlock(tx.id, blockGen0.sample.get.hash) is None
-  }
 }

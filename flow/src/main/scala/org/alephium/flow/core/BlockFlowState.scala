@@ -28,7 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.TxIdTxOutputLocators
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
@@ -76,12 +76,11 @@ trait BlockFlowState extends FlowTipsUtil {
     intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.logStorage
   }
 
-  def txOutputRefIndexStorage(
-      groupIndex: GroupIndex
-  ): IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
-    getBlockChainWithState(
-      groupIndex
-    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+  lazy val txOutputRefIndexStorage
+      : IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
       case Some(storage) =>
         Right(storage)
       case None =>
@@ -585,15 +584,19 @@ object BlockFlowState {
       targetGroup: GroupIndex,
       block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    val blockTs    = block.timestamp
-    val txIndexOpt = if (txIndex == -1) None else Some(txIndex)
+    val blockTs = block.timestamp
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id, txIndexOpt.map((block.hash, _, index)))
+        worldState.addAsset(
+          outputRef,
+          outputUpdated,
+          tx.id,
+          Some(TxOutputLocator(block.hash, txIndex, index))
+        )
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

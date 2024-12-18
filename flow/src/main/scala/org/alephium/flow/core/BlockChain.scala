@@ -359,13 +359,6 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  def getTransaction(txId: TransactionId, block: Block): IOResult[Option[Transaction]] = {
-    IOUtils.tryExecute(getTxIndexForBlock(txId, block.hash)).flatMap {
-      case Some(index) => Right(Some(block.transactions(index.index)))
-      case None        => Right(None)
-    }
-  }
-
   def isTxConfirmed(txId: TransactionId): IOResult[Boolean] = txStorage.exists(txId)
 
   private def getCanonicalTxIndex(txId: TransactionId): Option[TxIndex] = {
@@ -376,15 +369,6 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       } else {
         None
       }
-    }
-  }
-
-  private[core] def getTxIndexForBlock(
-      txId: TransactionId,
-      blockHash: BlockHash
-  ): Option[TxIndex] = {
-    txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
-      txIndexes.indexes.find(index => index.hash == blockHash)
     }
   }
 

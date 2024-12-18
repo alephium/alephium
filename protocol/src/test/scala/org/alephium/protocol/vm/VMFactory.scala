@@ -22,10 +22,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{ContractId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.{
-  txIdBlockHashesSerde,
-  TxIdTxOutputLocators
-}
+import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex._
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.AVector

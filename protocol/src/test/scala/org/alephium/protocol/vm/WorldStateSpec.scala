@@ -24,7 +24,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage.txIdBlockHashesSerde
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.{AlephiumSpec, AVector}
@@ -97,6 +97,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.getContractObj(contractId).isLeft is true
     worldState.contractExists(contractId) isE false
     worldState.removeAsset(assetOutputRef).isLeft is true
+
     worldState.removeAsset(contractOutputRef).isLeft is true
 
     update(
@@ -104,7 +105,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         assetOutputRef,
         assetOutput,
         TransactionId.generate,
-        Some((BlockHash.generate, 0, 0))
+        Some(TxOutputLocator(BlockHash.generate, 0, 0))
       )
     )
     worldState.getOutput(assetOutputRef) isE assetOutput
@@ -119,7 +120,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         contractOutput,
         isLemanFork,
         TransactionId.generate,
-        Some((BlockHash.generate, 0, 0))
+        Some(TxOutputLocator(BlockHash.generate, 0, 0))
       )
     }
     worldState.getContractObj(contractId) isE contractObj
@@ -142,7 +143,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         contractOutput1,
         isLemanFork,
         TransactionId.generate,
-        Some((BlockHash.generate, 0, 0))
+        Some(TxOutputLocator(BlockHash.generate, 0, 0))
       )
     )
     checkCode(worldState, isLemanFork, code, 2)
@@ -212,7 +213,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       contractOutputRef,
       contractOutput,
       TransactionId.generate,
-      Some((BlockHash.generate, 0, 0))
+      Some(TxOutputLocator(BlockHash.generate, 0, 0))
     ) isE ()
     val newWorldState = cached.persist().rightValue
     newWorldState.getContractObj(contractId).isRight is true
@@ -238,7 +239,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       contractOutputRef,
       contractOutput,
       TransactionId.generate,
-      Some((BlockHash.generate, 0, 0))
+      Some(TxOutputLocator(BlockHash.generate, 0, 0))
     ) isE ()
     val oldWorldState = cached.persist().rightValue
     val oldContractState =
@@ -329,7 +330,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       contractOutput,
       isLemanFork,
       TransactionId.generate,
-      Some((BlockHash.generate, 0, 0))
+      Some(TxOutputLocator(BlockHash.generate, 0, 0))
     ) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true

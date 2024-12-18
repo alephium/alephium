@@ -485,7 +485,7 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox,
-      txIndex: Option[Int]
+      txIndex: Int
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
@@ -513,14 +513,13 @@ object StatefulVM {
       tx: TransactionAbstract,
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
-      gasRemaining: GasBox,
-      txIndex: Option[Int]
+      gasRemaining: GasBox
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs, txIndex)
+    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs, 0)
     runTxScriptMockup(context, script)
   }
   // scalastyle:on parameter.number
