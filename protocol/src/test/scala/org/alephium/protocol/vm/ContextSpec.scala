@@ -231,7 +231,8 @@ class ContextSpec
         AVector.empty,
         outputRef,
         output,
-        context.txId
+        context.txId,
+        None
       )
       context
     }

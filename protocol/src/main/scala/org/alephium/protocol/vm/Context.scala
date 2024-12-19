@@ -22,6 +22,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(
@@ -86,14 +87,23 @@ sealed trait TxEnv {
   def gasFeeUnsafe: U256
 
   def isEntryMethodPayable: Boolean
+  def txIndex: Int // 0 for tx simulation
 }
 
 object TxEnv {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def apply(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
+      signatures: Stack[Signature],
+      txIndex: Int
+  ): TxEnv = Default(tx, prevOutputs, signatures, txIndex)
+
+  def dryrun(
+      tx: TransactionAbstract,
+      prevOutputs: AVector[AssetOutput],
       signatures: Stack[Signature]
-  ): TxEnv = Default(tx, prevOutputs, signatures)
+  ): TxEnv = apply(tx, prevOutputs, signatures, 0)
 
   def mockup(
       txId: TransactionId,
@@ -112,13 +122,15 @@ object TxEnv {
       gasPrice,
       gasAmount,
       gasPrice * gasAmount,
-      isEntryMethodPayable
+      isEntryMethodPayable,
+      0
     )
 
   final case class Default(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Signature]
+      signatures: Stack[Signature],
+      txIndex: Int
   ) extends TxEnv {
     def txId: TransactionId                = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
@@ -136,7 +148,8 @@ object TxEnv {
       gasPrice: GasPrice,
       gasAmount: GasBox,
       gasFeeUnsafe: U256,
-      isEntryMethodPayable: Boolean
+      isEntryMethodPayable: Boolean,
+      txIndex: Int
   ) extends TxEnv
 }
 
@@ -331,10 +344,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId: ContractId,
       contractOutput: ContractOutput
   ): ExeResult[Unit] = {
-    val outputRef = nextContractOutputRef(contractOutput)
+    val outputRef       = nextContractOutputRef(contractOutput)
+    val txOutputLocator = TxOutputLocator.from(blockEnv, txEnv, nextOutputIndex)
     for {
       _ <- chargeGeneratedOutput()
-      _ <- updateContractAsset(contractId, outputRef, contractOutput)
+      _ <- updateContractAsset(contractId, outputRef, contractOutput, txOutputLocator)
     } yield {
       generatedOutputs.addOne(contractOutput)
       ()
@@ -439,7 +453,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         outputRef,
         contractOutput,
         getHardFork().isLemanEnabled(),
-        txId
+        txId,
+        TxOutputLocator.from(blockEnv, txEnv, nextOutputIndex)
       )
 
     result match {
@@ -485,7 +500,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def updateContractAsset(
       contractId: ContractId,
       outputRef: ContractOutputRef,
-      output: ContractOutput
+      output: ContractOutput,
+      txOutputLocator: Option[TxOutputLocator]
   ): ExeResult[Unit] = {
     for {
       _ <- markAssetFlushed(contractId)
@@ -494,7 +510,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
           contractId,
           outputRef,
           output,
-          txId
+          txId,
+          txOutputLocator
         )
         .left
         .map(e => Left(IOErrorUpdateState(e)))
@@ -560,13 +577,14 @@ object StatefulContext {
       tx: TransactionAbstract,
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
-      preOutputs: AVector[AssetOutput]
+      preOutputs: AVector[AssetOutput],
+      txIndex: Int
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): StatefulContext = {
-    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures), txIndex)
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
   // scalastyle:on parameter.number

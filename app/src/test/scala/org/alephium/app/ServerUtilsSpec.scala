@@ -30,14 +30,14 @@ import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.core.{AMMContract, BlockFlow, ExtraUtxosInfo}
+import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
+import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => ModelContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.{Compiler, SourceIndex}
@@ -3946,16 +3946,6 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait ChainedTransactionsFixture extends ExecuteScriptFixture with ContractFixture {
-    val contract =
-      s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-    val contractCode = Compiler.compileContract(contract).toOption.get
-
     def checkAlphBalance(
         lockupScript: LockupScript,
         expectedAlphBalance: U256
@@ -4275,11 +4265,21 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "build a transfer transaction followed by a deploy contract transactions" in new ChainedTransactionsFixture {
+    val contractCode =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(contractCode).toOption.get
+
     def buildDeployContract(publicKey: PublicKey, initialAttoAlphAmount: Option[Amount] = None) =
       BuildDeployContractTx(
         fromPublicKey = publicKey.bytes,
         initialAttoAlphAmount = initialAttoAlphAmount,
-        bytecode = serialize(contractCode) ++ ByteString(0, 0)
+        bytecode = serialize(contract) ++ ByteString(0, 0)
       )
 
     failedDeployContract(
@@ -4595,7 +4595,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
     val transactions =
-      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
+      block.transactions
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
+        .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
         .from(block, 1, transactions)
@@ -4619,6 +4621,247 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.isBlockInMainChain(blockFlow, block.hash).rightValue is true
     serverUtils.isBlockInMainChain(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
+  }
+
+  trait TxContractOutputRefIndexInForkedChainFixture
+      extends ContractFixture
+      with ChainedTransactionsFixture {
+    val testKeyPair = chainIndex.to.generateKey
+
+    val contractCode =
+      s"""
+         |Contract TokenContract(mut burnAmount: U256) {
+         |  @using(assetsInContract = true)
+         |  pub fn burn() -> () {
+         |    burnToken!(selfAddress!(), selfTokenId!(), burnAmount)
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |
+         |  @using(updateFields = true)
+         |  pub fn updateBurnAmount(amount: U256) -> () {
+         |    burnAmount = amount
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(
+      contractCode,
+      initialMutState = AVector(vm.Val.U256(ALPH.oneAlph)),
+      initialAttoAlphAmount = ALPH.alph(100),
+      tokenIssuanceInfo = Some(TokenIssuance.Info(ALPH.alph(20)))
+    )._1
+
+    val updateBurnAmountScriptCode =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${contractId.toHexString}).updateBurnAmount(5 alph)
+         |}
+         |$contractCode
+         |""".stripMargin
+
+    val updateBurnAmountScript = Compiler.compileTxScript(updateBurnAmountScriptCode).rightValue
+
+    val burnTokenScriptCode =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${contractId.toHexString}).burn()
+         |}
+         |$contractCode
+         |""".stripMargin
+
+    val burnTokenScript = Compiler.compileTxScript(burnTokenScriptCode).rightValue
+
+    def verifyAndUpdateContractGeneratedOutput(
+        block: Block,
+        tokenAmount: U256,
+        newTokenAmount: U256
+    ): Block = {
+      block.nonCoinbase.length is 1
+      val tx               = block.nonCoinbase.head
+      val generatedOutputs = tx.generatedOutputs
+      generatedOutputs.length is 2
+      val contractOutputIndex = generatedOutputs.indexWhere(_.isContract)
+      val generatedOutput = generatedOutputs(contractOutputIndex).asInstanceOf[ModelContractOutput]
+      generatedOutput.tokens.head._2 is tokenAmount
+
+      block.copy(
+        transactions = block.transactions.replace(
+          0,
+          tx.copy(
+            generatedOutputs = generatedOutputs.replace(
+              contractOutputIndex,
+              generatedOutput.copy(tokens =
+                AVector((generatedOutput.tokens.head._1, newTokenAmount))
+              )
+            )
+          )
+        )
+      )
+    }
+
+    def getContractInput(block: Block): RichContractInput = {
+      val richBlockAndEvents = serverUtils
+        .getRichBlockAndEvents(blockFlow, block.hash)
+        .rightValue
+      richBlockAndEvents.block.transactions.head.contractInputs.length is 1
+      richBlockAndEvents.block.transactions.head.contractInputs.head
+    }
+
+    // main0  -> main1 -> main2 (update burn amount to 5)  -> main3 (genesis calls burn) -> main4 (genesis calls burn)
+    //        -> fork1 -> fork2 (genesis calls burn)       -> fork3 (genesis calls burn)
+    val main0 = transfer(blockFlow, genesisKeys(0)._1, testKeyPair._2, ALPH.alph(2))
+    addAndCheck(blockFlow, main0)
+
+    val block1 = emptyBlock(blockFlow, chainIndex)
+    val block2 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block1, block2)
+
+    val height4Hashes = blockFlow.getHashes(chainIndex, 4).rightValue
+    height4Hashes.toSet is Set(block1.hash, block2.hash)
+
+    val main1 = blockFlow.getBlockUnsafe(height4Hashes(0))
+    val fork1 = blockFlow.getBlockUnsafe(height4Hashes(1))
+    main1.parentHash is main0.hash
+    fork1.parentHash is main0.hash
+
+    val main2 = payableCall(
+      blockFlow,
+      chainIndex,
+      updateBurnAmountScript,
+      keyPairOpt = Some(testKeyPair)
+    )
+    addAndCheck(blockFlow, main2)
+    main2.parentHash is main1.hash
+
+    def main3: Block
+    def fork2: Block
+    def main4: Block
+    def fork3: Block
+
+    def verifyForkedChain(): Assertion = {
+      main2.nonCoinbase.length is 1
+      main2.nonCoinbase.head.inputsLength is 1
+      val testKeyTxOutputRef = main2.nonCoinbase.head.unsigned.inputs(0).outputRef
+      val testKeyTxOutput    = main0.nonCoinbase.head.unsigned.fixedOutputs(0)
+      blockFlow.getTxOutput(testKeyTxOutputRef, main2.hash, maxForkDepth) isE Some(testKeyTxOutput)
+
+      // Same tx in both main3 and fork2
+      main3.nonCoinbase.head.id is fork2.nonCoinbase.head.id
+
+      val fork3ContractInput = getContractInput(fork3)
+      val main4ContractInput = getContractInput(main4)
+      fork3ContractInput.key is main4ContractInput.key
+      fork3ContractInput.hint is main4ContractInput.hint
+      fork3ContractInput.tokens.head.amount is ALPH.alph(19)
+      main4ContractInput.tokens.head.amount is ALPH.alph(15)
+
+      val contractOutputRef = ContractOutputRef.unsafe(
+        Hint.ofContract(LockupScript.p2c(contractId).scriptHint),
+        TxOutputRef.unsafeKey(fork3ContractInput.key)
+      )
+
+      val contractOutputMain3 = ModelContractOutput(
+        amount = ALPH.alph(99),
+        lockupScript = LockupScript.p2c(contractId),
+        tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
+      )
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 0) isE Some(contractOutputMain3)
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 1) isE Some(contractOutputMain3)
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, maxForkDepth) isE Some(
+        contractOutputMain3
+      )
+
+      val contractOutputFork2 = ModelContractOutput(
+        amount = ALPH.alph(99),
+        lockupScript = LockupScript.p2c(contractId),
+        tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
+      )
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 0) isE Some(contractOutputMain3)
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 1) isE Some(contractOutputFork2)
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, maxForkDepth) isE Some(
+        contractOutputFork2
+      )
+    }
+  }
+
+  it should "return correct transaction output info in forked chain, build transactions one by one" in new TxContractOutputRefIndexInForkedChainFixture {
+    val main3 = payableCall(blockFlow, chainIndex, burnTokenScript)
+    addAndCheck(blockFlow, main3)
+    main3.parentHash is main2.hash
+
+    val main3Updated = verifyAndUpdateContractGeneratedOutput(main3, ALPH.alph(15), ALPH.alph(19))
+
+    val fork2 = mineBlock(fork1.hash, main3Updated, 4)
+    addAndCheck(blockFlow, fork2)
+    fork2.parentHash is fork1.hash
+
+    val main4 = payableCall(blockFlow, chainIndex, burnTokenScript)
+    addAndCheck(blockFlow, main4)
+    main4.parentHash is main3.hash
+
+    val main4Updated = verifyAndUpdateContractGeneratedOutput(main4, ALPH.alph(10), ALPH.alph(18))
+
+    val fork3 = mineBlock(fork2.hash, main4Updated, 5)
+    addAndCheck(blockFlow, fork3)
+    fork3.parentHash is fork2.hash
+
+    verifyForkedChain()
+  }
+
+  it should "return correct transaction output info in forked chain, with chained transactions" in new TxContractOutputRefIndexInForkedChainFixture {
+    val burnTokenScriptTx = BuildChainedExecuteScriptTx(
+      BuildExecuteScriptTx(genesisPublicKey.bytes, bytecode = serialize(burnTokenScript))
+    )
+    val burnTokenTxsResults = buildChainedTransactions(burnTokenScriptTx, burnTokenScriptTx)
+    burnTokenTxsResults.length is 2
+    val burnTokenTx0 = burnTokenTxsResults(0).value
+    val burnTokenTx1 = burnTokenTxsResults(1).value
+    signAndAddToMemPool(burnTokenTx0.txId, burnTokenTx0.unsignedTx, chainIndex, genesisPrivateKey)
+    val main3 = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck(blockFlow, main3)
+
+    val main3Updated = verifyAndUpdateContractGeneratedOutput(main3, ALPH.alph(15), ALPH.alph(19))
+    val fork2        = mineBlock(fork1.hash, main3Updated, 4)
+    addAndCheck(blockFlow, fork2)
+    fork2.parentHash is fork1.hash
+
+    signAndAddToMemPool(burnTokenTx1.txId, burnTokenTx1.unsignedTx, chainIndex, genesisPrivateKey)
+    val main4 = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck(blockFlow, main4)
+
+    val main4Updated = verifyAndUpdateContractGeneratedOutput(main4, ALPH.alph(10), ALPH.alph(18))
+    val fork3        = mineBlock(fork2.hash, main4Updated, 5)
+    addAndCheck(blockFlow, fork3)
+    fork3.parentHash is fork2.hash
+
+    verifyForkedChain()
+  }
+
+  it should "return correct transaction output for coinbase transactions" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    val chainIndex                      = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, fromPublicKey) = chainIndex.to.generateKey
+    val (_, toPublicKey)                = chainIndex.to.generateKey
+    val lockupScript                    = LockupScript.p2pkh(fromPublicKey)
+    val block0 = mine(
+      blockFlow,
+      chainIndex,
+      AVector.empty[Transaction],
+      lockupScript,
+      Some(ALPH.LaunchTimestamp.plusMillisUnsafe(1))
+    )
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, ALPH.oneAlph)
+    addAndCheck(blockFlow, block1)
+
+    block1.nonCoinbase.length is 1
+    block1.nonCoinbase.head.inputsLength is 1
+    val txOutputRef    = block1.nonCoinbase.head.unsigned.inputs(0).outputRef
+    val coinbaseOutput = block0.coinbase.unsigned.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some(coinbaseOutput)
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
@@ -4767,7 +5010,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "find rich block when node.indexes.tx-output-ref-index is enabled" in new TxOutputRefIndexFixture {
     val transactions =
-      block.transactions.mapE(tx => serverUtils.getRichTransaction(blockFlow, tx)).rightValue
+      block.transactions
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
+        .rightValue
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
@@ -4830,7 +5075,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
-    serverUtils.getRichTransaction(blockFlow, transaction).rightValue is richTransaction
+    serverUtils
+      .getRichTransaction(blockFlow, transaction, block1.hash)
+      .rightValue is richTransaction
 
     serverUtils
       .getRichTransaction(blockFlow, transaction.id, Some(chainIndex.from), Some(chainIndex.to))
@@ -4908,7 +5155,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val richTransaction =
       RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
 
-    serverUtils.getRichTransaction(blockFlow, scriptTransaction).rightValue is richTransaction
+    serverUtils
+      .getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash)
+      .rightValue is richTransaction
     serverUtils
       .getRichTransaction(
         blockFlow,
@@ -4920,7 +5169,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx))
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
         RichBlockEntry.from(scriptBlock, 3, richTxs).rightValue,
