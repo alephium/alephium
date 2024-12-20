@@ -60,7 +60,7 @@ object AssetScriptGasEstimator {
       ): Either[String, AssetScriptExecution] = {
         val txTemplate = TransactionTemplate(unsignedTx, AVector.empty, AVector.empty)
 
-        val txEnv = TxEnv(
+        val txEnv = TxEnv.dryrun(
           txTemplate,
           preOutputs.getOrElse(AVector.empty),
           Stack.popOnly(AVector.fill(16)(Signature.generate))
