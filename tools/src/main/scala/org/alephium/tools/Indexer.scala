@@ -163,5 +163,12 @@ object Indexer extends App with StrictLogging {
     }
   }
 
-  start()
+  args.headOption match {
+    case None | Some("build") =>
+      start()
+    case Some("clear") =>
+      clearIndexStorage()
+    case _ =>
+      exit("Please provide either 'build' or 'clear' as argument")
+  }
 }
