@@ -18,14 +18,16 @@ package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
 
+import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
+import org.alephium.io.IOError
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
-import org.alephium.protocol.model.{Block, ChainIndex, TransactionTemplate}
-import org.alephium.protocol.vm.LogConfig
-import org.alephium.util.{ActorRefT, EventBus}
+import org.alephium.protocol.model.{Block, ChainIndex, ContractId, TransactionTemplate}
+import org.alephium.protocol.vm.{LogConfig, LogState}
+import org.alephium.util.{ActorRefT, AVector, EventBus}
 
 final case class AllHandlers(
     flowHandler: ActorRefT[FlowHandler.Command],
@@ -194,6 +196,23 @@ object AllHandlers {
     headerHandlers.toMap
   }
 
-  final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
-  final case class TxNotify(tx: TransactionTemplate)      extends EventBus.Event
+  final case class BlockNotify(
+      block: Block,
+      height: Int,
+      logStates: AVector[(ContractId, LogState)]
+  ) extends EventBus.Event
+
+  object BlockNotify {
+    def from(block: Block, blockFlow: BlockFlow): Either[IOError, BlockNotify] = {
+      for {
+        height <- blockFlow.getHeight(block)
+        events <-
+          if (blockFlow.logConfig.enabled) {
+            blockFlow.getEventsByHash(Byte32.unsafe(block.hash.bytes))
+          } else { Right(AVector.empty) }
+        logStates = events.map(e => e._2.id.contractId -> e._3)
+      } yield BlockNotify(block, height, logStates)
+    }
+  }
+  final case class TxNotify(tx: TransactionTemplate) extends EventBus.Event
 }

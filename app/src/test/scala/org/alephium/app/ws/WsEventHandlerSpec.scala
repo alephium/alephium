@@ -16,9 +16,13 @@
 
 package org.alephium.app.ws
 
-import org.alephium.api.model.BlockEntry
+import org.alephium.api.model.{BlockAndEvents, BlockEntry}
 import org.alephium.app.ServerFixture
-import org.alephium.app.ws.WsParams.{SubscribeParams, WsNotificationParams}
+import org.alephium.app.ws.WsParams.{
+  SubscribeParams,
+  WsBlockNotificationParams,
+  WsNotificationParams
+}
 import org.alephium.json.Json._
 import org.alephium.util._
 
@@ -36,11 +40,10 @@ class WsEventHandlerSpec extends AlephiumSpec with ServerFixture {
   }
 
   it should "build Notification from Event" in {
-    val blockEntry   = BlockEntry.from(dummyBlock, 0).rightValue
-    val params       = WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
+    val blockAndEvents = BlockAndEvents(BlockEntry.from(dummyBlock, 0).rightValue, AVector.empty)
+    val params: WsNotificationParams =
+      WsBlockNotificationParams(SubscribeParams.Block.subscriptionId, blockAndEvents)
     val notification = WsEventHandler.buildJsonRpcNotification(params)
-    write(notification.params) is write(
-      WsNotificationParams(SubscribeParams.Block.subscriptionId, blockEntry)
-    )
+    write(notification.params) is write(params)
   }
 }

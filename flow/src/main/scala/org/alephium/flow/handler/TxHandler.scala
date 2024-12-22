@@ -468,8 +468,8 @@ trait AutoMineHandler extends TxCoreHandler {
     publishEvent(event)
 
     if (brokerConfig.contains(block.chainIndex.from)) {
-      escapeIOError(blockFlow.getHeight(block)) { height =>
-        eventBus ! BlockNotify(block, height)
+      escapeIOError(BlockNotify.from(block, blockFlow)) { blockNotify =>
+        eventBus ! blockNotify
       }
     }
   }

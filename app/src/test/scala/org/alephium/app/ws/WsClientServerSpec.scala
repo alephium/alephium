@@ -107,7 +107,7 @@ class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with Numer
           fail("Failed to subscribe")
         }
     }
-    node.eventBus ! BlockNotify(dummyBlock, 0)
+    node.eventBus ! BlockNotify(dummyBlock, 0, AVector.empty)
     measureTime(s"$numberOfConnections notifications with ser/deser") {
       clientProbe.receiveN(numberOfConnections, 10.seconds)
     }
@@ -119,7 +119,7 @@ class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with Numer
           fail("Failed to unsubscribe")
         }
     }
-    node.eventBus ! BlockNotify(dummyBlock, 1)
+    node.eventBus ! BlockNotify(dummyBlock, 1, AVector.empty)
     clientProbe.expectNoMessage()
     wsServer.httpServer.close().asScala.futureValue
   }

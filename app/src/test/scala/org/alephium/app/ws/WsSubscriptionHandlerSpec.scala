@@ -57,7 +57,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
     }
 
     def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
-      eventBusRef ! BlockNotify(blockGen.sample.get, height = 0)
+      eventBusRef ! BlockNotify(blockGen.sample.get, height = 0, AVector.empty)
     }
 
     def assertValidNotification(clientProbe: TestProbe): Assertion = {
@@ -189,12 +189,12 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
 
     val wsInitBehavior = WsStartBehavior(
       subscribingBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 0),
+      _ ! BlockNotify(blockGen.sample.get, height = 0, AVector.empty),
       assertCorrectSubscribeResponse
     )
     val wsNextBehavior = WsNextBehavior(
       unsubscribingBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 1),
+      _ ! BlockNotify(blockGen.sample.get, height = 1, AVector.empty),
       _.expectNoMessage()
     )
     checkWS(

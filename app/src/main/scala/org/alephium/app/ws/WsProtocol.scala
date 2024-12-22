@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
 import io.vertx.core.{Future => VertxFuture}
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.BlockEntry
+import org.alephium.api.model.BlockAndEvents
 import org.alephium.app.ws.WsParams.WsSubscriptionParams
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.crypto.Sha256
@@ -46,11 +46,22 @@ protected[ws] object WsMethod {
 protected[ws] object WsParams {
   sealed trait WsParams
   sealed trait WsSubscriptionParams extends WsParams
-  private type WsEventType = String
+  sealed trait WsNotificationParams extends WsParams
+  object WsNotificationParams extends ApiModelCodec {
+    implicit val wsNotificationParamsWriter: Writer[WsNotificationParams] =
+      writer[ujson.Value].comap[WsNotificationParams] {
+        case WsBlockNotificationParams(subscription, result) =>
+          ujson.Obj(
+            "subscription" -> ujson.Str(subscription),
+            "result"       -> write(result)
+          )
+      }
+  }
 
-  type WsId             = String
-  type WsCorrelationId  = Long
-  type WsSubscriptionId = String
+  private type WsEventType = String
+  type WsId                = String
+  type WsCorrelationId     = Long
+  type WsSubscriptionId    = String
 
   final case class SubscribeParams(eventType: WsEventType) extends WsSubscriptionParams {
     def subscriptionId: WsSubscriptionId = Sha256.hash(eventType).toHexString
@@ -142,19 +153,8 @@ protected[ws] object WsParams {
       )
   }
 
-  final case class WsNotificationParams(subscription: WsSubscriptionId, result: BlockEntry)
-      extends WsParams
-  object WsNotificationParams extends ApiModelCodec {
-    // macroW fails : [wartremover:ToString] trait CharSequence does not override toString and automatic toString is disabled
-    implicit val wsNotificationParamsWriter: Writer[WsNotificationParams] =
-      writer[ujson.Value].comap[WsNotificationParams] {
-        case WsNotificationParams(subscription, result) =>
-          ujson.Obj(
-            "subscription" -> ujson.Str(subscription),
-            "result"       -> write(result)
-          )
-      }
-  }
+  final case class WsBlockNotificationParams(subscription: WsSubscriptionId, result: BlockAndEvents)
+      extends WsNotificationParams
 }
 
 final protected[ws] case class WsRequest(id: Correlation, params: WsSubscriptionParams)
