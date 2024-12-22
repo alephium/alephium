@@ -17,12 +17,12 @@
 package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.KeyValueStorage
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 
 final case class NodeIndexesStorage(
     logStorage: LogStorage,
-    txOutputRefIndexStorage: Option[KeyValueStorage[TxOutputRef.Key, TransactionId]],
+    txOutputRefIndexStorage: Option[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexStorage: Option[SubContractIndexStorage]
 )

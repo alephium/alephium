@@ -828,11 +828,11 @@ trait EndpointsLogic extends Endpoints {
     {
       case (contractAddress, counterRange, _) => {
         Future.successful {
-          serverUtils.getEventsByContractId(
+          serverUtils.getEventsByContractAddress(
             blockFlow,
             counterRange.start,
             counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
-            contractAddress.lockupScript.contractId
+            contractAddress
           )
         }
       }

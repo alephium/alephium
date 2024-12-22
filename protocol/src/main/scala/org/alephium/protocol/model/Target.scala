@@ -42,7 +42,9 @@ final case class Target(bits: ByteString) extends Ordered[Target] {
 }
 
 object Target {
-  implicit val serde: Serde[Target] = Serde.bytesSerde(4).xmap(unsafe, _.bits)
+  val byteLength: Int = 4
+
+  implicit val serde: Serde[Target] = Serde.bytesSerde(byteLength).xmap(unsafe, _.bits)
 
   val maxBigInt: BigInteger = BigInteger.ONE.shiftLeft(256)
 

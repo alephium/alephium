@@ -19,7 +19,7 @@ package org.alephium.ralph
 import org.alephium.util.AlephiumSpec
 
 class VariableScopeSpec extends AlephiumSpec {
-  it should "check variable scope" in {
+  trait Fixture {
     val ref0 = Ast.Ident("0")
     val ref1 = Ast.Ident("1")
     val ref2 = Ast.Ident("2")
@@ -28,7 +28,9 @@ class VariableScopeSpec extends AlephiumSpec {
     val scope1    = ChildScope(scope0, ref1, None, 2)
     val scope2    = ChildScope(scope0, ref2, None, 2)
     val allScopes = Seq(FunctionRoot, scope0, scope1, scope2)
+  }
 
+  it should "check variable scope" in new Fixture {
     allScopes.foreach { scope =>
       FunctionRoot.include(scope) is true
       if (scope != FunctionRoot) {
@@ -41,5 +43,16 @@ class VariableScopeSpec extends AlephiumSpec {
     scope0.include(scope2) is true
     scope1.include(scope2) is false
     scope2.include(scope1) is false
+  }
+
+  it should "get scope ref path" in new Fixture {
+    FunctionRoot.getScopeRefPath.isEmpty is true
+    scope0.getScopeRefPath is Seq(ref0)
+    scope1.getScopeRefPath is Seq(ref0, ref1)
+    scope2.getScopeRefPath is Seq(ref0, ref2)
+
+    val ref3   = Ast.Ident("3")
+    val scope3 = ChildScope(scope2, ref3, None, 3)
+    scope3.getScopeRefPath is Seq(ref0, ref2, ref3)
   }
 }

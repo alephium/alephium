@@ -25,7 +25,7 @@ import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.FastParseExtension._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 @SuppressWarnings(
@@ -372,6 +372,9 @@ abstract class Parser[Ctx <: StatelessContext] {
           )
         } else {
           val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
+          val validAnnotationIds =
+            AVector(Parser.FunctionUsingAnnotation.id, Parser.FunctionInlineAnnotation.id)
+          Parser.checkAnnotations(annotations, validAnnotationIds, "function")
           val usingAnnotation = Parser.FunctionUsingAnnotation.extractFields(
             annotations,
             Parser.FunctionUsingAnnotationFields(
@@ -392,6 +395,7 @@ abstract class Parser[Ctx <: StatelessContext] {
               )
             )
           }
+          val inline = Parser.FunctionInlineAnnotation.extractFields(annotations, false)
           FuncDefTmp(
             annotations,
             funcId,
@@ -402,6 +406,7 @@ abstract class Parser[Ctx <: StatelessContext] {
             usingAnnotation.checkExternalCaller,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
+            inline,
             params,
             returnType,
             statements
@@ -426,6 +431,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         f.useCheckExternalCaller,
         f.useUpdateFields,
         f.useMethodIndex,
+        f.inline,
         f.args,
         f.rtypes,
         f.body
@@ -594,26 +600,62 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.EnumFieldSelector(enumId, field)
     }
 
-  def enumField[Unknown: P]: P[Ast.EnumField[Ctx]] =
-    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
-      Ast.EnumField(ident, value)
+  def enumField[Unknown: P]: P[Ast.RawEnumField[Ctx]] =
+    PP(Lexer.constantIdent ~ ("=" ~ (const | stringLiteral)).?) { case (ident, valueOpt) =>
+      Ast.RawEnumField(ident, valueOpt)
     }
+
+  @SuppressWarnings(
+    Array("org.wartremover.warts.OptionPartial", "org.wartremover.warts.IterableOps")
+  )
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
-      case (enumIndex, id, fields) =>
-        if (fields.isEmpty) {
+      case (enumIndex, id, rawFields) =>
+        if (rawFields.isEmpty) {
           val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
           throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
         }
-        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.v.tpe).size != 1) {
-          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
+
+        val firstField = rawFields.head.validateAsFirstField()
+        rawFields.tail.foreach(_.validate(id.name, firstField.value.v))
+
+        val fields = if (firstField.value.v.tpe != Val.U256) {
+          rawFields.map { case rawField @ Ast.RawEnumField(ident, valueOpt) =>
+            Ast.EnumField(ident, valueOpt.get).atSourceIndex(rawField.sourceIndex)
+          }
+        } else {
+          val (_, allFields) =
+            rawFields.tail.foldLeft(
+              (firstField.value.v.asInstanceOf[Val.U256].v, Seq(firstField))
+            ) { case ((currentValue, fields), rawField @ Ast.RawEnumField(ident, valueOpt)) =>
+              val (newValue, value) = valueOpt match {
+                case Some(v) => (v.v.asInstanceOf[Val.U256].v, v)
+                case None =>
+                  val nextValue = currentValue
+                    .add(U256.One)
+                    .getOrElse(
+                      throw Compiler.Error(
+                        s"Enum field ${ident.name} value overflows, it must not exceed ${U256.MaxValue}",
+                        ident.sourceIndex
+                      )
+                    )
+                  (
+                    nextValue,
+                    Ast.Const[Ctx](Val.U256(nextValue)).atSourceIndex(ident.sourceIndex)
+                  )
+              }
+              (newValue, fields :+ Ast.EnumField(ident, value).atSourceIndex(rawField.sourceIndex))
+            }
+          allFields
         }
+
+        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
         if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
         Ast.EnumDef(id, fields)
     }
+
   def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }
 
@@ -627,6 +669,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
+    inline: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -646,8 +689,8 @@ object Parser {
     def validate[Ctx <: StatelessContext](
         annotations: Seq[Ast.Annotation[Ctx]]
     ): Option[Annotation[Ctx]] = {
-      annotations.find(_.id.name == id) match {
-        case result @ Some(annotation) =>
+      annotations.filter(_.id.name == id) match {
+        case Seq(result @ annotation) =>
           val duplicateKeys = keys.filter(key => annotation.fields.count(_.ident.name == key) > 1)
           if (duplicateKeys.nonEmpty) {
             throw Compiler.Error(
@@ -662,8 +705,13 @@ object Parser {
               annotation.sourceIndex
             )
           }
-          result
-        case None => None
+          Some(result)
+        case Nil => None
+        case list =>
+          throw Compiler.Error(
+            s"There are duplicate annotations: $id",
+            list.headOption.flatMap(_.sourceIndex)
+          )
       }
     }
 
@@ -771,6 +819,18 @@ object Parser {
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
         methodIndex
       )
+    }
+  }
+
+  object FunctionInlineAnnotation extends RalphAnnotation[Boolean] {
+    val id: String            = "inline"
+    val keys: AVector[String] = AVector.empty
+
+    def extractFields[Ctx <: StatelessContext](
+        annotation: Annotation[Ctx],
+        default: Boolean
+    ): Boolean = {
+      true
     }
   }
 
@@ -1200,6 +1260,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               f.useCheckExternalCaller,
               f.useUpdateFields,
               f.useMethodIndex,
+              f.inline,
               f.args,
               f.rtypes,
               None

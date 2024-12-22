@@ -13,23 +13,18 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
+package org.alephium.protocol.vm.nodeindexes
 
-package org.alephium.api.model
+import org.alephium.protocol.model.TransactionId
+import org.alephium.serde.{avectorSerde, Serde}
+import org.alephium.util.AVector
 
-import akka.util.ByteString
+final case class TxIdTxOutputLocators(
+    txId: TransactionId,
+    txOutputLocators: AVector[TxOutputLocator]
+)
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.{AVector, TimeStamp}
-
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Destination(
-    address: Address.Asset,
-    attoAlphAmount: Option[Amount] = None,
-    tokens: Option[AVector[Token]] = None,
-    lockTime: Option[TimeStamp] = None,
-    message: Option[ByteString] = None
-) {
-  def getAttoAlphAmount(): Amount = {
-    attoAlphAmount.getOrElse(Amount.Zero)
-  }
+object TxIdTxOutputLocators {
+  implicit val txIdTxOutputLocatorsSerde: Serde[TxIdTxOutputLocators] =
+    Serde.forProduct2(apply, b => (b.txId, b.txOutputLocators))
 }

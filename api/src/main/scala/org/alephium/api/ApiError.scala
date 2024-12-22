@@ -151,4 +151,15 @@ object ApiError {
     )
   }
 
+  final case class GatewayTimeout(detail: String)
+      extends ApiError[StatusCode.GatewayTimeout.type] {}
+
+  object GatewayTimeout
+      extends Companion[StatusCode.GatewayTimeout.type, GatewayTimeout](
+        StatusCode.GatewayTimeout
+      ) {
+    def readerE: Reader[GatewayTimeout] =
+      reader[ujson.Value].map(json => GatewayTimeout(read[String](json("detail"))))
+  }
+
 }

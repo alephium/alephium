@@ -35,12 +35,14 @@ import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
+import org.alephium.flow.mempool.MemPool._
 import org.alephium.io.IOError
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
+import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -104,9 +106,11 @@ class ServerUtils(implicit
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
           for {
-            transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
-            blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
-            events       <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+            transactions <- block.transactions.mapE(tx =>
+              getRichTransaction(blockFlow, tx, block.hash)
+            )
+            blockEntry <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             RichBlockAndEvents(blockEntry, events.events)
           }
@@ -560,18 +564,19 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      transactions              <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx))
-      blockEntry                <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, hash))
+      blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
       contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
     } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
 
   private[app] def getRichTransaction(
       blockFlow: BlockFlow,
-      transaction: Transaction
+      transaction: Transaction,
+      spentBlockHash: BlockHash
   ): Try[RichTransaction] = {
     for {
-      assetInputs    <- getRichAssetInputs(blockFlow, transaction)
-      contractInputs <- getRichContractInputs(blockFlow, transaction)
+      assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHash)
+      contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHash)
     } yield {
       RichTransaction.from(transaction, assetInputs, contractInputs)
     }
@@ -580,11 +585,12 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[app] def getRichContractInputs(
       blockFlow: BlockFlow,
-      transaction: Transaction
+      transaction: Transaction,
+      spentBlockHash: BlockHash
   ): Try[AVector[RichContractInput]] = {
     transaction.contractInputs.mapE { contractOutputRef =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, contractOutputRef)
+        txOutputOpt <- wrapResult(blockFlow.getTxOutput(contractOutputRef, spentBlockHash))
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
@@ -598,11 +604,12 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[app] def getRichAssetInputs(
       blockFlow: BlockFlow,
-      transaction: Transaction
+      transaction: Transaction,
+      spentBlockHash: BlockHash
   ): Try[AVector[RichAssetInput]] = {
     transaction.unsigned.inputs.mapE { assetInput =>
       for {
-        txOutputOpt <- getTxOutput(blockFlow, assetInput.outputRef)
+        txOutputOpt <- wrapResult(blockFlow.getTxOutput(assetInput.outputRef, spentBlockHash))
         richInput <- txOutputOpt match {
           case Some(txOutput) =>
             Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
@@ -610,29 +617,6 @@ class ServerUtils(implicit
             Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
         }
       } yield richInput
-    }
-  }
-
-  private[app] def getTxOutput(
-      blockFlow: BlockFlow,
-      outputRef: TxOutputRef
-  ): Try[Option[TxOutput]] = {
-    for {
-      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
-      txOutputOpt <- txIdOpt match {
-        case Some(txId) =>
-          getTransaction(
-            blockFlow,
-            txId,
-            None,
-            None,
-            transaction => transaction.getOutput(outputRef)
-          )
-        case None =>
-          Right(None)
-      }
-    } yield {
-      txOutputOpt
     }
   }
 
@@ -670,16 +654,7 @@ class ServerUtils(implicit
     } yield BlockAndEvents(block, events.events)
 
   def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
-    for {
-      height <- blockFlow
-        .getHeight(blockHash)
-        .left
-        .map(handleBlockError(blockHash, _))
-      hashes <- blockFlow
-        .getHashes(ChainIndex.from(blockHash), height)
-        .left
-        .map(failedInIO)
-    } yield hashes.headOption.contains(blockHash)
+    blockFlow.isBlockInMainChain(blockHash).left.map(handleBlockError(blockHash, _))
   }
 
   def getBlockHeader(blockFlow: BlockFlow, hash: BlockHash): Try[BlockHeaderEntry] =
@@ -737,7 +712,13 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
-    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => model.Transaction.fromProtocol(tx))
+    getTransactionAndConvert(
+      blockFlow,
+      txId,
+      fromGroup,
+      toGroup,
+      tx => model.Transaction.fromProtocol(tx)
+    )
   }
 
   def getRichTransaction(
@@ -747,9 +728,35 @@ class ServerUtils(implicit
       toGroup: Option[GroupIndex]
   ): Try[model.RichTransaction] = {
     for {
-      transaction     <- getTransaction(blockFlow, txId, fromGroup, toGroup, identity)
-      richTransaction <- getRichTransaction(blockFlow, transaction)
+      blockHash       <- getBlockHashForTransaction(blockFlow, txId)
+      transaction     <- getTransactionAndConvert(blockFlow, txId, fromGroup, toGroup, identity)
+      richTransaction <- getRichTransaction(blockFlow, transaction, blockHash)
     } yield richTransaction
+  }
+
+  def getBlockHashForTransaction(blockFlow: BlockFlow, txId: TransactionId): Try[BlockHash] = {
+    val outputRef = TxOutputRef.key(txId, 0)
+    for {
+      locatorsOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
+      locators <- locatorsOpt.toRight(
+        notFound(s"Transaction id for output ref ${outputRef.value.toHexString}")
+      )
+      mainchainBlockHash <- getMainChainBlockHashFromOutputLocators(blockFlow, locators)
+    } yield mainchainBlockHash
+  }
+
+  def getMainChainBlockHashFromOutputLocators(
+      blockFlow: BlockFlow,
+      locators: TxIdTxOutputLocators
+  ): Try[BlockHash] = {
+    for {
+      locatorOpt <- locators.txOutputLocators.findE(locator =>
+        isBlockInMainChain(blockFlow, locator.blockHash)
+      )
+      locator <- locatorOpt.toRight(
+        notFound(s"Main chain block hash for ${locators.txId}")
+      )
+    } yield locator.blockHash
   }
 
   def getRawTransaction(
@@ -758,10 +765,16 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.RawTransaction] = {
-    getTransaction(blockFlow, txId, fromGroup, toGroup, tx => RawTransaction(serialize(tx)))
+    getTransactionAndConvert(
+      blockFlow,
+      txId,
+      fromGroup,
+      toGroup,
+      tx => RawTransaction(serialize(tx))
+    )
   }
 
-  def getTransaction[T](
+  def getTransactionAndConvert[T](
       blockFlow: BlockFlow,
       txId: TransactionId,
       fromGroup: Option[GroupIndex],
@@ -781,22 +794,6 @@ class ServerUtils(implicit
     result.flatMap {
       case Some(tx) => Right(convert(tx))
       case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
-    }
-  }
-
-  def getChainIndexForTx(
-      blockFlow: BlockFlow,
-      txId: TransactionId
-  ): Try[ChainIndex] = {
-    searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
-      case Right(Confirmed(blockHash, _, _, _, _)) =>
-        Right(ChainIndex.from(blockHash))
-      case Right(TxNotFound()) =>
-        Left(notFound(s"Transaction ${txId.toHexString}"))
-      case Right(MemPooled()) =>
-        Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
-      case Left(error) =>
-        Left(error)
     }
   }
 
@@ -824,21 +821,33 @@ class ServerUtils(implicit
     )
   }
 
-  def getEventsByContractId(
+  def getEventsByContractAddress(
       blockFlow: BlockFlow,
       start: Int,
       limit: Int,
-      contractId: ContractId
+      contractAddress: Address.Contract
   ): Try[ContractEvents] = {
-    wrapResult(
-      blockFlow
-        .getEvents(contractId, start, start + limit)
-        .map {
-          case (nextStart, logStatesVec) => {
-            ContractEvents.from(logStatesVec, nextStart)
+    wrapResult(blockFlow.getEvents(contractAddress.lockupScript.contractId, start, start + limit))
+      .flatMap {
+        case (nextStart, logStatesVec) => {
+          if (logStatesVec.isEmpty) {
+            wrapResult(blockFlow.getEventsCurrentCount(contractAddress.contractId)).flatMap {
+              case None =>
+                Left(notFound(s"Contract events of ${contractAddress}"))
+              case Some(currentCount) if currentCount == start =>
+                Right(ContractEvents.from(AVector.empty, nextStart))
+              case Some(currentCount) =>
+                Left(
+                  notFound(
+                    s"Current count for events of ${contractAddress} is '$currentCount', events start from '$start' with limit '$limit'"
+                  )
+                )
+            }
+          } else {
+            Right(ContractEvents.from(logStatesVec, nextStart))
           }
         }
-    )
+      }
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
@@ -846,12 +855,14 @@ class ServerUtils(implicit
   ): FutureTry[SubmitTxResult] = {
     val message =
       TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
-    txHandler.ask(message).mapTo[TxHandler.Event].map {
-      case _: TxHandler.AddSucceeded =>
+    txHandler.ask(message).mapTo[TxHandler.SubmitToMemPoolResult].map {
+      case TxHandler.ProcessedByMemPool(_, AddedToMemPool) =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
-      case TxHandler.AddFailed(_, reason) =>
-        logger.warn(s"Failed in adding tx: $reason")
-        Left(failed(reason))
+      case TxHandler.ProcessedByMemPool(_, AlreadyExisted) =>
+        // succeed for idempotency reasons due to clients retrying submission
+        Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
+      case failedResult =>
+        Left(failed(failedResult.message))
     }
   }
 
@@ -865,7 +876,7 @@ class ServerUtils(implicit
 
       if (simpleDests.nonEmpty) {
         for {
-          amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.attoAlphAmount.value))
+          amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.getAttoAlphAmount().value))
           tokens <- UnsignedTransaction
             .calculateTotalAmountPerToken(
               simpleDests.flatMap(
@@ -896,7 +907,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        Math.max(destination.attoAlphAmount.value, tokensDustAmount),
+        Math.max(destination.getAttoAlphAmount().value, tokensDustAmount),
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -917,7 +928,7 @@ class ServerUtils(implicit
           lockUnlock <- in.getLockPair()
           utxos      <- prepareOutputRefsOpt(in.utxos).left.map(failed)
           amount <- TxUtils
-            .checkTotalAttoAlphAmount(in.destinations.map(_.attoAlphAmount.value))
+            .checkTotalAttoAlphAmount(in.destinations.map(_.getAttoAlphAmount().value))
             .left
             .map(failed)
           tokens <- UnsignedTransaction
@@ -1656,14 +1667,25 @@ class ServerUtils(implicit
       limit: Int,
       contractAddress: Address.Contract
   ): Try[SubContracts] = {
-    for {
-      result <- wrapResult(
-        blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit).map {
-          case (nextStart, contractIds) =>
-            SubContracts(contractIds.map(Address.contract), nextStart)
+    wrapResult(blockFlow.getSubContractIds(contractAddress.contractId, start, start + limit))
+      .flatMap { case (nextStart, contractIds) =>
+        if (contractIds.isEmpty) {
+          wrapResult(blockFlow.getSubContractsCurrentCount(contractAddress.contractId)).flatMap {
+            case None =>
+              Left(notFound(s"Sub-contracts of ${contractAddress}"))
+            case Some(currentCount) if currentCount == start =>
+              Right(SubContracts(AVector.empty, currentCount))
+            case Some(currentCount) =>
+              Left(
+                notFound(
+                  s"Current count for sub-contracts of ${contractAddress} is '$currentCount', sub-contracts start from '$start' with limit '$limit'"
+                )
+              )
+          }
+        } else {
+          Right(SubContracts(contractIds.map(Address.contract), nextStart))
         }
-      )
-    } yield result
+      }
   }
 
   def getSubContractsCurrentCount(
@@ -1684,11 +1706,11 @@ class ServerUtils(implicit
       outputRef: TxOutputRef
   ): Try[TransactionId] = {
     for {
-      txIdOpt <- wrapResult(blockFlow.getTxIdFromOutputRef(outputRef))
-      txId <- txIdOpt.toRight(
+      resultOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
+      result <- resultOpt.toRight(
         notFound(s"Transaction id for output ref ${outputRef.key.value.toHexString}")
       )
-    } yield txId
+    } yield result.txId
   }
 
   private def call[P <: CallBase](
@@ -1868,8 +1890,10 @@ class ServerUtils(implicit
     for {
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, testContract.txId))
-      _ <- createContract(worldState, contractId, testContract)
+      _ <- testContract.existingContracts.foreachE(
+        createContract(worldState, _, testContract.blockHash, testContract.txId)
+      )
+      _      <- createContract(worldState, contractId, testContract)
       method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       executionResultPair <- executeContractMethod(
         worldState,
@@ -2177,6 +2201,7 @@ class ServerUtils(implicit
   def createContract(
       worldState: WorldState.Staging,
       existingContract: ContractState,
+      blockHash: BlockHash,
       txId: TransactionId
   ): Try[Unit] = {
     createContract(
@@ -2186,6 +2211,7 @@ class ServerUtils(implicit
       toVmVal(existingContract.immFields),
       toVmVal(existingContract.mutFields),
       existingContract.asset,
+      blockHash,
       txId
     )
   }
@@ -2202,6 +2228,7 @@ class ServerUtils(implicit
       toVmVal(testContract.initialImmFields),
       toVmVal(testContract.initialMutFields),
       testContract.initialAsset,
+      testContract.blockHash,
       testContract.txId
     )
   }
@@ -2213,6 +2240,7 @@ class ServerUtils(implicit
       initialImmState: AVector[vm.Val],
       initialMutState: AVector[vm.Val],
       asset: AssetState,
+      blockHash: BlockHash,
       txId: TransactionId
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
@@ -2226,7 +2254,8 @@ class ServerUtils(implicit
         initialMutState,
         outputRef,
         output,
-        txId
+        txId,
+        Some(TxOutputLocator(blockHash, 0, 0))
       )
     )
   }

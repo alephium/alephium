@@ -102,9 +102,9 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val lockedTokens = AVector(Token(TokenId.hash("token3"), alph(65).value))
 
-  val defaultDestinations = AVector(Destination(address, bigAmount, None, None))
+  val defaultDestinations = AVector(Destination(address, Some(bigAmount), None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, bigAmount, Some(tokens), Some(ts))
+    Destination(address, Some(bigAmount), Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 

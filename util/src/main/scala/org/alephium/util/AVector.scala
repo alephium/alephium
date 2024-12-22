@@ -530,6 +530,17 @@ final class AVector[@sp A](
     None
   }
 
+  def findE[L](f: A => Either[L, Boolean]): Either[L, Option[A]] = {
+    cfor(start)(_ < end, _ + 1) { i =>
+      val elem = elems(i)
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(b) => if (b) return Right(Some(elem))
+      }
+    }
+    Right(None)
+  }
+
   def indexWhere(f: A => Boolean): Int = {
     cfor(start)(_ < end, _ + 1) { i => if (f(elems(i))) return i - start }
     -1
@@ -639,6 +650,18 @@ final class AVector[@sp A](
         (left :+ elem, right)
       } else {
         (left, right :+ elem)
+      }
+    }
+  }
+
+  def partitionE[L](f: A => Either[L, Boolean]): Either[L, (AVector[A], AVector[A])] = {
+    foldE((AVector.empty, AVector.empty)) { case ((left, right), elem) =>
+      f(elem).map { bool =>
+        if (bool) {
+          (left :+ elem, right)
+        } else {
+          (left, right :+ elem)
+        }
       }
     }
   }
