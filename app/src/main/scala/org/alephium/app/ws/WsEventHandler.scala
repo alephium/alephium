@@ -20,14 +20,21 @@ import akka.actor.{ActorSystem, Props}
 import io.vertx.core.eventbus.{EventBus => VertxEventBus}
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.{BlockAndEvents, BlockEntry, ContractEventByBlockHash, Val}
+import org.alephium.api.model.{
+  BlockAndEvents,
+  BlockEntry,
+  ContractEventByBlockHash,
+  TransactionTemplate,
+  Val
+}
 import org.alephium.app.ws.WsEventHandler.buildJsonRpcNotification
 import org.alephium.app.ws.WsParams.{
   SubscribeParams,
   WsBlockNotificationParams,
-  WsNotificationParams
+  WsNotificationParams,
+  WsTxNotificationParams
 }
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json.{write, writeJs}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.Address
@@ -62,26 +69,36 @@ protected[ws] class WsEventHandler(vertxEventBus: VertxEventBus)(implicit
 ) extends BaseActor
     with ApiModelCodec {
 
-  def receive: Receive = { case BlockNotify(block, height, logStates) =>
-    BlockEntry.from(block, height) match {
-      case Right(blockEntry) =>
-        val contractEvents =
-          logStates.map { case (contractId, logState) =>
-            ContractEventByBlockHash(
-              logState.txId,
-              Address.contract(contractId),
-              logState.index.toInt,
-              logState.fields.map(Val.from)
-            )
-          }
-        val params = WsBlockNotificationParams(
-          SubscribeParams.Block.subscriptionId,
-          BlockAndEvents(blockEntry, contractEvents)
+  def receive: Receive = {
+    case TxNotify(tx, seenAt) =>
+      val params =
+        WsTxNotificationParams(
+          SubscribeParams.Tx.subscriptionId,
+          TransactionTemplate.fromProtocol(tx, seenAt)
         )
-        val _ =
-          vertxEventBus.publish(params.subscription, write(buildJsonRpcNotification(params)))
-      case Left(error) =>
-        log.error(error)
-    }
+      val _ =
+        vertxEventBus.publish(params.subscription, write(buildJsonRpcNotification(params)))
+
+    case BlockNotify(block, height, logStates) =>
+      BlockEntry.from(block, height) match {
+        case Right(blockEntry) =>
+          val contractEvents =
+            logStates.map { case (contractId, logState) =>
+              ContractEventByBlockHash(
+                logState.txId,
+                Address.contract(contractId),
+                logState.index.toInt,
+                logState.fields.map(Val.from)
+              )
+            }
+          val params = WsBlockNotificationParams(
+            SubscribeParams.Block.subscriptionId,
+            BlockAndEvents(blockEntry, contractEvents)
+          )
+          val _ =
+            vertxEventBus.publish(params.subscription, write(buildJsonRpcNotification(params)))
+        case Left(error) =>
+          log.error(error)
+      }
   }
 }

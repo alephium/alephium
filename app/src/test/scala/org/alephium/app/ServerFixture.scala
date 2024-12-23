@@ -243,7 +243,9 @@ object ServerFixture {
 
     val txHandlerRef =
       system.actorOf(
-        AlephiumTestActors.const(TxHandler.ProcessedByMemPool(dummyTx.toTemplate, AddedToMemPool))
+        AlephiumTestActors.const(
+          TxHandler.ProcessedByMemPool(dummyTx.toTemplate, AddedToMemPool(TimeStamp.now()))
+        )
       )
     val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
     val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)

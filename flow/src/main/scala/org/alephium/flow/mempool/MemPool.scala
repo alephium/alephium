@@ -171,7 +171,7 @@ class MemPool private (
       flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, parents, children))
       timestamps.put(tx.id, timestamp)
       measureTransactionsTotalInc(index.flattenIndex)
-      MemPool.AddedToMemPool
+      MemPool.AddedToMemPool(timestamp)
     }
   }
 
@@ -344,7 +344,7 @@ object MemPool {
   sealed trait AddToMemPoolResult {
     def addedCount: Int
   }
-  case object AddedToMemPool extends AddToMemPoolResult {
+  final case class AddedToMemPool(seenAt: TimeStamp) extends AddToMemPoolResult {
     def addedCount: Int = 1
   }
   sealed trait AddTxFailed extends AddToMemPoolResult {

@@ -24,7 +24,7 @@ import org.scalatest.EitherValues
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.exceptions.TestFailedException
 
-import org.alephium.app.ws.WsParams.SubscribeParams.Block
+import org.alephium.app.ws.WsParams.SubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
@@ -56,12 +56,13 @@ class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with Numer
     val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
 
     ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
-    ws.unsubscribeFromBlock(1).futureValue is Response.successful(Correlation(1))
+    ws.subscribeToTx(1).futureValue is Response.successful(Correlation(1), Tx.subscriptionId)
+    ws.unsubscribeFromBlock(2).futureValue is Response.successful(Correlation(2))
     ws.close().futureValue
     wsServer.httpServer.close().asScala.futureValue
   }
 
-  "WsServer" should "respond already subscribed or unsubscribed" in new WsServerFixture {
+  "WsServer" should "respond already subscribed or unsubscribed for block" in new WsServerFixture {
     val wsServer = bindAndListen()
     val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
 
@@ -72,6 +73,22 @@ class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with Numer
     ws.unsubscribeFromBlock(2).futureValue is Response.successful(Correlation(2))
     ws.unsubscribeFromBlock(3).futureValue is
       Response.failed(Correlation(3), Error(WsError.AlreadyUnsubscribed, Block.subscriptionId))
+
+    ws.close().futureValue
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
+  "WsServer" should "respond already subscribed or unsubscribed for tx" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
+
+    ws.subscribeToTx(0).futureValue is Response.successful(Correlation(0), Tx.subscriptionId)
+    ws.subscribeToTx(1).futureValue is
+      Response.failed(Correlation(1), Error(WsError.AlreadySubscribed, Tx.subscriptionId))
+
+    ws.unsubscribeFromTx(2).futureValue is Response.successful(Correlation(2))
+    ws.unsubscribeFromTx(3).futureValue is
+      Response.failed(Correlation(3), Error(WsError.AlreadyUnsubscribed, Tx.subscriptionId))
 
     ws.close().futureValue
     wsServer.httpServer.close().asScala.futureValue

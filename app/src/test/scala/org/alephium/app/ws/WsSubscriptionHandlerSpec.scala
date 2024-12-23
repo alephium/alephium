@@ -28,7 +28,7 @@ import org.alephium.app.ws.WsParams.{SubscribeParams, UnsubscribeParams}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler._
 import org.alephium.app.ws.WsUtils._
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
@@ -58,13 +58,15 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
 
     def serverBehavior(eventBusRef: ActorRefT[EventBus.Message]): Unit = {
       eventBusRef ! BlockNotify(blockGen.sample.get, height = 0, AVector.empty)
+      eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
     }
 
-    def assertValidNotification(clientProbe: TestProbe): Assertion = {
-      val notification = clientProbe.expectMsgClass(classOf[Notification])
-      notification.method is WsMethod.SubscriptionMethod
-      notification.params.obj.get("result").nonEmpty is true
-      notification.params.obj.get("subscription").nonEmpty is true
+    def assertValidNotification(clientProbe: TestProbe): Unit = {
+      AVector.fill(2)(clientProbe.expectMsgType[Notification]).foreach { notification =>
+        notification.method is WsMethod.SubscriptionMethod
+        notification.params.obj.get("result").nonEmpty is true
+        notification.params.obj.get("subscription").nonEmpty is true
+      }
     }
 
     val wsInitBehavior =
@@ -161,20 +163,26 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
       for {
         ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)
         blockSubscriptionResponse <- ws.subscribeToBlock(0)
+        txSubscriptionResponse    <- ws.subscribeToTx(1)
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
           result is ujson.Str(SubscribeParams.Block.subscriptionId)
           id is 0
         }
+        inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
+          result is ujson.Str(SubscribeParams.Tx.subscriptionId)
+          id is 1
+        }
         ws
       }
     }
 
-    def assertCorrectSubscribeResponse(clientProbe: TestProbe): Assertion = {
-      val notification = clientProbe.expectMsgClass(classOf[Notification])
-      notification.method is WsMethod.SubscriptionMethod
-      notification.params.obj.get("result").nonEmpty is true
-      notification.params.obj.get("subscription").nonEmpty is true
+    def assertCorrectSubscribeResponse(clientProbe: TestProbe): Unit = {
+      AVector.fill(2)(clientProbe.expectMsgType[Notification]).foreach { notification =>
+        notification.method is WsMethod.SubscriptionMethod
+        notification.params.obj.get("result").nonEmpty is true
+        notification.params.obj.get("subscription").nonEmpty is true
+      }
     }
 
     def unsubscribingBehavior(ws: ClientWs): Future[Unit] = {
@@ -185,16 +193,29 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
         }
         ()
       }
+      ws.unsubscribeFromTx(2).map { txSubscriptionResponse =>
+        inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
+          result is ujson.True
+          id is 2
+        }
+        ()
+      }
     }
 
     val wsInitBehavior = WsStartBehavior(
       subscribingBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 0, AVector.empty),
+      eventBusRef => {
+        eventBusRef ! BlockNotify(blockGen.sample.get, height = 0, AVector.empty)
+        eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
+      },
       assertCorrectSubscribeResponse
     )
     val wsNextBehavior = WsNextBehavior(
       unsubscribingBehavior,
-      _ ! BlockNotify(blockGen.sample.get, height = 1, AVector.empty),
+      eventBusRef => {
+        eventBusRef ! BlockNotify(blockGen.sample.get, height = 1, AVector.empty)
+        eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
+      },
       _.expectNoMessage()
     )
     checkWS(
@@ -211,33 +232,40 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with ServerFixture {
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = dummyServerWs("dummy")
-    subscriptionHandler ! Subscribe(Correlation(0), ws, SubscribeParams.Block)
 
-    eventually {
-      assertSubscribed(
-        ws.textHandlerID(),
-        SubscribeParams.Block.subscriptionId,
-        subscriptionHandler
-      )
-    }
+    AVector(
+      SubscribeParams.Block,
+      SubscribeParams.Tx
+    ).fold(0L) { case (index, params) =>
+      subscriptionHandler ! Subscribe(Correlation(index), ws, params)
 
-    // it should be idempotent for subscriptions
-    subscriptionHandler ! Subscribe(Correlation(1), ws, SubscribeParams.Block)
-    eventually {
-      assertSubscribed(
-        ws.textHandlerID(),
-        SubscribeParams.Block.subscriptionId,
-        subscriptionHandler
-      )
-    }
+      eventually {
+        assertSubscribed(
+          ws.textHandlerID(),
+          params.subscriptionId,
+          subscriptionHandler
+        )
+      }
 
-    subscriptionHandler ! Unsubscribe(Correlation(2), ws, SubscribeParams.Block.subscriptionId)
-    eventually {
-      assertConnectedButNotSubscribed(
-        ws.textHandlerID(),
-        SubscribeParams.Block.subscriptionId,
-        subscriptionHandler
-      )
+      // it should be idempotent for subscriptions
+      subscriptionHandler ! Subscribe(Correlation(index + 1), ws, params)
+      eventually {
+        assertSubscribed(
+          ws.textHandlerID(),
+          params.subscriptionId,
+          subscriptionHandler
+        )
+      }
+
+      subscriptionHandler ! Unsubscribe(Correlation(index + 2), ws, params.subscriptionId)
+      eventually {
+        assertConnectedButNotSubscribed(
+          ws.textHandlerID(),
+          params.subscriptionId,
+          subscriptionHandler
+        )
+      }
+      index + 3
     }
 
     subscriptionHandler ! Unregister(ws.textHandlerID())

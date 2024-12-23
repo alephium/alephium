@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
 import io.vertx.core.{Future => VertxFuture}
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.BlockAndEvents
+import org.alephium.api.model.{BlockAndEvents, TransactionTemplate}
 import org.alephium.app.ws.WsParams.WsSubscriptionParams
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.crypto.Sha256
@@ -47,10 +47,16 @@ protected[ws] object WsParams {
   sealed trait WsParams
   sealed trait WsSubscriptionParams extends WsParams
   sealed trait WsNotificationParams extends WsParams
-  object WsNotificationParams extends ApiModelCodec {
+  object WsNotificationParams       extends ApiModelCodec {
+    // macroW fails : [wartremover:ToString] trait CharSequence does not override toString and automatic toString is disabled
     implicit val wsNotificationParamsWriter: Writer[WsNotificationParams] =
       writer[ujson.Value].comap[WsNotificationParams] {
         case WsBlockNotificationParams(subscription, result) =>
+          ujson.Obj(
+            "subscription" -> ujson.Str(subscription),
+            "result"       -> write(result)
+          )
+        case WsTxNotificationParams(subscription, result) =>
           ujson.Obj(
             "subscription" -> ujson.Str(subscription),
             "result"       -> write(result)
@@ -155,6 +161,10 @@ protected[ws] object WsParams {
 
   final case class WsBlockNotificationParams(subscription: WsSubscriptionId, result: BlockAndEvents)
       extends WsNotificationParams
+  final case class WsTxNotificationParams(
+      subscription: WsSubscriptionId,
+      result: TransactionTemplate
+  ) extends WsNotificationParams
 }
 
 final protected[ws] case class WsRequest(id: Correlation, params: WsSubscriptionParams)

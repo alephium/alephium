@@ -856,7 +856,7 @@ class ServerUtils(implicit
     val message =
       TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
     txHandler.ask(message).mapTo[TxHandler.SubmitToMemPoolResult].map {
-      case TxHandler.ProcessedByMemPool(_, AddedToMemPool) =>
+      case TxHandler.ProcessedByMemPool(_, AddedToMemPool(_)) =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case TxHandler.ProcessedByMemPool(_, AlreadyExisted) =>
         // succeed for idempotency reasons due to clients retrying submission

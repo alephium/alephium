@@ -114,16 +114,17 @@ class GrandPoolSpec extends AlephiumSpec {
     val tx0         = block.nonCoinbase.head.toTemplate
     val mempool0    = pool.getMemPool(chainIndex0.from)
     val now         = TimeStamp.now()
-    mempool0.add(chainIndex0, tx0, now) is MemPool.AddedToMemPool
+    mempool0.add(chainIndex0, tx0, now) is MemPool.AddedToMemPool(now)
 
     val chainIndex1 = ChainIndex.unsafe(1, 1)
     val tx1         = transfer(blockFlow, chainIndex1).nonCoinbase.head.toTemplate
     val mempool1    = pool.getMemPool(chainIndex1.from)
+    val before      = now.minusUnsafe(Duration.ofSecondsUnsafe(2))
     mempool1.add(
       chainIndex1,
       tx1,
-      now.minusUnsafe(Duration.ofSecondsUnsafe(2))
-    ) is MemPool.AddedToMemPool
+      before
+    ) is MemPool.AddedToMemPool(before)
 
     pool.cleanMemPool(blockFlow, now)
     mempool0.contains(tx0) is true

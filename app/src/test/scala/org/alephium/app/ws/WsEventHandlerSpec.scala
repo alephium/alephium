@@ -16,17 +16,19 @@
 
 package org.alephium.app.ws
 
-import org.alephium.api.model.{BlockAndEvents, BlockEntry}
+import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
 import org.alephium.app.ServerFixture
 import org.alephium.app.ws.WsParams.{
   SubscribeParams,
   WsBlockNotificationParams,
-  WsNotificationParams
+  WsNotificationParams,
+  WsTxNotificationParams
 }
 import org.alephium.json.Json._
+import org.alephium.protocol.model.TxGenerators
 import org.alephium.util._
 
-class WsEventHandlerSpec extends AlephiumSpec with ServerFixture {
+class WsEventHandlerSpec extends AlephiumSpec with ServerFixture with TxGenerators {
 
   it should "subscribe event handler into event bus" in new WsServerFixture {
     val newHandler =
@@ -39,10 +41,20 @@ class WsEventHandlerSpec extends AlephiumSpec with ServerFixture {
       .contains(newHandler.ref) is true
   }
 
-  it should "build Notification from Event" in {
+  it should "build Block Notification from Event" in {
     val blockAndEvents = BlockAndEvents(BlockEntry.from(dummyBlock, 0).rightValue, AVector.empty)
     val params: WsNotificationParams =
       WsBlockNotificationParams(SubscribeParams.Block.subscriptionId, blockAndEvents)
+    val notification = WsEventHandler.buildJsonRpcNotification(params)
+    write(notification.params) is write(params)
+  }
+
+  it should "build Tx Notification from Event" in {
+    val params: WsNotificationParams =
+      WsTxNotificationParams(
+        SubscribeParams.Tx.subscriptionId,
+        TransactionTemplate.fromProtocol(transactionGen().sample.get.toTemplate, TimeStamp.now())
+      )
     val notification = WsEventHandler.buildJsonRpcNotification(params)
     write(notification.params) is write(params)
   }

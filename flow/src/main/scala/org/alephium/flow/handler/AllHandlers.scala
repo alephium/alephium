@@ -27,7 +27,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.model.{Block, ChainIndex, ContractId, TransactionTemplate}
 import org.alephium.protocol.vm.{LogConfig, LogState}
-import org.alephium.util.{ActorRefT, AVector, EventBus}
+import org.alephium.util.{ActorRefT, AVector, EventBus, TimeStamp}
 
 final case class AllHandlers(
     flowHandler: ActorRefT[FlowHandler.Command],
@@ -214,5 +214,5 @@ object AllHandlers {
       } yield BlockNotify(block, height, logStates)
     }
   }
-  final case class TxNotify(tx: TransactionTemplate) extends EventBus.Event
+  final case class TxNotify(tx: TransactionTemplate, seenAt: TimeStamp) extends EventBus.Event
 }
