@@ -100,7 +100,10 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getEventsByBlockHash,
     verifySignature,
     targetToHashrate,
-    checkHashIndexing
+    checkHashIndexing,
+    buildGrouplessTransfer,
+    buildGrouplessExecuteScriptTx,
+    buildGrouplessDeployContractTx
   )
 
   private lazy val servers = List(

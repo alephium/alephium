@@ -143,7 +143,10 @@ class RestServer(
       getContractEventsCurrentCountLogic,
       getEventsByTxIdLogic,
       getEventsByBlockHashLogic,
-      metricsLogic
+      metricsLogic,
+      buildGrouplessTransferLogic,
+      buildGrouplessExecuteScriptTxLogic,
+      buildGrouplessDeployContractTxLogic
     ).map(route(_)) ++ swaggerUiRoute
 
   val routes: AVector[Router => Route] =
