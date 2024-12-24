@@ -20,14 +20,14 @@ import java.util.concurrent.Executors
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 
 import org.alephium.app.HttpServerLike
-import org.alephium.app.ws.WsEventHandler.getSubscribedEventHandler
+import org.alephium.app.ws.WsEventHandler
 import org.alephium.app.ws.WsParams.WsId
 import org.alephium.flow.client.Node
 import org.alephium.protocol.config.NetworkConfig
@@ -46,15 +46,11 @@ object WsServer extends StrictLogging {
   def apply(system: ActorSystem, node: Node, maxConnections: Int, options: HttpServerOptions)(
       implicit networkConfig: NetworkConfig
   ): WsServer = {
-    val vertx        = Vertx.vertx()
-    val server       = vertx.createHttpServer(options)
-    val eventHandler = getSubscribedEventHandler(vertx.eventBus(), node.eventBus, system)
-    val subscriptionHandler =
-      ActorRefT
-        .build[WsSubscriptionHandler.SubscriptionMsg](
-          system,
-          Props(new WsSubscriptionHandler(vertx, maxConnections))
-        )
+    val vertx               = Vertx.vertx()
+    val server              = vertx.createHttpServer(options)
+    val subscriptionHandler = WsSubscriptionHandler.apply(vertx, system, maxConnections)
+    val eventHandler =
+      WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
     server.webSocketHandler { ws =>
       if (ws.path().equals("/ws")) {
         subscriptionHandler ! WsSubscriptionHandler.Connect(ServerWs(ws))

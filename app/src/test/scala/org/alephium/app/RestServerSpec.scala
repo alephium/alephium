@@ -1086,6 +1086,7 @@ abstract class RestServerSpec(
                    |    {
                    |      "blockHash": "${blockHash.toHexString}",
                    |      "txId": "${dummyTx.id.toHexString}",
+                   |      "contractAddress": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                    |      "eventIndex": 0,
                    |      "fields": [
                    |        {

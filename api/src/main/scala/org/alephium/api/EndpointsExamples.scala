@@ -262,6 +262,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val event = ContractEvent(
     blockHash,
     txId,
+    contractAddress,
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )

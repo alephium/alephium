@@ -36,7 +36,18 @@ import org.alephium.app.ws.WsSubscriptionHandler.{
   SubscriptionsResponse
 }
 import org.alephium.flow.handler.TestUtils
+import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
+
+trait WsSpec extends AlephiumSpec {
+  val ZeroEventIndex = 0
+  val contractAddress: Address.Contract = Address.Contract(
+    LockupScript.p2c(
+      ContractId.zero
+    )
+  )
+}
 
 trait WsServerFixture extends ServerFixture with ScalaFutures {
 

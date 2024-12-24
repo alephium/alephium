@@ -37,7 +37,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.app.ws.WsClient
+import org.alephium.app.ws.{ClientWs, WsClient}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -389,16 +389,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWsClient(port: Int): Future[Unit] = {
+  def startWsClient(port: Int): Future[ClientWs] = {
     implicit val ec: ExecutionContext = system.dispatcher
-    wsClient
-      .connect(port)
-      .flatMap { ws =>
-        ws.textMessageHandler { blockNotify =>
-          blockNotifyProbe.ref ! blockNotify
-        }
-        ws.subscribeToBlock(0)
-      }
+    wsClient.connect(port)(blockNotifyProbe.ref ! _)
   }
 
   def jsonRpc(method: String, params: String): String =

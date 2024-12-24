@@ -36,6 +36,7 @@ final case class ContractEventsByBlockHash(
 final case class ContractEvent(
     blockHash: BlockHash,
     txId: TransactionId,
+    contractAddress: Address.Contract,
     eventIndex: Int,
     fields: AVector[Val]
 )
@@ -85,12 +86,14 @@ object ContractEventByBlockHash {
 
 object ContractEvents {
   def from(logStates: LogStates): AVector[ContractEvent] = {
+    val contractAddress = Address.contract(logStates.contractId)
     logStates.states.flatMap { logState =>
       if (logState.index != debugEventIndex.v.v.intValue().toByte) {
         AVector(
           ContractEvent(
             logStates.blockHash,
             logState.txId,
+            contractAddress,
             logState.index.toInt,
             logState.fields.map(Val.from)
           )

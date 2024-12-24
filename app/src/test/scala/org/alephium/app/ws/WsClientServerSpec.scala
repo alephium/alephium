@@ -24,14 +24,15 @@ import org.scalatest.EitherValues
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.exceptions.TestFailedException
 
-import org.alephium.app.ws.WsParams.SubscribeParams.{Block, Tx}
+import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
+import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util._
 
-class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with NumericHelpers {
+class WsClientServerSpec extends WsSpec with EitherValues with NumericHelpers {
   import WsUtils._
 
   "WsServer" should "reject request to any endpoint besides /ws" in new WsServerFixture {
@@ -55,46 +56,65 @@ class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with Numer
     val wsServer = bindAndListen()
     val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
 
+    // for block notification
     ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
-    ws.subscribeToTx(1).futureValue is Response.successful(Correlation(1), Tx.subscriptionId)
-    ws.unsubscribeFromBlock(2).futureValue is Response.successful(Correlation(2))
+    ws.unsubscribeFromBlock(1).futureValue is Response.successful(Correlation(1))
+
+    // for tx notification
+    ws.subscribeToTx(2).futureValue is Response.successful(Correlation(2), Tx.subscriptionId)
+    ws.unsubscribeFromTx(3).futureValue is Response.successful(Correlation(3))
+
+    // for contract events notifications
+    val params = ContractEventsSubscribeParams.from(ZeroEventIndex, AVector(contractAddress))
+    ws.subscribeToContractEvents(4, params.eventIndex, params.addresses).futureValue is Response
+      .successful(
+        Correlation(4),
+        params.subscriptionId
+      )
+    ws.unsubscribeFromContractEvents(5, params.subscriptionId).futureValue is Response.successful(
+      Correlation(5)
+    )
     ws.close().futureValue
     wsServer.httpServer.close().asScala.futureValue
   }
 
-  "WsServer" should "respond already subscribed or unsubscribed for block" in new WsServerFixture {
+  "WsServer" should "respond already subscribed or unsubscribed" in new WsServerFixture {
     val wsServer = bindAndListen()
     val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
 
+    // for block
     ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
     ws.subscribeToBlock(1).futureValue is
       Response.failed(Correlation(1), Error(WsError.AlreadySubscribed, Block.subscriptionId))
-
     ws.unsubscribeFromBlock(2).futureValue is Response.successful(Correlation(2))
     ws.unsubscribeFromBlock(3).futureValue is
       Response.failed(Correlation(3), Error(WsError.AlreadyUnsubscribed, Block.subscriptionId))
 
+    // for tx
+    ws.subscribeToTx(4).futureValue is Response.successful(Correlation(4), Tx.subscriptionId)
+    ws.subscribeToTx(5).futureValue is
+      Response.failed(Correlation(5), Error(WsError.AlreadySubscribed, Tx.subscriptionId))
+    ws.unsubscribeFromTx(6).futureValue is Response.successful(Correlation(6))
+    ws.unsubscribeFromTx(7).futureValue is
+      Response.failed(Correlation(7), Error(WsError.AlreadyUnsubscribed, Tx.subscriptionId))
+
+    // for contract events
+    val params = ContractEventsSubscribeParams.from(ZeroEventIndex, AVector(contractAddress))
+    ws.subscribeToContractEvents(8, params.eventIndex, params.addresses).futureValue is Response
+      .successful(Correlation(8), params.subscriptionId)
+    ws.subscribeToContractEvents(9, params.eventIndex, params.addresses).futureValue is
+      Response.failed(Correlation(9), Error(WsError.AlreadySubscribed, params.subscriptionId))
+    ws.unsubscribeFromContractEvents(10, params.subscriptionId).futureValue is Response.successful(
+      Correlation(10)
+    )
+    ws.unsubscribeFromContractEvents(11, params.subscriptionId).futureValue is
+      Response.failed(Correlation(11), Error(WsError.AlreadyUnsubscribed, params.subscriptionId))
+
     ws.close().futureValue
     wsServer.httpServer.close().asScala.futureValue
   }
 
-  "WsServer" should "respond already subscribed or unsubscribed for tx" in new WsServerFixture {
-    val wsServer = bindAndListen()
-    val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
-
-    ws.subscribeToTx(0).futureValue is Response.successful(Correlation(0), Tx.subscriptionId)
-    ws.subscribeToTx(1).futureValue is
-      Response.failed(Correlation(1), Error(WsError.AlreadySubscribed, Tx.subscriptionId))
-
-    ws.unsubscribeFromTx(2).futureValue is Response.successful(Correlation(2))
-    ws.unsubscribeFromTx(3).futureValue is
-      Response.failed(Correlation(3), Error(WsError.AlreadyUnsubscribed, Tx.subscriptionId))
-
-    ws.close().futureValue
-    wsServer.httpServer.close().asScala.futureValue
-  }
-
-  "WsClient and WsServer" should "handle high load fast" in new WsServerFixture
+  "WsClient and WsServer" should "handle high load of block subscriptions, notifications and unsubscriptions" in new WsServerFixture
     with IntegrationPatience {
     val numberOfConnections           = maxClientConnections
     override def maxServerConnections = numberOfConnections
@@ -128,7 +148,7 @@ class WsClientServerSpec extends AlephiumFutureSpec with EitherValues with Numer
     measureTime(s"$numberOfConnections notifications with ser/deser") {
       clientProbe.receiveN(numberOfConnections, 10.seconds)
     }
-    measureTime(s"$numberOfConnections unsubscriptions requests/responses with ser/deser") {
+    measureTime(s"$numberOfConnections unsubscription requests/responses with ser/deser") {
       Future
         .sequence(websockets.map { case (index, ws) => ws.unsubscribeFromBlock(index) })
         .futureValue

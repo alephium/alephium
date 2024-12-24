@@ -16,22 +16,20 @@
 
 package org.alephium.app.ws
 
-import scala.collection.immutable.TreeMap
 import scala.concurrent.ExecutionContext.Implicits
-import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.app.ws.WsParams.{FilteredSubscribeParams, SubscribeParams}
+import org.alephium.app.ws.WsParams.{ContractEventsSubscribeParams, SimpleSubscribeParams}
 import org.alephium.json.Json._
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.AVector
 
-class WsProtocolSpec extends AlephiumSpec {
+class WsProtocolSpec extends WsSpec {
 
   "WebSocketProtocol" should "refuse all WsRequest that are not JsonRPC compliant" in {
     val method    = WsMethod.SubscribeMethod
-    val eventType = SubscribeParams.BlockEvent
+    val eventType = "foo"
     WsRequest
       .fromJsonString(s"""{"method": "$method", "params": ["$eventType"]}""")
       .isLeft is true
@@ -52,37 +50,34 @@ class WsProtocolSpec extends AlephiumSpec {
   }
 
   "WsRequest" should "pass R/W round-trip for simple subscription" in {
-    SubscribeParams.eventTypes.foreach { eventType =>
-      val method       = WsMethod.SubscribeMethod
-      val validReqJson = s"""{"method":"$method","params":["$eventType"],"id":0,"jsonrpc":"2.0"}"""
-      val expectedRequest = WsRequest.subscribe(0, SubscribeParams(eventType))
+    AVector(SimpleSubscribeParams.Block, SimpleSubscribeParams.Tx).foreach { params =>
+      val method = WsMethod.SubscribeMethod
+      val validReqJson =
+        s"""{"method":"$method","params":["${params.eventType}"],"id":0,"jsonrpc":"2.0"}"""
+      val expectedRequest = WsRequest.subscribe(0, params)
       write(expectedRequest) is validReqJson
       read[WsRequest](validReqJson) is expectedRequest
     }
   }
 
-  "WsRequest" should "pass R/W round-trip for filtered subscription" in {
-    FilteredSubscribeParams.eventTypes.foreach { eventType =>
+  "WsRequest" should "pass R/W round-trip for contract subscription" in {
+    ContractEventsSubscribeParams.eventTypes.foreach { eventType =>
       val method = WsMethod.SubscribeMethod
       val validReqJson =
-        s"""{"method":"$method","params":["$eventType",{"address":"xyz"}],"id":0,"jsonrpc":"2.0"}"""
-      val expectedRequest = WsRequest.subscribeWithFilter(
+        s"""{"method":"$method","params":["$eventType",$ZeroEventIndex,["${contractAddress.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
+      val expectedRequest = WsRequest.subscribe(
         0,
-        FilteredSubscribeParams(eventType, TreeMap("address" -> "xyz"))
+        ContractEventsSubscribeParams(eventType, 0, AVector(contractAddress))
       )
       write(expectedRequest) is validReqJson
       read[WsRequest](validReqJson) is expectedRequest
-
-      WsRequest
-        .fromJsonString(s"""{"method":"$method","params":["$eventType"],"id":0,"jsonrpc":"2.0"}""")
-        .isLeft is true
     }
   }
 
   "WsRequest" should "pass R/W round-trip for unsubscription from event type" in {
     val method = WsMethod.UnsubscribeMethod
-    SubscribeParams.eventTypes.foreach { eventType =>
-      val subscriptionId = SubscribeParams(eventType).subscriptionId
+    SimpleSubscribeParams.eventTypes.foreach { eventType =>
+      val subscriptionId = SimpleSubscribeParams(eventType).subscriptionId
       val validReqJson =
         s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""
       val expectedRequest = WsRequest.unsubscribe(0, subscriptionId)
@@ -91,11 +86,15 @@ class WsProtocolSpec extends AlephiumSpec {
     }
   }
 
-  "WsRequest" should "pass R/W round-trip for unsubscription of filtered event type" in {
+  "WsRequest" should "pass R/W round-trip for unsubscription of contract event type" in {
     val method = WsMethod.UnsubscribeMethod
-    FilteredSubscribeParams.eventTypes.foreach { eventType =>
+    ContractEventsSubscribeParams.eventTypes.foreach { eventType =>
       val subscriptionId =
-        FilteredSubscribeParams(eventType, TreeMap("address" -> "xyz")).subscriptionId
+        ContractEventsSubscribeParams(
+          eventType,
+          ZeroEventIndex,
+          AVector(contractAddress)
+        ).subscriptionId
       val validReqJson =
         s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""
       val expectedRequest = WsRequest.unsubscribe(0, subscriptionId)
@@ -106,25 +105,21 @@ class WsProtocolSpec extends AlephiumSpec {
 
   "WsUtils" should "convert VertxFuture to Scala Future" in {
     import WsUtils._
-    val successfulVertxFuture: VertxFuture[String] = VertxFuture.succeededFuture("Success Result")
-    val successfulScalaFuture: Future[String]      = successfulVertxFuture.asScala
-    successfulScalaFuture.onComplete {
-      case Success(value) =>
-        value is "Success Result"
-      case Failure(_) =>
-        fail("The future should not fail in this test case")
-    }(Implicits.global)
+    VertxFuture
+      .succeededFuture("Success")
+      .asScala
+      .onComplete {
+        case Success(value) => value is "Success"
+        case Failure(_)     => fail("The future should not fail")
+      }(Implicits.global)
 
     val exception                              = new RuntimeException("Test Failure")
     val failedVertxFuture: VertxFuture[String] = VertxFuture.failedFuture(exception)
-    val failedScalaFuture: Future[String]      = failedVertxFuture.asScala
-
-    failedScalaFuture.onComplete {
-      case Success(_) =>
-        fail("The future should not succeed in this test case")
-      case Failure(ex) =>
-        ex is exception // Expected exception is thrown
-    }(Implicits.global)
+    failedVertxFuture.asScala
+      .onComplete {
+        case Success(_)  => fail("The future should not succeed")
+        case Failure(ex) => ex is exception
+      }(Implicits.global)
   }
 
 }

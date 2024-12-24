@@ -20,6 +20,7 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
+import akka.actor.{ActorSystem, Props}
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{Message, MessageConsumer}
@@ -28,14 +29,24 @@ import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.json.Json.write
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
-import org.alephium.util.{AVector, BaseActor}
+import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 protected[ws] object WsSubscriptionHandler {
+
+  def apply(vertx: Vertx, system: ActorSystem, maxConnections: Int): ActorRefT[SubscriptionMsg] = {
+    ActorRefT
+      .build[WsSubscriptionHandler.SubscriptionMsg](
+        system,
+        Props(new WsSubscriptionHandler(vertx, maxConnections))
+      )
+  }
 
   sealed trait SubscriptionMsg
   sealed trait Command         extends SubscriptionMsg
   sealed trait CommandResponse extends SubscriptionMsg
   sealed trait Event           extends SubscriptionMsg
+
+  final case class NotificationPublished(params: WsNotificationParams) extends Event
 
   final case class Connect(socket: ServerWsLike) extends Command
   final case object GetSubscriptions             extends Command
@@ -47,7 +58,7 @@ protected[ws] object WsSubscriptionHandler {
   final protected[ws] case class Subscribe(
       id: Correlation,
       ws: ServerWsLike,
-      subscription: SubscribeParams
+      params: WsSubscriptionParams
   ) extends Command
   final private case class Subscribed(
       id: Correlation,
@@ -96,17 +107,28 @@ protected[ws] object WsSubscriptionHandler {
 
   final protected[ws] case class Unregister(id: WsId) extends Command
   final private case class Unregistered(id: WsId)     extends CommandResponse
+
+  final case class AddressWithIndex(address: String, eventIndex: Int)
 }
 
-protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) extends BaseActor {
+protected[ws] class WsSubscriptionHandler(
+    vertx: Vertx,
+    maxConnections: Int
+) extends BaseActor {
   import org.alephium.app.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
-  // subscriber with empty subscriptions is connected but not subscribed to any events
+  // subscriber who unsubscribe from all subscriptions is connected but not subscribed to any events
   private val subscribers =
     mutable.Map.empty[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]]
 
-  // scalastyle:off cyclomatic.complexity
+  private val multiSubscriptionsByAddress =
+    mutable.Map.empty[AddressWithIndex, AVector[WsSubscriptionId]]
+
+  private val multiSubscriptionsBySubscriptionId =
+    mutable.Map.empty[WsSubscriptionId, AVector[AddressWithIndex]]
+
+  // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
     case Connect(ws) =>
       if (subscribers.size >= maxConnections) {
@@ -116,8 +138,8 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
         ws.closeHandler(() => self ! Unregister(ws.textHandlerID()))
         val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
       }
-    case Subscribe(id, ws, subscription) =>
-      subscribe(id, ws, subscription)
+    case Subscribe(id, ws, params) =>
+      subscribe(id, ws, params)
     case Unsubscribe(id, ws, subscriptionId) =>
       unSubscribe(id, ws, subscriptionId)
     case Subscribed(id, ws, subscriptionId, consumer) =>
@@ -139,6 +161,7 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
     case Unsubscribed(id, ws, subscriptionId) =>
       subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == subscriptionId)))
+      unregisterMultiAddressSubscription(subscriptionId)
       respondAsyncAndForget(ws, Response.successful(id))
     case AlreadyUnSubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
@@ -155,8 +178,33 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
       val _ = subscribers.remove(id)
     case GetSubscriptions =>
       sender() ! SubscriptionsResponse(AVector.from(subscribers))
+    case NotificationPublished(params: WsTxNotificationParams) =>
+      val _ =
+        vertx.eventBus().publish(params.subscriptionId, write(params.buildJsonRpcNotification))
+    case NotificationPublished(params: WsBlockNotificationParams) =>
+      val _ =
+        vertx.eventBus().publish(params.subscriptionId, write(params.buildJsonRpcNotification))
+      params.result.getContractEvents.foreach { contractEvent =>
+        multiSubscriptionsByAddress
+          .get(AddressWithIndex(contractEvent.contractAddress.toBase58, contractEvent.eventIndex))
+          .foreach { subscriptionIds =>
+            subscriptionIds.foreach { subscriptionId =>
+              vertx
+                .eventBus()
+                .publish(
+                  subscriptionId,
+                  write(
+                    WsContractNotificationParams(
+                      subscriptionId,
+                      contractEvent
+                    ).buildJsonRpcNotification
+                  )
+                )
+            }
+          }
+      }
   }
-  // scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity method.length
 
   private def respondAsyncAndForget(ws: ServerWsLike, response: Response)(implicit
       ec: ExecutionContext
@@ -179,12 +227,10 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
       ec: ExecutionContext
   ): Unit = {
     WsRequest.fromJsonString(msg) match {
-      case Right(WsRequest(id, subscription: SubscribeParams)) =>
-        val _ = self ! Subscribe(id, ws, subscription)
-      case Right(WsRequest(_, FilteredSubscribeParams(_, _))) =>
-      // TODO implement events for particular address etc.
       case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
         val _ = self ! Unsubscribe(id, ws, subscriptionId)
+      case Right(WsRequest(id, params: WsSubscriptionParams)) =>
+        val _ = self ! Subscribe(id, ws, params)
       case Left(error) => respondAsyncAndForget(ws, Response.failed(error))
     }
   }
@@ -192,17 +238,27 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
   private def subscribe(
       id: Correlation,
       ws: ServerWsLike,
-      subscription: SubscribeParams
+      params: WsSubscriptionParams
   )(implicit
       ec: ExecutionContext
   ): Unit = {
-    val subscriptionId = subscription.subscriptionId
+    val subscriptionId = params.subscriptionId
     subscribers.get(ws.textHandlerID()) match {
       case Some(ss) if ss.exists(_._1 == subscriptionId) =>
         self ! AlreadySubscribed(id, ws, subscriptionId)
       case _ =>
-        subscribeToEvents(id, ws, subscription.subscriptionId) match {
+        subscribeToEvents(id, ws, subscriptionId) match {
           case Success(consumer) =>
+            params match {
+              case contractParams: ContractEventsSubscribeParams =>
+                registerMultiAddressSubscription(
+                  contractParams.subscriptionId,
+                  contractParams.addresses.map { address =>
+                    AddressWithIndex(address.toBase58, contractParams.eventIndex)
+                  }
+                )
+              case _ =>
+            }
             self ! Subscribed(id, ws, subscriptionId, consumer)
           case Failure(ex) =>
             self ! SubscriptionFailed(id, ws, ex.getMessage)
@@ -257,6 +313,36 @@ protected[ws] class WsSubscriptionHandler(vertx: Vertx, maxConnections: Int) ext
       )
   }
 
+  private def registerMultiAddressSubscription(
+      subscriptionId: WsSubscriptionId,
+      addressesWithIndex: AVector[AddressWithIndex]
+  ): Unit = {
+    multiSubscriptionsBySubscriptionId.put(
+      subscriptionId,
+      addressesWithIndex
+    )
+    addressesWithIndex.foreach { address =>
+      multiSubscriptionsByAddress.updateWith(address) {
+        case Some(ss) if ss.contains(subscriptionId) => Some(ss)
+        case None                                    => Some(AVector(subscriptionId))
+        case Some(subscriptions)                     => Some(subscriptions :+ subscriptionId)
+      }
+    }
+  }
+
+  private def unregisterMultiAddressSubscription(subscriptionId: WsSubscriptionId): Unit = {
+    multiSubscriptionsBySubscriptionId.remove(subscriptionId) match {
+      case None =>
+      case Some(addressesWithIndex) =>
+        addressesWithIndex.foreach { addressWithIndex =>
+          multiSubscriptionsByAddress.updateWith(addressWithIndex) {
+            case None => None
+            case Some(ss) =>
+              Option(ss.filterNot(_ == subscriptionId)).filter(_.nonEmpty)
+          }
+        }
+    }
+  }
   private def unSubscribeToEvents(subscription: MessageConsumer[String]): Future[Unit] = {
     import WsUtils._
     subscription

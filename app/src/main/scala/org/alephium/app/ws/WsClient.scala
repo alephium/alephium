@@ -27,11 +27,18 @@ import io.vertx.core.Vertx
 import io.vertx.core.http.{WebSocket, WebSocketClient, WebSocketClientOptions}
 
 import org.alephium.app.ws.ClientWs.WsException
-import org.alephium.app.ws.WsParams.{SubscribeParams, WsCorrelationId}
+import org.alephium.app.ws.WsParams.{
+  ContractEventsSubscribeParams,
+  SimpleSubscribeParams,
+  WsCorrelationId,
+  WsSubscriptionId
+}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json._
+import org.alephium.protocol.model.Address
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Notification, Response}
+import org.alephium.util.AVector
 
 object ClientWs {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -126,19 +133,36 @@ final case class ClientWs(underlying: WebSocket, notificationHandler: Notificati
   }
 
   def subscribeToBlock(id: WsCorrelationId): Future[Response] = {
-    writeRequestToSocket(WsRequest.subscribe(id, SubscribeParams.Block))
+    writeRequestToSocket(WsRequest.subscribe(id, SimpleSubscribeParams.Block))
   }
 
   def subscribeToTx(id: WsCorrelationId): Future[Response] = {
-    writeRequestToSocket(WsRequest.subscribe(id, SubscribeParams.Tx))
+    writeRequestToSocket(WsRequest.subscribe(id, SimpleSubscribeParams.Tx))
+  }
+
+  def subscribeToContractEvents(
+      id: WsCorrelationId,
+      eventIndex: Int,
+      addresses: AVector[Address.Contract]
+  ): Future[Response] = {
+    writeRequestToSocket(
+      WsRequest.subscribe(id, ContractEventsSubscribeParams.from(eventIndex, addresses))
+    )
   }
 
   def unsubscribeFromBlock(id: WsCorrelationId): Future[Response] = {
-    writeRequestToSocket(WsRequest.unsubscribe(id, SubscribeParams.Block.subscriptionId))
+    writeRequestToSocket(WsRequest.unsubscribe(id, SimpleSubscribeParams.Block.subscriptionId))
   }
 
   def unsubscribeFromTx(id: WsCorrelationId): Future[Response] = {
-    writeRequestToSocket(WsRequest.unsubscribe(id, SubscribeParams.Tx.subscriptionId))
+    writeRequestToSocket(WsRequest.unsubscribe(id, SimpleSubscribeParams.Tx.subscriptionId))
+  }
+
+  def unsubscribeFromContractEvents(
+      id: WsCorrelationId,
+      subscriptionId: WsSubscriptionId
+  ): Future[Response] = {
+    writeRequestToSocket(WsRequest.unsubscribe(id, subscriptionId))
   }
 
   def isClosed: Boolean = underlying.isClosed
