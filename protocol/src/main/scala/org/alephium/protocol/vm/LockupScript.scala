@@ -190,15 +190,14 @@ object LockupScript {
   object P2PK {
     private val scriptHintLength: Int = 4
 
-    def from(publicKey: PublicKeyLike)(implicit groupConfig: GroupConfig): P2PK =
-      from(publicKey, None)
+    def from(publicKey: PublicKeyLike): P2PK = P2PK(publicKey, publicKey.scriptHint)
 
     def from(publicKey: PublicKeyLike, groupIndexOpt: Option[GroupIndex])(implicit
         groupConfig: GroupConfig
     ): P2PK = {
       groupIndexOpt match {
         case Some(groupIndex) => P2PK(publicKey, findScriptHint(publicKey.scriptHint, groupIndex))
-        case None             => P2PK(publicKey, publicKey.scriptHint)
+        case None             => from(publicKey)
       }
     }
 

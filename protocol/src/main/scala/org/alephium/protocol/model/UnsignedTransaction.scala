@@ -511,7 +511,7 @@ object UnsignedTransaction {
   // Note: this would calculate excess dustAmount to cover the complicated cases
   def calculateTotalAmountNeeded(
       outputInfos: AVector[TxOutputInfo]
-  ): Either[String, (U256, AVector[(TokenId, U256)], Int)] = {
+  ): Either[String, UnsignedTransaction.TotalAmountNeeded] = {
     outputInfos
       .foldE((U256.Zero, ListMap.empty[TokenId, U256], 0)) {
         case ((totalAlphAmount, totalTokens, totalOutputLength), outputInfo) =>
@@ -621,4 +621,6 @@ object UnsignedTransaction {
       fromUnlockScript: UnlockScript,
       assets: AVector[(AssetOutputRef, AssetOutput)]
   )
+
+  type TotalAmountNeeded = (U256, AVector[(TokenId, U256)], Int)
 }

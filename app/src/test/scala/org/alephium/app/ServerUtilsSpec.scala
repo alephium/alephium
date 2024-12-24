@@ -16,8 +16,6 @@
 
 package org.alephium.app
 
-import java.net.InetSocketAddress
-
 import scala.util.Random
 
 import akka.util.ByteString
@@ -47,25 +45,9 @@ import org.alephium.util._
 // scalastyle:off file.size.limit number.of.methods
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
-  val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
 
   def warningString(code: String, sourceIndex: Option[SourceIndex]) = {
     code.substring(sourceIndex.get.index, sourceIndex.get.endIndex)
-  }
-
-  trait ApiConfigFixture extends SocketUtil {
-    val peerPort             = generatePort()
-    val address              = new InetSocketAddress("127.0.0.1", peerPort)
-    val blockflowFetchMaxAge = Duration.zero
-    implicit val apiConfig: ApiConfig = ApiConfig(
-      networkInterface = address.getAddress,
-      blockflowFetchMaxAge = blockflowFetchMaxAge,
-      askTimeout = Duration.ofMinutesUnsafe(1),
-      AVector.empty,
-      ALPH.oneAlph,
-      defaultUtxosLimit,
-      128
-    )
   }
 
   trait Fixture extends FlowFixture with ApiConfigFixture {

@@ -48,13 +48,14 @@ import org.alephium.util._
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
-    brokerConfig: BrokerConfig,
+    val brokerConfig: BrokerConfig,
     consensusConfigs: ConsensusConfigs,
-    networkConfig: NetworkConfig,
-    apiConfig: ApiConfig,
+    val networkConfig: NetworkConfig,
+    val apiConfig: ApiConfig,
     logConfig: LogConfig,
     executionContext: ExecutionContext
-) extends StrictLogging {
+) extends GrouplessUtils
+    with StrictLogging {
   import ServerUtils._
 
   def getHeightedBlocks(
@@ -879,7 +880,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
+  protected def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
     destinations.map { destination =>
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>

@@ -138,6 +138,11 @@ trait Endpoints
     eventsEndpoint
       .in("contract")
 
+  private val grouplessEndpoint: BaseEndpoint[Unit, Unit] =
+    baseEndpoint
+      .in("groupless")
+      .tag("Groupless")
+
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
       .in("node")
@@ -699,6 +704,14 @@ trait Endpoints
       .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[ContractEventsByBlockHash])
       .summary("Get contract events for a block")
+
+  lazy val buildGrouplessTransfer
+      : BaseEndpoint[BuildGrouplessTransferTx, AVector[BuildTransferTxResult]] =
+    grouplessEndpoint
+      .in("transfer")
+      .in(jsonBodyWithAlph[BuildGrouplessTransferTx])
+      .out(jsonBody[AVector[BuildTransferTxResult]])
+      .summary("Build unsigned transfer transactions from a groupless address")
 }
 
 object Endpoints {

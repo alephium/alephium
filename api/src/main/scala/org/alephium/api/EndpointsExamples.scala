@@ -33,7 +33,7 @@ import org.alephium.protocol.model.{
   TokenId,
   TransactionId
 }
-import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -1116,5 +1116,20 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val transactionIdExamples: List[Example[TransactionId]] =
     simpleExample(transaction.unsigned.txId)
+
+  private val grouplessAddress =
+    Address.Asset(LockupScript.P2PK.from(PublicKeyLike.SecP256K1(publicKey)))
+  implicit val buildGrouplessTransferExamples: List[Example[BuildGrouplessTransferTx]] = List(
+    defaultExample(
+      BuildGrouplessTransferTx(grouplessAddress, defaultDestinations)
+    ),
+    moreSettingsExample(
+      BuildGrouplessTransferTx(
+        grouplessAddress,
+        moreSettingsDestinations,
+        Some(model.nonCoinbaseMinGasPrice)
+      )
+    )
+  )
 }
 // scalastyle:on magic.number
