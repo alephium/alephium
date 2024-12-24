@@ -250,7 +250,10 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
 
-    def buildQuery(alphAmount: U256, tokenAmount: U256): BuildGrouplessExecuteScriptTx = {
+    def buildExecuteScriptQuery(
+        alphAmount: U256,
+        tokenAmount: U256
+    ): BuildGrouplessExecuteScriptTx = {
       val script =
         s"""
            |TxScript Main {
@@ -268,7 +271,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
 
     def testExecuteScript(alphAmount: U256, tokenAmount: U256, expectedTxSize: Int) = {
-      val query = buildQuery(alphAmount, tokenAmount)
+      val query = buildExecuteScriptQuery(alphAmount, tokenAmount)
       val txs   = buildGrouplessExecuteScriptTx(query)
       txs.length is expectedTxSize
 
@@ -308,15 +311,93 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
   it should "fail if the from address does not have enough balance when building execute script txs" in new BuildExecuteScriptTxFixture {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    val query0 = buildQuery(ALPH.alph(2), ALPH.alph(2))
+    val query0 = buildExecuteScriptQuery(ALPH.alph(2), ALPH.alph(2))
     serverUtils
       .buildGrouplessExecuteScriptTx(blockFlow, query0)
       .leftValue
       .detail is "Not enough ALPH balance, requires an additional 0.504 ALPH"
 
-    val query1 = buildQuery(ALPH.oneAlph, ALPH.alph(3))
+    val query1 = buildExecuteScriptQuery(ALPH.oneAlph, ALPH.alph(3))
     serverUtils
       .buildGrouplessExecuteScriptTx(blockFlow, query1)
+      .leftValue
+      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
+  }
+
+  trait BuildDeployContractTxFixture extends BuildExecuteScriptTxFixture {
+    def buildDeployContractQuery(
+        alphAmount: U256,
+        tokenAmount: U256
+    ): BuildGrouplessDeployContractTx = {
+      val code = BuildDeployContractTx.Code(
+        Compiler.compileContract(contract).rightValue,
+        AVector.empty,
+        AVector.empty
+      )
+      BuildGrouplessDeployContractTx(
+        fromAddress,
+        serialize(code),
+        initialAttoAlphAmount = Some(alphAmount),
+        initialTokenAmounts = Some(AVector(Token(tokenId, tokenAmount)))
+      )
+    }
+
+    private def buildGrouplessDeployContractTx(query: BuildGrouplessDeployContractTx) = {
+      val result      = serverUtils.buildGrouplessDeployContractTx(blockFlow, query).rightValue
+      val txs         = result.transferTxs.map(_.unsignedTx) :+ result.deployContractTx.unsignedTx
+      val unsignedTxs = txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
+      (unsignedTxs, result.deployContractTx.contractAddress.contractId)
+    }
+
+    def testDeployContract(alphAmount: U256, tokenAmount: U256, expectedTxSize: Int) = {
+      val query             = buildDeployContractQuery(alphAmount, tokenAmount)
+      val (txs, contractId) = buildGrouplessDeployContractTx(query)
+      txs.length is expectedTxSize
+
+      val accountBalance0 = getBalance(fromAddress.lockupScript)
+      txs.foreach(tx => mineWithTx(signWithPasskey(tx, fromPrivateKey)))
+      val contractBalance = getBalance(LockupScript.p2c(contractId))
+      val accountBalance1 = getBalance(fromAddress.lockupScript)
+
+      val gasFee = txs.fold(U256.Zero)((acc, tx) => acc.addUnsafe(tx.gasFee))
+      contractBalance._1 is alphAmount
+      contractBalance._2 is tokenAmount
+      accountBalance0._1 is accountBalance1._1.addUnsafe(alphAmount).addUnsafe(gasFee)
+      accountBalance0._2 is accountBalance1._2.addUnsafe(tokenAmount)
+    }
+  }
+
+  it should "build an deploy contract tx without cross-group transfers" in new BuildDeployContractTxFixture {
+    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+    testDeployContract(ALPH.oneAlph, ALPH.oneAlph, 1)
+  }
+
+  it should "build an deploy contract tx with one cross-group transfer when the from address has no balance" in new BuildDeployContractTxFixture {
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.head)
+    testDeployContract(ALPH.oneAlph, ALPH.oneAlph, 2)
+  }
+
+  it should "build an deploy contract tx with one cross-group transfer when the from address does not have enough balance" in new BuildDeployContractTxFixture {
+    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+    testDeployContract(ALPH.alph(2), ALPH.alph(4), 2)
+  }
+
+  it should "build an deploy contract tx with multiple cross-group transfers" in new BuildDeployContractTxFixture {
+    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+    testDeployContract(ALPH.alph(4), ALPH.alph(5), 3)
+  }
+
+  it should "fail if the from address does not have enough balance when building deploy contract txs" in new BuildDeployContractTxFixture {
+    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+    val query0 = buildDeployContractQuery(ALPH.alph(2), ALPH.alph(2))
+    serverUtils
+      .buildGrouplessDeployContractTx(blockFlow, query0)
+      .leftValue
+      .detail is "Not enough ALPH balance, requires an additional 0.504 ALPH"
+
+    val query1 = buildDeployContractQuery(ALPH.oneAlph, ALPH.alph(3))
+    serverUtils
+      .buildGrouplessDeployContractTx(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }

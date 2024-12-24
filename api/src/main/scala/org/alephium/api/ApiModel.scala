@@ -503,6 +503,9 @@ trait ApiModelCodec {
   implicit val buildGrouplessExecuteScriptTxRW: RW[BuildGrouplessExecuteScriptTx] = macroRW
   implicit val buildGrouplessExecuteScriptTxResultRW: RW[BuildGrouplessExecuteScriptTxResult] =
     macroRW
+  implicit val buildGrouplessDeployContractTxRW: RW[BuildGrouplessDeployContractTx] = macroRW
+  implicit val buildGrouplessDeployContractTxResultRW: RW[BuildGrouplessDeployContractTxResult] =
+    macroRW
 
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)

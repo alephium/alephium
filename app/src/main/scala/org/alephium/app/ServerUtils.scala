@@ -1327,33 +1327,50 @@ class ServerUtils(implicit
       .map(extraUtxosInfo.merge)
   }
 
+  final protected def buildDeployContractTxScript(
+      query: BuildTxCommon.DeployContractTx,
+      contractDeposit: U256,
+      tokens: AVector[(TokenId, U256)],
+      lockupScript: LockupScript.Asset
+  ): Try[StatefulScript] = {
+    for {
+      tokenIssuanceInfo <- BuildTxCommon
+        .getTokenIssuanceInfo(query.issueTokenAmount, query.issueTokenTo)
+        .left
+        .map(badRequest)
+      code <- query.decodeBytecode()
+      script <- buildDeployContractTxWithParsedState(
+        code.contract,
+        Address.Asset(lockupScript),
+        code.initialImmFields,
+        code.initialMutFields,
+        contractDeposit,
+        tokens,
+        tokenIssuanceInfo
+      )
+    } yield script
+  }
+
   def buildDeployContractUnsignedTx(
       blockFlow: BlockFlow,
       query: BuildDeployContractTx,
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
-      tokenIssuanceInfo <- BuildTxCommon
-        .getTokenIssuanceInfo(query.issueTokenAmount, query.issueTokenTo)
-        .left
-        .map(badRequest)
-      amounts  <- query.getAmounts.left.map(badRequest)
-      code     <- query.decodeBytecode()
+      amounts <- query.getAmounts.left.map(badRequest)
+      (contractDeposit, scriptTxAmounts) = amounts
       lockPair <- query.getLockPair()
-      script <- buildDeployContractTxWithParsedState(
-        code.contract,
-        Address.Asset(lockPair._1),
-        code.initialImmFields,
-        code.initialMutFields,
-        amounts._1,
-        amounts._2.tokens,
-        tokenIssuanceInfo
+      script <- buildDeployContractTxScript(
+        query,
+        contractDeposit,
+        scriptTxAmounts.tokens,
+        lockPair._1
       )
       utxos <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
       result <- unsignedTxFromScript(
         blockFlow,
         script,
-        amounts._2,
+        scriptTxAmounts,
         lockPair._1,
         lockPair._2,
         query.gasAmount,

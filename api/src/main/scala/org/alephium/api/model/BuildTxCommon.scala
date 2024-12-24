@@ -24,6 +24,7 @@ import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 trait BuildTxCommon {
@@ -157,6 +158,13 @@ object BuildTxCommon {
     def initialTokenAmounts: Option[AVector[Token]]
     def issueTokenAmount: Option[Amount]
     def issueTokenTo: Option[Address.Asset]
+    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)]
+
+    def decodeBytecode(): Try[BuildDeployContractTx.Code] = {
+      deserialize[BuildDeployContractTx.Code](bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+    }
 
     def getAmounts(implicit
         networkConfig: NetworkConfig

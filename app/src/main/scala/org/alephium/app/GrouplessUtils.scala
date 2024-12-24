@@ -318,10 +318,16 @@ trait GrouplessUtils { self: ServerUtils =>
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash
       )
-    } yield result
+    } yield {
+      val (transferTxs, executeScriptTx, outputs) = result
+      BuildGrouplessExecuteScriptTxResult(
+        transferTxs.map(BuildTransferTxResult.from),
+        BuildExecuteScriptTxResult.from(executeScriptTx, outputs)
+      )
+    }
   }
 
-  // scalastyle:off parameter.number method.length
+  // scalastyle:off parameter.number
   private def buildGrouplessExecuteScriptTx(
       blockFlow: BlockFlow,
       amounts: BuildTxCommon.ScriptTxAmounts,
@@ -332,7 +338,7 @@ trait GrouplessUtils { self: ServerUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash]
-  ): Try[BuildGrouplessExecuteScriptTxResult] = {
+  ): Try[(AVector[UnsignedTransaction], UnsignedTransaction, AVector[Output])] = {
     buildExecuteScriptTx(
       blockFlow,
       amounts,
@@ -343,13 +349,7 @@ trait GrouplessUtils { self: ServerUtils =>
       gasOpt,
       Some(gasPrice)
     ) match {
-      case Right((unsignedTx, outputs)) =>
-        Right(
-          BuildGrouplessExecuteScriptTxResult(
-            transferTxs = AVector.empty,
-            executeScriptTx = BuildExecuteScriptTxResult.from(unsignedTx, outputs)
-          )
-        )
+      case Right((unsignedTx, outputs)) => Right((AVector.empty, unsignedTx, outputs))
       case Left(_) =>
         val totalAmount = (amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1)
         for {
@@ -372,13 +372,46 @@ trait GrouplessUtils { self: ServerUtils =>
             gasOpt,
             Some(gasPrice)
           ).left.map(notEnoughAlph(crossGroupTxs._2, _))
-        } yield {
-          BuildGrouplessExecuteScriptTxResult(
-            transferTxs = crossGroupTxs._1.map(BuildTransferTxResult.from),
-            executeScriptTx = BuildExecuteScriptTxResult.from(result._1, result._2)
-          )
-        }
+        } yield (crossGroupTxs._1, result._1, result._2)
     }
   }
-  // scalastyle:on parameter.number method.length
+  // scalastyle:on parameter.number
+
+  def buildGrouplessDeployContractTx(
+      blockFlow: BlockFlow,
+      query: BuildGrouplessDeployContractTx
+  ): Try[BuildGrouplessDeployContractTxResult] = {
+    for {
+      amounts <- query.getAmounts.left.map(badRequest)
+      (contractDeposit, scriptTxAmounts) = amounts
+      lockPair <- query.getLockPair()
+      script <- buildDeployContractTxScript(
+        query,
+        contractDeposit,
+        scriptTxAmounts.tokens,
+        lockPair._1
+      )
+      utxos <- blockFlow
+        .getUsableUtxos(lockPair._1, apiConfig.defaultUtxosLimit)
+        .left
+        .map(failedInIO)
+      result <- buildGrouplessExecuteScriptTx(
+        blockFlow,
+        scriptTxAmounts,
+        lockPair,
+        script,
+        utxos,
+        None,
+        query.gasAmount,
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+        query.targetBlockHash
+      )
+    } yield {
+      val (transferTxs, deployContractTx, _) = result
+      BuildGrouplessDeployContractTxResult(
+        transferTxs.map(BuildTransferTxResult.from),
+        BuildDeployContractTxResult.from(deployContractTx)
+      )
+    }
+  }
 }

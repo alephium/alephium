@@ -904,6 +904,14 @@ trait EndpointsLogic extends Endpoints {
     query => Right(Some(query.fromAddress.groupIndex))
   )
 
+  val buildGrouplessDeployContractTxLogic = serverLogicRedirect(buildGrouplessDeployContractTx)(
+    query =>
+      withSyncedClique {
+        Future.successful(serverUtils.buildGrouplessDeployContractTx(blockFlow, query))
+      },
+    query => Right(Some(query.fromAddress.groupIndex))
+  )
+
   def fetchChainParams(): FutureTry[ChainParams] = {
     val now = TimeStamp.now()
     Future.successful(

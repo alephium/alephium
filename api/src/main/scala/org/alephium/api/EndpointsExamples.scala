@@ -1171,5 +1171,47 @@ trait EndpointsExamples extends ErrorExamples {
         )
       )
     )
+
+  implicit val buildGrouplessDeployContractTxExamples
+      : List[Example[BuildGrouplessDeployContractTx]] = List(
+    defaultExample(BuildGrouplessDeployContractTx(grouplessAddress, bytecode = byteString)),
+    moreSettingsExample(
+      BuildGrouplessDeployContractTx(
+        grouplessAddress,
+        byteString,
+        Some(bigAmount),
+        Some(tokens),
+        Some(bigAmount),
+        Some(address),
+        Some(model.nonCoinbaseMinGasPrice)
+      )
+    )
+  )
+
+  implicit val buildGrouplessDeployContractTxResultExamples
+      : List[Example[BuildGrouplessDeployContractTxResult]] =
+    simpleExample(
+      BuildGrouplessDeployContractTxResult(
+        transferTxs = AVector(
+          BuildTransferTxResult(
+            unsignedTx = hexString,
+            model.minimalGas,
+            model.nonCoinbaseMinGasPrice,
+            txId,
+            fromGroup = 2,
+            toGroup = 1
+          )
+        ),
+        deployContractTx = BuildDeployContractTxResult(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId,
+          contractAddress = Address.contract(contractId)
+        )
+      )
+    )
 }
 // scalastyle:on magic.number

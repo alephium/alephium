@@ -18,49 +18,25 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.api.{badRequest, Try}
 import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
-import org.alephium.serde._
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildDeployContractTx(
-    fromPublicKey: ByteString,
-    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
+final case class BuildGrouplessDeployContractTx(
+    fromAddress: Address.Asset,
     bytecode: ByteString,
     initialAttoAlphAmount: Option[Amount] = None,
     initialTokenAmounts: Option[AVector[Token]] = None,
     issueTokenAmount: Option[Amount] = None,
     issueTokenTo: Option[Address.Asset] = None,
-    gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon.DeployContractTx
-    with BuildTxCommon.FromPublicKey
+) extends BuildGrouplessTx
+    with BuildTxCommon.DeployContractTx {
+  def gasAmount: Option[GasBox] = None
 
-object BuildDeployContractTx {
-  final case class Code(
-      contract: StatefulContract,
-      initialImmFields: AVector[vm.Val],
-      initialMutFields: AVector[vm.Val]
-  )
-  object Code {
-    implicit val serde: Serde[Code] = {
-      val _serde: Serde[Code] =
-        Serde.forProduct3(Code.apply, t => (t.contract, t.initialImmFields, t.initialMutFields))
-
-      _serde.validate(code =>
-        if (code.contract.validate(code.initialImmFields, code.initialMutFields)) {
-          Right(())
-        } else {
-          Left(
-            s"Invalid field length, expect ${code.contract.fieldLength}, " +
-              s"have ${code.initialImmFields.length} immutable fields and " +
-              s"${code.initialMutFields.length} mutable fields"
-          )
-        }
-      )
-    }
-  }
+  def getLockPair(): Try[(LockupScript.P2PK, UnlockScript)] =
+    lockPair.left.map(badRequest)
 }

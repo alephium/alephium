@@ -720,6 +720,14 @@ trait Endpoints
       .in(jsonBody[BuildGrouplessExecuteScriptTx])
       .out(jsonBody[BuildGrouplessExecuteScriptTxResult])
       .summary("Build an unsigned execute script transaction from a groupless address")
+
+  lazy val buildGrouplessDeployContractTx
+      : BaseEndpoint[BuildGrouplessDeployContractTx, BuildGrouplessDeployContractTxResult] =
+    grouplessEndpoint.post
+      .in("deploy-contract")
+      .in(jsonBody[BuildGrouplessDeployContractTx])
+      .out(jsonBody[BuildGrouplessDeployContractTxResult])
+      .summary("Build an unsigned deploy contract transaction from a groupless address")
 }
 
 object Endpoints {
