@@ -240,6 +240,7 @@ object UnsignedTransaction {
       _      <- checkTokenValuesNonZero(outputInfos)
       txOutputs = buildOutputs(outputInfos)
       changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
+      _             <- checkWithMaxTxOutputNum(txOutputs.length + changeOutputs.length)
     } yield txOutputs -> changeOutputs
   }
 
@@ -395,6 +396,13 @@ object UnsignedTransaction {
     check(
       failCondition = assets.length > ALPH.MaxTxInputNum,
       "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
+    )
+  }
+
+  def checkWithMaxTxOutputNum(outputLength: Int): Either[String, Unit] = {
+    check(
+      failCondition = outputLength > ALPH.MaxTxOutputNum,
+      "Too many outputs for the transfer, consider to reduce the amount to send."
     )
   }
 

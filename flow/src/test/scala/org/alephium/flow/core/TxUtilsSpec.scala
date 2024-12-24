@@ -2630,6 +2630,44 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "fail if the output length exceeds the maximum allowed output length" in new FlowFixture {
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val fromPublicKey    = genesisKeys(chainIndex.from.value)._2
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    val toLockupScript   = LockupScript.p2pkh(chainIndex.from.generateKey._2)
+    val outputInfos = AVector.fill(ALPH.MaxTxOutputNum) {
+      UnsignedTransaction.TxOutputInfo(toLockupScript, dustUtxoAmount, AVector.empty, None)
+    }
+    blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        fromUnlockScript,
+        outputInfos.drop(1),
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .isRight is true
+
+    blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        fromUnlockScript,
+        outputInfos,
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .leftValue is "Too many outputs for the transfer, consider to reduce the amount to send."
+  }
+
   trait BuildScriptTxFixture extends UnsignedTransactionFixture {
     val script        = StatefulScript.unsafe(AVector.empty)
     val defaultGasFee = nonCoinbaseMinGasPrice * minimalGas
