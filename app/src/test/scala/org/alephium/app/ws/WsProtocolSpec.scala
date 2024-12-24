@@ -64,10 +64,10 @@ class WsProtocolSpec extends WsSpec {
     ContractEventsSubscribeParams.eventTypes.foreach { eventType =>
       val method = WsMethod.SubscribeMethod
       val validReqJson =
-        s"""{"method":"$method","params":["$eventType",$ZeroEventIndex,["${contractAddress.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
+        s"""{"method":"$method","params":["$eventType",$EventIndex_0,["${contractAddress_0.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
       val expectedRequest = WsRequest.subscribe(
         0,
-        ContractEventsSubscribeParams(eventType, 0, AVector(contractAddress))
+        ContractEventsSubscribeParams(eventType, 0, AVector(contractAddress_0))
       )
       write(expectedRequest) is validReqJson
       read[WsRequest](validReqJson) is expectedRequest
@@ -92,8 +92,8 @@ class WsProtocolSpec extends WsSpec {
       val subscriptionId =
         ContractEventsSubscribeParams(
           eventType,
-          ZeroEventIndex,
-          AVector(contractAddress)
+          EventIndex_0,
+          AVector(contractAddress_0)
         ).subscriptionId
       val validReqJson =
         s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""

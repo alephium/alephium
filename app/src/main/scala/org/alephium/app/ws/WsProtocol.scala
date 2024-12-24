@@ -51,34 +51,27 @@ protected[ws] object WsParams {
     def subscriptionId: WsSubscriptionId
   }
   sealed trait WsNotificationParams extends WsParams {
-    def subscriptionId: WsSubscriptionId
-    protected[ws] def buildJsonRpcNotification: Notification = {
-      Notification(
-        WsMethod.SubscriptionMethod,
-        writeJs(this)
-      )
+    def subscription: WsSubscriptionId
+    protected[ws] def asJsonRpcNotification: ujson.Obj = {
+      ujson
+        .Obj(
+          "method" -> WsMethod.SubscriptionMethod,
+          "params" -> writeJs(this)
+        )
     }
   }
   object WsNotificationParams extends ApiModelCodec {
-    // macroW fails : [wartremover:ToString] trait CharSequence does not override toString and automatic toString is disabled
-    implicit val wsNotificationParamsWriter: Writer[WsNotificationParams] =
+    implicit val wsSubscriptionParamsWriter: Writer[WsNotificationParams] = {
+      implicit val blockSubscriptionWriter: Writer[WsBlockNotificationParams]       = macroW
+      implicit val txSubscriptionWriter: Writer[WsTxNotificationParams]             = macroW
+      implicit val contractSubscriptionWriter: Writer[WsContractNotificationParams] = macroW
+
       writer[ujson.Value].comap[WsNotificationParams] {
-        case WsBlockNotificationParams(subscription, result) =>
-          ujson.Obj(
-            "subscription" -> ujson.Str(subscription),
-            "result"       -> write(result)
-          )
-        case WsTxNotificationParams(subscription, result) =>
-          ujson.Obj(
-            "subscription" -> ujson.Str(subscription),
-            "result"       -> write(result)
-          )
-        case WsContractNotificationParams(subscription, result) =>
-          ujson.Obj(
-            "subscription" -> ujson.Str(subscription),
-            "result"       -> write(result)
-          )
+        case block: WsBlockNotificationParams       => writeJs(block)
+        case tx: WsTxNotificationParams             => writeJs(tx)
+        case contract: WsContractNotificationParams => writeJs(contract)
       }
+    }
   }
 
   private type WsEventType = String
@@ -167,7 +160,7 @@ protected[ws] object WsParams {
                     eventType,
                     eventIndex.toInt,
                     AVector.from(addresses)
-                  ) // TODO multi-address
+                  )
                 )
             case unknown => Left(invalidContractParamsError(unknown))
           }
@@ -211,7 +204,7 @@ protected[ws] object WsParams {
   }
 
   final case class WsBlockNotificationParams(
-      subscriptionId: WsSubscriptionId,
+      subscription: WsSubscriptionId,
       result: BlockAndEvents
   ) extends WsNotificationParams
 
@@ -224,7 +217,7 @@ protected[ws] object WsParams {
   }
 
   final case class WsTxNotificationParams(
-      subscriptionId: WsSubscriptionId,
+      subscription: WsSubscriptionId,
       result: TransactionTemplate
   ) extends WsNotificationParams
 
@@ -237,7 +230,7 @@ protected[ws] object WsParams {
   }
 
   final case class WsContractNotificationParams(
-      subscriptionId: WsSubscriptionId,
+      subscription: WsSubscriptionId,
       result: ContractEvent
   ) extends WsNotificationParams
 

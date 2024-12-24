@@ -20,7 +20,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 import akka.testkit.TestProbe
-import org.scalatest.EitherValues
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.exceptions.TestFailedException
 
@@ -32,7 +31,7 @@ import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util._
 
-class WsClientServerSpec extends WsSpec with EitherValues with NumericHelpers {
+class WsClientServerSpec extends WsSpec {
   import WsUtils._
 
   "WsServer" should "reject request to any endpoint besides /ws" in new WsServerFixture {
@@ -65,7 +64,7 @@ class WsClientServerSpec extends WsSpec with EitherValues with NumericHelpers {
     ws.unsubscribeFromTx(3).futureValue is Response.successful(Correlation(3))
 
     // for contract events notifications
-    val params = ContractEventsSubscribeParams.from(ZeroEventIndex, AVector(contractAddress))
+    val params = ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
     ws.subscribeToContractEvents(4, params.eventIndex, params.addresses).futureValue is Response
       .successful(
         Correlation(4),
@@ -99,7 +98,7 @@ class WsClientServerSpec extends WsSpec with EitherValues with NumericHelpers {
       Response.failed(Correlation(7), Error(WsError.AlreadyUnsubscribed, Tx.subscriptionId))
 
     // for contract events
-    val params = ContractEventsSubscribeParams.from(ZeroEventIndex, AVector(contractAddress))
+    val params = ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
     ws.subscribeToContractEvents(8, params.eventIndex, params.addresses).futureValue is Response
       .successful(Correlation(8), params.subscriptionId)
     ws.subscribeToContractEvents(9, params.eventIndex, params.addresses).futureValue is

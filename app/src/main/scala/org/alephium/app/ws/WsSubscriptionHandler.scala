@@ -180,10 +180,10 @@ protected[ws] class WsSubscriptionHandler(
       sender() ! SubscriptionsResponse(AVector.from(subscribers))
     case NotificationPublished(params: WsTxNotificationParams) =>
       val _ =
-        vertx.eventBus().publish(params.subscriptionId, write(params.buildJsonRpcNotification))
+        vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
     case NotificationPublished(params: WsBlockNotificationParams) =>
       val _ =
-        vertx.eventBus().publish(params.subscriptionId, write(params.buildJsonRpcNotification))
+        vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
       params.result.getContractEvents.foreach { contractEvent =>
         multiSubscriptionsByAddress
           .get(AddressWithIndex(contractEvent.contractAddress.toBase58, contractEvent.eventIndex))
@@ -193,12 +193,10 @@ protected[ws] class WsSubscriptionHandler(
                 .eventBus()
                 .publish(
                   subscriptionId,
-                  write(
-                    WsContractNotificationParams(
-                      subscriptionId,
-                      contractEvent
-                    ).buildJsonRpcNotification
-                  )
+                  WsContractNotificationParams(
+                    subscriptionId,
+                    contractEvent
+                  ).asJsonRpcNotification.render()
                 )
             }
           }

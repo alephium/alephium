@@ -34,6 +34,7 @@ import org.alephium.app.ws.WsParams.{
 }
 import org.alephium.json.Json._
 import org.alephium.protocol.model.{Address, ContractId, TxGenerators}
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.util._
 
 class WsEventHandlerSpec extends WsSpec with ServerFixture with TxGenerators {
@@ -51,27 +52,25 @@ class WsEventHandlerSpec extends WsSpec with ServerFixture with TxGenerators {
       .contains(eventHandler.ref) is true
   }
 
-  it should "build Block Notification from Event" in {
+  it should "make Block Notification from Event round-trip" in {
     val blockAndEvents = BlockAndEvents(BlockEntry.from(dummyBlock, 0).rightValue, AVector.empty)
-    val params: WsNotificationParams =
+    val notificationParams: WsNotificationParams =
       WsBlockNotificationParams(SimpleSubscribeParams.Block.subscriptionId, blockAndEvents)
-    val notification = params.buildJsonRpcNotification
-    write(notification.params) is write(params)
+    read[JsonRPC.Notification](notificationParams.asJsonRpcNotification)
   }
 
-  it should "build Tx Notification from Event" in {
-    val params: WsNotificationParams =
+  it should "make Tx Notification from Event round-trip" in {
+    val notificationParams: WsNotificationParams =
       WsTxNotificationParams(
         SimpleSubscribeParams.Tx.subscriptionId,
         TransactionTemplate.fromProtocol(transactionGen().sample.get.toTemplate, TimeStamp.now())
       )
-    val notification = params.buildJsonRpcNotification
-    write(notification.params) is write(params)
+    read[JsonRPC.Notification](notificationParams.asJsonRpcNotification)
   }
 
-  it should "build Contract Notification from Event" in {
+  it should "make Contract Notification from Event round-trip" in {
     val subscribeParams =
-      ContractEventsSubscribeParams.from(ZeroEventIndex, AVector(contractAddress))
+      ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
     val notificationParams: WsNotificationParams =
       WsContractNotificationParams(
         subscribeParams.subscriptionId,
@@ -79,11 +78,10 @@ class WsEventHandlerSpec extends WsSpec with ServerFixture with TxGenerators {
           blockHashGen.sample.get,
           txIdGen.sample.get,
           Address.contract(ContractId.hash("foo")),
-          ZeroEventIndex,
+          EventIndex_0,
           AVector(ValU256(U256.unsafe(5)))
         )
       )
-    val notification = notificationParams.buildJsonRpcNotification
-    write(notification.params) is write(notificationParams)
+    read[JsonRPC.Notification](notificationParams.asJsonRpcNotification)
   }
 }

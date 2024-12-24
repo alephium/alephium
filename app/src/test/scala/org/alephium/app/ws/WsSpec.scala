@@ -27,26 +27,68 @@ import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
+import org.alephium.api.ApiModelCodec
+import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
 import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.app.ws.WsParams.{WsId, WsSubscriptionId}
+import org.alephium.app.ws.WsParams.{
+  WsBlockNotificationParams,
+  WsContractNotificationParams,
+  WsId,
+  WsNotificationParams,
+  WsSubscriptionId,
+  WsTxNotificationParams
+}
 import org.alephium.app.ws.WsSubscriptionHandler.{
   GetSubscriptions,
   SubscriptionMsg,
   SubscriptionsResponse
 }
 import org.alephium.flow.handler.TestUtils
+import org.alephium.json.Json.{read, reader, Reader}
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
-trait WsSpec extends AlephiumSpec {
-  val ZeroEventIndex = 0
-  val contractAddress: Address.Contract = Address.Contract(
+trait WsSpec extends AlephiumSpec with ApiModelCodec {
+  val EventIndex_0 = 0
+  val EventIndex_1 = 1
+
+  lazy val contractAddress_0: Address.Contract = Address.Contract(
     LockupScript.p2c(
       ContractId.zero
     )
   )
+  lazy val contractAddress_1: Address.Contract = Address.Contract(
+    LockupScript.p2c(
+      ContractId.generate
+    )
+  )
+  lazy val contractAddress_2: Address.Contract = Address.Contract(
+    LockupScript.p2c(
+      ContractId.generate
+    )
+  )
+
+  implicit val wsNotificationParamsReader: Reader[WsNotificationParams] =
+    reader[ujson.Value].map[WsNotificationParams] {
+      case ujson.Obj(values) =>
+        val subscription = values("subscription").str
+        values("result") match {
+          case obj: ujson.Obj if obj.value.contains("block") =>
+            WsBlockNotificationParams(subscription, read[BlockAndEvents](obj))
+          case obj: ujson.Obj if obj.value.contains("unsigned") =>
+            WsTxNotificationParams(subscription, read[TransactionTemplate](obj))
+          case obj: ujson.Obj if obj.value.contains("contractAddress") =>
+            WsContractNotificationParams(subscription, read[ContractEvent](obj))
+          case obj: ujson.Obj =>
+            throw new Exception(s"Unknown WsNotificationParams type with result: $obj")
+          case other =>
+            throw new Exception(s"Expected ujson.Obj for 'result', got: $other")
+        }
+      case other =>
+        throw new Exception(s"Invalid JSON format for WsNotificationParams: $other")
+    }
 }
 
 trait WsServerFixture extends ServerFixture with ScalaFutures {
