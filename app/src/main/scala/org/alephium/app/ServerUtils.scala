@@ -28,7 +28,7 @@ import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
-import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
@@ -1215,19 +1215,18 @@ class ServerUtils(implicit
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
-      extraUtxosInfo: ExtraUtxosInfo
+      utxos: AVector[AssetOutputInfo]
   ): Try[(UnsignedTransaction, AVector[TxInputWithAsset])] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
         blockFlow,
         script,
         amounts,
-        fromLockupScript,
         fromUnlockScript,
         gas,
         gasPrice,
         gasEstimationMultiplier,
-        extraUtxosInfo
+        utxos
       )
       inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
       unsignedTx <- wrapError {
@@ -1253,23 +1252,21 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       script: StatefulScript,
       amounts: BuildTxCommon.ScriptTxAmounts,
-      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
-      extraUtxosInfo: ExtraUtxosInfo
+      utxos: AVector[AssetOutputInfo]
   ): Try[Selected] = {
     val result = tryBuildSelectedUtxos(
       blockFlow,
       script,
       amounts,
-      fromLockupScript,
       fromUnlockScript,
       gas,
       gasPrice,
       gasEstimationMultiplier,
-      extraUtxosInfo
+      utxos
     )
     result match {
       case Right(res) =>
@@ -1282,12 +1279,11 @@ class ServerUtils(implicit
             blockFlow,
             script,
             amounts.copy(estimatedAlph = amounts.estimatedAlph.addUnsafe(dustUtxoAmount)),
-            fromLockupScript,
             fromUnlockScript,
             Some(res.gas),
             gasPrice,
             None,
-            extraUtxosInfo
+            utxos
           )
         } else {
           Right(res)
@@ -1300,32 +1296,35 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       script: StatefulScript,
       amounts: BuildTxCommon.ScriptTxAmounts,
-      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
-      extraUtxosInfo: ExtraUtxosInfo
+      utxos: AVector[AssetOutputInfo]
   ): Try[Selected] = {
-    val utxosLimit = apiConfig.defaultUtxosLimit
-    for {
-      utxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
-      selectedUtxos <- wrapError(
-        UtxoSelectionAlgo
-          .Build(
-            ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
-          )
-          .select(
-            AssetAmounts(amounts.estimatedAlph, amounts.tokens),
-            fromUnlockScript,
-            extraUtxosInfo.merge(utxos),
-            txOutputsLength = amounts.tokens.length + 1,
-            Some(script),
-            AssetScriptGasEstimator.Default(blockFlow),
-            TxScriptEmulator.Default(blockFlow)
-          )
+    wrapError(
+      blockFlow.selectUtxos(
+        fromUnlockScript,
+        utxos,
+        (amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1),
+        gasEstimationMultiplier,
+        Some(script),
+        gas,
+        gasPrice.getOrElse(nonCoinbaseMinGasPrice)
       )
-    } yield selectedUtxos
+    )
+  }
+
+  @inline private def getAllUtxos(
+      blockFlow: BlockFlow,
+      fromLockupScript: LockupScript.Asset,
+      extraUtxosInfo: ExtraUtxosInfo
+  ): Try[AVector[AssetOutputInfo]] = {
+    blockFlow
+      .getUsableUtxos(fromLockupScript, apiConfig.defaultUtxosLimit)
+      .left
+      .map(failedInIO)
+      .map(extraUtxosInfo.merge)
   }
 
   def buildDeployContractUnsignedTx(
@@ -1350,6 +1349,7 @@ class ServerUtils(implicit
         amounts._2.tokens,
         tokenIssuanceInfo
       )
+      utxos <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
       result <- unsignedTxFromScript(
         blockFlow,
         script,
@@ -1359,7 +1359,7 @@ class ServerUtils(implicit
         query.gasAmount,
         query.gasPrice,
         None,
-        extraUtxosInfo
+        utxos
       )
     } yield result._1
   }
@@ -1480,29 +1480,27 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def buildExecuteScriptUnsignedTx(
+  protected def buildExecuteScriptTx(
       blockFlow: BlockFlow,
-      query: BuildExecuteScriptTx,
-      extraUtxosInfo: ExtraUtxosInfo
+      amounts: BuildTxCommon.ScriptTxAmounts,
+      lockPair: (LockupScript.Asset, UnlockScript),
+      script: StatefulScript,
+      utxos: AVector[AssetOutputInfo],
+      multiplier: Option[GasEstimationMultiplier],
+      gasOpt: Option[GasBox],
+      gasPrice: Option[GasPrice]
   ): Try[(UnsignedTransaction, AVector[model.Output])] = {
     for {
-      _          <- query.check().left.map(badRequest)
-      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
-      amounts    <- query.getAmounts.left.map(badRequest)
-      lockPair   <- query.getLockPair()
-      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
       buildUnsignedTxResult <- unsignedTxFromScript(
         blockFlow,
         script,
         amounts,
         lockPair._1,
         lockPair._2,
-        query.gasAmount,
-        query.gasPrice,
+        gasOpt,
+        gasPrice,
         multiplier,
-        extraUtxosInfo
+        utxos
       )
       (unsignedTx, inputWithAssets) = buildUnsignedTxResult
       emulationResult <- TxScriptEmulator
@@ -1517,6 +1515,33 @@ class ServerUtils(implicit
       }
       (unsignedTx, generatedOutputs)
     }
+  }
+
+  def buildExecuteScriptUnsignedTx(
+      blockFlow: BlockFlow,
+      query: BuildExecuteScriptTx,
+      extraUtxosInfo: ExtraUtxosInfo
+  ): Try[(UnsignedTransaction, AVector[model.Output])] = {
+    for {
+      _          <- query.check().left.map(badRequest)
+      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
+      amounts    <- query.getAmounts.left.map(badRequest)
+      lockPair   <- query.getLockPair()
+      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+      utxos <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
+      result <- buildExecuteScriptTx(
+        blockFlow,
+        amounts,
+        lockPair,
+        script,
+        utxos,
+        multiplier,
+        query.gasAmount,
+        query.gasPrice
+      )
+    } yield result
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))

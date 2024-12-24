@@ -108,7 +108,6 @@ object BuildTxCommon {
       case _ =>
         Right(issueTokenAmount.map { amount =>
           (amount.value, issueTokenTo)
-
         })
     }
   }
@@ -141,6 +140,8 @@ object BuildTxCommon {
     def bytecode: ByteString
     def attoAlphAmount: Option[Amount]
     def tokens: Option[AVector[Token]]
+    def gasEstimationMultiplier: Option[Double]
+    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)]
 
     def getAmounts: Either[String, ScriptTxAmounts] = {
       BuildTxCommon.getAlphAndTokenAmounts(attoAlphAmount, tokens).flatMap {

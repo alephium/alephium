@@ -25,7 +25,8 @@ import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
-import org.alephium.serde.deserialize
+import org.alephium.ralph.Compiler
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
 
 class GrouplessUtilsSpec extends AlephiumSpec {
@@ -103,13 +104,13 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       balances._3 is AVector(tokenId -> tokenAmount)
     }
 
-    private def getAlphAndTokenBalance(lockupScript: LockupScript.Asset) = {
+    private def getAlphAndTokenBalance(lockupScript: LockupScript) = {
       val (alph, _, tokens, _, _) =
         blockFlow.getBalance(lockupScript, Int.MaxValue, false).rightValue
       (alph, tokens.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero))
     }
 
-    def getBalance(lockupScript: LockupScript.Asset) = {
+    def getBalance(lockupScript: LockupScript) = {
       lockupScript match {
         case origin: LockupScript.P2PK =>
           brokerConfig.cliqueGroups.fold((U256.Zero, U256.Zero)) {
@@ -122,7 +123,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       }
     }
 
-    private def mineWithTx(tx: Transaction) = {
+    def mineWithTx(tx: Transaction) = {
       val block = mineWithTxs(blockFlow, tx.chainIndex, AVector(tx))
       addAndCheck(blockFlow, block)
       if (!tx.chainIndex.isIntraGroup) {
@@ -207,7 +208,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     testTransfer(ALPH.oneAlph, ALPH.oneAlph, 3, 20)
   }
 
-  it should "fail if the from address does not have enough balance" in new Fixture {
+  it should "fail if the from address does not have enough balance when building transfer txs" in new Fixture {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
     val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
     val destination0 =
@@ -223,6 +224,99 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
+      .leftValue
+      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
+  }
+
+  trait BuildExecuteScriptTxFixture extends Fixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    let alphAmount = tokenRemaining!(callerAddress!(), ALPH)
+         |    let tokenAmount = tokenRemaining!(callerAddress!(), #${tokenId.toHexString})
+         |    transferTokenToSelf!(callerAddress!(), ALPH, alphAmount)
+         |    transferTokenToSelf!(callerAddress!(), #${tokenId.toHexString}, tokenAmount)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(contract, chainIndex = chainIndex)._1
+
+    private def buildGrouplessExecuteScriptTx(query: BuildGrouplessExecuteScriptTx) = {
+      val result = serverUtils.buildGrouplessExecuteScriptTx(blockFlow, query).rightValue
+      val txs    = result.transferTxs.map(_.unsignedTx) :+ result.executeScriptTx.unsignedTx
+      txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
+    }
+
+    def buildQuery(alphAmount: U256, tokenAmount: U256): BuildGrouplessExecuteScriptTx = {
+      val script =
+        s"""
+           |TxScript Main {
+           |  Foo(#${contractId.toHexString}).foo{callerAddress!() -> ALPH: $alphAmount, #${tokenId.toHexString}: $tokenAmount}()
+           |}
+           |$contract
+           |""".stripMargin
+      val compiledScript = Compiler.compileTxScript(script).rightValue
+      BuildGrouplessExecuteScriptTx(
+        fromAddress,
+        serialize(compiledScript),
+        attoAlphAmount = Some(alphAmount),
+        tokens = Some(AVector(Token(tokenId, tokenAmount)))
+      )
+    }
+
+    def testExecuteScript(alphAmount: U256, tokenAmount: U256, expectedTxSize: Int) = {
+      val query = buildQuery(alphAmount, tokenAmount)
+      val txs   = buildGrouplessExecuteScriptTx(query)
+      txs.length is expectedTxSize
+
+      val contractBalance0 = getBalance(LockupScript.p2c(contractId))
+      val accountBalance0  = getBalance(fromAddress.lockupScript)
+      txs.foreach(tx => mineWithTx(signWithPasskey(tx, fromPrivateKey)))
+      val contractBalance1 = getBalance(LockupScript.p2c(contractId))
+      val accountBalance1  = getBalance(fromAddress.lockupScript)
+
+      val gasFee = txs.fold(U256.Zero)((acc, tx) => acc.addUnsafe(tx.gasFee))
+      contractBalance1._1 is contractBalance0._1.addUnsafe(alphAmount)
+      contractBalance1._2 is contractBalance0._2.addUnsafe(tokenAmount)
+      accountBalance0._1 is accountBalance1._1.addUnsafe(alphAmount).addUnsafe(gasFee)
+      accountBalance0._2 is accountBalance1._2.addUnsafe(tokenAmount)
+    }
+  }
+
+  it should "build an execute script tx without cross-group transfers" in new BuildExecuteScriptTxFixture {
+    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+    testExecuteScript(ALPH.oneAlph, ALPH.oneAlph, 1)
+  }
+
+  it should "build an execute script tx with one cross-group transfer when the from address has no balance" in new BuildExecuteScriptTxFixture {
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.head)
+    testExecuteScript(ALPH.oneAlph, ALPH.oneAlph, 2)
+  }
+
+  it should "build an execute script tx with one cross-group transfer when the from address does not have enough balance" in new BuildExecuteScriptTxFixture {
+    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+    testExecuteScript(ALPH.alph(2), ALPH.alph(4), 2)
+  }
+
+  it should "build an execute script tx with multiple cross-group transfers" in new BuildExecuteScriptTxFixture {
+    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+    testExecuteScript(ALPH.alph(4), ALPH.alph(5), 3)
+  }
+
+  it should "fail if the from address does not have enough balance when building execute script txs" in new BuildExecuteScriptTxFixture {
+    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+    val query0 = buildQuery(ALPH.alph(2), ALPH.alph(2))
+    serverUtils
+      .buildGrouplessExecuteScriptTx(blockFlow, query0)
+      .leftValue
+      .detail is "Not enough ALPH balance, requires an additional 0.504 ALPH"
+
+    val query1 = buildQuery(ALPH.oneAlph, ALPH.alph(3))
+    serverUtils
+      .buildGrouplessExecuteScriptTx(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }

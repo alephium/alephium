@@ -18,12 +18,17 @@ package org.alephium.app
 
 import scala.collection.mutable
 
-import org.alephium.api.{badRequest, Try}
-import org.alephium.api.model.{BuildGrouplessTransferTx, BuildTransferTxResult}
+import sttp.model.StatusCode
+
+import org.alephium.api.{badRequest, failedInIO, ApiError, Try}
+import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, FlowUtils, TxUtils}
+import org.alephium.flow.gasestimation.GasEstimationMultiplier
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Math, U256}
 
 trait GrouplessUtils { self: ServerUtils =>
@@ -33,18 +38,21 @@ trait GrouplessUtils { self: ServerUtils =>
   ): Try[AVector[BuildTransferTxResult]] = {
     val outputInfos = prepareOutputInfos(query.destinations)
     val gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
-    val result = for {
-      lockPair <- query.lockPair
-      totalAmount <- blockFlow.checkAndCalcTotalAmountNeeded(
-        lockPair._1,
-        outputInfos,
-        None,
-        gasPrice
-      )
+    for {
+      lockPair <- query.lockPair.left.map(badRequest)
+      totalAmount <- blockFlow
+        .checkAndCalcTotalAmountNeeded(
+          lockPair._1,
+          outputInfos,
+          None,
+          gasPrice
+        )
+        .left
+        .map(badRequest)
       utxos <- blockFlow
         .getUsableUtxos(query.targetBlockHash, lockPair._1, self.apiConfig.defaultUtxosLimit)
         .left
-        .map(_.getMessage)
+        .map(failedInIO)
       txs <- buildGrouplessTransferTx(
         blockFlow,
         lockPair._1,
@@ -56,7 +64,6 @@ trait GrouplessUtils { self: ServerUtils =>
         query.targetBlockHash
       )
     } yield txs.map(BuildTransferTxResult.from)
-    result.left.map(badRequest)
   }
 
   private def buildGrouplessTransferTx(
@@ -68,58 +75,78 @@ trait GrouplessUtils { self: ServerUtils =>
       outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash]
-  ): Either[String, AVector[UnsignedTransaction]] = {
+  ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.transfer(lockup, unlock, outputInfos, totalAmount, utxos, None, gasPrice) match {
       case Right(unsignedTx) => Right(AVector(unsignedTx))
       case Left(_) =>
-        val (alphNeeded, tokenNeeded, _)       = totalAmount
-        val (alphBalance, _, tokenBalances, _) = TxUtils.getBalance(utxos.map(_.output))
-        val maxGasFee                          = gasPrice * getMaximalGasPerTx()
-        val remainAlph = maxGasFee.addUnsafe(alphNeeded).sub(alphBalance).getOrElse(U256.Zero)
-        val (remainTokens, _) = calcTokenAmount(tokenBalances, tokenNeeded)
-        val result = transferFromOtherGroups(
-          blockFlow,
-          lockup,
-          remainAlph,
-          remainTokens,
-          gasPrice,
-          targetBlockHash
-        )
-        if (result._3.nonEmpty) {
-          val message =
-            result._3.map(token => s"${token._1.toHexString}: ${token._2}").mkString(",")
-          Left(s"Not enough token balances, requires additional $message")
-        } else {
-          buildGrouplessTransferTx(
-            blockFlow,
-            lockup,
-            unlock,
-            result._1,
-            utxos,
-            outputInfos,
-            totalAmount,
-            gasPrice
-          ).left.map { error =>
-            if (result._2.nonZero) {
-              s"Not enough ALPH balance, requires an additional ${ALPH.prettifyAmount(result._2)}"
-            } else {
-              error
-            }
-          }
-        }
+        for {
+          crossGroupTxs <-
+            buildGrouplessTransferTxs(
+              blockFlow,
+              lockup,
+              totalAmount,
+              utxos,
+              gasPrice,
+              targetBlockHash
+            )
+          tx <- blockFlow
+            .transfer(
+              lockup,
+              unlock,
+              outputInfos,
+              totalAmount,
+              utxos ++ getExtraUtxos(lockup, crossGroupTxs._1),
+              None,
+              gasPrice
+            )
+            .left
+            .map(err => notEnoughAlph(crossGroupTxs._2, badRequest(err)))
+        } yield crossGroupTxs._1 :+ tx
     }
   }
 
-  private def buildGrouplessTransferTx(
+  @inline private def notEnoughAlph(
+      amount: U256,
+      error: ApiError[_ <: StatusCode]
+  ): ApiError[_ <: StatusCode] = {
+    if (amount.nonZero) {
+      badRequest(s"Not enough ALPH balance, requires an additional ${ALPH.prettifyAmount(amount)}")
+    } else {
+      error
+    }
+  }
+
+  private def buildGrouplessTransferTxs(
       blockFlow: BlockFlow,
       lockup: LockupScript.P2PK,
-      unlock: UnlockScript,
-      txs: AVector[UnsignedTransaction],
+      totalAmount: TotalAmountNeeded,
       utxos: AVector[FlowUtils.AssetOutputInfo],
-      outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
-      totalAmount: UnsignedTransaction.TotalAmountNeeded,
-      gasPrice: GasPrice
-  ): Either[String, AVector[UnsignedTransaction]] = {
+      gasPrice: GasPrice,
+      targetBlockHash: Option[BlockHash]
+  ): Try[(AVector[UnsignedTransaction], U256, AVector[(TokenId, U256)])] = {
+    val (alphNeeded, tokenNeeded, _)       = totalAmount
+    val (alphBalance, _, tokenBalances, _) = TxUtils.getBalance(utxos.map(_.output))
+    val maxGasFee                          = gasPrice * getMaximalGasPerTx()
+    val remainAlph        = maxGasFee.addUnsafe(alphNeeded).sub(alphBalance).getOrElse(U256.Zero)
+    val (remainTokens, _) = calcTokenAmount(tokenBalances, tokenNeeded)
+    val result = transferFromOtherGroups(
+      blockFlow,
+      lockup,
+      remainAlph,
+      remainTokens,
+      gasPrice,
+      targetBlockHash
+    )
+    if (result._3.nonEmpty) {
+      val message =
+        result._3.map(token => s"${token._1.toHexString}: ${token._2}").mkString(",")
+      Left(badRequest(s"Not enough token balances, requires additional $message"))
+    } else {
+      Right(result)
+    }
+  }
+
+  private def getExtraUtxos(lockup: LockupScript.P2PK, txs: AVector[UnsignedTransaction]) = {
     val extraUtxos = mutable.ArrayBuffer.empty[FlowUtils.AssetOutputInfo]
     txs.foreach(tx =>
       tx.fixedOutputs.mapWithIndex { case (output, index) =>
@@ -133,10 +160,7 @@ trait GrouplessUtils { self: ServerUtils =>
         }
       }
     )
-    val allUtxos = utxos ++ AVector.from(extraUtxos)
-    blockFlow
-      .transfer(lockup, unlock, outputInfos, totalAmount, allUtxos, None, gasPrice)
-      .map(txs :+ _)
+    AVector.from(extraUtxos)
   }
 
   private def transferFromOtherGroups(
@@ -267,4 +291,94 @@ trait GrouplessUtils { self: ServerUtils =>
         }
     }
   }
+
+  def buildGrouplessExecuteScriptTx(
+      blockFlow: BlockFlow,
+      query: BuildGrouplessExecuteScriptTx
+  ): Try[BuildGrouplessExecuteScriptTxResult] = {
+    for {
+      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
+      amounts    <- query.getAmounts.left.map(badRequest)
+      lockPair   <- query.getLockPair()
+      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+      utxos <- blockFlow
+        .getUsableUtxos(lockPair._1, apiConfig.defaultUtxosLimit)
+        .left
+        .map(failedInIO)
+      result <- buildGrouplessExecuteScriptTx(
+        blockFlow,
+        amounts,
+        lockPair,
+        script,
+        utxos,
+        multiplier,
+        query.gasAmount,
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+        query.targetBlockHash
+      )
+    } yield result
+  }
+
+  // scalastyle:off parameter.number method.length
+  private def buildGrouplessExecuteScriptTx(
+      blockFlow: BlockFlow,
+      amounts: BuildTxCommon.ScriptTxAmounts,
+      lockPair: (LockupScript.P2PK, UnlockScript),
+      script: StatefulScript,
+      utxos: AVector[FlowUtils.AssetOutputInfo],
+      multiplier: Option[GasEstimationMultiplier],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice,
+      targetBlockHash: Option[BlockHash]
+  ): Try[BuildGrouplessExecuteScriptTxResult] = {
+    buildExecuteScriptTx(
+      blockFlow,
+      amounts,
+      lockPair,
+      script,
+      utxos,
+      multiplier,
+      gasOpt,
+      Some(gasPrice)
+    ) match {
+      case Right((unsignedTx, outputs)) =>
+        Right(
+          BuildGrouplessExecuteScriptTxResult(
+            transferTxs = AVector.empty,
+            executeScriptTx = BuildExecuteScriptTxResult.from(unsignedTx, outputs)
+          )
+        )
+      case Left(_) =>
+        val totalAmount = (amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1)
+        for {
+          crossGroupTxs <-
+            buildGrouplessTransferTxs(
+              blockFlow,
+              lockPair._1,
+              totalAmount,
+              utxos,
+              gasPrice,
+              targetBlockHash
+            )
+          result <- buildExecuteScriptTx(
+            blockFlow,
+            amounts,
+            lockPair,
+            script,
+            utxos ++ getExtraUtxos(lockPair._1, crossGroupTxs._1),
+            multiplier,
+            gasOpt,
+            Some(gasPrice)
+          ).left.map(notEnoughAlph(crossGroupTxs._2, _))
+        } yield {
+          BuildGrouplessExecuteScriptTxResult(
+            transferTxs = crossGroupTxs._1.map(BuildTransferTxResult.from),
+            executeScriptTx = BuildExecuteScriptTxResult.from(result._1, result._2)
+          )
+        }
+    }
+  }
+  // scalastyle:on parameter.number method.length
 }

@@ -1041,7 +1041,22 @@ trait FlowFixture
     val webauthn          = WebAuthn(authenticatorData, clientData)
     val messageHash       = webauthn.messageHash
     val signature         = Bytes64.from(SecP256R1.sign(messageHash, priKey))
-    Transaction.from(unsignedTx, encodeToBytes64(webauthn) :+ signature)
+    val inputSignatures   = encodeToBytes64(webauthn) :+ signature
+    unsignedTx.scriptOpt match {
+      case None => Transaction.from(unsignedTx, inputSignatures)
+      case Some(script) =>
+        val txTemplate = TransactionTemplate(unsignedTx, inputSignatures, AVector.empty)
+        val (contractInputs, generatedOutputs) =
+          genInputsOutputs(blockFlow, unsignedTx.fromGroup, txTemplate, script)
+        Transaction(
+          unsignedTx,
+          true,
+          contractInputs,
+          generatedOutputs,
+          inputSignatures,
+          AVector.empty
+        )
+    }
   }
 }
 

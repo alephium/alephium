@@ -1131,5 +1131,45 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
   )
+
+  implicit val buildGrouplessExecuteScriptTxExamples: List[Example[BuildGrouplessExecuteScriptTx]] =
+    List(
+      defaultExample(BuildGrouplessExecuteScriptTx(grouplessAddress, bytecode = byteString)),
+      moreSettingsExample(
+        BuildGrouplessExecuteScriptTx(
+          grouplessAddress,
+          byteString,
+          Some(Amount(model.dustUtxoAmount)),
+          Some(tokens),
+          Some(model.nonCoinbaseMinGasPrice)
+        )
+      )
+    )
+
+  implicit val buildGrouplessExecuteScriptTxResultExamples
+      : List[Example[BuildGrouplessExecuteScriptTxResult]] =
+    simpleExample(
+      BuildGrouplessExecuteScriptTxResult(
+        transferTxs = AVector(
+          BuildTransferTxResult(
+            unsignedTx = hexString,
+            model.minimalGas,
+            model.nonCoinbaseMinGasPrice,
+            txId,
+            fromGroup = 2,
+            toGroup = 1
+          )
+        ),
+        executeScriptTx = BuildExecuteScriptTxResult(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId,
+          simulatedOutputs = AVector(outputAsset.upCast())
+        )
+      )
+    )
 }
 // scalastyle:on magic.number

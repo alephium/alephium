@@ -712,6 +712,14 @@ trait Endpoints
       .in(jsonBodyWithAlph[BuildGrouplessTransferTx])
       .out(jsonBody[AVector[BuildTransferTxResult]])
       .summary("Build unsigned transfer transactions from a groupless address")
+
+  lazy val buildGrouplessExecuteScriptTx
+      : BaseEndpoint[BuildGrouplessExecuteScriptTx, BuildGrouplessExecuteScriptTxResult] =
+    grouplessEndpoint.post
+      .in("execute-script")
+      .in(jsonBody[BuildGrouplessExecuteScriptTx])
+      .out(jsonBody[BuildGrouplessExecuteScriptTxResult])
+      .summary("Build an unsigned execute script transaction from a groupless address")
 }
 
 object Endpoints {

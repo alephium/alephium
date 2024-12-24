@@ -16,14 +16,16 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm.GasPrice
-import org.alephium.util.AVector
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildGrouplessTransferTx(
-    fromAddress: Address.Asset,
-    destinations: AVector[Destination],
-    gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
-) extends BuildGrouplessTx
+trait BuildGrouplessTx {
+  def fromAddress: Address.Asset
+
+  def lockPair: Either[String, (LockupScript.P2PK, UnlockScript)] = {
+    fromAddress.lockupScript match {
+      case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK(lock.publicKey.keyType)))
+      case _ => Left(s"Invalid from address: $fromAddress, expected a groupless address")
+    }
+  }
+}

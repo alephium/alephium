@@ -16,14 +16,9 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.AVector
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildGrouplessTransferTx(
-    fromAddress: Address.Asset,
-    destinations: AVector[Destination],
-    gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
-) extends BuildGrouplessTx
+final case class BuildGrouplessExecuteScriptTxResult(
+    transferTxs: AVector[BuildTransferTxResult],
+    executeScriptTx: BuildExecuteScriptTxResult
+)

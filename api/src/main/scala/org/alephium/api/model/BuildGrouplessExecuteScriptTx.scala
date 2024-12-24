@@ -16,14 +16,26 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
+import org.alephium.api.{badRequest, Try}
 import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildGrouplessTransferTx(
+final case class BuildGrouplessExecuteScriptTx(
     fromAddress: Address.Asset,
-    destinations: AVector[Destination],
+    bytecode: ByteString,
+    attoAlphAmount: Option[Amount] = None,
+    tokens: Option[AVector[Token]] = None,
     gasPrice: Option[GasPrice] = None,
-    targetBlockHash: Option[BlockHash] = None
+    targetBlockHash: Option[BlockHash] = None,
+    gasEstimationMultiplier: Option[Double] = None
 ) extends BuildGrouplessTx
+    with BuildTxCommon.ExecuteScriptTx {
+  def gasAmount: Option[GasBox] = None
+
+  def getLockPair(): Try[(LockupScript.P2PK, UnlockScript)] =
+    lockPair.left.map(badRequest)
+}

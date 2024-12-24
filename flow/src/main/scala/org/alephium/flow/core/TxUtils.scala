@@ -33,7 +33,7 @@ import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.{TxOutputInfo, UnlockScriptWithAssets}
-import org.alephium.protocol.vm.{GasBox, GasPrice, GasSchedule, LockupScript, UnlockScript}
+import org.alephium.protocol.vm._
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
@@ -101,7 +101,15 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UtxoSelectionAlgo.Selected]] = {
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
-        selectUtxos(fromUnlockScript, extraUtxosInfo.merge(utxos), totalAmount, gasOpt, gasPrice)
+        selectUtxos(
+          fromUnlockScript,
+          extraUtxosInfo.merge(utxos),
+          totalAmount,
+          None,
+          None,
+          gasOpt,
+          gasPrice
+        )
       }
   }
 
@@ -258,6 +266,8 @@ trait TxUtils { Self: FlowUtils =>
           utxos,
           (totalAmount, AVector.empty, rewardOutputs.length + 1),
           None,
+          None,
+          None,
           coinbaseGasPrice
         )
       }
@@ -346,21 +356,23 @@ trait TxUtils { Self: FlowUtils =>
     } yield calculateResult
   }
 
-  private def selectUtxos(
+  def selectUtxos(
       fromUnlockScript: UnlockScript,
       utxos: AVector[FlowUtils.AssetOutputInfo],
       totalAmount: UnsignedTransaction.TotalAmountNeeded,
+      gasEstimationMultiplier: Option[GasEstimationMultiplier],
+      txScriptOpt: Option[StatefulScript],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
   ): Either[String, UtxoSelectionAlgo.Selected] = {
     UtxoSelectionAlgo
-      .Build(ProvidedGas(gasOpt, gasPrice, None))
+      .Build(ProvidedGas(gasOpt, gasPrice, gasEstimationMultiplier))
       .select(
         AssetAmounts(totalAmount._1, totalAmount._2),
         fromUnlockScript,
         utxos,
         totalAmount._3,
-        txScriptOpt = None,
+        txScriptOpt,
         AssetScriptGasEstimator.Default(Self.blockFlow),
         TxScriptEmulator.Default(Self.blockFlow)
       )
@@ -376,7 +388,7 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {
     for {
-      selected <- selectUtxos(fromUnlockScript, utxos, totalAmount, gasOpt, gasPrice)
+      selected <- selectUtxos(fromUnlockScript, utxos, totalAmount, None, None, gasOpt, gasPrice)
       _        <- checkEstimatedGasAmount(selected.gas)
       unsignedTx <- UnsignedTransaction
         .buildTransferTx(
@@ -559,7 +571,15 @@ trait TxUtils { Self: FlowUtils =>
         _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
         _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
         amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
-        selected <- selectUtxos(fromUnlockScript, inputs, amountTokensOutputCount, None, gasPrice)
+        selected <- selectUtxos(
+          fromUnlockScript,
+          inputs,
+          amountTokensOutputCount,
+          None,
+          None,
+          None,
+          gasPrice
+        )
       } yield selected
 
       selectedResult match {

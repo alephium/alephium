@@ -896,6 +896,14 @@ trait EndpointsLogic extends Endpoints {
     query => Right(Some(query.fromAddress.groupIndex))
   )
 
+  val buildGrouplessExecuteScriptTxLogic = serverLogicRedirect(buildGrouplessExecuteScriptTx)(
+    query =>
+      withSyncedClique {
+        Future.successful(serverUtils.buildGrouplessExecuteScriptTx(blockFlow, query))
+      },
+    query => Right(Some(query.fromAddress.groupIndex))
+  )
+
   def fetchChainParams(): FutureTry[ChainParams] = {
     val now = TimeStamp.now()
     Future.successful(
