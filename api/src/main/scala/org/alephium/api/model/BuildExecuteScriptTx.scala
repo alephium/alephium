@@ -33,7 +33,7 @@ final case class BuildExecuteScriptTx(
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None,
     gasEstimationMultiplier: Option[Double] = None
-) extends BuildTxCommon
+) extends BuildTxCommon.ExecuteScriptTx
     with BuildTxCommon.FromPublicKey {
   def check(): Either[String, Unit] = {
     if (gasAmount.isEmpty || gasEstimationMultiplier.isEmpty) {

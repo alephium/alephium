@@ -21,9 +21,10 @@ import akka.util.ByteString
 import org.alephium.api.{badRequest, Try}
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId, TransactionId}
+import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
-import org.alephium.util.{AVector, Hex, U256}
+import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 trait BuildTxCommon {
   def gasAmount: Option[GasBox]
@@ -109,6 +110,82 @@ object BuildTxCommon {
           (amount.value, issueTokenTo)
 
         })
+    }
+  }
+
+  final case class ScriptTxAmounts(
+      approvedAlph: U256,
+      estimatedAlph: U256,
+      tokens: AVector[(TokenId, U256)]
+  )
+
+  object ScriptTxAmounts {
+    def from(
+        approvedAlph: U256,
+        tokens: AVector[(TokenId, U256)]
+    ): Either[String, ScriptTxAmounts] = {
+      val estimatedTxOutputsLength = tokens.length + 1
+      // Allocate extra dust amounts for potential fixed outputs as well as generated outputs
+      val estimatedTotalDustAmount =
+        dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength * 2))
+      approvedAlph
+        .add(estimatedTotalDustAmount)
+        .map { estimatedAlph =>
+          ScriptTxAmounts(approvedAlph, estimatedAlph, tokens)
+        }
+        .toRight("ALPH amount overflow")
+    }
+  }
+
+  trait ExecuteScriptTx extends BuildTxCommon {
+    def bytecode: ByteString
+    def attoAlphAmount: Option[Amount]
+    def tokens: Option[AVector[Token]]
+
+    def getAmounts: Either[String, ScriptTxAmounts] = {
+      BuildTxCommon.getAlphAndTokenAmounts(attoAlphAmount, tokens).flatMap {
+        case (alphAmount, tokens) =>
+          ScriptTxAmounts.from(alphAmount.getOrElse(U256.Zero), tokens)
+      }
+    }
+  }
+
+  trait DeployContractTx extends BuildTxCommon {
+    def bytecode: ByteString
+    def initialAttoAlphAmount: Option[Amount]
+    def initialTokenAmounts: Option[AVector[Token]]
+    def issueTokenAmount: Option[Amount]
+    def issueTokenTo: Option[Address.Asset]
+
+    def getAmounts(implicit
+        networkConfig: NetworkConfig
+    ): Either[String, (U256, ScriptTxAmounts)] = {
+      val hardfork = networkConfig.getHardFork(TimeStamp.now())
+      for {
+        amounts <- BuildTxCommon.getAlphAndTokenAmounts(initialAttoAlphAmount, initialTokenAmounts)
+        contractDeposit <- getInitialAttoAlphAmount(amounts._1, hardfork)
+        approvedAlph <- contractDeposit
+          .add(issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
+          .toRight("ALPH amount overflow")
+        result <- ScriptTxAmounts.from(approvedAlph, amounts._2)
+      } yield (contractDeposit, result)
+    }
+  }
+
+  def getInitialAttoAlphAmount(
+      amountOption: Option[U256],
+      hardfork: HardFork
+  ): Either[String, U256] = {
+    val minimalContractDeposit = minimalContractStorageDeposit(hardfork)
+    amountOption match {
+      case Some(amount) =>
+        if (amount >= minimalContractDeposit) { Right(amount) }
+        else {
+          Left(
+            s"Expect ${Amount.toAlphString(minimalContractDeposit)} deposit to deploy a new contract"
+          )
+        }
+      case None => Right(minimalContractDeposit)
     }
   }
 }

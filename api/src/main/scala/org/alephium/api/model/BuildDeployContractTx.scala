@@ -37,7 +37,7 @@ final case class BuildDeployContractTx(
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon
+) extends BuildTxCommon.DeployContractTx
     with BuildTxCommon.FromPublicKey {
   def decodeBytecode(): Try[BuildDeployContractTx.Code] = {
     deserialize[BuildDeployContractTx.Code](bytecode).left.map(serdeError =>

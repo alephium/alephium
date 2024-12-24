@@ -1812,4 +1812,24 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
     ) isE (None, AVector(tokenId2 -> U256.One))
   }
+
+  it should "check the minimal amount deposit for contract creation" in {
+    BuildTxCommon.getInitialAttoAlphAmount(None, HardFork.Leman) isE minimalAlphInContractPreRhone
+    BuildTxCommon.getInitialAttoAlphAmount(
+      Some(minimalAlphInContractPreRhone),
+      HardFork.Leman
+    ) isE minimalAlphInContractPreRhone
+    BuildTxCommon
+      .getInitialAttoAlphAmount(Some(minimalAlphInContractPreRhone - 1), HardFork.Leman)
+      .leftValue is "Expect 1 ALPH deposit to deploy a new contract"
+
+    BuildTxCommon.getInitialAttoAlphAmount(None, HardFork.Rhone) isE minimalAlphInContract
+    BuildTxCommon.getInitialAttoAlphAmount(
+      Some(minimalAlphInContract),
+      HardFork.Rhone
+    ) isE minimalAlphInContract
+    BuildTxCommon
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Rhone)
+      .leftValue is "Expect 0.1 ALPH deposit to deploy a new contract"
+  }
 }
