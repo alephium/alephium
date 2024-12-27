@@ -16,9 +16,7 @@
 
 package org.alephium.app.ws
 
-import java.util.concurrent.Executors
-
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
@@ -40,8 +38,6 @@ final case class WsServer(
 ) extends HttpServerLike
 
 object WsServer extends StrictLogging {
-  implicit val wsExecutionContext: ExecutionContext =
-    ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
 
   def apply(system: ActorSystem, node: Node, maxConnections: Int, options: HttpServerOptions)(
       implicit networkConfig: NetworkConfig

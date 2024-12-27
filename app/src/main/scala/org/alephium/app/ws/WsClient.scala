@@ -88,7 +88,6 @@ final case class ClientWs(underlying: WebSocket, notificationHandler: Notificati
         }
       case Failure(_) =>
         logger.warn(s"Unsupported message: $message")
-
     }
   )
 

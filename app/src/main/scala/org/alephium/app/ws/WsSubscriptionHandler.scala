@@ -42,11 +42,18 @@ protected[ws] object WsSubscriptionHandler {
   }
 
   sealed trait SubscriptionMsg
+  sealed trait Event extends SubscriptionMsg
+
+  final protected[ws] case class NotificationPublished(params: WsNotificationParams) extends Event
+  final private case class NotificationFailed(
+      id: Correlation,
+      ws: ServerWsLike,
+      subscriptionId: WsSubscriptionId,
+      msg: String
+  ) extends Event
+
   sealed trait Command         extends SubscriptionMsg
   sealed trait CommandResponse extends SubscriptionMsg
-  sealed trait Event           extends SubscriptionMsg
-
-  final case class NotificationPublished(params: WsNotificationParams) extends Event
 
   final case class Connect(socket: ServerWsLike) extends Command
   final case object GetSubscriptions             extends Command
@@ -100,18 +107,14 @@ protected[ws] object WsSubscriptionHandler {
       err: String
   ) extends CommandResponse
 
-  final private case class NotificationFailed(
-      id: Correlation,
-      ws: ServerWsLike,
-      subscriptionId: WsSubscriptionId,
-      msg: String
-  ) extends Event
-
   final protected[ws] case class Unregister(id: WsId) extends Command
   final private case class Unregistered(id: WsId)     extends CommandResponse
 
-  final case class AddressWithIndex(address: String, eventIndex: Int)
-  final case class WsIdWithSubscriptionId(wsId: WsId, subscriptionId: WsSubscriptionId)
+  final protected[ws] case class AddressWithIndex(address: String, eventIndex: Int)
+  final protected[ws] case class WsIdWithSubscriptionId(
+      wsId: WsId,
+      subscriptionId: WsSubscriptionId
+  )
 }
 
 protected[ws] class WsSubscriptionHandler(
@@ -280,7 +283,7 @@ protected[ws] class WsSubscriptionHandler(
     subscribers.get(ws.textHandlerID()).map(_.filter(_._1 == subscriptionId)) match {
       case Some(subscriptions) if subscriptions.nonEmpty =>
         subscriptions.foreach { case (subscriptionId, consumer) =>
-          unSubscribeToEvents(consumer)
+          unregisterConsumer(consumer)
             .andThen {
               case Success(_) =>
                 self ! Unsubscribed(id, ws, subscriptionId)
@@ -351,7 +354,8 @@ protected[ws] class WsSubscriptionHandler(
         }
     }
   }
-  private def unSubscribeToEvents(subscription: MessageConsumer[String]): Future[Unit] = {
+
+  private def unregisterConsumer(subscription: MessageConsumer[String]): Future[Unit] = {
     import WsUtils._
     subscription
       .unregister()
@@ -363,10 +367,9 @@ protected[ws] class WsSubscriptionHandler(
     Future.sequence(
       subscribers.get(id).toList.flatMap { subscriptions =>
         subscriptions.map { case (_, consumer) =>
-          unSubscribeToEvents(consumer) // TODO possible retry here
+          unregisterConsumer(consumer)
         }
       }
     ) onComplete { _ => self ! Unregistered(id) }
   }
-
 }

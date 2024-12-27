@@ -46,44 +46,19 @@ protected[ws] object WsMethod {
 }
 
 protected[ws] object WsParams {
-  sealed trait WsParams
-  sealed trait WsSubscriptionParams extends WsParams {
-    def subscriptionId: WsSubscriptionId
-  }
-  sealed trait WsNotificationParams extends WsParams {
-    def subscription: WsSubscriptionId
-    protected[ws] def asJsonRpcNotification: ujson.Obj = {
-      ujson
-        .Obj(
-          "method" -> WsMethod.SubscriptionMethod,
-          "params" -> writeJs(this)
-        )
-    }
-  }
-  object WsNotificationParams extends ApiModelCodec {
-    implicit val wsSubscriptionParamsWriter: Writer[WsNotificationParams] = {
-      implicit val blockSubscriptionWriter: Writer[WsBlockNotificationParams]       = macroW
-      implicit val txSubscriptionWriter: Writer[WsTxNotificationParams]             = macroW
-      implicit val contractSubscriptionWriter: Writer[WsContractNotificationParams] = macroW
-
-      writer[ujson.Value].comap[WsNotificationParams] {
-        case block: WsBlockNotificationParams       => writeJs(block)
-        case tx: WsTxNotificationParams             => writeJs(tx)
-        case contract: WsContractNotificationParams => writeJs(contract)
-      }
-    }
-  }
-
   private type WsEventType = String
   type WsId                = String
   type WsCorrelationId     = Long
   type WsSubscriptionId    = String
 
+  sealed trait WsParams
+  sealed trait WsSubscriptionParams extends WsParams {
+    def subscriptionId: WsSubscriptionId
+  }
   final case class SimpleSubscribeParams(eventType: WsEventType) extends WsSubscriptionParams {
     def subscriptionId: WsSubscriptionId = Sha256.hash(eventType).toHexString
   }
   object SimpleSubscribeParams {
-
     private val BlockEvent: WsEventType = "block"
     private val TxEvent: WsEventType    = "tx"
 
@@ -113,6 +88,7 @@ protected[ws] object WsParams {
         s"Invalid subscription json: $json, expected array with one of: ${eventTypes.mkString(", ")}"
       )
   }
+
   final case class ContractEventsSubscribeParams(
       eventType: WsEventType,
       eventIndex: Int,
@@ -136,12 +112,9 @@ protected[ws] object WsParams {
         address: AVector[Address.Contract]
     ): ContractEventsSubscribeParams = ContractEventsSubscribeParams(Contract, eventIndex, address)
 
-    protected[ws] def read(
-        eventTypeJson: ujson.Value,
-        eventIndexJson: ujson.Value,
-        addressesJson: ujson.Value
-    ): Either[Error, WsSubscriptionParams] = {
-      (eventTypeJson, eventIndexJson, addressesJson) match {
+    protected[ws] def read(jsonArr: ujson.Arr): Either[Error, WsSubscriptionParams] = {
+      assume(jsonArr.arr.length == 3)
+      (jsonArr(0), jsonArr(1), jsonArr(2)) match {
         case (ujson.Str(eventType), ujson.Num(eventIndex), ujson.Arr(addressArr)) =>
           eventType match {
             case Contract =>
@@ -203,11 +176,34 @@ protected[ws] object WsParams {
       )
   }
 
+  sealed trait WsNotificationParams extends WsParams {
+    def subscription: WsSubscriptionId
+    protected[ws] def asJsonRpcNotification: ujson.Obj = {
+      ujson
+        .Obj(
+          "method" -> WsMethod.SubscriptionMethod,
+          "params" -> writeJs(this)
+        )
+    }
+  }
+  object WsNotificationParams extends ApiModelCodec {
+    implicit val wsSubscriptionParamsWriter: Writer[WsNotificationParams] = {
+      implicit val blockSubscriptionWriter: Writer[WsBlockNotificationParams]       = macroW
+      implicit val txSubscriptionWriter: Writer[WsTxNotificationParams]             = macroW
+      implicit val contractSubscriptionWriter: Writer[WsContractNotificationParams] = macroW
+
+      writer[ujson.Value].comap[WsNotificationParams] {
+        case block: WsBlockNotificationParams       => writeJs(block)
+        case tx: WsTxNotificationParams             => writeJs(tx)
+        case contract: WsContractNotificationParams => writeJs(contract)
+      }
+    }
+  }
+
   final case class WsBlockNotificationParams(
       subscription: WsSubscriptionId,
       result: BlockAndEvents
   ) extends WsNotificationParams
-
   object WsBlockNotificationParams {
     protected[ws] def from(blockAndEvents: BlockAndEvents): WsBlockNotificationParams =
       WsBlockNotificationParams(
@@ -220,7 +216,6 @@ protected[ws] object WsParams {
       subscription: WsSubscriptionId,
       result: TransactionTemplate
   ) extends WsNotificationParams
-
   object WsTxNotificationParams {
     protected[ws] def from(txTemplate: TransactionTemplate): WsTxNotificationParams =
       WsTxNotificationParams(
@@ -228,16 +223,14 @@ protected[ws] object WsParams {
         txTemplate
       )
   }
-
   final case class WsContractNotificationParams(
       subscription: WsSubscriptionId,
       result: ContractEvent
   ) extends WsNotificationParams
-
 }
 
-final protected[ws] case class WsRequest(id: Correlation, params: WsSubscriptionParams)
-protected[ws] object WsRequest extends ApiModelCodec {
+final case class WsRequest(id: Correlation, params: WsSubscriptionParams)
+object WsRequest extends ApiModelCodec {
   import WsParams._
 
   final case class Correlation(id: WsCorrelationId) extends WithId
@@ -282,12 +275,12 @@ protected[ws] object WsRequest extends ApiModelCodec {
             case WsMethod.UnsubscribeMethod => UnsubscribeParams.read(arr(0))
           }
         case ujson.Arr(arr) if arr.length == 3 =>
-          ContractEventsSubscribeParams.read(arr(0), arr(1), arr(2))
+          ContractEventsSubscribeParams.read(arr)
         case unsupported =>
           Left(
             Error(
               Error.InvalidParamsCode,
-              s"Invalid params format: $unsupported, expected array of size 1 for block/tx notifications or 3 for contract events"
+              s"Invalid params format: $unsupported, expected array of size 1 for block/tx or 3 for contract events notifications"
             )
           )
       }
@@ -321,5 +314,4 @@ object WsUtils {
       promise.future
     }
   }
-
 }
