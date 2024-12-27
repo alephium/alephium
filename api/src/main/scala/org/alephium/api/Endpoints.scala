@@ -32,7 +32,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Transaction => _, _}
+import org.alephium.protocol.model.{Balance => _, Transaction => _, _}
 import org.alephium.util.{AVector, TimeStamp}
 
 //scalastyle:off file.size.limit
@@ -728,6 +728,14 @@ trait Endpoints
       .in(jsonBody[BuildGrouplessDeployContractTx])
       .out(jsonBody[BuildGrouplessDeployContractTxResult])
       .summary("Build an unsigned deploy contract transaction from a groupless address")
+
+  lazy val getGrouplessBalance: BaseEndpoint[(Address, Option[Boolean]), Balance] =
+    grouplessEndpoint.get
+      .in(path[Address]("address"))
+      .in("balance")
+      .in(query[Option[Boolean]]("mempool"))
+      .out(jsonBodyWithAlph[Balance])
+      .summary("Get the balance of a groupless address")
 }
 
 object Endpoints {

@@ -22,8 +22,8 @@ import org.alephium.api.model.{Transaction => _, Val => _, _}
 import org.alephium.crypto.SecP256R1
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.ExtraUtxosInfo
-import org.alephium.protocol.ALPH
-import org.alephium.protocol.model._
+import org.alephium.protocol.{ALPH, PublicKey}
+import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -105,25 +105,23 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .rightValue
       mineWithTx(Transaction.from(unsignedTx, genesisPrivateKey))
       val balances = blockFlow.getBalance(toLockupScript, Int.MaxValue, false).rightValue
-      balances._1 is alphAmount
-      balances._3 is AVector(tokenId -> tokenAmount)
+      balances.totalAlph is alphAmount
+      balances.totalTokens is AVector(tokenId -> tokenAmount)
     }
 
     private def getAlphAndTokenBalance(lockupScript: LockupScript) = {
-      val (alph, _, tokens, _, _) =
-        blockFlow.getBalance(lockupScript, Int.MaxValue, false).rightValue
-      (alph, tokens.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero))
+      val balance     = blockFlow.getBalance(lockupScript, Int.MaxValue, false).rightValue
+      val tokenAmount = balance.totalTokens.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero)
+      (balance.totalAlph, tokenAmount)
     }
 
     def getBalance(lockupScript: LockupScript) = {
       lockupScript match {
-        case origin: LockupScript.P2PK =>
-          brokerConfig.cliqueGroups.fold((U256.Zero, U256.Zero)) {
-            case ((alphAcc, tokenAcc), groupIndex) =>
-              val lockupScript  = LockupScript.p2pk(origin.publicKey, Some(groupIndex))
-              val (alph, token) = getAlphAndTokenBalance(lockupScript)
-              (alphAcc.addUnsafe(alph), tokenAcc.addUnsafe(token))
-          }
+        case p2pk: LockupScript.P2PK =>
+          val balance =
+            serverUtils.getGrouplessBalance(blockFlow, Address.Asset(p2pk), false).rightValue
+          val tokenAmount = balance.tokenBalances.flatMap(_.find(_.id == tokenId).map(_.amount))
+          (balance.balance.value, tokenAmount.getOrElse(U256.Zero))
         case _ => getAlphAndTokenBalance(lockupScript)
       }
     }
@@ -427,5 +425,37 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       .buildGrouplessDeployContractTx(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
+  }
+
+  it should "get the balance of the groupless address" in new Fixture {
+    allLockupScripts.length is 3
+    val invalidAddress = Address.p2pkh(PublicKey.generate)
+    serverUtils.getGrouplessBalance(blockFlow, invalidAddress, false).leftValue.detail is
+      s"""Invalid groupless address: $invalidAddress"""
+
+    val lockTime = TimeStamp.now().plusHoursUnsafe(1)
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.head, Some(lockTime))
+    val balance0 = serverUtils.getGrouplessBalance(blockFlow, fromAddress, true).rightValue
+    balance0.balance.value is ALPH.alph(2)
+    balance0.lockedBalance.value is ALPH.alph(2)
+    balance0.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance0.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance0.utxoNum is 2
+
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+    val balance1 = serverUtils.getGrouplessBalance(blockFlow, fromAddress, true).rightValue
+    balance1.balance.value is ALPH.alph(4)
+    balance1.lockedBalance.value is ALPH.alph(2)
+    balance1.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(4))))
+    balance1.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance1.utxoNum is 4
+
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.last)
+    val balance2 = serverUtils.getGrouplessBalance(blockFlow, fromAddress, true).rightValue
+    balance2.balance.value is ALPH.alph(6)
+    balance2.lockedBalance.value is ALPH.alph(2)
+    balance2.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(6))))
+    balance2.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance2.utxoNum is 6
   }
 }

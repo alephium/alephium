@@ -153,16 +153,12 @@ trait TxUtils { Self: FlowUtils =>
       lockupScript: LockupScript,
       utxosLimit: Int,
       getMempoolUtxos: Boolean
-  ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
+  ): IOResult[Balance] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
     getUTXOs(lockupScript, utxosLimit, getMempoolUtxos).map { utxos =>
-      val utxosNum = utxos.length
-
-      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances) =
-        TxUtils.getBalance(utxos.map(_.output))
-      (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum)
+      TxUtils.getBalance(utxos.map(_.output))
     }
   }
 
@@ -1627,9 +1623,7 @@ object TxUtils {
     def getBalances(): AVector[(TokenId, U256)] = AVector.from(balances)
   }
 
-  def getBalance(
-      outputs: AVector[TxOutput]
-  ): (U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)]) = {
+  def getBalance(outputs: AVector[TxOutput]): Balance = {
     var attoAlphBalance: U256       = U256.Zero
     var attoAlphLockedBalance: U256 = U256.Zero
     val tokenBalances               = new TokenBalances(mutable.Map.empty)
@@ -1654,11 +1648,12 @@ object TxUtils {
       }
     }
 
-    (
+    Balance(
       attoAlphBalance,
       attoAlphLockedBalance,
       tokenBalances.getBalances(),
-      tokenLockedBalances.getBalances()
+      tokenLockedBalances.getBalances(),
+      outputs.length
     )
   }
 

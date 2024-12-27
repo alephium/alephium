@@ -20,12 +20,13 @@ import scala.collection.mutable
 
 import sttp.model.StatusCode
 
-import org.alephium.api.{badRequest, failedInIO, ApiError, Try}
+import org.alephium.api.{badRequest, failed, failedInIO, wrapResult, ApiError, Try}
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, FlowUtils, TxUtils}
 import org.alephium.flow.gasestimation.GasEstimationMultiplier
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model._
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde.deserialize
@@ -428,5 +429,23 @@ trait GrouplessUtils { self: ServerUtils =>
         BuildDeployContractTxResult.from(deployContractTx)
       )
     }
+  }
+
+  def getGrouplessBalance(
+      blockFlow: BlockFlow,
+      address: Address,
+      getMempoolUtxos: Boolean
+  ): Try[Balance] = {
+    for {
+      p2pk <- address.lockupScript match {
+        case lock: LockupScript.P2PK => Right(lock)
+        case _                       => Left(badRequest(s"Invalid groupless address: $address"))
+      }
+      allBalances <- wrapResult(AVector.from(brokerConfig.groupRange).mapE { groupIndex =>
+        val lockupScript = LockupScript.p2pk(p2pk.publicKey, Some(GroupIndex.unsafe(groupIndex)))
+        blockFlow.getBalance(lockupScript, apiConfig.defaultUtxosLimit, getMempoolUtxos)
+      })
+      balance <- allBalances.foldE(model.Balance.zero)(_ merge _).left.map(failed)
+    } yield Balance.from(balance)
   }
 }

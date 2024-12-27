@@ -912,6 +912,16 @@ trait EndpointsLogic extends Endpoints {
     query => Right(Some(query.fromAddress.groupIndex))
   )
 
+  val getGrouplessBalanceLogic = serverLogicRedirect(getGrouplessBalance)(
+    query => {
+      val (address, getMempoolUtxos) = query
+      Future.successful(
+        serverUtils.getGrouplessBalance(blockFlow, address, getMempoolUtxos.getOrElse(true))
+      )
+    },
+    query => Right(Some(query._1.groupIndex))
+  )
+
   def fetchChainParams(): FutureTry[ChainParams] = {
     val now = TimeStamp.now()
     Future.successful(

@@ -638,15 +638,14 @@ class BlockFlowSpec extends AlephiumSpec {
 
     addAndCheck(blockFlow, block)
     val lockedBalance = ALPH.alph(1) - nonCoinbaseMinGasFee
-    blockFlow.getBalance(toLockupScript, Int.MaxValue, true) is Right(
-      (
+    blockFlow.getBalance(toLockupScript, Int.MaxValue, true) isE
+      Balance(
         lockedBalance,
         lockedBalance,
         AVector.empty[(TokenId, U256)],
         AVector.empty[(TokenId, U256)],
         1
       )
-    )
 
     blockFlow
       .transfer(
@@ -719,14 +718,13 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val balance = initialAmount - (ALPH.oneAlph + nonCoinbaseMinGasFee).mulUnsafe(txCount)
       blockFlow
-        .getBalance(fromLockup, Int.MaxValue, true)
-        .rightValue is ((
+        .getBalance(fromLockup, Int.MaxValue, true) isE Balance(
         balance,
         U256.Zero,
         AVector.empty[(TokenId, U256)],
         AVector.empty[(TokenId, U256)],
         1
-      ))
+      )
 
       tx
     }

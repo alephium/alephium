@@ -103,7 +103,8 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     checkHashIndexing,
     buildGrouplessTransfer,
     buildGrouplessExecuteScriptTx,
-    buildGrouplessDeployContractTx
+    buildGrouplessDeployContractTx,
+    getGrouplessBalance
   )
 
   private lazy val servers = List(

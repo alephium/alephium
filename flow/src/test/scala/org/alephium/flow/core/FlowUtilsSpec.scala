@@ -496,8 +496,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     keys.foreach { case (_, pubKey) =>
       val block = transfer(blockFlow, fromPriKey, pubKey, ALPH.alph(2))
       addAndCheck(blockFlow, block)
-      blockFlow.getBalance(LockupScript.p2pkh(pubKey), Int.MaxValue, true).rightValue._1 is ALPH
-        .alph(2)
+      blockFlow.getBalance(LockupScript.p2pkh(pubKey), Int.MaxValue, true).rightValue.totalAlph is
+        ALPH.alph(2)
     }
 
     val txs = keys.zipWithIndex.map { case ((priKey, _), index) =>

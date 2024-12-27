@@ -35,7 +35,7 @@ import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
+import org.alephium.protocol.model.{AssetOutput => _, Balance => _, ContractOutput => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.{Compiler, SourceIndex}
@@ -3737,10 +3737,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenId: TokenId,
         expectedTokenBalance: Option[U256]
     ) = {
-      val (alphAmount, _, tokens, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalance is alphAmount
-      tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
+      balance.totalAlph is expectedAlphBalance
+      balance.totalTokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
     }
   }
 
@@ -3762,9 +3762,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     val tokenId = TokenId.from(createToken(10))
-    val (_, _, tokens0, _, _) =
+    val balance =
       blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-    tokens0.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
+    balance.totalTokens.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
 
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
@@ -3841,9 +3841,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript: LockupScript,
         expectedAlphBalance: U256
     ) = {
-      val (alphAmount, _, _, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalance is alphAmount
+      expectedAlphBalance is balance.totalAlph
     }
 
     def checkTokenBalance(
@@ -3851,9 +3851,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenId: TokenId,
         expectedTokenBalance: U256
     ) = {
-      val (_, _, tokenAmounts, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      tokenAmounts.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero) is expectedTokenBalance
+      balance.totalTokens
+        .find(_._1 == tokenId)
+        .map(_._2)
+        .getOrElse(U256.Zero) is expectedTokenBalance
     }
 
     def signAndAndToMemPool(
