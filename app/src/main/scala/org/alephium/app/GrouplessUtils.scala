@@ -29,7 +29,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde.deserialize
-import org.alephium.util.{AVector, Math, U256}
+import org.alephium.util.{AVector, Math, TimeStamp, U256}
 
 trait GrouplessUtils { self: ServerUtils =>
   def buildGrouplessTransferTx(
@@ -124,9 +124,9 @@ trait GrouplessUtils { self: ServerUtils =>
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash]
   ): Try[(AVector[UnsignedTransaction], U256, AVector[(TokenId, U256)])] = {
-    val (alphNeeded, tokenNeeded, _)       = totalAmount
-    val (alphBalance, _, tokenBalances, _) = TxUtils.getBalance(utxos.map(_.output))
-    val maxGasFee                          = gasPrice * getMaximalGasPerTx()
+    val (alphNeeded, tokenNeeded, _) = totalAmount
+    val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
+    val maxGasFee                    = gasPrice * getMaximalGasPerTx()
     val remainAlph        = maxGasFee.addUnsafe(alphNeeded).sub(alphBalance).getOrElse(U256.Zero)
     val (remainTokens, _) = calcTokenAmount(tokenBalances, tokenNeeded)
     val result = transferFromOtherGroups(
@@ -197,6 +197,21 @@ trait GrouplessUtils { self: ServerUtils =>
       }
   }
 
+  private def getAvailableBalances(utxos: AVector[FlowUtils.AssetOutputInfo]) = {
+    var alphBalance   = U256.Zero
+    val tokenBalances = new TxUtils.TokenBalances(mutable.Map.empty)
+    val currentTs     = TimeStamp.now()
+    utxos.foreach { utxo =>
+      if (utxo.output.lockTime <= currentTs) {
+        alphBalance.add(utxo.output.amount).foreach(alphBalance = _)
+        utxo.output.tokens.foreach { case (tokenId, amount) =>
+          tokenBalances.addToken(tokenId, amount)
+        }
+      }
+    }
+    (alphBalance, tokenBalances.getBalances())
+  }
+
   private def transferFromOtherGroup(
       blockFlow: BlockFlow,
       fromGroupIndex: GroupIndex,
@@ -212,8 +227,8 @@ trait GrouplessUtils { self: ServerUtils =>
       .left
       .map(_.getMessage)
       .flatMap { utxos =>
-        val (alphBalance, _, tokenBalances, _) = TxUtils.getBalance(utxos.map(_.output))
-        val (remainTokens, transferTokens)     = calcTokenAmount(tokenBalances, tokenAmounts)
+        val (alphBalance, tokenBalances)   = getAvailableBalances(utxos)
+        val (remainTokens, transferTokens) = calcTokenAmount(tokenBalances, tokenAmounts)
         val transferAlph = calcAlphAmount(alphBalance, alphAmount, transferTokens.length, gasPrice)
         val outputInfos = AVector(
           UnsignedTransaction.TxOutputInfo(toLockup, transferAlph, transferTokens, None)

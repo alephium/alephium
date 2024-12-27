@@ -27,7 +27,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
-import org.alephium.util.{AlephiumSpec, AVector, Hex, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class GrouplessUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
@@ -63,14 +63,19 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       TokenId.from(contractId)
     }
 
-    def prepare(alphAmount: U256, tokenAmount: U256, toLockupScript: LockupScript.Asset) = {
+    def prepare(
+        alphAmount: U256,
+        tokenAmount: U256,
+        toLockupScript: LockupScript.Asset,
+        lockTime: Option[TimeStamp] = None
+    ) = {
       assume(alphAmount >= dustUtxoAmount)
       val alphRemain = alphAmount.subUnsafe(dustUtxoAmount)
       val tokenOutputInfo = UnsignedTransaction.TxOutputInfo(
         toLockupScript,
         dustUtxoAmount,
         AVector(tokenId -> tokenAmount),
-        None
+        lockTime
       )
       val outputInfos = if (alphRemain.isZero) {
         AVector(tokenOutputInfo)
@@ -82,7 +87,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
               toLockupScript,
               alphAmount.subUnsafe(dustUtxoAmount),
               AVector.empty,
-              None
+              lockTime
             ),
           tokenOutputInfo
         )
@@ -221,6 +226,28 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     val destination1 =
       Destination(toAddress, ALPH.oneAlph, Some(AVector(Token(tokenId, ALPH.alph(3)))))
+    val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
+    serverUtils
+      .buildGrouplessTransferTx(blockFlow, query1)
+      .leftValue
+      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
+  }
+
+  it should "fail if the balance is locked" in new Fixture {
+    val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
+
+    val lockTime = TimeStamp.now().plusHoursUnsafe(1)
+    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
+    val destination0 = Destination(toAddress, ALPH.alph(1), None)
+    val query0       = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
+    serverUtils
+      .buildGrouplessTransferTx(blockFlow, query0)
+      .leftValue
+      .detail is "Not enough ALPH balance, requires an additional 1.501 ALPH"
+
+    prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
+    val destination1 =
+      Destination(toAddress, ALPH.alph(1), Some(AVector(Token(tokenId, ALPH.alph(2)))))
     val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
