@@ -28,7 +28,8 @@ import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
   UnsubscribeParams,
-  WsNotificationParams
+  WsNotificationParams,
+  WsSubscriptionId
 }
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler._
@@ -44,7 +45,7 @@ import org.alephium.util._
 class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
   import org.alephium.app.ws.WsBehaviorFixture._
 
-  def logStatesFor(
+  private def logStatesFor(
       contractIdsWithEventIndex: AVector[(ContractId, Int)]
   ): AVector[(ContractId, LogState)] = {
     contractIdsWithEventIndex.map { case (contractId, eventIndex) =>
@@ -193,15 +194,6 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
   }
 
   it should "subscribe/unsubscribe from block, tx and contract events from multiple addresses of different event indexes" in new WsBehaviorFixture {
-    val contractEventsParams_0 = ContractEventsSubscribeParams.from(
-      EventIndex_0,
-      AVector(contractAddress_0, contractAddress_1)
-    )
-    val contractEventsParams_1 = ContractEventsSubscribeParams.from(
-      EventIndex_1,
-      AVector(contractAddress_1, contractAddress_2)
-    )
-
     def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
         ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)
@@ -300,6 +292,91 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
     )
   }
 
+  it should "support multiple subscriptions to multiple addresses of different event index" in new WsSubscriptionFixture
+    with Eventually {
+    val WsServer(httpServer, _, subscriptionHandler) = bindAndListen()
+    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+
+    val ws = dummyServerWs("dummy")
+
+    def convertParams(
+        paramss: AVector[ContractEventsSubscribeParams]
+    ): AVector[(WsIdWithSubscriptionId, AddressWithIndex)] = {
+      assume(paramss.length == paramss.map(_.subscriptionId).toSet.size)
+      paramss.flatMap { params =>
+        params.addresses.map(addr =>
+          WsIdWithSubscriptionId(ws.textHandlerID(), params.subscriptionId) -> AddressWithIndex(
+            addr.toBase58,
+            params.eventIndex
+          )
+        )
+      }
+    }
+
+    val contractEventParams =
+      AVector(contractEventsParams_0, contractEventsParams_1, contractEventsParams_2)
+    val expectedSubscriptionsByAddress = {
+      AVector.from(
+        convertParams(contractEventParams)
+          .groupBy(_._2)
+          .view
+          .mapValues(_.map(_._1))
+      )
+    }
+
+    val expectedAddressesBySubscriptionId =
+      AVector.from(
+        convertParams(contractEventParams)
+          .groupBy(_._1)
+          .view
+          .mapValues(_.map(_._2))
+      )
+
+    contractEventParams.foreachWithIndex { case (params, index) =>
+      subscriptionHandler ! Subscribe(Correlation(index.toLong), ws, params)
+    }
+    eventually {
+      val response = getSubscriptions(subscriptionHandler)
+      response.subscriptionsByAddress is expectedSubscriptionsByAddress.iterator.toMap
+      response.addressesBySubscriptionId is expectedAddressesBySubscriptionId.iterator.toMap
+    }
+
+    // it should be idempotent for subscriptions
+    contractEventParams.fold(3L) { case (index, params) =>
+      subscriptionHandler ! Subscribe(Correlation(index), ws, params)
+      index + 1
+    }
+    eventually {
+      val response = getSubscriptions(subscriptionHandler)
+      response.subscriptionsByAddress is expectedSubscriptionsByAddress.iterator.toMap
+      response.addressesBySubscriptionId is expectedAddressesBySubscriptionId.iterator.toMap
+    }
+
+    contractEventParams.fold(6L) { case (index, params) =>
+      subscriptionHandler ! Unsubscribe(Correlation(index), ws, params.subscriptionId)
+      index + 1
+    }
+    eventually {
+      contractEventParams.foreach { params =>
+        assertConnectedButNotSubscribed(
+          ws.textHandlerID(),
+          params.subscriptionId,
+          subscriptionHandler
+        )
+      }
+      val response = getSubscriptions(subscriptionHandler)
+      response.subscriptionsByAddress is Map
+        .empty[AddressWithIndex, AVector[WsIdWithSubscriptionId]]
+      response.addressesBySubscriptionId is Map
+        .empty[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
+    }
+
+    subscriptionHandler ! Unregister(ws.textHandlerID())
+    eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
+
+    httpServer.close().asScala.futureValue
+  }
+
   it should "support subscription, unsubscription and disconnection" in new WsSubscriptionFixture
     with Eventually {
     val WsServer(httpServer, _, subscriptionHandler) = bindAndListen()
@@ -307,31 +384,38 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
 
     val ws = dummyServerWs("dummy")
 
-    AVector(
-      SimpleSubscribeParams.Block,
-      SimpleSubscribeParams.Tx,
-      ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
-    ).fold(0L) { case (index, params) =>
-      subscriptionHandler ! Subscribe(Correlation(index), ws, params)
+    def assertSimpleSubscription(
+        subscriptionId: WsSubscriptionId,
+        subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
+    ): Assertion = {
+      val response = getSubscriptions(subscriptionHandler)
+      response.subscriptions
+        .find(_._1 == ws.textHandlerID())
+        .tapEach(_._2.length is 1)
+        .exists(_._2.filter(_._1 == subscriptionId).length == 1) is true
+    }
+
+    AVector(SimpleSubscribeParams.Block, SimpleSubscribeParams.Tx, contractEventsParams_0).fold(
+      0L
+    ) { case (correlationId, params) =>
+      subscriptionHandler ! Subscribe(Correlation(correlationId), ws, params)
       eventually {
-        assertSubscribed(
-          ws.textHandlerID(),
+        assertSimpleSubscription(
           params.subscriptionId,
           subscriptionHandler
         )
       }
 
       // it should be idempotent for subscriptions
-      subscriptionHandler ! Subscribe(Correlation(index + 1), ws, params)
+      subscriptionHandler ! Subscribe(Correlation(correlationId + 1), ws, params)
       eventually {
-        assertSubscribed(
-          ws.textHandlerID(),
+        assertSimpleSubscription(
           params.subscriptionId,
           subscriptionHandler
         )
       }
 
-      subscriptionHandler ! Unsubscribe(Correlation(index + 2), ws, params.subscriptionId)
+      subscriptionHandler ! Unsubscribe(Correlation(correlationId + 2), ws, params.subscriptionId)
       eventually {
         assertConnectedButNotSubscribed(
           ws.textHandlerID(),
@@ -339,7 +423,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
           subscriptionHandler
         )
       }
-      index + 3
+      correlationId + 3
     }
 
     subscriptionHandler ! Unregister(ws.textHandlerID())

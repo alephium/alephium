@@ -32,6 +32,7 @@ import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplat
 import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.app.ws.WsParams.{
+  ContractEventsSubscribeParams,
   WsBlockNotificationParams,
   WsContractNotificationParams,
   WsId,
@@ -68,6 +69,19 @@ trait WsSpec extends AlephiumSpec with ApiModelCodec {
     LockupScript.p2c(
       ContractId.generate
     )
+  )
+
+  val contractEventsParams_0 = ContractEventsSubscribeParams.from(
+    EventIndex_0,
+    AVector(contractAddress_0, contractAddress_1)
+  )
+  val contractEventsParams_1 = ContractEventsSubscribeParams.from(
+    EventIndex_1,
+    AVector(contractAddress_1, contractAddress_2)
+  )
+  val contractEventsParams_2 = ContractEventsSubscribeParams.from(
+    EventIndex_1,
+    AVector(contractAddress_2)
   )
 
   implicit val wsNotificationParamsReader: Reader[WsNotificationParams] =
@@ -171,7 +185,7 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
       .mapTo[SubscriptionsResponse]
       .futureValue
       .subscriptions
-      .length is 0
+      .size is 0
   }
 
   def testEventHandlerInitialized(eventHandler: ActorRefT[EventBus.Message]): Assertion = {
@@ -194,16 +208,6 @@ trait WsSubscriptionFixture extends WsServerFixture with Eventually {
       .mapTo[SubscriptionsResponse]
       .futureValue
 
-  def assertSubscribed(
-      wsId: WsId,
-      subscriptionId: WsSubscriptionId,
-      subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
-  ): Assertion = {
-    getSubscriptions(subscriptionHandler).subscriptions
-      .find(_._1 == wsId)
-      .exists(_._2.filter(_._1 == subscriptionId).length == 1) is true
-  }
-
   def assertConnectedButNotSubscribed(
       wsId: WsId,
       subscriptionId: WsSubscriptionId,
@@ -218,9 +222,7 @@ trait WsSubscriptionFixture extends WsServerFixture with Eventually {
       wsId: WsId,
       subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
   ): Assertion = {
-    getSubscriptions(subscriptionHandler).subscriptions
-      .find(_._1 == wsId)
-      .isEmpty is true
+    !getSubscriptions(subscriptionHandler).subscriptions.exists(_._1 == wsId) is true
   }
 
 }

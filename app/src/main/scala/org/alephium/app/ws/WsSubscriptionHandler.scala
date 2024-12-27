@@ -52,7 +52,9 @@ protected[ws] object WsSubscriptionHandler {
   final case object GetSubscriptions             extends Command
 
   final case class SubscriptionsResponse(
-      subscriptions: AVector[(WsId, AVector[(WsSubscriptionId, MessageConsumer[String])])]
+      subscriptions: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
+      subscriptionsByAddress: Map[AddressWithIndex, AVector[WsIdWithSubscriptionId]],
+      addressesBySubscriptionId: Map[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
   ) extends CommandResponse
 
   final protected[ws] case class Subscribe(
@@ -109,6 +111,7 @@ protected[ws] object WsSubscriptionHandler {
   final private case class Unregistered(id: WsId)     extends CommandResponse
 
   final case class AddressWithIndex(address: String, eventIndex: Int)
+  final case class WsIdWithSubscriptionId(wsId: WsId, subscriptionId: WsSubscriptionId)
 }
 
 protected[ws] class WsSubscriptionHandler(
@@ -122,11 +125,11 @@ protected[ws] class WsSubscriptionHandler(
   private val subscribers =
     mutable.Map.empty[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]]
 
-  private val multiSubscriptionsByAddress =
-    mutable.Map.empty[AddressWithIndex, AVector[WsSubscriptionId]]
+  private val subscriptionsByAddress =
+    mutable.Map.empty[AddressWithIndex, AVector[WsIdWithSubscriptionId]]
 
-  private val multiSubscriptionsBySubscriptionId =
-    mutable.Map.empty[WsSubscriptionId, AVector[AddressWithIndex]]
+  private val addressesBySubscriptionId =
+    mutable.Map.empty[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
 
   // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
@@ -160,8 +163,9 @@ protected[ws] class WsSubscriptionHandler(
     case SubscriptionFailed(id, ws, reason) =>
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
     case Unsubscribed(id, ws, subscriptionId) =>
+      val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), subscriptionId)
       subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == subscriptionId)))
-      unregisterMultiAddressSubscription(subscriptionId)
+      unregisterMultiAddressSubscription(wsIdWithSubscriptionId)
       respondAsyncAndForget(ws, Response.successful(id))
     case AlreadyUnSubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
@@ -177,7 +181,11 @@ protected[ws] class WsSubscriptionHandler(
     case Unregistered(id) =>
       val _ = subscribers.remove(id)
     case GetSubscriptions =>
-      sender() ! SubscriptionsResponse(AVector.from(subscribers))
+      sender() ! SubscriptionsResponse(
+        subscribers.toMap,
+        subscriptionsByAddress.toMap,
+        addressesBySubscriptionId.toMap
+      )
     case NotificationPublished(params: WsTxNotificationParams) =>
       val _ =
         vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
@@ -185,10 +193,10 @@ protected[ws] class WsSubscriptionHandler(
       val _ =
         vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
       params.result.getContractEvents.foreach { contractEvent =>
-        multiSubscriptionsByAddress
+        subscriptionsByAddress
           .get(AddressWithIndex(contractEvent.contractAddress.toBase58, contractEvent.eventIndex))
           .foreach { subscriptionIds =>
-            subscriptionIds.foreach { subscriptionId =>
+            subscriptionIds.foreach { case WsIdWithSubscriptionId(_, subscriptionId) =>
               vertx
                 .eventBus()
                 .publish(
@@ -240,24 +248,24 @@ protected[ws] class WsSubscriptionHandler(
   )(implicit
       ec: ExecutionContext
   ): Unit = {
-    val subscriptionId = params.subscriptionId
+    val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), params.subscriptionId)
     subscribers.get(ws.textHandlerID()) match {
-      case Some(ss) if ss.exists(_._1 == subscriptionId) =>
-        self ! AlreadySubscribed(id, ws, subscriptionId)
+      case Some(ss) if ss.exists(_._1 == wsIdWithSubscriptionId.subscriptionId) =>
+        self ! AlreadySubscribed(id, ws, wsIdWithSubscriptionId.subscriptionId)
       case _ =>
-        subscribeToEvents(id, ws, subscriptionId) match {
+        subscribeToEvents(id, ws, wsIdWithSubscriptionId.subscriptionId) match {
           case Success(consumer) =>
             params match {
               case contractParams: ContractEventsSubscribeParams =>
                 registerMultiAddressSubscription(
-                  contractParams.subscriptionId,
+                  wsIdWithSubscriptionId,
                   contractParams.addresses.map { address =>
                     AddressWithIndex(address.toBase58, contractParams.eventIndex)
                   }
                 )
               case _ =>
             }
-            self ! Subscribed(id, ws, subscriptionId, consumer)
+            self ! Subscribed(id, ws, wsIdWithSubscriptionId.subscriptionId, consumer)
           case Failure(ex) =>
             self ! SubscriptionFailed(id, ws, ex.getMessage)
         }
@@ -312,31 +320,33 @@ protected[ws] class WsSubscriptionHandler(
   }
 
   private def registerMultiAddressSubscription(
-      subscriptionId: WsSubscriptionId,
+      wsIdWithSubscriptionId: WsIdWithSubscriptionId,
       addressesWithIndex: AVector[AddressWithIndex]
   ): Unit = {
-    multiSubscriptionsBySubscriptionId.put(
-      subscriptionId,
+    addressesBySubscriptionId.put(
+      wsIdWithSubscriptionId,
       addressesWithIndex
     )
     addressesWithIndex.foreach { address =>
-      multiSubscriptionsByAddress.updateWith(address) {
-        case Some(ss) if ss.contains(subscriptionId) => Some(ss)
-        case None                                    => Some(AVector(subscriptionId))
-        case Some(subscriptions)                     => Some(subscriptions :+ subscriptionId)
+      subscriptionsByAddress.updateWith(address) {
+        case Some(ss) if ss.contains(wsIdWithSubscriptionId) => Some(ss)
+        case None                => Some(AVector(wsIdWithSubscriptionId))
+        case Some(subscriptions) => Some(subscriptions :+ wsIdWithSubscriptionId)
       }
     }
   }
 
-  private def unregisterMultiAddressSubscription(subscriptionId: WsSubscriptionId): Unit = {
-    multiSubscriptionsBySubscriptionId.remove(subscriptionId) match {
+  private def unregisterMultiAddressSubscription(
+      wsIdWithSubscriptionId: WsIdWithSubscriptionId
+  ): Unit = {
+    addressesBySubscriptionId.remove(wsIdWithSubscriptionId) match {
       case None =>
       case Some(addressesWithIndex) =>
         addressesWithIndex.foreach { addressWithIndex =>
-          multiSubscriptionsByAddress.updateWith(addressWithIndex) {
+          subscriptionsByAddress.updateWith(addressWithIndex) {
             case None => None
             case Some(ss) =>
-              Option(ss.filterNot(_ == subscriptionId)).filter(_.nonEmpty)
+              Option(ss.filterNot(_ == wsIdWithSubscriptionId)).filter(_.nonEmpty)
           }
         }
     }
