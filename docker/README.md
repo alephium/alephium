@@ -1,7 +1,7 @@
 Docker Stack Setup
 ====
 
-This folder containes all the necessary material to build and run Alephium via docker container.
+This folder contains all the necessary material to build and run Alephium via docker container.
 
 ## Prerequisites
 
