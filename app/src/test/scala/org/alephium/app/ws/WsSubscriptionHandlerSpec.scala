@@ -37,26 +37,12 @@ import org.alephium.app.ws.WsSubscriptionHandler._
 import org.alephium.app.ws.WsUtils._
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
-import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.{LogState, Val}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
 
 class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
   import org.alephium.app.ws.WsBehaviorFixture._
-
-  private def logStatesFor(
-      contractIdsWithEventIndex: AVector[(ContractId, Int)]
-  ): AVector[(ContractId, LogState)] = {
-    contractIdsWithEventIndex.map { case (contractId, eventIndex) =>
-      contractId -> LogState(
-        transactionGen().sample.get.id,
-        eventIndex.toByte,
-        AVector(Val.U256(1))
-      )
-    }
-  }
 
   it should "connect and subscribe multiple ws clients to multiple events" in new WsBehaviorFixture {
     val contractEventsParams =
@@ -98,7 +84,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
       eventBusRef ! BlockNotify(
         blockGen.sample.get,
         height = 0,
-        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
+        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0), transactionGen())
       )
       eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
     }
@@ -274,7 +260,8 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
               contractAddress_0.contractId -> EventIndex_0,
               contractAddress_1.contractId -> EventIndex_0,
               contractAddress_2.contractId -> EventIndex_1
-            )
+            ),
+            transactionGen()
           )
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
@@ -287,7 +274,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
         eventBusRef ! BlockNotify(
           blockGen.sample.get,
           height = 1,
-          logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
+          logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0), transactionGen())
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
       },

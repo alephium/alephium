@@ -23,6 +23,7 @@ import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions}
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -47,7 +48,9 @@ import org.alephium.app.ws.WsSubscriptionHandler.{
 }
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
-import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.model.{ContractId, Transaction}
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.{LogState, Val}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 
@@ -83,6 +86,19 @@ trait WsSpec extends AlephiumSpec with ApiModelCodec {
     EventIndex_1,
     AVector(contractAddress_2)
   )
+
+  def logStatesFor(
+      contractIdsWithEventIndex: AVector[(ContractId, Int)],
+      txGen: => Gen[Transaction]
+  ): AVector[(ContractId, LogState)] = {
+    contractIdsWithEventIndex.map { case (contractId, eventIndex) =>
+      contractId -> LogState(
+        txGen.sample.get.id,
+        eventIndex.toByte,
+        AVector(Val.U256(U256.unsafe(1)))
+      )
+    }
+  }
 
   implicit val wsNotificationParamsReader: Reader[WsNotificationParams] =
     reader[ujson.Value].map[WsNotificationParams] {

@@ -26,7 +26,7 @@ import org.scalatest.exceptions.TestFailedException
 import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util._
@@ -113,12 +113,16 @@ class WsClientServerSpec extends WsSpec {
     wsServer.httpServer.close().asScala.futureValue
   }
 
-  "WsClient and WsServer" should "handle high load of block subscriptions, notifications and unsubscriptions" in new WsServerFixture
+  "WsClient and WsServer" should "handle high load of block, tx and event contract subscriptions, notifications and unsubscriptions" in new WsServerFixture
     with IntegrationPatience {
     val numberOfConnections           = maxClientConnections
     override def maxServerConnections = numberOfConnections
     val clientProbe                   = TestProbe()
     val wsServer                      = bindAndListen()
+
+    val numberOfSubscriptions   = numberOfConnections * 3
+    val numberOfNotifications   = numberOfConnections * 3
+    val numberOfUnSubscriptions = numberOfConnections * 3
 
     val websockets =
       measureTime(s"$numberOfConnections connections") {
@@ -135,26 +139,54 @@ class WsClientServerSpec extends WsSpec {
           .futureValue
       }
 
-    measureTime(s"$numberOfConnections subscription requests/responses with ser/deser") {
+    val contractAddresses = AVector(contractAddress_0)
+
+    measureTime(s"$numberOfSubscriptions subscription requests/responses with ser/deser") {
       Future
-        .sequence(websockets.map { case (index, ws) => ws.subscribeToBlock(index) })
+        .sequence(
+          websockets.flatMap { case (index, ws) =>
+            AVector(
+              ws.subscribeToBlock(index),
+              ws.subscribeToTx(index + 1),
+              ws.subscribeToContractEvents(index + 2, EventIndex_0, contractAddresses)
+            )
+          }
+        )
         .futureValue
         .collectFirst { case _: Response.Failure =>
           fail("Failed to subscribe")
         }
     }
-    node.eventBus ! BlockNotify(dummyBlock, 0, AVector.empty)
-    measureTime(s"$numberOfConnections notifications with ser/deser") {
-      clientProbe.receiveN(numberOfConnections, 10.seconds)
+    node.eventBus ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
+    node.eventBus ! BlockNotify(
+      dummyBlock,
+      0,
+      logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0), transactionGen())
+    )
+
+    measureTime(s"$numberOfNotifications notifications with ser/deser") {
+      clientProbe.receiveN(numberOfNotifications, 10.seconds)
     }
-    measureTime(s"$numberOfConnections unsubscription requests/responses with ser/deser") {
+
+    val contractEventSubscriptionId =
+      ContractEventsSubscribeParams.from(EventIndex_0, contractAddresses).subscriptionId
+
+    measureTime(s"$numberOfUnSubscriptions unsubscription requests/responses with ser/deser") {
       Future
-        .sequence(websockets.map { case (index, ws) => ws.unsubscribeFromBlock(index) })
+        .sequence(websockets.flatMap { case (index, ws) =>
+          AVector(
+            ws.unsubscribeFromBlock(index + 3),
+            ws.unsubscribeFromTx(index + 4),
+            ws.unsubscribeFromContractEvents(index + 5, contractEventSubscriptionId)
+          )
+
+        })
         .futureValue
         .collectFirst { case _: Response.Failure =>
           fail("Failed to unsubscribe")
         }
     }
+
     node.eventBus ! BlockNotify(dummyBlock, 1, AVector.empty)
     clientProbe.expectNoMessage()
     wsServer.httpServer.close().asScala.futureValue
