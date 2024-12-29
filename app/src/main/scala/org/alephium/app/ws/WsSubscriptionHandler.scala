@@ -124,7 +124,7 @@ protected[ws] class WsSubscriptionHandler(
   import org.alephium.app.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
-  // subscriber who unsubscribe from all subscriptions is connected but not subscribed to any events
+  // client who unsubscribes from all subscriptions is connected but not subscribed to any events
   private val subscribers =
     mutable.Map.empty[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]]
 
@@ -199,7 +199,7 @@ protected[ws] class WsSubscriptionHandler(
         subscriptionsByAddress
           .get(AddressWithIndex(contractEvent.contractAddress.toBase58, contractEvent.eventIndex))
           .foreach { subscriptionIds =>
-            subscriptionIds.foreach { case WsIdWithSubscriptionId(_, subscriptionId) =>
+            subscriptionIds.map(_.subscriptionId).toSet.foreach { subscriptionId =>
               vertx
                 .eventBus()
                 .publish(
