@@ -23,12 +23,12 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
 import org.alephium.app.ws.WsParams.WsSubscriptionParams
 import org.alephium.app.ws.WsRequest.Correlation
-import org.alephium.crypto.Sha256
 import org.alephium.json.Json._
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.{AVector, EitherF, Hex}
 
 protected[ws] object WsMethod {
   private type WsMethodType = String
@@ -41,14 +41,14 @@ protected[ws] object WsParams {
   protected[ws] type WsEventType      = String
   protected[ws] type WsId             = String
   protected[ws] type WsCorrelationId  = Long
-  protected[ws] type WsSubscriptionId = String
+  protected[ws] type WsSubscriptionId = Hash
 
   sealed trait WsParams
   sealed trait WsSubscriptionParams extends WsParams {
     def subscriptionId: WsSubscriptionId
   }
   final case class SimpleSubscribeParams(eventType: WsEventType) extends WsSubscriptionParams {
-    def subscriptionId: WsSubscriptionId = Sha256.hash(eventType).toHexString
+    def subscriptionId: WsSubscriptionId = Hash.hash(eventType)
   }
   object SimpleSubscribeParams {
     private val BlockEvent: WsEventType = "block"
@@ -77,13 +77,12 @@ protected[ws] object WsParams {
       addresses: AVector[Address.Contract]
   ) extends WsSubscriptionParams {
     def subscriptionId: WsSubscriptionId =
-      Sha256
+      Hash
         .hash(
           addresses
             .map(address => s"$eventType/$eventIndex/$address")
             .mkString(",")
         )
-        .toHexString
   }
   object ContractEventsSubscribeParams {
     val Contract: WsEventType = "contract"
@@ -139,8 +138,16 @@ protected[ws] object WsParams {
   object UnsubscribeParams {
     protected[ws] def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
       json match {
-        case ujson.Str(subscriptionId) if subscriptionId.nonEmpty =>
-          Right(UnsubscribeParams(subscriptionId))
+        case ujson.Str(subscriptionIdHex) =>
+          (for {
+            subscriptionIdHex <- Hex.from(subscriptionIdHex)
+            subscriptionId    <- Hash.from(subscriptionIdHex)
+          } yield subscriptionId) match {
+            case None =>
+              Left(WsError.invalidSubscriptionId(subscriptionIdHex))
+            case Some(hash) =>
+              Right(UnsubscribeParams(hash))
+          }
         case unsupported =>
           Left(WsError.invalidUnsubscriptionFormat(unsupported))
       }
@@ -221,7 +228,7 @@ object WsRequest extends ApiModelCodec {
         case UnsubscribeParams(subscriptionId) =>
           Request(
             WsMethod.UnsubscribeMethod,
-            ujson.Arr(ujson.Str(subscriptionId)),
+            ujson.Arr(ujson.Str(subscriptionId.toHexString)),
             req.id.id
           )
         case ContractEventsSubscribeParams(eventType, eventIndex, addresses) =>

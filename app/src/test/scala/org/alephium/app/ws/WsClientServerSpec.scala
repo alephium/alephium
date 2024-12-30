@@ -27,8 +27,7 @@ import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
-import org.alephium.json.Json._
-import org.alephium.rpc.model.JsonRPC.{Error, Response}
+import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util._
 
 class WsClientServerSpec extends WsSubscriptionFixture {
@@ -81,30 +80,30 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     // for block
     ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
     ws.subscribeToBlock(1).futureValue is
-      Response.failed(Correlation(1), Error(WsError.AlreadySubscribed, Block.subscriptionId))
+      Response.failed(Correlation(1), WsError.alreadySubscribed(Block.subscriptionId))
     ws.unsubscribeFromBlock(2).futureValue is Response.successful(Correlation(2))
     ws.unsubscribeFromBlock(3).futureValue is
-      Response.failed(Correlation(3), Error(WsError.AlreadyUnsubscribed, Block.subscriptionId))
+      Response.failed(Correlation(3), WsError.alreadyUnSubscribed(Block.subscriptionId))
 
     // for tx
     ws.subscribeToTx(4).futureValue is Response.successful(Correlation(4), Tx.subscriptionId)
     ws.subscribeToTx(5).futureValue is
-      Response.failed(Correlation(5), Error(WsError.AlreadySubscribed, Tx.subscriptionId))
+      Response.failed(Correlation(5), WsError.alreadySubscribed(Tx.subscriptionId))
     ws.unsubscribeFromTx(6).futureValue is Response.successful(Correlation(6))
     ws.unsubscribeFromTx(7).futureValue is
-      Response.failed(Correlation(7), Error(WsError.AlreadyUnsubscribed, Tx.subscriptionId))
+      Response.failed(Correlation(7), WsError.alreadyUnSubscribed(Tx.subscriptionId))
 
     // for contract events
     val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     ws.subscribeToContractEvents(8, params.eventIndex, params.addresses).futureValue is Response
       .successful(Correlation(8), params.subscriptionId)
     ws.subscribeToContractEvents(9, params.eventIndex, params.addresses).futureValue is
-      Response.failed(Correlation(9), Error(WsError.AlreadySubscribed, params.subscriptionId))
+      Response.failed(Correlation(9), WsError.alreadySubscribed(params.subscriptionId))
     ws.unsubscribeFromContractEvents(10, params.subscriptionId).futureValue is Response.successful(
       Correlation(10)
     )
     ws.unsubscribeFromContractEvents(11, params.subscriptionId).futureValue is
-      Response.failed(Correlation(11), Error(WsError.AlreadyUnsubscribed, params.subscriptionId))
+      Response.failed(Correlation(11), WsError.alreadyUnSubscribed(params.subscriptionId))
 
     ws.close().futureValue
     wsServer.httpServer.close().asScala.futureValue

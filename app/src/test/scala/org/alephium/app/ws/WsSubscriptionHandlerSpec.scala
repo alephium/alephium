@@ -26,7 +26,6 @@ import org.scalatest.concurrent.Eventually
 import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
-  UnsubscribeParams,
   WsNotificationParams,
   WsSubscriptionId
 }
@@ -63,15 +62,15 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId)
+          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
           id is 0
         }
         inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId)
+          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
           id is 1
         }
         inside(contractEventsSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams.subscriptionId)
+          result is ujson.Str(contractEventsParams.subscriptionId.toHexString)
           id is 2
         }
         ws
@@ -166,8 +165,10 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
     }
 
     def invalidUnsubscriptionParamsBehavior(ws: ClientWs): Future[Unit] = {
+      val invalidUnsubscribeReq =
+        s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["invalidSubscriptionId"],"id":0,"jsonrpc":"2.0"}"""
       ws.underlying
-        .writeTextMessage(write(WsRequest(Correlation(1), UnsubscribeParams(""))))
+        .writeTextMessage(invalidUnsubscribeReq)
         .asScala
         .mapTo[Unit]
     }
@@ -204,19 +205,19 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId)
+          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
           id is 0
         }
         inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId)
+          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
           id is 1
         }
         inside(contractEventsSubscriptionResponse_0) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams_0.subscriptionId)
+          result is ujson.Str(contractEventsParams_0.subscriptionId.toHexString)
           id is 2
         }
         inside(contractEventsSubscriptionResponse_1) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams_1.subscriptionId)
+          result is ujson.Str(contractEventsParams_1.subscriptionId.toHexString)
           id is 3
         }
         ws

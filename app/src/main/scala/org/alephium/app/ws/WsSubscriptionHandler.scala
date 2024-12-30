@@ -158,11 +158,11 @@ protected[ws] class WsSubscriptionHandler(
         case None =>
           Some(AVector(subscriptionId -> consumer))
       }
-      respondAsyncAndForget(ws, Response.successful(id, subscriptionId))
+      respondAsyncAndForget(ws, Response.successful(id, subscriptionId.toHexString))
     case AlreadySubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
         ws,
-        Response.failed(id, Error(WsError.AlreadySubscribed, subscriptionId))
+        Response.failed(id, WsError.alreadySubscribed(subscriptionId))
       )
     case SubscriptionFailed(id, ws, reason) =>
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
@@ -174,7 +174,7 @@ protected[ws] class WsSubscriptionHandler(
     case AlreadyUnSubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
         ws,
-        Response.failed(id, Error(WsError.AlreadyUnsubscribed, subscriptionId))
+        Response.failed(id, WsError.alreadyUnSubscribed(subscriptionId))
       )
     case UnsubscriptionFailed(id, ws, reason) =>
       respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
@@ -207,7 +207,7 @@ protected[ws] class WsSubscriptionHandler(
   // scalastyle:on cyclomatic.complexity method.length
 
   private def publishNotification(params: WsNotificationParams): Unit = {
-    vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
+    vertx.eventBus().publish(params.subscription.toHexString, params.asJsonRpcNotification.render())
     ()
   }
 
@@ -297,7 +297,7 @@ protected[ws] class WsSubscriptionHandler(
     vertx
       .eventBus()
       .consumer[String](
-        subscriptionId,
+        subscriptionId.toHexString,
         new io.vertx.core.Handler[Message[String]] {
           override def handle(message: Message[String]): Unit = {
             if (!ws.isClosed) {

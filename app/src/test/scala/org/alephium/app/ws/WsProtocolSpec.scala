@@ -67,7 +67,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
       subscribeRequest is read[WsRequest](validSubscriptionReqJson)
 
       val validUnSubscriptionReqJson =
-        s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${params.subscriptionId}"],"id":0,"jsonrpc":"2.0"}"""
+        s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${params.subscriptionId.toHexString}"],"id":0,"jsonrpc":"2.0"}"""
       val unSubscribeRequest = WsRequest.unsubscribe(0, params.subscriptionId)
       write(unSubscribeRequest) is validUnSubscriptionReqJson
       unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
@@ -81,7 +81,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
         RequestUnsafe(
           "2.0",
           WsMethod.UnsubscribeMethod,
-          ujson.Arr(ujson.Str(params.subscriptionId)),
+          ujson.Arr(ujson.Str(params.subscriptionId.toHexString)),
           0
         )
       val expectedUnSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest).rightValue
@@ -98,7 +98,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
     subscribeRequest is read[WsRequest](validSubscriptionReqJson)
 
     val validUnSubscriptionReqJson =
-      s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${contractEventParams.subscriptionId}"],"id":$EventIndex_0,"jsonrpc":"2.0"}"""
+      s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${contractEventParams.subscriptionId.toHexString}"],"id":$EventIndex_0,"jsonrpc":"2.0"}"""
     val unSubscribeRequest = WsRequest.unsubscribe(0, contractEventParams.subscriptionId)
     write(unSubscribeRequest) is validUnSubscriptionReqJson
     unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
@@ -117,7 +117,12 @@ class WsProtocolSpec extends WsSubscriptionFixture {
         "2.0",
         WsMethod.UnsubscribeMethod,
         ujson.Arr(
-          ujson.Str(ContractEventsSubscribeParams.fromSingle(0, contractAddress_0).subscriptionId)
+          ujson.Str(
+            ContractEventsSubscribeParams
+              .fromSingle(0, contractAddress_0)
+              .subscriptionId
+              .toHexString
+          )
         ),
         0
       )

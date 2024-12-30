@@ -20,13 +20,13 @@ import scala.concurrent.{Future, Promise}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.app.ws.WsParams.{ContractEventsSubscribeParams, WsEventType}
+import org.alephium.app.ws.WsParams.{ContractEventsSubscribeParams, WsEventType, WsSubscriptionId}
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.eventTypes
 import org.alephium.rpc.model.JsonRPC.Error
 
 object WsError {
   protected[ws] val AlreadySubscribed: Int   = -32010
-  protected[ws] val AlreadyUnsubscribed: Int = -32011
+  protected[ws] val AlreadyUnSubscribed: Int = -32011
 
   protected[ws] def invalidEventType(eventType: WsEventType): Error =
     Error(
@@ -44,6 +44,12 @@ object WsError {
     Error(
       Error.InvalidParamsCode,
       s"Invalid subscription: $json, expected array with subscriptionId"
+    )
+
+  protected[ws] def invalidSubscriptionId(subscriptionId: String): Error =
+    Error(
+      Error.InvalidParamsCode,
+      s"Invalid subscription ID: $subscriptionId, it should be SHA256 hash as Hex"
     )
 
   protected[ws] def invalidContractEventParams(eventType: WsEventType): Error =
@@ -71,6 +77,12 @@ object WsError {
       Error.InvalidParamsCode,
       s"Invalid params format: $json, expected array of size 1 for block/tx or 3 for contract events notifications"
     )
+
+  protected[ws] def alreadySubscribed(subscriptionId: WsSubscriptionId): Error =
+    Error(WsError.AlreadySubscribed, subscriptionId.toHexString)
+
+  protected[ws] def alreadyUnSubscribed(subscriptionId: WsSubscriptionId): Error =
+    Error(WsError.AlreadyUnSubscribed, subscriptionId.toHexString)
 }
 
 object WsUtils {

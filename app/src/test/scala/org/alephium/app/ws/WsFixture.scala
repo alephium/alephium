@@ -55,6 +55,7 @@ import org.alephium.app.ws.WsSubscriptionHandler.{
 }
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.{LockupScript, LogState, LogStateRef, LogStatesId, Val}
 import org.alephium.util._
@@ -95,7 +96,7 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
   implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
     reader[ujson.Value].map[WsNotificationParams] {
       case ujson.Obj(values) =>
-        val subscription = values("subscription").str
+        val subscription = Hash.unsafe(Hex.unsafe(values("subscription").str))
         values("result") match {
           case obj: ujson.Obj if obj.value.contains("block") =>
             WsBlockNotificationParams(subscription, read[BlockAndEvents](obj))
