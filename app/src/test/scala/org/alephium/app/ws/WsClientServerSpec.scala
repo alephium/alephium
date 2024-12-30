@@ -31,7 +31,7 @@ import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util._
 
-class WsClientServerSpec extends WsSpec {
+class WsClientServerSpec extends WsSubscriptionFixture {
   import WsUtils._
 
   "WsServer" should "reject request to any endpoint besides /ws" in new WsServerFixture {
@@ -64,12 +64,9 @@ class WsClientServerSpec extends WsSpec {
     ws.unsubscribeFromTx(3).futureValue is Response.successful(Correlation(3))
 
     // for contract events notifications
-    val params = ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
+    val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     ws.subscribeToContractEvents(4, params.eventIndex, params.addresses).futureValue is Response
-      .successful(
-        Correlation(4),
-        params.subscriptionId
-      )
+      .successful(Correlation(4), params.subscriptionId)
     ws.unsubscribeFromContractEvents(5, params.subscriptionId).futureValue is Response.successful(
       Correlation(5)
     )
@@ -98,7 +95,7 @@ class WsClientServerSpec extends WsSpec {
       Response.failed(Correlation(7), Error(WsError.AlreadyUnsubscribed, Tx.subscriptionId))
 
     // for contract events
-    val params = ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
+    val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     ws.subscribeToContractEvents(8, params.eventIndex, params.addresses).futureValue is Response
       .successful(Correlation(8), params.subscriptionId)
     ws.subscribeToContractEvents(9, params.eventIndex, params.addresses).futureValue is
@@ -161,7 +158,7 @@ class WsClientServerSpec extends WsSpec {
     node.eventBus ! BlockNotify(
       dummyBlock,
       0,
-      logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0), transactionGen())
+      logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
     )
 
     measureTime(s"$numberOfNotifications notifications with ser/deser") {
@@ -169,7 +166,7 @@ class WsClientServerSpec extends WsSpec {
     }
 
     val contractEventSubscriptionId =
-      ContractEventsSubscribeParams.from(EventIndex_0, contractAddresses).subscriptionId
+      ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0).subscriptionId
 
     measureTime(s"$numberOfUnSubscriptions unsubscription requests/responses with ser/deser") {
       Future

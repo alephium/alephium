@@ -28,6 +28,7 @@ import io.vertx.core.eventbus.{Message, MessageConsumer}
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.json.Json.write
+import org.alephium.protocol.model.Address
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
@@ -168,7 +169,7 @@ protected[ws] class WsSubscriptionHandler(
     case Unsubscribed(id, ws, subscriptionId) =>
       val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), subscriptionId)
       subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == subscriptionId)))
-      unregisterMultiAddressSubscription(wsIdWithSubscriptionId)
+      unregisterContractEventSubscription(wsIdWithSubscriptionId)
       respondAsyncAndForget(ws, Response.successful(id))
     case AlreadyUnSubscribed(id, ws, subscriptionId) =>
       respondAsyncAndForget(
@@ -190,30 +191,25 @@ protected[ws] class WsSubscriptionHandler(
         addressesBySubscriptionId.toMap
       )
     case NotificationPublished(params: WsTxNotificationParams) =>
-      val _ =
-        vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
+      publishNotification(params)
     case NotificationPublished(params: WsBlockNotificationParams) =>
-      val _ =
-        vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
+      val _ = publishNotification(params)
       params.result.getContractEvents.foreach { contractEvent =>
         subscriptionsByAddress
           .get(AddressWithIndex(contractEvent.contractAddress.toBase58, contractEvent.eventIndex))
           .foreach { subscriptionIds =>
             subscriptionIds.map(_.subscriptionId).toSet.foreach { subscriptionId =>
-              vertx
-                .eventBus()
-                .publish(
-                  subscriptionId,
-                  WsContractNotificationParams(
-                    subscriptionId,
-                    contractEvent
-                  ).asJsonRpcNotification.render()
-                )
+              publishNotification(WsContractEventNotificationParams(subscriptionId, contractEvent))
             }
           }
       }
   }
   // scalastyle:on cyclomatic.complexity method.length
+
+  private def publishNotification(params: WsNotificationParams): Unit = {
+    vertx.eventBus().publish(params.subscription, params.asJsonRpcNotification.render())
+    ()
+  }
 
   private def respondAsyncAndForget(ws: ServerWsLike, response: Response)(implicit
       ec: ExecutionContext
@@ -244,11 +240,7 @@ protected[ws] class WsSubscriptionHandler(
     }
   }
 
-  private def subscribe(
-      id: Correlation,
-      ws: ServerWsLike,
-      params: WsSubscriptionParams
-  )(implicit
+  private def subscribe(id: Correlation, ws: ServerWsLike, params: WsSubscriptionParams)(implicit
       ec: ExecutionContext
   ): Unit = {
     val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), params.subscriptionId)
@@ -260,11 +252,10 @@ protected[ws] class WsSubscriptionHandler(
           case Success(consumer) =>
             params match {
               case contractParams: ContractEventsSubscribeParams =>
-                registerMultiAddressSubscription(
+                registerContractEventSubscription(
                   wsIdWithSubscriptionId,
-                  contractParams.addresses.map { address =>
-                    AddressWithIndex(address.toBase58, contractParams.eventIndex)
-                  }
+                  contractParams.eventIndex,
+                  contractParams.addresses
                 )
               case _ =>
             }
@@ -322,24 +313,26 @@ protected[ws] class WsSubscriptionHandler(
       )
   }
 
-  private def registerMultiAddressSubscription(
+  private def registerContractEventSubscription(
       wsIdWithSubscriptionId: WsIdWithSubscriptionId,
-      addressesWithIndex: AVector[AddressWithIndex]
+      eventIndex: Int,
+      addresses: AVector[Address.Contract]
   ): Unit = {
-    addressesBySubscriptionId.put(
-      wsIdWithSubscriptionId,
-      addressesWithIndex
-    )
-    addressesWithIndex.foreach { address =>
-      subscriptionsByAddress.updateWith(address) {
-        case Some(ss) if ss.contains(wsIdWithSubscriptionId) => Some(ss)
-        case None                => Some(AVector(wsIdWithSubscriptionId))
-        case Some(subscriptions) => Some(subscriptions :+ wsIdWithSubscriptionId)
+    val addressesWithIndex =
+      addresses.map { address =>
+        val addressWithIndex = AddressWithIndex(address.toBase58, eventIndex)
+        subscriptionsByAddress.updateWith(addressWithIndex) {
+          case Some(ss) if ss.contains(wsIdWithSubscriptionId) => Some(ss)
+          case None                => Some(AVector(wsIdWithSubscriptionId))
+          case Some(subscriptions) => Some(subscriptions :+ wsIdWithSubscriptionId)
+        }
+        addressWithIndex
       }
-    }
+    addressesBySubscriptionId.put(wsIdWithSubscriptionId, addressesWithIndex)
+    ()
   }
 
-  private def unregisterMultiAddressSubscription(
+  private def unregisterContractEventSubscription(
       wsIdWithSubscriptionId: WsIdWithSubscriptionId
   ): Unit = {
     addressesBySubscriptionId.remove(wsIdWithSubscriptionId) match {

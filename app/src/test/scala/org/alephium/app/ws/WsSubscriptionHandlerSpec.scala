@@ -23,12 +23,10 @@ import org.scalatest.Assertion
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.Eventually
 
-import org.alephium.app.ServerFixture
 import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
   UnsubscribeParams,
-  WsId,
   WsNotificationParams,
   WsSubscriptionId
 }
@@ -41,12 +39,12 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
 
-class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
+class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
   import org.alephium.app.ws.WsBehaviorFixture._
 
   it should "connect and subscribe multiple ws clients to multiple events" in new WsBehaviorFixture {
     val contractEventsParams =
-      ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
+      ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     val subscriptionIdSet =
       Set(
         SimpleSubscribeParams.Block.subscriptionId,
@@ -84,7 +82,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
       eventBusRef ! BlockNotify(
         blockGen.sample.get,
         height = 0,
-        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0), transactionGen())
+        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
       )
       eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
     }
@@ -260,8 +258,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
               contractAddress_0.contractId -> EventIndex_0,
               contractAddress_1.contractId -> EventIndex_0,
               contractAddress_2.contractId -> EventIndex_1
-            ),
-            transactionGen()
+            )
           )
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
@@ -274,7 +271,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
         eventBusRef ! BlockNotify(
           blockGen.sample.get,
           height = 1,
-          logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0), transactionGen())
+          logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
       },
@@ -293,29 +290,13 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
     val WsServer(httpServer, _, subscriptionHandler) = bindAndListen()
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 
-    def flattenParams(
-        wsId: WsId,
-        paramss: AVector[ContractEventsSubscribeParams]
-    ): AVector[(WsIdWithSubscriptionId, AddressWithIndex)] = {
-      assume(paramss.length == paramss.map(_.subscriptionId).toSet.size)
-      paramss.flatMap { params =>
-        params.addresses.map(addr =>
-          WsIdWithSubscriptionId(wsId, params.subscriptionId) -> AddressWithIndex(
-            addr.toBase58,
-            params.eventIndex
-          )
-        )
-      }
-    }
-
-    val ws_0          = dummyServerWs("dummy_0")
-    val ws_1          = dummyServerWs("dummy_1")
+    val websockets    = AVector(dummyServerWs("dummy_0"), dummyServerWs("dummy_1"))
     var correlationId = 0
     val contractEventParams =
       AVector(contractEventsParams_0, contractEventsParams_1, contractEventsParams_2)
 
     val subscriptionRequests: AVector[(WsIdWithSubscriptionId, AddressWithIndex)] =
-      AVector(ws_0, ws_1).flatMap { ws =>
+      websockets.flatMap { ws =>
         contractEventParams.foreach { params =>
           subscriptionHandler ! Subscribe(Correlation(correlationId.toLong), ws, params)
           correlationId += 1
@@ -345,7 +326,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
     }
 
     // it should be idempotent for subscriptions
-    AVector(ws_0, ws_1).foreach { ws =>
+    websockets.foreach { ws =>
       contractEventParams.foreach { params =>
         subscriptionHandler ! Subscribe(Correlation(correlationId.toLong), ws, params)
         correlationId += 1
@@ -357,7 +338,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
       response.addressesBySubscriptionId is expectedAddressesBySubscriptionId.iterator.toMap
     }
 
-    AVector(ws_0, ws_1).foreach { ws =>
+    websockets.foreach { ws =>
       contractEventParams.foreach { params =>
         subscriptionHandler ! Unsubscribe(
           Correlation(correlationId.toLong),
@@ -384,7 +365,7 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
         .empty[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
     }
 
-    AVector(ws_0, ws_1).foreach { ws =>
+    websockets.foreach { ws =>
       subscriptionHandler ! Unregister(ws.textHandlerID())
       eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
     }
@@ -445,5 +426,4 @@ class WsSubscriptionHandlerSpec extends WsSpec with ServerFixture {
 
     httpServer.close().asScala.futureValue
   }
-
 }

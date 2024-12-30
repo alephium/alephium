@@ -21,13 +21,22 @@ import scala.util.{Failure, Success}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.app.ws.WsParams.{ContractEventsSubscribeParams, SimpleSubscribeParams}
+import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
+import org.alephium.app.ws.WsParams.{
+  ContractEventsSubscribeParams,
+  SimpleSubscribeParams,
+  WsBlockNotificationParams,
+  WsContractEventNotificationParams,
+  WsNotificationParams,
+  WsTxNotificationParams
+}
 import org.alephium.json.Json._
-import org.alephium.util.AVector
+import org.alephium.rpc.model.JsonRPC.RequestUnsafe
+import org.alephium.util.{AVector, TimeStamp}
 
-class WsProtocolSpec extends WsSpec {
+class WsProtocolSpec extends WsSubscriptionFixture {
 
-  "WebSocketProtocol" should "refuse all WsRequest that are not JsonRPC compliant" in {
+  "WsProtocol" should "refuse all WsRequests that are not JsonRPC compliant" in {
     val method    = WsMethod.SubscribeMethod
     val eventType = "foo"
     WsRequest
@@ -49,57 +58,115 @@ class WsProtocolSpec extends WsSpec {
       .isLeft is true
   }
 
-  "WsRequest" should "pass R/W round-trip for simple subscription" in {
+  "WsRequest" should "pass ser/deser round-trip for simple subscription/unsubscription" in {
     AVector(SimpleSubscribeParams.Block, SimpleSubscribeParams.Tx).foreach { params =>
-      val method = WsMethod.SubscribeMethod
-      val validReqJson =
-        s"""{"method":"$method","params":["${params.eventType}"],"id":0,"jsonrpc":"2.0"}"""
-      val expectedRequest = WsRequest.subscribe(0, params)
-      write(expectedRequest) is validReqJson
-      read[WsRequest](validReqJson) is expectedRequest
+      val validSubscriptionReqJson =
+        s"""{"method":"${WsMethod.SubscribeMethod}","params":["${params.eventType}"],"id":0,"jsonrpc":"2.0"}"""
+      val subscribeRequest = WsRequest.subscribe(0, params)
+      write(subscribeRequest) is validSubscriptionReqJson
+      subscribeRequest is read[WsRequest](validSubscriptionReqJson)
+
+      val validUnSubscriptionReqJson =
+        s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${params.subscriptionId}"],"id":0,"jsonrpc":"2.0"}"""
+      val unSubscribeRequest = WsRequest.unsubscribe(0, params.subscriptionId)
+      write(unSubscribeRequest) is validUnSubscriptionReqJson
+      unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
+
+      val jsonRpcSubscribeRequest =
+        RequestUnsafe("2.0", WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(params.eventType)), 0)
+      val expectedSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcSubscribeRequest).rightValue
+      expectedSubscribeRequest is read[WsRequest](write(expectedSubscribeRequest))
+
+      val jsonRpcUnSubscribeRequest =
+        RequestUnsafe(
+          "2.0",
+          WsMethod.UnsubscribeMethod,
+          ujson.Arr(ujson.Str(params.subscriptionId)),
+          0
+        )
+      val expectedUnSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest).rightValue
+      expectedUnSubscribeRequest is read[WsRequest](write(expectedUnSubscribeRequest))
     }
   }
 
-  "WsRequest" should "pass R/W round-trip for contract subscription" in {
-    ContractEventsSubscribeParams.eventTypes.foreach { eventType =>
-      val method = WsMethod.SubscribeMethod
-      val validReqJson =
-        s"""{"method":"$method","params":["$eventType",$EventIndex_0,["${contractAddress_0.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
-      val expectedRequest = WsRequest.subscribe(
-        0,
-        ContractEventsSubscribeParams(eventType, 0, AVector(contractAddress_0))
+  "WsRequest" should "pass ser/deser round-trip for contract event subscription/unsubscription" in {
+    val contractEventParams = ContractEventsSubscribeParams.fromSingle(0, contractAddress_0)
+    val validSubscriptionReqJson =
+      s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.Contract}",$EventIndex_0,["${contractAddress_0.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
+    val subscribeRequest = WsRequest.subscribe(0, contractEventParams)
+    write(subscribeRequest) is validSubscriptionReqJson
+    subscribeRequest is read[WsRequest](validSubscriptionReqJson)
+
+    val validUnSubscriptionReqJson =
+      s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${contractEventParams.subscriptionId}"],"id":$EventIndex_0,"jsonrpc":"2.0"}"""
+    val unSubscribeRequest = WsRequest.unsubscribe(0, contractEventParams.subscriptionId)
+    write(unSubscribeRequest) is validUnSubscriptionReqJson
+    unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
+
+    val eventType  = ujson.Str(ContractEventsSubscribeParams.Contract)
+    val eventIndex = ujson.Num(0)
+    val addresses  = ujson.Arr(ujson.Str(contractAddress_0.toBase58))
+
+    val jsonRpcSubscribeRequest =
+      RequestUnsafe("2.0", WsMethod.SubscribeMethod, ujson.Arr(eventType, eventIndex, addresses), 0)
+    val expectedSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcSubscribeRequest).rightValue
+    expectedSubscribeRequest is read[WsRequest](write(expectedSubscribeRequest))
+
+    val jsonRpcUnSubscribeRequest =
+      RequestUnsafe(
+        "2.0",
+        WsMethod.UnsubscribeMethod,
+        ujson.Arr(
+          ujson.Str(ContractEventsSubscribeParams.fromSingle(0, contractAddress_0).subscriptionId)
+        ),
+        0
       )
-      write(expectedRequest) is validReqJson
-      read[WsRequest](validReqJson) is expectedRequest
-    }
+    val expectedUnSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest).rightValue
+    expectedUnSubscribeRequest is read[WsRequest](write(expectedUnSubscribeRequest))
   }
 
-  "WsRequest" should "pass R/W round-trip for unsubscription from event type" in {
-    val method = WsMethod.UnsubscribeMethod
-    SimpleSubscribeParams.eventTypes.foreach { eventType =>
-      val subscriptionId = SimpleSubscribeParams(eventType).subscriptionId
-      val validReqJson =
-        s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""
-      val expectedRequest = WsRequest.unsubscribe(0, subscriptionId)
-      write(expectedRequest) is validReqJson
-      read[WsRequest](validReqJson) is expectedRequest
-    }
-  }
+  "WsNotificationParams" should "pass ser/deser round-trip for notifications" in {
+    val blockAndEvents = BlockAndEvents(
+      BlockEntry.from(dummyBlock, 0).rightValue,
+      contractEventByBlockHash
+    )
 
-  "WsRequest" should "pass R/W round-trip for unsubscription of contract event type" in {
-    val method = WsMethod.UnsubscribeMethod
-    ContractEventsSubscribeParams.eventTypes.foreach { eventType =>
-      val subscriptionId =
-        ContractEventsSubscribeParams(
-          eventType,
-          EventIndex_0,
-          AVector(contractAddress_0)
-        ).subscriptionId
-      val validReqJson =
-        s"""{"method":"$method","params":["$subscriptionId"],"id":0,"jsonrpc":"2.0"}"""
-      val expectedRequest = WsRequest.unsubscribe(0, subscriptionId)
-      write(expectedRequest) is validReqJson
-      read[WsRequest](validReqJson) is expectedRequest
+    val blockNotificationParams: WsNotificationParams =
+      WsBlockNotificationParams.from(blockAndEvents)
+    val blockNotificationJson = write(blockNotificationParams)
+    read[WsNotificationParams](blockNotificationJson) is blockNotificationParams
+
+    val blockNotificationRpc = blockNotificationParams.asJsonRpcNotification
+    blockNotificationRpc("method") is WsMethod.SubscriptionMethod
+    blockNotificationRpc("params") is writeJs(blockNotificationParams)
+
+    val txNotificationParams: WsNotificationParams =
+      WsTxNotificationParams.from(
+        TransactionTemplate.fromProtocol(transactionGen().sample.get.toTemplate, TimeStamp.now())
+      )
+    val txNotificationJson = write(txNotificationParams)
+    read[WsNotificationParams](txNotificationJson) is txNotificationParams
+
+    val txNotificationRpc = txNotificationParams.asJsonRpcNotification
+    txNotificationRpc("method") is WsMethod.SubscriptionMethod
+    txNotificationRpc("params") is writeJs(txNotificationParams)
+
+    val contractEventParams = ContractEventsSubscribeParams.fromSingle(0, contractAddress_0)
+    val contractEventNotificationParams: WsNotificationParams =
+      WsContractEventNotificationParams(contractEventParams.subscriptionId, contractEvent)
+    val contractEventNotificationJson = write(contractEventNotificationParams)
+    read[WsNotificationParams](contractEventNotificationJson) is contractEventNotificationParams
+
+    val contractEventNotificationRpc = contractEventNotificationParams.asJsonRpcNotification
+    contractEventNotificationRpc("method") is WsMethod.SubscriptionMethod
+    contractEventNotificationRpc("params") is writeJs(contractEventNotificationParams)
+
+    val allNotifications =
+      AVector(blockNotificationParams, txNotificationParams, contractEventNotificationParams)
+    allNotifications.foreach { notification =>
+      val serialized   = write(notification)(WsNotificationParams.wsSubscriptionParamsWriter)
+      val deserialized = read[WsNotificationParams](serialized)
+      deserialized is notification
     }
   }
 
@@ -121,5 +188,4 @@ class WsProtocolSpec extends WsSpec {
         case Failure(ex) => ex is exception
       }(Implicits.global)
   }
-
 }

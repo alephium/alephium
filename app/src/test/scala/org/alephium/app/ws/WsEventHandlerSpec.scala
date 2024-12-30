@@ -16,28 +16,20 @@
 
 package org.alephium.app.ws
 
-import org.alephium.api.model.{
-  BlockAndEvents,
-  BlockEntry,
-  ContractEvent,
-  TransactionTemplate,
-  ValU256
-}
-import org.alephium.app.ServerFixture
+import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
 import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
   WsBlockNotificationParams,
-  WsContractNotificationParams,
+  WsContractEventNotificationParams,
   WsNotificationParams,
   WsTxNotificationParams
 }
 import org.alephium.json.Json._
-import org.alephium.protocol.model.{Address, ContractId, TxGenerators}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.util._
 
-class WsEventHandlerSpec extends WsSpec with ServerFixture with TxGenerators {
+class WsEventHandlerSpec extends WsSubscriptionFixture {
 
   it should "subscribe event handler into event bus" in new WsServerFixture {
     val subscriptionHandler =
@@ -52,14 +44,15 @@ class WsEventHandlerSpec extends WsSpec with ServerFixture with TxGenerators {
       .contains(eventHandler.ref) is true
   }
 
-  it should "make Block Notification from Event round-trip" in {
-    val blockAndEvents = BlockAndEvents(BlockEntry.from(dummyBlock, 0).rightValue, AVector.empty)
+  it should "make JsonRPC Block Notification ser/deser round-trip" in {
+    val blockAndEvents =
+      BlockAndEvents(BlockEntry.from(dummyBlock, 0).rightValue, contractEventByBlockHash)
     val notificationParams: WsNotificationParams =
       WsBlockNotificationParams(SimpleSubscribeParams.Block.subscriptionId, blockAndEvents)
     read[JsonRPC.Notification](notificationParams.asJsonRpcNotification)
   }
 
-  it should "make Tx Notification from Event round-trip" in {
+  it should "make JsonRPC Tx Notification ser/deser round-trip" in {
     val notificationParams: WsNotificationParams =
       WsTxNotificationParams(
         SimpleSubscribeParams.Tx.subscriptionId,
@@ -68,20 +61,10 @@ class WsEventHandlerSpec extends WsSpec with ServerFixture with TxGenerators {
     read[JsonRPC.Notification](notificationParams.asJsonRpcNotification)
   }
 
-  it should "make Contract Notification from Event round-trip" in {
-    val subscribeParams =
-      ContractEventsSubscribeParams.from(EventIndex_0, AVector(contractAddress_0))
+  it should "make JsonRPC Contract Notification ser/deser round-trip" in {
+    val subscribeParams = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     val notificationParams: WsNotificationParams =
-      WsContractNotificationParams(
-        subscribeParams.subscriptionId,
-        ContractEvent(
-          blockHashGen.sample.get,
-          txIdGen.sample.get,
-          Address.contract(ContractId.hash("foo")),
-          EventIndex_0,
-          AVector(ValU256(U256.unsafe(5)))
-        )
-      )
+      WsContractEventNotificationParams(subscribeParams.subscriptionId, contractEvent)
     read[JsonRPC.Notification](notificationParams.asJsonRpcNotification)
   }
 }

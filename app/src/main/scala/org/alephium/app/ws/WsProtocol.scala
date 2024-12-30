@@ -17,10 +17,7 @@
 package org.alephium.app.ws
 
 import scala.collection.mutable
-import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
-
-import io.vertx.core.{Future => VertxFuture}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
@@ -33,11 +30,6 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, EitherF}
 
-protected[ws] object WsError {
-  val AlreadySubscribed: Int   = -32010
-  val AlreadyUnsubscribed: Int = -32011
-}
-
 protected[ws] object WsMethod {
   private type WsMethodType = String
   val SubscribeMethod: WsMethodType    = "subscribe"
@@ -46,10 +38,10 @@ protected[ws] object WsMethod {
 }
 
 protected[ws] object WsParams {
-  private type WsEventType = String
-  type WsId                = String
-  type WsCorrelationId     = Long
-  type WsSubscriptionId    = String
+  protected[ws] type WsEventType      = String
+  protected[ws] type WsId             = String
+  protected[ws] type WsCorrelationId  = Long
+  protected[ws] type WsSubscriptionId = String
 
   sealed trait WsParams
   sealed trait WsSubscriptionParams extends WsParams {
@@ -72,21 +64,11 @@ protected[ws] object WsParams {
         case ujson.Str(eventTypeOrSubscriptionId) =>
           eventTypeOrSubscriptionId match {
             case BlockEvent | TxEvent => Right(SimpleSubscribeParams(eventTypeOrSubscriptionId))
-            case unknown              => Left(invalidEventTypeError(unknown))
+            case unknown              => Left(WsError.invalidEventType(unknown))
           }
-        case unsupported => Left(invalidSubscriptionJsonError(unsupported))
+        case unsupported => Left(WsError.invalidSubscriptionEventTypes(unsupported))
       }
     }
-    private def invalidEventTypeError(eventType: WsEventType): Error =
-      Error(
-        Error.InvalidParamsCode,
-        s"Invalid event type: $eventType, expected array with one of: ${eventTypes.mkString(", ")}"
-      )
-    private def invalidSubscriptionJsonError(json: ujson.Value): Error =
-      Error(
-        Error.InvalidParamsCode,
-        s"Invalid subscription json: $json, expected array with one of: ${eventTypes.mkString(", ")}"
-      )
   }
 
   final case class ContractEventsSubscribeParams(
@@ -104,76 +86,65 @@ protected[ws] object WsParams {
         .toHexString
   }
   object ContractEventsSubscribeParams {
-    val Contract: WsEventType            = "contract"
-    val eventTypes: AVector[WsEventType] = AVector(Contract)
+    val Contract: WsEventType = "contract"
 
     protected[ws] def from(
         eventIndex: Int,
-        address: AVector[Address.Contract]
-    ): ContractEventsSubscribeParams = ContractEventsSubscribeParams(Contract, eventIndex, address)
+        addresses: AVector[Address.Contract]
+    ): ContractEventsSubscribeParams =
+      ContractEventsSubscribeParams(Contract, eventIndex, addresses)
 
-    protected[ws] def read(jsonArr: ujson.Arr): Either[Error, WsSubscriptionParams] = {
+    protected[ws] def fromSingle(
+        eventIndex: Int,
+        address: Address.Contract
+    ): ContractEventsSubscribeParams =
+      ContractEventsSubscribeParams(Contract, eventIndex, AVector(address))
+
+    private def buildContractEventsSubscribeParams(
+        eventIndex: Int,
+        addressArr: Iterable[ujson.Value]
+    ): Either[Error, ContractEventsSubscribeParams] = {
+      EitherF
+        .foldTry(addressArr, mutable.ArrayBuffer.empty[Address.Contract]) {
+          case (addresses, addressValue) =>
+            addressValue.strOpt match {
+              case None =>
+                Left(WsError.invalidContractAddressType)
+              case Some(address) =>
+                LockupScript.p2c(address).map(Address.Contract(_)) match {
+                  case Some(address) => Right(addresses :+ address)
+                  case None          => Left(WsError.invalidContractAddress(address))
+                }
+            }
+        }
+        .map(addresses => ContractEventsSubscribeParams.from(eventIndex, AVector.from(addresses)))
+    }
+
+    protected[ws] def read(jsonArr: ujson.Arr): Either[Error, ContractEventsSubscribeParams] = {
       assume(jsonArr.arr.length == 3)
       (jsonArr(0), jsonArr(1), jsonArr(2)) match {
         case (ujson.Str(eventType), ujson.Num(eventIndex), ujson.Arr(addressArr)) =>
           eventType match {
             case Contract =>
-              EitherF
-                .foldTry(addressArr, mutable.ArrayBuffer.empty[Address.Contract]) {
-                  case (addresses, address) =>
-                    LockupScript
-                      .p2c(address.str)
-                      .map(Address.Contract(_)) match {
-                      case Some(address) => Right(addresses :+ address)
-                      case None          => Left(invalidContractAddress(address.str))
-                    }
-                }
-                .map(addresses =>
-                  ContractEventsSubscribeParams(
-                    eventType,
-                    eventIndex.toInt,
-                    AVector.from(addresses)
-                  )
-                )
-            case unknown => Left(invalidContractParamsError(unknown))
+              buildContractEventsSubscribeParams(eventIndex.toInt, addressArr)
+            case unknown =>
+              Left(WsError.invalidContractEventParams(unknown))
           }
-        case unsupported => Left(invalidContractParamsJsonError(unsupported))
+        case unsupported => Left(WsError.invalidParamsArrayElements(unsupported))
       }
     }
-
-    private def invalidContractAddress(address: String): Error =
-      Error(Error.InvalidParamsCode, s"Contract address $address is not valid")
-
-    private def invalidContractParamsError(eventType: WsEventType): Error =
-      Error(
-        Error.InvalidParamsCode,
-        s"Invalid event type: $eventType, expected array with eventType, eventIndex and array of addresses"
-      )
-    private def invalidContractParamsJsonError(
-        json: (ujson.Value, ujson.Value, ujson.Value)
-    ): Error =
-      Error(
-        Error.InvalidParamsCode,
-        s"Invalid event type json: $json, expected array with eventType, eventIndex and array of addresses"
-      )
-
   }
 
   final case class UnsubscribeParams(subscriptionId: WsSubscriptionId) extends WsSubscriptionParams
   object UnsubscribeParams {
     protected[ws] def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
       json match {
-        case ujson.Str(eventTypeOrSubscriptionId) if eventTypeOrSubscriptionId.nonEmpty =>
-          Right(UnsubscribeParams(eventTypeOrSubscriptionId))
+        case ujson.Str(subscriptionId) if subscriptionId.nonEmpty =>
+          Right(UnsubscribeParams(subscriptionId))
         case unsupported =>
-          Left(invalidUnsubscriptionJsonError(unsupported))
+          Left(WsError.invalidUnsubscriptionFormat(unsupported))
       }
     }
-    private def invalidUnsubscriptionJsonError(json: ujson.Value): Error =
-      Error(
-        Error.InvalidParamsCode,
-        s"Invalid subscription json: $json, expected array with subscriptionId"
-      )
   }
 
   sealed trait WsNotificationParams extends WsParams {
@@ -188,14 +159,14 @@ protected[ws] object WsParams {
   }
   object WsNotificationParams extends ApiModelCodec {
     implicit val wsSubscriptionParamsWriter: Writer[WsNotificationParams] = {
-      implicit val blockSubscriptionWriter: Writer[WsBlockNotificationParams]       = macroW
-      implicit val txSubscriptionWriter: Writer[WsTxNotificationParams]             = macroW
-      implicit val contractSubscriptionWriter: Writer[WsContractNotificationParams] = macroW
+      implicit val blockSubscriptionWriter: Writer[WsBlockNotificationParams]            = macroW
+      implicit val txSubscriptionWriter: Writer[WsTxNotificationParams]                  = macroW
+      implicit val contractSubscriptionWriter: Writer[WsContractEventNotificationParams] = macroW
 
       writer[ujson.Value].comap[WsNotificationParams] {
-        case block: WsBlockNotificationParams       => writeJs(block)
-        case tx: WsTxNotificationParams             => writeJs(tx)
-        case contract: WsContractNotificationParams => writeJs(contract)
+        case block: WsBlockNotificationParams            => writeJs(block)
+        case tx: WsTxNotificationParams                  => writeJs(tx)
+        case contract: WsContractEventNotificationParams => writeJs(contract)
       }
     }
   }
@@ -223,7 +194,7 @@ protected[ws] object WsParams {
         txTemplate
       )
   }
-  final case class WsContractNotificationParams(
+  final case class WsContractEventNotificationParams(
       subscription: WsSubscriptionId,
       result: ContractEvent
   ) extends WsNotificationParams
@@ -266,7 +237,7 @@ object WsRequest extends ApiModelCodec {
       }
   }
 
-  private def fromJsonRpc(r: RequestUnsafe): Either[Error, WsRequest] = {
+  protected[ws] def fromJsonRpc(r: RequestUnsafe): Either[Error, WsRequest] = {
     def readParams =
       r.params match {
         case ujson.Arr(arr) if arr.length == 1 =>
@@ -277,12 +248,7 @@ object WsRequest extends ApiModelCodec {
         case ujson.Arr(arr) if arr.length == 3 =>
           ContractEventsSubscribeParams.read(arr)
         case unsupported =>
-          Left(
-            Error(
-              Error.InvalidParamsCode,
-              s"Invalid params format: $unsupported, expected array of size 1 for block/tx or 3 for contract events notifications"
-            )
-          )
+          Left(WsError.invalidParamsFormat(unsupported))
       }
     readParams.map(params => WsRequest(Correlation(r.id), params))
   }
@@ -294,24 +260,14 @@ object WsRequest extends ApiModelCodec {
     }
   }
 
-  protected[ws] def subscribe(id: WsCorrelationId, params: WsSubscriptionParams): WsRequest =
+  protected[ws] def subscribe(id: WsCorrelationId, params: WsSubscriptionParams): WsRequest = {
     WsRequest(Correlation(id), params)
+  }
 
-  protected[ws] def unsubscribe(id: WsCorrelationId, subscriptionId: WsSubscriptionId): WsRequest =
+  protected[ws] def unsubscribe(
+      id: WsCorrelationId,
+      subscriptionId: WsSubscriptionId
+  ): WsRequest = {
     WsRequest(Correlation(id), UnsubscribeParams(subscriptionId))
-}
-
-object WsUtils {
-  implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
-    def asScala: Future[T] = {
-      val promise = Promise[T]()
-      vertxFuture.onComplete {
-        case handler if handler.succeeded() =>
-          promise.success(handler.result())
-        case handler if handler.failed() =>
-          promise.failure(handler.cause())
-      }
-      promise.future
-    }
   }
 }
