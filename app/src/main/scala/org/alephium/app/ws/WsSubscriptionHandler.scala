@@ -18,11 +18,13 @@ package org.alephium.app.ws
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 import akka.actor.{ActorSystem, Props}
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
+import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 
 import org.alephium.app.ws.WsParams._
@@ -34,11 +36,16 @@ import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 protected[ws] object WsSubscriptionHandler {
 
-  def apply(vertx: Vertx, system: ActorSystem, maxConnections: Int): ActorRefT[SubscriptionMsg] = {
+  def apply(
+      vertx: Vertx,
+      system: ActorSystem,
+      maxConnections: Int,
+      keepAliveInterval: FiniteDuration
+  ): ActorRefT[SubscriptionMsg] = {
     ActorRefT
       .build[WsSubscriptionHandler.SubscriptionMsg](
         system,
-        Props(new WsSubscriptionHandler(vertx, maxConnections))
+        Props(new WsSubscriptionHandler(vertx, maxConnections, keepAliveInterval))
       )
   }
 
@@ -111,6 +118,8 @@ protected[ws] object WsSubscriptionHandler {
   final protected[ws] case class Unregister(id: WsId) extends Command
   final private case class Unregistered(id: WsId)     extends CommandResponse
 
+  private case object KeepAlive
+
   final protected[ws] case class AddressWithIndex(address: String, eventIndex: Int)
   final protected[ws] case class WsIdWithSubscriptionId(
       wsId: WsId,
@@ -120,10 +129,13 @@ protected[ws] object WsSubscriptionHandler {
 
 protected[ws] class WsSubscriptionHandler(
     vertx: Vertx,
-    maxConnections: Int
+    maxConnections: Int,
+    keepAliveInterval: FiniteDuration
 ) extends BaseActor {
   import org.alephium.app.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
+
+  private val openedWebSockets = mutable.Map.empty[WsId, ServerWsLike]
 
   // client who unsubscribes from all subscriptions is connected but not subscribed to any events
   private val subscribers =
@@ -135,15 +147,46 @@ protected[ws] class WsSubscriptionHandler(
   private val addressesBySubscriptionId =
     mutable.Map.empty[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
 
+  private val pingScheduler =
+    context.system.scheduler.scheduleWithFixedDelay(
+      keepAliveInterval,
+      keepAliveInterval,
+      self,
+      KeepAlive
+    )
+
+  override def postStop(): Unit = {
+    pingScheduler.cancel()
+    ()
+  }
+
   // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
+    case KeepAlive =>
+      openedWebSockets.foreachEntry { case (wsId, ws) =>
+        if (ws.isClosed) {
+          openedWebSockets.remove(wsId)
+        } else {
+          ws.writePing(Buffer.buffer("ping"))
+        }
+      }
     case Connect(ws) =>
       if (subscribers.size >= maxConnections) {
         log.warning(s"WebSocket connections reached max limit ${subscribers.size}")
         ws.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
       } else {
+        ws.frameHandler { frame =>
+          if (frame.isPing) {
+            ws.writePong(Buffer.buffer("pong")).onComplete {
+              case Success(_) =>
+              case Failure(ex) =>
+                log.error(ex, "Websocket keep-alive failure")
+            }
+          }
+        }
         ws.closeHandler(() => self ! Unregister(ws.textHandlerID()))
         val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
+        val _ = openedWebSockets.put(ws.textHandlerID(), ws)
       }
     case Subscribe(id, ws, params) =>
       subscribe(id, ws, params)

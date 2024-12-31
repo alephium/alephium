@@ -24,9 +24,11 @@ import scala.util.{Failure, Success, Try}
 
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
+import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{WebSocket, WebSocketClient, WebSocketClientOptions}
 
 import org.alephium.app.ws.ClientWs.WsException
+import org.alephium.app.ws.WsClient.KeepAlive
 import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
@@ -53,15 +55,18 @@ final case class WsClient(underlying: WebSocketClient) {
       port: Int,
       host: String = "127.0.0.1",
       uri: String = "/ws"
-  )(notificationHandler: Notification => Unit)(implicit ec: ExecutionContext): Future[ClientWs] = {
+  )(
+      notificationHandler: Notification => Unit
+  )(keepAliveHandler: KeepAlive => Unit)(implicit ec: ExecutionContext): Future[ClientWs] = {
     underlying
       .connect(port, host, uri)
       .asScala
-      .map(underlying => ClientWs(underlying, notificationHandler))
+      .map(underlying => ClientWs(underlying, notificationHandler, keepAliveHandler))
   }
 }
 
 object WsClient {
+  final case class KeepAlive(data: Buffer)
 
   def apply(vertx: Vertx): WsClient = {
     WsClient(vertx.createWebSocketClient())
@@ -72,9 +77,24 @@ object WsClient {
   }
 }
 
-final case class ClientWs(underlying: WebSocket, notificationHandler: Notification => Unit)(implicit
+final case class ClientWs(
+    underlying: WebSocket,
+    notificationHandler: Notification => Unit,
+    keepAliveHandler: KeepAlive => Unit
+)(implicit
     ec: ExecutionContext
 ) extends StrictLogging {
+
+  underlying.frameHandler { frame =>
+    if (frame.isPing) {
+      underlying.writePong(Buffer.buffer("pong")).asScala.onComplete {
+        case Success(_) =>
+          keepAliveHandler(KeepAlive(frame.binaryData()))
+        case Failure(ex) =>
+          logger.error("Websocket keep-alive failure", ex)
+      }
+    }
+  }
 
   underlying.textMessageHandler((message: String) =>
     Try(ujson.read(message)) match {

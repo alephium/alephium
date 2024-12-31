@@ -16,15 +16,10 @@
 
 package org.alephium.app.ws
 
+import scala.concurrent.duration.DurationInt
+
 import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
-import org.alephium.app.ws.WsParams.{
-  ContractEventsSubscribeParams,
-  SimpleSubscribeParams,
-  WsBlockNotificationParams,
-  WsContractEventNotificationParams,
-  WsNotificationParams,
-  WsTxNotificationParams
-}
+import org.alephium.app.ws.WsParams._
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.util._
@@ -33,7 +28,7 @@ class WsEventHandlerSpec extends WsSubscriptionFixture {
 
   it should "subscribe event handler into event bus" in new WsServerFixture {
     val subscriptionHandler =
-      WsSubscriptionHandler.apply(vertx, system, networkConfig.maxWsConnections)
+      WsSubscriptionHandler.apply(vertx, system, networkConfig.maxWsConnections, 10.seconds)
     val eventHandler =
       WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
     node.eventBus

@@ -391,7 +391,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def startWsClient(port: Int): Future[ClientWs] = {
     implicit val ec: ExecutionContext = system.dispatcher
-    wsClient.connect(port)(blockNotifyProbe.ref ! _)
+    wsClient.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
   }
 
   def jsonRpc(method: String, params: String): String =

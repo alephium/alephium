@@ -230,7 +230,13 @@ object RestServer {
         .setRegisterWebSocketWriteHandlers(true)
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
     val webSocketServer =
-      WsServer(flowSystem, node, networkSetting.maxWsConnections, httpOptions)
+      WsServer(
+        flowSystem,
+        node,
+        networkSetting.maxWsConnections,
+        networkSetting.wsPingFrequency,
+        httpOptions
+      )
     new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }

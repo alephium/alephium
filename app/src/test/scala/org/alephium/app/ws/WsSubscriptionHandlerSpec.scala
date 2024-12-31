@@ -52,7 +52,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
       )
     def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
-        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)
+        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         blockSubscriptionResponse <- ws.subscribeToBlock(0)
         txSubscriptionResponse    <- ws.subscribeToTx(1)
         contractEventsSubscriptionResponse <- ws.subscribeToContractEvents(
@@ -109,7 +109,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
   it should "not spin ws connections over limit" in new WsBehaviorFixture {
     override def maxServerConnections: Int = 2
     val wsSpec = WsStartBehavior(
-      _ => wsClient.connect(wsPort)(_ => ()),
+      _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
       _ => (),
       _ => true is true
     )
@@ -125,7 +125,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
     def invalidMessageBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
         vertxWs <- wsClient.underlying.connect(wsPort, "127.0.0.1", "/ws").asScala
-        ws = ClientWs(vertxWs, _ => ())
+        ws = ClientWs(vertxWs, _ => (), _ => ())
         // using underlying ws to test unexpected messages, WsClient does not allow that
         _ = vertxWs.textMessageHandler(clientProbe.ref ! _)
         _ <- vertxWs.writeTextMessage("invalid_msg").asScala
@@ -190,7 +190,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
   it should "subscribe/unsubscribe from block, tx and contract events from multiple addresses of different event indexes" in new WsBehaviorFixture {
     def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
-        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)
+        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         blockSubscriptionResponse <- ws.subscribeToBlock(0)
         txSubscriptionResponse    <- ws.subscribeToTx(1)
         contractEventsSubscriptionResponse_0 <- ws.subscribeToContractEvents(

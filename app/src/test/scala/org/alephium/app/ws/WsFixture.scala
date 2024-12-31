@@ -22,7 +22,8 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions}
+import io.vertx.core.buffer.Buffer
+import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions, WebSocketFrame}
 import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -148,8 +149,9 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
       .setMaxWebSocketFrameSize(1024 * 1024)
       .setRegisterWebSocketWriteHandlers(true)
 
-  protected def maxServerConnections: Int = 10
-  protected def maxClientConnections: Int = 500
+  protected def maxServerConnections: Int   = 10
+  protected def maxClientConnections: Int   = 500
+  protected def keepAliveInterval: Duration = Duration.ofSecondsUnsafe(10)
 
   protected def bindAndListen(): WsServer = {
     val wsServer =
@@ -157,6 +159,7 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
         system,
         node,
         maxServerConnections,
+        keepAliveInterval,
         wsOptions
       )
     wsServer.httpServer
@@ -178,12 +181,15 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
   // scalastyle:on regex
 
   protected def dummyServerWs(id: String): ServerWsLike = new ServerWsLike {
-    override def textHandlerID(): WsId                                     = id
-    override def isClosed: Boolean                                         = false
-    override def reject(statusCode: Int): Unit                             = ()
-    override def closeHandler(handler: () => Unit): ServerWsLike           = this
-    override def textMessageHandler(handler: String => Unit): ServerWsLike = this
-    override def writeTextMessage(msg: String): Future[Unit]               = Future.successful(())
+    override def textHandlerID(): WsId                                       = id
+    override def isClosed: Boolean                                           = false
+    override def reject(statusCode: Int): Unit                               = ()
+    override def closeHandler(handler: () => Unit): ServerWsLike             = this
+    override def textMessageHandler(handler: String => Unit): ServerWsLike   = this
+    override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+    override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
+    override def writePong(data: Buffer): Future[Unit]                       = Future.successful(())
+    override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
   }
 
   protected def testSubscriptionHandlerInitialized(

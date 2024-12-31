@@ -16,20 +16,23 @@
 
 package org.alephium.app.ws
 
+import java.util.concurrent.TimeUnit
+
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
+import io.vertx.core.buffer.Buffer
+import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket, WebSocketFrame}
 
 import org.alephium.app.HttpServerLike
-import org.alephium.app.ws.WsEventHandler
 import org.alephium.app.ws.WsParams.WsId
 import org.alephium.flow.client.Node
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.util.{ActorRefT, EventBus}
+import org.alephium.util.{ActorRefT, Duration, EventBus}
 
 final case class WsServer(
     httpServer: HttpServer,
@@ -39,12 +42,25 @@ final case class WsServer(
 
 object WsServer extends StrictLogging {
 
-  def apply(system: ActorSystem, node: Node, maxConnections: Int, options: HttpServerOptions)(
-      implicit networkConfig: NetworkConfig
+  def apply(
+      system: ActorSystem,
+      node: Node,
+      maxConnections: Int,
+      keepAliveInterval: Duration,
+      options: HttpServerOptions
+  )(implicit
+      networkConfig: NetworkConfig
   ): WsServer = {
-    val vertx               = Vertx.vertx()
-    val server              = vertx.createHttpServer(options)
-    val subscriptionHandler = WsSubscriptionHandler.apply(vertx, system, maxConnections)
+    val vertx  = Vertx.vertx()
+    val server = vertx.createHttpServer(options)
+
+    val subscriptionHandler =
+      WsSubscriptionHandler.apply(
+        vertx,
+        system,
+        maxConnections,
+        FiniteDuration(keepAliveInterval.millis, TimeUnit.MILLISECONDS)
+      )
     val eventHandler =
       WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
     server.webSocketHandler { ws =>
@@ -64,7 +80,10 @@ trait ServerWsLike {
   def reject(statusCode: Int): Unit
   def closeHandler(handler: () => Unit): ServerWsLike
   def textMessageHandler(handler: String => Unit): ServerWsLike
+  def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike
   def writeTextMessage(msg: String): Future[Unit]
+  def writePong(data: Buffer): Future[Unit]
+  def writePing(data: Buffer): Future[Unit]
 }
 
 final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
@@ -82,6 +101,17 @@ final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
     this
   }
 
+  def frameHandler(handler: WebSocketFrame => Unit): ServerWs = {
+    underlying.frameHandler((msg: WebSocketFrame) => handler(msg))
+    this
+  }
+
   def writeTextMessage(msg: String): Future[Unit] =
     underlying.writeTextMessage(msg).asScala.mapTo[Unit]
+
+  def writePong(data: Buffer): Future[Unit] =
+    underlying.writePong(data).asScala.mapTo[Unit]
+
+  def writePing(data: Buffer): Future[Unit] =
+    underlying.writePing(data).asScala.mapTo[Unit]
 }

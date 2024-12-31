@@ -33,12 +33,24 @@ import org.alephium.util._
 class WsClientServerSpec extends WsSubscriptionFixture {
   import WsUtils._
 
+  "WsServer" should "keep websocket connection alive" in new WsServerFixture with Eventually {
+    override val keepAliveInterval = Duration.ofMillisUnsafe(20)
+    val wsServer                   = bindAndListen()
+    val keepAliveProbe             = TestProbe()
+    val ws = wsClient.connect(wsPort)(_ => ())(keepAliveProbe.ref ! _).futureValue
+    eventually {
+      keepAliveProbe.expectMsgType[WsClient.KeepAlive]
+    }
+    ws.close()
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
   "WsServer" should "reject request to any endpoint besides /ws" in new WsServerFixture {
     val wsServer = bindAndListen()
     assertThrows[TestFailedException](
-      wsClient.connect(wsPort, uri = "/wrong")(_ => ()).futureValue
+      wsClient.connect(wsPort, uri = "/wrong")(_ => ())(_ => ()).futureValue
     )
-    wsClient.connect(wsPort)(_ => ()).futureValue.isClosed is false
+    wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue.isClosed is false
     wsServer.httpServer.close().asScala.futureValue
   }
 
@@ -52,7 +64,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
 
   "WsClient and WsServer" should "subscribe/unsubscribe and acknowledge by response" in new WsServerFixture {
     val wsServer = bindAndListen()
-    val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
 
     // for block notification
     ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
@@ -75,7 +87,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
 
   "WsServer" should "respond already subscribed or unsubscribed" in new WsServerFixture {
     val wsServer = bindAndListen()
-    val ws       = wsClient.connect(wsPort)(_ => ()).futureValue
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
 
     // for block
     ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
@@ -127,7 +139,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
             AVector
               .tabulate(numberOfConnections) { index =>
                 wsClient
-                  .connect(wsPort)(clientProbe.ref ! _)
+                  .connect(wsPort)(clientProbe.ref ! _)(_ => ())
                   .map(index.toLong -> _)
               }
               .toSeq

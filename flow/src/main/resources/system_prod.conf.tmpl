@@ -21,6 +21,9 @@ alephium {
     max-ws-connections = 100
     max-clique-from-same-ip = 2
 
+    # The frequency at which websocket server will ping the client to keep the connection alive.
+    ws-ping-frequency = 30 second
+
     # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
 
