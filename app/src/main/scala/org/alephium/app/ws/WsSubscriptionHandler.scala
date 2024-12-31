@@ -165,7 +165,7 @@ protected[ws] class WsSubscriptionHandler(
     case KeepAlive =>
       openedWebSockets.foreachEntry { case (wsId, ws) =>
         if (ws.isClosed) {
-          openedWebSockets.remove(wsId)
+          self ! Unregister(wsId)
         } else {
           ws.writePing(Buffer.buffer("ping"))
         }
@@ -224,9 +224,9 @@ protected[ws] class WsSubscriptionHandler(
     case NotificationFailed(_, _, _, _) =>
     // TODO can we do something about failing notification to client which is not closed ?
     case Unregister(id) =>
-      unregister(id)
+      unregisterConsumers(id)
     case Unregistered(id) =>
-      val _ = subscribers.remove(id)
+      cleanOnDisconnection(id)
     case GetSubscriptions =>
       sender() ! SubscriptionsResponse(
         subscribers.toMap,
@@ -399,7 +399,23 @@ protected[ws] class WsSubscriptionHandler(
       .mapTo[Unit]
   }
 
-  private def unregister(id: WsId)(implicit ec: ExecutionContext): Unit = {
+  private def cleanOnDisconnection(id: WsId): Unit = {
+    val _ = subscribers.remove(id)
+    val _ = openedWebSockets.remove(id)
+    subscriptionsByAddress.filter(_._2.exists(_.wsId == id)).foreachEntry {
+      case (addressWithIndex, _) =>
+        subscriptionsByAddress.updateWith(addressWithIndex) {
+          case Some(ss) => Option(ss.filterNot(_.wsId == id)).filter(_.nonEmpty)
+          case None     => None
+        }
+    }
+    addressesBySubscriptionId.filter(_._1.wsId == id).foreachEntry {
+      case (wsIdWithSubscriptionId, _) =>
+        addressesBySubscriptionId.remove(wsIdWithSubscriptionId)
+    }
+  }
+
+  private def unregisterConsumers(id: WsId)(implicit ec: ExecutionContext): Unit = {
     Future.sequence(
       subscribers.get(id).toList.flatMap { subscriptions =>
         subscriptions.map { case (_, consumer) =>

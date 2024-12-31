@@ -26,6 +26,7 @@ import org.scalatest.exceptions.TestFailedException
 import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
+import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util._
@@ -83,6 +84,34 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     )
     ws.close().futureValue
     wsServer.httpServer.close().asScala.futureValue
+  }
+
+  "WsServer" should "unregister and clean all subscriptions on websocket disconnection" in new WsServerFixture
+    with Eventually {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
+
+    ws.subscribeToBlock(0).futureValue is Response.successful(Correlation(0), Block.subscriptionId)
+    ws.subscribeToTx(2).futureValue is Response.successful(Correlation(2), Tx.subscriptionId)
+    val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
+    ws.subscribeToContractEvents(4, params.eventIndex, params.addresses).futureValue is Response
+      .successful(Correlation(4), params.subscriptionId)
+
+    val responseBeforeClose =
+      wsServer.subscriptionHandler.ask(GetSubscriptions).mapTo[SubscriptionsResponse].futureValue
+    responseBeforeClose.subscriptions.nonEmpty is true
+    responseBeforeClose.subscriptionsByAddress.nonEmpty is true
+    responseBeforeClose.addressesBySubscriptionId.nonEmpty is true
+
+    ws.close().futureValue
+
+    eventually {
+      val responseAfterClose =
+        wsServer.subscriptionHandler.ask(GetSubscriptions).mapTo[SubscriptionsResponse].futureValue
+      responseAfterClose.subscriptions.isEmpty is true
+      responseAfterClose.subscriptionsByAddress.isEmpty is true
+      responseAfterClose.addressesBySubscriptionId.isEmpty is true
+    }
   }
 
   "WsServer" should "respond already subscribed or unsubscribed" in new WsServerFixture {
