@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
+import org.alephium.serde.{_deserialize => _decode, deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class CoinbaseDataPrefix private (fromGroup: Byte, toGroup: Byte, blockTs: TimeStamp)
@@ -37,7 +37,7 @@ object CoinbaseDataPrefix {
   }
 }
 
-sealed trait CoinbaseData {
+sealed trait CoinbaseData extends Product with Serializable {
   def prefix: CoinbaseDataPrefix
   def isGhostEnabled: Boolean = this match {
     case _: CoinbaseDataV1 => false
@@ -49,6 +49,18 @@ final case class CoinbaseDataV1(
     prefix: CoinbaseDataPrefix,
     minerData: ByteString
 ) extends CoinbaseData
+
+object CoinbaseDataV1 {
+  implicit val serde: Serde[CoinbaseDataV1] = new Serde[CoinbaseDataV1] {
+    def serialize(input: CoinbaseDataV1): ByteString = encode(input.prefix) ++ input.minerData
+
+    def _deserialize(input: ByteString): SerdeResult[Staging[CoinbaseDataV1]] = {
+      for {
+        prefix <- _decode[CoinbaseDataPrefix](input)
+      } yield Staging(CoinbaseDataV1(prefix.value, prefix.rest), ByteString.empty)
+    }
+  }
+}
 
 final case class GhostUncleData(blockHash: BlockHash, lockupScript: LockupScript.Asset)
 
@@ -66,44 +78,33 @@ final case class CoinbaseDataV2(
     minerData: ByteString
 ) extends CoinbaseData
 
-object CoinbaseData {
-  implicit def serde(implicit networkConfig: NetworkConfig): Serde[CoinbaseData] =
-    new Serde[CoinbaseData] {
-      def _deserialize(input: ByteString): SerdeResult[Staging[CoinbaseData]] = {
-        for {
-          prefixResult <- _decode[CoinbaseDataPrefix](input)
-          hardFork = networkConfig.getHardFork(prefixResult.value.blockTs)
-          coinbaseData <-
-            if (hardFork.isRhoneEnabled()) {
-              for {
-                ghostUncleDataResult <- _decode[AVector[GhostUncleData]](prefixResult.rest)
-              } yield Staging[CoinbaseData](
-                CoinbaseDataV2(
-                  prefixResult.value,
-                  ghostUncleDataResult.value,
-                  ghostUncleDataResult.rest
-                ),
-                ByteString.empty
-              )
-            } else {
-              Right(
-                Staging[CoinbaseData](
-                  CoinbaseDataV1(prefixResult.value, prefixResult.rest),
-                  ByteString.empty
-                )
-              )
-            }
-        } yield coinbaseData
-      }
+object CoinbaseDataV2 {
+  implicit val serde: Serde[CoinbaseDataV2] = new Serde[CoinbaseDataV2] {
+    def serialize(input: CoinbaseDataV2): ByteString =
+      encode(input.prefix) ++ encode(input.ghostUncleData) ++ input.minerData
 
-      def serialize(d: CoinbaseData): ByteString = {
-        d match {
-          case data: CoinbaseDataV1 => encode(data.prefix) ++ data.minerData
-          case data: CoinbaseDataV2 =>
-            encode(data.prefix) ++ encode(data.ghostUncleData) ++ data.minerData
-        }
-      }
+    def _deserialize(input: ByteString): SerdeResult[Staging[CoinbaseDataV2]] = {
+      for {
+        prefix <- _decode[CoinbaseDataPrefix](input)
+        uncles <- _decode[AVector[GhostUncleData]](prefix.rest)
+      } yield Staging(CoinbaseDataV2(prefix.value, uncles.value, uncles.rest), ByteString.empty)
     }
+  }
+}
+
+object CoinbaseData {
+  implicit val serializer: Serializer[CoinbaseData] = {
+    case data: CoinbaseDataV1 => encode(data)
+    case data: CoinbaseDataV2 => encode(data)
+  }
+
+  def deserialize(input: ByteString, hardFork: HardFork): SerdeResult[CoinbaseData] = {
+    if (hardFork.isRhoneEnabled()) {
+      decode[CoinbaseDataV2](input)
+    } else {
+      decode[CoinbaseDataV1](input)
+    }
+  }
 
   def from(
       chainIndex: ChainIndex,

@@ -255,6 +255,12 @@ class BlockValidationSpec extends AlephiumSpec {
         )
       )
     }
+
+    implicit val validator: Block => BlockValidationResult[Unit] =
+      (blk: Block) => {
+        val hardFork = networkConfig.getHardFork(blk.timestamp)
+        checkCoinbaseData(blk.chainIndex, blk, hardFork).map(_ => ())
+      }
   }
 
   it should "check coinbase data for pre-rhone hardfork" in new CoinbaseDataFixture {
@@ -263,9 +269,6 @@ class BlockValidationSpec extends AlephiumSpec {
       ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
-    implicit val validator: (Block) => BlockValidationResult[Unit] =
-      (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
     val block          = emptyBlock(blockFlow, chainIndex)
     val selectedUncles = AVector.empty
@@ -324,9 +327,6 @@ class BlockValidationSpec extends AlephiumSpec {
     Seq(HardFork.Rhone, HardFork.Danube).contains(
       networkConfig.getHardFork(TimeStamp.now())
     ) is true
-
-    implicit val validator: (Block) => BlockValidationResult[Unit] =
-      (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
     val uncleBlock     = blockGen(chainIndex).sample.get
     val uncleMiner     = assetLockupGen(chainIndex.to).sample.get

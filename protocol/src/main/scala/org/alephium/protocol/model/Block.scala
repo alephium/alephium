@@ -26,7 +26,7 @@ import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.{avectorSerde, deserialize, Serde, SerdeResult}
+import org.alephium.serde.{avectorSerde, Serde, SerdeResult}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction])
@@ -48,7 +48,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     _ghostUncleData match {
       case Some(data) => Right(data)
       case None =>
-        deserialize[CoinbaseData](coinbase.unsigned.fixedOutputs.head.additionalData).map {
+        val hardFork = networkConfig.getHardFork(header.timestamp)
+        CoinbaseData.deserialize(coinbase.unsigned.fixedOutputs.head.additionalData, hardFork).map {
           case v2: CoinbaseDataV2 =>
             _ghostUncleData = Some(v2.ghostUncleData)
             v2.ghostUncleData
