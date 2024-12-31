@@ -408,13 +408,12 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     block._ghostUncleData is Some(AVector.empty[GhostUncleData])
 
     val groupIndex = GroupIndex.unsafe(0)
-    val ghostUncleData =
-      AVector.fill(2)(GhostUncleData(BlockHash.random, assetLockupGen(groupIndex).sample.get))
-    val coinbaseData: CoinbaseData = CoinbaseDataV2(
-      CoinbaseDataPrefix.from(block.chainIndex, block.timestamp),
-      ghostUncleData,
-      ByteString.empty
+    val selectedGhostUncles = AVector.fill(2)(
+      SelectedGhostUncle(BlockHash.random, assetLockupGen(groupIndex).sample.get, 1)
     )
+    val ghostUncleData = selectedGhostUncles.map(GhostUncleData.from)
+    val coinbaseData =
+      CoinbaseData.from(block.chainIndex, block.timestamp, selectedGhostUncles, ByteString.empty)
     val newOutput =
       block.coinbase.unsigned.fixedOutputs.head.copy(additionalData = serialize(coinbaseData))
     val newCoinbaseTx = block.coinbase.copy(

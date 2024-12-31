@@ -594,13 +594,19 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       val data = coinbase.unsigned.fixedOutputs.head.additionalData
       CoinbaseData.deserialize(data, hardFork) match {
         case Right(CoinbaseDataV1(prefix, _)) =>
-          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+          if (prefix == CoinbaseDataPrefixV1.from(chainIndex, block.timestamp)) {
             validBlock(AVector.empty)
           } else {
             invalidBlock(InvalidCoinbaseData)
           }
         case Right(CoinbaseDataV2(prefix, ghostUncleData, _)) =>
-          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+          if (prefix == CoinbaseDataPrefixV1.from(chainIndex, block.timestamp)) {
+            validBlock(ghostUncleData)
+          } else {
+            invalidBlock(InvalidCoinbaseData)
+          }
+        case Right(CoinbaseDataV3(prefix, ghostUncleData, _)) =>
+          if (prefix == CoinbaseDataPrefixV2.from(chainIndex)) {
             validBlock(ghostUncleData)
           } else {
             invalidBlock(InvalidCoinbaseData)

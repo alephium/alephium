@@ -27,14 +27,15 @@ import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixture.Default {
   it should "serde CoinbaseDataV1" in {
-    def test(prefix: CoinbaseDataPrefix, minerData: ByteString) = {
+    def test(prefix: CoinbaseDataPrefixV1, minerData: ByteString) = {
       val data = CoinbaseDataV1(prefix, minerData)
+      data.ghostUncleData.isEmpty is true
       CoinbaseData.deserialize(serialize[CoinbaseData](data), HardFork.Mainnet).rightValue is data
       CoinbaseData.deserialize(serialize[CoinbaseData](data), HardFork.Leman).rightValue is data
       CoinbaseData.deserialize(serialize[CoinbaseData](data), HardFork.Rhone).isLeft is true
     }
 
-    val prefix = CoinbaseDataPrefix.from(chainIndexGen.sample.get, TimeStamp.now())
+    val prefix = CoinbaseDataPrefixV1.from(chainIndexGen.sample.get, TimeStamp.now())
     test(prefix, ByteString.empty)
 
     @scala.annotation.tailrec
@@ -46,13 +47,15 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
     test(prefix, ByteString.fromArrayUnsafe(randomMinerData(40)))
   }
 
-  it should "serde CoinbaseDataV2" in new NoIndexModelGenerators with NetworkConfigFixture.RhoneT {
+  trait GhostUncleFixture extends NoIndexModelGenerators {
     val chainIndex = chainIndexGen.sample.get
-    val prefix     = CoinbaseDataPrefix.from(chainIndex, TimeStamp.now())
     val ghostUncleData =
       AVector.fill(2)(GhostUncleData(BlockHash.random, assetLockupGen(chainIndex.to).sample.get))
+  }
 
-    val data0 = CoinbaseDataV2(prefix, ghostUncleData, ByteString.empty)
+  it should "serde CoinbaseDataV2" in new GhostUncleFixture {
+    val prefix = CoinbaseDataPrefixV1.from(chainIndex, TimeStamp.now())
+    val data0  = CoinbaseDataV2(prefix, ghostUncleData, ByteString.empty)
     CoinbaseData.deserialize(serialize[CoinbaseData](data0), HardFork.Rhone).rightValue is data0
 
     val data1 = CoinbaseDataV2(
@@ -61,5 +64,46 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
       ByteString.fromArrayUnsafe(Random.nextBytes(40))
     )
     CoinbaseData.deserialize(serialize[CoinbaseData](data1), HardFork.Rhone).rightValue is data1
+  }
+
+  it should "serde CoinbaseDataV3" in new GhostUncleFixture {
+    val prefix = CoinbaseDataPrefixV2.from(chainIndex)
+    val data0  = CoinbaseDataV3(prefix, ghostUncleData, ByteString.empty)
+    CoinbaseData.deserialize(serialize[CoinbaseData](data0), HardFork.Danube).rightValue is data0
+
+    val data1 = CoinbaseDataV3(
+      prefix,
+      ghostUncleData,
+      ByteString.fromArrayUnsafe(Random.nextBytes(40))
+    )
+    CoinbaseData.deserialize(serialize[CoinbaseData](data1), HardFork.Danube).rightValue is data1
+  }
+
+  it should "get correct coinbase data" in new NoIndexModelGenerators {
+    val chainIndex = chainIndexGen.sample.get
+    val timestamp  = TimeStamp.now()
+    val selectedGhostUncles =
+      AVector(SelectedGhostUncle(BlockHash.generate, assetLockupGen(chainIndex.from).sample.get, 1))
+    val minerData = ByteString.empty
+
+    {
+      implicit val networkConfig = NetworkConfigFixture.Genesis
+      CoinbaseData.from(chainIndex, timestamp, selectedGhostUncles, minerData) is a[CoinbaseDataV1]
+    }
+
+    {
+      implicit val networkConfig = NetworkConfigFixture.Leman
+      CoinbaseData.from(chainIndex, timestamp, selectedGhostUncles, minerData) is a[CoinbaseDataV1]
+    }
+
+    {
+      implicit val networkConfig = NetworkConfigFixture.Rhone
+      CoinbaseData.from(chainIndex, timestamp, selectedGhostUncles, minerData) is a[CoinbaseDataV2]
+    }
+
+    {
+      implicit val networkConfig = NetworkConfigFixture.Danube
+      CoinbaseData.from(chainIndex, timestamp, selectedGhostUncles, minerData) is a[CoinbaseDataV3]
+    }
   }
 }

@@ -261,6 +261,31 @@ class BlockValidationSpec extends AlephiumSpec {
         val hardFork = networkConfig.getHardFork(blk.timestamp)
         checkCoinbaseData(blk.chainIndex, blk, hardFork).map(_ => ())
       }
+
+    def testWrongBlockTimeStamp() = {
+      info("wrong block timestamp")
+      val data = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
+      block.Coinbase.output(_.copy(additionalData = data)).fail(InvalidCoinbaseData)
+    }
+
+    def testWrongChainIndex() = {
+      info("wrong chain index")
+      val data = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
+      block.Coinbase.output(_.copy(additionalData = data)).fail(InvalidCoinbaseData)
+    }
+
+    def testWrongFormat() = {
+      info("wrong format")
+      val wrongFormat = ByteString("wrong-coinbase-data-format")
+      block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
+    }
+
+    def testEmptyFixedOutputs() = {
+      info("empty fixed outputs")
+      block.Coinbase
+        .unsignedTx(unsigned => unsigned.copy(fixedOutputs = AVector.empty))
+        .fail(InvalidCoinbaseFormat)
+    }
   }
 
   it should "check coinbase data for pre-rhone hardfork" in new CoinbaseDataFixture {
@@ -272,25 +297,15 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val block          = emptyBlock(blockFlow, chainIndex)
     val selectedUncles = AVector.empty
+
+    coinbaseData is a[CoinbaseDataV1]
     block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
     block.pass()
 
-    info("wrong block timestamp")
-    val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
-    block.Coinbase.output(_.copy(additionalData = data0)).fail(InvalidCoinbaseData)
-
-    info("wrong chain index")
-    val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
-    block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
-
-    info("wrong format")
-    val wrongFormat = ByteString("wrong-coinbase-data-format")
-    block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
-
-    info("empty fixed outputs")
-    block.Coinbase
-      .unsignedTx(unsigned => unsigned.copy(fixedOutputs = AVector.empty))
-      .fail(InvalidCoinbaseFormat)
+    testWrongBlockTimeStamp()
+    testWrongChainIndex()
+    testWrongFormat()
+    testEmptyFixedOutputs()
   }
 
   it should "check uncles for pre-rhone hardfork" in new Fixture {
@@ -313,55 +328,68 @@ class BlockValidationSpec extends AlephiumSpec {
     block.fail(InvalidGhostUnclesBeforeRhoneHardFork)
   }
 
-  it should "check coinbase data for since-rhone hardfork" in new CoinbaseDataFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
-
-    val uncleBlock     = blockGen(chainIndex).sample.get
-    val uncleMiner     = assetLockupGen(chainIndex.to).sample.get
-    val selectedUncles = AVector(SelectedGhostUncle(uncleBlock.hash, uncleMiner, 1))
-    val block = mineWithoutCoinbase(
+  trait CoinbaseDataWithGhostUnclesFixture extends CoinbaseDataFixture {
+    lazy val uncleBlock     = blockGen(chainIndex).sample.get
+    lazy val uncleMiner     = assetLockupGen(chainIndex.to).sample.get
+    lazy val selectedUncles = AVector(SelectedGhostUncle(uncleBlock.hash, uncleMiner, 1))
+    lazy val block = mineWithoutCoinbase(
       blockFlow,
       chainIndex,
       AVector.empty,
       TimeStamp.now(),
       selectedUncles
     )
+
+    def testEmptyUncles() = {
+      info("empty uncles")
+      val block = emptyBlock(blockFlow, chainIndex)
+      block.ghostUncleHashes.rightValue.isEmpty is true
+      block.pass()
+    }
+  }
+
+  it should "check coinbase data for rhone hardfork" in new CoinbaseDataWithGhostUnclesFixture {
+    override val configValues: Map[String, Any] = Map(
+      (
+        "alephium.network.rhone-hard-fork-timestamp",
+        NetworkConfigFixture.Rhone.rhoneHardForkTimestamp.millis
+      ),
+      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+
+    coinbaseData is a[CoinbaseDataV2]
     block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
     block.pass()
 
-    info("empty uncles")
-    val block1 = emptyBlock(blockFlow, chainIndex)
-    block1.ghostUncleHashes.rightValue.isEmpty is true
-    block1.pass()
+    testEmptyUncles()
+    testWrongBlockTimeStamp()
+    testWrongChainIndex()
+    testWrongFormat()
+    testEmptyFixedOutputs()
+  }
+
+  it should "check coinbase data for since-danube hardfork" in new CoinbaseDataWithGhostUnclesFixture {
+    override val configValues: Map[String, Any] = Map(
+      (
+        "alephium.network.danube-hard-fork-timestamp",
+        NetworkConfigFixture.SinceDanube.danubeHardForkTimestamp.millis
+      )
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Danube
+
+    coinbaseData is a[CoinbaseDataV3]
+    block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
+    block.pass()
+
+    testEmptyUncles()
+    testWrongChainIndex()
+    testWrongFormat()
+    testEmptyFixedOutputs()
 
     info("wrong block timestamp")
     val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
-    block.Coinbase.output(_.copy(additionalData = data0)).fail(InvalidCoinbaseData)
-
-    info("wrong chain index")
-    val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
-    block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
-
-    info("wrong format")
-    val wrongFormat = ByteString("wrong-coinbase-data-format")
-    block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
-
-    info("empty fixed outputs")
-    block.Coinbase
-      .unsignedTx(unsigned => unsigned.copy(fixedOutputs = AVector.empty))
-      .fail(InvalidCoinbaseFormat)
+    block.Coinbase.output(_.copy(additionalData = data0)).pass()
   }
 
   it should "check coinbase locked amount pre-rhone" in new Fixture {
@@ -835,9 +863,10 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase reward rhone" in new RhoneCoinbaseFixture {
-    implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
+    implicit val validator: Block => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Rhone)
+      val hardFork  = networkConfig.getHardFork(blk.timestamp)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, hardFork)
     }
 
     {

@@ -560,10 +560,9 @@ trait FlowFixture
       val hardFork = networkConfig.getHardFork(template.templateTs)
       CoinbaseData
         .deserialize(coinbase.unsigned.fixedOutputs.head.additionalData, hardFork)
-        .rightValue match {
-        case v2: CoinbaseDataV2 => v2.ghostUncleData.map(_.blockHash)
-        case _: CoinbaseDataV1  => AVector.empty
-      }
+        .rightValue
+        .ghostUncleData
+        .map(_.blockHash)
     }
   }
 

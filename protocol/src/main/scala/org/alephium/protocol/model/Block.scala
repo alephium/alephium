@@ -48,15 +48,12 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     _ghostUncleData match {
       case Some(data) => Right(data)
       case None =>
-        val hardFork = networkConfig.getHardFork(header.timestamp)
-        CoinbaseData.deserialize(coinbase.unsigned.fixedOutputs.head.additionalData, hardFork).map {
-          case v2: CoinbaseDataV2 =>
-            _ghostUncleData = Some(v2.ghostUncleData)
-            v2.ghostUncleData
-          case _: CoinbaseDataV1 =>
-            val data = AVector.empty[GhostUncleData]
-            _ghostUncleData = Some(data)
-            data
+        val rawCoinbaseData = coinbase.unsigned.fixedOutputs.head.additionalData
+        val hardFork        = networkConfig.getHardFork(header.timestamp)
+        CoinbaseData.deserialize(rawCoinbaseData, hardFork).map { coinbaseData =>
+          val ghostUncleData = coinbaseData.ghostUncleData
+          _ghostUncleData = Some(ghostUncleData)
+          ghostUncleData
         }
     }
   }
