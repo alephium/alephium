@@ -90,8 +90,10 @@ protected[ws] object WsParams {
     protected[ws] def from(
         eventIndex: Int,
         addresses: AVector[Address.Contract]
-    ): ContractEventsSubscribeParams =
+    ): ContractEventsSubscribeParams = {
+      assume(addresses.nonEmpty, "Contract Event subscription needs at least one contract address")
       ContractEventsSubscribeParams(Contract, eventIndex, addresses)
+    }
 
     protected[ws] def fromSingle(
         eventIndex: Int,
@@ -103,20 +105,24 @@ protected[ws] object WsParams {
         eventIndex: Int,
         addressArr: Iterable[ujson.Value]
     ): Either[Error, ContractEventsSubscribeParams] = {
-      EitherF
-        .foldTry(addressArr, mutable.ArrayBuffer.empty[Address.Contract]) {
-          case (addresses, addressValue) =>
-            addressValue.strOpt match {
-              case None =>
-                Left(WsError.invalidContractAddressType)
-              case Some(address) =>
-                LockupScript.p2c(address).map(Address.Contract(_)) match {
-                  case Some(address) => Right(addresses :+ address)
-                  case None          => Left(WsError.invalidContractAddress(address))
-                }
-            }
-        }
-        .map(addresses => ContractEventsSubscribeParams.from(eventIndex, AVector.from(addresses)))
+      if (addressArr.isEmpty) {
+        Left(WsError.emptyContractAddress)
+      } else {
+        EitherF
+          .foldTry(addressArr, mutable.ArrayBuffer.empty[Address.Contract]) {
+            case (addresses, addressValue) =>
+              addressValue.strOpt match {
+                case None =>
+                  Left(WsError.invalidContractAddressType)
+                case Some(address) =>
+                  LockupScript.p2c(address).map(Address.Contract(_)) match {
+                    case Some(address) => Right(addresses :+ address)
+                    case None          => Left(WsError.invalidContractAddress(address))
+                  }
+              }
+          }
+          .map(addresses => ContractEventsSubscribeParams.from(eventIndex, AVector.from(addresses)))
+      }
     }
 
     protected[ws] def read(jsonArr: ujson.Arr): Either[Error, ContractEventsSubscribeParams] = {
@@ -217,7 +223,7 @@ object WsRequest extends ApiModelCodec {
     reader[ujson.Value].map[WsRequest] { json =>
       fromJsonString(json.render()) match {
         case Right(wsRequest) => wsRequest
-        case Left(error)      => throw new IllegalArgumentException(error.message)
+        case Left(error)      => throw error
       }
     }
   implicit protected[ws] val wsRequestWriter: Writer[WsRequest] = writer[Request].comap[WsRequest] {

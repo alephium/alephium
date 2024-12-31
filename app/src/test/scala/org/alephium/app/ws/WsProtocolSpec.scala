@@ -22,15 +22,9 @@ import scala.util.{Failure, Success}
 import io.vertx.core.{Future => VertxFuture}
 
 import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
-import org.alephium.app.ws.WsParams.{
-  ContractEventsSubscribeParams,
-  SimpleSubscribeParams,
-  WsBlockNotificationParams,
-  WsContractEventNotificationParams,
-  WsNotificationParams,
-  WsTxNotificationParams
-}
+import org.alephium.app.ws.WsParams._
 import org.alephium.json.Json._
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.RequestUnsafe
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -128,6 +122,26 @@ class WsProtocolSpec extends WsSubscriptionFixture {
       )
     val expectedUnSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest).rightValue
     expectedUnSubscribeRequest is read[WsRequest](write(expectedUnSubscribeRequest))
+  }
+
+  "WsRequest" should "not allow for building contract event subscription without contract address" in {
+    assertThrows[AssertionError](ContractEventsSubscribeParams.from(0, AVector.empty))
+
+    val invalidSubscriptionRequest =
+      s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.Contract}",$EventIndex_0,[]],"id":0,"jsonrpc":"2.0"}"""
+
+    assertThrows[JsonRPC.Error](read[WsRequest](invalidSubscriptionRequest))
+
+    val eventType  = ujson.Str(ContractEventsSubscribeParams.Contract)
+    val eventIndex = ujson.Num(0)
+    val invalidJsonRpcSubscribeRequest =
+      RequestUnsafe(
+        "2.0",
+        WsMethod.SubscribeMethod,
+        ujson.Arr(eventType, eventIndex, ujson.Arr()),
+        0
+      )
+    WsRequest.fromJsonRpc(invalidJsonRpcSubscribeRequest).isLeft is true
   }
 
   "WsNotificationParams" should "pass ser/deser round-trip for notifications" in {

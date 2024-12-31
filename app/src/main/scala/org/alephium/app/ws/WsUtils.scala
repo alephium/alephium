@@ -69,6 +69,12 @@ object WsError {
   protected[ws] def invalidContractAddress(address: String): Error =
     Error(Error.InvalidParamsCode, s"Contract address $address is not valid")
 
+  protected[ws] def emptyContractAddress: Error =
+    Error(
+      Error.InvalidParamsCode,
+      s"Contract address array cannot be empty, define at least one contract address"
+    )
+
   protected[ws] def invalidContractAddressType: Error =
     Error(Error.InvalidParamsCode, s"Contract address should be base58 encoded String")
 

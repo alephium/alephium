@@ -51,7 +51,7 @@ object JsonRPC extends StrictLogging {
       versionSet(writeJs(request)(tmpWriter))
   }
 
-  final case class Error(code: Int, message: String, data: Option[String])
+  final case class Error(code: Int, message: String, data: Option[String]) extends Throwable
   object Error {
     implicit val errorReadWriter: ReadWriter[Error] = {
       readwriter[ujson.Value].bimap[Error](

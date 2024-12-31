@@ -194,7 +194,7 @@ class RestServer(
         .asScala
     } yield {
       logger.info(
-        s"Listening to rest-http requests including websocket /ws on /$address:${httpBinding.actualPort}"
+        s"Listening to rest-http requests including websocket endpoint '/ws' on /$address:${httpBinding.actualPort}"
       )
       httpBindingPromise.success(httpBinding)
     }
