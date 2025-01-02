@@ -7247,6 +7247,202 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
   }
 
+  it should "support chained contract calls in TxScript after danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+    val chainedSwapBlock = payableCall(
+      blockFlow,
+      chainIndex,
+      Compiler.compileTxScript(chainedSwapScript).rightValue,
+      keyPairOpt = Some(userKeyPair)
+    )
+    addAndCheck(blockFlow, chainedSwapBlock)
+    getContractAsset(swapToken1Token2).tokens.toSet is Set(
+      (token1Id, U256.unsafe(105)),
+      (token2Id, U256.unsafe(95))
+    )
+    getContractAsset(swapToken2Token3).tokens.toSet is Set(
+      (token2Id, U256.unsafe(105)),
+      (token3Id, U256.unsafe(95))
+    )
+
+    getTokenBalance(blockFlow, userLockupScript, token1Id) is U256.unsafe(5)
+    getTokenBalance(blockFlow, userLockupScript, token2Id) is U256.unsafe(0)
+    getTokenBalance(blockFlow, userLockupScript, token3Id) is U256.unsafe(5)
+  }
+
+  it should "not support chained contract calls in TxScript before danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(chainedSwapScript).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  trait ChainedContractCallsFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp),
+    )
+    val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000), Some(genesisLockup)))
+    val token1Code =
+      s"""
+         |Contract Token1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract1 = createContract(token1Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token1Id  = TokenId.from(contract1)
+
+    val token2Code =
+      s"""
+         |Contract Token2() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract2 = createContract(token2Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token2Id  = TokenId.from(contract2)
+
+    val token3Code =
+      s"""
+         |Contract Token3() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract3 = createContract(token3Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token3Id  = TokenId.from(contract3)
+
+    val swapContractCode =
+      s"""
+         |Contract Swap(tokenId1: ByteVec, tokenId2: ByteVec, mut token1Reserve: U256, mut token2Reserve: U256) {
+         |  event AddLiquidity(lp: Address, token1Amount: U256, token2Amount: U256)
+         |  event SwapToken(buyer: Address, tokenId: ByteVec, tokenAmount: U256)
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn addLiquidity(lp: Address, token1Amount: U256, token2Amount: U256) -> () {
+         |    emit AddLiquidity(lp, token1Amount, token2Amount)
+         |
+         |    transferTokenToSelf!(lp, tokenId1, token1Amount)
+         |    transferTokenToSelf!(lp, tokenId2, token2Amount)
+         |    token1Reserve = token1Reserve + token1Amount
+         |    token2Reserve = token2Reserve + token2Amount
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn swap(buyer: Address, tokenId: ByteVec, tokenAmount: U256) -> () {
+         |    assert!(tokenId == tokenId1 || tokenId == tokenId2, 0)
+         |    emit SwapToken(buyer, tokenId, tokenAmount)
+         |
+         |    if (tokenId == tokenId1) {
+         |      let token1Amount = tokenAmount
+         |      let token2Amount = token2Reserve - token1Reserve * token2Reserve / (token1Reserve + token1Amount)
+         |      transferTokenToSelf!(buyer, tokenId1, token1Amount)
+         |      transferTokenFromSelf!(buyer, tokenId2, token2Amount)
+         |      token1Reserve = token1Reserve + token1Amount
+         |      token2Reserve = token2Reserve - token2Amount
+         |    } else {
+         |      let token2Amount = tokenAmount
+         |      let token1Amount = token1Reserve - token1Reserve * token2Reserve / (token2Reserve + token2Amount)
+         |      transferTokenToSelf!(buyer, tokenId2, token2Amount)
+         |      transferTokenFromSelf!(buyer, tokenId1, token1Amount)
+         |      token1Reserve = token1Reserve + token1Amount
+         |      token2Reserve = token2Reserve - token2Amount
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val swapToken1Token2 = createContract(
+      swapContractCode,
+      initialImmState = AVector(Val.ByteVec(token1Id.bytes), Val.ByteVec(token2Id.bytes)),
+      initialMutState = AVector(Val.U256(0), Val.U256(0))
+    )._1
+
+    val swapToken2Token3 = createContract(
+      swapContractCode,
+      initialImmState = AVector(Val.ByteVec(token2Id.bytes), Val.ByteVec(token3Id.bytes)),
+      initialMutState = AVector(Val.U256(0), Val.U256(0))
+    )._1
+
+    val swapContract = Compiler.compileContract(swapContractCode).rightValue
+
+    def addLiquidityScript(
+        swap: ContractId,
+        lp: Address,
+        tokenId1: TokenId,
+        tokenId2: TokenId,
+        token1Amount: Int,
+        token2Amount: Int
+    ): String =
+      s"""
+         |TxScript AddLiquidity() {
+         |  Swap(#${swap.toHexString}).addLiquidity{
+         |    @$lp -> #${tokenId1.toHexString}: ${token1Amount}, #${tokenId2.toHexString}: ${token2Amount}
+         |  }(@$lp, ${token1Amount}, ${token2Amount})
+         |}
+         |
+         |$swapContractCode
+         |""".stripMargin
+
+    def addLiquidity(
+        swap: ContractId,
+        tokenId1: TokenId,
+        tokenId2: TokenId,
+        token1Amount: Int,
+        token2Amount: Int
+    ): Unit = {
+      val code =
+        addLiquidityScript(swap, genesisAddress, tokenId1, tokenId2, token1Amount, token2Amount)
+      val block = payableCall(blockFlow, chainIndex, Compiler.compileTxScript(code).rightValue)
+      addAndCheck(blockFlow, block)
+    }
+    addLiquidity(swapToken1Token2, token1Id, token2Id, 100, 100)
+    addLiquidity(swapToken2Token3, token2Id, token3Id, 100, 100)
+
+    getContractAsset(swapToken1Token2).tokens.toSet is Set(
+      (token1Id, U256.unsafe(100)),
+      (token2Id, U256.unsafe(100))
+    )
+    getContractAsset(swapToken2Token3).tokens.toSet is Set(
+      (token2Id, U256.unsafe(100)),
+      (token3Id, U256.unsafe(100))
+    )
+
+    val userKeyPair               = chainIndex.from.generateKey
+    val userLockupScript          = LockupScript.p2pkh(userKeyPair._2)
+    val userAddress               = Address.from(userLockupScript)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val block3 = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      userLockupScript,
+      AVector(token1Id -> U256.unsafe(10)),
+      ALPH.alph(10)
+    )
+    addAndCheck(blockFlow, block3)
+
+    getTokenBalance(blockFlow, userLockupScript, token1Id) is U256.unsafe(10)
+    getTokenBalance(blockFlow, userLockupScript, token2Id) is U256.unsafe(0)
+    getTokenBalance(blockFlow, userLockupScript, token3Id) is U256.unsafe(0)
+
+    val chainedSwapScript: String =
+      s"""
+         |TxScript ChainedSwapToken() {
+         |  Swap(#${swapToken1Token2.toHexString}).swap{
+         |    @$userAddress -> #${token1Id.toHexString}: 5
+         |  }(@$userAddress, #${token1Id.toHexString}, 5)
+         |
+         |  Swap(#${swapToken2Token3.toHexString}).swap{
+         |    @$userAddress -> #${token2Id.toHexString}: 5
+         |  }(@$userAddress, #${token2Id.toHexString}, 5)
+         |}
+         |$swapContractCode
+         |""".stripMargin
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
