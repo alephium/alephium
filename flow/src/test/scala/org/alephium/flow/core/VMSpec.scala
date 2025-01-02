@@ -7282,10 +7282,36 @@ class VMSpec extends AlephiumSpec with Generators {
     ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
   }
 
+  it should "not support chained contract calls in contracts after danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(swapThroughProxyScriptCode).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  it should "not support chained contract calls in contracts before danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(swapThroughProxyScriptCode).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
   trait ChainedContractCallsFixture extends ContractFixture {
     def danubeHardForkTimestamp: Long
     override val configValues: Map[String, Any] = Map(
-      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp),
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
     )
     val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000), Some(genesisLockup)))
     val token1Code =
@@ -7440,6 +7466,36 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }(@$userAddress, #${token2Id.toHexString}, 5)
          |}
          |$swapContractCode
+         |""".stripMargin
+
+    val swapProxyContractCode: String =
+      s"""
+         |Contract SwapProxy() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn swap() -> () {
+         |    Swap(#${swapToken1Token2.toHexString}).swap{
+         |      @$userAddress -> #${token1Id.toHexString}: 5
+         |    }(@$userAddress, #${token1Id.toHexString}, 5)
+         |
+         |    Swap(#${swapToken2Token3.toHexString}).swap{
+         |      @$userAddress -> #${token2Id.toHexString}: 5
+         |    }(@$userAddress, #${token2Id.toHexString}, 5)
+         |  }
+         |}
+         |$swapContractCode
+         |""".stripMargin
+
+    val swapProxyContract = createContract(swapProxyContractCode)._1
+
+    val swapThroughProxyScriptCode =
+      s"""
+         |TxScript Main {
+         |  SwapProxy(#${swapProxyContract.toHexString}).swap{
+         |    @$userAddress -> #${token1Id.toHexString}: 5
+         |  }()
+         |}
+         |
+         |$swapProxyContractCode
          |""".stripMargin
   }
 
