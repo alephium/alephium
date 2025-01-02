@@ -279,7 +279,7 @@ protected[ws] class WsSubscriptionHandler(
         val _ = self ! Unsubscribe(id, ws, subscriptionId)
       case Right(WsRequest(id, params: WsSubscriptionParams)) =>
         val _ = self ! Subscribe(id, ws, params)
-      case Left(error) => respondAsyncAndForget(ws, Response.failed(error))
+      case Left(failure) => respondAsyncAndForget(ws, failure)
     }
   }
 

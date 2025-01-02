@@ -47,6 +47,7 @@ import org.alephium.app.ws.WsParams.{
   WsSubscriptionId,
   WsTxNotificationParams
 }
+import org.alephium.app.ws.WsRequest.fromJsonString
 import org.alephium.app.ws.WsSubscriptionHandler.{
   AddressWithIndex,
   GetSubscriptions,
@@ -81,18 +82,32 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
     )
   )
 
-  protected lazy val contractEventsParams_0 = ContractEventsSubscribeParams.from(
-    EventIndex_0,
-    AVector(contractAddress_0, contractAddress_1)
-  )
-  protected lazy val contractEventsParams_1 = ContractEventsSubscribeParams.from(
-    EventIndex_1,
-    AVector(contractAddress_1, contractAddress_2)
-  )
+  protected lazy val contractEventsParams_0 = ContractEventsSubscribeParams
+    .from(
+      EventIndex_0,
+      AVector(contractAddress_0, contractAddress_1)
+    )
+    .rightValue
+  protected lazy val contractEventsParams_1 = ContractEventsSubscribeParams
+    .from(
+      EventIndex_1,
+      AVector(contractAddress_1, contractAddress_2)
+    )
+    .rightValue
   protected lazy val contractEventsParams_2 = ContractEventsSubscribeParams.fromSingle(
     EventIndex_1,
     contractAddress_2
   )
+
+  lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
+
+  lazy val tooManyContractAddresses = AVector.fill(1001) {
+    Address.Contract(
+      LockupScript.p2c(
+        ContractId.generate
+      )
+    )
+  }
 
   implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
     reader[ujson.Value].map[WsNotificationParams] {
@@ -112,6 +127,14 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
         }
       case other =>
         throw new Exception(s"Invalid JSON format for WsNotificationParams: $other")
+    }
+
+  implicit protected val wsRequestReader: Reader[WsRequest] =
+    reader[ujson.Value].map[WsRequest] { json =>
+      fromJsonString(json.render()) match {
+        case Right(wsRequest) => wsRequest
+        case Left(failure)    => throw failure.error
+      }
     }
 }
 

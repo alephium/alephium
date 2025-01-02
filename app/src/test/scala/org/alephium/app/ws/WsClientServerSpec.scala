@@ -63,6 +63,62 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     httpServer.close().asScala.futureValue
   }
 
+  "WsServer" should "reject invalid contract events subscription requests with duplicate addresses" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
+
+    val duplicateAddressRequest = WsRequest(
+      Correlation(0),
+      ContractEventsSubscribeParams(
+        ContractEventsSubscribeParams.Contract,
+        0,
+        duplicateAddresses
+      )
+    )
+    ws.writeRequestToSocket(duplicateAddressRequest).futureValue is Response
+      .failed(
+        duplicateAddressRequest.id,
+        WsError.duplicatedAddresses(contractAddress_0.toBase58)
+      )
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
+  "WsServer" should "reject invalid contract events subscription requests with empty addresses" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
+
+    val emptyAddressRequest = WsRequest(
+      Correlation(0),
+      ContractEventsSubscribeParams(ContractEventsSubscribeParams.Contract, 0, AVector.empty)
+    )
+    ws.writeRequestToSocket(emptyAddressRequest).futureValue is Response
+      .failed(
+        emptyAddressRequest.id,
+        WsError.emptyContractAddress
+      )
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
+  "WsServer" should "reject invalid contract events subscription requests with too many addresses" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
+
+    val tooManyAddressesRequest = WsRequest(
+      Correlation(0),
+      ContractEventsSubscribeParams(
+        ContractEventsSubscribeParams.Contract,
+        0,
+        tooManyContractAddresses
+      )
+    )
+    ws.writeRequestToSocket(tooManyAddressesRequest).futureValue is Response
+      .failed(
+        tooManyAddressesRequest.id,
+        WsError.tooManyContractAddresses(ContractEventsSubscribeParams.ContractAddressLimit)
+      )
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
   "WsClient and WsServer" should "subscribe/unsubscribe and acknowledge by response" in new WsServerFixture {
     val wsServer = bindAndListen()
     val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue

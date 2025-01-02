@@ -124,8 +124,16 @@ class WsProtocolSpec extends WsSubscriptionFixture {
     expectedUnSubscribeRequest is read[WsRequest](write(expectedUnSubscribeRequest))
   }
 
-  "WsRequest" should "not allow for building contract event subscription without contract address" in {
-    assertThrows[AssertionError](ContractEventsSubscribeParams.from(0, AVector.empty))
+  "WsRequest" should "not allow for building contract event subscription with invalid contract addresses" in {
+    ContractEventsSubscribeParams.from(0, AVector.empty).isLeft is true
+
+    ContractEventsSubscribeParams
+      .from(0, duplicateAddresses)
+      .isLeft is true
+
+    ContractEventsSubscribeParams
+      .from(0, tooManyContractAddresses)
+      .isLeft is true
 
     val invalidSubscriptionRequest =
       s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.Contract}",$EventIndex_0,[]],"id":0,"jsonrpc":"2.0"}"""

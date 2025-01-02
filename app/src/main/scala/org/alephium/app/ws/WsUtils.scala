@@ -72,7 +72,19 @@ object WsError {
   protected[ws] def emptyContractAddress: Error =
     Error(
       Error.InvalidParamsCode,
-      s"Contract address array cannot be empty, define at least one contract address"
+      "Contract address array cannot be empty, define at least one contract address"
+    )
+
+  protected[ws] def tooManyContractAddresses(limit: Int): Error =
+    Error(
+      Error.InvalidParamsCode,
+      s"Contract address array cannot be greater than $limit"
+    )
+
+  protected[ws] def duplicatedAddresses(duplicateAddress: String): Error =
+    Error(
+      Error.InvalidParamsCode,
+      s"Contract address array cannot contain duplicate address: $duplicateAddress"
     )
 
   protected[ws] def invalidContractAddressType: Error =

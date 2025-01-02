@@ -114,7 +114,7 @@ final case class ClientWs(
   private val ongoingRequests =
     new ConcurrentSkipListMap[WsCorrelationId, Promise[Response]]().asScala
 
-  private def writeRequestToSocket(request: WsRequest): Future[Response] = {
+  protected[ws] def writeRequestToSocket(request: WsRequest): Future[Response] = {
     if (ongoingRequests.contains(request.id.id)) {
       Future.failed(WsException(s"Request with id ${request.id.id} already executed."))
     } else {
@@ -164,9 +164,14 @@ final case class ClientWs(
       eventIndex: Int,
       addresses: AVector[Address.Contract]
   ): Future[Response] = {
-    writeRequestToSocket(
-      WsRequest.subscribe(id, ContractEventsSubscribeParams.from(eventIndex, addresses))
-    )
+    ContractEventsSubscribeParams.from(eventIndex, addresses) match {
+      case Right(params) =>
+        writeRequestToSocket(
+          WsRequest.subscribe(id, params)
+        )
+      case Left(error) =>
+        Future.failed(error)
+    }
   }
 
   def unsubscribeFromBlock(id: WsCorrelationId): Future[Response] = {

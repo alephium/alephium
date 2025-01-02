@@ -17,6 +17,7 @@
 package org.alephium.app.ws
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 
 import org.alephium.api.ApiModelCodec
@@ -27,6 +28,7 @@ import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, EitherF, Hex}
 
@@ -85,14 +87,37 @@ protected[ws] object WsParams {
         )
   }
   object ContractEventsSubscribeParams {
-    val Contract: WsEventType = "contract"
+    protected[ws] val Contract: WsEventType = "contract"
+    protected[ws] val ContractAddressLimit  = 1000
+
+    private def firstDuplicate[T](vec: AVector[T]): Option[T] = {
+      val seen = mutable.Set[T]()
+      vec.find { elem =>
+        if (seen.contains(elem)) {
+          true
+        } else {
+          seen.add(elem)
+          false
+        }
+      }
+    }
 
     protected[ws] def from(
         eventIndex: Int,
         addresses: AVector[Address.Contract]
-    ): ContractEventsSubscribeParams = {
-      assume(addresses.nonEmpty, "Contract Event subscription needs at least one contract address")
-      ContractEventsSubscribeParams(Contract, eventIndex, addresses)
+    ): Either[Error, ContractEventsSubscribeParams] = {
+      firstDuplicate(addresses) match {
+        case Some(addressDuplicate) =>
+          Left(WsError.duplicatedAddresses(addressDuplicate.toBase58))
+        case None =>
+          if (addresses.isEmpty) {
+            Left(WsError.emptyContractAddress)
+          } else if (addresses.length > ContractAddressLimit) {
+            Left(WsError.tooManyContractAddresses(ContractAddressLimit))
+          } else {
+            Right(ContractEventsSubscribeParams(Contract, eventIndex, addresses))
+          }
+      }
     }
 
     protected[ws] def fromSingle(
@@ -103,26 +128,24 @@ protected[ws] object WsParams {
 
     private def buildContractEventsSubscribeParams(
         eventIndex: Int,
-        addressArr: Iterable[ujson.Value]
+        addressArr: ArrayBuffer[ujson.Value]
     ): Either[Error, ContractEventsSubscribeParams] = {
-      if (addressArr.isEmpty) {
-        Left(WsError.emptyContractAddress)
-      } else {
-        EitherF
-          .foldTry(addressArr, mutable.ArrayBuffer.empty[Address.Contract]) {
-            case (addresses, addressValue) =>
-              addressValue.strOpt match {
-                case None =>
-                  Left(WsError.invalidContractAddressType)
-                case Some(address) =>
-                  LockupScript.p2c(address).map(Address.Contract(_)) match {
-                    case Some(address) => Right(addresses :+ address)
-                    case None          => Left(WsError.invalidContractAddress(address))
-                  }
-              }
-          }
-          .map(addresses => ContractEventsSubscribeParams.from(eventIndex, AVector.from(addresses)))
-      }
+      EitherF
+        .foldTry(addressArr, mutable.ArrayBuffer.empty[Address.Contract]) {
+          case (addresses, addressValue) =>
+            addressValue.strOpt match {
+              case None =>
+                Left(WsError.invalidContractAddressType)
+              case Some(address) =>
+                LockupScript.p2c(address).map(Address.Contract(_)) match {
+                  case Some(address) => Right(addresses :+ address)
+                  case None          => Left(WsError.invalidContractAddress(address))
+                }
+            }
+        }
+        .flatMap(addresses =>
+          ContractEventsSubscribeParams.from(eventIndex, AVector.from(addresses))
+        )
     }
 
     protected[ws] def read(jsonArr: ujson.Arr): Either[Error, ContractEventsSubscribeParams] = {
@@ -219,13 +242,6 @@ object WsRequest extends ApiModelCodec {
 
   final case class Correlation(id: WsCorrelationId) extends WithId
 
-  implicit protected[ws] val wsRequestReader: Reader[WsRequest] =
-    reader[ujson.Value].map[WsRequest] { json =>
-      fromJsonString(json.render()) match {
-        case Right(wsRequest) => wsRequest
-        case Left(error)      => throw error
-      }
-    }
   implicit protected[ws] val wsRequestWriter: Writer[WsRequest] = writer[Request].comap[WsRequest] {
     req =>
       req.params match {
@@ -266,10 +282,12 @@ object WsRequest extends ApiModelCodec {
     readParams.map(params => WsRequest(Correlation(r.id), params))
   }
 
-  protected[ws] def fromJsonString(msg: String): Either[Error, WsRequest] = {
+  protected[ws] def fromJsonString(msg: String): Either[JsonRPC.Response.Failure, WsRequest] = {
     Try(read[RequestUnsafe](msg)) match {
-      case Success(r)  => fromJsonRpc(r)
-      case Failure(ex) => Left(Error(Error.ParseErrorCode, ex.getMessage))
+      case Success(r) =>
+        fromJsonRpc(r).left.map(JsonRPC.Response.Failure(_, Option(r.id)))
+      case Failure(ex) =>
+        Left(JsonRPC.Response.Failure(Error(Error.ParseErrorCode, ex.getMessage), id = None))
     }
   }
 
