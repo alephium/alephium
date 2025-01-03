@@ -21,11 +21,11 @@ alephium {
     max-clique-from-same-ip = 2
 
     ws-max-connections = 100
-    ws-max-frame-size = 262144 // 1024 * 256
+    ws-max-frame-size = 16384 // increase with ws-max-contract-event-addresses
     # Each websocket client connection is limited by number of subscriptions
     ws-max-subscriptions-per-connection = 50
     # Each contract event subscription is limited by number of contract addresses
-    ws-max-contract-event-addresses = 1000
+    ws-max-contract-event-addresses = 100 // increase with ws-max-frame-size
     # The frequency at which websocket server will ping the client to keep the connection alive.
     ws-ping-frequency = 30 second
 

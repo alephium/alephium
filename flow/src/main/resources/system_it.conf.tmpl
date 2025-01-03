@@ -23,9 +23,9 @@ alephium {
     max-clique-from-same-ip = 3
 
     ws-max-connections = 100
-    ws-max-frame-size = 262144 // 1024 * 256
+    ws-max-frame-size = 16384 // increase with ws-max-contract-event-addresses
     ws-max-subscriptions-per-connection = 50
-    ws-max-contract-event-addresses = 1000
+    ws-max-contract-event-addresses = 100 // increase with ws-max-frame-size
     ws-ping-frequency = 10 second
 
     ping-frequency = 10 second

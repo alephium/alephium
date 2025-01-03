@@ -20,6 +20,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 import akka.testkit.TestProbe
+import org.scalatest.Inside.inside
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.exceptions.TestFailedException
 
@@ -97,6 +98,23 @@ class WsClientServerSpec extends WsSubscriptionFixture {
         emptyAddressRequest.id,
         WsError.emptyContractAddress
       )
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
+  "WsServer" should "handle ws connection with maximum contract event addresses within wsMaxFrameSize" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
+    val req = WsRequest(
+      Correlation(0L),
+      ContractEventsSubscribeParams(
+        ContractEventsSubscribeParams.Contract,
+        0,
+        tooManyContractAddresses.tail
+      )
+    )
+    inside(ws.writeRequestToSocket(req).futureValue) { case JsonRPC.Response.Success(_, id) =>
+      id is 0L
+    }
     wsServer.httpServer.close().asScala.futureValue
   }
 

@@ -96,17 +96,6 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
     EventIndex_1,
     contractAddress_2
   )
-
-  lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
-
-  lazy val tooManyContractAddresses = AVector.fill(1001) {
-    Address.Contract(
-      LockupScript.p2c(
-        ContractId.generate
-      )
-    )
-  }
-
 }
 
 trait WsServerFixture extends ServerFixture with ScalaFutures {
@@ -140,7 +129,7 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
 
   lazy val wsOptions =
     new HttpServerOptions()
-      .setMaxWebSocketFrameSize(1024 * 1024)
+      .setMaxWebSocketFrameSize(node.config.network.wsMaxFrameSize)
       .setRegisterWebSocketWriteHandlers(true)
 
   protected def maxServerConnections: Int   = 10
@@ -263,7 +252,18 @@ trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventual
     }
   }
 
-  protected val contractEvent = {
+  protected lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
+
+  protected lazy val tooManyContractAddresses =
+    AVector.fill(networkConfig.wsMaxContractEventAddresses + 1) {
+      Address.Contract(
+        LockupScript.p2c(
+          ContractId.generate
+        )
+      )
+    }
+
+  protected lazy val contractEvent = {
     ContractEvent(
       blockHashGen.sample.get,
       txIdGen.sample.get,
@@ -273,7 +273,7 @@ trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventual
     )
   }
 
-  protected val contractEventByBlockHash: AVector[ContractEventByBlockHash] =
+  protected lazy val contractEventByBlockHash: AVector[ContractEventByBlockHash] =
     logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)).map {
       case (contractId, logState) =>
         ContractEventByBlockHash.from(LogStateRef(LogStatesId(contractId, 0), 0), logState)
