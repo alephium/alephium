@@ -70,7 +70,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   private val vertx = Vertx.vertx()
   private val wsClient =
-    WsClient(vertx, new WebSocketClientOptions().setMaxFrameSize(apiConfig.maxWebSocketFrameSize))
+    WsClient(vertx, new WebSocketClientOptions().setMaxFrameSize(networkConfig.wsMaxFrameSize))
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))

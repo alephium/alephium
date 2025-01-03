@@ -18,9 +18,14 @@ alephium {
   network {
     max-outbound-connections-per-group = 16
     max-inbound-connections-per-group = 64
-    max-ws-connections = 100
     max-clique-from-same-ip = 2
 
+    ws-max-connections = 100
+    ws-max-frame-size = 262144 // 1024 * 256
+    # Each websocket client connection is limited by number of subscriptions
+    ws-max-subscriptions-per-connection = 50
+    # Each contract event subscription is limited by number of contract addresses
+    ws-max-contract-event-addresses = 1000
     # The frequency at which websocket server will ping the client to keep the connection alive.
     ws-ping-frequency = 30 second
 
@@ -109,7 +114,6 @@ alephium {
     gas-fee-cap = "1000000000000000000"// 1 ALPH
     default-utxos-limit = 5000
     max-form-buffered-bytes = 131072 // 128 * 1024
-    max-web-socket-frame-size = 1048576 // 1024 * 1024
     enable-http-metrics = false
   }
 

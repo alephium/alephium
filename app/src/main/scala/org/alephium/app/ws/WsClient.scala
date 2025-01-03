@@ -164,14 +164,9 @@ final case class ClientWs(
       eventIndex: Int,
       addresses: AVector[Address.Contract]
   ): Future[Response] = {
-    ContractEventsSubscribeParams.from(eventIndex, addresses) match {
-      case Right(params) =>
-        writeRequestToSocket(
-          WsRequest.subscribe(id, params)
-        )
-      case Left(error) =>
-        Future.failed(error)
-    }
+    writeRequestToSocket(
+      WsRequest.subscribe(id, ContractEventsSubscribeParams.from(eventIndex, addresses))
+    )
   }
 
   def unsubscribeFromBlock(id: WsCorrelationId): Future[Response] = {

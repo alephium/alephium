@@ -87,13 +87,11 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
       EventIndex_0,
       AVector(contractAddress_0, contractAddress_1)
     )
-    .rightValue
   protected lazy val contractEventsParams_1 = ContractEventsSubscribeParams
     .from(
       EventIndex_1,
       AVector(contractAddress_1, contractAddress_2)
     )
-    .rightValue
   protected lazy val contractEventsParams_2 = ContractEventsSubscribeParams.fromSingle(
     EventIndex_1,
     contractAddress_2
@@ -109,33 +107,6 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
     )
   }
 
-  implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
-    reader[ujson.Value].map[WsNotificationParams] {
-      case ujson.Obj(values) =>
-        val subscription = Hash.unsafe(Hex.unsafe(values("subscription").str))
-        values("result") match {
-          case obj: ujson.Obj if obj.value.contains("block") =>
-            WsBlockNotificationParams(subscription, read[BlockAndEvents](obj))
-          case obj: ujson.Obj if obj.value.contains("unsigned") =>
-            WsTxNotificationParams(subscription, read[TransactionTemplate](obj))
-          case obj: ujson.Obj if obj.value.contains("contractAddress") =>
-            WsContractEventNotificationParams(subscription, read[ContractEvent](obj))
-          case obj: ujson.Obj =>
-            throw new Exception(s"Unknown WsNotificationParams type with result: $obj")
-          case other =>
-            throw new Exception(s"Expected ujson.Obj for 'result', got: $other")
-        }
-      case other =>
-        throw new Exception(s"Invalid JSON format for WsNotificationParams: $other")
-    }
-
-  implicit protected val wsRequestReader: Reader[WsRequest] =
-    reader[ujson.Value].map[WsRequest] { json =>
-      fromJsonString(json.render()) match {
-        case Right(wsRequest) => wsRequest
-        case Left(failure)    => throw failure.error
-      }
-    }
 }
 
 trait WsServerFixture extends ServerFixture with ScalaFutures {
@@ -163,7 +134,7 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
     WsClient(
       vertx,
       new WebSocketClientOptions()
-        .setMaxFrameSize(apiConfig.maxWebSocketFrameSize)
+        .setMaxFrameSize(node.config.network.wsMaxFrameSize)
         .setMaxConnections(maxClientConnections)
     )
 
@@ -182,6 +153,8 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
         system,
         node,
         maxServerConnections,
+        node.config.network.wsMaxSubscriptionsPerConnection,
+        node.config.network.wsMaxContractEventAddresses,
         keepAliveInterval,
         wsOptions
       )
@@ -236,6 +209,34 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
       .value
       .contains(eventHandler.ref) is true
   }
+
+  implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
+    reader[ujson.Value].map[WsNotificationParams] {
+      case ujson.Obj(values) =>
+        val subscription = Hash.unsafe(Hex.unsafe(values("subscription").str))
+        values("result") match {
+          case obj: ujson.Obj if obj.value.contains("block") =>
+            WsBlockNotificationParams(subscription, read[BlockAndEvents](obj))
+          case obj: ujson.Obj if obj.value.contains("unsigned") =>
+            WsTxNotificationParams(subscription, read[TransactionTemplate](obj))
+          case obj: ujson.Obj if obj.value.contains("contractAddress") =>
+            WsContractEventNotificationParams(subscription, read[ContractEvent](obj))
+          case obj: ujson.Obj =>
+            throw new Exception(s"Unknown WsNotificationParams type with result: $obj")
+          case other =>
+            throw new Exception(s"Expected ujson.Obj for 'result', got: $other")
+        }
+      case other =>
+        throw new Exception(s"Invalid JSON format for WsNotificationParams: $other")
+    }
+
+  implicit protected val wsRequestReader: Reader[WsRequest] =
+    reader[ujson.Value].map[WsRequest] { json =>
+      fromJsonString(json.render(), node.config.network.wsMaxContractEventAddresses) match {
+        case Right(wsRequest) => wsRequest
+        case Left(failure)    => throw failure.error
+      }
+    }
 }
 
 trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventually {

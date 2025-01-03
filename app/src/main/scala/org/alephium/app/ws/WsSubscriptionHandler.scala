@@ -20,32 +20,43 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
+
 import akka.actor.{ActorSystem, Props}
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
+
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.json.Json.write
 import org.alephium.protocol.model.Address
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
-import org.alephium.util.{AVector, ActorRefT, BaseActor}
+import org.alephium.util.{ActorRefT, AVector, BaseActor}
 
 protected[ws] object WsSubscriptionHandler {
-  protected[ws] val MaxSubscriptionsPerClient = 50
 
   def apply(
       vertx: Vertx,
       system: ActorSystem,
       maxConnections: Int,
-      keepAliveInterval: FiniteDuration
+      maxSubscriptionsPerConnection: Int,
+      maxContractEventAddresses: Int,
+      pingFrequency: FiniteDuration
   ): ActorRefT[SubscriptionMsg] = {
     ActorRefT
       .build[WsSubscriptionHandler.SubscriptionMsg](
         system,
-        Props(new WsSubscriptionHandler(vertx, maxConnections, keepAliveInterval))
+        Props(
+          new WsSubscriptionHandler(
+            vertx,
+            maxConnections,
+            maxSubscriptionsPerConnection,
+            maxContractEventAddresses,
+            pingFrequency
+          )
+        )
       )
   }
 
@@ -114,7 +125,9 @@ protected[ws] object WsSubscriptionHandler {
 protected[ws] class WsSubscriptionHandler(
     vertx: Vertx,
     maxConnections: Int,
-    keepAliveInterval: FiniteDuration
+    maxSubscriptionsPerConnection: Int,
+    maxContractEventAddresses: Int,
+    pingFrequency: FiniteDuration
 ) extends BaseActor {
   import org.alephium.app.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
@@ -133,8 +146,8 @@ protected[ws] class WsSubscriptionHandler(
 
   private val pingScheduler =
     context.system.scheduler.scheduleWithFixedDelay(
-      keepAliveInterval,
-      keepAliveInterval,
+      pingFrequency,
+      pingFrequency,
       self,
       KeepAlive
     )
@@ -243,15 +256,14 @@ protected[ws] class WsSubscriptionHandler(
     }
   }
 
-  private def handleMessage(ws: ServerWsLike, msg: String)(implicit
-      ec: ExecutionContext
-  ): Unit = {
-    WsRequest.fromJsonString(msg) match {
+  private def handleMessage(ws: ServerWsLike, msg: String): Unit = {
+    WsRequest.fromJsonString(msg, maxContractEventAddresses) match {
       case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
         val _ = self ! Unsubscribe(id, ws, subscriptionId)
       case Right(WsRequest(id, params: WsSubscriptionParams)) =>
         val _ = self ! Subscribe(id, ws, params)
-      case Left(failure) => respondAsyncAndForget(ws, failure)
+      case Left(failure) =>
+        val _ = self ! RequestRejected(ws, failure)
     }
   }
 
@@ -265,10 +277,10 @@ protected[ws] class WsSubscriptionHandler(
           ws,
           Response.failed(id, WsError.alreadySubscribed(wsIdWithSubscriptionId.subscriptionId))
         )
-      case Some(ss) if ss.length >= MaxSubscriptionsPerClient =>
+      case Some(ss) if ss.length >= maxSubscriptionsPerConnection =>
         self ! RequestRejected(
           ws,
-          Response.failed(id, WsError.subscriptionLimitExceeded(MaxSubscriptionsPerClient))
+          Response.failed(id, WsError.subscriptionLimitExceeded(maxSubscriptionsPerConnection))
         )
       case _ =>
         subscribeToEvents(id, ws, wsIdWithSubscriptionId.subscriptionId) match {

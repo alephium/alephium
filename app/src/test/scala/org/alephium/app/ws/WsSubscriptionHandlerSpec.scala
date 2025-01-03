@@ -151,7 +151,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
         }
         inside(rejectedSubscription) { case JsonRPC.Response.Failure(error, id) =>
           error is WsError.subscriptionLimitExceeded(
-            WsSubscriptionHandler.MaxSubscriptionsPerClient
+            node.config.network.wsMaxSubscriptionsPerConnection
           )
           id is Some(50L)
         }

@@ -20,10 +20,14 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
-    max-ws-connections = 100
     max-clique-from-same-ip = 3
 
+    ws-max-connections = 100
+    ws-max-frame-size = 262144 // 1024 * 256
+    ws-max-subscriptions-per-connection = 50
+    ws-max-contract-event-addresses = 1000
     ws-ping-frequency = 10 second
+
     ping-frequency = 10 second
     retry-timeout = 10 second
     ban-duration = 1 day
@@ -78,7 +82,6 @@ alephium {
     gas-fee-cap = "1000000000000000000"// 1 ALPH
     default-utxos-limit = 512
     max-form-buffered-bytes = 131072 // 128 * 1024
-    max-web-socket-frame-size = 1048576 // 1024 * 1024
     enable-http-metrics = false
   }
 

@@ -42,7 +42,6 @@ class ApiConfigSpec extends AlephiumSpec {
     val apiConfig  = ApiConfig.load(prodConfig)
     alphConfig.network.networkId is NetworkId.AlephiumMainNet
     apiConfig.defaultUtxosLimit is 5000
-    apiConfig.maxWebSocketFrameSize is 1048576
     apiConfig.enableHttpMetrics is false
   }
 
@@ -155,7 +154,6 @@ class ApiConfigSpec extends AlephiumSpec {
       ("alephium.api.gas-fee-cap", "1000000000000000000"),
       ("alephium.api.default-utxos-limit", 512),
       ("alephium.api.max-form-buffered-bytes", 128 * 1024),
-      ("alephium.api.max-web-socket-frame-size", 1024 * 1024),
       ("alephium.api.enable-http-metrics", enableHttpMetrics.getOrElse(null))
     )
 

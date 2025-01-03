@@ -46,7 +46,9 @@ object WsServer extends StrictLogging {
       system: ActorSystem,
       node: Node,
       maxConnections: Int,
-      keepAliveInterval: Duration,
+      maxSubscriptionsPerConnection: Int,
+      maxContractEventAddresses: Int,
+      pingFrequency: Duration,
       options: HttpServerOptions
   )(implicit
       networkConfig: NetworkConfig
@@ -59,7 +61,9 @@ object WsServer extends StrictLogging {
         vertx,
         system,
         maxConnections,
-        FiniteDuration(keepAliveInterval.millis, TimeUnit.MILLISECONDS)
+        maxSubscriptionsPerConnection,
+        maxContractEventAddresses,
+        FiniteDuration(pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
     val eventHandler =
       WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)

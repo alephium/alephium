@@ -67,7 +67,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       ALPH.oneAlph,
       utxosLimitInApiConfig,
       maxFormBufferedBytes = 128,
-      maxWebSocketFrameSize = 1024 * 1024,
       enableHttpMetrics = true
     )
   }

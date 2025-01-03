@@ -226,14 +226,16 @@ object RestServer {
     val restPort = node.config.network.restPort
     val httpOptions =
       new HttpServerOptions()
-        .setMaxWebSocketFrameSize(apiConfig.maxWebSocketFrameSize)
+        .setMaxWebSocketFrameSize(networkSetting.wsMaxFrameSize)
         .setRegisterWebSocketWriteHandlers(true)
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
     val webSocketServer =
       WsServer(
         flowSystem,
         node,
-        networkSetting.maxWsConnections,
+        networkSetting.wsMaxConnections,
+        networkSetting.wsMaxSubscriptionsPerConnection,
+        networkSetting.wsMaxContractEventAddresses,
         networkSetting.wsPingFrequency,
         httpOptions
       )

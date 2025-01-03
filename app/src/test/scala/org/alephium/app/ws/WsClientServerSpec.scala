@@ -139,9 +139,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     ws.writeRequestToSocket(requestOverLimit).futureValue is Response
       .failed(
         requestOverLimit.id,
-        WsError.subscriptionLimitExceeded(
-          WsSubscriptionHandler.MaxSubscriptionsPerClient
-        )
+        WsError.subscriptionLimitExceeded(node.config.network.wsMaxSubscriptionsPerConnection)
       )
     wsServer.httpServer.close().asScala.futureValue
   }
@@ -161,7 +159,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     ws.writeRequestToSocket(tooManyAddressesRequest).futureValue is Response
       .failed(
         tooManyAddressesRequest.id,
-        WsError.tooManyContractAddresses(ContractEventsSubscribeParams.ContractAddressLimit)
+        WsError.tooManyContractAddresses(node.config.network.wsMaxContractEventAddresses)
       )
     wsServer.httpServer.close().asScala.futureValue
   }

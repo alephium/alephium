@@ -30,25 +30,35 @@ import org.alephium.util.{AVector, TimeStamp}
 
 class WsProtocolSpec extends WsSubscriptionFixture {
 
+  private val contractAddressLimit = node.config.network.wsMaxContractEventAddresses
+
   "WsProtocol" should "refuse all WsRequests that are not JsonRPC compliant" in {
     val method    = WsMethod.SubscribeMethod
     val eventType = "foo"
     WsRequest
-      .fromJsonString(s"""{"method": "$method", "params": ["$eventType"]}""")
+      .fromJsonString(s"""{"method": "$method", "params": ["$eventType"]}""", contractAddressLimit)
       .isLeft is true
-    WsRequest.fromJsonString(s"""{"method": "$method"""").isLeft is true
+    WsRequest.fromJsonString(s"""{"method": "$method"""", contractAddressLimit).isLeft is true
     WsRequest
-      .fromJsonString(s"""{"method2": "$method", "params": ["$eventType"]}""")
-      .isLeft is true
-    WsRequest
-      .fromJsonString(s"""{"method": "$method", "params2": ["$eventType"]}""")
-      .isLeft is true
-    WsRequest.fromJsonString(s"""{"method": "$method", "params": "$eventType"}""").isLeft is true
-    WsRequest
-      .fromJsonString(s"""{"jsonrpc": "2.0", "method": "$method", "params": "$eventType"}""")
+      .fromJsonString(s"""{"method2": "$method", "params": ["$eventType"]}""", contractAddressLimit)
       .isLeft is true
     WsRequest
-      .fromJsonString(s"""{"id": 0, "method": "$method", "params": "$eventType"}""")
+      .fromJsonString(s"""{"method": "$method", "params2": ["$eventType"]}""", contractAddressLimit)
+      .isLeft is true
+    WsRequest
+      .fromJsonString(s"""{"method": "$method", "params": "$eventType"}""", contractAddressLimit)
+      .isLeft is true
+    WsRequest
+      .fromJsonString(
+        s"""{"jsonrpc": "2.0", "method": "$method", "params": "$eventType"}""",
+        contractAddressLimit
+      )
+      .isLeft is true
+    WsRequest
+      .fromJsonString(
+        s"""{"id": 0, "method": "$method", "params": "$eventType"}""",
+        contractAddressLimit
+      )
       .isLeft is true
   }
 
@@ -68,7 +78,8 @@ class WsProtocolSpec extends WsSubscriptionFixture {
 
       val jsonRpcSubscribeRequest =
         RequestUnsafe("2.0", WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(params.eventType)), 0)
-      val expectedSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcSubscribeRequest).rightValue
+      val expectedSubscribeRequest =
+        WsRequest.fromJsonRpc(jsonRpcSubscribeRequest, contractAddressLimit).rightValue
       expectedSubscribeRequest is read[WsRequest](write(expectedSubscribeRequest))
 
       val jsonRpcUnSubscribeRequest =
@@ -78,7 +89,8 @@ class WsProtocolSpec extends WsSubscriptionFixture {
           ujson.Arr(ujson.Str(params.subscriptionId.toHexString)),
           0
         )
-      val expectedUnSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest).rightValue
+      val expectedUnSubscribeRequest =
+        WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest, contractAddressLimit).rightValue
       expectedUnSubscribeRequest is read[WsRequest](write(expectedUnSubscribeRequest))
     }
   }
@@ -103,7 +115,8 @@ class WsProtocolSpec extends WsSubscriptionFixture {
 
     val jsonRpcSubscribeRequest =
       RequestUnsafe("2.0", WsMethod.SubscribeMethod, ujson.Arr(eventType, eventIndex, addresses), 0)
-    val expectedSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcSubscribeRequest).rightValue
+    val expectedSubscribeRequest =
+      WsRequest.fromJsonRpc(jsonRpcSubscribeRequest, contractAddressLimit).rightValue
     expectedSubscribeRequest is read[WsRequest](write(expectedSubscribeRequest))
 
     val jsonRpcUnSubscribeRequest =
@@ -120,36 +133,53 @@ class WsProtocolSpec extends WsSubscriptionFixture {
         ),
         0
       )
-    val expectedUnSubscribeRequest = WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest).rightValue
+    val expectedUnSubscribeRequest =
+      WsRequest.fromJsonRpc(jsonRpcUnSubscribeRequest, contractAddressLimit).rightValue
     expectedUnSubscribeRequest is read[WsRequest](write(expectedUnSubscribeRequest))
   }
 
   "WsRequest" should "not allow for building contract event subscription with invalid contract addresses" in {
-    ContractEventsSubscribeParams.from(0, AVector.empty).isLeft is true
-
-    ContractEventsSubscribeParams
-      .from(0, duplicateAddresses)
-      .isLeft is true
-
-    ContractEventsSubscribeParams
-      .from(0, tooManyContractAddresses)
-      .isLeft is true
+    ContractEventsSubscribeParams.buildAddresses(AVector("")).isLeft is true
 
     val invalidSubscriptionRequest =
       s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.Contract}",$EventIndex_0,[]],"id":0,"jsonrpc":"2.0"}"""
-
     assertThrows[JsonRPC.Error](read[WsRequest](invalidSubscriptionRequest))
 
     val eventType  = ujson.Str(ContractEventsSubscribeParams.Contract)
     val eventIndex = ujson.Num(0)
-    val invalidJsonRpcSubscribeRequest =
+
+    val requestWithEmptyAddresses =
       RequestUnsafe(
         "2.0",
         WsMethod.SubscribeMethod,
         ujson.Arr(eventType, eventIndex, ujson.Arr()),
         0
       )
-    WsRequest.fromJsonRpc(invalidJsonRpcSubscribeRequest).isLeft is true
+    WsRequest
+      .fromJsonRpc(requestWithEmptyAddresses, contractAddressLimit)
+      .isLeft is true
+
+    val requestWithDuplicateAddresses =
+      RequestUnsafe(
+        "2.0",
+        WsMethod.SubscribeMethod,
+        ujson.Arr(eventType, eventIndex, ujson.Arr(duplicateAddresses.map(_.toBase58))),
+        0
+      )
+    WsRequest
+      .fromJsonRpc(requestWithDuplicateAddresses, contractAddressLimit)
+      .isLeft is true
+
+    val requestWithTooManyAddresses =
+      RequestUnsafe(
+        "2.0",
+        WsMethod.SubscribeMethod,
+        ujson.Arr(eventType, eventIndex, ujson.Arr(tooManyContractAddresses.map(_.toBase58))),
+        0
+      )
+    WsRequest
+      .fromJsonRpc(requestWithTooManyAddresses, contractAddressLimit)
+      .isLeft is true
   }
 
   "WsNotificationParams" should "pass ser/deser round-trip for notifications" in {

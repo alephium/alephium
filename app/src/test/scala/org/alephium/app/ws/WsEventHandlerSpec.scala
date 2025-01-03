@@ -28,7 +28,14 @@ class WsEventHandlerSpec extends WsSubscriptionFixture {
 
   it should "subscribe event handler into event bus" in new WsServerFixture {
     val subscriptionHandler =
-      WsSubscriptionHandler.apply(vertx, system, networkConfig.maxWsConnections, 10.seconds)
+      WsSubscriptionHandler.apply(
+        vertx,
+        system,
+        networkConfig.wsMaxConnections,
+        networkConfig.wsMaxSubscriptionsPerConnection,
+        networkConfig.wsMaxContractEventAddresses,
+        10.seconds
+      )
     val eventHandler =
       WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
     node.eventBus
