@@ -121,6 +121,57 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
     )
   }
 
+  it should "not allow for more subscriptions per ws client than limit" in new WsBehaviorFixture {
+    def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+      for {
+        ws <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
+        successfulSubscriptions <- Future.sequence(
+          AVector
+            .tabulate(50) { index =>
+              ws.subscribeToContractEvents(
+                index.toLong,
+                eventIndex = index,
+                contractEventsParams_0.addresses
+              )
+            }
+            .toIterable
+        )
+        rejectedSubscription <- ws.subscribeToContractEvents(
+          50L,
+          contractEventsParams_1.eventIndex,
+          contractEventsParams_1.addresses
+        )
+      } yield {
+        inside(successfulSubscriptions) { case responses =>
+          responses.foreach {
+            case JsonRPC.Response.Success(_, _) =>
+            case JsonRPC.Response.Failure(error, _) =>
+              fail(error.getMessage)
+          }
+        }
+        inside(rejectedSubscription) { case JsonRPC.Response.Failure(error, id) =>
+          error is WsError.subscriptionLimitExceeded(
+            WsSubscriptionHandler.MaxSubscriptionsPerClient
+          )
+          id is Some(50L)
+        }
+        ws
+      }
+    }
+
+    val wsSpec = WsStartBehavior(
+      subscribingBehavior,
+      _ => (),
+      _ => true is true
+    )
+    checkWS(
+      initBehaviors = AVector.fill(1)(wsSpec),
+      nextBehaviors = AVector.empty,
+      expectedSubscriptions = 50,
+      openWebsocketsCount = 1
+    )
+  }
+
   it should "handle invalid messages with error" in new WsBehaviorFixture {
     def invalidMessageBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {

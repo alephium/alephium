@@ -20,21 +20,21 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
-
 import akka.actor.{ActorSystem, Props}
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
-
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.json.Json.write
 import org.alephium.protocol.model.Address
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{AVector, ActorRefT, BaseActor}
 
 protected[ws] object WsSubscriptionHandler {
+  protected[ws] val MaxSubscriptionsPerClient = 50
 
   def apply(
       vertx: Vertx,
@@ -83,15 +83,9 @@ protected[ws] object WsSubscriptionHandler {
       subscriptionId: WsSubscriptionId,
       consumer: MessageConsumer[String]
   ) extends CommandResponse
-  final private case class AlreadySubscribed(
-      id: Correlation,
+  final private case class RequestRejected(
       ws: ServerWsLike,
-      subscriptionId: WsSubscriptionId
-  ) extends CommandResponse
-  final private case class SubscriptionFailed(
-      id: Correlation,
-      ws: ServerWsLike,
-      err: String
+      response: JsonRPC.Response.Failure
   ) extends CommandResponse
 
   final protected[ws] case class Unsubscribe(
@@ -103,16 +97,6 @@ protected[ws] object WsSubscriptionHandler {
       id: Correlation,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
-  ) extends CommandResponse
-  final private case class AlreadyUnSubscribed(
-      id: Correlation,
-      ws: ServerWsLike,
-      subscriptionId: WsSubscriptionId
-  ) extends CommandResponse
-  final private case class UnsubscriptionFailed(
-      id: Correlation,
-      ws: ServerWsLike,
-      err: String
   ) extends CommandResponse
 
   final protected[ws] case class Unregister(id: WsId) extends Command
@@ -202,25 +186,13 @@ protected[ws] class WsSubscriptionHandler(
           Some(AVector(subscriptionId -> consumer))
       }
       respondAsyncAndForget(ws, Response.successful(id, subscriptionId.toHexString))
-    case AlreadySubscribed(id, ws, subscriptionId) =>
-      respondAsyncAndForget(
-        ws,
-        Response.failed(id, WsError.alreadySubscribed(subscriptionId))
-      )
-    case SubscriptionFailed(id, ws, reason) =>
-      respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
+    case RequestRejected(ws, response) =>
+      respondAsyncAndForget(ws, response)
     case Unsubscribed(id, ws, subscriptionId) =>
       val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), subscriptionId)
       subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == subscriptionId)))
       unregisterContractEventSubscription(wsIdWithSubscriptionId)
       respondAsyncAndForget(ws, Response.successful(id))
-    case AlreadyUnSubscribed(id, ws, subscriptionId) =>
-      respondAsyncAndForget(
-        ws,
-        Response.failed(id, WsError.alreadyUnSubscribed(subscriptionId))
-      )
-    case UnsubscriptionFailed(id, ws, reason) =>
-      respondAsyncAndForget(ws, Response.failed(id, Error.server(reason)))
     case NotificationFailed(_, _, _, _) =>
     // TODO can we do something about failing notification to client which is not closed ?
     case Unregister(id) =>
@@ -289,7 +261,15 @@ protected[ws] class WsSubscriptionHandler(
     val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), params.subscriptionId)
     subscribers.get(ws.textHandlerID()) match {
       case Some(ss) if ss.exists(_._1 == wsIdWithSubscriptionId.subscriptionId) =>
-        self ! AlreadySubscribed(id, ws, wsIdWithSubscriptionId.subscriptionId)
+        self ! RequestRejected(
+          ws,
+          Response.failed(id, WsError.alreadySubscribed(wsIdWithSubscriptionId.subscriptionId))
+        )
+      case Some(ss) if ss.length >= MaxSubscriptionsPerClient =>
+        self ! RequestRejected(
+          ws,
+          Response.failed(id, WsError.subscriptionLimitExceeded(MaxSubscriptionsPerClient))
+        )
       case _ =>
         subscribeToEvents(id, ws, wsIdWithSubscriptionId.subscriptionId) match {
           case Success(consumer) =>
@@ -304,7 +284,7 @@ protected[ws] class WsSubscriptionHandler(
             }
             self ! Subscribed(id, ws, wsIdWithSubscriptionId.subscriptionId, consumer)
           case Failure(ex) =>
-            self ! SubscriptionFailed(id, ws, ex.getMessage)
+            self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
         }
     }
   }
@@ -322,11 +302,11 @@ protected[ws] class WsSubscriptionHandler(
               case Success(_) =>
                 self ! Unsubscribed(id, ws, subscriptionId)
               case Failure(ex) =>
-                self ! UnsubscriptionFailed(id, ws, ex.getMessage)
+                self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
             }(context.dispatcher)
         }
       case _ =>
-        self ! AlreadyUnSubscribed(id, ws, subscriptionId)
+        self ! RequestRejected(ws, Response.failed(id, WsError.alreadyUnSubscribed(subscriptionId)))
     }
   }
 

@@ -28,6 +28,7 @@ import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
+import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util._
 
@@ -95,6 +96,52 @@ class WsClientServerSpec extends WsSubscriptionFixture {
       .failed(
         emptyAddressRequest.id,
         WsError.emptyContractAddress
+      )
+    wsServer.httpServer.close().asScala.futureValue
+  }
+
+  "WsServer" should "reject subscriptions over limit" in new WsServerFixture {
+    val wsServer = bindAndListen()
+    val ws       = wsClient.connect(wsPort)(_ => ())(_ => ()).futureValue
+
+    val responses =
+      Future
+        .sequence(
+          AVector
+            .tabulate(50) { index =>
+              val req = WsRequest(
+                Correlation(index.toLong),
+                ContractEventsSubscribeParams(
+                  ContractEventsSubscribeParams.Contract,
+                  index,
+                  contractEventsParams_0.addresses
+                )
+              )
+              ws.writeRequestToSocket(req)
+            }
+            .toIterable
+        )
+        .futureValue
+
+    responses.foreach {
+      case JsonRPC.Response.Success(_, _) =>
+      case JsonRPC.Response.Failure(error, _) =>
+        fail(error.getMessage)
+    }
+    val requestOverLimit = WsRequest(
+      Correlation(50L),
+      ContractEventsSubscribeParams(
+        ContractEventsSubscribeParams.Contract,
+        50,
+        contractEventsParams_1.addresses
+      )
+    )
+    ws.writeRequestToSocket(requestOverLimit).futureValue is Response
+      .failed(
+        requestOverLimit.id,
+        WsError.subscriptionLimitExceeded(
+          WsSubscriptionHandler.MaxSubscriptionsPerClient
+        )
       )
     wsServer.httpServer.close().asScala.futureValue
   }

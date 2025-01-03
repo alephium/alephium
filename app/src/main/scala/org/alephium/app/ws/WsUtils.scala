@@ -25,8 +25,9 @@ import org.alephium.app.ws.WsParams.SimpleSubscribeParams.eventTypes
 import org.alephium.rpc.model.JsonRPC.Error
 
 object WsError {
-  protected[ws] val AlreadySubscribed: Int   = -32010
-  protected[ws] val AlreadyUnSubscribed: Int = -32011
+  protected[ws] val AlreadySubscribed: Int         = -32010
+  protected[ws] val AlreadyUnSubscribed: Int       = -32011
+  protected[ws] val SubscriptionLimitExceeded: Int = -32012
 
   protected[ws] def invalidEventType(eventType: WsEventType): Error =
     Error(
@@ -101,6 +102,9 @@ object WsError {
 
   protected[ws] def alreadyUnSubscribed(subscriptionId: WsSubscriptionId): Error =
     Error(WsError.AlreadyUnSubscribed, subscriptionId.toHexString)
+
+  protected[ws] def subscriptionLimitExceeded(limit: Int): Error =
+    Error(WsError.SubscriptionLimitExceeded, s"Number of subscriptions is limited to $limit")
 }
 
 object WsUtils {
