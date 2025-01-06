@@ -16,22 +16,23 @@
 
 package org.alephium.io
 
-import scala.collection.mutable.ArrayBuffer
+import java.nio.file.{Files => JFiles}
 
 import org.alephium.crypto.Keccak256
 import org.alephium.serde.Serde
-import org.alephium.util.{AlephiumFixture, Files}
+import org.alephium.util.{AlephiumFixture, AlephiumSpec, Env, Files}
 
 trait StorageFixture extends AlephiumFixture {
 
-  private val storages = ArrayBuffer.empty[RocksDBSource]
-
   def newDBStorage(): RocksDBSource = {
-    val tmpdir  = Files.tmpDir
+    val rootPath = Files.testRootPath(Env.currentEnv)
+    if (!JFiles.exists(rootPath)) {
+      rootPath.toFile.mkdir()
+    }
     val dbname  = s"test-db-${Keccak256.generate.toHexString}"
-    val dbPath  = tmpdir.resolve(dbname)
+    val dbPath  = rootPath.resolve(dbname)
     val storage = RocksDBSource.openUnsafe(dbPath)
-    storages.append(storage)
+    AlephiumSpec.addCleanTask(() => storage.dESTROYUnsafe())
     storage
   }
 
@@ -40,9 +41,5 @@ trait StorageFixture extends AlephiumFixture {
       cf: RocksDBSource.ColumnFamily
   ): KeyValueStorage[K, V] = {
     RocksDBKeyValueStorage[K, V](storage, cf)
-  }
-
-  protected def postTest(): Unit = {
-    storages.foreach(_.dESTROY().isRight is true)
   }
 }

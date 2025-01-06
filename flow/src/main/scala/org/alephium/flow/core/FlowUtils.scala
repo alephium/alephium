@@ -218,7 +218,14 @@ trait FlowUtils
       order
         .foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
-          generateFullTx(chainIndex, groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
+          generateFullTx(
+            chainIndex,
+            groupView,
+            blockEnv,
+            tx,
+            tx.unsigned.scriptOpt.get,
+            scriptTxIndex
+          )
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
         .map { _ =>
@@ -320,7 +327,15 @@ trait FlowUtils
   ): IOResult[BlockFlowTemplate] = {
     val blockEnv = if (hardFork.isRhoneEnabled()) {
       val refCache = Some(mutable.HashMap.empty[AssetOutputRef, AssetOutput])
-      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, refCache)
+      BlockEnv(
+        chainIndex,
+        networkConfig.networkId,
+        templateTs,
+        target,
+        None,
+        hardFork,
+        refCache
+      )
     } else {
       BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None)
     }
@@ -443,7 +458,8 @@ trait FlowUtils
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       tx: TransactionTemplate,
-      script: StatefulScript
+      script: StatefulScript,
+      txIndex: Int
   ): IOResult[Transaction] = {
     val validator = TxValidation.build
     for {
@@ -462,7 +478,8 @@ trait FlowUtils
           chainIndex,
           groupView,
           blockEnv,
-          preOutputs
+          preOutputs,
+          txIndex
         )
         result match {
           case Right(successfulTx) => Right(successfulTx)

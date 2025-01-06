@@ -1046,10 +1046,12 @@ trait TxOutputRefIndexFixture extends FlowFixture {
     utxos.length is 1
     val txOutputRef = utxos.head.ref
     if (enableTxOutputRefIndex) {
-      blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
+      blockFlow.getTxIdTxOutputLocatorsFromOutputRef(txOutputRef).map(_.map(_.txId)) isE Some(
+        block.nonCoinbase.head.id
+      )
     } else {
       blockFlow
-        .getTxIdFromOutputRef(txOutputRef)
+        .getTxIdTxOutputLocatorsFromOutputRef(txOutputRef)
         .leftValue
         .reason
         .getMessage is "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"

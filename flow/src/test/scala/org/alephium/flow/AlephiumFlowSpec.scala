@@ -21,9 +21,10 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 
 import akka.util.ByteString
-import org.scalatest.{Assertion, BeforeAndAfterAll}
+import org.scalatest.Assertion
 
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -54,8 +55,7 @@ trait FlowFixture
   def storageBlockFlow(): BlockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
   def isolatedBlockFlow(): BlockFlow = {
-    val newStorages =
-      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    val newStorages = StoragesFixture.buildStorages(rootPath.resolve(Hash.generate.toHexString))
     BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)
   }
 
@@ -108,11 +108,21 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       txScript: StatefulScript,
-      gas: Int = 100000
+      gas: Int = 100000,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
     mineWithTxs(blockFlow, chainIndex)(
-      transferTxs(_, _, ALPH.alph(1), 1, Some(txScript), true, scriptGas = gas)
+      transferTxs(
+        _,
+        _,
+        ALPH.alph(1),
+        1,
+        Some(txScript),
+        true,
+        scriptGas = gas,
+        keyPairOpt = keyPairOpt
+      )
     )
   }
 
@@ -127,6 +137,57 @@ trait FlowFixture
       invoker -> txScripts(index)
     }
     mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
+  }
+
+  def prepareUtxos(
+      fromPrivateKey: PrivateKey,
+      fromPublicKey: PublicKey,
+      outputsLimitOpt: Option[Int] = None
+  ): (AVector[AssetOutputInfo], U256) = {
+    lazy val lockupScript = Address.p2pkh(fromPublicKey).lockupScript
+    lazy val initialUtxos = blockFlow
+      .getUTXOs(lockupScript, Int.MaxValue, true)
+      .rightValue
+      .asUnsafe[AssetOutputInfo]
+    def getBalance =
+      blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
+    outputsLimitOpt match {
+      case None => initialUtxos -> getBalance
+      case Some(outputsLimit) =>
+        require(outputsLimit < ALPH.MaxTxOutputNum, "Number of outputs must fit in a transaction")
+        if (initialUtxos.length >= outputsLimit) {
+          initialUtxos.take(outputsLimit) -> getBalance
+        } else if (outputsLimit == 0) {
+          AVector.empty[AssetOutputInfo] -> getBalance
+        } else {
+          require(outputsLimit > 0, "Number of outputs must be greater than 0")
+          val amountPerOutput =
+            getAlphBalance(blockFlow, lockupScript).divUnsafe(U256.unsafe(outputsLimit))
+          val outputs = AVector.fill(outputsLimit - initialUtxos.length) {
+            TxOutputInfo(lockupScript, amountPerOutput, AVector.empty, None)
+          }
+          val unsignedTx = blockFlow
+            .transfer(
+              fromPublicKey,
+              outputs,
+              None,
+              nonCoinbaseMinGasPrice,
+              Int.MaxValue,
+              ExtraUtxosInfo.empty
+            )
+            .rightValue
+            .rightValue
+          val tx    = Transaction.from(unsignedTx, fromPrivateKey)
+          val block = mineWithTxs(blockFlow, tx.chainIndex)((_, _) => AVector(tx))
+          addAndCheck(blockFlow, block)
+          val utxos = blockFlow
+            .getUTXOs(lockupScript, Int.MaxValue, true)
+            .rightValue
+            .asUnsafe[AssetOutputInfo]
+          assume(utxos.length == outputsLimit)
+          utxos -> getBalance
+        }
+    }
   }
 
   def transfer(
@@ -223,10 +284,14 @@ trait FlowFixture
       gasFeeInTheAmount: Boolean,
       lockTimeOpt: Option[TimeStamp] = None,
       scriptGas: Int = 100000,
-      validation: Boolean = true
+      validation: Boolean = true,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): AVector[Transaction] = {
-    val mainGroup                  = chainIndex.from
-    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val mainGroup = chainIndex.from
+    val (privateKey, publicKey) = keyPairOpt.getOrElse {
+      val keys = genesisKeys(mainGroup.value)
+      (keys._1, keys._2)
+    }
     val gasAmount = txScriptOpt match {
       case None =>
         if (numReceivers > 1) {
@@ -611,7 +676,8 @@ trait FlowFixture
         tx,
         preOutputs,
         txScript,
-        tx.unsigned.gasAmount
+        tx.unsigned.gasAmount,
+        0
       )
       .rightValue
     result.contractInputs -> result.generatedOutputs
@@ -697,6 +763,17 @@ trait FlowFixture
     brokerConfig.contains(lockupScript.groupIndex) is true
     val query = blockFlow.getUsableUtxos(lockupScript, defaultUtxoLimit)
     U256.unsafe(query.rightValue.sumBy(_.output.amount.v: BigInt).underlying())
+  }
+
+  def getTotalUtxoCountsAndBalance(
+      blockFlow: BlockFlow,
+      outs: AVector[TxOutputInfo]
+  ): (Int, U256) = {
+    outs.fold((0, U256.Zero)) { case ((utxoCount, balance), output) =>
+      val balanceInfo =
+        blockFlow.getBalance(output.lockupScript, Int.MaxValue, false).rightValue
+      (utxoCount + balanceInfo._5, balance + balanceInfo._1)
+    }
   }
 
   def showBalances(blockFlow: BlockFlow): Unit = {
@@ -785,7 +862,8 @@ trait FlowFixture
       None
     )
     val txValidation = TxValidation.build
-    val gasLeft = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false).rightValue
+    val gasLeft =
+      txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false, 0).rightValue
     val gasUsed = initialGas.use(gasLeft).rightValue
     print(s"length: ${tx0.unsigned.inputs.length}\n")
     print(s"gasUsed $gasUsed\n")
@@ -919,14 +997,15 @@ trait FlowFixture
 
   def callCompiledTxScript(
       script: StatefulScript,
-      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0),
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
     script.toTemplateString() is Hex.toHexString(serialize(script))
     val block =
       if (script.entryMethod.usePreapprovedAssets) {
-        payableCall(blockFlow, chainIndex, script)
+        payableCall(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
       } else {
-        simpleScript(blockFlow, chainIndex, script)
+        simpleScript(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
       }
     addAndCheck(blockFlow, block)
     block
@@ -956,18 +1035,24 @@ trait FlowFixture
     }
     AVector.fill(n)(createTx())
   }
-}
 
-trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {
-  override def afterAll(): Unit = {
-    super.afterAll()
-    cleanStorages()
+  def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {
+    val chainIndex   = block.chainIndex
+    val lockupScript = getGenesisLockupScript(chainIndex)
+    val template0    = BlockFlowTemplate.from(block, height)
+    val parentIndex  = brokerConfig.groups - 1 + chainIndex.to.value
+    val newDeps      = template0.deps.replace(parentIndex, parentHash)
+    val template1 = blockFlow
+      .rebuild(template0, template0.transactions.init, AVector.empty, lockupScript)
+      .copy(
+        deps = newDeps,
+        depStateHash =
+          blockFlow.getDepStateHash(BlockDeps.unsafe(newDeps), chainIndex.from).rightValue
+      )
+    mine(blockFlow, template1)
   }
 }
 
-class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec {
-  override def afterAll(): Unit = {
-    super.afterAll()
-    cleanStorages()
-  }
-}
+trait AlephiumFlowSpec extends AlephiumSpec with FlowFixture
+
+class AlephiumFlowActorSpec extends AlephiumActorSpec with AlephiumFlowSpec

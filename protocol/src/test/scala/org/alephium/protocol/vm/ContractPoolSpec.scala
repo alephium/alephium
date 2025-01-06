@@ -22,6 +22,7 @@ import org.scalatest.Assertion
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, TimeStamp}
 
 class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
@@ -74,7 +75,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
           fields(mutFieldLength),
           outputRef,
           output,
-          TransactionId.generate
+          TransactionId.generate,
+          Some(TxOutputLocator(BlockHash.generate, 0, 0))
         ) isE ()
       pool.worldState.getContractObj(contractId) isE
         contract
@@ -237,7 +239,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       AVector.empty,
       outputRef,
       output,
-      TransactionId.generate
+      TransactionId.generate,
+      Some(TxOutputLocator(BlockHash.generate, 0, 0))
     ) isE ()
 
     pool.gasRemaining is initialGas

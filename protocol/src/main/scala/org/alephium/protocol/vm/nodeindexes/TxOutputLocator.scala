@@ -13,31 +13,29 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.protocol.vm.nodeindexes
 
-import org.alephium.io.StagingKVStorage
-import org.alephium.protocol.model.TxOutputRef
-import org.alephium.protocol.vm.event.StagingLog
-import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
-import org.alephium.protocol.vm.subcontractindex.StagingSubContractIndex
+import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.vm.{BlockEnv, TxEnv}
+import org.alephium.serde.{intSerde, Serde}
 
-final case class StagingNodeIndexes(
-    logState: StagingLog,
-    txOutputRefIndexState: Option[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
-    subContractIndexState: Option[StagingSubContractIndex]
-) {
-  def rollback(): Unit = {
-    logState.rollback()
-    txOutputRefIndexState.foreach(_.rollback())
-    subContractIndexState.foreach(_.rollback())
-    ()
-  }
+final case class TxOutputLocator(
+    blockHash: BlockHash,
+    txIndex: Int,
+    txOutputIndex: Int
+)
 
-  def commit(): Unit = {
-    logState.commit()
-    txOutputRefIndexState.foreach(_.commit())
-    subContractIndexState.foreach(_.commit())
-    ()
+object TxOutputLocator {
+  implicit val txOutputLocatorSerde: Serde[TxOutputLocator] =
+    Serde.forProduct3(apply, b => (b.blockHash, b.txIndex, b.txOutputIndex))
+
+  def from(
+      blockEnv: BlockEnv,
+      txEnv: TxEnv,
+      txOutputIndex: Int
+  ): Option[TxOutputLocator] = {
+    for {
+      blockHash <- blockEnv.blockId
+    } yield TxOutputLocator(blockHash, txEnv.txIndex, txOutputIndex)
   }
 }

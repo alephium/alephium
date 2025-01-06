@@ -14,22 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.http
 
-import akka.util.ByteString
+import scala.concurrent.Future
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.{AVector, TimeStamp}
+import sttp.tapir.server.interceptor.metrics.MetricsRequestInterceptor
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Destination(
-    address: Address.Asset,
-    attoAlphAmount: Option[Amount] = None,
-    tokens: Option[AVector[Token]] = None,
-    lockTime: Option[TimeStamp] = None,
-    message: Option[ByteString] = None
-) {
-  def getAttoAlphAmount(): Amount = {
-    attoAlphAmount.getOrElse(Amount.Zero)
+import org.alephium.util.AlephiumSpec
+
+class ServerOptionsSpec extends AlephiumSpec {
+  "ServerOptions" should "enable metrics based on the config" in {
+    def checkMetrics(enableMetrics: Boolean) = {
+      ServerOptions
+        .serverOptions(enableMetrics)
+        .interceptors
+        .exists(
+          _.isInstanceOf[MetricsRequestInterceptor[Future]]
+        ) is enableMetrics
+    }
+
+    checkMetrics(true)
+    checkMetrics(false)
   }
 }

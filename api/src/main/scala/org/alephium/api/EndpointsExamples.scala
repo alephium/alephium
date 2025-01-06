@@ -103,9 +103,9 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val lockedTokens = AVector(Token(TokenId.hash("token3"), alph(65).value))
 
-  val defaultDestinations = AVector(Destination(address, bigAmount, None, None))
+  val defaultDestinations = AVector(Destination(address, Some(bigAmount), None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, bigAmount, Some(tokens), Some(ts))
+    Destination(address, Some(bigAmount), Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
@@ -549,6 +549,21 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val buildTransferFromOneToManyGroupsResultsExamples
+      : List[Example[AVector[BuildTransferTxResult]]] =
+    simpleExample(
+      AVector(
+        BuildTransferTxResult(
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId,
+          fromGroup = 2,
+          toGroup = 1
+        )
+      )
+    )
+
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
@@ -952,6 +967,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
+
+  implicit lazy val contractCodeExamples: List[Example[StatefulContract]] =
+    simpleExample(existingContract.bytecode)
 
   private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),

@@ -196,6 +196,8 @@ lazy val app = mainProject("app")
 
         copy(artifact, artifactTargetPath)
 
+        run("chmod", "644", artifactTargetPath)
+
         expose(12973) // http
         expose(11973) // ws
         expose(10973) // miner
@@ -262,7 +264,8 @@ lazy val http = project("http")
       `tapir-vertx`,
       `tapir-client`,
       `tapir-files`,
-      `sttp-backend`
+      `sttp-backend`,
+      `tapir-prometheus-metrics`
     )
   )
 

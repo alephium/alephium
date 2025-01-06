@@ -41,5 +41,6 @@ class ServerSpec extends AlephiumSpec with ScalaFutures with SocketUtil {
 
     server.start().futureValue is ()
     server.stop().futureValue is ()
+    server.storages.dESTROYUnsafe()
   }
 }

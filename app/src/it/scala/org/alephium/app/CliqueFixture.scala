@@ -139,7 +139,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKey: String,
       restPort: Int
   ): SubmitTxResult = eventually {
-    val destinations = AVector(Destination(Address.asset(toAddress).get, Amount(amount)))
+    val destinations = AVector(Destination(Address.asset(toAddress).get, Some(Amount(amount))))
     transfer(fromPubKey, destinations, privateKey, restPort)
   }
 
