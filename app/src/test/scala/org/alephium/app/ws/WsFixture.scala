@@ -52,8 +52,8 @@ import org.alephium.app.ws.WsSubscriptionHandler.{
   AddressWithIndex,
   GetSubscriptions,
   SubscriptionMsg,
-  SubscriptionsResponse,
-  WsIdWithSubscriptionId
+  SubscriptionOfConnection,
+  WsImmutableSubscriptions
 }
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
@@ -96,6 +96,8 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
     EventIndex_1,
     contractAddress_2
   )
+
+  protected lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
 }
 
 trait WsServerFixture extends ServerFixture with ScalaFutures {
@@ -182,7 +184,7 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
   ): Assertion = {
     subscriptionHandler
       .ask(GetSubscriptions)
-      .mapTo[SubscriptionsResponse]
+      .mapTo[WsImmutableSubscriptions]
       .futureValue
       .subscriptions
       .size is 0
@@ -231,28 +233,26 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
 trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventually {
   protected def getSubscriptions(
       subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
-  ): SubscriptionsResponse =
+  ): WsImmutableSubscriptions =
     subscriptionHandler
       .ask(GetSubscriptions)
-      .mapTo[SubscriptionsResponse]
+      .mapTo[WsImmutableSubscriptions]
       .futureValue
 
   protected def flattenParams(
       wsId: WsId,
       paramss: AVector[ContractEventsSubscribeParams]
-  ): AVector[(WsIdWithSubscriptionId, AddressWithIndex)] = {
+  ): AVector[(SubscriptionOfConnection, AddressWithIndex)] = {
     assume(paramss.length == paramss.map(_.subscriptionId).toSet.size)
     paramss.flatMap { params =>
       params.addresses.map(addr =>
-        WsIdWithSubscriptionId(wsId, params.subscriptionId) -> AddressWithIndex(
+        SubscriptionOfConnection(wsId, params.subscriptionId) -> AddressWithIndex(
           addr.toBase58,
           params.eventIndex
         )
       )
     }
   }
-
-  protected lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
 
   protected lazy val tooManyContractAddresses =
     AVector.fill(networkConfig.wsMaxContractEventAddresses + 1) {
@@ -348,7 +348,7 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
       probedSockets.filterNot(_._1.isClosed).length is openWebsocketsCount
       subscriptionHandler
         .ask(GetSubscriptions)
-        .mapTo[SubscriptionsResponse]
+        .mapTo[WsImmutableSubscriptions]
         .futureValue
         .subscriptions
         .map(_._2.length)

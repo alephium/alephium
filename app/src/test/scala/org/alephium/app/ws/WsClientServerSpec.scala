@@ -27,7 +27,7 @@ import org.scalatest.exceptions.TestFailedException
 import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
 import org.alephium.app.ws.WsRequest.Correlation
-import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, SubscriptionsResponse}
+import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, WsImmutableSubscriptions}
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.Response
@@ -72,7 +72,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     val duplicateAddressRequest = WsRequest(
       Correlation(0),
       ContractEventsSubscribeParams(
-        ContractEventsSubscribeParams.Contract,
+        ContractEventsSubscribeParams.ContractEvent,
         0,
         duplicateAddresses
       )
@@ -91,7 +91,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
 
     val emptyAddressRequest = WsRequest(
       Correlation(0),
-      ContractEventsSubscribeParams(ContractEventsSubscribeParams.Contract, 0, AVector.empty)
+      ContractEventsSubscribeParams(ContractEventsSubscribeParams.ContractEvent, 0, AVector.empty)
     )
     ws.writeRequestToSocket(emptyAddressRequest).futureValue is Response
       .failed(
@@ -107,7 +107,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     val req = WsRequest(
       Correlation(0L),
       ContractEventsSubscribeParams(
-        ContractEventsSubscribeParams.Contract,
+        ContractEventsSubscribeParams.ContractEvent,
         0,
         tooManyContractAddresses.tail
       )
@@ -130,7 +130,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
               val req = WsRequest(
                 Correlation(index.toLong),
                 ContractEventsSubscribeParams(
-                  ContractEventsSubscribeParams.Contract,
+                  ContractEventsSubscribeParams.ContractEvent,
                   index,
                   contractEventsParams_0.addresses
                 )
@@ -149,7 +149,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     val requestOverLimit = WsRequest(
       Correlation(50L),
       ContractEventsSubscribeParams(
-        ContractEventsSubscribeParams.Contract,
+        ContractEventsSubscribeParams.ContractEvent,
         50,
         contractEventsParams_1.addresses
       )
@@ -169,7 +169,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     val tooManyAddressesRequest = WsRequest(
       Correlation(0),
       ContractEventsSubscribeParams(
-        ContractEventsSubscribeParams.Contract,
+        ContractEventsSubscribeParams.ContractEvent,
         0,
         tooManyContractAddresses
       )
@@ -217,7 +217,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
       .successful(Correlation(4), params.subscriptionId)
 
     val responseBeforeClose =
-      wsServer.subscriptionHandler.ask(GetSubscriptions).mapTo[SubscriptionsResponse].futureValue
+      wsServer.subscriptionHandler.ask(GetSubscriptions).mapTo[WsImmutableSubscriptions].futureValue
     responseBeforeClose.subscriptions.nonEmpty is true
     responseBeforeClose.subscriptionsByAddress.nonEmpty is true
     responseBeforeClose.addressesBySubscriptionId.nonEmpty is true
@@ -226,7 +226,10 @@ class WsClientServerSpec extends WsSubscriptionFixture {
 
     eventually {
       val responseAfterClose =
-        wsServer.subscriptionHandler.ask(GetSubscriptions).mapTo[SubscriptionsResponse].futureValue
+        wsServer.subscriptionHandler
+          .ask(GetSubscriptions)
+          .mapTo[WsImmutableSubscriptions]
+          .futureValue
       responseAfterClose.subscriptions.isEmpty is true
       responseAfterClose.subscriptionsByAddress.isEmpty is true
       responseAfterClose.addressesBySubscriptionId.isEmpty is true
@@ -344,7 +347,7 @@ class WsClientServerSpec extends WsSubscriptionFixture {
     }
 
     node.eventBus ! BlockNotify(dummyBlock, 1, AVector.empty)
-    clientProbe.expectNoMessage()
+    clientProbe.expectNoMessage(50.millis)
     wsServer.httpServer.close().asScala.futureValue
   }
 }

@@ -33,6 +33,7 @@ import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
   WsCorrelationId,
+  WsEventIndex,
   WsSubscriptionId
 }
 import org.alephium.app.ws.WsUtils._
@@ -161,7 +162,7 @@ final case class ClientWs(
 
   def subscribeToContractEvents(
       id: WsCorrelationId,
-      eventIndex: Int,
+      eventIndex: WsEventIndex,
       addresses: AVector[Address.Contract]
   ): Future[Response] = {
     writeRequestToSocket(

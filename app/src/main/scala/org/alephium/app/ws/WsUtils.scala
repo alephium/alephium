@@ -16,98 +16,52 @@
 
 package org.alephium.app.ws
 
+import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.app.ws.WsParams.{ContractEventsSubscribeParams, WsEventType, WsSubscriptionId}
-import org.alephium.app.ws.WsParams.SimpleSubscribeParams.eventTypes
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC.Error
-
-object WsError {
-  protected[ws] val AlreadySubscribed: Int         = -32010
-  protected[ws] val AlreadyUnSubscribed: Int       = -32011
-  protected[ws] val SubscriptionLimitExceeded: Int = -32012
-
-  protected[ws] def invalidEventType(eventType: WsEventType): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid event type: $eventType, expected array with one of: ${eventTypes.mkString(", ")}"
-    )
-
-  protected[ws] def invalidSubscriptionEventTypes(json: ujson.Value): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid subscription: $json, expected array with one of: ${eventTypes.mkString(", ")}"
-    )
-
-  protected[ws] def invalidUnsubscriptionFormat(json: ujson.Value): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid subscription: $json, expected array with subscriptionId"
-    )
-
-  protected[ws] def invalidSubscriptionId(subscriptionId: String): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid subscription ID: $subscriptionId, it should be SHA256 hash as Hex"
-    )
-
-  protected[ws] def invalidContractEventParams(eventType: WsEventType): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Unknown event type: $eventType, expected: ${ContractEventsSubscribeParams.Contract}"
-    )
-
-  protected[ws] def invalidParamsArrayElements(
-      json: (ujson.Value, ujson.Value, ujson.Value)
-  ): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid params: $json, expected array with eventType, eventIndex and array of addresses"
-    )
-
-  protected[ws] def invalidContractAddress(address: String): Error =
-    Error(Error.InvalidParamsCode, s"Contract address $address is not valid")
-
-  protected[ws] def emptyContractAddress: Error =
-    Error(
-      Error.InvalidParamsCode,
-      "Contract address array cannot be empty, define at least one contract address"
-    )
-
-  protected[ws] def tooManyContractAddresses(limit: Int): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Contract address array cannot be greater than $limit"
-    )
-
-  protected[ws] def duplicatedAddresses(duplicateAddress: String): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Contract address array cannot contain duplicate address: $duplicateAddress"
-    )
-
-  protected[ws] def invalidContractAddressType: Error =
-    Error(Error.InvalidParamsCode, s"Contract address should be base58 encoded String")
-
-  protected[ws] def invalidParamsFormat(json: ujson.Value): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid params format: $json, expected array of size 1 for block/tx or 3 for contract events notifications"
-    )
-
-  protected[ws] def alreadySubscribed(subscriptionId: WsSubscriptionId): Error =
-    Error(WsError.AlreadySubscribed, subscriptionId.toHexString)
-
-  protected[ws] def alreadyUnSubscribed(subscriptionId: WsSubscriptionId): Error =
-    Error(WsError.AlreadyUnSubscribed, subscriptionId.toHexString)
-
-  protected[ws] def subscriptionLimitExceeded(limit: Int): Error =
-    Error(WsError.SubscriptionLimitExceeded, s"Number of subscriptions is limited to $limit")
-}
+import org.alephium.util.{AVector, EitherF}
 
 object WsUtils {
+  def firstDuplicate[T](vec: AVector[T]): Option[T] = {
+    val seen = mutable.Set[T]()
+    vec.find { elem =>
+      if (seen.contains(elem)) {
+        true
+      } else {
+        seen.add(elem)
+        false
+      }
+    }
+  }
+
+  def deduplicate[T](vec: AVector[T]): AVector[T] = {
+    val seen = mutable.Set[T]()
+    vec.filter { elem =>
+      if (seen.contains(elem)) {
+        false
+      } else {
+        seen.add(elem)
+        true
+      }
+    }
+  }
+
+  def buildAddresses(addresses: AVector[String]): Either[Error, AVector[Address.Contract]] =
+    EitherF
+      .foldTry(addresses, mutable.ArrayBuffer.empty[Address.Contract]) {
+        case (addresses, address) =>
+          LockupScript.p2c(address).map(Address.Contract(_)) match {
+            case Some(address) => Right(addresses :+ address)
+            case None          => Left(WsError.invalidContractAddress(address))
+          }
+      }
+      .map(AVector.from(_))
+
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
       val promise = Promise[T]()

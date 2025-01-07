@@ -16,11 +16,6 @@
 
 package org.alephium.app.ws
 
-import scala.concurrent.ExecutionContext.Implicits
-import scala.util.{Failure, Success}
-
-import io.vertx.core.{Future => VertxFuture}
-
 import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
 import org.alephium.app.ws.WsParams._
 import org.alephium.json.Json._
@@ -98,7 +93,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
   "WsRequest" should "pass ser/deser round-trip for contract event subscription/unsubscription" in {
     val contractEventParams = ContractEventsSubscribeParams.fromSingle(0, contractAddress_0)
     val validSubscriptionReqJson =
-      s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.Contract}",$EventIndex_0,["${contractAddress_0.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
+      s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.ContractEvent}",$EventIndex_0,["${contractAddress_0.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
     val subscribeRequest = WsRequest.subscribe(0, contractEventParams)
     write(subscribeRequest) is validSubscriptionReqJson
     subscribeRequest is read[WsRequest](validSubscriptionReqJson)
@@ -109,7 +104,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
     write(unSubscribeRequest) is validUnSubscriptionReqJson
     unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
 
-    val eventType  = ujson.Str(ContractEventsSubscribeParams.Contract)
+    val eventType  = ujson.Str(ContractEventsSubscribeParams.ContractEvent)
     val eventIndex = ujson.Num(0)
     val addresses  = ujson.Arr(ujson.Str(contractAddress_0.toBase58))
 
@@ -139,13 +134,11 @@ class WsProtocolSpec extends WsSubscriptionFixture {
   }
 
   "WsRequest" should "not allow for building contract event subscription with invalid contract addresses" in {
-    ContractEventsSubscribeParams.buildAddresses(AVector("")).isLeft is true
-
     val invalidSubscriptionRequest =
-      s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.Contract}",$EventIndex_0,[]],"id":0,"jsonrpc":"2.0"}"""
+      s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.ContractEvent}",$EventIndex_0,[]],"id":0,"jsonrpc":"2.0"}"""
     assertThrows[JsonRPC.Error](read[WsRequest](invalidSubscriptionRequest))
 
-    val eventType  = ujson.Str(ContractEventsSubscribeParams.Contract)
+    val eventType  = ujson.Str(ContractEventsSubscribeParams.ContractEvent)
     val eventIndex = ujson.Num(0)
 
     val requestWithEmptyAddresses =
@@ -225,24 +218,5 @@ class WsProtocolSpec extends WsSubscriptionFixture {
       val deserialized = read[WsNotificationParams](serialized)
       deserialized is notification
     }
-  }
-
-  "WsUtils" should "convert VertxFuture to Scala Future" in {
-    import WsUtils._
-    VertxFuture
-      .succeededFuture("Success")
-      .asScala
-      .onComplete {
-        case Success(value) => value is "Success"
-        case Failure(_)     => fail("The future should not fail")
-      }(Implicits.global)
-
-    val exception                              = new RuntimeException("Test Failure")
-    val failedVertxFuture: VertxFuture[String] = VertxFuture.failedFuture(exception)
-    failedVertxFuture.asScala
-      .onComplete {
-        case Success(_)  => fail("The future should not succeed")
-        case Failure(ex) => ex is exception
-      }(Implicits.global)
   }
 }

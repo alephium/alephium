@@ -17,6 +17,7 @@
 package org.alephium.app.ws
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 import akka.testkit.TestProbe
 import org.scalatest.Assertion
@@ -92,7 +93,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
           notification.method is WsMethod.SubscriptionMethod
           read[WsNotificationParams](notification.params).subscription
         }
-      clientProbe.expectNoMessage()
+      clientProbe.expectNoMessage(50.millis)
       subscriptionIds.toSet is subscriptionIdSet
     }
 
@@ -327,7 +328,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
       },
-      _.expectNoMessage()
+      _.expectNoMessage(50.millis)
     )
     checkWS(
       initBehaviors = AVector.fill(1)(wsInitBehavior),
@@ -347,7 +348,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
     val contractEventParams =
       AVector(contractEventsParams_0, contractEventsParams_1, contractEventsParams_2)
 
-    val subscriptionRequests: AVector[(WsIdWithSubscriptionId, AddressWithIndex)] =
+    val subscriptionRequests: AVector[(SubscriptionOfConnection, AddressWithIndex)] =
       websockets.flatMap { ws =>
         contractEventParams.foreach { params =>
           subscriptionHandler ! Subscribe(Correlation(correlationId.toLong), ws, params)
@@ -412,13 +413,13 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
     eventually {
       val response = getSubscriptions(subscriptionHandler)
       response.subscriptionsByAddress is Map
-        .empty[AddressWithIndex, AVector[WsIdWithSubscriptionId]]
+        .empty[AddressWithIndex, AVector[SubscriptionOfConnection]]
       response.addressesBySubscriptionId is Map
-        .empty[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
+        .empty[SubscriptionOfConnection, AVector[AddressWithIndex]]
     }
 
     websockets.foreach { ws =>
-      subscriptionHandler ! Unregister(ws.textHandlerID())
+      subscriptionHandler ! Disconnect(ws.textHandlerID())
       eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
     }
     httpServer.close().asScala.futureValue
@@ -473,7 +474,7 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
       correlationId + 3
     }
 
-    subscriptionHandler ! Unregister(ws.textHandlerID())
+    subscriptionHandler ! Disconnect(ws.textHandlerID())
     eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
 
     httpServer.close().asScala.futureValue

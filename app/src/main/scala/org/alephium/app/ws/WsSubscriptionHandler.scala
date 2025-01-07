@@ -29,8 +29,8 @@ import io.vertx.core.eventbus.{Message, MessageConsumer}
 
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
+import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json.write
-import org.alephium.protocol.model.Address
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util.{ActorRefT, AVector, BaseActor}
@@ -77,10 +77,10 @@ protected[ws] object WsSubscriptionHandler {
   final case class Connect(socket: ServerWsLike) extends Command
   final case object GetSubscriptions             extends Command
 
-  final case class SubscriptionsResponse(
+  final case class WsImmutableSubscriptions(
       subscriptions: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
-      subscriptionsByAddress: Map[AddressWithIndex, AVector[WsIdWithSubscriptionId]],
-      addressesBySubscriptionId: Map[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
+      subscriptionsByAddress: Map[AddressWithIndex, AVector[SubscriptionOfConnection]],
+      addressesBySubscriptionId: Map[SubscriptionOfConnection, AVector[AddressWithIndex]]
   ) extends CommandResponse
 
   final protected[ws] case class Subscribe(
@@ -91,7 +91,7 @@ protected[ws] object WsSubscriptionHandler {
   final private case class Subscribed(
       id: Correlation,
       ws: ServerWsLike,
-      subscriptionId: WsSubscriptionId,
+      params: WsSubscriptionParams,
       consumer: MessageConsumer[String]
   ) extends CommandResponse
   final private case class RequestRejected(
@@ -110,13 +110,13 @@ protected[ws] object WsSubscriptionHandler {
       subscriptionId: WsSubscriptionId
   ) extends CommandResponse
 
-  final protected[ws] case class Unregister(id: WsId) extends Command
-  final private case class Unregistered(id: WsId)     extends CommandResponse
+  final protected[ws] case class Disconnect(id: WsId) extends Command
+  final private case class Disconnected(id: WsId)     extends CommandResponse
 
   private case object KeepAlive
 
-  final protected[ws] case class AddressWithIndex(address: String, eventIndex: Int)
-  final protected[ws] case class WsIdWithSubscriptionId(
+  final protected[ws] case class AddressWithIndex(address: String, eventIndex: WsEventIndex)
+  final protected[ws] case class SubscriptionOfConnection(
       wsId: WsId,
       subscriptionId: WsSubscriptionId
   )
@@ -134,15 +134,7 @@ protected[ws] class WsSubscriptionHandler(
 
   private val openedWebSockets = mutable.Map.empty[WsId, ServerWsLike]
 
-  // client who unsubscribes from all subscriptions is connected but not subscribed to any events
-  private val subscribers =
-    mutable.Map.empty[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]]
-
-  private val subscriptionsByAddress =
-    mutable.Map.empty[AddressWithIndex, AVector[WsIdWithSubscriptionId]]
-
-  private val addressesBySubscriptionId =
-    mutable.Map.empty[WsIdWithSubscriptionId, AVector[AddressWithIndex]]
+  private val subscriptionsState = WsSubscriptionsState.empty[MessageConsumer[String]]()
 
   private val pingScheduler =
     context.system.scheduler.scheduleWithFixedDelay(
@@ -157,82 +149,57 @@ protected[ws] class WsSubscriptionHandler(
     ()
   }
 
-  // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
     case KeepAlive =>
       openedWebSockets.foreachEntry { case (wsId, ws) =>
         if (ws.isClosed) {
-          self ! Unregister(wsId)
+          self ! Disconnect(wsId)
         } else {
           ws.writePing(Buffer.buffer("ping"))
         }
       }
     case Connect(ws) =>
-      if (subscribers.size >= maxConnections) {
-        log.warning(s"WebSocket connections reached max limit ${subscribers.size}")
-        ws.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
-      } else {
-        ws.frameHandler { frame =>
-          if (frame.isPing) {
-            ws.writePong(Buffer.buffer("pong")).onComplete {
-              case Success(_) =>
-              case Failure(ex) =>
-                log.error(ex, "Websocket keep-alive failure")
-            }
-          }
-        }
-        ws.closeHandler(() => self ! Unregister(ws.textHandlerID()))
-        val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
-        val _ = openedWebSockets.put(ws.textHandlerID(), ws)
-      }
+      connect(ws)
     case Subscribe(id, ws, params) =>
       subscribe(id, ws, params)
     case Unsubscribe(id, ws, subscriptionId) =>
-      unSubscribe(id, ws, subscriptionId)
-    case Subscribed(id, ws, subscriptionId, consumer) =>
-      subscribers.updateWith(ws.textHandlerID()) {
-        case Some(ss) if ss.exists(_._1 == subscriptionId) =>
-          Some(ss)
-        case Some(ss) =>
-          Some(ss :+ (subscriptionId -> consumer))
-        case None =>
-          Some(AVector(subscriptionId -> consumer))
-      }
-      respondAsyncAndForget(ws, Response.successful(id, subscriptionId.toHexString))
+      unsubscribe(id, ws, subscriptionId)
+    case Subscribed(id, ws, params, consumer) =>
+      subscriptionsState.addNewSubscription(ws.textHandlerID(), params, consumer)
+      respondAsyncAndForget(ws, Response.successful(id, params.subscriptionId.toHexString))
     case RequestRejected(ws, response) =>
       respondAsyncAndForget(ws, response)
     case Unsubscribed(id, ws, subscriptionId) =>
-      val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), subscriptionId)
-      subscribers.updateWith(ws.textHandlerID())(_.map(_.filterNot(_._1 == subscriptionId)))
-      unregisterContractEventSubscription(wsIdWithSubscriptionId)
+      subscriptionsState.removeSubscription(ws.textHandlerID(), subscriptionId)
       respondAsyncAndForget(ws, Response.successful(id))
     case NotificationFailed(_, _, _, _) =>
     // TODO can we do something about failing notification to client which is not closed ?
-    case Unregister(id) =>
-      unregisterConsumers(id)
-    case Unregistered(id) =>
-      cleanOnDisconnection(id)
+    case Disconnect(id) =>
+      Future
+        .sequence(subscriptionsState.getConsumers(id).map(_.unregister().asScala).toSeq)
+        .onComplete { _ =>
+          self ! Disconnected(id)
+        }
+    case Disconnected(id) =>
+      val _ = openedWebSockets.remove(id)
+      subscriptionsState.removeAllSubscriptions(id)
     case GetSubscriptions =>
-      sender() ! SubscriptionsResponse(
-        subscribers.toMap,
-        subscriptionsByAddress.toMap,
-        addressesBySubscriptionId.toMap
+      sender() ! WsImmutableSubscriptions(
+        subscriptionsState.connections.toMap,
+        subscriptionsState.contractSubscriptionMappings.toMap,
+        subscriptionsState.contractAddressMappings.toMap
       )
     case NotificationPublished(params: WsTxNotificationParams) =>
       publishNotification(params)
     case NotificationPublished(params: WsBlockNotificationParams) =>
       val _ = publishNotification(params)
       params.result.getContractEvents.foreach { contractEvent =>
-        subscriptionsByAddress
-          .get(AddressWithIndex(contractEvent.contractAddress.toBase58, contractEvent.eventIndex))
-          .foreach { subscriptionIds =>
-            subscriptionIds.map(_.subscriptionId).toSet.foreach { subscriptionId =>
-              publishNotification(WsContractEventNotificationParams(subscriptionId, contractEvent))
-            }
-          }
+        subscriptionsState
+          .getUniqueSubscriptionIds(contractEvent.contractAddress, contractEvent.eventIndex)
+          .map(WsContractEventNotificationParams(_, contractEvent))
+          .foreach(publishNotification)
       }
   }
-  // scalastyle:on cyclomatic.complexity method.length
 
   private def publishNotification(params: WsNotificationParams): Unit = {
     vertx.eventBus().publish(params.subscription.toHexString, params.asJsonRpcNotification.render())
@@ -256,6 +223,27 @@ protected[ws] class WsSubscriptionHandler(
     }
   }
 
+  private def connect(ws: ServerWsLike): Unit = {
+    val connectionsCount = subscriptionsState.connections.size
+    if (connectionsCount >= maxConnections) {
+      log.warning(s"WebSocket connections reached max limit $connectionsCount")
+      ws.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
+    } else {
+      ws.frameHandler { frame =>
+        if (frame.isPing) {
+          ws.writePong(Buffer.buffer("pong")).onComplete {
+            case Success(_) =>
+            case Failure(ex) =>
+              log.error(ex, "Websocket keep-alive failure")
+          }
+        }
+      }
+      ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
+      val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
+      val _ = openedWebSockets.put(ws.textHandlerID(), ws)
+    }
+  }
+
   private def handleMessage(ws: ServerWsLike, msg: String): Unit = {
     WsRequest.fromJsonString(msg, maxContractEventAddresses) match {
       case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
@@ -270,150 +258,64 @@ protected[ws] class WsSubscriptionHandler(
   private def subscribe(id: Correlation, ws: ServerWsLike, params: WsSubscriptionParams)(implicit
       ec: ExecutionContext
   ): Unit = {
-    val wsIdWithSubscriptionId = WsIdWithSubscriptionId(ws.textHandlerID(), params.subscriptionId)
-    subscribers.get(ws.textHandlerID()) match {
-      case Some(ss) if ss.exists(_._1 == wsIdWithSubscriptionId.subscriptionId) =>
-        self ! RequestRejected(
-          ws,
-          Response.failed(id, WsError.alreadySubscribed(wsIdWithSubscriptionId.subscriptionId))
+    val subscriptionId = params.subscriptionId
+
+    def registerConsumer: Try[MessageConsumer[String]] = Try {
+      vertx
+        .eventBus()
+        .consumer[String](
+          subscriptionId.toHexString,
+          new io.vertx.core.Handler[Message[String]] {
+            override def handle(message: Message[String]): Unit = {
+              if (!ws.isClosed) {
+                val _ =
+                  ws.writeTextMessage(message.body()).andThen { case Failure(ex) =>
+                    if (!ws.isClosed) {
+                      self ! NotificationFailed(id, ws, subscriptionId, ex.getMessage)
+                    }
+                  }
+              }
+            }
+          }
         )
-      case Some(ss) if ss.length >= maxSubscriptionsPerConnection =>
+    }
+
+    subscriptionsState.getSubscriptions(ws.textHandlerID()) match {
+      case subscriptions if subscriptions.contains(subscriptionId) =>
+        self ! RequestRejected(ws, Response.failed(id, WsError.alreadySubscribed(subscriptionId)))
+      case subscriptions if subscriptions.length >= maxSubscriptionsPerConnection =>
         self ! RequestRejected(
           ws,
           Response.failed(id, WsError.subscriptionLimitExceeded(maxSubscriptionsPerConnection))
         )
       case _ =>
-        subscribeToEvents(id, ws, wsIdWithSubscriptionId.subscriptionId) match {
+        registerConsumer match {
           case Success(consumer) =>
-            params match {
-              case contractParams: ContractEventsSubscribeParams =>
-                registerContractEventSubscription(
-                  wsIdWithSubscriptionId,
-                  contractParams.eventIndex,
-                  contractParams.addresses
-                )
-              case _ =>
-            }
-            self ! Subscribed(id, ws, wsIdWithSubscriptionId.subscriptionId, consumer)
+            self ! Subscribed(id, ws, params, consumer)
           case Failure(ex) =>
             self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
         }
     }
   }
 
-  private def unSubscribe(
+  private def unsubscribe(
       id: Correlation,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
   ): Unit = {
-    subscribers.get(ws.textHandlerID()).map(_.filter(_._1 == subscriptionId)) match {
-      case Some(subscriptions) if subscriptions.nonEmpty =>
-        subscriptions.foreach { case (subscriptionId, consumer) =>
-          unregisterConsumer(consumer)
-            .andThen {
-              case Success(_) =>
-                self ! Unsubscribed(id, ws, subscriptionId)
-              case Failure(ex) =>
-                self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
-            }(context.dispatcher)
-        }
+    subscriptionsState.getConsumer(ws.textHandlerID(), subscriptionId) match {
+      case Some(consumer) =>
+        consumer
+          .unregister()
+          .asScala
+          .onComplete {
+            case Success(_) =>
+              self ! Unsubscribed(id, ws, subscriptionId)
+            case Failure(ex) =>
+              self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
+          }(context.dispatcher)
       case _ =>
         self ! RequestRejected(ws, Response.failed(id, WsError.alreadyUnSubscribed(subscriptionId)))
     }
-  }
-
-  private def subscribeToEvents(
-      id: Correlation,
-      ws: ServerWsLike,
-      subscriptionId: WsSubscriptionId
-  )(implicit
-      ec: ExecutionContext
-  ): Try[MessageConsumer[String]] = Try {
-    vertx
-      .eventBus()
-      .consumer[String](
-        subscriptionId.toHexString,
-        new io.vertx.core.Handler[Message[String]] {
-          override def handle(message: Message[String]): Unit = {
-            if (!ws.isClosed) {
-              val _ =
-                ws.writeTextMessage(message.body()).andThen { case Failure(ex) =>
-                  if (!ws.isClosed) {
-                    self ! NotificationFailed(id, ws, subscriptionId, ex.getMessage)
-                  }
-                }
-            }
-          }
-        }
-      )
-  }
-
-  private def registerContractEventSubscription(
-      wsIdWithSubscriptionId: WsIdWithSubscriptionId,
-      eventIndex: Int,
-      addresses: AVector[Address.Contract]
-  ): Unit = {
-    val addressesWithIndex =
-      addresses.map { address =>
-        val addressWithIndex = AddressWithIndex(address.toBase58, eventIndex)
-        subscriptionsByAddress.updateWith(addressWithIndex) {
-          case Some(ss) if ss.contains(wsIdWithSubscriptionId) => Some(ss)
-          case None                => Some(AVector(wsIdWithSubscriptionId))
-          case Some(subscriptions) => Some(subscriptions :+ wsIdWithSubscriptionId)
-        }
-        addressWithIndex
-      }
-    addressesBySubscriptionId.put(wsIdWithSubscriptionId, addressesWithIndex)
-    ()
-  }
-
-  private def unregisterContractEventSubscription(
-      wsIdWithSubscriptionId: WsIdWithSubscriptionId
-  ): Unit = {
-    addressesBySubscriptionId.remove(wsIdWithSubscriptionId) match {
-      case None =>
-      case Some(addressesWithIndex) =>
-        addressesWithIndex.foreach { addressWithIndex =>
-          subscriptionsByAddress.updateWith(addressWithIndex) {
-            case None => None
-            case Some(ss) =>
-              Option(ss.filterNot(_ == wsIdWithSubscriptionId)).filter(_.nonEmpty)
-          }
-        }
-    }
-  }
-
-  private def unregisterConsumer(subscription: MessageConsumer[String]): Future[Unit] = {
-    import WsUtils._
-    subscription
-      .unregister()
-      .asScala
-      .mapTo[Unit]
-  }
-
-  private def cleanOnDisconnection(id: WsId): Unit = {
-    val _ = subscribers.remove(id)
-    val _ = openedWebSockets.remove(id)
-    subscriptionsByAddress.filter(_._2.exists(_.wsId == id)).foreachEntry {
-      case (addressWithIndex, _) =>
-        subscriptionsByAddress.updateWith(addressWithIndex) {
-          case Some(ss) => Option(ss.filterNot(_.wsId == id)).filter(_.nonEmpty)
-          case None     => None
-        }
-    }
-    addressesBySubscriptionId.filter(_._1.wsId == id).foreachEntry {
-      case (wsIdWithSubscriptionId, _) =>
-        addressesBySubscriptionId.remove(wsIdWithSubscriptionId)
-    }
-  }
-
-  private def unregisterConsumers(id: WsId)(implicit ec: ExecutionContext): Unit = {
-    Future.sequence(
-      subscribers.get(id).toList.flatMap { subscriptions =>
-        subscriptions.map { case (_, consumer) =>
-          unregisterConsumer(consumer)
-        }
-      }
-    ) onComplete { _ => self ! Unregistered(id) }
   }
 }

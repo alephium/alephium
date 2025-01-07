@@ -16,20 +16,19 @@
 
 package org.alephium.app.ws
 
-import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
 import org.alephium.app.ws.WsParams.WsSubscriptionParams
 import org.alephium.app.ws.WsRequest.Correlation
+import org.alephium.app.ws.WsSubscriptionHandler.AddressWithIndex
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AVector, EitherF, Hex}
+import org.alephium.util.{AVector, Hex}
 
 protected[ws] object WsMethod {
   private type WsMethodType = String
@@ -40,6 +39,7 @@ protected[ws] object WsMethod {
 
 protected[ws] object WsParams {
   protected[ws] type WsEventType      = String
+  protected[ws] type WsEventIndex     = Int
   protected[ws] type WsId             = String
   protected[ws] type WsCorrelationId  = Long
   protected[ws] type WsSubscriptionId = Hash
@@ -49,7 +49,7 @@ protected[ws] object WsParams {
     def subscriptionId: WsSubscriptionId
   }
   final case class SimpleSubscribeParams(eventType: WsEventType) extends WsSubscriptionParams {
-    def subscriptionId: WsSubscriptionId = Hash.hash(eventType)
+    lazy val subscriptionId: WsSubscriptionId = Hash.hash(eventType)
   }
   object SimpleSubscribeParams {
     private val BlockEvent: WsEventType = "block"
@@ -74,56 +74,33 @@ protected[ws] object WsParams {
 
   final case class ContractEventsSubscribeParams(
       eventType: WsEventType,
-      eventIndex: Int,
+      eventIndex: WsEventIndex,
       addresses: AVector[Address.Contract]
   ) extends WsSubscriptionParams {
-    def subscriptionId: WsSubscriptionId =
+    lazy val subscriptionId: WsSubscriptionId =
       Hash
         .hash(
           addresses
             .map(address => s"$eventType/$eventIndex/$address")
             .mkString(",")
         )
+    def toAddressesWithIndex: AVector[AddressWithIndex] =
+      addresses.map(addr => AddressWithIndex(addr.toBase58, eventIndex))
   }
   object ContractEventsSubscribeParams {
-    protected[ws] val Contract: WsEventType = "contract"
-
-    private def firstDuplicate[T](vec: AVector[T]): Option[T] = {
-      val seen = mutable.Set[T]()
-      vec.find { elem =>
-        if (seen.contains(elem)) {
-          true
-        } else {
-          seen.add(elem)
-          false
-        }
-      }
-    }
+    protected[ws] val ContractEvent: WsEventType = "contract"
 
     protected[ws] def from(
-        eventIndex: Int,
+        eventIndex: WsEventIndex,
         addresses: AVector[Address.Contract]
     ): ContractEventsSubscribeParams =
-      ContractEventsSubscribeParams(Contract, eventIndex, addresses)
+      ContractEventsSubscribeParams(ContractEvent, eventIndex, addresses)
 
     protected[ws] def fromSingle(
-        eventIndex: Int,
+        eventIndex: WsEventIndex,
         address: Address.Contract
     ): ContractEventsSubscribeParams =
-      ContractEventsSubscribeParams(Contract, eventIndex, AVector(address))
-
-    protected[ws] def buildAddresses(
-        addresses: AVector[String]
-    ): Either[Error, AVector[Address.Contract]] = {
-      EitherF
-        .foldTry(addresses, mutable.ArrayBuffer.empty[Address.Contract]) {
-          case (addresses, address) =>
-            LockupScript.p2c(address).map(Address.Contract(_)) match {
-              case Some(address) => Right(addresses :+ address)
-              case None          => Left(WsError.invalidContractAddress(address))
-            }
-        }
-    }.map(AVector.from(_))
+      ContractEventsSubscribeParams(ContractEvent, eventIndex, AVector(address))
 
     protected[ws] def read(
         jsonArr: ujson.Arr,
@@ -133,19 +110,20 @@ protected[ws] object WsParams {
       (jsonArr(0), jsonArr(1), jsonArr(2)) match {
         case (ujson.Str(eventType), ujson.Num(eventIndex), ujson.Arr(addressArr)) =>
           eventType match {
-            case Contract if addressArr.isEmpty =>
+            case ContractEvent if addressArr.isEmpty =>
               Left(WsError.emptyContractAddress)
-            case Contract if addressArr.length > contractAddressLimit =>
+            case ContractEvent if addressArr.length > contractAddressLimit =>
               Left(WsError.tooManyContractAddresses(contractAddressLimit))
-            case Contract if addressArr(0).strOpt.isEmpty =>
+            case ContractEvent if addressArr(0).strOpt.isEmpty =>
               Left(WsError.invalidContractAddressType)
-            case Contract =>
+            case ContractEvent =>
               val addresses = AVector.from(addressArr.map(_.str))
-              firstDuplicate(addresses) match {
+              WsUtils.firstDuplicate(addresses) match {
                 case Some(addressDuplicate) =>
                   Left(WsError.duplicatedAddresses(addressDuplicate))
                 case None =>
-                  buildAddresses(addresses)
+                  WsUtils
+                    .buildAddresses(addresses)
                     .map(ContractEventsSubscribeParams.from(eventIndex.toInt, _))
               }
             case unknown =>
