@@ -24,12 +24,9 @@ import org.alephium.util.{AlephiumSpec, AVector}
 
 class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 
-  private val consumer_0 = "0"
+  private val consumer_0 = "0" // just a mock as SubscriptionsState is unaware of consumers
   private val consumer_1 = "1"
   private val consumer_2 = "2"
-
-  private val wsId_0 = "0"
-  private val wsId_1 = "1"
 
   private lazy val subscriptionOfConnection_0 =
     SubscriptionOfConnection(

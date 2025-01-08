@@ -28,12 +28,7 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
-import org.alephium.app.ws.WsParams.{
-  ContractEventsSubscribeParams,
-  SimpleSubscribeParams,
-  WsNotificationParams,
-  WsSubscriptionId
-}
+import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsNotificationParams, WsSubscriptionId}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler._
 import org.alephium.app.ws.WsUtils._
@@ -43,7 +38,11 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
 
-class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with ScalaFutures {
+class WsSubscriptionHandlerSpec
+    extends AlephiumSpec
+    with WsSubscriptionFixture
+    with BeforeAndAfterAll
+    with ScalaFutures {
   import org.alephium.app.ws.WsBehaviorFixture._
 
   private lazy val system: ActorSystem = ActorSystem("ws-subscription-handler-spec")
@@ -55,13 +54,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   }
 
   it should "connect and subscribe multiple ws clients to multiple events" in new WsBehaviorFixture {
-    val contractEventsParams =
-      ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     val subscriptionIdSet =
       Set(
         SimpleSubscribeParams.Block.subscriptionId,
         SimpleSubscribeParams.Tx.subscriptionId,
-        contractEventsParams.subscriptionId
+        contractEventsParams_0.subscriptionId
       )
     def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
@@ -70,8 +67,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         txSubscriptionResponse    <- ws.subscribeToTx(1)
         contractEventsSubscriptionResponse <- ws.subscribeToContractEvents(
           2,
-          contractEventsParams.eventIndex,
-          contractEventsParams.addresses
+          contractEventsParams_0.eventIndex,
+          contractEventsParams_0.addresses
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
@@ -83,7 +80,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
           id is 1
         }
         inside(contractEventsSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams.subscriptionId.toHexString)
+          result is ujson.Str(contractEventsParams_0.subscriptionId.toHexString)
           id is 2
         }
         ws
@@ -109,10 +106,10 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       subscriptionIds.toSet is subscriptionIdSet
     }
 
-    val wsInitBehavior =
-      WsStartBehavior(subscribingRequestResponseBehavior, serverBehavior, assertValidNotification)
     checkWS(
-      initBehaviors = AVector.fill(3)(wsInitBehavior),
+      initBehaviors = AVector.fill(3)(
+        WsStartBehavior(subscribingRequestResponseBehavior, serverBehavior, assertValidNotification)
+      ),
       nextBehaviors = AVector.empty,
       expectedSubscriptions = 3 * 3, // 3 clients, 3 subscriptions each
       openWebsocketsCount = 3

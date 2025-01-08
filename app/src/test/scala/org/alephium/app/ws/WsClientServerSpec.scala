@@ -21,7 +21,6 @@ import scala.concurrent.duration.DurationInt
 
 import akka.testkit.TestProbe
 import org.scalatest.Inside.inside
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.exceptions.TestFailedException
 
@@ -36,7 +35,7 @@ import org.alephium.util._
 
 class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
 
-  "WsServer" should "keep websocket connection alive" in new WsClientServerFixture with Eventually {
+  "WsServer" should "keep websocket connection alive" in new WsClientServerFixture {
     override val keepAliveInterval = Duration.ofMillisUnsafe(20)
     val keepAliveProbe             = TestProbe()
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(keepAliveProbe.ref ! _)) { _ =>
@@ -55,8 +54,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
     }
   }
 
-  "WsServer" should "initialize subscription and event handler" in new WsClientServerFixture
-    with Eventually {
+  "WsServer" should "initialize subscription and event handler" in new WsClientServerFixture {
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
     eventually(testEventHandlerInitialized(eventHandler))
   }
@@ -192,8 +190,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
     }
   }
 
-  "WsClient and WsServer" should "unregister and clean all subscriptions on websocket disconnection" in new WsClientServerFixture
-    with Eventually {
+  "WsClient and WsServer" should "unregister and clean all subscriptions on websocket disconnection" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       ws.subscribeToBlock(0).futureValue is Response.successful(
         Correlation(0),
@@ -261,8 +258,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
     }
   }
 
-  "WsClient and WsServer" should "handle high load of block, tx and event contract subscriptions, notifications and unsubscriptions" in new WsClientServerFixture
-    with IntegrationPatience {
+  "WsClient and WsServer" should "handle high load of block, tx and event contract subscriptions, notifications and unsubscriptions" in new WsClientServerFixture {
     val numberOfConnections           = maxClientConnections
     override def maxServerConnections = numberOfConnections
     val clientProbe                   = TestProbe()

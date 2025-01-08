@@ -18,7 +18,7 @@ package org.alephium.app.ws
 
 import org.alephium.util._
 
-class WsEventHandlerSpec extends AlephiumSpec with WsSubscriptionFixture {
+class WsEventHandlerSpec extends AlephiumSpec {
 
   it should "subscribe event handler into event bus" in new WsClientServerFixture {
     eventually {

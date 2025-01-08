@@ -16,6 +16,8 @@
 
 package org.alephium.app.ws
 
+import java.util.UUID
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
 
@@ -58,6 +60,11 @@ import org.alephium.protocol.vm.{LogState, Val}
 import org.alephium.util._
 
 trait WsFixture extends ServerFixture {
+
+  protected lazy val wsIdGen: Gen[WsId] = Gen.const("__vertx.ws.").map(_ + UUID.randomUUID())
+
+  protected lazy val wsId_0 = wsIdGen.sample.get
+  protected lazy val wsId_1 = wsIdGen.sample.get
 
   protected lazy val contractAddressGen: Gen[Address.Contract] = for {
     group        <- groupIndexGen
@@ -111,6 +118,7 @@ trait WsClientServerFixture
     with ServerFixture
     with ScalaFutures
     with Eventually
+    with IntegrationPatience
     with BeforeAndAfterEach {
 
   override val configValues = configPortsValues
@@ -318,10 +326,7 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
     }
 }
 
-trait WsBehaviorFixture
-    extends WsClientServerFixture
-    with WsSubscriptionFixture
-    with IntegrationPatience {
+trait WsBehaviorFixture extends WsClientServerFixture {
   import org.alephium.app.ws.WsSubscriptionHandler._
   import org.alephium.app.ws.WsBehaviorFixture._
 
@@ -331,7 +336,6 @@ trait WsBehaviorFixture
       expectedSubscriptions: Int,
       openWebsocketsCount: Int
   ): Assertion = {
-    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
     eventually(testEventHandlerInitialized(eventHandler))
 
     val probedSockets =
