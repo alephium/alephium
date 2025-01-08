@@ -16,13 +16,17 @@
 
 package org.alephium.app.ws
 
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
+import java.util.concurrent.TimeUnit
 
+import scala.concurrent.Future
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
+import akka.actor.ActorSystem
 import akka.testkit.TestProbe
-import org.scalatest.Assertion
+import io.vertx.core.Vertx
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.Inside.inside
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
@@ -39,8 +43,16 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
 
-class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
+class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with ScalaFutures {
   import org.alephium.app.ws.WsBehaviorFixture._
+
+  private lazy val system: ActorSystem = ActorSystem("ws-subscription-handler-spec")
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    system.terminate().futureValue
+    ()
+  }
 
   it should "connect and subscribe multiple ws clients to multiple events" in new WsBehaviorFixture {
     val contractEventsParams =
@@ -340,7 +352,15 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
 
   it should "support multiple subscriptions of multiple clients to multiple addresses of different event index" in new WsSubscriptionFixture
     with Eventually {
-    val WsServer(httpServer, _, subscriptionHandler) = bindAndListen()
+    val subscriptionHandler =
+      WsSubscriptionHandler.apply(
+        Vertx.vertx(),
+        system,
+        config.network.wsMaxConnections,
+        config.network.wsMaxSubscriptionsPerConnection,
+        config.network.wsMaxContractEventAddresses,
+        FiniteDuration(config.network.wsPingFrequency.millis, TimeUnit.MILLISECONDS)
+      )
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val websockets    = AVector(dummyServerWs("dummy_0"), dummyServerWs("dummy_1"))
@@ -422,12 +442,19 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
       subscriptionHandler ! Disconnect(ws.textHandlerID())
       eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
     }
-    httpServer.close().asScala.futureValue
   }
 
   it should "support subscription, unsubscription and disconnection" in new WsSubscriptionFixture
     with Eventually {
-    val WsServer(httpServer, _, subscriptionHandler) = bindAndListen()
+    val subscriptionHandler =
+      WsSubscriptionHandler.apply(
+        Vertx.vertx(),
+        system,
+        config.network.wsMaxConnections,
+        config.network.wsMaxSubscriptionsPerConnection,
+        config.network.wsMaxContractEventAddresses,
+        FiniteDuration(config.network.wsPingFrequency.millis, TimeUnit.MILLISECONDS)
+      )
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = dummyServerWs("dummy")
@@ -476,7 +503,5 @@ class WsSubscriptionHandlerSpec extends WsSubscriptionFixture {
 
     subscriptionHandler ! Disconnect(ws.textHandlerID())
     eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
-
-    httpServer.close().asScala.futureValue
   }
 }

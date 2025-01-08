@@ -21,9 +21,9 @@ import scala.util.{Failure, Success}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.util.AVector
+import org.alephium.util.{AlephiumSpec, AVector}
 
-class WsUtilsSpec extends WsFixture {
+class WsUtilsSpec extends AlephiumSpec with WsFixture {
   it should "build addresses" in {
     WsUtils.buildAddresses(AVector("")).isLeft is true
     WsUtils.buildAddresses(AVector(contractAddress_0.toBase58)).isRight is true

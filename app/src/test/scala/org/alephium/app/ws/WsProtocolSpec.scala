@@ -16,16 +16,22 @@
 
 package org.alephium.app.ws
 
-import org.alephium.api.model.{BlockAndEvents, BlockEntry, TransactionTemplate}
+import org.alephium.api.model.{
+  BlockAndEvents,
+  BlockEntry,
+  ContractEventByBlockHash,
+  TransactionTemplate
+}
 import org.alephium.app.ws.WsParams._
 import org.alephium.json.Json._
+import org.alephium.protocol.vm.{LogStateRef, LogStatesId}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.RequestUnsafe
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
-class WsProtocolSpec extends WsSubscriptionFixture {
+class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
 
-  private val contractAddressLimit = node.config.network.wsMaxContractEventAddresses
+  private val contractAddressLimit = config.network.wsMaxContractEventAddresses
 
   "WsProtocol" should "refuse all WsRequests that are not JsonRPC compliant" in {
     val method    = WsMethod.SubscribeMethod
@@ -91,7 +97,8 @@ class WsProtocolSpec extends WsSubscriptionFixture {
   }
 
   "WsRequest" should "pass ser/deser round-trip for contract event subscription/unsubscription" in {
-    val contractEventParams = ContractEventsSubscribeParams.fromSingle(0, contractAddress_0)
+    val contractEventParams =
+      ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
     val validSubscriptionReqJson =
       s"""{"method":"${WsMethod.SubscribeMethod}","params":["${ContractEventsSubscribeParams.ContractEvent}",$EventIndex_0,["${contractAddress_0.toBase58}"]],"id":0,"jsonrpc":"2.0"}"""
     val subscribeRequest = WsRequest.subscribe(0, contractEventParams)
@@ -99,13 +106,13 @@ class WsProtocolSpec extends WsSubscriptionFixture {
     subscribeRequest is read[WsRequest](validSubscriptionReqJson)
 
     val validUnSubscriptionReqJson =
-      s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${contractEventParams.subscriptionId.toHexString}"],"id":$EventIndex_0,"jsonrpc":"2.0"}"""
+      s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["${contractEventParams.subscriptionId.toHexString}"],"id":0,"jsonrpc":"2.0"}"""
     val unSubscribeRequest = WsRequest.unsubscribe(0, contractEventParams.subscriptionId)
     write(unSubscribeRequest) is validUnSubscriptionReqJson
     unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
 
     val eventType  = ujson.Str(ContractEventsSubscribeParams.ContractEvent)
-    val eventIndex = ujson.Num(0)
+    val eventIndex = ujson.Num(EventIndex_0.toDouble)
     val addresses  = ujson.Arr(ujson.Str(contractAddress_0.toBase58))
 
     val jsonRpcSubscribeRequest =
@@ -121,7 +128,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
         ujson.Arr(
           ujson.Str(
             ContractEventsSubscribeParams
-              .fromSingle(0, contractAddress_0)
+              .fromSingle(EventIndex_0, contractAddress_0)
               .subscriptionId
               .toHexString
           )
@@ -139,7 +146,7 @@ class WsProtocolSpec extends WsSubscriptionFixture {
     assertThrows[JsonRPC.Error](read[WsRequest](invalidSubscriptionRequest))
 
     val eventType  = ujson.Str(ContractEventsSubscribeParams.ContractEvent)
-    val eventIndex = ujson.Num(0)
+    val eventIndex = ujson.Num(EventIndex_0.toDouble)
 
     val requestWithEmptyAddresses =
       RequestUnsafe(
@@ -176,10 +183,14 @@ class WsProtocolSpec extends WsSubscriptionFixture {
   }
 
   "WsNotificationParams" should "pass ser/deser round-trip for notifications" in {
-    val blockAndEvents = BlockAndEvents(
-      BlockEntry.from(dummyBlock, 0).rightValue,
-      contractEventByBlockHash
-    )
+    val blockAndEvents =
+      BlockAndEvents(
+        BlockEntry.from(dummyBlock, 0).rightValue,
+        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)).map {
+          case (contractId, logState) =>
+            ContractEventByBlockHash.from(LogStateRef(LogStatesId(contractId, 0), 0), logState)
+        }
+      )
 
     val blockNotificationParams: WsNotificationParams =
       WsBlockNotificationParams.from(blockAndEvents)

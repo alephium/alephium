@@ -61,6 +61,17 @@ final case class WsSubscriptionsState[C: ClassTag](
   def getSubscriptions(wsId: WsId): AVector[WsSubscriptionId] =
     connections.get(wsId: WsId).map(_.map(_._1)).getOrElse(AVector.empty)
 
+  def getUniqueSubscriptionIds(
+      contractAddress: Address.Contract,
+      eventIndex: WsEventIndex
+  ): AVector[WsSubscriptionId] =
+    contractSubscriptionMappings
+      .get(AddressWithIndex(contractAddress.toBase58, eventIndex))
+      .map { subscriptionOfConnections =>
+        deduplicate(subscriptionOfConnections.map(_.subscriptionId))
+      }
+      .getOrElse(AVector.empty)
+
   protected[ws] def addContractEventSubscriptionForAddress(
       subscriptionOfConnection: SubscriptionOfConnection,
       addressWithIndex: AddressWithIndex
@@ -102,17 +113,6 @@ final case class WsSubscriptionsState[C: ClassTag](
       case _ =>
     }
   }
-
-  def getUniqueSubscriptionIds(
-      contractAddress: Address.Contract,
-      eventIndex: WsEventIndex
-  ): AVector[WsSubscriptionId] =
-    contractSubscriptionMappings
-      .get(AddressWithIndex(contractAddress.toBase58, eventIndex))
-      .map { subscriptionOfConnections =>
-        deduplicate(subscriptionOfConnections.map(_.subscriptionId))
-      }
-      .getOrElse(AVector.empty)
 
   protected[ws] def removeSubscriptionByAddress(
       addressWithIndex: AddressWithIndex,

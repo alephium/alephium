@@ -17,6 +17,7 @@
 package org.alephium.app.ws
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.DurationInt
 
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
@@ -24,18 +25,12 @@ import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions, WebSocketFrame}
-import org.scalatest.Assertion
+import org.scalacheck.Gen
+import org.scalatest.{Assertion, BeforeAndAfterEach}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
+import sttp.tapir.server.vertx.VertxFutureServerInterpreter.VertxFutureToScalaFuture
 
-import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.{
-  BlockAndEvents,
-  ContractEvent,
-  ContractEventByBlockHash,
-  TransactionTemplate,
-  ValU256
-}
+import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate, ValU256}
 import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.app.ws.WsParams.{
@@ -59,28 +54,22 @@ import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ContractId}
-import org.alephium.protocol.vm.{LockupScript, LogState, LogStateRef, LogStatesId, Val}
+import org.alephium.protocol.vm.{LogState, Val}
 import org.alephium.util._
 
-trait WsFixture extends AlephiumSpec with ApiModelCodec {
-  protected val EventIndex_0 = 0
-  protected val EventIndex_1 = 1
+trait WsFixture extends ServerFixture {
 
-  protected lazy val contractAddress_0: Address.Contract = Address.Contract(
-    LockupScript.p2c(
-      ContractId.zero
-    )
-  )
-  protected lazy val contractAddress_1: Address.Contract = Address.Contract(
-    LockupScript.p2c(
-      ContractId.generate
-    )
-  )
-  protected lazy val contractAddress_2: Address.Contract = Address.Contract(
-    LockupScript.p2c(
-      ContractId.generate
-    )
-  )
+  protected lazy val contractAddressGen: Gen[Address.Contract] = for {
+    group        <- groupIndexGen
+    lockupScript <- p2cLockupGen(group)
+  } yield Address.Contract(lockupScript)
+
+  protected lazy val EventIndex_0 = Gen.choose(1, 10).sample.get
+  protected lazy val EventIndex_1 = Gen.choose(11, 20).sample.get
+
+  protected lazy val contractAddress_0: Address.Contract = contractAddressGen.sample.get
+  protected lazy val contractAddress_1: Address.Contract = contractAddressGen.sample.get
+  protected lazy val contractAddress_2: Address.Contract = contractAddressGen.sample.get
 
   protected lazy val contractEventsParams_0 = ContractEventsSubscribeParams
     .from(
@@ -98,18 +87,42 @@ trait WsFixture extends AlephiumSpec with ApiModelCodec {
   )
 
   protected lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
+
+  protected lazy val tooManyContractAddresses: AVector[Address.Contract] =
+    Gen
+      .listOfN(networkConfig.wsMaxContractEventAddresses + 1, contractAddressGen)
+      .map(AVector.from)
+      .sample
+      .get
+
+  protected lazy val contractEvent = {
+    ContractEvent(
+      blockHashGen.sample.get,
+      txIdGen.sample.get,
+      contractAddressGen.sample.get,
+      EventIndex_0,
+      AVector(ValU256(U256.unsafe(5)))
+    )
+  }
 }
 
-trait WsServerFixture extends ServerFixture with ScalaFutures {
+trait WsClientServerFixture
+    extends AlephiumSpec
+    with ServerFixture
+    with ScalaFutures
+    with Eventually
+    with BeforeAndAfterEach {
 
-  override val configValues                        = configPortsValues
+  override val configValues = configPortsValues
+
   implicit protected lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
   implicit protected val timeout: Timeout          = Timeout(Duration.ofSecondsUnsafe(5).asScala)
-  implicit protected val system: ActorSystem       = ActorSystem("websocket-server-spec")
+  implicit protected val system: ActorSystem       = ActorSystem("WsServerFixtureSystem")
   implicit protected val executionContext: ExecutionContext = system.dispatcher
-  protected lazy val vertx                                  = Vertx.vertx()
-  protected lazy val blockFlowProbe                         = TestProbe()
-  protected lazy val (allHandlers, _)                       = TestUtils.createAllHandlersProbe
+
+  protected lazy val vertx            = Vertx.vertx()
+  protected lazy val blockFlowProbe   = TestProbe()
+  protected lazy val (allHandlers, _) = TestUtils.createAllHandlersProbe
   protected lazy val node = new NodeDummy(
     dummyIntraCliqueInfo,
     dummyNeighborPeers,
@@ -120,18 +133,11 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
     dummyContract,
     storages
   )
-  protected lazy val wsPort: Int = node.config.network.restPort
-  protected lazy val wsClient: WsClient =
-    WsClient(
-      vertx,
-      new WebSocketClientOptions()
-        .setMaxFrameSize(node.config.network.wsMaxFrameSize)
-        .setMaxConnections(maxClientConnections)
-    )
 
-  lazy val wsOptions =
+  protected lazy val wsPort: Int = config.network.restPort
+  protected lazy val wsOptions =
     new HttpServerOptions()
-      .setMaxWebSocketFrameSize(node.config.network.wsMaxFrameSize)
+      .setMaxWebSocketFrameSize(config.network.wsMaxFrameSize)
       .setRegisterWebSocketWriteHandlers(true)
 
   protected def maxServerConnections: Int   = 10
@@ -144,16 +150,27 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
         system,
         node,
         maxServerConnections,
-        node.config.network.wsMaxSubscriptionsPerConnection,
-        node.config.network.wsMaxContractEventAddresses,
+        config.network.wsMaxSubscriptionsPerConnection,
+        config.network.wsMaxContractEventAddresses,
         keepAliveInterval,
         wsOptions
       )
     wsServer.httpServer
-      .listen(node.config.network.restPort, apiConfig.networkInterface.getHostAddress)
+      .listen(config.network.restPort, apiConfig.networkInterface.getHostAddress)
       .asScala
       .futureValue
     wsServer
+  }
+
+  protected lazy val WsServer(httpServer, eventHandler, subscriptionHandler) = bindAndListen()
+  protected lazy val wsClient: WsClient = {
+    httpServer.actualPort() is config.network.restPort
+    WsClient(
+      vertx,
+      new WebSocketClientOptions()
+        .setMaxFrameSize(config.network.wsMaxFrameSize)
+        .setMaxConnections(maxClientConnections)
+    )
   }
 
   // scalastyle:off regex
@@ -167,6 +184,35 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
   }
   // scalastyle:on regex
 
+  def testWsAndClose[A](wsF: Future[ClientWs])(testCode: ClientWs => A): A = {
+    val ws = wsF.futureValue
+    try {
+      testCode(ws)
+    } finally {
+      ws.close().futureValue
+    }
+  }
+
+  protected def testEventHandlerInitialized(
+      eventHandler: ActorRefT[EventBus.Message]
+  ): Assertion = {
+    node.eventBus
+      .ask(EventBus.ListSubscribers)
+      .mapTo[EventBus.Subscribers]
+      .futureValue
+      .value
+      .contains(eventHandler.ref) is true
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    httpServer.close().asScala.futureValue
+    system.terminate().futureValue
+    ()
+  }
+}
+
+trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutures with Eventually {
   protected def dummyServerWs(id: String): ServerWsLike = new ServerWsLike {
     override def textHandlerID(): WsId                                       = id
     override def isClosed: Boolean                                           = false
@@ -183,59 +229,18 @@ trait WsServerFixture extends ServerFixture with ScalaFutures {
       subscriptionHandler: ActorRefT[SubscriptionMsg]
   ): Assertion = {
     subscriptionHandler
-      .ask(GetSubscriptions)
+      .ask(GetSubscriptions)(Timeout(100.millis))
       .mapTo[WsImmutableSubscriptions]
       .futureValue
       .subscriptions
       .size is 0
   }
 
-  protected def testEventHandlerInitialized(
-      eventHandler: ActorRefT[EventBus.Message]
-  ): Assertion = {
-    node.eventBus
-      .ask(EventBus.ListSubscribers)
-      .mapTo[EventBus.Subscribers]
-      .futureValue
-      .value
-      .contains(eventHandler.ref) is true
-  }
-
-  implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
-    reader[ujson.Value].map[WsNotificationParams] {
-      case ujson.Obj(values) =>
-        val subscription = Hash.unsafe(Hex.unsafe(values("subscription").str))
-        values("result") match {
-          case obj: ujson.Obj if obj.value.contains("block") =>
-            WsBlockNotificationParams(subscription, read[BlockAndEvents](obj))
-          case obj: ujson.Obj if obj.value.contains("unsigned") =>
-            WsTxNotificationParams(subscription, read[TransactionTemplate](obj))
-          case obj: ujson.Obj if obj.value.contains("contractAddress") =>
-            WsContractEventNotificationParams(subscription, read[ContractEvent](obj))
-          case obj: ujson.Obj =>
-            throw new Exception(s"Unknown WsNotificationParams type with result: $obj")
-          case other =>
-            throw new Exception(s"Expected ujson.Obj for 'result', got: $other")
-        }
-      case other =>
-        throw new Exception(s"Invalid JSON format for WsNotificationParams: $other")
-    }
-
-  implicit protected val wsRequestReader: Reader[WsRequest] =
-    reader[ujson.Value].map[WsRequest] { json =>
-      fromJsonString(json.render(), node.config.network.wsMaxContractEventAddresses) match {
-        case Right(wsRequest) => wsRequest
-        case Left(failure)    => throw failure.error
-      }
-    }
-}
-
-trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventually {
   protected def getSubscriptions(
       subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
   ): WsImmutableSubscriptions =
     subscriptionHandler
-      .ask(GetSubscriptions)
+      .ask(GetSubscriptions)(Timeout(100.millis))
       .mapTo[WsImmutableSubscriptions]
       .futureValue
 
@@ -253,31 +258,6 @@ trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventual
       )
     }
   }
-
-  protected lazy val tooManyContractAddresses =
-    AVector.fill(networkConfig.wsMaxContractEventAddresses + 1) {
-      Address.Contract(
-        LockupScript.p2c(
-          ContractId.generate
-        )
-      )
-    }
-
-  protected lazy val contractEvent = {
-    ContractEvent(
-      blockHashGen.sample.get,
-      txIdGen.sample.get,
-      Address.contract(ContractId.hash("foo")),
-      EventIndex_0,
-      AVector(ValU256(U256.unsafe(5)))
-    )
-  }
-
-  protected lazy val contractEventByBlockHash: AVector[ContractEventByBlockHash] =
-    logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)).map {
-      case (contractId, logState) =>
-        ContractEventByBlockHash.from(LogStateRef(LogStatesId(contractId, 0), 0), logState)
-    }
 
   protected def logStatesFor(
       contractIdsWithEventIndex: AVector[(ContractId, Int)]
@@ -307,9 +287,41 @@ trait WsSubscriptionFixture extends WsServerFixture with WsFixture with Eventual
   ): Assertion = {
     !getSubscriptions(subscriptionHandler).subscriptions.exists(_._1 == wsId) is true
   }
+
+  implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
+    reader[ujson.Value].map[WsNotificationParams] {
+      case ujson.Obj(values) if values.contains("subscription") =>
+        val subscription = Hash.unsafe(Hex.unsafe(values("subscription").str))
+        values("result") match {
+          case obj: ujson.Obj if obj.value.contains("block") =>
+            WsBlockNotificationParams(subscription, read[BlockAndEvents](obj))
+          case obj: ujson.Obj if obj.value.contains("unsigned") =>
+            WsTxNotificationParams(subscription, read[TransactionTemplate](obj))
+          case obj: ujson.Obj if obj.value.contains("contractAddress") =>
+            WsContractEventNotificationParams(subscription, read[ContractEvent](obj))
+          case other =>
+            throw new Exception(s"Expected ujson.Obj for 'result', got: $other")
+        }
+      case other =>
+        throw new Exception(s"Invalid JSON format for WsNotificationParams: $other")
+    }
+
+  implicit protected val wsRequestReader: Reader[WsRequest] =
+    reader[ujson.Value].map[WsRequest] { json =>
+      fromJsonString(
+        json.render(),
+        config.network.wsMaxContractEventAddresses
+      ) match {
+        case Right(wsRequest) => wsRequest
+        case Left(failure)    => throw failure.error
+      }
+    }
 }
 
-trait WsBehaviorFixture extends WsServerFixture with Eventually with IntegrationPatience {
+trait WsBehaviorFixture
+    extends WsClientServerFixture
+    with WsSubscriptionFixture
+    with IntegrationPatience {
   import org.alephium.app.ws.WsSubscriptionHandler._
   import org.alephium.app.ws.WsBehaviorFixture._
 
@@ -318,9 +330,7 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
       nextBehaviors: AVector[WsNextBehavior],
       expectedSubscriptions: Int,
       openWebsocketsCount: Int
-  ): Unit = {
-    val WsServer(httpServer, eventHandler, subscriptionHandler) = bindAndListen()
-
+  ): Assertion = {
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
     eventually(testEventHandlerInitialized(eventHandler))
 
@@ -330,32 +340,35 @@ trait WsBehaviorFixture extends WsServerFixture with Eventually with Integration
         val ws          = startBehavior(clientProbe).futureValue
         ws -> clientProbe
       }
-
-    initBehaviors.foreach { case WsStartBehavior(_, serverBehavior, clientAssertionOnMsg) =>
-      serverBehavior(node.eventBus)
-      probedSockets.foreach { case (_, clientProbe) =>
-        clientAssertionOnMsg(clientProbe)
-      }
-    }
-    probedSockets.foreach { case (ws, clientProbe) =>
-      nextBehaviors.foreach { case WsNextBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
-        behavior(ws).futureValue
+    try {
+      initBehaviors.foreach { case WsStartBehavior(_, serverBehavior, clientAssertionOnMsg) =>
         serverBehavior(node.eventBus)
-        clientAssertionOnMsg(clientProbe)
+        probedSockets.foreach { case (_, clientProbe) =>
+          clientAssertionOnMsg(clientProbe)
+        }
       }
+      probedSockets.foreach { case (ws, clientProbe) =>
+        nextBehaviors.foreach {
+          case WsNextBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
+            behavior(ws).futureValue
+            serverBehavior(node.eventBus)
+            clientAssertionOnMsg(clientProbe)
+        }
+      }
+      eventually {
+        probedSockets.filterNot(_._1.isClosed).length is openWebsocketsCount
+        subscriptionHandler
+          .ask(GetSubscriptions)
+          .mapTo[WsImmutableSubscriptions]
+          .futureValue
+          .subscriptions
+          .map(_._2.length)
+          .sum is expectedSubscriptions
+      }
+    } finally {
+      Future.sequence(probedSockets.map(_._1.close()).iterator).futureValue
+      ()
     }
-    eventually {
-      probedSockets.filterNot(_._1.isClosed).length is openWebsocketsCount
-      subscriptionHandler
-        .ask(GetSubscriptions)
-        .mapTo[WsImmutableSubscriptions]
-        .futureValue
-        .subscriptions
-        .map(_._2.length)
-        .sum is expectedSubscriptions
-    }
-    probedSockets.foreach(_._1.close().futureValue)
-    httpServer.close().asScala.mapTo[Unit].futureValue
   }
 }
 

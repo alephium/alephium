@@ -20,9 +20,9 @@ import scala.collection.mutable
 
 import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsSubscriptionId}
 import org.alephium.app.ws.WsSubscriptionHandler.SubscriptionOfConnection
-import org.alephium.util.AVector
+import org.alephium.util.{AlephiumSpec, AVector}
 
-class WsSubscriptionsStateSpec extends WsFixture {
+class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 
   private val consumer_0 = "0"
   private val consumer_1 = "1"
