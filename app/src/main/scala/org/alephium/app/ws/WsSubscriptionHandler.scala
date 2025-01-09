@@ -68,7 +68,8 @@ protected[ws] object WsSubscriptionHandler {
       id: Correlation,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId,
-      msg: String
+      msg: String,
+      error: String
   ) extends Event
 
   sealed trait Command         extends SubscriptionMsg
@@ -149,14 +150,11 @@ protected[ws] class WsSubscriptionHandler(
     ()
   }
 
+  // scalastyle:off cyclomatic.complexity
   override def receive: Receive = {
     case KeepAlive =>
       openedWebSockets.foreachEntry { case (wsId, ws) =>
-        if (ws.isClosed) {
-          self ! Disconnect(wsId)
-        } else {
-          ws.writePing(Buffer.buffer("ping"))
-        }
+        if (ws.isClosed) self ! Disconnect(wsId) else ws.writePing(Buffer.buffer("ping"))
       }
     case Connect(ws) =>
       connect(ws)
@@ -172,14 +170,18 @@ protected[ws] class WsSubscriptionHandler(
     case Unsubscribed(id, ws, subscriptionId) =>
       subscriptionsState.removeSubscription(ws.textHandlerID(), subscriptionId)
       respondAsyncAndForget(ws, Response.successful(id))
-    case NotificationFailed(_, _, _, _) =>
-    // TODO can we do something about failing notification to client which is not closed ?
+    case NotificationFailed(_, ws, _, msg, error) =>
+      ws.writeTextMessage(msg).onComplete {
+        case Success(_) =>
+          log.warning(error, "Open ws connection recovered from notification writing error.")
+        case Failure(ex) =>
+          log.error(ex.getMessage, "Ws notification writing failed repeatedly, closing.")
+          self ! Disconnect(ws.textHandlerID())
+      }
     case Disconnect(id) =>
       Future
         .sequence(subscriptionsState.getConsumers(id).map(_.unregister().asScala).toSeq)
-        .onComplete { _ =>
-          self ! Disconnected(id)
-        }
+        .onComplete { _ => self ! Disconnected(id) }
     case Disconnected(id) =>
       val _ = openedWebSockets.remove(id)
       subscriptionsState.removeAllSubscriptions(id)
@@ -200,6 +202,7 @@ protected[ws] class WsSubscriptionHandler(
           .foreach(publishNotification)
       }
   }
+  // scalastyle:on cyclomatic.complexity
 
   private def publishNotification(params: WsNotificationParams): Unit = {
     vertx.eventBus().publish(params.subscription.toHexString, params.asJsonRpcNotification.render())
@@ -268,12 +271,19 @@ protected[ws] class WsSubscriptionHandler(
           new io.vertx.core.Handler[Message[String]] {
             override def handle(message: Message[String]): Unit = {
               if (!ws.isClosed) {
-                val _ =
-                  ws.writeTextMessage(message.body()).andThen { case Failure(ex) =>
+                ws.writeTextMessage(message.body()).onComplete {
+                  case Success(_) =>
+                  case Failure(ex) =>
                     if (!ws.isClosed) {
-                      self ! NotificationFailed(id, ws, subscriptionId, ex.getMessage)
+                      self ! NotificationFailed(
+                        id,
+                        ws,
+                        subscriptionId,
+                        message.body(),
+                        ex.getMessage
+                      )
                     }
-                  }
+                }
               }
             }
           }
