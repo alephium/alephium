@@ -112,7 +112,6 @@ protected[ws] object WsSubscriptionHandler {
   ) extends CommandResponse
 
   final protected[ws] case class Disconnect(id: WsId) extends Command
-  final private case class Disconnected(id: WsId)     extends CommandResponse
 
   private case object KeepAlive
 
@@ -150,7 +149,7 @@ protected[ws] class WsSubscriptionHandler(
     ()
   }
 
-  // scalastyle:off cyclomatic.complexity
+  // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
     case KeepAlive =>
       openedWebSockets.foreachEntry { case (wsId, ws) =>
@@ -175,16 +174,18 @@ protected[ws] class WsSubscriptionHandler(
         case Success(_) =>
           log.warning(error, "Open ws connection recovered from notification writing error.")
         case Failure(ex) =>
-          log.error(ex.getMessage, "Ws notification writing failed repeatedly, closing.")
+          log.warning(ex, "Ws notification writing failed repeatedly, closing.")
           self ! Disconnect(ws.textHandlerID())
       }
     case Disconnect(id) =>
-      Future
-        .sequence(subscriptionsState.getConsumers(id).map(_.unregister().asScala).toSeq)
-        .onComplete { _ => self ! Disconnected(id) }
-    case Disconnected(id) =>
       val _ = openedWebSockets.remove(id)
       subscriptionsState.removeAllSubscriptions(id)
+      Future
+        .sequence(subscriptionsState.getConsumers(id).map(_.unregister().asScala).toSeq)
+        .onComplete {
+          case Success(_)  =>
+          case Failure(ex) => log.warning(ex, "Unregistering consumer failed.")
+        }
     case GetSubscriptions =>
       sender() ! WsImmutableSubscriptions(
         subscriptionsState.connections.toMap,
@@ -202,7 +203,7 @@ protected[ws] class WsSubscriptionHandler(
           .foreach(publishNotification)
       }
   }
-  // scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity method.length
 
   private def publishNotification(params: WsNotificationParams): Unit = {
     vertx.eventBus().publish(params.subscription.toHexString, params.asJsonRpcNotification.render())
