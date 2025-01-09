@@ -284,10 +284,18 @@ object BrokerHandler {
       .mkString("[", ",", "]")
   }
 
+  private def showHeights(heights: AVector[Int]): String = {
+    if (heights.isEmpty) {
+      "[]"
+    } else if (heights.length == 1) {
+      s"[${heights.head}]"
+    } else {
+      s"[${heights.head} .. ${heights.last}]"
+    }
+  }
+
   def showIndexedHeights(heights: AVector[(ChainIndex, AVector[Int])]): String = {
-    heights
-      .map(p => s"${p._1} -> ${if (p._2.isEmpty) "[]" else s"[${p._2.head} .. ${p._2.last}]"}")
-      .mkString(", ")
+    heights.map(p => s"${p._1} -> ${showHeights(p._2)}").mkString(", ")
   }
 
   def showFlowData[T <: FlowData](data: AVector[AVector[T]]): String = {
@@ -709,7 +717,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   private def isFindingAncestor: Boolean = states.isDefined
 
   private def isAncestorFound: Boolean =
-    isFindingAncestor && states.forall(_.forall(_.isAncestorFound))
+    states.exists(_.forall(_.isAncestorFound))
 }
 
 object SyncV2Handler {

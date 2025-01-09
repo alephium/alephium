@@ -103,12 +103,6 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
     }
   }
 
-  def handleHandshakeInfo(
-      _remoteBrokerInfo: BrokerInfo,
-      clientInfo: String,
-      protocolVersion: ProtocolVersion
-  ): Unit
-
   @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit =
     f match {
       case Right(t) => g(t)
@@ -235,6 +229,11 @@ trait HandshakeHandler extends BaseHandler {
 
   def send(payload: Payload): Unit
   def onHandshakeCompleted(hello: Hello): Unit
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit
   def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit
 
   def handShaking: Receive = {

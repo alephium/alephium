@@ -115,10 +115,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def maxWeightTipStateUnsafe: (BlockHash, Int, Weight) = {
     tips.keys().foldLeft((genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)) {
-      case ((_, height, weight), tip) =>
+      case ((previousTip, height, weight), tip) =>
         getStateUnsafe(tip) match {
           case BlockState(tipHeight, tipWeight) =>
-            if (tipWeight > weight) (tip, tipHeight, tipWeight) else (tip, height, weight)
+            if (tipWeight > weight) (tip, tipHeight, tipWeight) else (previousTip, height, weight)
         }
     }
   }
