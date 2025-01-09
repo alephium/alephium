@@ -809,6 +809,29 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     state1.taskQueue.isEmpty is true
     state1.nextFromHeight is bestHeight1 + 1
     state1.skeletonHeights is Some(skeletonHeights)
+
+    1.until(bestHeight1 - BatchSize, BatchSize).zipWithIndex.foreach { case (fromHeight, index) =>
+      val expectedHeights = skeletonHeights.drop(index)
+      state1.nextSkeletonHeights(fromHeight, MaxQueueSize) is Some(expectedHeights)
+      state1.taskQueue.isEmpty is true
+      state1.nextFromHeight is bestHeight1 + 1
+      state1.skeletonHeights is Some(expectedHeights)
+    }
+
+    (BatchSize + 1).until(MaxQueueSize, BatchSize).zipWithIndex.foreach { case (size, index) =>
+      val expectedHeights = skeletonHeights.take(index + 1)
+      state1.nextSkeletonHeights(1, size) is Some(expectedHeights)
+      state1.taskQueue.isEmpty is true
+      state1.nextFromHeight is size
+      state1.skeletonHeights is Some(expectedHeights)
+    }
+
+    state1.nextSkeletonHeights(bestHeight1 - BatchSize + 1, MaxQueueSize) is None
+    state1.nextFromHeight is bestHeight1 + 1
+    state1.skeletonHeights.isEmpty is true
+    state1.taskQueue.toSeq is Seq(
+      BlockDownloadTask(chainIndex, bestHeight1 - BatchSize + 1, bestHeight1, None)
+    )
   }
 
   it should "handle skeleton headers" in new SyncStatePerChainFixture {
