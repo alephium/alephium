@@ -178,10 +178,11 @@ protected[ws] class WsSubscriptionHandler(
           self ! Disconnect(ws.textHandlerID())
       }
     case Disconnect(id) =>
-      val _ = openedWebSockets.remove(id)
+      val _         = openedWebSockets.remove(id)
+      val customers = subscriptionsState.getConsumers(id)
       subscriptionsState.removeAllSubscriptions(id)
       Future
-        .sequence(subscriptionsState.getConsumers(id).map(_.unregister().asScala).toSeq)
+        .sequence(customers.map(_.unregister().asScala).toSeq)
         .onComplete {
           case Success(_)  =>
           case Failure(ex) => log.warning(ex, "Unregistering consumer failed.")
