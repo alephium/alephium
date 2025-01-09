@@ -117,15 +117,9 @@ protected[ws] object WsParams {
             case ContractEvent if addressArr(0).strOpt.isEmpty =>
               Left(WsError.invalidContractAddressType)
             case ContractEvent =>
-              val addresses = AVector.from(addressArr.map(_.str))
-              WsUtils.firstDuplicate(addresses) match {
-                case Some(addressDuplicate) =>
-                  Left(WsError.duplicatedAddresses(addressDuplicate))
-                case None =>
-                  WsUtils
-                    .buildAddresses(addresses)
-                    .map(ContractEventsSubscribeParams.from(eventIndex.toInt, _))
-              }
+              WsUtils
+                .buildUniqueContractAddresses(addressArr)
+                .map(ContractEventsSubscribeParams.from(eventIndex.toInt, _))
             case unknown =>
               Left(WsError.invalidContractEventParams(unknown))
           }

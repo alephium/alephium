@@ -24,10 +24,14 @@ import io.vertx.core.{Future => VertxFuture}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WsUtilsSpec extends AlephiumSpec with WsFixture {
-  it should "build addresses" in {
-    WsUtils.buildAddresses(AVector("")).isLeft is true
-    WsUtils.buildAddresses(AVector(contractAddress_0.toBase58)).isRight is true
-    WsUtils.buildAddresses(AVector(contractAddress_0.toBase58, contractAddress_1.toBase58)) match {
+  it should "build unique contract addresses or fail" in {
+    WsUtils.buildUniqueContractAddresses(ujson.Arr(ujson.Str("")).arr).isLeft is true
+    WsUtils
+      .buildUniqueContractAddresses(ujson.Arr(ujson.Str(contractAddress_0.toBase58)).arr)
+      .isRight is true
+    WsUtils.buildUniqueContractAddresses(
+      ujson.Arr(ujson.Str(contractAddress_0.toBase58), ujson.Str(contractAddress_1.toBase58)).arr
+    ) match {
       case Right(addresses) =>
         addresses.length is 2
         addresses(0).toBase58 is contractAddress_0.toBase58
@@ -35,41 +39,50 @@ class WsUtilsSpec extends AlephiumSpec with WsFixture {
       case Left(_) => fail("Should return Right for valid addresses")
     }
 
-    WsUtils.buildAddresses(AVector(contractAddress_0.toBase58, "invalid-address")) match {
+    WsUtils.buildUniqueContractAddresses(
+      ujson.Arr(ujson.Str(contractAddress_0.toBase58), ujson.Str("invalid-address")).arr
+    ) match {
       case Right(_)    => fail("Should return Left for invalid address")
       case Left(error) => error is WsError.invalidContractAddress("invalid-address")
     }
-  }
 
-  it should "find first address duplicate" in {
-    WsUtils.firstDuplicate(AVector(contractAddress_0, contractAddress_1)).isEmpty is true
-    val duplicateAddresses = AVector(contractAddress_0, contractAddress_1, contractAddress_0)
-    WsUtils.firstDuplicate(duplicateAddresses) match {
-      case Some(duplicate) => duplicate is contractAddress_0
-      case None            => fail("Should find the duplicate address")
-    }
-    WsUtils.firstDuplicate(AVector.empty[String]).isEmpty is true
-    WsUtils.firstDuplicate(AVector(contractAddress_0)).isEmpty is true
-    val multipleDuplicates =
-      AVector(contractAddress_0, contractAddress_1, contractAddress_0, contractAddress_1)
-    WsUtils.firstDuplicate(multipleDuplicates) match {
-      case Some(duplicate) => duplicate is contractAddress_0
-      case None            => fail("Should find the first duplicate")
+    val duplicateAddresses = ujson
+      .Arr(
+        ujson.Str(contractAddress_0.toBase58),
+        ujson.Str(contractAddress_1.toBase58),
+        ujson.Str(contractAddress_0.toBase58)
+      )
+      .arr
+    WsUtils.buildUniqueContractAddresses(duplicateAddresses) match {
+      case Right(_)    => fail("Should return Left for duplicate addresses")
+      case Left(error) => error is WsError.duplicatedAddresses(contractAddress_0.toBase58)
     }
   }
 
-  it should "deduplicate addresses" in {
-    val duplicateAddresses = AVector(contractAddress_0, contractAddress_1, contractAddress_0)
-    WsUtils.deduplicate(duplicateAddresses) is AVector(contractAddress_0, contractAddress_1)
-    WsUtils.deduplicate(AVector.empty[String]) is AVector.empty[String]
-    WsUtils.deduplicate(AVector(contractAddress_0, contractAddress_1)) is AVector(
-      contractAddress_0,
-      contractAddress_1
+  it should "deduplicate subscription ids" in {
+    val duplicatedSubscriptionIds = AVector(
+      contractEventsParams_0.subscriptionId,
+      contractEventsParams_1.subscriptionId,
+      contractEventsParams_0.subscriptionId
     )
-    WsUtils.deduplicate(AVector(contractAddress_0)) is AVector(contractAddress_0)
-    val multipleDuplicates =
-      AVector(contractAddress_0, contractAddress_1, contractAddress_0, contractAddress_1)
-    WsUtils.deduplicate(multipleDuplicates) is AVector(contractAddress_0, contractAddress_1)
+    WsUtils.deduplicate(duplicatedSubscriptionIds) is AVector(
+      contractEventsParams_0.subscriptionId,
+      contractEventsParams_1.subscriptionId
+    )
+    WsUtils.deduplicate(
+      AVector(contractEventsParams_0.subscriptionId, contractEventsParams_1.subscriptionId)
+    ) is AVector(
+      contractEventsParams_0.subscriptionId,
+      contractEventsParams_1.subscriptionId
+    )
+    WsUtils.deduplicate(AVector(contractEventsParams_0.subscriptionId)) is AVector(
+      contractEventsParams_0.subscriptionId
+    )
+    val multipleDuplicates = duplicatedSubscriptionIds :+ contractEventsParams_1.subscriptionId
+    WsUtils.deduplicate(multipleDuplicates) is AVector(
+      contractEventsParams_0.subscriptionId,
+      contractEventsParams_1.subscriptionId
+    )
   }
 
   it should "convert VertxFuture to Scala Future" in {

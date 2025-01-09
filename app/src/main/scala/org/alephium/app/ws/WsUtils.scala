@@ -27,18 +27,6 @@ import org.alephium.rpc.model.JsonRPC.Error
 import org.alephium.util.{AVector, EitherF}
 
 object WsUtils {
-  def firstDuplicate[T](vec: AVector[T]): Option[T] = {
-    val seen = mutable.Set[T]()
-    vec.find { elem =>
-      if (seen.contains(elem)) {
-        true
-      } else {
-        seen.add(elem)
-        false
-      }
-    }
-  }
-
   def deduplicate[T](vec: AVector[T]): AVector[T] = {
     val seen = mutable.Set[T]()
     vec.filter { elem =>
@@ -51,16 +39,28 @@ object WsUtils {
     }
   }
 
-  def buildAddresses(addresses: AVector[String]): Either[Error, AVector[Address.Contract]] =
+  def buildUniqueContractAddresses(
+      addressArr: mutable.ArrayBuffer[ujson.Value]
+  ): Either[Error, AVector[Address.Contract]] = {
     EitherF
-      .foldTry(addresses, mutable.ArrayBuffer.empty[Address.Contract]) {
-        case (addresses, address) =>
-          LockupScript.p2c(address).map(Address.Contract(_)) match {
-            case Some(address) => Right(addresses :+ address)
-            case None          => Left(WsError.invalidContractAddress(address))
-          }
+      .foldTry(
+        addressArr,
+        (mutable.Set.empty[String], mutable.ArrayBuffer.empty[Address.Contract])
+      ) { case ((seen, addresses), addressVal) =>
+        addressVal.strOpt match {
+          case Some(address) if seen.contains(address) =>
+            Left(WsError.duplicatedAddresses(address))
+          case Some(address) =>
+            LockupScript.p2c(address).map(Address.Contract(_)) match {
+              case Some(contractAddress) =>
+                Right((seen.addOne(address), addresses :+ contractAddress))
+              case None => Left(WsError.invalidContractAddress(address))
+            }
+          case None => Left(WsError.invalidContractAddressType)
+        }
       }
-      .map(AVector.from(_))
+      .map { case (_, addresses) => AVector.from(addresses) }
+  }
 
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
