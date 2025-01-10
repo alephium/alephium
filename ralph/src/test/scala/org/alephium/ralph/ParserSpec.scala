@@ -2648,6 +2648,205 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("-x", StatelessParser.expr(_)).get.value is
       UnaryOp[StatelessContext](Negate, Variable(Ident("x")))
   }
+
+  it should "parse unit test defs" in {
+    val statements = Seq(
+      FuncCall[StatefulContext](
+        FuncId("assert", true),
+        Seq.empty,
+        Seq(
+          Binop(
+            Eq,
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+            Const(Val.U256(U256.unsafe(10)))
+          ),
+          Const(Val.U256(U256.unsafe(0)))
+        )
+      )
+    )
+
+    val withoutSettings =
+      s"""
+         |test "foo"
+         |with Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withoutSettings, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        None,
+        Seq(
+          Testing.SingleTestDef(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(10)))),
+                None
+              )
+            ),
+            None,
+            statements
+          )
+        )
+      )
+
+    val withSettings =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |with Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withSettings, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(10)))),
+                None
+              )
+            ),
+            None,
+            statements
+          )
+        )
+      )
+
+    val withAssets =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |with
+         |  Self(10)
+         |  ApproveAssets{ From -> ALPH: 1 }
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withAssets, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(10)))),
+                None
+              )
+            ),
+            Some(
+              Testing.ApprovedAssetsDef(
+                Seq(
+                  ApproveAsset(
+                    Variable(Ident("From")),
+                    Seq((ALPHTokenId(), Const(Val.U256(U256.One))))
+                  )
+                )
+              )
+            ),
+            statements
+          )
+        )
+      )
+
+    val withMultipleContracts =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |with
+         |  Self(10)
+         |  Bar(20)@address1
+         |  Bar(30)@address2
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleContracts, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(10)))),
+                None
+              ),
+              Testing.CreateContractDef(
+                TypeId("Bar"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(20)))),
+                Some(Ident("address1"))
+              ),
+              Testing.CreateContractDef(
+                TypeId("Bar"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(30)))),
+                Some(Ident("address2"))
+              )
+            ),
+            None,
+            statements
+          )
+        )
+      )
+
+    val withMultipleTests =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |with Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |with Self(11) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleTests, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(10)))),
+                None
+              )
+            ),
+            None,
+            statements
+          ),
+          Testing.SingleTestDef(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(11)))),
+                None
+              )
+            ),
+            None,
+            statements
+          )
+        )
+      )
+  }
 }
 
 class ParseNoFileSpec extends ParserSpec(None)

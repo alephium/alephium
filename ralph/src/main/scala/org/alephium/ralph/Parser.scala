@@ -964,7 +964,9 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     "org.wartremover.warts.Serializable"
   )
 )
-class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
+class StatefulParser(val fileURI: Option[java.net.URI])
+    extends Parser[StatefulContext]
+    with TestingParser {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
@@ -1341,4 +1343,43 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       .map { case (fromIndex, typeId, exprs, endIndex) =>
         Ast.EmitEvent(typeId, exprs).atSourceIndex(fromIndex, endIndex, fileURI)
       }
+}
+
+trait TestingParser { self: StatefulParser =>
+  private def groupDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
+    PP("group" ~ "=" ~ expr)(Testing.GroupDef.apply)
+  private def blockHashDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
+    PP("blockHash" ~ "=" ~ expr)(Testing.BlockHashDef.apply)
+  private def blockTimeStampDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
+    PP("blockTimeStamp" ~ "=" ~ expr)(Testing.BlockTimeStampDef.apply)
+  private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] = P(
+    groupDef | blockHashDef | blockTimeStampDef
+  )
+
+  private def settingsDef[Unknown: P]: P[Testing.SettingsDef[StatefulContext]] =
+    PP("with" ~ "Settings" ~ "(" ~ settingDef.rep(0, ",") ~ ")")(Testing.SettingsDef.apply)
+
+  private def contractAssets[Unknown: P] = P("{" ~ amountList ~ "}")
+  private def contractCtor[Unknown: P]   = P("(" ~ expr.rep(0, ",") ~ ")")
+  private def createContractDef[Unknown: P]: P[Testing.CreateContractDef[StatefulContext]] =
+    PP(Lexer.typeId ~ contractAssets.? ~ contractCtor ~ P("@" ~ Lexer.ident).?) {
+      case (typeId, assets, fields, address) =>
+        Testing.CreateContractDef(typeId, assets.getOrElse(Seq.empty), fields, address)
+    }
+
+  private def testName[Unknown: P]: P[String] = P("\"" ~ CharPred(_ != '"').rep.! ~ "\"")
+  private def approveAssetsDef[Unknown: P]: P[Testing.ApprovedAssetsDef[StatefulContext]] =
+    PP("ApproveAssets" ~ approveAssets)(Testing.ApprovedAssetsDef.apply)
+  private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
+    PP("with" ~ createContractDef.rep ~ approveAssetsDef.? ~ "{" ~ statement.rep ~ "}") {
+      case (contracts, assets, statements) =>
+        Testing.SingleTestDef(contracts, assets, statements)
+    }
+
+  def rawUnitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
+    PP("test" ~ testName ~ settingsDef.? ~ singleTestDef.rep) { case (name, settings, tests) =>
+      Testing.UnitTestDef(name, settings, tests)
+    }
+  def unitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
+    P(Start ~ rawUnitTestDef ~ End)
 }
