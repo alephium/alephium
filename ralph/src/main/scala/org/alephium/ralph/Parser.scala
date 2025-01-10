@@ -1173,7 +1173,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~
-        (mapDef | eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
+        (mapDef | eventDef | constantVarDef | rawEnumDef | func | rawUnitTestDef).rep ~ "}"
         ~~ Index
     ).map {
       case (
@@ -1194,31 +1194,35 @@ class StatefulParser(val fileURI: Option[java.net.URI])
         val events                = ArrayBuffer.empty[Ast.EventDef]
         val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef[StatefulContext]]
         val enums                 = ArrayBuffer.empty[Ast.EnumDef[StatefulContext]]
+        val unitTests             = ArrayBuffer.empty[Testing.UnitTestDef[StatefulContext]]
 
         statements.foreach {
           case m: Ast.MapDef =>
-            if (events.nonEmpty || constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+            if (
+              events.nonEmpty || constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty || unitTests.nonEmpty
+            ) {
               throwContractStmtsOutOfOrderException(m.sourceIndex)
             }
             maps += m
           case e: Ast.EventDef =>
-            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty || unitTests.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
           case c: Ast.ConstantVarDef[StatefulContext @unchecked] =>
-            if (funcs.nonEmpty || enums.nonEmpty) {
+            if (funcs.nonEmpty || enums.nonEmpty || unitTests.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
             constantVars += c.withOrigin(typeId)
           case e: Ast.EnumDef[StatefulContext @unchecked] =>
-            if (funcs.nonEmpty) {
+            if (funcs.nonEmpty || unitTests.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             e.fields.foreach(_.withOrigin(typeId))
             enums += e
-          case f: Ast.FuncDef[StatefulContext @unchecked] => funcs += f
-          case _                                          =>
+          case f: Ast.FuncDef[StatefulContext @unchecked]         => funcs += f
+          case t: Testing.UnitTestDef[StatefulContext @unchecked] => unitTests += t
+          case _                                                  =>
         }
 
         Ast
@@ -1234,7 +1238,8 @@ class StatefulParser(val fileURI: Option[java.net.URI])
             events.toSeq,
             constantVars.toSeq,
             enums.toSeq,
-            contractInheritances.getOrElse(Seq.empty)
+            contractInheritances.getOrElse(Seq.empty),
+            unitTests.toSeq
           )
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }

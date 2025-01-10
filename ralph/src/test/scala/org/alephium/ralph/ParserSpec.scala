@@ -1459,7 +1459,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
           ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
-        )
+        ),
+        Seq.empty
       )
       fastparse
         .parse(code(Keyword.`extends`.name), StatefulParser.contract(_))
@@ -1826,7 +1827,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
-        Seq(InterfaceInheritance(TypeId("Parent")))
+        Seq(InterfaceInheritance(TypeId("Parent"))),
+        Seq.empty
       )
     }
 
@@ -1872,7 +1874,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           ContractInheritance(TypeId("Parent0"), Seq.empty),
           ContractInheritance(TypeId("Parent1"), Seq.empty),
           InterfaceInheritance(TypeId("Parent2"))
-        )
+        ),
+        Seq.empty
       )
     }
 
@@ -2041,6 +2044,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
+        Seq.empty,
         Seq.empty
       )
     }
@@ -2094,7 +2098,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
-        Seq(InterfaceInheritance(TypeId("Bar")))
+        Seq(InterfaceInheritance(TypeId("Bar"))),
+        Seq.empty
       )
     }
   }
@@ -2846,6 +2851,20 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           )
         )
       )
+
+    val contractWithTests =
+      s"""
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> U256 {
+         |    return v
+         |  }
+         |  test "foo" with Self(10) {
+         |    assert!(foo() == 10, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val parsed = parse(contractWithTests, StatefulParser.contract(_)).get.value
+    parsed.unitTests.length is 1
   }
 }
 

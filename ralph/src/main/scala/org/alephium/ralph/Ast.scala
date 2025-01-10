@@ -2532,7 +2532,8 @@ object Ast {
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef[StatefulContext]],
       enums: Seq[EnumDef[StatefulContext]],
-      inheritances: Seq[Inheritance]
+      inheritances: Seq[Inheritance],
+      unitTests: Seq[Testing.UnitTestDef[StatefulContext]]
   ) extends ContractWithState {
     lazy val hasStdIdField: Boolean = stdIdEnabled.exists(identity) && stdInterfaceId.nonEmpty
     lazy val contractFields: Seq[Argument] = if (hasStdIdField) fields :+ Ast.stdArg else fields
@@ -2880,7 +2881,8 @@ object Ast {
             events,
             constantVars,
             enums,
-            c.inheritances
+            c.inheritances,
+            c.unitTests
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
           val (stdId, funcs, events) =
