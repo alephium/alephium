@@ -113,8 +113,8 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |""".stripMargin
   lazy val project          = Compiler.compileProject(contractStr).rightValue
   lazy val compiledContract = project._1.head
-  lazy val CompiledContract(contract, contractAst, contractWarnings, _) = compiledContract
-  lazy val compiledStruct                                               = project._3.structs.head
+  lazy val CompiledContract(contract, contractAst, contractWarnings, _, _) = compiledContract
+  lazy val compiledStruct                                                  = project._3.structs.head
 
   val scriptStr =
     s"""

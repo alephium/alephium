@@ -34,7 +34,8 @@ final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
     warnings: AVector[Warning],
-    debugCode: StatefulContract
+    debugCode: StatefulContract,
+    tests: AVector[Testing.CompiledUnitTest[StatefulContext]]
 )
 final case class CompiledScript(
     code: StatefulScript,
@@ -245,11 +246,11 @@ object Compiler {
         tpe: Type,
         value: Val,
         instrs: Seq[Instr[Ctx]],
-        constantDef: Ast.ConstantDefinition
+        constantDef: Option[Ast.ConstantDefinition]
     ) extends VarInfo {
       def isMutable: Boolean   = false
       def isUnused: Boolean    = false
-      def isGenerated: Boolean = false
+      def isGenerated: Boolean = constantDef.isEmpty
       def isLocal: Boolean     = true
     }
     final case class InlinedArgument[Ctx <: StatelessContext](
@@ -459,7 +460,7 @@ object Compiler {
         mutable.HashMap.empty,
         0,
         funcTable,
-        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, funcTable)),
+        immutable.Map(script.ident -> ContractInfo(script, ContractKind.TxScript, funcTable)),
         globalState
       )
     }
@@ -510,6 +511,7 @@ object Compiler {
   }
 
   final case class ContractInfo[Ctx <: StatelessContext](
+      ast: Ast.ContractT[Ctx],
       kind: ContractKind,
       funcs: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   )
@@ -907,7 +909,19 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+
+    private[ralph] def addTestingConstant(ident: Ast.Ident, value: Val, tpe: Type): Unit = {
+      assume(tpe.toVal == value.tpe)
+      val sname = checkNewVariable(ident)
+      addVarInfo(sname, VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), None))
+      ()
+    }
+
+    def addConstant(
+        ident: Ast.Ident,
+        value: Val,
+        constantDef: Option[Ast.ConstantDefinition]
+    ): Unit = {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
       val varInfo =
@@ -1069,9 +1083,9 @@ object Compiler {
       val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       val unusedFields         = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       unusedVars.foreach {
-        case (varKey, c: VarInfo.Constant[_]) =>
-          if (c.constantDef.definedIn(typeId)) {
-            unusedLocalConstants.addOne((varKey.name, c.constantDef.ident.sourceIndex))
+        case (varKey, VarInfo.Constant(_, _, _, _, Some(constantDef))) =>
+          if (constantDef.definedIn(typeId)) {
+            unusedLocalConstants.addOne((varKey.name, constantDef.ident.sourceIndex))
           }
         case (varKey, varInfo) if !varInfo.isLocal =>
           unusedFields.addOne((varKey.name, varInfo.ident.sourceIndex))
@@ -1089,11 +1103,11 @@ object Compiler {
         : Iterable[(Ast.TypeId, (String, Option[SourceIndex]))] = {
       val used = mutable.ArrayBuffer.empty[(Ast.TypeId, (String, Option[SourceIndex]))]
       varTable.foreach {
-        case (varKey, c: VarInfo.Constant[_]) =>
+        case (varKey, VarInfo.Constant(_, tpe, _, _, Some(constantDef))) =>
           if (accessedVars.contains(ReadVariable(varKey))) {
-            c.constantDef.origin match {
+            constantDef.origin match {
               case Some(originContractId) if originContractId != typeId =>
-                used.addOne((originContractId, (varKey.name, c.tpe.sourceIndex)))
+                used.addOne((originContractId, (varKey.name, tpe.sourceIndex)))
               case _ => ()
             }
           }

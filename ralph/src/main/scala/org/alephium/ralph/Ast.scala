@@ -2139,7 +2139,7 @@ object Ast {
           )
       }
     }
-    def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+    def addConstant(ident: Ident, value: Val, constantDef: Option[Ast.ConstantDefinition]): Unit = {
       val tpe = Type.fromVal(value.tpe)
       constants(ident) =
         Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
@@ -2687,6 +2687,12 @@ object Ast {
       StatefulContract(fieldsLength, genMethods(state))
     }
 
+    def genUnitTestCode(
+        state: Compiler.State[StatefulContext]
+    ): AVector[Testing.CompiledUnitTest[StatefulContext]] = {
+      AVector.from(unitTests).flatMap(_.compile(state))
+    }
+
     // the state must have been updated in the check pass
     def buildCheckExternalCallerTable(
         state: Compiler.State[StatefulContext]
@@ -2767,7 +2773,7 @@ object Ast {
         case txContract: Ast.Contract =>
           Compiler.ContractKind.Contract(txContract.isAbstract)
       }
-      contract.ident -> Compiler.ContractInfo(kind, contract.funcTable(globalState))
+      contract.ident -> Compiler.ContractInfo(contract, kind, contract.funcTable(globalState))
     }.toMap
 
     def structs: Seq[Struct]                 = globalState.structs
@@ -3064,7 +3070,8 @@ object Ast {
           inlinedReleaseCode,
           contract,
           state.getWarnings,
-          inlinedDebugCode
+          inlinedDebugCode,
+          contract.genUnitTestCode(state)
         ) -> index
       }
       (warnings, compiled)
