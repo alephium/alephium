@@ -210,7 +210,7 @@ object Testing {
       val values = contract.fields.view.zipWithIndex.flatMap { case (argument, index) =>
         val fieldExpr = fields(index)
         val fieldType = state.resolveType(argument.tpe)
-        if (fieldExpr.getType(state) != Seq(fieldType)) {
+        if (fieldExpr.getType(state).map(_.toVal) != Seq(fieldType.toVal)) {
           throw Compiler.Error(
             s"Invalid contract field type, expected $fieldType",
             fieldExpr.sourceIndex

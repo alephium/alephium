@@ -172,6 +172,39 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     }
 
     {
+      info("Create a contract as an interface")
+      val code =
+        s"""
+           |Contract Foo(bar: IBar) {
+           |  pub fn foo() -> U256 {
+           |    return bar.bar()
+           |  }
+           |  test "foo" with Bar(0)@addr Self(addr) {
+           |    assert!(foo() == 0, 0)
+           |  }
+           |}
+           |Interface IBar {
+           |  pub fn bar() -> U256
+           |}
+           |Contract Bar(v: U256) implements IBar {
+           |  pub fn bar() -> U256 {
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+      val contracts = compileContractFull(code).rightValue.tests.head.contracts
+      contracts.length is 2
+      val bar = contracts.head
+      bar.typeId is Ast.TypeId("Bar")
+      bar.immFields is AVector[Val](Val.U256(U256.Zero))
+      bar.mutFields.isEmpty is true
+      val foo = contracts.last
+      foo.typeId is Ast.TypeId("Foo")
+      foo.immFields is AVector[Val](Val.ByteVec(bar.contractId.bytes))
+      foo.mutFields.isEmpty is true
+    }
+
+    {
       info("Multiple tests")
       val code =
         s"""
