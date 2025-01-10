@@ -209,7 +209,7 @@ class RestServer(
       ()
     }
 }
-// scalastyle:off parameter.number magic.number
+// scalastyle:off parameter.number
 object RestServer {
   def apply(
       flowSystem: ActorSystem,
@@ -242,4 +242,4 @@ object RestServer {
     new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }
-// scalastyle:on parameter.number magic.number
+// scalastyle:on parameter.number

@@ -232,6 +232,14 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "distinct" in new Fixture {
+    forAll(vectorGen) { vc =>
+      checkEq(vc.distinct, vc.toArray.distinct)
+    }
+    AVector.empty[Int].distinct is AVector.empty[Int]
+    AVector(1, 2, 2, 3, 1, 4).distinct is AVector(1, 2, 3, 4)
+  }
+
   it should "reverse vector" in new Fixture {
     forAll(vectorGen) { vc => checkEq(vc.reverse, vc.toArray.reverse) }
   }

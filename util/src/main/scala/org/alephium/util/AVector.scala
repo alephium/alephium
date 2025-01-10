@@ -152,6 +152,10 @@ final class AVector[@sp A](
     false
   }
 
+  def distinct: AVector[A] = {
+    AVector.unsafe(elems.distinct)
+  }
+
   def exists(f: A => Boolean): Boolean = {
     cfor(start)(_ < end, _ + 1) { i =>
       val a = elems(i)

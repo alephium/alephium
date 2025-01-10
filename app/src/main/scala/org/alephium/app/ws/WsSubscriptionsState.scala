@@ -27,7 +27,6 @@ import org.alephium.app.ws.WsParams.{
   WsSubscriptionParams
 }
 import org.alephium.app.ws.WsSubscriptionHandler.{AddressWithIndex, SubscriptionOfConnection}
-import org.alephium.app.ws.WsUtils.deduplicate
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
@@ -67,9 +66,7 @@ final case class WsSubscriptionsState[C: ClassTag](
   ): AVector[WsSubscriptionId] =
     contractSubscriptionMappings
       .get(AddressWithIndex(contractAddress.toBase58, eventIndex))
-      .map { subscriptionOfConnections =>
-        deduplicate(subscriptionOfConnections.map(_.subscriptionId))
-      }
+      .map(_.map(_.subscriptionId).distinct)
       .getOrElse(AVector.empty)
 
   protected[ws] def addContractEventSubscriptionForAddress(

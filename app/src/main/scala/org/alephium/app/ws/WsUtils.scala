@@ -27,18 +27,6 @@ import org.alephium.rpc.model.JsonRPC.Error
 import org.alephium.util.{AVector, EitherF}
 
 object WsUtils {
-  def deduplicate[T](vec: AVector[T]): AVector[T] = {
-    val seen = mutable.Set[T]()
-    vec.filter { elem =>
-      if (seen.contains(elem)) {
-        false
-      } else {
-        seen.add(elem)
-        true
-      }
-    }
-  }
-
   def buildUniqueContractAddresses(
       addressArr: mutable.ArrayBuffer[ujson.Value]
   ): Either[Error, AVector[Address.Contract]] = {

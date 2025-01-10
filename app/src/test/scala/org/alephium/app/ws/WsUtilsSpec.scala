@@ -21,7 +21,7 @@ import scala.util.{Failure, Success}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.AlephiumSpec
 
 class WsUtilsSpec extends AlephiumSpec with WsFixture {
   it should "build unique contract addresses or fail" in {
@@ -57,32 +57,6 @@ class WsUtilsSpec extends AlephiumSpec with WsFixture {
       case Right(_)    => fail("Should return Left for duplicate addresses")
       case Left(error) => error is WsError.duplicatedAddresses(contractAddress_0.toBase58)
     }
-  }
-
-  it should "deduplicate subscription ids" in {
-    val duplicatedSubscriptionIds = AVector(
-      contractEventsParams_0.subscriptionId,
-      contractEventsParams_1.subscriptionId,
-      contractEventsParams_0.subscriptionId
-    )
-    WsUtils.deduplicate(duplicatedSubscriptionIds) is AVector(
-      contractEventsParams_0.subscriptionId,
-      contractEventsParams_1.subscriptionId
-    )
-    WsUtils.deduplicate(
-      AVector(contractEventsParams_0.subscriptionId, contractEventsParams_1.subscriptionId)
-    ) is AVector(
-      contractEventsParams_0.subscriptionId,
-      contractEventsParams_1.subscriptionId
-    )
-    WsUtils.deduplicate(AVector(contractEventsParams_0.subscriptionId)) is AVector(
-      contractEventsParams_0.subscriptionId
-    )
-    val multipleDuplicates = duplicatedSubscriptionIds :+ contractEventsParams_1.subscriptionId
-    WsUtils.deduplicate(multipleDuplicates) is AVector(
-      contractEventsParams_0.subscriptionId,
-      contractEventsParams_1.subscriptionId
-    )
   }
 
   it should "convert VertxFuture to Scala Future" in {
