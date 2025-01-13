@@ -29,6 +29,7 @@ import io.vertx.core.eventbus.{Message, MessageConsumer}
 
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
+import org.alephium.app.ws.WsSubscriptionsState.{ContractKey, SubscriptionOfConnection}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json.write
 import org.alephium.rpc.model.JsonRPC
@@ -80,8 +81,8 @@ protected[ws] object WsSubscriptionHandler {
 
   final case class WsImmutableSubscriptions(
       subscriptions: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
-      subscriptionsByAddress: Map[AddressWithIndex, AVector[SubscriptionOfConnection]],
-      addressesBySubscriptionId: Map[SubscriptionOfConnection, AVector[AddressWithIndex]]
+      subscriptionsByAddress: Map[ContractKey, AVector[SubscriptionOfConnection]],
+      addressesBySubscriptionId: Map[SubscriptionOfConnection, AVector[ContractKey]]
   ) extends CommandResponse
 
   final protected[ws] case class Subscribe(
@@ -114,12 +115,6 @@ protected[ws] object WsSubscriptionHandler {
   final protected[ws] case class Disconnect(id: WsId) extends Command
 
   private case object KeepAlive
-
-  final protected[ws] case class AddressWithIndex(address: String, eventIndex: WsEventIndex)
-  final protected[ws] case class SubscriptionOfConnection(
-      wsId: WsId,
-      subscriptionId: WsSubscriptionId
-  )
 }
 
 protected[ws] class WsSubscriptionHandler(

@@ -16,7 +16,7 @@
 
 package org.alephium.app.ws
 
-import org.alephium.app.ws.WsParams.{ContractEventsSubscribeParams, WsEventType, WsSubscriptionId}
+import org.alephium.app.ws.WsParams.{WsEventType, WsSubscriptionId}
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.eventTypes
 import org.alephium.rpc.model.JsonRPC.Error
 
@@ -25,16 +25,10 @@ object WsError {
   private val AlreadyUnSubscribed: Int       = -32011
   private val SubscriptionLimitExceeded: Int = -32012
 
-  protected[ws] def invalidEventType(eventType: WsEventType): Error =
+  protected[ws] def invalidSimpleEventType(eventType: WsEventType): Error =
     Error(
       Error.InvalidParamsCode,
-      s"Invalid event type: $eventType, expected array with one of: ${eventTypes.mkString(", ")}"
-    )
-
-  protected[ws] def invalidSubscriptionEventTypes(json: ujson.Value): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid subscription: $json, expected array with one of: ${eventTypes.mkString(", ")}"
+      s"Invalid event type: $eventType, expected one of: ${eventTypes.mkString(", ")}"
     )
 
   protected[ws] def invalidUnsubscriptionFormat(json: ujson.Value): Error =
@@ -47,20 +41,6 @@ object WsError {
     Error(
       Error.InvalidParamsCode,
       s"Invalid subscription ID: $subscriptionId, it should be SHA256 hash as Hex"
-    )
-
-  protected[ws] def invalidContractEventParams(eventType: WsEventType): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Unknown event type: $eventType, expected: ${ContractEventsSubscribeParams.ContractEvent}"
-    )
-
-  protected[ws] def invalidParamsArrayElements(
-      json: (ujson.Value, ujson.Value, ujson.Value)
-  ): Error =
-    Error(
-      Error.InvalidParamsCode,
-      s"Invalid params: $json, expected array with eventType, eventIndex and array of addresses"
     )
 
   protected[ws] def invalidContractAddress(address: String): Error =
@@ -90,7 +70,19 @@ object WsError {
   protected[ws] def invalidParamsFormat(json: ujson.Value): Error =
     Error(
       Error.InvalidParamsCode,
-      s"Invalid params format: $json, expected array of size 1 for block/tx or 3 for contract events notifications"
+      s"Invalid params format: $json. Expected an array of size 1: [block | tx], or size 2: [contract, {address: [String], eventIndex?: Integer}]"
+    )
+
+  protected[ws] def invalidContractParamsFormat(json: ujson.Obj): Error =
+    Error(
+      Error.InvalidParamsCode,
+      s"Invalid contract params object: $json, expected object {address: [String], eventIndex?: Integer}"
+    )
+
+  protected[ws] def invalidContractParamsEventIndexFormat(json: ujson.Value): Error =
+    Error(
+      Error.InvalidParamsCode,
+      s"Invalid contract params eventIndex field: $json, expected integer"
     )
 
   protected[ws] def alreadySubscribed(subscriptionId: WsSubscriptionId): Error =

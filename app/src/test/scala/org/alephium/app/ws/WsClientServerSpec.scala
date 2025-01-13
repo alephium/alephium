@@ -63,11 +63,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val duplicateAddressRequest = WsRequest(
         Correlation(0),
-        ContractEventsSubscribeParams(
-          ContractEventsSubscribeParams.ContractEvent,
-          0,
-          duplicateAddresses
-        )
+        ContractEventsSubscribeParams.from(duplicateAddresses, Some(EventIndex_0))
       )
       ws.writeRequestToSocket(duplicateAddressRequest).futureValue is Response
         .failed(
@@ -79,10 +75,11 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
 
   "WsServer" should "reject invalid contract events subscription requests with empty addresses" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
-      val emptyAddressRequest = WsRequest(
-        Correlation(0),
-        ContractEventsSubscribeParams(ContractEventsSubscribeParams.ContractEvent, 0, AVector.empty)
-      )
+      val emptyAddressRequest =
+        WsRequest(
+          Correlation(0),
+          ContractEventsSubscribeParams.from(AVector.empty, Some(EventIndex_0))
+        )
       ws.writeRequestToSocket(emptyAddressRequest).futureValue is Response
         .failed(
           emptyAddressRequest.id,
@@ -95,11 +92,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val req = WsRequest(
         Correlation(0L),
-        ContractEventsSubscribeParams(
-          ContractEventsSubscribeParams.ContractEvent,
-          0,
-          tooManyContractAddresses.tail
-        )
+        ContractEventsSubscribeParams.from(tooManyContractAddresses.tail, Some(EventIndex_0))
       )
       inside(ws.writeRequestToSocket(req).futureValue) { case JsonRPC.Response.Success(_, id) =>
         id is 0L
@@ -116,11 +109,8 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
               .tabulate(50) { index =>
                 val req = WsRequest(
                   Correlation(index.toLong),
-                  ContractEventsSubscribeParams(
-                    ContractEventsSubscribeParams.ContractEvent,
-                    index,
-                    contractEventsParams_0.addresses
-                  )
+                  ContractEventsSubscribeParams
+                    .from(params_addr_01_eventIndex_0.addresses, Some(index))
                 )
                 ws.writeRequestToSocket(req)
               }
@@ -135,10 +125,9 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
       }
       val requestOverLimit = WsRequest(
         Correlation(50L),
-        ContractEventsSubscribeParams(
-          ContractEventsSubscribeParams.ContractEvent,
-          50,
-          contractEventsParams_1.addresses
+        ContractEventsSubscribeParams.from(
+          params_addr_12_eventIndex_1.addresses,
+          Some(EventIndex_0)
         )
       )
       ws.writeRequestToSocket(requestOverLimit).futureValue is Response
@@ -153,11 +142,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val tooManyAddressesRequest = WsRequest(
         Correlation(0),
-        ContractEventsSubscribeParams(
-          ContractEventsSubscribeParams.ContractEvent,
-          0,
-          tooManyContractAddresses
-        )
+        ContractEventsSubscribeParams.from(tooManyContractAddresses, Some(EventIndex_0))
       )
       ws.writeRequestToSocket(tooManyAddressesRequest).futureValue is Response
         .failed(
@@ -180,13 +165,21 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
       ws.subscribeToTx(2).futureValue is Response.successful(Correlation(2), Tx.subscriptionId)
       ws.unsubscribeFromTx(3).futureValue is Response.successful(Correlation(3))
 
-      // for contract events notifications
-      val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
-      ws.subscribeToContractEvents(4, params.eventIndex, params.addresses).futureValue is Response
-        .successful(Correlation(4), params.subscriptionId)
-      ws.unsubscribeFromContractEvents(5, params.subscriptionId).futureValue is Response.successful(
-        Correlation(5)
-      )
+      // for filtered contract events notifications
+      val filteredParams =
+        ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
+      ws.subscribeToContractEvents(4, filteredParams.addresses, filteredParams.eventIndex)
+        .futureValue is Response
+        .successful(Correlation(4), filteredParams.subscriptionId)
+      ws.unsubscribeFromContractEvents(5, filteredParams.subscriptionId).futureValue is Response
+        .successful(Correlation(5))
+
+      // for all contract events notifications
+      val params = ContractEventsSubscribeParams.fromSingle(contractAddress_0, None)
+      ws.subscribeToContractEvents(5, params.addresses, params.eventIndex).futureValue is Response
+        .successful(Correlation(5), params.subscriptionId)
+      ws.unsubscribeFromContractEvents(6, params.subscriptionId).futureValue is Response
+        .successful(Correlation(6))
     }
   }
 
@@ -197,8 +190,8 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
         Block.subscriptionId
       )
       ws.subscribeToTx(2).futureValue is Response.successful(Correlation(2), Tx.subscriptionId)
-      val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
-      ws.subscribeToContractEvents(4, params.eventIndex, params.addresses).futureValue is Response
+      val params = ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
+      ws.subscribeToContractEvents(4, params.addresses, params.eventIndex).futureValue is Response
         .successful(Correlation(4), params.subscriptionId)
 
       val responseBeforeClose =
@@ -243,18 +236,30 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
       ws.unsubscribeFromTx(7).futureValue is
         Response.failed(Correlation(7), WsError.alreadyUnSubscribed(Tx.subscriptionId))
 
-      // for contract events
-      val params = ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0)
-      ws.subscribeToContractEvents(8, params.eventIndex, params.addresses).futureValue is Response
-        .successful(Correlation(8), params.subscriptionId)
-      ws.subscribeToContractEvents(9, params.eventIndex, params.addresses).futureValue is
-        Response.failed(Correlation(9), WsError.alreadySubscribed(params.subscriptionId))
-      ws.unsubscribeFromContractEvents(10, params.subscriptionId).futureValue is Response
-        .successful(
-          Correlation(10)
-        )
-      ws.unsubscribeFromContractEvents(11, params.subscriptionId).futureValue is
-        Response.failed(Correlation(11), WsError.alreadyUnSubscribed(params.subscriptionId))
+      // for filtered contract events
+      val filteredParams =
+        ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
+      ws.subscribeToContractEvents(8, filteredParams.addresses, filteredParams.eventIndex)
+        .futureValue is Response
+        .successful(Correlation(8), filteredParams.subscriptionId)
+      ws.subscribeToContractEvents(9, filteredParams.addresses, filteredParams.eventIndex)
+        .futureValue is
+        Response.failed(Correlation(9), WsError.alreadySubscribed(filteredParams.subscriptionId))
+      ws.unsubscribeFromContractEvents(10, filteredParams.subscriptionId).futureValue is Response
+        .successful(Correlation(10))
+      ws.unsubscribeFromContractEvents(11, filteredParams.subscriptionId).futureValue is
+        Response.failed(Correlation(11), WsError.alreadyUnSubscribed(filteredParams.subscriptionId))
+
+      // for all contract events
+      val params = ContractEventsSubscribeParams.fromSingle(contractAddress_0, None)
+      ws.subscribeToContractEvents(12, params.addresses, params.eventIndex).futureValue is Response
+        .successful(Correlation(12), params.subscriptionId)
+      ws.subscribeToContractEvents(13, params.addresses, params.eventIndex).futureValue is
+        Response.failed(Correlation(13), WsError.alreadySubscribed(params.subscriptionId))
+      ws.unsubscribeFromContractEvents(14, params.subscriptionId).futureValue is Response
+        .successful(Correlation(14))
+      ws.unsubscribeFromContractEvents(15, params.subscriptionId).futureValue is
+        Response.failed(Correlation(15), WsError.alreadyUnSubscribed(params.subscriptionId))
     }
   }
 
@@ -290,7 +295,7 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
               AVector(
                 ws.subscribeToBlock(index),
                 ws.subscribeToTx(index + 1),
-                ws.subscribeToContractEvents(index + 2, EventIndex_0, contractAddresses)
+                ws.subscribeToContractEvents(index + 2, contractAddresses, Some(EventIndex_0))
               )
             }
           )
@@ -311,7 +316,9 @@ class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
       }
 
       val contractEventSubscriptionId =
-        ContractEventsSubscribeParams.fromSingle(EventIndex_0, contractAddress_0).subscriptionId
+        ContractEventsSubscribeParams
+          .fromSingle(contractAddress_0, Some(EventIndex_0))
+          .subscriptionId
 
       measureTime(s"$numberOfUnSubscriptions unsubscription requests/responses with ser/deser") {
         Future

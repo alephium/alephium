@@ -19,7 +19,7 @@ package org.alephium.app.ws
 import scala.collection.mutable
 
 import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsSubscriptionId}
-import org.alephium.app.ws.WsSubscriptionHandler.SubscriptionOfConnection
+import org.alephium.app.ws.WsSubscriptionsState.SubscriptionOfConnection
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
@@ -27,80 +27,77 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   private val consumer_0 = "0" // just a mock as SubscriptionsState is unaware of consumers
   private val consumer_1 = "1"
   private val consumer_2 = "2"
+  private val consumer_3 = "3"
 
-  private lazy val subscriptionOfConnection_0 =
-    SubscriptionOfConnection(
-      wsId_0,
-      contractEventsParams_0.subscriptionId
-    )
+  private lazy val subscription_addr_01_eventIndex_0 =
+    SubscriptionOfConnection.fromParams(wsId_0, params_addr_01_eventIndex_0)
 
-  private lazy val subscriptionOfConnection_1 =
-    SubscriptionOfConnection(
-      wsId_0,
-      contractEventsParams_1.subscriptionId
-    )
+  private lazy val subscription_addr_12_eventIndex_1 =
+    SubscriptionOfConnection.fromParams(wsId_0, params_addr_12_eventIndex_1)
 
-  private lazy val subscriptionOfConnection_2 =
-    SubscriptionOfConnection(
-      wsId_0,
-      contractEventsParams_2.subscriptionId
-    )
+  private lazy val subscription_addr_2_eventIndex_1 =
+    SubscriptionOfConnection.fromParams(wsId_0, params_addr_2_eventIndex_1)
 
   it should "be idempotent on adding new contract event subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
-
-    val addr = contractEventsParams_0.toAddressesWithIndex.head
-    subscriptionsState.addContractEventSubscriptionForAddress(subscriptionOfConnection_0, addr)
-    subscriptionsState.addContractEventSubscriptionForAddress(subscriptionOfConnection_0, addr)
-
-    subscriptionsState.contractSubscriptionMappings is mutable.Map(
-      addr -> AVector(subscriptionOfConnection_0)
+    subscriptionsState.addContractEventSubscriptions(
+      params_addr_01_eventIndex_0.toContractKeys,
+      subscription_addr_01_eventIndex_0
     )
-
-    subscriptionsState.addContractEventSubscriptionForAddress(subscriptionOfConnection_1, addr)
-
-    subscriptionsState.contractSubscriptionMappings is mutable.Map(
-      addr -> AVector(subscriptionOfConnection_0, subscriptionOfConnection_1)
+    val result_1 = subscriptionsState.contractSubscriptionMappings.toMap
+    subscriptionsState.addContractEventSubscriptions(
+      params_addr_01_eventIndex_0.toContractKeys,
+      subscription_addr_01_eventIndex_0
     )
+    val result_2 = subscriptionsState.contractSubscriptionMappings.toMap
+    result_1 is result_2
   }
 
   it should "be idempotent on adding new subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_0, consumer_0)
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_0, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
+    val result_1 = subscriptionsState.contractSubscriptionMappings.toMap
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
+    val result_2 = subscriptionsState.contractSubscriptionMappings.toMap
+    result_1 is result_2
 
     subscriptionsState.connections is mutable.Map(
-      wsId_0 -> AVector(contractEventsParams_0.subscriptionId -> consumer_0)
+      wsId_0 -> AVector(params_addr_01_eventIndex_0.subscriptionId -> consumer_0)
     )
 
     subscriptionsState.contractAddressMappings is mutable.Map(
-      subscriptionOfConnection_0 -> contractEventsParams_0.toAddressesWithIndex
+      subscription_addr_01_eventIndex_0 -> params_addr_01_eventIndex_0.toContractKeys
     )
 
     subscriptionsState.contractSubscriptionMappings is mutable.Map.from(
-      contractEventsParams_0.toAddressesWithIndex.map(_ -> AVector(subscriptionOfConnection_0))
+      params_addr_01_eventIndex_0.toContractKeys.map(
+        _ -> AVector(subscription_addr_01_eventIndex_0)
+      )
     )
-
   }
 
   it should "get consumers and subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_0, consumer_0)
-    subscriptionsState.addNewSubscription(wsId_1, contractEventsParams_1, consumer_1)
-    subscriptionsState.addNewSubscription(wsId_1, contractEventsParams_2, consumer_2)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_12_eventIndex_1, consumer_1)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_2_eventIndex_1, consumer_2)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_3_unfiltered, consumer_3)
 
-    subscriptionsState.getConsumer(wsId_0, contractEventsParams_1.subscriptionId) is None
-    subscriptionsState.getSubscriptions(wsId_0) is AVector(contractEventsParams_0.subscriptionId)
+    subscriptionsState.getConsumer(wsId_0, params_addr_12_eventIndex_1.subscriptionId) is None
+    subscriptionsState.getSubscriptions(wsId_0) is AVector(
+      params_addr_01_eventIndex_0.subscriptionId
+    )
 
-    subscriptionsState.getConsumer(wsId_1, contractEventsParams_1.subscriptionId) is Some(
+    subscriptionsState.getConsumer(wsId_1, params_addr_12_eventIndex_1.subscriptionId) is Some(
       consumer_1
     )
-    subscriptionsState.getConsumers(wsId_1) is AVector(consumer_1, consumer_2)
+    subscriptionsState.getConsumers(wsId_1) is AVector(consumer_1, consumer_2, consumer_3)
     subscriptionsState.getSubscriptions(wsId_1) is AVector(
-      contractEventsParams_1.subscriptionId,
-      contractEventsParams_2.subscriptionId
+      params_addr_12_eventIndex_1.subscriptionId,
+      params_addr_2_eventIndex_1.subscriptionId,
+      params_addr_3_unfiltered.subscriptionId
     )
 
     subscriptionsState.getConsumers("") is AVector.empty[String]
@@ -109,13 +106,13 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 
   "getting unique subscription ids" should "deduplicate subscription ids for given address" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_0, consumer_0)
-    subscriptionsState.addNewSubscription(wsId_1, contractEventsParams_0, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_01_eventIndex_0, consumer_0)
 
     subscriptionsState.getUniqueSubscriptionIds(
-      contractEventsParams_0.addresses.head,
-      contractEventsParams_0.eventIndex
-    ) is AVector(contractEventsParams_0.subscriptionId)
+      params_addr_01_eventIndex_0.addresses.head,
+      params_addr_01_eventIndex_0.eventIndex.get
+    ) is AVector(params_addr_01_eventIndex_0.subscriptionId)
   }
 
   "adding simple subscription" should "not affect contract mappings" in {
@@ -138,52 +135,57 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   it should "add and remove subscriptions and addresses" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_1, consumer_0)
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_2, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_2_eventIndex_1, consumer_0)
 
     subscriptionsState.connections is mutable.Map(
       wsId_0 -> AVector(
-        contractEventsParams_1.subscriptionId -> consumer_0,
-        contractEventsParams_2.subscriptionId -> consumer_0
+        params_addr_12_eventIndex_1.subscriptionId -> consumer_0,
+        params_addr_2_eventIndex_1.subscriptionId  -> consumer_0
       )
     )
 
     subscriptionsState.contractAddressMappings is mutable.Map(
-      subscriptionOfConnection_1 -> contractEventsParams_1.toAddressesWithIndex,
-      subscriptionOfConnection_2 -> contractEventsParams_2.toAddressesWithIndex
+      subscription_addr_12_eventIndex_1 -> params_addr_12_eventIndex_1.toContractKeys,
+      subscription_addr_2_eventIndex_1  -> params_addr_2_eventIndex_1.toContractKeys
     )
 
     val expectedKeys =
-      contractEventsParams_1.toAddressesWithIndex ++ contractEventsParams_2.toAddressesWithIndex
+      params_addr_12_eventIndex_1.toContractKeys ++ params_addr_2_eventIndex_1.toContractKeys
     subscriptionsState.contractSubscriptionMappings.keys.toSet is expectedKeys.toSet
 
-    val subscriptionsSharingAddress =
-      AVector(subscriptionOfConnection_1, subscriptionOfConnection_2)
-    val sharedAddress = contractEventsParams_2.toAddressesWithIndex.head
-    subscriptionsState.contractSubscriptionMappings(sharedAddress) is subscriptionsSharingAddress
+    val sharedSubscriptionsByAddress =
+      AVector(subscription_addr_12_eventIndex_1, subscription_addr_2_eventIndex_1)
+    val sharedContractKeyBySubscriptions = params_addr_2_eventIndex_1.toContractKeys.head
+    subscriptionsState.contractSubscriptionMappings(
+      sharedContractKeyBySubscriptions
+    ) is sharedSubscriptionsByAddress
 
-    subscriptionsState.removeSubscription(wsId_0, contractEventsParams_1.subscriptionId)
+    subscriptionsState.removeSubscription(wsId_0, params_addr_12_eventIndex_1.subscriptionId)
 
     subscriptionsState.connections is mutable.Map(
-      wsId_0 -> AVector(contractEventsParams_2.subscriptionId -> consumer_0)
+      wsId_0 -> AVector(params_addr_2_eventIndex_1.subscriptionId -> consumer_0)
     )
 
     subscriptionsState.contractAddressMappings is mutable.Map(
-      subscriptionOfConnection_2 -> contractEventsParams_2.toAddressesWithIndex
+      subscription_addr_2_eventIndex_1 -> params_addr_2_eventIndex_1.toContractKeys
     )
 
-    subscriptionsState.contractSubscriptionMappings.keys.toSet is contractEventsParams_2.toAddressesWithIndex.toSet
+    subscriptionsState.contractSubscriptionMappings.keys.toSet is params_addr_2_eventIndex_1.toContractKeys.toSet
     subscriptionsState.contractSubscriptionMappings.foreachEntry { case (_, subscriptions) =>
       subscriptions.length is 1
-      subscriptions.head is subscriptionOfConnection_2
+      subscriptions.head is subscription_addr_2_eventIndex_1
     }
   }
 
   "removing subscription by address" should "not allow for addresses with 0 subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_1, consumer_0)
-    contractEventsParams_1.toAddressesWithIndex.map { addressWithIndex =>
-      subscriptionsState.removeSubscriptionByAddress(addressWithIndex, subscriptionOfConnection_1)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
+    params_addr_12_eventIndex_1.toContractKeys.map { addressWithIndex =>
+      subscriptionsState.removeSubscriptionByAddress(
+        addressWithIndex,
+        subscription_addr_12_eventIndex_1
+      )
     }
 
     subscriptionsState.contractSubscriptionMappings.size is 0
@@ -192,14 +194,15 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   it should "remove all subscriptions for given connection" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
-    subscriptionsState.addNewSubscription(wsId_0, contractEventsParams_0, consumer_0)
-    subscriptionsState.addNewSubscription(wsId_1, contractEventsParams_1, consumer_1)
-    subscriptionsState.addNewSubscription(wsId_1, contractEventsParams_2, consumer_2)
+    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_12_eventIndex_1, consumer_1)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_2_eventIndex_1, consumer_2)
+    subscriptionsState.addNewSubscription(wsId_1, params_addr_3_unfiltered, consumer_3)
 
     subscriptionsState.removeAllSubscriptions(wsId_1)
 
     subscriptionsState.connections is mutable.Map(
-      wsId_0 -> AVector(contractEventsParams_0.subscriptionId -> consumer_0)
+      wsId_0 -> AVector(params_addr_01_eventIndex_0.subscriptionId -> consumer_0)
     )
 
     subscriptionsState.contractAddressMappings.forall(_._1.wsId == wsId_0) is true

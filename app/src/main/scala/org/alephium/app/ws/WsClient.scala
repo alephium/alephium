@@ -162,11 +162,11 @@ final case class ClientWs(
 
   def subscribeToContractEvents(
       id: WsCorrelationId,
-      eventIndex: WsEventIndex,
-      addresses: AVector[Address.Contract]
+      addresses: AVector[Address.Contract],
+      eventIndex: Option[WsEventIndex]
   ): Future[Response] = {
     writeRequestToSocket(
-      WsRequest.subscribe(id, ContractEventsSubscribeParams.from(eventIndex, addresses))
+      WsRequest.subscribe(id, ContractEventsSubscribeParams.from(addresses, eventIndex))
     )
   }
 

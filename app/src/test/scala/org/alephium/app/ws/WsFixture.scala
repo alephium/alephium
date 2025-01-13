@@ -46,12 +46,11 @@ import org.alephium.app.ws.WsParams.{
 }
 import org.alephium.app.ws.WsRequest.fromJsonString
 import org.alephium.app.ws.WsSubscriptionHandler.{
-  AddressWithIndex,
   GetSubscriptions,
   SubscriptionMsg,
-  SubscriptionOfConnection,
   WsImmutableSubscriptions
 }
+import org.alephium.app.ws.WsSubscriptionsState.{ContractKey, SubscriptionOfConnection}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
 import org.alephium.protocol.Hash
@@ -77,20 +76,25 @@ trait WsFixture extends ServerFixture {
   protected lazy val contractAddress_0: Address.Contract = contractAddressGen.sample.get
   protected lazy val contractAddress_1: Address.Contract = contractAddressGen.sample.get
   protected lazy val contractAddress_2: Address.Contract = contractAddressGen.sample.get
+  protected lazy val contractAddress_3: Address.Contract = contractAddressGen.sample.get
 
-  protected lazy val contractEventsParams_0 = ContractEventsSubscribeParams
+  protected lazy val params_addr_01_eventIndex_0 = ContractEventsSubscribeParams
     .from(
-      EventIndex_0,
-      AVector(contractAddress_0, contractAddress_1)
+      AVector(contractAddress_0, contractAddress_1),
+      Some(EventIndex_0)
     )
-  protected lazy val contractEventsParams_1 = ContractEventsSubscribeParams
+  protected lazy val params_addr_12_eventIndex_1 = ContractEventsSubscribeParams
     .from(
-      EventIndex_1,
-      AVector(contractAddress_1, contractAddress_2)
+      AVector(contractAddress_1, contractAddress_2),
+      Some(EventIndex_1)
     )
-  protected lazy val contractEventsParams_2 = ContractEventsSubscribeParams.fromSingle(
-    EventIndex_1,
-    contractAddress_2
+  protected lazy val params_addr_2_eventIndex_1 = ContractEventsSubscribeParams.fromSingle(
+    contractAddress_2,
+    Some(EventIndex_1)
+  )
+  protected lazy val params_addr_3_unfiltered = ContractEventsSubscribeParams.fromSingle(
+    contractAddress_3,
+    None
   )
 
   protected lazy val duplicateAddresses = AVector(contractAddress_0, contractAddress_0)
@@ -255,15 +259,12 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
   protected def flattenParams(
       wsId: WsId,
       paramss: AVector[ContractEventsSubscribeParams]
-  ): AVector[(SubscriptionOfConnection, AddressWithIndex)] = {
+  ): AVector[(SubscriptionOfConnection, ContractKey)] = {
     assume(paramss.length == paramss.map(_.subscriptionId).toSet.size)
     paramss.flatMap { params =>
-      params.addresses.map(addr =>
-        SubscriptionOfConnection(wsId, params.subscriptionId) -> AddressWithIndex(
-          addr.toBase58,
-          params.eventIndex
-        )
-      )
+      params.toContractKeys.map { contractKey =>
+        SubscriptionOfConnection(wsId, params.subscriptionId) -> contractKey
+      }
     }
   }
 

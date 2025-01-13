@@ -31,6 +31,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsNotificationParams, WsSubscriptionId}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler._
+import org.alephium.app.ws.WsSubscriptionsState.{ContractKey, SubscriptionOfConnection}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
@@ -58,7 +59,7 @@ class WsSubscriptionHandlerSpec
       Set(
         SimpleSubscribeParams.Block.subscriptionId,
         SimpleSubscribeParams.Tx.subscriptionId,
-        contractEventsParams_0.subscriptionId
+        params_addr_01_eventIndex_0.subscriptionId
       )
     def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
@@ -67,8 +68,8 @@ class WsSubscriptionHandlerSpec
         txSubscriptionResponse    <- ws.subscribeToTx(1)
         contractEventsSubscriptionResponse <- ws.subscribeToContractEvents(
           2,
-          contractEventsParams_0.eventIndex,
-          contractEventsParams_0.addresses
+          params_addr_01_eventIndex_0.addresses,
+          params_addr_01_eventIndex_0.eventIndex
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
@@ -80,7 +81,7 @@ class WsSubscriptionHandlerSpec
           id is 1
         }
         inside(contractEventsSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams_0.subscriptionId.toHexString)
+          result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
           id is 2
         }
         ws
@@ -140,16 +141,16 @@ class WsSubscriptionHandlerSpec
             .tabulate(50) { index =>
               ws.subscribeToContractEvents(
                 index.toLong,
-                eventIndex = index,
-                contractEventsParams_0.addresses
+                params_addr_01_eventIndex_0.addresses,
+                eventIndex = Some(index)
               )
             }
             .toIterable
         )
         rejectedSubscription <- ws.subscribeToContractEvents(
           50L,
-          contractEventsParams_1.eventIndex,
-          contractEventsParams_1.addresses
+          params_addr_12_eventIndex_1.addresses,
+          params_addr_12_eventIndex_1.eventIndex
         )
       } yield {
         inside(successfulSubscriptions) { case responses =>
@@ -226,10 +227,15 @@ class WsSubscriptionHandlerSpec
     }
 
     def invalidUnsubscriptionParamsBehavior(ws: ClientWs): Future[Unit] = {
-      val invalidUnsubscribeReq =
-        s"""{"method":"${WsMethod.UnsubscribeMethod}","params":["invalidSubscriptionId"],"id":0,"jsonrpc":"2.0"}"""
+      val invalidUnsubscribeReq = ujson
+        .Obj(
+          "method"  -> WsMethod.UnsubscribeMethod,
+          "params"  -> ujson.Arr("invalidSubscriptionId"),
+          "id"      -> 0,
+          "jsonrpc" -> "2.0"
+        )
       ws.underlying
-        .writeTextMessage(invalidUnsubscribeReq)
+        .writeTextMessage(invalidUnsubscribeReq.render())
         .asScala
         .mapTo[Unit]
     }
@@ -256,13 +262,18 @@ class WsSubscriptionHandlerSpec
         txSubscriptionResponse    <- ws.subscribeToTx(1)
         contractEventsSubscriptionResponse_0 <- ws.subscribeToContractEvents(
           2,
-          contractEventsParams_0.eventIndex,
-          contractEventsParams_0.addresses
+          params_addr_01_eventIndex_0.addresses,
+          params_addr_01_eventIndex_0.eventIndex
         )
         contractEventsSubscriptionResponse_1 <- ws.subscribeToContractEvents(
           3,
-          contractEventsParams_1.eventIndex,
-          contractEventsParams_1.addresses
+          params_addr_12_eventIndex_1.addresses,
+          params_addr_12_eventIndex_1.eventIndex
+        )
+        contractEventsSubscriptionResponse_2 <- ws.subscribeToContractEvents(
+          4,
+          params_addr_3_unfiltered.addresses,
+          params_addr_3_unfiltered.eventIndex
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
@@ -274,22 +285,28 @@ class WsSubscriptionHandlerSpec
           id is 1
         }
         inside(contractEventsSubscriptionResponse_0) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams_0.subscriptionId.toHexString)
+          result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
           id is 2
         }
         inside(contractEventsSubscriptionResponse_1) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(contractEventsParams_1.subscriptionId.toHexString)
+          result is ujson.Str(params_addr_12_eventIndex_1.subscriptionId.toHexString)
           id is 3
+        }
+        inside(contractEventsSubscriptionResponse_2) { case JsonRPC.Response.Success(result, id) =>
+          result is ujson.Str(params_addr_3_unfiltered.subscriptionId.toHexString)
+          id is 4
         }
         ws
       }
     }
 
     def assertCorrectNotificationResponse(clientProbe: TestProbe): Assertion = {
-      val notifications = AVector.fill(5)(clientProbe.expectMsgType[Notification])
+      val notifications = AVector.fill(6)(clientProbe.expectMsgType[Notification])
       val params        = notifications.map(n => read[WsNotificationParams](n.params))
-      params.map(_.subscription).length is 5     // for 1 tx, 1 block and 3 addresses
-      params.map(_.subscription).toSet.size is 4 // only 2 unique contract events subscriptions
+      // notifications for 1 tx, 1 block and 4 contract events
+      params.map(_.subscription).length is 6
+      // notifications come for 1 tx, 1 block and 3 unique contract event subscription Ids
+      params.map(_.subscription).distinct.length is 5
     }
 
     def testResponse(correlationId: Long)(response: Response): Unit = {
@@ -301,12 +318,14 @@ class WsSubscriptionHandlerSpec
     }
 
     def unsubscribingBehavior(ws: ClientWs): Future[Unit] = {
-      ws.unsubscribeFromBlock(3).map(testResponse(correlationId = 3))
-      ws.unsubscribeFromTx(4).map(testResponse(correlationId = 4))
-      ws.unsubscribeFromContractEvents(5, contractEventsParams_0.subscriptionId)
-        .map(testResponse(correlationId = 5))
-      ws.unsubscribeFromContractEvents(6, contractEventsParams_1.subscriptionId)
-        .map(testResponse(correlationId = 6))
+      ws.unsubscribeFromBlock(5).map(testResponse(correlationId = 5))
+      ws.unsubscribeFromTx(6).map(testResponse(correlationId = 6))
+      ws.unsubscribeFromContractEvents(7, params_addr_01_eventIndex_0.subscriptionId)
+        .map(testResponse(correlationId = 7))
+      ws.unsubscribeFromContractEvents(8, params_addr_12_eventIndex_1.subscriptionId)
+        .map(testResponse(correlationId = 8))
+      ws.unsubscribeFromContractEvents(9, params_addr_3_unfiltered.subscriptionId)
+        .map(testResponse(correlationId = 9))
     }
 
     val wsInitBehavior = WsStartBehavior(
@@ -319,7 +338,8 @@ class WsSubscriptionHandlerSpec
             AVector(
               contractAddress_0.contractId -> EventIndex_0,
               contractAddress_1.contractId -> EventIndex_0,
-              contractAddress_2.contractId -> EventIndex_1
+              contractAddress_2.contractId -> EventIndex_1,
+              contractAddress_3.contractId -> 1234 // contractAddress_3 is not filtered by eventIndex
             )
           )
         )
@@ -363,9 +383,14 @@ class WsSubscriptionHandlerSpec
     val websockets    = AVector(dummyServerWs("dummy_0"), dummyServerWs("dummy_1"))
     var correlationId = 0
     val contractEventParams =
-      AVector(contractEventsParams_0, contractEventsParams_1, contractEventsParams_2)
+      AVector(
+        params_addr_01_eventIndex_0,
+        params_addr_12_eventIndex_1,
+        params_addr_2_eventIndex_1,
+        params_addr_3_unfiltered
+      )
 
-    val subscriptionRequests: AVector[(SubscriptionOfConnection, AddressWithIndex)] =
+    val subscriptionRequests: AVector[(SubscriptionOfConnection, ContractKey)] =
       websockets.flatMap { ws =>
         contractEventParams.foreach { params =>
           subscriptionHandler ! Subscribe(Correlation(correlationId.toLong), ws, params)
@@ -430,9 +455,9 @@ class WsSubscriptionHandlerSpec
     eventually {
       val response = getSubscriptions(subscriptionHandler)
       response.subscriptionsByAddress is Map
-        .empty[AddressWithIndex, AVector[SubscriptionOfConnection]]
+        .empty[ContractKey, AVector[SubscriptionOfConnection]]
       response.addressesBySubscriptionId is Map
-        .empty[SubscriptionOfConnection, AVector[AddressWithIndex]]
+        .empty[SubscriptionOfConnection, AVector[ContractKey]]
     }
 
     websockets.foreach { ws =>
@@ -467,7 +492,12 @@ class WsSubscriptionHandlerSpec
         .exists(_._2.filter(_._1 == subscriptionId).length == 1) is true
     }
 
-    AVector(SimpleSubscribeParams.Block, SimpleSubscribeParams.Tx, contractEventsParams_0).fold(
+    AVector(
+      SimpleSubscribeParams.Block,
+      SimpleSubscribeParams.Tx,
+      params_addr_01_eventIndex_0,
+      params_addr_3_unfiltered
+    ).fold(
       0L
     ) { case (correlationId, params) =>
       subscriptionHandler ! Subscribe(Correlation(correlationId), ws, params)

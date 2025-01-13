@@ -25,6 +25,7 @@ import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
+//scalastyle:off file.size.limit
 abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Ordering[A])
     extends AlephiumSpec {
 
@@ -800,3 +801,4 @@ class SpecialAVectorSpec extends AlephiumSpec {
     converted(2).asInstanceOf[Bar] is Bar(3)
   }
 }
+//scalastyle:on file.size.limit

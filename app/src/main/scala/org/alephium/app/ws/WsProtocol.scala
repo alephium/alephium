@@ -22,7 +22,7 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
 import org.alephium.app.ws.WsParams.WsSubscriptionParams
 import org.alephium.app.ws.WsRequest.Correlation
-import org.alephium.app.ws.WsSubscriptionHandler.AddressWithIndex
+import org.alephium.app.ws.WsSubscriptionsState.{AddressKey, AddressWithEventIndexKey, ContractKey}
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
@@ -62,68 +62,74 @@ protected[ws] object WsParams {
 
     protected[ws] def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
       json match {
-        case ujson.Str(eventTypeOrSubscriptionId) =>
-          eventTypeOrSubscriptionId match {
-            case BlockEvent | TxEvent => Right(SimpleSubscribeParams(eventTypeOrSubscriptionId))
-            case unknown              => Left(WsError.invalidEventType(unknown))
+        case ujson.Str(eventType) =>
+          eventType match {
+            case BlockEvent | TxEvent => Right(SimpleSubscribeParams(eventType))
+            case unknown              => Left(WsError.invalidSimpleEventType(unknown))
           }
-        case unsupported => Left(WsError.invalidSubscriptionEventTypes(unsupported))
+        case unsupported => Left(WsError.invalidParamsFormat(unsupported))
       }
     }
   }
 
   final case class ContractEventsSubscribeParams(
       eventType: WsEventType,
-      eventIndex: WsEventIndex,
+      eventIndex: Option[WsEventIndex],
       addresses: AVector[Address.Contract]
   ) extends WsSubscriptionParams {
     lazy val subscriptionId: WsSubscriptionId =
       Hash
         .hash(
           addresses
-            .map(address => s"$eventType/$eventIndex/$address")
+            .map(address => s"$eventType/${eventIndex.getOrElse("")}/$address")
             .mkString(",")
         )
-    def toAddressesWithIndex: AVector[AddressWithIndex] =
-      addresses.map(addr => AddressWithIndex(addr.toBase58, eventIndex))
+    def toContractKeys: AVector[ContractKey] = eventIndex match {
+      case Some(index) => addresses.map(addr => AddressWithEventIndexKey(addr.toBase58, index))
+      case None        => addresses.map(addr => AddressKey(addr.toBase58))
+    }
   }
   object ContractEventsSubscribeParams {
     protected[ws] val ContractEvent: WsEventType = "contract"
+    protected[ws] val AddressField               = "address"
+    protected[ws] val EventIndexField            = "eventIndex"
 
     protected[ws] def from(
-        eventIndex: WsEventIndex,
-        addresses: AVector[Address.Contract]
+        addresses: AVector[Address.Contract],
+        eventIndex: Option[WsEventIndex]
     ): ContractEventsSubscribeParams =
       ContractEventsSubscribeParams(ContractEvent, eventIndex, addresses)
 
     protected[ws] def fromSingle(
-        eventIndex: WsEventIndex,
-        address: Address.Contract
+        address: Address.Contract,
+        eventIndex: Option[WsEventIndex]
     ): ContractEventsSubscribeParams =
       ContractEventsSubscribeParams(ContractEvent, eventIndex, AVector(address))
 
     protected[ws] def read(
-        jsonArr: ujson.Arr,
+        jsonObj: ujson.Obj,
         contractAddressLimit: Int
     ): Either[Error, ContractEventsSubscribeParams] = {
-      assume(jsonArr.arr.length == 3)
-      (jsonArr(0), jsonArr(1), jsonArr(2)) match {
-        case (ujson.Str(eventType), ujson.Num(eventIndex), ujson.Arr(addressArr)) =>
-          eventType match {
-            case ContractEvent if addressArr.isEmpty =>
-              Left(WsError.emptyContractAddress)
-            case ContractEvent if addressArr.length > contractAddressLimit =>
-              Left(WsError.tooManyContractAddresses(contractAddressLimit))
-            case ContractEvent if addressArr(0).strOpt.isEmpty =>
-              Left(WsError.invalidContractAddressType)
-            case ContractEvent =>
-              WsUtils
-                .buildUniqueContractAddresses(addressArr)
-                .map(ContractEventsSubscribeParams.from(eventIndex.toInt, _))
-            case unknown =>
-              Left(WsError.invalidContractEventParams(unknown))
-          }
-        case unsupported => Left(WsError.invalidParamsArrayElements(unsupported))
+      jsonObj.value.get(AddressField) match {
+        case Some(ujson.Arr(addressArr)) if addressArr.isEmpty =>
+          Left(WsError.emptyContractAddress)
+        case Some(ujson.Arr(addressArr)) if addressArr.length > contractAddressLimit =>
+          Left(WsError.tooManyContractAddresses(contractAddressLimit))
+        case Some(ujson.Arr(addressArr)) =>
+          WsUtils
+            .buildUniqueContractAddresses(addressArr)
+            .flatMap { addresses =>
+              jsonObj.value.get(EventIndexField) match {
+                case Some(ujson.Num(eventIndex)) =>
+                  Right(ContractEventsSubscribeParams.from(addresses, Option(eventIndex.toInt)))
+                case None =>
+                  Right(ContractEventsSubscribeParams.from(addresses, None))
+                case Some(value) =>
+                  Left(WsError.invalidContractParamsEventIndexFormat(value))
+              }
+            }
+        case _ =>
+          Left(WsError.invalidContractParamsFormat(jsonObj))
       }
     }
   }
@@ -218,13 +224,25 @@ object WsRequest extends ApiModelCodec {
             ujson.Arr(ujson.Str(subscriptionId.toHexString)),
             req.id.id
           )
-        case ContractEventsSubscribeParams(eventType, eventIndex, addresses) =>
+        case ContractEventsSubscribeParams(eventType, eventIndexOpt, addresses) =>
+          val addressArr =
+            ujson.Arr.from(
+              addresses.map(address => ujson.Str(address.toBase58))
+            )
+          val optionalEventIndexEntry =
+            eventIndexOpt
+              .map { eventIndex =>
+                ContractEventsSubscribeParams.EventIndexField -> ujson.Num(eventIndex.toDouble)
+              }
+
           Request(
             WsMethod.SubscribeMethod,
             ujson.Arr(
               ujson.Str(eventType),
-              ujson.Num(eventIndex.toDouble),
-              ujson.Arr.from(addresses.map(address => ujson.Str(address.toBase58)))
+              ujson.Obj(
+                ContractEventsSubscribeParams.AddressField -> addressArr,
+                optionalEventIndexEntry.toList*
+              )
             ),
             req.id.id
           )
@@ -242,8 +260,18 @@ object WsRequest extends ApiModelCodec {
             case WsMethod.SubscribeMethod   => SimpleSubscribeParams.read(arr(0))
             case WsMethod.UnsubscribeMethod => UnsubscribeParams.read(arr(0))
           }
-        case ujson.Arr(arr) if arr.length == 3 =>
-          ContractEventsSubscribeParams.read(arr, contractAddressLimit)
+        case ujson.Arr(arr) if arr.length == 2 =>
+          arr(0) match {
+            case ujson.Str(ContractEventsSubscribeParams.ContractEvent) =>
+              arr(1) match {
+                case ujson.Obj(filterObj) =>
+                  ContractEventsSubscribeParams.read(filterObj, contractAddressLimit)
+                case unsupported =>
+                  Left(WsError.invalidParamsFormat(unsupported))
+              }
+            case unsupported =>
+              Left(WsError.invalidParamsFormat(unsupported))
+          }
         case unsupported =>
           Left(WsError.invalidParamsFormat(unsupported))
       }
