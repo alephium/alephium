@@ -729,7 +729,7 @@ object SyncState {
     }
 
     def putBack(tasks: AVector[BlockDownloadTask]): Unit = {
-      tasks.sortBy(_.id).reverse.foreach(putBack)
+      tasks.sortBy(_.id).foreachReversed(putBack)
     }
 
     def taskSize: Int             = taskQueue.length

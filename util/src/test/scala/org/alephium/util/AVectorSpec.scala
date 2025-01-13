@@ -25,6 +25,7 @@ import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
+// scalastyle:off file.size.limit
 abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Ordering[A])
     extends AlephiumSpec {
 
@@ -247,6 +248,19 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       checkEq(vc, arr)
       vc.foreachWithIndexE { (_, i) => Right(require(i >= 0 && i < vc.length)) } isE ()
       vc.foreachWithIndexE { (_, _) => Left(()) }.isLeft is true
+    }
+  }
+
+  it should "reverseForeach" in new Fixture {
+    val empty  = AVector.empty[A]
+    val buffer = ArrayBuffer.empty[A]
+    empty.foreachReversed(buffer.append)
+    buffer.isEmpty is true
+
+    forAll(vectorGen) { vc =>
+      val buffer = ArrayBuffer.empty[A]
+      vc.foreachReversed(buffer.append)
+      checkEq(vc.reverse, buffer)
     }
   }
 

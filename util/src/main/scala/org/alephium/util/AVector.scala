@@ -265,6 +265,13 @@ final class AVector[@sp A](
     AVector.unsafe(arr)
   }
 
+  def foreachReversed[U](f: A => U): Unit = {
+    cfor(end)(_ > start, _ - 1) { i =>
+      f(elems(i - 1))
+      ()
+    }
+  }
+
   def foreach[U](f: A => U): Unit = {
     cfor(start)(_ < end, _ + 1) { i =>
       f(elems(i))
