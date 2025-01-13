@@ -44,7 +44,7 @@ import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
-import org.alephium.ralph.Compiler
+import org.alephium.ralph.{CompiledContract, Compiler, Testing}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
 
@@ -1625,12 +1625,13 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileProject(query: Compile.Project): Try[CompileProjectResult] = {
+  def compileProject(blockFlow: BlockFlow, query: Compile.Project): Try[CompileProjectResult] = {
     Compiler
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
-      .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
       .left
       .map(error => failed(error.format(query.code)))
+      .flatMap(result => runTests(blockFlow, result._1).map(_ => result))
+      .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
   }
 
   def getContractState(
@@ -1890,6 +1891,73 @@ class ServerUtils(implicit
           }
         }
         .flatMap(results => Right(MultipleCallContractResult(results)))
+    }
+  }
+
+  private def createContracts(
+      worldState: WorldState.Staging,
+      allContracts: Map[String, CompiledContract],
+      testingContract: CompiledContract,
+      test: Testing.CompiledUnitTest[StatefulContext],
+      blockHash: BlockHash,
+      txId: TransactionId
+  ) = {
+    test.contracts.foreachE { c =>
+      val contractCode = if (c.typeId == testingContract.ast.ident) {
+        val code = testingContract.debugCode
+        code.copy(methods = code.methods :+ test.method)
+      } else {
+        allContracts(c.typeId.name).debugCode
+      }
+      createContract(
+        worldState,
+        c.contractId,
+        contractCode,
+        c.immFields,
+        c.mutFields,
+        AssetState.forTesting(c.tokens),
+        blockHash,
+        txId
+      )
+    }
+  }
+
+  private def runTests(
+      blockFlow: BlockFlow,
+      contracts: AVector[CompiledContract]
+  ): Try[Unit] = {
+    val contractMap = contracts.map(c => (c.ast.ident.name, c)).iterator.toMap
+    contracts.foreachE { testingContract =>
+      testingContract.tests.foreachE { test =>
+        for {
+          groupIndex <- test.getGroupIndex.left.map(badRequest)
+          blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
+          blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
+          txId           = TransactionId.random
+          worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
+          _ <- createContracts(
+            worldState,
+            contractMap,
+            testingContract,
+            test,
+            blockHash,
+            txId
+          )
+          _ <- executeContractMethod(
+            worldState,
+            groupIndex,
+            test.selfContract.contractId,
+            None,
+            txId,
+            blockHash,
+            blockTimeStamp,
+            test.assets.map(TestInputAsset.from).getOrElse(AVector.empty),
+            testingContract.debugCode.methodsLength,
+            AVector.empty,
+            test.method
+          )
+        } yield ()
+      }
     }
   }
 

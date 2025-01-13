@@ -21,6 +21,7 @@ import akka.util.ByteString
 import org.alephium.protocol.model.{Address, AssetOutput}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm._
+import org.alephium.ralph.Testing
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
@@ -53,5 +54,13 @@ final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
       )
     }
     alphInstrs ++ tokenInstrs
+  }
+}
+
+object TestInputAsset {
+  def from(assets: Testing.ApprovedAssetsValue): AVector[TestInputAsset] = {
+    assets.assets.map { case (lockupScript, tokens) =>
+      TestInputAsset(Address.Asset(lockupScript), AssetState.forTesting(tokens))
+    }
   }
 }

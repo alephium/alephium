@@ -16,7 +16,7 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{ContractId, ContractOutput}
+import org.alephium.protocol.model.{minimalAlphInContract, ContractId, ContractOutput, TokenId}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, U256}
 
@@ -36,6 +36,13 @@ final case class AssetState(attoAlphAmount: U256, tokens: Option[AVector[Token]]
 object AssetState {
   def from(attoAlphAmount: U256, tokens: AVector[Token]): AssetState = {
     AssetState(attoAlphAmount, Some(tokens))
+  }
+
+  def forTesting(tokens: AVector[(TokenId, U256)]): AssetState = {
+    val attoAlphAmount =
+      tokens.find(_._1 == TokenId.alph).map(_._2).getOrElse(minimalAlphInContract)
+    val remains = tokens.filter(_._1 != TokenId.alph).map(Token.tupled)
+    AssetState(attoAlphAmount, Option.when(remains.nonEmpty)(remains))
   }
 
   def from(output: model.TxOutput): AssetState = {

@@ -2891,7 +2891,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (contracts, scripts, globalState, globalWarnings) =
       Compiler.compileProject(rawCode).rightValue
     val query  = Compile.Project(rawCode)
-    val result = serverUtils.compileProject(query).rightValue
+    val result = serverUtils.compileProject(blockFlow, query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2999,7 +2999,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
 
     val query  = Compile.Project(rawCode)
-    val result = serverUtils.compileProject(query).rightValue
+    val result = serverUtils.compileProject(blockFlow, query).rightValue
     result.contracts.length is 1
     result.contracts.head.functions.length is 2
     result.scripts.length is 1
@@ -5683,6 +5683,95 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"Contract code hash: ${codeHash.toHexString} not found"
     createContract(code, AVector.empty, AVector.empty)._2
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
+  }
+
+  it should "run unit tests" in new Fixture {
+    val serverUtils = new ServerUtils
+
+    {
+      val now = TimeStamp.now()
+      def code(blockTimeStamp: TimeStamp) =
+        s"""
+           |Contract Foo(@unused v: U256) {
+           |  pub fn foo() -> U256 {
+           |    return blockTimeStamp!()
+           |  }
+           |  test "foo"
+           |  with Settings(blockTimeStamp = ${now.millis})
+           |  with Self(0) {
+           |    assert!(foo() == ${blockTimeStamp.millis}, 0)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(now))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(now.plusMillisUnsafe(1))))
+        .leftValue
+        .detail
+        .contains("Error Code: 0") is true
+    }
+
+    {
+      def code(result: Int) =
+        s"""
+           |Contract Foo(bar0: Bar, bar1: Bar) {
+           |  pub fn add() -> U256 {
+           |    return bar0.value() + bar1.value()
+           |  }
+           |  test "add"
+           |  with
+           |    Bar(10)@addr0
+           |    Bar(20)@addr1
+           |    Self(addr0, addr1)
+           |  {
+           |    assert!(add() == $result, 0)
+           |  }
+           |}
+           |Contract Bar(v: U256) {
+           |  pub fn value() -> U256 {
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(20)))
+        .leftValue
+        .detail
+        .contains("Error Code: 0") is true
+    }
+
+    {
+      val fromAddress = generateAddress(ChainIndex.unsafe(0))
+      def code(result: String) =
+        s"""
+           |Contract Foo(mut balance: U256) {
+           |  @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |  pub fn transfer(from: Address) -> U256 {
+           |    let amount = 1 alph
+           |    transferTokenToSelf!(from, ALPH, 1 alph)
+           |    balance = balance + amount
+           |    return balance
+           |  }
+           |
+           |  test "transfer"
+           |  with
+           |    Self(0)
+           |    ApproveAssets{@$fromAddress -> ALPH: 2 alph}
+           |  {
+           |    assert!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code("1 alph"))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
+        .leftValue
+        .detail
+        .contains("Error Code: 0") is true
+    }
   }
 
   @scala.annotation.tailrec

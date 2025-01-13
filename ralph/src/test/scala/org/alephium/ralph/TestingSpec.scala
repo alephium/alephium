@@ -313,8 +313,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       test.assets is Some(
         Testing.ApprovedAssetsValue(
           AVector(
-            LockupScript.fromBase58(address0).value -> AVector(TokenId.alph -> ALPH.alph(1)),
-            LockupScript.fromBase58(address1).value -> AVector(
+            LockupScript.asset(address0).value -> AVector(TokenId.alph -> ALPH.alph(1)),
+            LockupScript.asset(address1).value -> AVector(
               TokenId.alph -> ALPH.alph(2),
               tokenId      -> ALPH.alph(1)
             )

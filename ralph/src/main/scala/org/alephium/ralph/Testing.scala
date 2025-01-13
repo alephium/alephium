@@ -16,6 +16,7 @@
 
 package org.alephium.ralph
 
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
@@ -114,9 +115,17 @@ object Testing {
     private def getApprovedTokens(
         state: Compiler.State[Ctx],
         asset: Ast.ApproveAsset[Ctx]
-    ): (LockupScript, AVector[(TokenId, U256)]) = {
+    ): (LockupScript.Asset, AVector[(TokenId, U256)]) = {
       val address =
         checkAndGetValue[Ctx, Val.Address](state, asset.address, Val.Address, "address")
+      val assetAddress = address.lockupScript match {
+        case address: LockupScript.Asset => address
+        case _ =>
+          throw Compiler.Error(
+            s"Invalid address ${address.toBase58}, expected an asset address",
+            asset.address.sourceIndex
+          )
+      }
       val tokens = asset.tokenAmounts.map { case (tokenExpr, amountExpr) =>
         getApprovedToken(state, tokenExpr, amountExpr)
       }
@@ -127,14 +136,16 @@ object Testing {
             throw Compiler.Error(s"Token amount overflow", asset.sourceIndex)
         }
       }
-      (address.lockupScript, AVector.from(amounts))
+      (assetAddress, AVector.from(amounts))
     }
 
     def compile(state: Compiler.State[Ctx]): ApprovedAssetsValue = {
       ApprovedAssetsValue(AVector.from(assets.map(getApprovedTokens(state, _))))
     }
   }
-  final case class ApprovedAssetsValue(assets: AVector[(LockupScript, AVector[(TokenId, U256)])])
+  final case class ApprovedAssetsValue(
+      assets: AVector[(LockupScript.Asset, AVector[(TokenId, U256)])]
+  ) extends AnyVal
 
   final case class CreateContractDef[Ctx <: StatelessContext](
       typeId: Ast.TypeId,
@@ -311,5 +322,10 @@ object Testing {
       method: Method[Ctx]
   ) {
     lazy val contracts: AVector[CreateContractValue] = dependencies :+ selfContract
+
+    def getGroupIndex(implicit groupConfig: GroupConfig): Either[String, GroupIndex] = {
+      val group = settings.map(_.group).getOrElse(0)
+      GroupIndex.from(group).toRight(s"Invalid group setting $group in test $name")
+    }
   }
 }
