@@ -654,7 +654,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   ): ResultT[AVector[(ChainIndex, AVector[Int])]] = {
     state.binarySearch match {
       case None =>
-        from(headers.reverse.findE(blockflow.contains)).map {
+        from(headers.findReversedE(blockflow.contains)).map {
           case Some(ancestor) =>
             log.debug(
               s"Found the ancestor between self and the peer $remoteAddress, chain index: ${state.chainIndex}, hash: ${ancestor.hash}"

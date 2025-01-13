@@ -408,6 +408,21 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "findReversedE" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversedE(_ => Right(false)) isE None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversedE(e => Right(e._1 == elem)) isE Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversedE(_ => Right(false)) isE None
+        vector.findReversedE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
