@@ -2061,6 +2061,7 @@ class ServerUtils(implicit
     val context    = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
     for {
       _ <- checkArgs(args, method)
+      _ <- checkGasFee(testGasFee, inputAssets)
       result <- runWithDebugError(
         context,
         contractId,
@@ -2075,7 +2076,7 @@ class ServerUtils(implicit
   }
   // scalastyle:on method.length parameter.number
 
-  def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
+  private def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
     if (args.sumBy(_.flattenSize()) != method.argsLength) {
       Left(
         failed(
@@ -2084,6 +2085,19 @@ class ServerUtils(implicit
       )
     } else {
       Right(())
+    }
+  }
+
+  private def checkGasFee(testGasFee: U256, inputAssets: AVector[TestInputAsset]): Try[Unit] = {
+    inputAssets.headOption match {
+      case Some(inputAsset) if inputAsset.asset.attoAlphAmount < testGasFee =>
+        Left(
+          failed(
+            s"First input asset should have at least ${ALPH.prettifyAmount(testGasFee)} to cover gas"
+          )
+        )
+      case _ =>
+        Right(())
     }
   }
 
