@@ -2118,11 +2118,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils = new ServerUtils()
 
-    def buildTestParam(callerAddressOpt: Option[Address.Contract]): TestContract.Complete = {
+    def buildTestParam(
+        callerContractAddressOpt: Option[Address.Contract]
+    ): TestContract.Complete = {
       TestContract(
         bytecode = childContract,
         address = Some(childAddress),
-        callerAddress = callerAddressOpt,
+        callerContractAddress = callerContractAddressOpt,
         initialImmFields = Option(
           AVector[Val](
             ValByteVec(parentContractId.bytes),
