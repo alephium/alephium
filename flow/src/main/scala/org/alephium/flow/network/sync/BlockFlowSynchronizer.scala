@@ -438,14 +438,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] def downloadBlocks(): Unit = {
     val chains = syncingChains.values.filter(!_.isTaskQueueEmpty)
     if (chains.nonEmpty) {
-      val ordered  = AVector.from(chains).sortBy(_.taskSize)(Ordering[Int].reverse)
-      val allTasks = mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
-      var continue = true
-      while (continue) {
-        val newTasks = collectTasks(ordered)
-        newTasks.foreach { case (broker, task) => addToMap(allTasks, broker, task) }
-        continue = newTasks.nonEmpty
-      }
+      val orderedChains  = AVector.from(chains).sortBy(_.taskSize)(Ordering[Int].reverse)
+      val orderedBrokers = brokers.sortBy(_._2.requestNum)
+      val allTasks = collectAndAssignTasks(orderedChains, orderedBrokers, mutable.HashMap.empty)
       allTasks.foreachEntry { case (brokerActor, tasksPerBroker) =>
         val tasks = AVector.from(tasksPerBroker)
         log.debug(
@@ -456,7 +451,21 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def collectTasks(chains: AVector[SyncStatePerChain]) = {
+  @scala.annotation.tailrec
+  private def collectAndAssignTasks(
+      chains: AVector[SyncStatePerChain],
+      brokers: scala.collection.Seq[(BrokerActor, BrokerStatus)],
+      acc: mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
+  ): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
+    val newTasks = collectAndAssignTasks(chains, brokers)
+    newTasks.foreach { case (broker, task) => addToMap(acc, broker, task) }
+    if (newTasks.nonEmpty) collectAndAssignTasks(chains, brokers, acc) else acc
+  }
+
+  private def collectAndAssignTasks(
+      chains: AVector[SyncStatePerChain],
+      brokers: scala.collection.Seq[(BrokerActor, BrokerStatus)]
+  ) = {
     val acc = mutable.ArrayBuffer.empty[(BrokerActor, BlockDownloadTask)]
     chains.foreach { state =>
       state.nextTask { task =>

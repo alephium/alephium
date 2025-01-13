@@ -166,6 +166,22 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       blockFlowSynchronizerActor.syncingChains(chainIndex) = syncState
       syncState
     }
+
+    def addSyncingChain(chain: SyncStatePerChain) = {
+      blockFlowSynchronizerActor
+        .getBrokerStatus(chain.originBroker)
+        .foreach(_.updateTips(AVector(chain.bestTip)))
+      blockFlowSynchronizerActor.syncingChains(chain.chainIndex) = chain
+    }
+
+    def genTasks(chainIndex: ChainIndex, size: Int) = {
+      val toHeader = emptyBlock(blockFlow, chainIndex).header
+      AVector.from(0 until size).map { index =>
+        val fromHeight = BatchSize * index + 1
+        val toHeight   = BatchSize * (index + 1)
+        BlockDownloadTask(chainIndex, fromHeight, toHeight, Some(toHeader))
+      }
+    }
   }
 
   it should "schedule sync" in new BlockFlowSynchronizerV2Fixture {
@@ -531,25 +547,14 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "download blocks from multiple peers" in new BlockFlowSynchronizerV2Fixture {
-    import SyncState._
-
     override val configValues: Map[String, Any] =
       Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 4))
-
-    def genTasks(chainIndex: ChainIndex) = {
-      val toHeader = emptyBlock(blockFlow, chainIndex).header
-      AVector.from(0 until 16).map { index =>
-        val fromHeight = BatchSize * index + 1
-        val toHeight   = BatchSize * (index + 1)
-        BlockDownloadTask(chainIndex, fromHeight, toHeight, Some(toHeader))
-      }
-    }
 
     val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val (brokerActor1, brokerStatus1, probe1) = addBroker()
     val allTasks = brokerConfig.chainIndexes.map { chainIndex =>
       val syncingChain  = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
-      val tasksPerChain = genTasks(chainIndex)
+      val tasksPerChain = genTasks(chainIndex, 16)
       syncingChain.taskQueue.addAll(tasksPerChain)
       tasksPerChain
     }
@@ -574,6 +579,59 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     )
     probe1.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
       tasks.toSet is AVector.tabulate(allTasks.length)(index => allTasks(index)(2)).toSet
+    }
+  }
+
+  it should "collect tasks in order of task size" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    override val configValues: Map[String, Any] =
+      Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 4))
+
+    val (brokerActor, brokerStatus, probe) = addBroker()
+    val maxTaskSize                        = 20
+    val allChains = brokerConfig.chainIndexes.mapWithIndex { case (chainIndex, index) =>
+      val syncingChain  = SyncStatePerChain(chainIndex, chainTipGen.sample.get, brokerActor)
+      val tasksPerChain = genTasks(chainIndex, maxTaskSize).dropRight(index)
+      syncingChain.taskQueue.addAll(tasksPerChain)
+      (syncingChain, tasksPerChain)
+    }
+    allChains.shuffle().foreach { case (chain, _) => addSyncingChain(chain) }
+    val chainTips = genChainTips.map(tip => tip.copy(height = Int.MaxValue))
+    brokerStatus.updateTips(chainTips)
+
+    val allTasks = allChains.sortBy(_._2.length).reverse.map(_._2.head)
+    blockFlowSynchronizerActor.downloadBlocks()
+    probe.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) => tasks is allTasks }
+  }
+
+  it should "collect tasks in order of broker capacity" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    val brokers      = AVector.from((0 until 4).map(_ => addBroker()))
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokers.head._1)
+    val allTasks     = genTasks(chainIndex, 16)
+    syncingChain.taskQueue.addAll(allTasks)
+
+    val chainTips = genChainTips.map(tip => tip.copy(height = Int.MaxValue))
+    brokers.shuffle().foreachWithIndex { case ((_, status, _), index) =>
+      status.requestNum = MaxRequestNum - (BatchSize * (index + 1))
+      status.updateTips(chainTips)
+    }
+
+    val probes = brokers.sortBy(_._2.requestNum).map(_._3)
+    blockFlowSynchronizerActor.downloadBlocks()
+    val tasksPerBroker = AVector(
+      allTasks.slice(0, 4),
+      allTasks.slice(4, 7),
+      allTasks.slice(7, 9),
+      allTasks.slice(9, 10)
+    )
+    probes.foreachWithIndex { case (probe, index) =>
+      probe.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
+        tasks is tasksPerBroker(index)
+      }
     }
   }
 
