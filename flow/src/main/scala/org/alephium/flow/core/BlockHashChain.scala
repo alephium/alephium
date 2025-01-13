@@ -25,7 +25,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BlockHash, ChainIndex, Weight}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, ChainTip, Weight}
 import org.alephium.util.{AVector, Cache, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods file.size.limit
@@ -111,14 +111,18 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     IOUtils.tryExecute(maxHeightByWeightUnsafe)
   }
 
-  def maxHeightByWeightUnsafe: Int = maxWeightTipStateUnsafe._2
+  def maxHeightByWeightUnsafe: Int = maxWeightTipUnsafe.height
 
-  def maxWeightTipStateUnsafe: (BlockHash, Int, Weight) = {
-    tips.keys().foldLeft((genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)) {
-      case ((previousTip, height, weight), tip) =>
-        getStateUnsafe(tip) match {
+  def maxWeightTipUnsafe: ChainTip = {
+    tips.keys().foldLeft(ChainTip(genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)) {
+      case (previousTip, tipHash) =>
+        getStateUnsafe(tipHash) match {
           case BlockState(tipHeight, tipWeight) =>
-            if (tipWeight > weight) (tip, tipHeight, tipWeight) else (previousTip, height, weight)
+            if (tipWeight > previousTip.weight) {
+              ChainTip(tipHash, tipHeight, tipWeight)
+            } else {
+              previousTip
+            }
         }
     }
   }

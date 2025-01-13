@@ -22,7 +22,11 @@ import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
-import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
+import org.alephium.flow.network.broker.{
+  BrokerHandler => BaseBrokerHandler,
+  ChainTipInfo,
+  MisbehaviorManager
+}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALPH
@@ -310,7 +314,7 @@ object BrokerHandler {
 trait SyncV2Handler { _: BrokerHandler =>
   import SyncV2Handler._
 
-  private[interclique] var states: Option[AVector[StatePerChain]] = None
+  private[interclique] var findingAncestorStates: Option[AVector[StatePerChain]] = None
   private[interclique] val pendingRequests = mutable.Map.empty[RequestId, RequestInfo]
 
   private var selfChainTips: Option[AVector[ChainTip]]   = None
@@ -321,7 +325,7 @@ trait SyncV2Handler { _: BrokerHandler =>
     schedule(self, BaseBrokerHandler.CheckPendingRequest, RequestTimeout)
 
     val receive: Receive = {
-      case BaseBrokerHandler.ChainState(tips) =>
+      case BaseBrokerHandler.SendChainState(tips) =>
         log.debug(s"Send chain state to $remoteAddress: ${BrokerHandler.showChainState(tips)}")
         send(ChainState(tips))
         selfChainTips = Some(tips)
@@ -516,15 +520,15 @@ trait SyncV2Handler { _: BrokerHandler =>
     )
   }
 
-  private def handleGetAncestors(chains: AVector[(ChainIndex, ChainTip, ChainTip)]): Unit = {
+  private def handleGetAncestors(chains: AVector[ChainTipInfo]): Unit = {
     assume(chains.nonEmpty)
     val states = mutable.ArrayBuffer.empty[StatePerChain]
-    val heights = chains.map { case (chainIndex, bestTip, selfTip) =>
+    val heights = chains.map { case ChainTipInfo(chainIndex, bestTip, selfTip) =>
       val heightsPerChain = SyncV2Handler.calculateRequestSpan(bestTip.height, selfTip.height)
       states.addOne(StatePerChain(chainIndex, bestTip))
       (chainIndex, heightsPerChain)
     }
-    this.states = Some(AVector.from(states))
+    this.findingAncestorStates = Some(AVector.from(states))
     val request = HeadersByHeightsRequest(heights)
     log.debug(
       s"Sending HeadersByHeightsRequest to $remoteAddress: " +
@@ -603,7 +607,7 @@ trait SyncV2Handler { _: BrokerHandler =>
           )
           sendRequest(request, None)
         } else if (isAncestorFound) {
-          states.foreach { states =>
+          findingAncestorStates.foreach { states =>
             val ancestors =
               AVector.from(states).foldE(AVector.empty[(ChainIndex, Int)]) { case (acc, state) =>
                 state.ancestor match {
@@ -619,7 +623,7 @@ trait SyncV2Handler { _: BrokerHandler =>
               blockFlowSynchronizer ! BlockFlowSynchronizer.Ancestors(ancestors)
             }
           }
-          states = None
+          findingAncestorStates = None
         }
       case Left(MisbehaviorT(misbehavior)) => stopOnError(misbehavior)
       case Left(IOErrorT(error)) => escapeIOError[Unit](Left(error), "Get ancestors")(_ => ())
@@ -663,11 +667,11 @@ trait SyncV2Handler { _: BrokerHandler =>
             )
             requestsAcc :+ (state.chainIndex, AVector(state.startBinarySearch()))
         }
-      case Some((start, end)) =>
+      case Some((_, _)) =>
         if (headers.length == 1) { // we have checked that the headers are not empty
           from(blockflow.contains(headers.head)).flatMap { exists =>
             val ancestor = if (exists) Some(headers.head) else None
-            state.handleBinarySearch(start, end, ancestor) match {
+            state.getNextHeight(ancestor) match {
               case Some(height) => Right(requestsAcc :+ (state.chainIndex, AVector(height)))
               case None =>
                 if (!state.isAncestorFound) {
@@ -676,6 +680,7 @@ trait SyncV2Handler { _: BrokerHandler =>
                     state.setAncestor
                   }
                 }
+                state.resetBinarySearch()
                 Right(requestsAcc)
             }
           }
@@ -711,13 +716,13 @@ trait SyncV2Handler { _: BrokerHandler =>
   }
 
   private def getChainState(chainIndex: ChainIndex): Option[StatePerChain] = {
-    states.flatMap(_.find(s => s.chainIndex == chainIndex))
+    findingAncestorStates.flatMap(_.find(s => s.chainIndex == chainIndex))
   }
 
-  private def isFindingAncestor: Boolean = states.isDefined
+  private def isFindingAncestor: Boolean = findingAncestorStates.isDefined
 
   private def isAncestorFound: Boolean =
-    states.exists(_.forall(_.isAncestorFound))
+    findingAncestorStates.exists(_.forall(_.isAncestorFound))
 }
 
 object SyncV2Handler {
@@ -756,22 +761,24 @@ object SyncV2Handler {
       (ALPH.GenesisHeight + bestTip.height) / 2
     }
 
-    def handleBinarySearch(
-        start: Int,
-        end: Int,
-        ancestor: Option[BlockHeader]
-    ): Option[Int] = {
+    def getNextHeight(ancestor: Option[BlockHeader]): Option[Int] = {
       assume(binarySearch.isDefined)
-      if (ancestor.isDefined) {
-        this.ancestor = ancestor
+      binarySearch.flatMap { case (start, end) =>
+        if (ancestor.isDefined) {
+          this.ancestor = ancestor
+        }
+        val lastHeight = (start + end) / 2
+        val (newStart, newEnd) = ancestor match {
+          case Some(_) => (lastHeight, end)
+          case None    => (start, lastHeight)
+        }
+        binarySearch = Some((newStart, newEnd))
+        Option.when(newStart + 1 < newEnd)((newStart + newEnd) / 2)
       }
-      val lastHeight = (start + end) / 2
-      val (newStart, newEnd) = ancestor match {
-        case Some(_) => (lastHeight, end)
-        case None    => (start, lastHeight)
-      }
-      binarySearch = Some((newStart, newEnd))
-      Option.when(newStart + 1 < newEnd)((newStart + newEnd) / 2)
+    }
+
+    @inline def resetBinarySearch(): Unit = {
+      binarySearch = None
     }
 
     @inline def setAncestor(blockHeader: BlockHeader): Unit = {

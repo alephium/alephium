@@ -27,7 +27,7 @@ import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network._
-import org.alephium.flow.network.broker.{BrokerHandler, MisbehaviorManager}
+import org.alephium.flow.network.broker.{BrokerHandler, ChainTipInfo, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
@@ -96,7 +96,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
 
     case event: ChainHandler.FlowDataValidationEvent =>
       finalized(event.data.hash)
-      onBlockFinalized(event)
+      onBlockProcessed(event)
 
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
@@ -179,7 +179,7 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
 
     case chainState: FlowHandler.ChainState =>
       samplePeers(ProtocolV2).foreach { case (actor, broker) =>
-        actor ! BrokerHandler.ChainState(chainState.filterFor(broker.info))
+        actor ! BrokerHandler.SendChainState(chainState.filterFor(broker.info))
       }
       handleSelfChainState(chainState.tips)
 
@@ -308,7 +308,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     if (!isSyncing) tryStartSync()
   }
 
-  def onBlockFinalized(event: ChainHandler.FlowDataValidationEvent): Unit = {
+  def onBlockProcessed(event: ChainHandler.FlowDataValidationEvent): Unit = {
     if (isSyncing) {
       val isBlockValid = event match {
         case _: ChainHandler.FlowDataAdded   => true
@@ -397,7 +397,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
     requestsPerBroker.foreachEntry { case (broker, chainsPerBroker) =>
       val requests = chainsPerBroker.map { case (chainIndex, bestTip, selfTip) =>
-        (chainIndex, bestTip, selfTip)
+        ChainTipInfo(chainIndex, bestTip, selfTip)
       }
       broker ! BrokerHandler.GetAncestors(AVector.from(requests))
     }

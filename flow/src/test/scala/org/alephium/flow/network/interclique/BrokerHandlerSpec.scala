@@ -33,7 +33,7 @@ import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
-import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
+import org.alephium.flow.network.broker.{ChainTipInfo, ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.network.sync.SyncState.BlockDownloadTask
 import org.alephium.flow.setting.NetworkSetting
@@ -390,7 +390,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "send chain state to peer" in new Fixture {
     val tips = genChainTips()
-    brokerHandler ! BaseBrokerHandler.ChainState(tips)
+    brokerHandler ! BaseBrokerHandler.SendChainState(tips)
     connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
       Message
         .deserialize(message)
@@ -490,7 +490,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     def prepare(chainIndex: ChainIndex, bestHeight: Int): Unit = {
       val bestTip = ChainTip(BlockHash.random, bestHeight, Weight.zero)
       val state   = StatePerChain(chainIndex, bestTip)
-      brokerHandlerActor.states = Some(AVector(state))
+      brokerHandlerActor.findingAncestorStates = Some(AVector(state))
       val request = HeadersByHeightsRequest(defaultRequestId, AVector((chainIndex, AVector(0))))
       brokerHandlerActor.pendingRequests(request.id) = RequestInfo(request, None)
     }
@@ -514,14 +514,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "handle GetAncestors request" in new GetAncestorsFixture {
     val chains = brokerConfig.chainIndexes.map { chainIndex =>
-      (chainIndex, genChainTip(chainIndex), genChainTip(chainIndex))
+      ChainTipInfo(chainIndex, genChainTip(chainIndex), genChainTip(chainIndex))
     }
     brokerHandler ! BaseBrokerHandler.GetAncestors(chains)
 
     val requests = mutable.ArrayBuffer.empty[(ChainIndex, AVector[Int])]
-    brokerHandlerActor.states.isDefined is true
-    brokerHandlerActor.states.get.foreachWithIndex { case (state, index) =>
-      val (chainIndex, bestTip, selfTip) = chains(index)
+    brokerHandlerActor.findingAncestorStates.isDefined is true
+    brokerHandlerActor.findingAncestorStates.get.foreachWithIndex { case (state, index) =>
+      val ChainTipInfo(chainIndex, bestTip, selfTip) = chains(index)
       state.chainIndex is chainIndex
       state.bestTip is bestTip
       state.binarySearch is None
@@ -539,7 +539,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val requestId = brokerHandlerActor.pendingRequests.head._1
 
     val chains = brokerConfig.chainIndexes.map { chainIndex =>
-      (chainIndex, genChainTip(chainIndex), genChainTip(chainIndex))
+      ChainTipInfo(chainIndex, genChainTip(chainIndex), genChainTip(chainIndex))
     }
     brokerHandler ! BaseBrokerHandler.GetAncestors(chains)
     eventually(brokerHandlerActor.pendingRequests.contains(requestId) is false)
@@ -553,7 +553,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 4))))
     brokerHandlerActor.pendingRequests.isEmpty is true
-    brokerHandlerActor.states.isEmpty is true
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
 
   it should "publish misbehavior and stop broker if the ancestors response is invalid" in {
@@ -594,7 +594,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val unknownHeader = emptyBlock(blockFlow, chainIndex).header
     prepare(chainIndex, 30)
 
-    val state = brokerHandlerActor.states.get.head
+    val state = brokerHandlerActor.findingAncestorStates.get.head
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(defaultRequestId, AVector(AVector(unknownHeader)))
     )
@@ -634,8 +634,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       HeadersByHeightsResponse(requestId4, AVector(AVector(headers(11))))
     )
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 12))))
+    state.binarySearch.isEmpty is true
     connectionHandler.expectNoMessage()
-    brokerHandlerActor.states.isEmpty is true
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
 
   it should "work when receiving genesis header" in new GetAncestorsFixture {
@@ -652,14 +653,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 0))))
     connectionHandler.expectNoMessage()
-    brokerHandlerActor.states.isEmpty is true
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
 
   it should "work if the self chain height is genesis height" in new GetAncestorsFixture {
     val unknownHeader = emptyBlock(blockFlow, chainIndex).header
     prepare(chainIndex, 30)
 
-    val state         = brokerHandlerActor.states.get.head
+    val state         = brokerHandlerActor.findingAncestorStates.get.head
     var lastRequestId = defaultRequestId
     var lastHeight    = 30
     (0 until 4).foreach { _ =>
@@ -670,7 +671,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       lastHeight = lastHeight / 2
       lastRequestId = expectHeadersRequest(AVector((chainIndex, AVector(lastHeight))))
       blockFlowSynchronizer.expectNoMessage()
-      brokerHandlerActor.states.isDefined is true
+      brokerHandlerActor.findingAncestorStates.isDefined is true
     }
 
     brokerHandler ! BaseBrokerHandler.Received(
@@ -678,7 +679,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 0))))
     connectionHandler.expectNoMessage()
-    brokerHandlerActor.states.isEmpty is true
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
 
   it should "handle HeadersByHeightsRequest" in new Fixture {
@@ -871,7 +872,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.remoteSynced is false
 
     val selfChainTips = genChainTips()
-    brokerHandler ! BaseBrokerHandler.ChainState(selfChainTips)
+    brokerHandler ! BaseBrokerHandler.SendChainState(selfChainTips)
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is false
 
@@ -881,9 +882,39 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is true
 
-    brokerHandler ! BaseBrokerHandler.ChainState(remoteChainTips)
+    brokerHandler ! BaseBrokerHandler.SendChainState(remoteChainTips)
     brokerHandlerActor.selfSynced is true
     brokerHandlerActor.remoteSynced is true
+  }
+
+  it should "get next height" in new Fixture {
+    val bestTip = genChainTip(chainIndex).copy(height = 21)
+    val state   = SyncV2Handler.StatePerChain(chainIndex, bestTip)
+    state.ancestor.isEmpty is true
+    state.binarySearch.isEmpty is true
+
+    state.startBinarySearch()
+    state.binarySearch is Some((0, 21))
+    state.ancestor.isEmpty is true
+
+    val header0 = emptyBlock(blockFlow, chainIndex).header
+    state.getNextHeight(Some(header0)) is Some(15)
+    state.binarySearch is Some((10, 21))
+    state.ancestor is Some(header0)
+
+    state.getNextHeight(None) is Some(12)
+    state.binarySearch is Some((10, 15))
+    state.ancestor is Some(header0)
+
+    state.getNextHeight(None) is Some(11)
+    state.binarySearch is Some((10, 12))
+    state.ancestor is Some(header0)
+
+    val header1 = emptyBlock(blockFlow, chainIndex).header
+    state.getNextHeight(Some(header1)) is None
+    state.binarySearch is Some((11, 12))
+    state.ancestor is Some(header1)
+    state.getNextHeight(None) is None
   }
 
   trait Fixture extends FlowFixture {

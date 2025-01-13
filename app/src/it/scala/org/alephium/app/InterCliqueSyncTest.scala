@@ -137,7 +137,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       Hello.unsafe(clientId1, hello.timestamp, hello.brokerInfo, hello.signature)
     }
     val clientId2 =
-      s"scala-alephium/${ReleaseVersion.protocolV2Version}/${System.getProperty("os.name")}"
+      s"scala-alephium/${ReleaseVersion.p2pProtocolV2Version}/${System.getProperty("os.name")}"
     val injection2: PartialFunction[Payload, Payload] = { case hello: Hello =>
       Hello.unsafe(clientId2, hello.timestamp, hello.brokerInfo, hello.signature)
     }

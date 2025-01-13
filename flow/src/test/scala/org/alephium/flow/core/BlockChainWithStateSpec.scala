@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
+import org.alephium.protocol.model.{Block, ChainIndex, ChainTip, NoIndexModelGeneratorsLike, Weight}
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -100,6 +100,6 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     blocks.shuffle().foreach { case (block, weight) =>
       addAndCheck(chain, block, weight)
     }
-    chain.maxWeightTipStateUnsafe is (tip._1.hash, 1, tip._2)
+    chain.maxWeightTipUnsafe is ChainTip(tip._1.hash, 1, tip._2)
   }
 }

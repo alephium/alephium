@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.message
 
-import scala.reflect.ClassTag
-
 import akka.util.ByteString
 import io.prometheus.client.Counter
 
@@ -433,6 +431,16 @@ trait IndexedPayload[T] {
 
 sealed trait IndexedSerding[T, P <: IndexedPayload[T] with Payload]
     extends Payload.ValidatedSerding[P] {
+  protected def baseSerde: Serde[AVector[T]]
+  implicit protected lazy val dataSerde: Serde[(ChainIndex, AVector[T])] = {
+    implicit val indexSerde: Serde[ChainIndex] =
+      Serde.forProduct2[Int, Int, ChainIndex](
+        (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
+        chainIndex => (chainIndex.from.value, chainIndex.to.value)
+      )
+    Serde.tuple2[ChainIndex, AVector[T]](indexSerde, baseSerde)
+  }
+
   def name: String
 
   def checkDataPerChain(values: AVector[T]): Boolean
@@ -447,15 +455,6 @@ sealed trait IndexedSerding[T, P <: IndexedPayload[T] with Payload]
 }
 
 object IndexedSerding {
-  implicit private[message] def dataSerde[T: Serde: ClassTag]: Serde[(ChainIndex, AVector[T])] = {
-    implicit val indexSerde: Serde[ChainIndex] =
-      Serde.forProduct2[Int, Int, ChainIndex](
-        (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
-        chainIndex => (chainIndex.from.value, chainIndex.to.value)
-      )
-    Serde.tuple2[ChainIndex, AVector[T]]
-  }
-
   @inline private def check(
       chainIndex: ChainIndex
   )(implicit config: GroupConfig): Boolean = {
@@ -475,8 +474,8 @@ object NewTxHashes extends IndexedSerding[TransactionId, NewTxHashes] with Paylo
 
   def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
 
-  import IndexedSerding.dataSerde
-  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
+  implicit val serde: Serde[NewTxHashes]       = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
 }
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
@@ -491,8 +490,8 @@ object TxsRequest extends IndexedSerding[TransactionId, TxsRequest] with Payload
 
   def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
 
-  import IndexedSerding.dataSerde
-  implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
+  implicit val serde: Serde[TxsRequest]        = Serde.forProduct2(apply, p => (p.id, p.hashes))
 
   def apply(hashes: AVector[(ChainIndex, AVector[TransactionId])]): TxsRequest =
     TxsRequest(RequestId.random(), hashes)
@@ -535,8 +534,9 @@ final case class HeadersByHeightsRequest(
 object HeadersByHeightsRequest
     extends IndexedSerding[Int, HeadersByHeightsRequest]
     with Payload.Code {
-  import IndexedSerding.dataSerde
   def name: String = codeName
+
+  val baseSerde: Serde[AVector[Int]] = avectorSerde[Int]
   implicit val serde: Serde[HeadersByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
@@ -569,10 +569,12 @@ final case class BlocksByHeightsRequest(
 object BlocksByHeightsRequest
     extends IndexedSerding[Int, BlocksByHeightsRequest]
     with Payload.Code {
-  import IndexedSerding.dataSerde
   def name: String = codeName
+
+  val baseSerde: Serde[AVector[Int]] = avectorSerde[Int]
   implicit val serde: Serde[BlocksByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
+
   def checkDataPerChain(values: AVector[Int]): Boolean = values.forall(_ >= 0)
 
   def apply(data: AVector[(ChainIndex, AVector[Int])]): BlocksByHeightsRequest =
