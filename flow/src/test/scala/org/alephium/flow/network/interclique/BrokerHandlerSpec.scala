@@ -594,6 +594,54 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
+  it should "publish misbehavior and stop the broker if it receives invalid headers response" in new SyncV2Fixture {
+    import SyncV2Handler._
+
+    brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
+      HeadersByHeightsRequest(
+        defaultRequestId,
+        AVector(chainIndex -> BlockHeightRange.from(1, 1, 1))
+      ),
+      None
+    )
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksByHeightsResponse(defaultRequestId, AVector(AVector(block)))
+    )
+
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  it should "publish misbehavior and stop the broker if it receives invalid blocks response" in new SyncV2Fixture {
+    import SyncV2Handler._
+
+    brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
+      BlocksByHeightsRequest(
+        defaultRequestId,
+        AVector(chainIndex -> BlockHeightRange.from(1, 1, 1))
+      ),
+      None
+    )
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(AVector(block.header)))
+    )
+
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
   it should "fall back to binary search to find the ancestor" in new GetAncestorsFixture {
     val headers       = genBlocks(12).map(_.header)
     val unknownHeader = emptyBlock(blockFlow, chainIndex).header

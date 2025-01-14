@@ -459,9 +459,11 @@ trait SyncV2Handler { _: BrokerHandler =>
               )
               stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
             }
-          case command => // this should never happen
-            log.error(s"Internal error, expected a blocks request, but got $command")
-            context.stop(self)
+          case _ =>
+            log.error(
+              s"Received invalid BlocksByHeightsResponse from $remoteAddress, request: $info"
+            )
+            stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
         }
       case None =>
         log.warning(s"Ignore unknown BlocksByHeightsResponse from $remoteAddress, request id: $id")
@@ -571,11 +573,11 @@ trait SyncV2Handler { _: BrokerHandler =>
               )
               stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
             }
-          case _ => // this should never happen
+          case _ =>
             log.error(
-              s"Internal error, expected a HeadersByHeightsRequest, but got ${info.payload}"
+              s"Received invalid HeadersByHeightsResponse from $remoteAddress, request: $info"
             )
-            context.stop(self)
+            stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
         }
       case None =>
         log.warning(s"Ignore unknown HeadersByHeightsResponse from $remoteAddress, request id: $id")
