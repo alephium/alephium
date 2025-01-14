@@ -39,11 +39,7 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
 
-class WsSubscriptionHandlerSpec
-    extends AlephiumSpec
-    with WsSubscriptionFixture
-    with BeforeAndAfterAll
-    with ScalaFutures {
+class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with ScalaFutures {
   import org.alephium.app.ws.WsBehaviorFixture._
 
   private lazy val system: ActorSystem = ActorSystem("ws-subscription-handler-spec")

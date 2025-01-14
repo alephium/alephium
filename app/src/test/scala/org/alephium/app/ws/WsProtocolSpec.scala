@@ -23,6 +23,7 @@ import org.alephium.api.model.{
   TransactionTemplate
 }
 import org.alephium.app.ws.WsParams._
+import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams.{AddressesField, EventIndexField}
 import org.alephium.json.Json._
 import org.alephium.protocol.vm.{LogStateRef, LogStatesId}
 import org.alephium.rpc.model.JsonRPC
@@ -111,8 +112,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
     val addresses  = ujson.Arr(ujson.Str(contractAddress_0.toBase58))
 
     AVector(
-      Some(EventIndex_0) -> ujson.Obj("eventIndex" -> eventIndex, "address" -> addresses),
-      None               -> ujson.Obj("address" -> addresses)
+      Some(EventIndex_0) -> ujson.Obj(AddressesField -> addresses, EventIndexField -> eventIndex),
+      None               -> ujson.Obj(AddressesField -> addresses)
     ).foreach { case (eventIndexOpt, expectedObj) =>
       val contractEventParams =
         ContractEventsSubscribeParams.fromSingle(contractAddress_0, eventIndexOpt)
@@ -182,8 +183,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
           "params" -> ujson.Arr(
             ContractEventsSubscribeParams.ContractEvent,
             ujson.Obj(
-              "eventIndex" -> eventIndex,
-              "address"    -> ujson.Arr()
+              EventIndexField -> eventIndex,
+              AddressesField  -> ujson.Arr()
             )
           ),
           "id"      -> 0,
@@ -198,8 +199,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
         ujson.Arr(
           eventType,
           ujson.Obj(
-            "eventIndex" -> eventIndex,
-            "address"    -> ujson.Arr()
+            EventIndexField -> eventIndex,
+            AddressesField  -> ujson.Arr()
           )
         ),
         0
@@ -215,8 +216,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
         ujson.Arr(
           eventType,
           ujson.Obj(
-            "eventIndex" -> eventIndex,
-            "address"    -> ujson.Arr(duplicateAddresses.map(_.toBase58))
+            EventIndexField -> eventIndex,
+            AddressesField  -> ujson.Arr(duplicateAddresses.map(_.toBase58))
           )
         ),
         0
@@ -233,8 +234,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
           eventType,
           eventIndex,
           ujson.Obj(
-            "eventIndex" -> eventIndex,
-            "address"    -> ujson.Arr(tooManyContractAddresses.map(_.toBase58))
+            EventIndexField -> eventIndex,
+            AddressesField  -> ujson.Arr(tooManyContractAddresses.map(_.toBase58))
           )
         ),
         0
@@ -250,8 +251,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
         ujson.Arr(
           eventType,
           ujson.Obj(
-            "eventIndex" -> "2",
-            "address"    -> ujson.Arr(ujson.Str(contractAddress_0.toBase58))
+            EventIndexField -> "2",
+            AddressesField  -> ujson.Arr(ujson.Str(contractAddress_0.toBase58))
           )
         ),
         0

@@ -119,6 +119,7 @@ trait WsFixture extends ServerFixture {
 
 trait WsClientServerFixture
     extends AlephiumSpec
+    with WsSubscriptionFixture
     with ServerFixture
     with ScalaFutures
     with Eventually
@@ -177,6 +178,8 @@ trait WsClientServerFixture
   protected lazy val WsServer(httpServer, eventHandler, subscriptionHandler) = bindAndListen()
   protected lazy val wsClient: WsClient = {
     httpServer.actualPort() is config.network.restPort
+    testEventHandlerInitialized(eventHandler)
+    testSubscriptionHandlerInitialized(subscriptionHandler)
     WsClient(
       vertx,
       new WebSocketClientOptions()

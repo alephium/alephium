@@ -93,7 +93,7 @@ protected[ws] object WsParams {
   }
   object ContractEventsSubscribeParams {
     protected[ws] val ContractEvent: WsEventType = "contract"
-    protected[ws] val AddressField               = "address"
+    protected[ws] val AddressesField             = "addresses"
     protected[ws] val EventIndexField            = "eventIndex"
 
     protected[ws] def from(
@@ -112,7 +112,7 @@ protected[ws] object WsParams {
         jsonObj: ujson.Obj,
         contractAddressLimit: Int
     ): Either[Error, ContractEventsSubscribeParams] = {
-      jsonObj.value.get(AddressField) match {
+      jsonObj.value.get(AddressesField) match {
         case Some(ujson.Arr(addressArr)) if addressArr.isEmpty =>
           Left(WsError.emptyContractAddress)
         case Some(ujson.Arr(addressArr)) if addressArr.length > contractAddressLimit =>
@@ -242,7 +242,7 @@ object WsRequest extends ApiModelCodec {
             ujson.Arr(
               ujson.Str(eventType),
               ujson.Obj(
-                ContractEventsSubscribeParams.AddressField -> addressArr,
+                ContractEventsSubscribeParams.AddressesField -> addressArr,
                 optionalEventIndexEntry.toList*
               )
             ),

@@ -44,12 +44,12 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       params_addr_01_eventIndex_0.toContractEventKeys,
       subscription_addr_01_eventIndex_0
     )
-    val result_1 = subscriptionsState.contractSubscriptionMappings.toMap
+    val result_1 = subscriptionsState.subscriptionsByContractKey.toMap
     subscriptionsState.addSubscriptionForContractEventKeys(
       params_addr_01_eventIndex_0.toContractEventKeys,
       subscription_addr_01_eventIndex_0
     )
-    val result_2 = subscriptionsState.contractSubscriptionMappings.toMap
+    val result_2 = subscriptionsState.subscriptionsByContractKey.toMap
     result_1 is result_2
   }
 
@@ -57,20 +57,20 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
     subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
-    val result_1 = subscriptionsState.contractSubscriptionMappings.toMap
+    val result_1 = subscriptionsState.subscriptionsByContractKey.toMap
     subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
-    val result_2 = subscriptionsState.contractSubscriptionMappings.toMap
+    val result_2 = subscriptionsState.subscriptionsByContractKey.toMap
     result_1 is result_2
 
     subscriptionsState.connections is mutable.Map(
       wsId_0 -> AVector(params_addr_01_eventIndex_0.subscriptionId -> consumer_0)
     )
 
-    subscriptionsState.contractAddressMappings is mutable.Map(
+    subscriptionsState.contractKeysBySubscription is mutable.Map(
       subscription_addr_01_eventIndex_0 -> params_addr_01_eventIndex_0.toContractEventKeys
     )
 
-    subscriptionsState.contractSubscriptionMappings is mutable.Map.from(
+    subscriptionsState.subscriptionsByContractKey is mutable.Map.from(
       params_addr_01_eventIndex_0.toContractEventKeys.map(
         _ -> AVector(subscription_addr_01_eventIndex_0)
       )
@@ -128,11 +128,11 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       )
     )
 
-    subscriptionsState.contractAddressMappings.size is 0
-    subscriptionsState.contractSubscriptionMappings.size is 0
+    subscriptionsState.contractKeysBySubscription.size is 0
+    subscriptionsState.subscriptionsByContractKey.size is 0
   }
 
-  it should "add and remove subscriptions and addresses" in {
+  it should "add and remove subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
     subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
@@ -145,21 +145,21 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       )
     )
 
-    subscriptionsState.contractAddressMappings is mutable.Map(
+    subscriptionsState.contractKeysBySubscription is mutable.Map(
       subscription_addr_12_eventIndex_1 -> params_addr_12_eventIndex_1.toContractEventKeys,
       subscription_addr_2_eventIndex_1  -> params_addr_2_eventIndex_1.toContractEventKeys
     )
 
     val expectedKeys =
       params_addr_12_eventIndex_1.toContractEventKeys ++ params_addr_2_eventIndex_1.toContractEventKeys
-    subscriptionsState.contractSubscriptionMappings.keys.toSet is expectedKeys.toSet
+    subscriptionsState.subscriptionsByContractKey.keys.toSet is expectedKeys.toSet
 
-    val sharedSubscriptionsByAddress =
+    val sharedSubscriptionsByContractEventKey =
       AVector(subscription_addr_12_eventIndex_1, subscription_addr_2_eventIndex_1)
     val sharedContractKeyBySubscriptions = params_addr_2_eventIndex_1.toContractEventKeys.head
-    subscriptionsState.contractSubscriptionMappings(
+    subscriptionsState.subscriptionsByContractKey(
       sharedContractKeyBySubscriptions
-    ) is sharedSubscriptionsByAddress
+    ) is sharedSubscriptionsByContractEventKey
 
     subscriptionsState.removeSubscription(wsId_0, params_addr_12_eventIndex_1.subscriptionId)
 
@@ -167,18 +167,18 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       wsId_0 -> AVector(params_addr_2_eventIndex_1.subscriptionId -> consumer_0)
     )
 
-    subscriptionsState.contractAddressMappings is mutable.Map(
+    subscriptionsState.contractKeysBySubscription is mutable.Map(
       subscription_addr_2_eventIndex_1 -> params_addr_2_eventIndex_1.toContractEventKeys
     )
 
-    subscriptionsState.contractSubscriptionMappings.keys.toSet is params_addr_2_eventIndex_1.toContractEventKeys.toSet
-    subscriptionsState.contractSubscriptionMappings.foreachEntry { case (_, subscriptions) =>
+    subscriptionsState.subscriptionsByContractKey.keys.toSet is params_addr_2_eventIndex_1.toContractEventKeys.toSet
+    subscriptionsState.subscriptionsByContractKey.foreachEntry { case (_, subscriptions) =>
       subscriptions.length is 1
       subscriptions.head is subscription_addr_2_eventIndex_1
     }
   }
 
-  "removing subscription by address" should "not allow for addresses with 0 subscriptions" in {
+  "removing subscription by contract event key" should "not allow for contract event keys with 0 subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
     subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
     params_addr_12_eventIndex_1.toContractEventKeys.map { contractKey =>
@@ -188,7 +188,7 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       )
     }
 
-    subscriptionsState.contractSubscriptionMappings.size is 0
+    subscriptionsState.subscriptionsByContractKey.size is 0
   }
 
   it should "remove all subscriptions for given connection" in {
@@ -205,7 +205,7 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       wsId_0 -> AVector(params_addr_01_eventIndex_0.subscriptionId -> consumer_0)
     )
 
-    subscriptionsState.contractAddressMappings.forall(_._1.wsId == wsId_0) is true
-    subscriptionsState.contractSubscriptionMappings.forall(_._2.forall(_.wsId == wsId_0)) is true
+    subscriptionsState.contractKeysBySubscription.forall(_._1.wsId == wsId_0) is true
+    subscriptionsState.subscriptionsByContractKey.forall(_._2.forall(_.wsId == wsId_0)) is true
   }
 }

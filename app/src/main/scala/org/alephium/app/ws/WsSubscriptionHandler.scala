@@ -185,8 +185,8 @@ protected[ws] class WsSubscriptionHandler(
     case GetSubscriptions =>
       sender() ! WsImmutableSubscriptions(
         subscriptionsState.connections.toMap,
-        subscriptionsState.contractSubscriptionMappings.toMap,
-        subscriptionsState.contractAddressMappings.toMap
+        subscriptionsState.subscriptionsByContractKey.toMap,
+        subscriptionsState.contractKeysBySubscription.toMap
       )
     case NotificationPublished(params: WsTxNotificationParams) =>
       publishNotification(params)

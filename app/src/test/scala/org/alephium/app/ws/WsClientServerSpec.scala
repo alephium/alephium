@@ -33,7 +33,7 @@ import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util._
 
-class WsClientServerSpec extends AlephiumSpec with WsSubscriptionFixture {
+class WsClientServerSpec extends AlephiumSpec {
 
   "WsServer" should "keep websocket connection alive" in new WsClientServerFixture {
     override val keepAliveInterval = Duration.ofMillisUnsafe(20)
