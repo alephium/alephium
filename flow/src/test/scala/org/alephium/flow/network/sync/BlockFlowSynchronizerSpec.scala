@@ -411,10 +411,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer ! FlowHandler.ChainState(selfChainTips)
     blockProcessed(emptyBlock(blockFlow, chainIndex))
     probe.expectMsg(BrokerHandler.SendChainState(selfChainTips))
-    syncingChain.skeletonHeights is Some(AVector(50, 100, 150, 200))
+    syncingChain.skeletonHeightRange is Some(BlockHeightRange.from(50, 200, 50))
     syncingChain.nextFromHeight is 201
     probe.expectMsg(
-      BrokerHandler.GetSkeletons(AVector((chainIndex, syncingChain.skeletonHeights.get)))
+      BrokerHandler.GetSkeletons(AVector((chainIndex, syncingChain.skeletonHeightRange.get)))
     )
   }
 
@@ -438,7 +438,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     )
     val task = BlockDownloadTask(chainIndex0, 1, BatchSize, None)
     probe0.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
-    probe1.expectMsg(BrokerHandler.GetSkeletons(AVector((chainIndex1, AVector(BatchSize)))))
+    val range = BlockHeightRange.from(BatchSize, BatchSize, BatchSize)
+    probe1.expectMsg(BrokerHandler.GetSkeletons(AVector((chainIndex1, range))))
   }
 
   it should "handle skeleton response" in new BlockFlowSynchronizerV2Fixture {
@@ -447,20 +448,20 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val (brokerActor, _, probe) = addBroker()
     val chainIndex              = ChainIndex.unsafe(0, 0)
     val syncingChain            = addSyncingChain(chainIndex, 200, brokerActor)
-    val heights                 = AVector(50, 100)
+    val heights                 = BlockHeightRange.from(50, 100, 50)
     val headers = AVector.fill(heights.length)(emptyBlock(blockFlow, chainIndex).header)
     val response =
       BlockFlowSynchronizer.UpdateSkeletons(AVector((chainIndex, heights)), AVector(headers))
     blockFlowSynchronizer.tell(response, TestProbe().ref)
     probe.expectNoMessage()
 
-    syncingChain.skeletonHeights = Some(heights)
+    syncingChain.skeletonHeightRange = Some(heights)
     blockFlowSynchronizer.tell(response, TestProbe().ref)
-    syncingChain.skeletonHeights.isDefined is true
+    syncingChain.skeletonHeightRange.isDefined is true
     probe.expectNoMessage()
 
     blockFlowSynchronizer.tell(response, brokerActor.ref)
-    syncingChain.skeletonHeights.isDefined is false
+    syncingChain.skeletonHeightRange.isDefined is false
     val tasks = AVector(
       BlockDownloadTask(chainIndex, 1, 50, Some(headers(0))),
       BlockDownloadTask(chainIndex, 51, 100, Some(headers(1)))
@@ -874,46 +875,48 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     state0.initSkeletonHeights(state0.originBroker, 2) is None
     state0.taskQueue.dequeue().id is TaskId(2, bestHeight0)
     state0.nextFromHeight is bestHeight0 + 1
-    state0.skeletonHeights is None
+    state0.skeletonHeightRange is None
 
-    state0.initSkeletonHeights(state0.originBroker, 1) is Some(AVector(bestHeight0 - 1))
+    state0.initSkeletonHeights(state0.originBroker, 1).get.heights is AVector(bestHeight0 - 1)
     state0.taskQueue.isEmpty is true
     state0.nextFromHeight is bestHeight0
-    state0.skeletonHeights is Some(AVector(bestHeight0 - 1))
+    state0.skeletonHeightRange.get.heights is AVector(bestHeight0 - 1)
     state0.nextSkeletonHeights(state0.nextFromHeight, MaxQueueSize) is None
     state0.taskQueue.dequeue().id is TaskId(bestHeight0, bestHeight0)
     state0.nextFromHeight is bestHeight0 + 1
-    state0.skeletonHeights is None
+    state0.skeletonHeightRange is None
 
     state0.initSkeletonHeights(invalidBroker, 1) is None
 
-    val bestHeight1     = MaxQueueSize
-    val state1          = newState(bestHeight1)
-    val skeletonHeights = AVector.from(BatchSize.to(MaxQueueSize, BatchSize))
-    state1.initSkeletonHeights(state0.originBroker, 1) is Some(skeletonHeights)
+    val bestHeight1 = MaxQueueSize
+    val state1      = newState(bestHeight1)
+    val range       = BlockHeightRange.from(BatchSize, MaxQueueSize, BatchSize)
+    state1.initSkeletonHeights(state0.originBroker, 1) is Some(range)
     state1.taskQueue.isEmpty is true
     state1.nextFromHeight is bestHeight1 + 1
-    state1.skeletonHeights is Some(skeletonHeights)
+    state1.skeletonHeightRange is Some(range)
 
     1.until(bestHeight1 - BatchSize, BatchSize).zipWithIndex.foreach { case (fromHeight, index) =>
-      val expectedHeights = skeletonHeights.drop(index)
-      state1.nextSkeletonHeights(fromHeight, MaxQueueSize) is Some(expectedHeights)
+      val expectedRange =
+        BlockHeightRange.from(range.from + range.step * index, range.to, range.step)
+      state1.nextSkeletonHeights(fromHeight, MaxQueueSize) is Some(expectedRange)
       state1.taskQueue.isEmpty is true
       state1.nextFromHeight is bestHeight1 + 1
-      state1.skeletonHeights is Some(expectedHeights)
+      state1.skeletonHeightRange is Some(expectedRange)
     }
 
     (BatchSize + 1).until(MaxQueueSize, BatchSize).zipWithIndex.foreach { case (size, index) =>
-      val expectedHeights = skeletonHeights.take(index + 1)
-      state1.nextSkeletonHeights(1, size) is Some(expectedHeights)
+      val expectedRange =
+        BlockHeightRange.from(range.from, range.from + range.step * index, range.step)
+      state1.nextSkeletonHeights(1, size) is Some(expectedRange)
       state1.taskQueue.isEmpty is true
       state1.nextFromHeight is size
-      state1.skeletonHeights is Some(expectedHeights)
+      state1.skeletonHeightRange is Some(expectedRange)
     }
 
     state1.nextSkeletonHeights(bestHeight1 - BatchSize + 1, MaxQueueSize) is None
     state1.nextFromHeight is bestHeight1 + 1
-    state1.skeletonHeights.isEmpty is true
+    state1.skeletonHeightRange.isEmpty is true
     state1.taskQueue.toSeq is Seq(
       BlockDownloadTask(chainIndex, bestHeight1 - BatchSize + 1, bestHeight1, None)
     )
@@ -923,19 +926,19 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import SyncState._
 
     val state   = newState()
-    val heights = AVector.from(50.to(200, 50))
+    val heights = BlockHeightRange.from(50, 200, 50)
     val headers = AVector.fill(4)(emptyBlock(blockFlow, chainIndex).header)
-    state.skeletonHeights = Some(heights)
+    state.skeletonHeightRange = Some(heights)
     state.taskQueue.isEmpty is true
     state.taskIds.isEmpty is true
 
     state.onSkeletonFetched(invalidBroker, heights, headers)
-    state.skeletonHeights is Some(heights)
+    state.skeletonHeightRange is Some(heights)
     state.taskQueue.isEmpty is true
     state.taskIds.isEmpty is true
 
     state.onSkeletonFetched(state.originBroker, heights, headers)
-    state.skeletonHeights is None
+    state.skeletonHeightRange is None
     val tasks = headers.mapWithIndex { case (toHeader, index) =>
       BlockDownloadTask(chainIndex, 50 * index + 1, 50 * (index + 1), Some(toHeader))
     }
@@ -1097,19 +1100,19 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     def reset(): Unit = {
       state.nextFromHeight = 1
-      state.skeletonHeights = None
+      state.skeletonHeightRange = None
       state.taskQueue.clear()
       state.validating.clear()
       state.blockQueue.clear()
     }
 
-    def testMoveOne(blocks: Option[AVector[Int]]) = {
-      blocks match {
+    def testMoveOne(range: Option[BlockHeightRange]) = {
+      range match {
         case None => state.tryMoveOn() is None
-        case Some(blocks) =>
-          state.tryMoveOn() is Some(blocks)
-          state.nextFromHeight is blocks.last + 1
-          state.skeletonHeights is Some(blocks)
+        case Some(range) =>
+          state.tryMoveOn() is Some(range)
+          state.nextFromHeight is (range.heights.last + 1)
+          state.skeletonHeightRange is Some(range)
       }
     }
 
@@ -1118,7 +1121,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     testMoveOne(None)
 
     reset()
-    state.skeletonHeights = Some(AVector(50))
+    state.skeletonHeightRange = Some(BlockHeightRange.fromHeight(50))
     testMoveOne(None)
 
     reset()
@@ -1130,14 +1133,14 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blocks.foreach(b => state.validating.add(b.hash))
     testMoveOne(None)
     state.validating.remove(state.validating.head)
-    testMoveOne(Some(AVector(50, 100)))
+    testMoveOne(Some(BlockHeightRange.from(50, 100, 50)))
 
     val fromBroker = (state.originBroker, brokerInfo)
     reset()
     blocks.foreach(b => state.blockQueue.addOne(b.hash -> DownloadedBlock(b, fromBroker)))
     testMoveOne(None)
     state.blockQueue.remove(state.blockQueue.head._1)
-    testMoveOne(Some(AVector(50, 100)))
+    testMoveOne(Some(BlockHeightRange.from(50, 100, 50)))
 
     reset()
     blocks.view.take(blocks.length / 2 + 1).foreach { b =>
@@ -1147,13 +1150,13 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     testMoveOne(None)
     state.blockQueue.remove(blocks.head.hash)
     state.validating.remove(blocks.head.hash)
-    testMoveOne(Some(AVector(50, 100)))
+    testMoveOne(Some(BlockHeightRange.from(50, 100, 50)))
 
     reset()
     val taskId = TaskId(50, 100)
     state.taskIds.addOne(taskId)
     testMoveOne(None)
     state.downloadedBlocks.addOne((taskId, AVector.empty))
-    testMoveOne(Some(AVector(50, 100)))
+    testMoveOne(Some(BlockHeightRange.from(50, 100, 50)))
   }
 }

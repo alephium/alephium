@@ -51,7 +51,7 @@ object BlockFlowSynchronizer {
   final case class UpdateChainState(tips: AVector[ChainTip])            extends Command
   final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)])  extends Command
   final case class UpdateSkeletons(
-      requests: AVector[(ChainIndex, AVector[Int])],
+      requests: AVector[(ChainIndex, BlockHeightRange)],
       responses: AVector[AVector[BlockHeader]]
   ) extends Command
   final case class UpdateBlockDownloaded(
@@ -340,12 +340,11 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def tryMoveOn(): Unit = {
     val requests =
-      mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, AVector[Int])]]
+      mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, BlockHeightRange)]]
     syncingChains.foreachEntry { case (chainIndex, state) =>
       state.tryMoveOn() match {
-        case Some(heights) =>
-          assume(heights.nonEmpty, "Skeleton heights must not be empty")
-          addToMap(requests, state.originBroker, (chainIndex, heights))
+        case Some(range) =>
+          addToMap(requests, state.originBroker, (chainIndex, range))
         case None => ()
       }
     }
@@ -406,14 +405,12 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   def handleAncestors(ancestors: AVector[(ChainIndex, Int)]): Unit = {
     val brokerActor: BrokerActor = ActorRefT(sender())
-    val requests                 = mutable.ArrayBuffer.empty[(ChainIndex, AVector[Int])]
+    val requests                 = mutable.ArrayBuffer.empty[(ChainIndex, BlockHeightRange)]
     ancestors.foreach { case (chainIndex, height) =>
       syncingChains.get(chainIndex).foreach { state =>
         state.initSkeletonHeights(brokerActor, height + 1) match {
-          case Some(heights) =>
-            assume(heights.nonEmpty, "Skeleton heights must not be empty")
-            requests.addOne((chainIndex, heights))
-          case None => ()
+          case Some(range) => requests.addOne((chainIndex, range))
+          case None        => ()
         }
       }
     }
@@ -424,14 +421,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   def handleSkeletons(
-      requests: AVector[(ChainIndex, AVector[Int])],
+      requests: AVector[(ChainIndex, BlockHeightRange)],
       responses: AVector[AVector[BlockHeader]]
   ): Unit = {
     val brokerActor: BrokerActor = ActorRefT(sender())
     assume(requests.length == responses.length)
-    requests.foreachWithIndex { case ((chainIndex, heights), index) =>
+    requests.foreachWithIndex { case ((chainIndex, range), index) =>
       val headers = responses(index)
-      syncingChains.get(chainIndex).foreach(_.onSkeletonFetched(brokerActor, heights, headers))
+      syncingChains.get(chainIndex).foreach(_.onSkeletonFetched(brokerActor, range, headers))
     }
     downloadBlocks()
   }
@@ -583,9 +580,9 @@ object SyncState {
       toHeight: Int,
       toHeader: Option[BlockHeader]
   ) {
-    def heights: AVector[Int] = AVector.from(fromHeight to toHeight)
-    def size: Int             = toHeight - fromHeight + 1
-    def id: TaskId            = TaskId(fromHeight, toHeight)
+    def heightRange: BlockHeightRange = BlockHeightRange.from(fromHeight, toHeight, 1)
+    def size: Int                     = toHeight - fromHeight + 1
+    def id: TaskId                    = TaskId(fromHeight, toHeight)
 
     override def toString: String = s"${chainIndex.from.value}->${chainIndex.to.value}:$id"
   }
@@ -601,10 +598,10 @@ object SyncState {
       val chainIndex: ChainIndex,
       val bestTip: ChainTip
   ) extends LazyLogging {
-    private[sync] var nextFromHeight                        = ALPH.GenesisHeight
-    private[sync] var skeletonHeights: Option[AVector[Int]] = None
-    private[sync] val taskIds                               = mutable.SortedSet.empty[TaskId]
-    private[sync] val taskQueue                             = mutable.Queue.empty[BlockDownloadTask]
+    private[sync] var nextFromHeight                                = ALPH.GenesisHeight
+    private[sync] var skeletonHeightRange: Option[BlockHeightRange] = None
+    private[sync] val taskIds   = mutable.SortedSet.empty[TaskId]
+    private[sync] val taskQueue = mutable.Queue.empty[BlockDownloadTask]
 
     // Although we download blocks in order of height, the blocks we receive
     // may not be sorted by height. `downloadedBlocks` is used to sort the
@@ -624,15 +621,15 @@ object SyncState {
       }
     }
 
-    def initSkeletonHeights(broker: BrokerActor, from: Int): Option[AVector[Int]] = {
+    def initSkeletonHeights(broker: BrokerActor, from: Int): Option[BlockHeightRange] = {
       if (broker == originBroker) nextSkeletonHeights(from, MaxQueueSize) else None
     }
 
-    private[sync] def nextSkeletonHeights(from: Int, size: Int): Option[AVector[Int]] = {
+    private[sync] def nextSkeletonHeights(from: Int, size: Int): Option[BlockHeightRange] = {
       assume(from <= bestTip.height && size > BatchSize)
       if (bestTip.height - from < BatchSize) {
         nextFromHeight = bestTip.height + 1
-        skeletonHeights = None
+        skeletonHeightRange = None
         val task = BlockDownloadTask(chainIndex, from, bestTip.height, None)
         logger.debug(s"Trying to download latest blocks $task, chain index: $chainIndex")
         addNewTask(task)
@@ -641,24 +638,24 @@ object SyncState {
         val maxHeight  = math.min(bestTip.height, from + size)
         val toHeight   = (from + ((maxHeight - from + 1) / BatchSize) * BatchSize) - 1
         val fromHeight = from + BatchSize - 1
-        val heights    = AVector.from(fromHeight.to(toHeight, BatchSize))
+        val range      = BlockHeightRange.from(fromHeight, toHeight, BatchSize)
         nextFromHeight = toHeight + 1
-        skeletonHeights = Some(heights)
-        logger.debug(s"Moving on to the next skeleton, heights: $heights, chain index: $chainIndex")
-        Some(heights)
+        skeletonHeightRange = Some(range)
+        logger.debug(s"Moving on to the next skeleton, range: $range, chain index: $chainIndex")
+        Some(range)
       }
     }
 
     def onSkeletonFetched(
         broker: BrokerActor,
-        heights: AVector[Int],
+        range: BlockHeightRange,
         headers: AVector[BlockHeader]
     ): Unit = {
-      if (broker == originBroker && skeletonHeights.contains(heights)) {
-        skeletonHeights = None
-        assume(heights.length == headers.length)
+      if (broker == originBroker && skeletonHeightRange.contains(range)) {
+        skeletonHeightRange = None
+        assume(range.length == headers.length)
         headers.foreachWithIndex { case (header, index) =>
-          val toHeight   = heights(index)
+          val toHeight   = range.at(index)
           val fromHeight = toHeight - BatchSize + 1
           val task       = BlockDownloadTask(chainIndex, fromHeight, toHeight, Some(header))
           addNewTask(task)
@@ -712,12 +709,12 @@ object SyncState {
       ()
     }
 
-    def tryMoveOn(): Option[AVector[Int]] = {
+    def tryMoveOn(): Option[BlockHeightRange] = {
       val queueSize = blockQueue.size + validating.size
       if (
         nextFromHeight > ALPH.GenesisHeight && // We don't know the common ancestor height yet
         nextFromHeight <= bestTip.height &&
-        skeletonHeights.isEmpty &&
+        skeletonHeightRange.isEmpty &&
         taskQueue.isEmpty &&
         queueSize <= MaxQueueSize / 2 &&
         isSkeletonFilled

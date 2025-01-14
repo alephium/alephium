@@ -288,18 +288,8 @@ object BrokerHandler {
       .mkString("[", ",", "]")
   }
 
-  private def showHeights(heights: AVector[Int]): String = {
-    if (heights.isEmpty) {
-      "[]"
-    } else if (heights.length == 1) {
-      s"[${heights.head}]"
-    } else {
-      s"[${heights.head} .. ${heights.last}]"
-    }
-  }
-
-  def showIndexedHeights(heights: AVector[(ChainIndex, AVector[Int])]): String = {
-    heights.map(p => s"${p._1} -> ${showHeights(p._2)}").mkString(", ")
+  def showIndexedHeights(heights: AVector[(ChainIndex, BlockHeightRange)]): String = {
+    heights.map(p => s"${p._1} -> ${p._2}").mkString(", ")
   }
 
   def showFlowData[T <: FlowData](data: AVector[AVector[T]]): String = {
@@ -434,7 +424,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   }
 
   private def handleDownloadBlocksRequest(cmd: BaseBrokerHandler.DownloadBlockTasks): Unit = {
-    val heights = cmd.tasks.map(task => (task.chainIndex, task.heights))
+    val heights = cmd.tasks.map(task => (task.chainIndex, task.heightRange))
     val request = BlocksByHeightsRequest(heights)
     log.debug(
       s"Sending BlocksByHeightsRequest to $remoteAddress: " +
@@ -480,8 +470,8 @@ trait SyncV2Handler { _: BrokerHandler =>
 
   private def handleFlowDataRequest[T <: FlowData](
       id: RequestId,
-      heights: AVector[(ChainIndex, AVector[Int])],
-      func: (ChainIndex, AVector[Int]) => IOResult[AVector[T]],
+      heights: AVector[(ChainIndex, BlockHeightRange)],
+      func: (ChainIndex, BlockHeightRange) => IOResult[AVector[T]],
       responseCtor: (RequestId, AVector[AVector[T]]) => Payload.Solicited,
       name: String
   ): Unit = {
@@ -509,12 +499,12 @@ trait SyncV2Handler { _: BrokerHandler =>
 
   private def handleBlocksRequest(
       id: RequestId,
-      chains: AVector[(ChainIndex, AVector[Int])]
+      chains: AVector[(ChainIndex, BlockHeightRange)]
   ): Unit = {
     handleFlowDataRequest(
       id,
       chains,
-      (chainIndex, heights) => blockflow.getBlockChain(chainIndex).getBlocksByHeights(heights),
+      (chainIndex, range) => blockflow.getBlockChain(chainIndex).getBlocksByHeights(range.heights),
       BlocksByHeightsResponse.apply,
       "BlocksByHeights"
     )
@@ -539,12 +529,15 @@ trait SyncV2Handler { _: BrokerHandler =>
 
   private def handleHeadersRequest(
       id: RequestId,
-      heights: AVector[(ChainIndex, AVector[Int])]
+      heights: AVector[(ChainIndex, BlockHeightRange)]
   ): Unit = {
     handleFlowDataRequest(
       id,
       heights,
-      (chainIndex, heights) => blockflow.getHeaderChain(chainIndex).getHeadersByHeights(heights),
+      (
+          chainIndex,
+          range
+      ) => blockflow.getHeaderChain(chainIndex).getHeadersByHeights(range.heights),
       HeadersByHeightsResponse.apply,
       "HeadersByHeights"
     )
@@ -590,12 +583,13 @@ trait SyncV2Handler { _: BrokerHandler =>
   }
 
   private def handleAncestorResponse(headerss: AVector[AVector[BlockHeader]]): Unit = {
-    val heights = headerss.foldE(AVector.empty[(ChainIndex, AVector[Int])]) { case (acc, headers) =>
-      val chainIndex = headers.head.chainIndex
-      getChainState(chainIndex) match {
-        case Some(state) => handleAncestorResponse(state, headers, acc)
-        case None        => Right(acc)
-      }
+    val heights = headerss.foldE(AVector.empty[(ChainIndex, BlockHeightRange)]) {
+      case (acc, headers) =>
+        val chainIndex = headers.head.chainIndex
+        getChainState(chainIndex) match {
+          case Some(state) => handleAncestorResponse(state, headers, acc)
+          case None        => Right(acc)
+        }
     }
     heights match {
       case Right(heights) =>
@@ -631,7 +625,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   }
 
   private def handleSkeletonResponse(
-      requests: AVector[(ChainIndex, AVector[Int])],
+      requests: AVector[(ChainIndex, BlockHeightRange)],
       response: AVector[AVector[BlockHeader]]
   ): Unit = {
     val isValid = requests.forallWithIndex { case ((_, heights), index) =>
@@ -650,8 +644,8 @@ trait SyncV2Handler { _: BrokerHandler =>
   private def handleAncestorResponse(
       state: StatePerChain,
       headers: AVector[BlockHeader],
-      requestsAcc: AVector[(ChainIndex, AVector[Int])]
-  ): ResultT[AVector[(ChainIndex, AVector[Int])]] = {
+      requestsAcc: AVector[(ChainIndex, BlockHeightRange)]
+  ): ResultT[AVector[(ChainIndex, BlockHeightRange)]] = {
     state.binarySearch match {
       case None =>
         from(headers.findReversedE(blockflow.contains)).map {
@@ -665,14 +659,16 @@ trait SyncV2Handler { _: BrokerHandler =>
             log.debug(
               s"Fallback to binary search to find the ancestor between self and the peer $remoteAddress"
             )
-            requestsAcc :+ (state.chainIndex, AVector(state.startBinarySearch()))
+            val height = state.startBinarySearch()
+            requestsAcc :+ (state.chainIndex, BlockHeightRange.fromHeight(height))
         }
       case Some((_, _)) =>
         if (headers.length == 1) { // we have checked that the headers are not empty
           from(blockflow.contains(headers.head)).flatMap { exists =>
             val ancestor = if (exists) Some(headers.head) else None
             state.getNextHeight(ancestor) match {
-              case Some(height) => Right(requestsAcc :+ (state.chainIndex, AVector(height)))
+              case Some(height) =>
+                Right(requestsAcc :+ (state.chainIndex, BlockHeightRange.fromHeight(height)))
               case None =>
                 if (!state.isAncestorFound) {
                   val chain = blockflow.getBlockChain(state.chainIndex)
@@ -798,7 +794,7 @@ object SyncV2Handler {
     if (value < min) min else if (value > max) max else value
   }
 
-  def calculateRequestSpan(remoteHeight: Int, localHeight: Int): AVector[Int] = {
+  def calculateRequestSpan(remoteHeight: Int, localHeight: Int): BlockHeightRange = {
     assume(remoteHeight >= 0 && localHeight >= 0)
     val maxCount      = 12
     val requestHead   = math.max(remoteHeight - 1, ALPH.GenesisHeight)
@@ -807,9 +803,7 @@ object SyncV2Handler {
     val span          = calcInRange(1 + totalSpan / maxCount, 2, 16)
     val count         = calcInRange(1 + totalSpan / span, 2, maxCount)
     val from          = math.max(requestHead - (count - 1) * span, ALPH.GenesisHeight)
-    val result        = AVector.from(from.to(from + (count - 1) * span, span))
-    assume(result.nonEmpty, "Resulting span must not be empty")
-    result
+    BlockHeightRange.from(from, from + (count - 1) * span, span)
   }
 
   def validateBlocks(

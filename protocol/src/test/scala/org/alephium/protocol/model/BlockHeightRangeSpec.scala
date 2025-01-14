@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
 
 class BlockHeightRangeSpec extends AlephiumSpec with NumericHelpers {
@@ -37,17 +38,23 @@ class BlockHeightRangeSpec extends AlephiumSpec with NumericHelpers {
     invalidRanges.foreach(_.isValid() is false)
   }
 
-  it should "get heights from range" in {
-    val from = nextInt(0, 100)
-    val to   = nextInt(100, 200)
-    val step = nextInt(1, 5)
+  it should "test block height range" in {
+    val from   = nextInt(0, 100)
+    val to     = nextInt(100, 200)
+    val step   = nextInt(1, 5)
+    val range0 = BlockHeightRange.fromHeight(from)
+    range0.length is 1
+    range0.heights is AVector(from)
+    range0.at(0) is from
 
     val expected = AVector.from(from.to(to, step))
-    val range    = BlockHeightRange.from(from, to, step)
-    range.length is expected.length
-    range.heights is expected
-    (0 until range.length).foreach { index =>
-      range.at(index) is expected(index)
+    val range1   = BlockHeightRange.from(from, to, step)
+    range1.length is expected.length
+    range1.heights is expected
+    (0 until range1.length).foreach { index =>
+      range1.at(index) is expected(index)
     }
+
+    deserialize[BlockHeightRange](serialize(range1)) isE range1
   }
 }

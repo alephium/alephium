@@ -426,24 +426,24 @@ object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
 }
 
 trait IndexedPayload[T] {
-  def data: AVector[(ChainIndex, AVector[T])]
+  def data: AVector[(ChainIndex, T)]
 }
 
 sealed trait IndexedSerding[T, P <: IndexedPayload[T] with Payload]
     extends Payload.ValidatedSerding[P] {
-  protected def baseSerde: Serde[AVector[T]]
-  implicit protected lazy val dataSerde: Serde[(ChainIndex, AVector[T])] = {
+  protected def baseSerde: Serde[T]
+  implicit protected lazy val dataSerde: Serde[(ChainIndex, T)] = {
     implicit val indexSerde: Serde[ChainIndex] =
       Serde.forProduct2[Int, Int, ChainIndex](
         (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
         chainIndex => (chainIndex.from.value, chainIndex.to.value)
       )
-    Serde.tuple2[ChainIndex, AVector[T]](indexSerde, baseSerde)
+    Serde.tuple2[ChainIndex, T](indexSerde, baseSerde)
   }
 
   def name: String
 
-  def checkDataPerChain(values: AVector[T]): Boolean
+  def checkDataPerChain(values: T): Boolean
 
   override def validate(input: P)(implicit config: GroupConfig): Either[String, Unit] = {
     if (input.data.forall(p => IndexedSerding.check(p._1) && checkDataPerChain(p._2))) {
@@ -464,12 +464,12 @@ object IndexedSerding {
 
 final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.UnSolicited
-    with IndexedPayload[TransactionId] {
+    with IndexedPayload[AVector[TransactionId]] {
   def data: AVector[(ChainIndex, AVector[TransactionId])] = hashes
   override def measure(): Unit                            = NewTxHashes.payloadLabeled.inc()
 }
 
-object NewTxHashes extends IndexedSerding[TransactionId, NewTxHashes] with Payload.Code {
+object NewTxHashes extends IndexedSerding[AVector[TransactionId], NewTxHashes] with Payload.Code {
   def name: String = codeName
 
   def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
@@ -480,12 +480,12 @@ object NewTxHashes extends IndexedSerding[TransactionId, NewTxHashes] with Paylo
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.Solicited
-    with IndexedPayload[TransactionId] {
+    with IndexedPayload[AVector[TransactionId]] {
   def data: AVector[(ChainIndex, AVector[TransactionId])] = hashes
   override def measure(): Unit                            = TxsRequest.payloadLabeled.inc()
 }
 
-object TxsRequest extends IndexedSerding[TransactionId, TxsRequest] with Payload.Code {
+object TxsRequest extends IndexedSerding[AVector[TransactionId], TxsRequest] with Payload.Code {
   def name: String = codeName
 
   def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
@@ -525,24 +525,24 @@ object ChainState extends Payload.ValidatedSerding[ChainState] with Payload.Code
 
 final case class HeadersByHeightsRequest(
     id: RequestId,
-    data: AVector[(ChainIndex, AVector[Int])]
+    data: AVector[(ChainIndex, BlockHeightRange)]
 ) extends Payload.Solicited
-    with IndexedPayload[Int] {
+    with IndexedPayload[BlockHeightRange] {
   def measure(): Unit = HeadersByHeightsRequest.payloadLabeled.inc()
 }
 
 object HeadersByHeightsRequest
-    extends IndexedSerding[Int, HeadersByHeightsRequest]
+    extends IndexedSerding[BlockHeightRange, HeadersByHeightsRequest]
     with Payload.Code {
   def name: String = codeName
 
-  val baseSerde: Serde[AVector[Int]] = avectorSerde[Int]
+  val baseSerde: Serde[BlockHeightRange] = BlockHeightRange.serde
   implicit val serde: Serde[HeadersByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
-  def checkDataPerChain(values: AVector[Int]): Boolean = values.forall(_ >= 0)
+  def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
 
-  def apply(data: AVector[(ChainIndex, AVector[Int])]): HeadersByHeightsRequest =
+  def apply(data: AVector[(ChainIndex, BlockHeightRange)]): HeadersByHeightsRequest =
     HeadersByHeightsRequest(RequestId.random(), data)
 }
 
@@ -560,24 +560,24 @@ object HeadersByHeightsResponse
 
 final case class BlocksByHeightsRequest(
     id: RequestId,
-    data: AVector[(ChainIndex, AVector[Int])]
+    data: AVector[(ChainIndex, BlockHeightRange)]
 ) extends Payload.Solicited
-    with IndexedPayload[Int] {
+    with IndexedPayload[BlockHeightRange] {
   def measure(): Unit = BlocksByHeightsRequest.payloadLabeled.inc()
 }
 
 object BlocksByHeightsRequest
-    extends IndexedSerding[Int, BlocksByHeightsRequest]
+    extends IndexedSerding[BlockHeightRange, BlocksByHeightsRequest]
     with Payload.Code {
   def name: String = codeName
 
-  val baseSerde: Serde[AVector[Int]] = avectorSerde[Int]
+  val baseSerde: Serde[BlockHeightRange] = BlockHeightRange.serde
   implicit val serde: Serde[BlocksByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
-  def checkDataPerChain(values: AVector[Int]): Boolean = values.forall(_ >= 0)
+  def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
 
-  def apply(data: AVector[(ChainIndex, AVector[Int])]): BlocksByHeightsRequest =
+  def apply(data: AVector[(ChainIndex, BlockHeightRange)]): BlocksByHeightsRequest =
     BlocksByHeightsRequest(RequestId.random(), data)
 }
 

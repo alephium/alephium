@@ -27,7 +27,7 @@ import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model._
-import org.alephium.serde.{intSerde, serialize, Serde, SerdeError}
+import org.alephium.serde.{serialize, Serde, SerdeError}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
@@ -242,7 +242,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     val requestId  = RequestId.unsafe(1)
-    val request    = HeadersByHeightsRequest(requestId, AVector((chainIndex, AVector(1, 2))))
+    val request =
+      HeadersByHeightsRequest(requestId, AVector((chainIndex, BlockHeightRange(1, 2, 1))))
     verifySerde(request) {
       // code id
       hex"11" ++
@@ -252,12 +253,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         hex"01" ++
         // chain index
         hex"0000" ++
-        // number of heights
-        hex"02" ++
-        // height0
-        serialize(1) ++
-        // height1
-        serialize(2)
+        // range
+        hex"010201"
     }
 
     val header0  = blockGen.sample.get.header
@@ -288,10 +285,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"01" ++
           // invalid chain index
           hex"0500" ++
-          // number of heights
-          hex"01" ++
-          // height
-          serialize(1)
+          // range
+          hex"010201"
       )
       .leftValue is SerdeError.validation(
       "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
@@ -307,10 +302,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"01" ++
           // chain index
           hex"0000" ++
-          // number of heights
-          hex"01" ++
-          // invalid height
-          serialize(-1)
+          // invalid range
+          hex"020101"
       )
       .leftValue is SerdeError.validation(
       "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
@@ -322,7 +315,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     val requestId  = RequestId.unsafe(1)
-    val request    = BlocksByHeightsRequest(requestId, AVector((chainIndex, AVector(1, 2))))
+    val request =
+      BlocksByHeightsRequest(requestId, AVector((chainIndex, BlockHeightRange(1, 2, 1))))
     verifySerde(request) {
       // code id
       hex"13" ++
@@ -332,12 +326,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         hex"01" ++
         // chain index
         hex"0000" ++
-        // number of heights
-        hex"02" ++
-        // height0
-        serialize(1) ++
-        // height1
-        serialize(2)
+        // range
+        hex"010201"
     }
 
     val block0   = blockGen.sample.get
@@ -368,10 +358,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"01" ++
           // invalid chain index
           hex"0500" ++
-          // number of heights
-          hex"01" ++
-          // height
-          serialize(1)
+          // range
+          hex"010201"
       )
       .leftValue is SerdeError.validation(
       "Invalid ChainIndex or data in BlocksByHeightsRequest payload"
@@ -387,10 +375,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"01" ++
           // chain index
           hex"0000" ++
-          // number of heights
-          hex"01" ++
-          // invalid height
-          serialize(-1)
+          // invalid range
+          hex"020101"
       )
       .leftValue is SerdeError.validation(
       "Invalid ChainIndex or data in BlocksByHeightsRequest payload"

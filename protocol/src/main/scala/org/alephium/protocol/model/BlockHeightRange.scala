@@ -40,4 +40,6 @@ object BlockHeightRange {
     assume(range.isValid(), s"Invalid block height range: ${range}")
     range
   }
+
+  def fromHeight(height: Int): BlockHeightRange = from(height, height, 1)
 }

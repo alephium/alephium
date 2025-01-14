@@ -451,14 +451,14 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       (0, 0, AVector(0, 2))
     )
     testCases.foreach { case (remoteHeight, localHeight, requestHeights) =>
-      SyncV2Handler.calculateRequestSpan(remoteHeight, localHeight) is requestHeights
+      SyncV2Handler.calculateRequestSpan(remoteHeight, localHeight).heights is requestHeights
     }
   }
 
   trait SyncV2Fixture extends Fixture {
     val defaultRequestId = RequestId.unsafe(1)
 
-    def expectHeadersRequest(chains: AVector[(ChainIndex, AVector[Int])]): RequestId = {
+    def expectHeadersRequest(chains: AVector[(ChainIndex, BlockHeightRange)]): RequestId = {
       var requestId: RequestId = RequestId.unsafe(0)
       connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
         val payload = Message
@@ -491,7 +491,10 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       val bestTip = ChainTip(BlockHash.random, bestHeight, Weight.zero)
       val state   = StatePerChain(chainIndex, bestTip)
       brokerHandlerActor.findingAncestorStates = Some(AVector(state))
-      val request = HeadersByHeightsRequest(defaultRequestId, AVector((chainIndex, AVector(0))))
+      val request = HeadersByHeightsRequest(
+        defaultRequestId,
+        AVector((chainIndex, BlockHeightRange.fromHeight(0)))
+      )
       brokerHandlerActor.pendingRequests(request.id) = RequestInfo(request, None)
     }
 
@@ -518,7 +521,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     }
     brokerHandler ! BaseBrokerHandler.GetAncestors(chains)
 
-    val requests = mutable.ArrayBuffer.empty[(ChainIndex, AVector[Int])]
+    val requests = mutable.ArrayBuffer.empty[(ChainIndex, BlockHeightRange)]
     brokerHandlerActor.findingAncestorStates.isDefined is true
     brokerHandlerActor.findingAncestorStates.get.foreachWithIndex { case (state, index) =>
       val ChainTipInfo(chainIndex, bestTip, selfTip) = chains(index)
@@ -534,7 +537,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "clear the pending requests when the GetAncestors request is received" in new GetAncestorsFixture {
-    brokerHandler ! BaseBrokerHandler.GetSkeletons(AVector((chainIndex, AVector(50, 100))))
+    brokerHandler ! BaseBrokerHandler.GetSkeletons(
+      AVector((chainIndex, BlockHeightRange.from(50, 100, 50)))
+    )
     eventually(brokerHandlerActor.pendingRequests.nonEmpty is true)
     val requestId = brokerHandlerActor.pendingRequests.head._1
 
@@ -601,35 +606,35 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     state.binarySearch is Some((0, 30))
     state.ancestor is None
 
-    val requestId0 = expectHeadersRequest(AVector((chainIndex, AVector(15))))
+    val requestId0 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(15))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId0, AVector(AVector(unknownHeader)))
     )
     state.binarySearch is Some((0, 15))
     state.ancestor is None
 
-    val requestId1 = expectHeadersRequest(AVector((chainIndex, AVector(7))))
+    val requestId1 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(7))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId1, AVector(AVector(headers(6))))
     )
     state.binarySearch is Some((7, 15))
     state.ancestor is Some(headers(6))
 
-    val requestId2 = expectHeadersRequest(AVector((chainIndex, AVector(11))))
+    val requestId2 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(11))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId2, AVector(AVector(headers(10))))
     )
     state.binarySearch is Some((11, 15))
     state.ancestor is Some(headers(10))
 
-    val requestId3 = expectHeadersRequest(AVector((chainIndex, AVector(13))))
+    val requestId3 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(13))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId3, AVector(AVector(unknownHeader)))
     )
     state.binarySearch is Some((11, 13))
     state.ancestor is Some(headers(10))
 
-    val requestId4 = expectHeadersRequest(AVector((chainIndex, AVector(12))))
+    val requestId4 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(12))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId4, AVector(AVector(headers(11))))
     )
@@ -644,7 +649,10 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "work when receiving genesis header" in new GetAncestorsFixture {
     import SyncV2Handler.RequestInfo
     prepare(chainIndex, 2)
-    val request = HeadersByHeightsRequest(defaultRequestId, AVector((chainIndex, AVector(0, 2))))
+    val request = HeadersByHeightsRequest(
+      defaultRequestId,
+      AVector((chainIndex, BlockHeightRange.from(0, 2, 2)))
+    )
     brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(request, None)
 
     val header        = emptyBlock(blockFlow, chainIndex).header
@@ -671,7 +679,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       )
       state.binarySearch is Some((0, lastHeight))
       lastHeight = lastHeight / 2
-      lastRequestId = expectHeadersRequest(AVector((chainIndex, AVector(lastHeight))))
+      lastRequestId =
+        expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(lastHeight))))
       blockFlowSynchronizer.expectNoMessage()
       brokerHandlerActor.findingAncestorStates.isDefined is true
     }
@@ -685,7 +694,10 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "handle HeadersByHeightsRequest" in new Fixture {
-    val request    = HeadersByHeightsRequest(RequestId.unsafe(1), AVector((chainIndex, AVector(0))))
+    val request = HeadersByHeightsRequest(
+      RequestId.unsafe(1),
+      AVector((chainIndex, BlockHeightRange.fromHeight(0)))
+    )
     val blockchain = blockFlow.getBlockChain(chainIndex)
     val headers    = AVector(AVector(blockchain.getBlockHeaderUnsafe(blockchain.genesisHash)))
     brokerHandler ! BaseBrokerHandler.Received(request)
@@ -703,7 +715,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   trait GetSkeletonFixture extends SyncV2Fixture {
     import SyncV2Handler._
 
-    def prepare(chains: AVector[(ChainIndex, AVector[Int])]) = {
+    def prepare(chains: AVector[(ChainIndex, BlockHeightRange)]) = {
       val request     = HeadersByHeightsRequest(defaultRequestId, chains)
       val requestInfo = RequestInfo(request, None)
       brokerHandlerActor.pendingRequests.addOne((request.id, requestInfo))
@@ -711,13 +723,13 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "handle GetSkeleton request" in new GetSkeletonFixture {
-    val chains = AVector((chainIndex, AVector(50, 100)))
+    val chains = AVector((chainIndex, BlockHeightRange.from(50, 100, 50)))
     brokerHandler ! BaseBrokerHandler.GetSkeletons(chains)
     expectHeadersRequest(AVector.from(chains))
   }
 
   it should "handle GetSkeleton response" in new GetSkeletonFixture {
-    val chains = AVector((chainIndex, AVector(50, 100)))
+    val chains = AVector((chainIndex, BlockHeightRange.from(50, 100, 50)))
     prepare(chains)
 
     val headers = AVector.fill(2)(emptyBlock(blockFlow, chainIndex).header)
@@ -745,7 +757,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     import SyncV2Handler._
 
     def prepare(tasks: AVector[BlockDownloadTask]) = {
-      val chains      = tasks.map(t => (t.chainIndex, t.heights))
+      val chains      = tasks.map(t => (t.chainIndex, t.heightRange))
       val request     = BlocksByHeightsRequest(defaultRequestId, chains)
       val requestInfo = RequestInfo(request, Some(BaseBrokerHandler.DownloadBlockTasks(tasks)))
       brokerHandlerActor.pendingRequests.addOne((request.id, requestInfo))
@@ -761,13 +773,13 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
         .rightValue
         .payload
         .asInstanceOf[BlocksByHeightsRequest]
-      payload.data is AVector((chainIndex, AVector.from(1 to 50)))
+      payload.data is AVector((chainIndex, BlockHeightRange.from(1, 50, 1)))
     }
   }
 
   it should "handle blocks request" in new DownloadBlocksFixture {
     val blocks  = genBlocks(4)
-    val heights = AVector((chainIndex, AVector.from(1 to 4)))
+    val heights = AVector((chainIndex, BlockHeightRange.from(1, 4, 1)))
     brokerHandler ! BaseBrokerHandler.Received(BlocksByHeightsRequest(defaultRequestId, heights))
     connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
       val payload = Message
@@ -847,8 +859,11 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "check pending requests" in new SyncV2Fixture {
     import SyncV2Handler.RequestInfo
 
-    val now         = TimeStamp.now()
-    val request     = HeadersByHeightsRequest(defaultRequestId, AVector((chainIndex, AVector(1))))
+    val now = TimeStamp.now()
+    val request = HeadersByHeightsRequest(
+      defaultRequestId,
+      AVector((chainIndex, BlockHeightRange.fromHeight(1)))
+    )
     val requestInfo = RequestInfo(request, None, now.minusUnsafe(Duration.ofSecondsUnsafe(3)))
     brokerHandlerActor.pendingRequests.addOne((defaultRequestId, requestInfo))
 
