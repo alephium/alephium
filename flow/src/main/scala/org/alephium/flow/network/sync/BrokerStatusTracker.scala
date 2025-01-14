@@ -23,7 +23,7 @@ import org.alephium.flow.core.maxSyncBlocksPerChain
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.SyncState.{BlockDownloadTask, TaskId}
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
@@ -33,27 +33,22 @@ object BrokerStatusTracker {
 
   val MaxRequestNum: Int = maxSyncBlocksPerChain * 16
 
-  final class BrokerStatus(val info: BrokerInfo, val version: ProtocolVersion) {
-    private[sync] var tips: Option[AVector[ChainTip]] = None
-    private[sync] var requestNum                      = 0
-    private[sync] val pendingTasks                    = mutable.Set.empty[BlockDownloadTask]
+  final class BrokerStatus(
+      val info: BrokerInfo,
+      val version: ProtocolVersion,
+      private[sync] val tips: Array[Option[ChainTip]]
+  ) {
+    private[sync] var requestNum   = 0
+    private[sync] val pendingTasks = mutable.Set.empty[BlockDownloadTask]
     private[sync] val missedBlocks = mutable.HashMap.empty[ChainIndex, mutable.Set[TaskId]]
 
-    def contains(chainIndex: ChainIndex): Boolean = info.contains(chainIndex.from)
+    def updateTips(newTips: AVector[ChainTip])(implicit groupConfig: GroupConfig): Unit =
+      newTips.foreach(tip => tips(tip.chainIndex.flattenIndex) = Some(tip))
 
-    def updateTips(newTips: AVector[ChainTip]): Unit = tips = Some(newTips)
+    def getChainTip(chainIndex: ChainIndex)(implicit groupConfig: GroupConfig): Option[ChainTip] =
+      tips(chainIndex.flattenIndex)
 
-    def getChainTip(
-        chainIndex: ChainIndex
-    )(implicit brokerConfig: BrokerConfig): Option[ChainTip] = {
-      if (contains(chainIndex)) {
-        tips.flatMap(_.find(_.chainIndex == chainIndex))
-      } else {
-        None
-      }
-    }
-
-    def canDownload(task: BlockDownloadTask)(implicit brokerConfig: BrokerConfig): Boolean = {
+    def canDownload(task: BlockDownloadTask)(implicit groupConfig: GroupConfig): Boolean = {
       requestNum < MaxRequestNum &&
       !pendingTasks.contains(task) &&
       !containsMissedBlocks(task.chainIndex, task.id) &&
@@ -93,8 +88,11 @@ object BrokerStatusTracker {
   }
 
   object BrokerStatus {
-    def apply(info: BrokerInfo, version: ProtocolVersion): BrokerStatus =
-      new BrokerStatus(info, version)
+    def apply(info: BrokerInfo, version: ProtocolVersion)(implicit
+        groupConfig: GroupConfig
+    ): BrokerStatus = {
+      new BrokerStatus(info, version, Array.fill(groupConfig.chainNum)(None))
+    }
   }
 }
 

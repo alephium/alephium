@@ -83,12 +83,15 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   }
 
   it should "getChainTip" in new BrokerStatusFixture {
-    status.tips.isEmpty is true
+    status.tips.length is brokerConfig.chainNum
+    status.tips.foreach(_.isEmpty is true)
     chainIndexes.foreach(status.getChainTip(_) is None)
 
     val chainTips = genChainTips()
     status.updateTips(chainTips)
-    status.tips is Some(chainTips)
+    status.tips is (Array.from(chainTips.map(Some(_))) ++ Array.fill(
+      brokerConfig.chainNum - chainTips.length
+    )(None))
 
     chainIndexes.foreachWithIndex { case (chainIndex, index) =>
       status.getChainTip(chainIndex) is Some(chainTips(index))
