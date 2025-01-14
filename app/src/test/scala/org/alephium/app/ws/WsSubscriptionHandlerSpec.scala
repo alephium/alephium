@@ -31,7 +31,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsNotificationParams, WsSubscriptionId}
 import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler._
-import org.alephium.app.ws.WsSubscriptionsState.{ContractKey, SubscriptionOfConnection}
+import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
@@ -390,7 +390,7 @@ class WsSubscriptionHandlerSpec
         params_addr_3_unfiltered
       )
 
-    val subscriptionRequests: AVector[(SubscriptionOfConnection, ContractKey)] =
+    val subscriptionRequests: AVector[(SubscriptionOfConnection, ContractEventKey)] =
       websockets.flatMap { ws =>
         contractEventParams.foreach { params =>
           subscriptionHandler ! Subscribe(Correlation(correlationId.toLong), ws, params)
@@ -455,9 +455,9 @@ class WsSubscriptionHandlerSpec
     eventually {
       val response = getSubscriptions(subscriptionHandler)
       response.subscriptionsByAddress is Map
-        .empty[ContractKey, AVector[SubscriptionOfConnection]]
+        .empty[ContractEventKey, AVector[SubscriptionOfConnection]]
       response.addressesBySubscriptionId is Map
-        .empty[SubscriptionOfConnection, AVector[ContractKey]]
+        .empty[SubscriptionOfConnection, AVector[ContractEventKey]]
     }
 
     websockets.foreach { ws =>

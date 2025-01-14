@@ -40,13 +40,13 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 
   it should "be idempotent on adding new contract event subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
-    subscriptionsState.addSubscriptionForContractKeys(
-      params_addr_01_eventIndex_0.toContractKeys,
+    subscriptionsState.addSubscriptionForContractEventKeys(
+      params_addr_01_eventIndex_0.toContractEventKeys,
       subscription_addr_01_eventIndex_0
     )
     val result_1 = subscriptionsState.contractSubscriptionMappings.toMap
-    subscriptionsState.addSubscriptionForContractKeys(
-      params_addr_01_eventIndex_0.toContractKeys,
+    subscriptionsState.addSubscriptionForContractEventKeys(
+      params_addr_01_eventIndex_0.toContractEventKeys,
       subscription_addr_01_eventIndex_0
     )
     val result_2 = subscriptionsState.contractSubscriptionMappings.toMap
@@ -67,11 +67,11 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
     )
 
     subscriptionsState.contractAddressMappings is mutable.Map(
-      subscription_addr_01_eventIndex_0 -> params_addr_01_eventIndex_0.toContractKeys
+      subscription_addr_01_eventIndex_0 -> params_addr_01_eventIndex_0.toContractEventKeys
     )
 
     subscriptionsState.contractSubscriptionMappings is mutable.Map.from(
-      params_addr_01_eventIndex_0.toContractKeys.map(
+      params_addr_01_eventIndex_0.toContractEventKeys.map(
         _ -> AVector(subscription_addr_01_eventIndex_0)
       )
     )
@@ -146,17 +146,17 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
     )
 
     subscriptionsState.contractAddressMappings is mutable.Map(
-      subscription_addr_12_eventIndex_1 -> params_addr_12_eventIndex_1.toContractKeys,
-      subscription_addr_2_eventIndex_1  -> params_addr_2_eventIndex_1.toContractKeys
+      subscription_addr_12_eventIndex_1 -> params_addr_12_eventIndex_1.toContractEventKeys,
+      subscription_addr_2_eventIndex_1  -> params_addr_2_eventIndex_1.toContractEventKeys
     )
 
     val expectedKeys =
-      params_addr_12_eventIndex_1.toContractKeys ++ params_addr_2_eventIndex_1.toContractKeys
+      params_addr_12_eventIndex_1.toContractEventKeys ++ params_addr_2_eventIndex_1.toContractEventKeys
     subscriptionsState.contractSubscriptionMappings.keys.toSet is expectedKeys.toSet
 
     val sharedSubscriptionsByAddress =
       AVector(subscription_addr_12_eventIndex_1, subscription_addr_2_eventIndex_1)
-    val sharedContractKeyBySubscriptions = params_addr_2_eventIndex_1.toContractKeys.head
+    val sharedContractKeyBySubscriptions = params_addr_2_eventIndex_1.toContractEventKeys.head
     subscriptionsState.contractSubscriptionMappings(
       sharedContractKeyBySubscriptions
     ) is sharedSubscriptionsByAddress
@@ -168,10 +168,10 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
     )
 
     subscriptionsState.contractAddressMappings is mutable.Map(
-      subscription_addr_2_eventIndex_1 -> params_addr_2_eventIndex_1.toContractKeys
+      subscription_addr_2_eventIndex_1 -> params_addr_2_eventIndex_1.toContractEventKeys
     )
 
-    subscriptionsState.contractSubscriptionMappings.keys.toSet is params_addr_2_eventIndex_1.toContractKeys.toSet
+    subscriptionsState.contractSubscriptionMappings.keys.toSet is params_addr_2_eventIndex_1.toContractEventKeys.toSet
     subscriptionsState.contractSubscriptionMappings.foreachEntry { case (_, subscriptions) =>
       subscriptions.length is 1
       subscriptions.head is subscription_addr_2_eventIndex_1
@@ -181,8 +181,8 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   "removing subscription by address" should "not allow for addresses with 0 subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
     subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
-    params_addr_12_eventIndex_1.toContractKeys.map { contractKey =>
-      subscriptionsState.removeSubscriptionByContractKey(
+    params_addr_12_eventIndex_1.toContractEventKeys.map { contractKey =>
+      subscriptionsState.removeSubscriptionByContractEventKey(
         contractKey,
         subscription_addr_12_eventIndex_1
       )

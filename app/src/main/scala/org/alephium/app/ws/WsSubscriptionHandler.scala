@@ -29,7 +29,7 @@ import io.vertx.core.eventbus.{Message, MessageConsumer}
 
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsRequest.Correlation
-import org.alephium.app.ws.WsSubscriptionsState.{ContractKey, SubscriptionOfConnection}
+import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json.write
 import org.alephium.rpc.model.JsonRPC
@@ -81,8 +81,8 @@ protected[ws] object WsSubscriptionHandler {
 
   final case class WsImmutableSubscriptions(
       subscriptions: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
-      subscriptionsByAddress: Map[ContractKey, AVector[SubscriptionOfConnection]],
-      addressesBySubscriptionId: Map[SubscriptionOfConnection, AVector[ContractKey]]
+      subscriptionsByAddress: Map[ContractEventKey, AVector[SubscriptionOfConnection]],
+      addressesBySubscriptionId: Map[SubscriptionOfConnection, AVector[ContractEventKey]]
   ) extends CommandResponse
 
   final protected[ws] case class Subscribe(

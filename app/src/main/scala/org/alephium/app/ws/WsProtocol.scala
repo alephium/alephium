@@ -22,7 +22,11 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
 import org.alephium.app.ws.WsParams.WsSubscriptionParams
 import org.alephium.app.ws.WsRequest.Correlation
-import org.alephium.app.ws.WsSubscriptionsState.{AddressKey, AddressWithEventIndexKey, ContractKey}
+import org.alephium.app.ws.WsSubscriptionsState.{
+  AddressKey,
+  AddressWithEventIndexKey,
+  ContractEventKey
+}
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
@@ -82,7 +86,7 @@ protected[ws] object WsParams {
             .map(address => s"$eventType/${eventIndex.getOrElse("")}/$address")
             .mkString(",")
         )
-    def toContractKeys: AVector[ContractKey] = eventIndex match {
+    def toContractEventKeys: AVector[ContractEventKey] = eventIndex match {
       case Some(index) => addresses.map(addr => AddressWithEventIndexKey(addr.toBase58, index))
       case None        => addresses.map(addr => AddressKey(addr.toBase58))
     }

@@ -29,25 +29,25 @@ import org.alephium.app.ws.WsParams.{
 import org.alephium.app.ws.WsSubscriptionsState.{
   AddressKey,
   AddressWithEventIndexKey,
-  ContractKey,
+  ContractEventKey,
   SubscriptionOfConnection
 }
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
 /** WsSubscriptionHandler actor state (mutable for performance reasons) with many-to-many
-  * relationship between subscription and contract event addresses
+  * relationship between subscription of a connection and contract event keys
   * @param connections
   *   client who unsubscribes from all subscriptions is connected but not subscribed to any events
   * @param contractSubscriptionMappings
-  *   index by address
+  *   index by contractEventKey, either address or an address with eventIndex
   * @param contractAddressMappings
-  *   index by subscription id
+  *   index by subscriptionId of particular connection
   */
 final case class WsSubscriptionsState[C: ClassTag](
     connections: mutable.Map[WsId, AVector[(WsSubscriptionId, C)]],
-    contractSubscriptionMappings: mutable.Map[ContractKey, AVector[SubscriptionOfConnection]],
-    contractAddressMappings: mutable.Map[SubscriptionOfConnection, AVector[ContractKey]]
+    contractSubscriptionMappings: mutable.Map[ContractEventKey, AVector[SubscriptionOfConnection]],
+    contractAddressMappings: mutable.Map[SubscriptionOfConnection, AVector[ContractEventKey]]
 ) {
 
   def getConsumer(wsId: WsId, subscriptionId: WsSubscriptionId): Option[C] = {
@@ -82,12 +82,12 @@ final case class WsSubscriptionsState[C: ClassTag](
     (filteredSubscriptions ++ unfilteredSubscriptions).map(_.subscriptionId).distinct
   }
 
-  protected[ws] def addSubscriptionForContractKeys(
-      contractKeys: AVector[ContractKey],
+  protected[ws] def addSubscriptionForContractEventKeys(
+      contractEventKeys: AVector[ContractEventKey],
       subscriptionOfConnection: SubscriptionOfConnection
   ): Unit =
-    contractKeys.foreach { contractKey =>
-      contractSubscriptionMappings.updateWith(contractKey) {
+    contractEventKeys.foreach { contractEventKey =>
+      contractSubscriptionMappings.updateWith(contractEventKey) {
         case Some(ss) if ss.contains(subscriptionOfConnection) =>
           // should never happen as we test for it at SubscriptionHandler
           Some(ss)
@@ -113,19 +113,19 @@ final case class WsSubscriptionsState[C: ClassTag](
     params match {
       case contractParams: ContractEventsSubscribeParams =>
         val subscriptionOfConnection = SubscriptionOfConnection(wsId, subscriptionId)
-        val contractKeys             = contractParams.toContractKeys
-        addSubscriptionForContractKeys(contractKeys, subscriptionOfConnection)
-        contractAddressMappings.put(subscriptionOfConnection, contractKeys)
+        val contractEventKeys        = contractParams.toContractEventKeys
+        addSubscriptionForContractEventKeys(contractEventKeys, subscriptionOfConnection)
+        contractAddressMappings.put(subscriptionOfConnection, contractEventKeys)
         ()
       case _ =>
     }
   }
 
-  protected[ws] def removeSubscriptionByContractKey(
-      contractKey: ContractKey,
+  protected[ws] def removeSubscriptionByContractEventKey(
+      contractEventKey: ContractEventKey,
       subscriptionOfConnection: SubscriptionOfConnection
   ): Option[AVector[SubscriptionOfConnection]] =
-    contractSubscriptionMappings.updateWith(contractKey) {
+    contractSubscriptionMappings.updateWith(contractEventKey) {
       case None     => None
       case Some(ss) => Option(ss.filterNot(_ == subscriptionOfConnection)).filter(_.nonEmpty)
     }
@@ -136,16 +136,16 @@ final case class WsSubscriptionsState[C: ClassTag](
     val subscriptionOfConnection = SubscriptionOfConnection(wsId, subscriptionId)
     contractAddressMappings
       .remove(subscriptionOfConnection)
-      .foreach { contractKey =>
-        contractKey.foreach(removeSubscriptionByContractKey(_, subscriptionOfConnection))
+      .foreach { contractEventKey =>
+        contractEventKey.foreach(removeSubscriptionByContractEventKey(_, subscriptionOfConnection))
       }
   }
 
   def removeAllSubscriptions(wsId: WsId): Unit = {
     connections.remove(wsId)
 
-    AVector.from(contractSubscriptionMappings.keysIterator).foreach { contractKey =>
-      contractSubscriptionMappings.updateWith(contractKey) {
+    AVector.from(contractSubscriptionMappings.keysIterator).foreach { contractEventKey =>
+      contractSubscriptionMappings.updateWith(contractEventKey) {
         case Some(ss) => Option(ss.filterNot(_.wsId == wsId)).filter(_.nonEmpty)
         case None     => None
       }
@@ -159,11 +159,11 @@ final case class WsSubscriptionsState[C: ClassTag](
 }
 
 object WsSubscriptionsState {
-  sealed trait ContractKey
+  sealed trait ContractEventKey
 
-  final case class AddressKey(address: String) extends ContractKey
+  final case class AddressKey(address: String) extends ContractEventKey
   final case class AddressWithEventIndexKey(address: String, eventIndex: WsEventIndex)
-      extends ContractKey
+      extends ContractEventKey
 
   final protected[ws] case class SubscriptionOfConnection(
       wsId: WsId,
@@ -178,7 +178,7 @@ object WsSubscriptionsState {
   def empty[C: ClassTag](): WsSubscriptionsState[C] =
     WsSubscriptionsState[C](
       mutable.Map.empty[WsId, AVector[(WsSubscriptionId, C)]],
-      mutable.Map.empty[ContractKey, AVector[SubscriptionOfConnection]],
-      mutable.Map.empty[SubscriptionOfConnection, AVector[ContractKey]]
+      mutable.Map.empty[ContractEventKey, AVector[SubscriptionOfConnection]],
+      mutable.Map.empty[SubscriptionOfConnection, AVector[ContractEventKey]]
     )
 }

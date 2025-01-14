@@ -50,7 +50,7 @@ import org.alephium.app.ws.WsSubscriptionHandler.{
   SubscriptionMsg,
   WsImmutableSubscriptions
 }
-import org.alephium.app.ws.WsSubscriptionsState.{ContractKey, SubscriptionOfConnection}
+import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
 import org.alephium.protocol.Hash
@@ -259,10 +259,10 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
   protected def flattenParams(
       wsId: WsId,
       paramss: AVector[ContractEventsSubscribeParams]
-  ): AVector[(SubscriptionOfConnection, ContractKey)] = {
+  ): AVector[(SubscriptionOfConnection, ContractEventKey)] = {
     assume(paramss.length == paramss.map(_.subscriptionId).toSet.size)
     paramss.flatMap { params =>
-      params.toContractKeys.map { contractKey =>
+      params.toContractEventKeys.map { contractKey =>
         SubscriptionOfConnection(wsId, params.subscriptionId) -> contractKey
       }
     }

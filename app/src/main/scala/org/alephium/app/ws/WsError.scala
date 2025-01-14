@@ -26,7 +26,7 @@ object WsError {
   private val AlreadyUnSubscribed: Int       = -32011
   private val SubscriptionLimitExceeded: Int = -32012
 
-  private val contractParamsObject = "{address: [String], eventIndex?: Integer}"
+  private val ContractParamsObject = "{address: [String], eventIndex?: Integer}"
 
   protected[ws] def invalidUnsubscriptionFormat(json: ujson.Value): Error =
     Error(
@@ -70,13 +70,13 @@ object WsError {
   protected[ws] def invalidParamsFormat(json: ujson.Value): Error =
     Error(
       Error.InvalidParamsCode,
-      s"Invalid params format: $json. Expected an array of size 1: [$BlockEvent | $TxEvent], or size 2: [$ContractEvent, $contractParamsObject]"
+      s"Invalid params format: $json. Expected an array of size 1: [$BlockEvent | $TxEvent], or size 2: [$ContractEvent, $ContractParamsObject]"
     )
 
   protected[ws] def invalidContractParamsFormat(json: ujson.Obj): Error =
     Error(
       Error.InvalidParamsCode,
-      s"Invalid contract params object: $json, expected: $contractParamsObject"
+      s"Invalid contract params object: $json, expected: $ContractParamsObject"
     )
 
   protected[ws] def invalidContractParamsEventIndexType(json: ujson.Value): Error =
