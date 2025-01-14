@@ -16,7 +16,11 @@
 
 package org.alephium.app.ws
 
-import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams.ContractEvent
+import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams.{
+  AddressesField,
+  ContractEvent,
+  EventIndexField
+}
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{BlockEvent, TxEvent}
 import org.alephium.app.ws.WsParams.WsSubscriptionId
 import org.alephium.rpc.model.JsonRPC.Error
@@ -26,7 +30,7 @@ object WsError {
   private val AlreadyUnSubscribed: Int       = -32011
   private val SubscriptionLimitExceeded: Int = -32012
 
-  private val ContractParamsObject = "{address: [String], eventIndex?: Integer}"
+  private val ContractParamsObject = s"{$AddressesField: [String], $EventIndexField?: Integer}"
 
   protected[ws] def invalidUnsubscriptionFormat(json: ujson.Value): Error =
     Error(
