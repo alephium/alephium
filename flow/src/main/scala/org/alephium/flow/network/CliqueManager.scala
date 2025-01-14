@@ -32,7 +32,7 @@ object CliqueManager {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       discoveryServer: ActorRefT[DiscoveryServer.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
       numBootstrapNodes: Int
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
@@ -55,7 +55,7 @@ class CliqueManager(
     blockflow: BlockFlow,
     allHandlers: AllHandlers,
     discoveryServer: ActorRefT[DiscoveryServer.Command],
-    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
+    blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
     numBootstrapNodes: Int
 )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting)
     extends BaseActor

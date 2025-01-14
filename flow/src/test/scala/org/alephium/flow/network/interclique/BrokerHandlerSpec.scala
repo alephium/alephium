@@ -405,7 +405,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     setRemoteBrokerInfo()
     val tips = genChainTips()
     brokerHandler ! BaseBrokerHandler.Received(ChainState(tips))
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.ChainState(tips))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateChainState(tips))
   }
 
   it should "stop handler and publish misbehavior if the tip size is invalid" in new Fixture {
@@ -551,7 +551,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(defaultRequestId, AVector(blocks.map(_.header)))
     )
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 4))))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 4))))
     brokerHandlerActor.pendingRequests.isEmpty is true
     brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
@@ -633,7 +633,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId4, AVector(AVector(headers(11))))
     )
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 12))))
+    blockFlowSynchronizer.expectMsg(
+      BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 12)))
+    )
     state.binarySearch.isEmpty is true
     connectionHandler.expectNoMessage()
     brokerHandlerActor.findingAncestorStates.isEmpty is true
@@ -651,7 +653,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(defaultRequestId, AVector(AVector(genesisHeader, header)))
     )
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 0))))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 0))))
     connectionHandler.expectNoMessage()
     brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
@@ -677,7 +679,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(lastRequestId, AVector(AVector(unknownHeader)))
     )
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Ancestors(AVector((chainIndex, 0))))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 0))))
     connectionHandler.expectNoMessage()
     brokerHandlerActor.findingAncestorStates.isEmpty is true
   }
@@ -723,7 +725,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       HeadersByHeightsResponse(defaultRequestId, AVector(headers))
     )
     eventually(brokerHandlerActor.pendingRequests.contains(defaultRequestId) is false)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.Skeletons(chains, AVector(headers)))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateSkeletons(chains, AVector(headers)))
 
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
@@ -788,7 +790,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     eventually(brokerHandlerActor.pendingRequests.contains(defaultRequestId) is false)
     blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.BlockDownloaded(AVector((task0, blocks, true)))
+      BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task0, blocks, true)))
     )
 
     val task1 = task0.copy(toHeader = None)
@@ -797,7 +799,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       BlocksByHeightsResponse(defaultRequestId, AVector(blocks))
     )
     blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.BlockDownloaded(AVector((task1, blocks, true)))
+      BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task1, blocks, true)))
     )
 
     val task2 = task0.copy(toHeader = Some(blocks.head.header))
@@ -806,7 +808,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       BlocksByHeightsResponse(defaultRequestId, AVector(blocks))
     )
     blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.BlockDownloaded(AVector((task2, blocks, false)))
+      BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task2, blocks, false)))
     )
   }
 
@@ -999,7 +1001,7 @@ object TestBrokerHandler {
       blockflow: BlockFlow,
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
       seenTxExpiryDuration: Duration
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
@@ -1025,7 +1027,7 @@ class TestBrokerHandler(
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
-    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
     override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
     override val seenTxExpiryDuration: Duration
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)

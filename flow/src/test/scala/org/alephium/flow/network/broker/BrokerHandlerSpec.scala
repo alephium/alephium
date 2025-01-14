@@ -226,7 +226,7 @@ object TestBrokerHandler {
       pingFrequency: Duration,
       remoteAddress: InetSocketAddress,
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
       blockflow: BlockFlow,
       allHandlers: AllHandlers
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
@@ -247,7 +247,7 @@ class TestBrokerHandler(
     val pingFrequency: Duration,
     val remoteAddress: InetSocketAddress,
     val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent],
+    val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)

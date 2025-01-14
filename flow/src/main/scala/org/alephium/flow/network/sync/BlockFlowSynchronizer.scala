@@ -43,20 +43,20 @@ object BlockFlowSynchronizer {
   ): Props =
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
-  sealed trait CommandOrEvent
-  case object Sync                                                      extends CommandOrEvent
-  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends CommandOrEvent
-  case object CleanDownloading                                          extends CommandOrEvent
-  final case class BlockAnnouncement(hash: BlockHash)                   extends CommandOrEvent
-  final case class ChainState(tips: AVector[ChainTip])                  extends CommandOrEvent
-  final case class Ancestors(chains: AVector[(ChainIndex, Int)])        extends CommandOrEvent
-  final case class Skeletons(
+  sealed trait Command
+  case object Sync                                                      extends Command
+  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
+  case object CleanDownloading                                          extends Command
+  final case class BlockAnnouncement(hash: BlockHash)                   extends Command
+  final case class UpdateChainState(tips: AVector[ChainTip])            extends Command
+  final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)])  extends Command
+  final case class UpdateSkeletons(
       requests: AVector[(ChainIndex, AVector[Int])],
       responses: AVector[AVector[BlockHeader]]
-  ) extends CommandOrEvent
-  final case class BlockDownloaded(
+  ) extends Command
+  final case class UpdateBlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
-  ) extends CommandOrEvent
+  ) extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -183,16 +183,16 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
       }
       handleSelfChainState(chainState.tips)
 
-    case BlockFlowSynchronizer.ChainState(tips) =>
+    case BlockFlowSynchronizer.UpdateChainState(tips) =>
       handlePeerChainState(tips)
 
-    case BlockFlowSynchronizer.Ancestors(ancestors) =>
+    case BlockFlowSynchronizer.UpdateAncestors(ancestors) =>
       handleAncestors(ancestors)
 
-    case BlockFlowSynchronizer.Skeletons(requests, responses) =>
+    case BlockFlowSynchronizer.UpdateSkeletons(requests, responses) =>
       handleSkeletons(requests, responses)
 
-    case BlockFlowSynchronizer.BlockDownloaded(result) =>
+    case BlockFlowSynchronizer.UpdateBlockDownloaded(result) =>
       handleBlockDownloaded(result)
 
     case Terminated(actor) => onBrokerTerminated(ActorRefT(actor))

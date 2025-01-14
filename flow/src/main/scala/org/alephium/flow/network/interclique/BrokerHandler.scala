@@ -336,7 +336,7 @@ trait SyncV2Handler { _: BrokerHandler =>
           log.debug(
             s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
           )
-          blockFlowSynchronizer ! BlockFlowSynchronizer.ChainState(tips)
+          blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(tips)
           selfChainTips.foreach(checkSyncedByChainState(_, tips))
           remoteChainTips = Some(tips)
         } else {
@@ -462,7 +462,7 @@ trait SyncV2Handler { _: BrokerHandler =>
                 val isValid = SyncV2Handler.validateBlocks(blocks, task.size, task.toHeader)
                 (task, blocks, isValid)
               }
-              blockFlowSynchronizer ! BlockFlowSynchronizer.BlockDownloaded(result)
+              blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateBlockDownloaded(result)
             } else {
               log.error(
                 s"Received invalid BlocksByHeightsResponse from $remoteAddress: ${BrokerHandler.showFlowData(blockss)}"
@@ -620,7 +620,7 @@ trait SyncV2Handler { _: BrokerHandler =>
               log.info(
                 s"Found ancestors between self and the peer $remoteAddress: ${BrokerHandler.showAncestors(ancestors)}"
               )
-              blockFlowSynchronizer ! BlockFlowSynchronizer.Ancestors(ancestors)
+              blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateAncestors(ancestors)
             }
           }
           findingAncestorStates = None
@@ -638,7 +638,7 @@ trait SyncV2Handler { _: BrokerHandler =>
       response(index).length == heights.length
     }
     if (isValid) {
-      blockFlowSynchronizer ! BlockFlowSynchronizer.Skeletons(requests, response)
+      blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateSkeletons(requests, response)
     } else {
       log.error(
         s"Received invalid skeleton from $remoteAddress: ${BrokerHandler.showFlowData(response)}"

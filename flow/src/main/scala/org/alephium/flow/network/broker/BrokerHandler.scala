@@ -72,7 +72,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def allHandlers: AllHandlers
 
   def brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
-  def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.CommandOrEvent]
+  def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 
   override def receive: Receive = handShaking
 
