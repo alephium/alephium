@@ -55,6 +55,7 @@ object BrokerStatusTracker {
 
     def canDownload(task: BlockDownloadTask)(implicit brokerConfig: BrokerConfig): Boolean = {
       requestNum < MaxRequestNum &&
+      !pendingTasks.contains(task) &&
       !containsMissedBlocks(task.chainIndex, task.id) &&
       getChainTip(task.chainIndex).exists(_.height >= task.toHeight)
     }

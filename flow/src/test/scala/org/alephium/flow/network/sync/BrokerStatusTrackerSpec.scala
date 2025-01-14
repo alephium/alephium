@@ -116,6 +116,10 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.canDownload(task) is true
     status.canDownload(task.copy(toHeight = 6)) is false
     status.canDownload(task.copy(chainIndex = ChainIndex.unsafe(1, 1))) is false
+
+    status.pendingTasks.contains(task) is false
+    status.pendingTasks.add(task)
+    status.canDownload(task) is false
   }
 
   it should "add/get/remove pending requests" in new BrokerStatusFixture {
