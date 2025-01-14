@@ -52,10 +52,8 @@ protected[ws] object WsParams {
     lazy val subscriptionId: WsSubscriptionId = Hash.hash(eventType)
   }
   object SimpleSubscribeParams {
-    private val BlockEvent: WsEventType = "block"
-    private val TxEvent: WsEventType    = "tx"
-
-    protected[ws] val eventTypes: AVector[WsEventType] = AVector(BlockEvent, TxEvent)
+    protected[ws] val BlockEvent: WsEventType = "block"
+    protected[ws] val TxEvent: WsEventType    = "tx"
 
     protected[ws] val Block: SimpleSubscribeParams = SimpleSubscribeParams(BlockEvent)
     protected[ws] val Tx: SimpleSubscribeParams    = SimpleSubscribeParams(TxEvent)
@@ -65,7 +63,7 @@ protected[ws] object WsParams {
         case ujson.Str(eventType) =>
           eventType match {
             case BlockEvent | TxEvent => Right(SimpleSubscribeParams(eventType))
-            case unknown              => Left(WsError.invalidSimpleEventType(unknown))
+            case _                    => Left(WsError.invalidParamsFormat(json))
           }
         case unsupported => Left(WsError.invalidParamsFormat(unsupported))
       }
@@ -125,7 +123,7 @@ protected[ws] object WsParams {
                 case None =>
                   Right(ContractEventsSubscribeParams.from(addresses, None))
                 case Some(value) =>
-                  Left(WsError.invalidContractParamsEventIndexFormat(value))
+                  Left(WsError.invalidContractParamsEventIndexType(value))
               }
             }
         case _ =>
