@@ -412,8 +412,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       )
     eventually {
       val response = getSubscriptions(subscriptionHandler)
-      response.subscriptionsByAddress is expectedSubscriptionsByAddress.iterator.toMap
-      response.addressesBySubscriptionId is expectedAddressesBySubscriptionId.iterator.toMap
+      response.subscriptionsByContractKey is expectedSubscriptionsByAddress.iterator.toMap
+      response.contractKeysBySubscription is expectedAddressesBySubscriptionId.iterator.toMap
     }
 
     // it should be idempotent for subscriptions
@@ -425,8 +425,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
     eventually {
       val response = getSubscriptions(subscriptionHandler)
-      response.subscriptionsByAddress is expectedSubscriptionsByAddress.iterator.toMap
-      response.addressesBySubscriptionId is expectedAddressesBySubscriptionId.iterator.toMap
+      response.subscriptionsByContractKey is expectedSubscriptionsByAddress.iterator.toMap
+      response.contractKeysBySubscription is expectedAddressesBySubscriptionId.iterator.toMap
     }
 
     websockets.foreach { ws =>
@@ -450,9 +450,9 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
     eventually {
       val response = getSubscriptions(subscriptionHandler)
-      response.subscriptionsByAddress is Map
+      response.subscriptionsByContractKey is Map
         .empty[ContractEventKey, AVector[SubscriptionOfConnection]]
-      response.addressesBySubscriptionId is Map
+      response.contractKeysBySubscription is Map
         .empty[SubscriptionOfConnection, AVector[ContractEventKey]]
     }
 
@@ -482,7 +482,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
     ): Assertion = {
       val response = getSubscriptions(subscriptionHandler)
-      response.subscriptions
+      response.connections
         .find(_._1 == ws.textHandlerID())
         .tapEach(_._2.length is 1)
         .exists(_._2.filter(_._1 == subscriptionId).length == 1) is true

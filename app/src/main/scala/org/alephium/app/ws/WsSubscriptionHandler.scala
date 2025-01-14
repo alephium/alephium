@@ -80,9 +80,9 @@ protected[ws] object WsSubscriptionHandler {
   final case object GetSubscriptions             extends Command
 
   final case class WsImmutableSubscriptions(
-      subscriptions: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
-      subscriptionsByAddress: Map[ContractEventKey, AVector[SubscriptionOfConnection]],
-      addressesBySubscriptionId: Map[SubscriptionOfConnection, AVector[ContractEventKey]]
+      connections: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
+      subscriptionsByContractKey: Map[ContractEventKey, AVector[SubscriptionOfConnection]],
+      contractKeysBySubscription: Map[SubscriptionOfConnection, AVector[ContractEventKey]]
   ) extends CommandResponse
 
   final protected[ws] case class Subscribe(
@@ -96,10 +96,6 @@ protected[ws] object WsSubscriptionHandler {
       params: WsSubscriptionParams,
       consumer: MessageConsumer[String]
   ) extends CommandResponse
-  final private case class RequestRejected(
-      ws: ServerWsLike,
-      response: JsonRPC.Response.Failure
-  ) extends CommandResponse
 
   final protected[ws] case class Unsubscribe(
       id: Correlation,
@@ -110,6 +106,11 @@ protected[ws] object WsSubscriptionHandler {
       id: Correlation,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
+  ) extends CommandResponse
+
+  final private case class RequestRejected(
+      ws: ServerWsLike,
+      response: JsonRPC.Response.Failure
   ) extends CommandResponse
 
   final protected[ws] case class Disconnect(id: WsId) extends Command
@@ -127,7 +128,7 @@ protected[ws] class WsSubscriptionHandler(
   import org.alephium.app.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
-  private val openedWebSockets = mutable.Map.empty[WsId, ServerWsLike]
+  private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
 
   private val subscriptionsState = WsSubscriptionsState.empty[MessageConsumer[String]]()
 
@@ -147,7 +148,7 @@ protected[ws] class WsSubscriptionHandler(
   // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
     case KeepAlive =>
-      openedWebSockets.foreachEntry { case (wsId, ws) =>
+      openedWsConnections.foreachEntry { case (wsId, ws) =>
         if (ws.isClosed) self ! Disconnect(wsId) else ws.writePing(Buffer.buffer("ping"))
       }
     case Connect(ws) =>
@@ -173,7 +174,7 @@ protected[ws] class WsSubscriptionHandler(
           self ! Disconnect(ws.textHandlerID())
       }
     case Disconnect(id) =>
-      val _         = openedWebSockets.remove(id)
+      val _         = openedWsConnections.remove(id)
       val customers = subscriptionsState.getConsumers(id)
       subscriptionsState.removeAllSubscriptions(id)
       Future
@@ -240,7 +241,7 @@ protected[ws] class WsSubscriptionHandler(
       }
       ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
       val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
-      val _ = openedWebSockets.put(ws.textHandlerID(), ws)
+      val _ = openedWsConnections.put(ws.textHandlerID(), ws)
     }
   }
 

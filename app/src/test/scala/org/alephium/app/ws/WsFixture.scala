@@ -247,7 +247,7 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
       .ask(GetSubscriptions)(Timeout(100.millis))
       .mapTo[WsImmutableSubscriptions]
       .futureValue
-      .subscriptions
+      .connections
       .size is 0
   }
 
@@ -288,7 +288,7 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
       subscriptionId: WsSubscriptionId,
       subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
   ): Assertion = {
-    getSubscriptions(subscriptionHandler).subscriptions
+    getSubscriptions(subscriptionHandler).connections
       .find(_._1 == wsId)
       .exists(_._2.filter(_._1 == subscriptionId).length == 0) is true
   }
@@ -297,7 +297,7 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
       wsId: WsId,
       subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
   ): Assertion = {
-    !getSubscriptions(subscriptionHandler).subscriptions.exists(_._1 == wsId) is true
+    !getSubscriptions(subscriptionHandler).connections.exists(_._1 == wsId) is true
   }
 
   implicit protected val wsNotificationParamsReader: Reader[WsNotificationParams] =
@@ -369,7 +369,7 @@ trait WsBehaviorFixture extends WsClientServerFixture {
           .ask(GetSubscriptions)
           .mapTo[WsImmutableSubscriptions]
           .futureValue
-          .subscriptions
+          .connections
           .map(_._2.length)
           .sum is expectedSubscriptions
       }

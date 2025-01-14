@@ -35,7 +35,7 @@ import org.alephium.util._
 
 class WsClientServerSpec extends AlephiumSpec {
 
-  "WsServer" should "keep websocket connection alive" in new WsClientServerFixture {
+  "WsServer" should "keep ws connection alive" in new WsClientServerFixture {
     override val keepAliveInterval = Duration.ofMillisUnsafe(20)
     val keepAliveProbe             = TestProbe()
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(keepAliveProbe.ref ! _)) { _ =>
@@ -100,7 +100,7 @@ class WsClientServerSpec extends AlephiumSpec {
     }
   }
 
-  "WsServer" should "reject subscriptions over limit" in new WsClientServerFixture {
+  "WsServer" should "reject subscription which is over limit" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val responses =
         Future
@@ -196,9 +196,9 @@ class WsClientServerSpec extends AlephiumSpec {
 
       val responseBeforeClose =
         subscriptionHandler.ask(GetSubscriptions).mapTo[WsImmutableSubscriptions].futureValue
-      responseBeforeClose.subscriptions.nonEmpty is true
-      responseBeforeClose.subscriptionsByAddress.nonEmpty is true
-      responseBeforeClose.addressesBySubscriptionId.nonEmpty is true
+      responseBeforeClose.connections.nonEmpty is true
+      responseBeforeClose.subscriptionsByContractKey.nonEmpty is true
+      responseBeforeClose.contractKeysBySubscription.nonEmpty is true
 
       ws.close().futureValue
 
@@ -208,9 +208,9 @@ class WsClientServerSpec extends AlephiumSpec {
             .ask(GetSubscriptions)
             .mapTo[WsImmutableSubscriptions]
             .futureValue
-        responseAfterClose.subscriptions.isEmpty is true
-        responseAfterClose.subscriptionsByAddress.isEmpty is true
-        responseAfterClose.addressesBySubscriptionId.isEmpty is true
+        responseAfterClose.connections.isEmpty is true
+        responseAfterClose.subscriptionsByContractKey.isEmpty is true
+        responseAfterClose.contractKeysBySubscription.isEmpty is true
       }
     }
   }
