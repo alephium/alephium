@@ -68,20 +68,16 @@ object ReleaseVersion {
 
   val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
 
-  @inline def checkClientId(clientId: String)(implicit networkConfig: NetworkConfig): Boolean = {
-    fromClientId(clientId) match {
-      case Some(version) => checkClientVersion(version)
-      case None          => false
+  def fromClientId(
+      clientId: String
+  )(implicit networkConfig: NetworkConfig): Option[ReleaseVersion] = {
+    fromClientIdStr(clientId) match {
+      case Some(version) if version.checkRhoneUpgrade() => Some(version)
+      case _                                            => None
     }
   }
 
-  @inline def checkClientVersion(
-      version: ReleaseVersion
-  )(implicit networkConfig: NetworkConfig): Boolean = {
-    version.checkRhoneUpgrade()
-  }
-
-  def fromClientId(clientId: String): Option[ReleaseVersion] = {
+  private def fromClientIdStr(clientId: String): Option[ReleaseVersion] = {
     val parts = clientId.split("/")
     if (parts.length < 2) {
       None

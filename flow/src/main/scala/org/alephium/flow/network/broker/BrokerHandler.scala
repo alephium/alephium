@@ -84,22 +84,17 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def onHandshakeCompleted(hello: Hello): Unit = {
     ReleaseVersion.fromClientId(hello.clientId) match {
       case Some(clientVersion) =>
-        if (!ReleaseVersion.checkClientVersion(clientVersion)) {
-          handleInvalidClientId(hello.clientId)
-        } else {
-          val protocolVersion = clientVersion.protocolVersion
-          handleHandshakeInfo(
-            BrokerInfo.from(remoteAddress, hello.brokerInfo),
-            hello.clientId,
-            protocolVersion
-          )
-          protocolVersion match {
-            case ProtocolV1 => context become (exchangingV1 orElse pingPong)
-            case ProtocolV2 => context become (exchangingV2 orElse pingPong)
-          }
+        val protocolVersion = clientVersion.protocolVersion
+        handleHandshakeInfo(
+          BrokerInfo.from(remoteAddress, hello.brokerInfo),
+          hello.clientId,
+          protocolVersion
+        )
+        protocolVersion match {
+          case ProtocolV1 => context become (exchangingV1 orElse pingPong)
+          case ProtocolV2 => context become (exchangingV2 orElse pingPong)
         }
-      case None =>
-        handleInvalidClientId(hello.clientId)
+      case None => handleInvalidClientId(hello.clientId)
     }
   }
 

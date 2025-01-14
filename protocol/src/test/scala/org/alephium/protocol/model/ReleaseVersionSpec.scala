@@ -65,40 +65,40 @@ class ReleaseVersionSpec extends AlephiumSpec {
       info("Test mainnet pre-Rhone")
       implicit val config = buildNetworkConfig(NetworkId.AlephiumMainNet, now.plusHoursUnsafe(1))
       config.getHardFork(now) is HardFork.Leman
-      ReleaseVersion.checkClientId("xxx") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.8.1/Linux") is true
-      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
-      ReleaseVersion.checkClientId("scala-alephium/v3.1.1/Linux") is true
+      ReleaseVersion.fromClientId("xxx") is None
+      ReleaseVersion.fromClientId("scala-alephium/v2.8.1/Linux") is Some(ReleaseVersion(2, 8, 1))
+      ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
+      ReleaseVersion.fromClientId("scala-alephium/v3.1.1/Linux") is Some(ReleaseVersion(3, 1, 1))
     }
 
     {
       info("Test mainnet Rhone")
       implicit val config = buildNetworkConfig(NetworkId.AlephiumMainNet, now.plusHoursUnsafe(-1))
       config.getHardFork(now) is HardFork.Rhone
-      ReleaseVersion.checkClientId("xxx") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.8.1/Linux") is false
-      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
-      ReleaseVersion.checkClientId("scala-alephium/v3.1.1/Linux") is true
+      ReleaseVersion.fromClientId("xxx") is None
+      ReleaseVersion.fromClientId("scala-alephium/v2.8.1/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
+      ReleaseVersion.fromClientId("scala-alephium/v3.1.1/Linux") is Some(ReleaseVersion(3, 1, 1))
     }
 
     {
       info("Test testnet pre-Rhone")
       implicit val config = buildNetworkConfig(NetworkId.AlephiumTestNet, now.plusHoursUnsafe(1))
       config.getHardFork(now) is HardFork.Leman
-      ReleaseVersion.checkClientId("xxx") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is true
-      ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
-      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
+      ReleaseVersion.fromClientId("xxx") is None
+      ReleaseVersion.fromClientId("scala-alephium/v2.14.5/Linux") is Some(ReleaseVersion(2, 14, 5))
+      ReleaseVersion.fromClientId("scala-alephium/v2.14.6/Linux") is Some(ReleaseVersion(2, 14, 6))
+      ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
     }
 
     {
       info("Test testnet Rhone")
       implicit val config = buildNetworkConfig(NetworkId.AlephiumTestNet, now.plusHoursUnsafe(-1))
       config.getHardFork(now) is HardFork.Rhone
-      ReleaseVersion.checkClientId("xxx") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is false
-      ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
-      ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
+      ReleaseVersion.fromClientId("xxx") is None
+      ReleaseVersion.fromClientId("scala-alephium/v2.14.5/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v2.14.6/Linux") is Some(ReleaseVersion(2, 14, 6))
+      ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
     }
   }
 

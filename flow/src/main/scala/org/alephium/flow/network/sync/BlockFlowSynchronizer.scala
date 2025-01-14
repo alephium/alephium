@@ -94,10 +94,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       // TODO: what if this peer is not synced?
       if (protocolVersion == ProtocolV2 && currentVersion == ProtocolV1) switchToV2()
 
-    case event: ChainHandler.FlowDataValidationEvent =>
-      finalized(event.data.hash)
-      onBlockProcessed(event)
-
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
       if (sizeDelta > 0) {
@@ -164,6 +160,8 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
       if (blockHashes.nonEmpty) {
         sender() ! BrokerHandler.DownloadBlocks(blockHashes)
       }
+    case event: ChainHandler.FlowDataValidationEvent =>
+      finalized(event.data.hash)
     case Terminated(actor) => removeBroker(ActorRefT(actor))
   }
 }
@@ -194,6 +192,9 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
 
     case BlockFlowSynchronizer.UpdateBlockDownloaded(result) =>
       handleBlockDownloaded(result)
+
+    case event: ChainHandler.FlowDataValidationEvent =>
+      onBlockProcessed(event)
 
     case Terminated(actor) => onBrokerTerminated(ActorRefT(actor))
   }
@@ -693,15 +694,13 @@ object SyncState {
 
     def tryValidateMoreBlocks(acc: mutable.ArrayBuffer[DownloadedBlock]): Unit = {
       if (validating.size < BatchSize && blockQueue.nonEmpty) {
-        val selected = blockQueue.view
-          .filterNot(v => validating.contains(v._1))
-          .take(BatchSize)
-          .map(_._2)
-          .toSeq
+        val selected = blockQueue.view.take(BatchSize).map(_._2).toSeq
         logger.debug(
           s"Sending more blocks for validation: ${selected.size}, chain index: $chainIndex"
         )
-        validating.addAll(selected.map(_.block.hash))
+        val hashes = selected.map(_.block.hash)
+        validating.addAll(hashes)
+        blockQueue.subtractAll(hashes)
         acc.addAll(selected)
       }
     }
@@ -709,13 +708,12 @@ object SyncState {
     def isSkeletonFilled: Boolean = taskIds.forall(downloadedBlocks.contains)
 
     def handleFinalizedBlock(hash: BlockHash): Unit = {
-      blockQueue.remove(hash)
       validating.remove(hash)
       ()
     }
 
     def tryMoveOn(): Option[AVector[Int]] = {
-      val queueSize = blockQueue.size
+      val queueSize = blockQueue.size + validating.size
       if (
         nextFromHeight > ALPH.GenesisHeight && // We don't know the common ancestor height yet
         nextFromHeight <= bestTip.height &&
