@@ -794,6 +794,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     val selfChainTips = genChainTips
     blockFlowSynchronizerActor.currentVersion is ProtocolV1
+    (0 until BlockFlowSynchronizer.V2SwitchThreshold - 1).foreach(_ => addBroker(ProtocolV2))
+    blockFlowSynchronizerActor.currentVersion is ProtocolV1
+
     addBroker(ProtocolV2)
     blockFlowSynchronizerActor.startTime.isDefined is false
     blockFlowSynchronizerActor.isSyncing is false

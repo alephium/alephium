@@ -37,6 +37,8 @@ import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object BlockFlowSynchronizer {
+  val V2SwitchThreshold: Int = 3
+
   def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
       networkSetting: NetworkSetting,
       brokerConfig: BrokerConfig
@@ -91,8 +93,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
   def common: Receive = {
     case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, protocolVersion) =>
       addBroker(broker, remoteBrokerInfo, protocolVersion)
-      // TODO: what if this peer is not synced?
-      if (protocolVersion == ProtocolV2 && currentVersion == ProtocolV1) switchToV2()
+      if (currentVersion == ProtocolV1 && peerSizeUsingV2 >= V2SwitchThreshold) switchToV2()
 
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)

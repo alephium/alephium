@@ -111,6 +111,8 @@ trait BrokerStatusTracker {
     Math.min(peerSize, networkSetting.syncPeerSampleSize)
   }
 
+  def peerSizeUsingV2: Int = brokers.count(_._2.version == ProtocolV2)
+
   def samplePeers(version: ProtocolVersion): AVector[(BrokerActor, BrokerStatus)] = {
     val filtered = version match {
       case ProtocolV2 => brokers.filter(_._2.version == ProtocolV2)
