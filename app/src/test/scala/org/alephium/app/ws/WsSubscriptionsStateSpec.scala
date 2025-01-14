@@ -40,12 +40,12 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 
   it should "be idempotent on adding new contract event subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
-    subscriptionsState.addContractEventSubscriptions(
+    subscriptionsState.addSubscriptionForContractKeys(
       params_addr_01_eventIndex_0.toContractKeys,
       subscription_addr_01_eventIndex_0
     )
     val result_1 = subscriptionsState.contractSubscriptionMappings.toMap
-    subscriptionsState.addContractEventSubscriptions(
+    subscriptionsState.addSubscriptionForContractKeys(
       params_addr_01_eventIndex_0.toContractKeys,
       subscription_addr_01_eventIndex_0
     )
@@ -181,9 +181,9 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   "removing subscription by address" should "not allow for addresses with 0 subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
     subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
-    params_addr_12_eventIndex_1.toContractKeys.map { addressWithIndex =>
-      subscriptionsState.removeSubscriptionByAddress(
-        addressWithIndex,
+    params_addr_12_eventIndex_1.toContractKeys.map { contractKey =>
+      subscriptionsState.removeSubscriptionByContractKey(
+        contractKey,
         subscription_addr_12_eventIndex_1
       )
     }
