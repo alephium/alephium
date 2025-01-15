@@ -93,7 +93,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
     }
 
-    def assertValidNotification(clientProbe: TestProbe): Assertion = {
+    def assertValidNotification(
+        wsEither: Either[Throwable, ClientWs],
+        clientProbe: TestProbe
+    ): Assertion = {
+      wsEither.isRight is true
       val subscriptionIds =
         AVector.fill(3)(clientProbe.expectMsgType[Notification]).map { notification =>
           notification.method is WsMethod.SubscriptionMethod
@@ -115,16 +119,29 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
   it should "not spin ws connections over limit" in new WsBehaviorFixture {
     override def maxServerConnections: Int = 2
-    val wsSpec = WsStartBehavior(
-      _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
-      _ => (),
-      _ => true is true
-    )
+    val wsStartBehaviors =
+      AVector(
+        WsStartBehavior(
+          _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
+          _ => (),
+          (wsEither, _) => wsEither.isRight is true
+        ),
+        WsStartBehavior(
+          _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
+          _ => (),
+          (wsEither, _) => wsEither.isRight is true
+        ),
+        WsStartBehavior(
+          _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
+          _ => (),
+          (wsEither, _) => wsEither.isRight is false
+        )
+      )
     checkWS(
-      initBehaviors = AVector.fill(3)(wsSpec),
+      initBehaviors = wsStartBehaviors,
       nextBehaviors = AVector.empty,
       expectedSubscriptions = 0,
-      openWebsocketsCount = 3
+      openWebsocketsCount = 2
     )
   }
 
@@ -169,7 +186,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     val wsSpec = WsStartBehavior(
       subscribingBehavior,
       _ => (),
-      _ => true is true
+      (_, _) => true is true
     )
     checkWS(
       initBehaviors = AVector.fill(1)(wsSpec),
@@ -190,18 +207,23 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       } yield ws
     }
 
-    def assertParsingError(clientProbe: TestProbe): Assertion = {
+    def assertParsingError(
+        wsEither: Either[Throwable, ClientWs],
+        clientProbe: TestProbe
+    ): Assertion = {
+      wsEither.isRight is true
       inside(read[Response.Failure](clientProbe.expectMsgClass(classOf[String]))) {
         case JsonRPC.Response.Failure(error, _) =>
           error.code is Error.ParseErrorCode
       }
     }
 
-    def invalidSubscriptionParamsBehavior(ws: ClientWs): Future[Unit] = {
-      ws.underlying
+    def invalidSubscriptionParamsBehavior(ws: Either[Throwable, ClientWs]): Unit = {
+      ws.rightValue.underlying
         .writeTextMessage(write(WsRequest.subscribe(1, SimpleSubscribeParams(""))))
         .asScala
         .mapTo[Unit]
+        .futureValue
     }
 
     def assertInvalidSubscription(clientProbe: TestProbe): Assertion = {
@@ -222,7 +244,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    def invalidUnsubscriptionParamsBehavior(ws: ClientWs): Future[Unit] = {
+    def invalidUnsubscriptionParamsBehavior(ws: Either[Throwable, ClientWs]): Unit = {
       val invalidUnsubscribeReq = ujson
         .Obj(
           "method"  -> WsMethod.UnsubscribeMethod,
@@ -230,10 +252,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
           "id"      -> 0,
           "jsonrpc" -> "2.0"
         )
-      ws.underlying
+      ws.rightValue.underlying
         .writeTextMessage(invalidUnsubscribeReq.render())
         .asScala
         .mapTo[Unit]
+        .futureValue
     }
 
     val wsInitBehavior = WsStartBehavior(invalidMessageBehavior, _ => (), assertParsingError)
@@ -296,7 +319,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    def assertCorrectNotificationResponse(clientProbe: TestProbe): Assertion = {
+    def assertCorrectNotificationResponse(
+        wsEither: Either[Throwable, ClientWs],
+        clientProbe: TestProbe
+    ): Assertion = {
+      wsEither.isRight is true
       val notifications = AVector.fill(6)(clientProbe.expectMsgType[Notification])
       val params        = notifications.map(n => read[WsNotificationParams](n.params))
       // notifications for 1 tx, 1 block and 4 contract events
@@ -313,15 +340,21 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       ()
     }
 
-    def unsubscribingBehavior(ws: ClientWs): Future[Unit] = {
-      ws.unsubscribeFromBlock(5).map(testResponse(correlationId = 5))
-      ws.unsubscribeFromTx(6).map(testResponse(correlationId = 6))
-      ws.unsubscribeFromContractEvents(7, params_addr_01_eventIndex_0.subscriptionId)
-        .map(testResponse(correlationId = 7))
-      ws.unsubscribeFromContractEvents(8, params_addr_12_eventIndex_1.subscriptionId)
-        .map(testResponse(correlationId = 8))
-      ws.unsubscribeFromContractEvents(9, params_addr_3_unfiltered.subscriptionId)
-        .map(testResponse(correlationId = 9))
+    def unsubscribingBehavior(wsE: Either[Throwable, ClientWs]): Unit = {
+      val ws = wsE.rightValue
+      (for {
+        _ <- ws.unsubscribeFromBlock(5).map(testResponse(correlationId = 5))
+        _ <- ws.unsubscribeFromTx(6).map(testResponse(correlationId = 6))
+        _ <- ws
+          .unsubscribeFromContractEvents(7, params_addr_01_eventIndex_0.subscriptionId)
+          .map(testResponse(correlationId = 7))
+        _ <- ws
+          .unsubscribeFromContractEvents(8, params_addr_12_eventIndex_1.subscriptionId)
+          .map(testResponse(correlationId = 8))
+        _ <- ws
+          .unsubscribeFromContractEvents(9, params_addr_3_unfiltered.subscriptionId)
+          .map(testResponse(correlationId = 9))
+      } yield ()).futureValue
     }
 
     val wsInitBehavior = WsStartBehavior(

@@ -20,6 +20,7 @@ import java.util.UUID
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success}
 
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
@@ -343,28 +344,34 @@ trait WsBehaviorFixture extends WsClientServerFixture {
     eventually(testEventHandlerInitialized(eventHandler))
 
     val probedSockets =
-      initBehaviors.map { case WsStartBehavior(startBehavior, _, _) =>
+      initBehaviors.map(_.clientInitBehavior).map { clientInitBehavior =>
         val clientProbe = TestProbe()
-        val ws          = startBehavior(clientProbe).futureValue
-        ws -> clientProbe
+        val wsEither = clientInitBehavior(clientProbe).transform {
+          case Success(value)     => Success(Right(value))
+          case Failure(exception) => Success(Left(exception))
+        }.futureValue
+        wsEither -> clientProbe
       }
     try {
       initBehaviors.foreach { case WsStartBehavior(_, serverBehavior, clientAssertionOnMsg) =>
         serverBehavior(node.eventBus)
-        probedSockets.foreach { case (_, clientProbe) =>
-          clientAssertionOnMsg(clientProbe)
+        probedSockets.foreach { case (wsEither, clientProbe) =>
+          clientAssertionOnMsg(wsEither, clientProbe)
         }
       }
-      probedSockets.foreach { case (ws, clientProbe) =>
+      probedSockets.foreach { case (wsEither, clientProbe) =>
         nextBehaviors.foreach {
-          case WsNextBehavior(behavior, serverBehavior, clientAssertionOnMsg) =>
-            behavior(ws).futureValue
+          case WsNextBehavior(clientInitBehavior, serverBehavior, clientAssertionOnMsg) =>
+            clientInitBehavior(wsEither)
             serverBehavior(node.eventBus)
             clientAssertionOnMsg(clientProbe)
         }
       }
       eventually {
-        probedSockets.filterNot(_._1.isClosed).length is openWebsocketsCount
+        probedSockets
+          .map(_._1)
+          .filter(ws => ws.isRight && !ws.rightValue.isClosed)
+          .length is openWebsocketsCount
         subscriptionHandler
           .ask(GetSubscriptions)
           .mapTo[WsImmutableSubscriptions]
@@ -374,7 +381,7 @@ trait WsBehaviorFixture extends WsClientServerFixture {
           .sum is expectedSubscriptions
       }
     } finally {
-      Future.sequence(probedSockets.map(_._1.close()).iterator).futureValue
+      probedSockets.foreach(_._1.map(_.close()))
       ()
     }
   }
@@ -386,11 +393,11 @@ object WsBehaviorFixture {
   final case class WsStartBehavior(
       clientInitBehavior: TestProbe => Future[ClientWs],
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
-      clientAssertionOnMsg: TestProbe => Any
+      clientAssertionOnMsg: (Either[Throwable, ClientWs], TestProbe) => Any
   ) extends WsBehavior
 
   final case class WsNextBehavior(
-      clientInitBehavior: ClientWs => Future[Unit],
+      clientInitBehavior: Either[Throwable, ClientWs] => Any,
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
       clientAssertionOnMsg: TestProbe => Any
   ) extends WsBehavior
