@@ -63,7 +63,7 @@ class WsClientServerSpec extends AlephiumSpec {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val duplicateAddressRequest = WsRequest(
         Correlation(0),
-        ContractEventsSubscribeParams.from(duplicateAddresses, Some(EventIndex_0))
+        ContractEventsSubscribeParams(duplicateAddresses, Some(EventIndex_0))
       )
       ws.writeRequestToSocket(duplicateAddressRequest).futureValue is Response
         .failed(
@@ -78,7 +78,7 @@ class WsClientServerSpec extends AlephiumSpec {
       val emptyAddressRequest =
         WsRequest(
           Correlation(0),
-          ContractEventsSubscribeParams.from(AVector.empty, Some(EventIndex_0))
+          ContractEventsSubscribeParams(AVector.empty, Some(EventIndex_0))
         )
       ws.writeRequestToSocket(emptyAddressRequest).futureValue is Response
         .failed(
@@ -92,7 +92,7 @@ class WsClientServerSpec extends AlephiumSpec {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val req = WsRequest(
         Correlation(0L),
-        ContractEventsSubscribeParams.from(tooManyContractAddresses.tail, Some(EventIndex_0))
+        ContractEventsSubscribeParams(tooManyContractAddresses.tail, Some(EventIndex_0))
       )
       inside(ws.writeRequestToSocket(req).futureValue) { case JsonRPC.Response.Success(_, id) =>
         id is 0L
@@ -109,8 +109,7 @@ class WsClientServerSpec extends AlephiumSpec {
               .tabulate(50) { index =>
                 val req = WsRequest(
                   Correlation(index.toLong),
-                  ContractEventsSubscribeParams
-                    .from(params_addr_01_eventIndex_0.addresses, Some(index))
+                  ContractEventsSubscribeParams(params_addr_01_eventIndex_0.addresses, Some(index))
                 )
                 ws.writeRequestToSocket(req)
               }
@@ -123,13 +122,7 @@ class WsClientServerSpec extends AlephiumSpec {
         case JsonRPC.Response.Failure(error, _) =>
           fail(error.getMessage)
       }
-      val requestOverLimit = WsRequest(
-        Correlation(50L),
-        ContractEventsSubscribeParams.from(
-          params_addr_12_eventIndex_1.addresses,
-          Some(EventIndex_0)
-        )
-      )
+      val requestOverLimit = WsRequest(Correlation(50L), params_addr_12_eventIndex_1)
       ws.writeRequestToSocket(requestOverLimit).futureValue is Response
         .failed(
           requestOverLimit.id,
@@ -142,7 +135,7 @@ class WsClientServerSpec extends AlephiumSpec {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val tooManyAddressesRequest = WsRequest(
         Correlation(0),
-        ContractEventsSubscribeParams.from(tooManyContractAddresses, Some(EventIndex_0))
+        ContractEventsSubscribeParams(tooManyContractAddresses, Some(EventIndex_0))
       )
       ws.writeRequestToSocket(tooManyAddressesRequest).futureValue is Response
         .failed(

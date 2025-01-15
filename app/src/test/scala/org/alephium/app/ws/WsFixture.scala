@@ -79,16 +79,14 @@ trait WsFixture extends ServerFixture {
   protected lazy val contractAddress_2: Address.Contract = contractAddressGen.sample.get
   protected lazy val contractAddress_3: Address.Contract = contractAddressGen.sample.get
 
-  protected lazy val params_addr_01_eventIndex_0 = ContractEventsSubscribeParams
-    .from(
-      AVector(contractAddress_0, contractAddress_1),
-      Some(EventIndex_0)
-    )
-  protected lazy val params_addr_12_eventIndex_1 = ContractEventsSubscribeParams
-    .from(
-      AVector(contractAddress_1, contractAddress_2),
-      Some(EventIndex_1)
-    )
+  protected lazy val params_addr_01_eventIndex_0 = ContractEventsSubscribeParams(
+    AVector(contractAddress_0, contractAddress_1),
+    Some(EventIndex_0)
+  )
+  protected lazy val params_addr_12_eventIndex_1 = ContractEventsSubscribeParams(
+    AVector(contractAddress_1, contractAddress_2),
+    Some(EventIndex_1)
+  )
   protected lazy val params_addr_2_eventIndex_1 = ContractEventsSubscribeParams.fromSingle(
     contractAddress_2,
     Some(EventIndex_1)

@@ -75,15 +75,16 @@ protected[ws] object WsParams {
   }
 
   final case class ContractEventsSubscribeParams(
-      eventType: WsEventType,
-      eventIndex: Option[WsEventIndex],
-      addresses: AVector[Address.Contract]
+      addresses: AVector[Address.Contract],
+      eventIndex: Option[WsEventIndex]
   ) extends WsSubscriptionParams {
     lazy val subscriptionId: WsSubscriptionId =
       Hash
         .hash(
           addresses
-            .map(address => s"$eventType/${eventIndex.getOrElse("")}/$address")
+            .map { address =>
+              s"${ContractEventsSubscribeParams.ContractEvent}/${eventIndex.getOrElse("")}/$address"
+            }
             .mkString(",")
         )
     def toContractEventKeys: AVector[ContractEventKey] = eventIndex match {
@@ -96,17 +97,11 @@ protected[ws] object WsParams {
     protected[ws] val AddressesField             = "addresses"
     protected[ws] val EventIndexField            = "eventIndex"
 
-    protected[ws] def from(
-        addresses: AVector[Address.Contract],
-        eventIndex: Option[WsEventIndex]
-    ): ContractEventsSubscribeParams =
-      ContractEventsSubscribeParams(ContractEvent, eventIndex, addresses)
-
     protected[ws] def fromSingle(
         address: Address.Contract,
         eventIndex: Option[WsEventIndex]
     ): ContractEventsSubscribeParams =
-      ContractEventsSubscribeParams(ContractEvent, eventIndex, AVector(address))
+      ContractEventsSubscribeParams(AVector(address), eventIndex)
 
     protected[ws] def read(
         jsonObj: ujson.Obj,
@@ -123,9 +118,9 @@ protected[ws] object WsParams {
             .flatMap { addresses =>
               jsonObj.value.get(EventIndexField) match {
                 case Some(ujson.Num(eventIndex)) =>
-                  Right(ContractEventsSubscribeParams.from(addresses, Option(eventIndex.toInt)))
+                  Right(ContractEventsSubscribeParams(addresses, Option(eventIndex.toInt)))
                 case None =>
-                  Right(ContractEventsSubscribeParams.from(addresses, None))
+                  Right(ContractEventsSubscribeParams(addresses, None))
                 case Some(value) =>
                   Left(WsError.invalidContractParamsEventIndexType(value))
               }
@@ -226,7 +221,7 @@ object WsRequest extends ApiModelCodec {
             ujson.Arr(ujson.Str(subscriptionId.toHexString)),
             req.id.id
           )
-        case ContractEventsSubscribeParams(eventType, eventIndexOpt, addresses) =>
+        case ContractEventsSubscribeParams(addresses, eventIndexOpt) =>
           val addressArr =
             ujson.Arr.from(
               addresses.map(address => ujson.Str(address.toBase58))
@@ -240,7 +235,7 @@ object WsRequest extends ApiModelCodec {
           Request(
             WsMethod.SubscribeMethod,
             ujson.Arr(
-              ujson.Str(eventType),
+              ujson.Str(ContractEventsSubscribeParams.ContractEvent),
               ujson.Obj(
                 ContractEventsSubscribeParams.AddressesField -> addressArr,
                 optionalEventIndexEntry.toList*

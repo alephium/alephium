@@ -164,7 +164,7 @@ final case class ClientWs(
       eventIndex: Option[WsEventIndex]
   ): Future[Response] = {
     writeRequestToSocket(
-      WsRequest.subscribe(id, ContractEventsSubscribeParams.from(addresses, eventIndex))
+      WsRequest.subscribe(id, ContractEventsSubscribeParams(addresses, eventIndex))
     )
   }
 
