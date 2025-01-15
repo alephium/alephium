@@ -97,7 +97,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         wsEither: Either[Throwable, ClientWs],
         clientProbe: TestProbe
     ): Assertion = {
-      wsEither.isRight is true
+      wsEither.left.foreach(ex => fail(s"Expected Right, but got Left with exception: $ex"))
       val subscriptionIds =
         AVector.fill(3)(clientProbe.expectMsgType[Notification]).map { notification =>
           notification.method is WsMethod.SubscriptionMethod
@@ -201,19 +201,24 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         wsEither: Either[Throwable, ClientWs],
         clientProbe: TestProbe
     ): Assertion = {
-      wsEither.isRight is true
+      wsEither.left.foreach(ex => fail(s"Expected Right, but got Left with exception: $ex"))
       inside(read[Response.Failure](clientProbe.expectMsgClass(classOf[String]))) {
         case JsonRPC.Response.Failure(error, _) =>
           error.code is Error.ParseErrorCode
       }
     }
 
-    def invalidSubscriptionParamsBehavior(ws: Either[Throwable, ClientWs]): Unit = {
-      ws.rightValue.underlying
-        .writeTextMessage(write(WsRequest.subscribe(1, SimpleSubscribeParams(""))))
-        .asScala
-        .mapTo[Unit]
-        .futureValue
+    def invalidSubscriptionParamsBehavior(wsEither: Either[Throwable, ClientWs]): Unit = {
+      wsEither match {
+        case Right(clientWs) =>
+          clientWs.underlying
+            .writeTextMessage(write(WsRequest.subscribe(1, SimpleSubscribeParams(""))))
+            .asScala
+            .mapTo[Unit]
+            .futureValue
+        case Left(ex) =>
+          fail(s"Expected Right, but got Left with exception: $ex")
+      }
     }
 
     def assertInvalidSubscription(clientProbe: TestProbe): Assertion = {
@@ -234,7 +239,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    def invalidUnsubscriptionParamsBehavior(ws: Either[Throwable, ClientWs]): Unit = {
+    def invalidUnsubscriptionParamsBehavior(wsEither: Either[Throwable, ClientWs]): Unit = {
       val invalidUnsubscribeReq = ujson
         .Obj(
           "method"  -> WsMethod.UnsubscribeMethod,
@@ -242,11 +247,16 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
           "id"      -> 0,
           "jsonrpc" -> "2.0"
         )
-      ws.rightValue.underlying
-        .writeTextMessage(invalidUnsubscribeReq.render())
-        .asScala
-        .mapTo[Unit]
-        .futureValue
+      wsEither match {
+        case Right(clientWs) =>
+          clientWs.underlying
+            .writeTextMessage(invalidUnsubscribeReq.render())
+            .asScala
+            .mapTo[Unit]
+            .futureValue
+        case Left(ex) =>
+          fail(s"Expected Right, but got Left with exception: $ex")
+      }
     }
 
     val wsInitBehavior = WsStartBehavior(invalidMessageBehavior, _ => (), assertParsingError)
@@ -313,7 +323,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         wsEither: Either[Throwable, ClientWs],
         clientProbe: TestProbe
     ): Assertion = {
-      wsEither.isRight is true
+      wsEither.left.foreach(ex => fail(s"Expected Right, but got Left with exception: $ex"))
       val notifications = AVector.fill(6)(clientProbe.expectMsgType[Notification])
       val params        = notifications.map(n => read[WsNotificationParams](n.params))
       // notifications for 1 tx, 1 block and 4 contract events
@@ -330,8 +340,13 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       ()
     }
 
-    def unsubscribingBehavior(wsE: Either[Throwable, ClientWs]): Unit = {
-      val ws = wsE.rightValue
+    def unsubscribingBehavior(wsEither: Either[Throwable, ClientWs]): Unit = {
+      val ws = wsEither match {
+        case Right(clientWs) =>
+          clientWs
+        case Left(ex) =>
+          fail(s"Expected Right, but got Left with exception: $ex")
+      }
       (for {
         _ <- ws.unsubscribeFromBlock(5).map(testResponse(correlationId = 5))
         _ <- ws.unsubscribeFromTx(6).map(testResponse(correlationId = 6))

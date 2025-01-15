@@ -32,23 +32,20 @@ object WsUtils {
       addressArr: mutable.ArrayBuffer[ujson.Value]
   ): Either[Error, AVector[Address.Contract]] = {
     EitherF
-      .foldTry(
-        addressArr,
-        (mutable.Set.empty[String], mutable.ArrayBuffer.empty[Address.Contract])
-      ) { case ((seen, addresses), addressVal) =>
+      .foldTry(addressArr, mutable.Set.empty[Address.Contract]) { case (addresses, addressVal) =>
         addressVal.strOpt match {
-          case Some(address) if seen.contains(address) =>
-            Left(WsError.duplicatedAddresses(address))
           case Some(address) =>
             LockupScript.p2c(address).map(Address.Contract(_)) match {
+              case Some(contractAddress) if addresses.contains(contractAddress) =>
+                Left(WsError.duplicatedAddresses(address))
               case Some(contractAddress) =>
-                Right((seen.addOne(address), addresses :+ contractAddress))
+                Right(addresses.addOne(contractAddress))
               case None => Left(WsError.invalidContractAddress(address))
             }
           case None => Left(WsError.invalidContractAddressType)
         }
       }
-      .map { case (_, addresses) => AVector.from(addresses) }
+      .map(AVector.from)
   }
 
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {

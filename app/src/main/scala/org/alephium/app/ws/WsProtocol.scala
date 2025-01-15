@@ -82,9 +82,7 @@ protected[ws] object WsParams {
       Hash
         .hash(
           addresses
-            .map { address =>
-              s"${ContractEventsSubscribeParams.ContractEvent}/${eventIndex.getOrElse("")}/$address"
-            }
+            .map(address => s"${eventIndex.getOrElse("")}/$address")
             .mkString(",")
         )
     def toContractEventKeys: AVector[ContractEventKey] = eventIndex match {
