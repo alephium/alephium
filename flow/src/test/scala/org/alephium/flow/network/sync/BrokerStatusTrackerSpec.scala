@@ -42,24 +42,30 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   }
 
   it should "sample the right size" in new Fixture {
-    networkSetting.syncPeerSampleSize is 3
+    networkSetting.syncPeerSampleSizeV1 is 3
 
     (1 until 4).foreach(_ => addNewBroker(ProtocolV1))
-    samplePeersSize(brokers.size) is 1
+    samplePeersSize(brokers.size, ProtocolV1) is 1
     samplePeers(ProtocolV1).toSeq.toMap.size is 1
     samplePeers(ProtocolV2).isEmpty is true
     (4 until 9).foreach(_ => addNewBroker(ProtocolV2))
-    samplePeersSize(brokers.size) is 2
+    samplePeersSize(brokers.size, ProtocolV1) is 2
     samplePeers(ProtocolV1).toSeq.toMap.size is 2
     (9 until 1024).foreach(_ => addNewBroker(ProtocolV1))
-    samplePeersSize(brokers.size) is 3
+    samplePeersSize(brokers.size, ProtocolV1) is 3
     samplePeers(ProtocolV1).toSeq.toMap.size is 3
 
+    networkSetting.syncPeerSampleSizeV2 is 5
+    samplePeersSize(peerSizeUsingV2, ProtocolV2) is 2
     samplePeers(ProtocolV2).toSeq.toMap.size is 2
     (1 until 4).foreach(_ => addNewBroker(ProtocolV2))
+    samplePeersSize(peerSizeUsingV2, ProtocolV2) is 2
     samplePeers(ProtocolV2).toSeq.toMap.size is 2
-    (9 until 1024).foreach(_ => addNewBroker(ProtocolV2))
+    addNewBroker(ProtocolV2)
+    samplePeersSize(peerSizeUsingV2, ProtocolV2) is 3
     samplePeers(ProtocolV2).toSeq.toMap.size is 3
+    (9 until 1024).foreach(_ => addNewBroker(ProtocolV2))
+    samplePeers(ProtocolV2).toSeq.toMap.size is 5
   }
 
   behavior of "BrokerStatus"

@@ -106,9 +106,14 @@ trait BrokerStatusTracker {
   def getBrokerStatus(broker: BrokerActor): Option[BrokerStatus] =
     brokers.find(_._1 == broker).map(_._2)
 
-  def samplePeersSize(brokerSize: Int): Int = {
+  def samplePeersSize(brokerSize: Int, protocolVersion: ProtocolVersion): Int = {
+    val syncPeerSampleSize = if (protocolVersion == ProtocolV1) {
+      networkSetting.syncPeerSampleSizeV1
+    } else {
+      networkSetting.syncPeerSampleSizeV2
+    }
     val peerSize = Math.sqrt(brokerSize.toDouble).toInt
-    Math.min(peerSize, networkSetting.syncPeerSampleSize)
+    Math.min(peerSize, syncPeerSampleSize)
   }
 
   def peerSizeUsingV2: Int = brokers.count(_._2.version == ProtocolV2)
@@ -121,7 +126,7 @@ trait BrokerStatusTracker {
     if (filtered.isEmpty) {
       AVector.empty
     } else {
-      val peerSize   = samplePeersSize(filtered.size)
+      val peerSize   = samplePeersSize(filtered.size, version)
       val startIndex = Random.nextInt(filtered.size)
       AVector.tabulate(peerSize) { k =>
         filtered((startIndex + k) % filtered.size)

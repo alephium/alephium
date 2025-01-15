@@ -60,6 +60,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
     config.network.connectionBufferCapacityInByte is 100000000L
+    config.network.syncPeerSampleSizeV1 is 3
+    config.network.syncPeerSampleSizeV2 is 5
   }
 
   it should "load mainnet config" in {
