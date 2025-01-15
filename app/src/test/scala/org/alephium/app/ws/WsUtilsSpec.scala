@@ -17,13 +17,15 @@
 package org.alephium.app.ws
 
 import scala.concurrent.ExecutionContext.Implicits
-import scala.util.{Failure, Success}
+import scala.concurrent.Future
 
 import io.vertx.core.{Future => VertxFuture}
+import org.scalatest.concurrent.ScalaFutures
 
+import org.alephium.app.ws.WsUtils._
 import org.alephium.util.AlephiumSpec
 
-class WsUtilsSpec extends AlephiumSpec with WsFixture {
+class WsUtilsSpec extends AlephiumSpec with WsFixture with ScalaFutures {
   it should "build unique contract addresses or fail" in {
     WsUtils.buildUniqueContractAddresses(ujson.Arr(ujson.Str("")).arr).isLeft is true
     WsUtils
@@ -59,22 +61,39 @@ class WsUtilsSpec extends AlephiumSpec with WsFixture {
     }
   }
 
-  it should "convert VertxFuture to Scala Future" in {
-    import WsUtils._
-    VertxFuture
-      .succeededFuture("Success")
-      .asScala
-      .onComplete {
-        case Success(value) => value is "Success"
-        case Failure(_)     => fail("The future should not fail")
-      }(Implicits.global)
+  "VertxFuture" should "convert to Scala Future" in {
+    val successVertxFuture = VertxFuture.succeededFuture("Success").asScala
+    val failureVertxFuture =
+      VertxFuture.failedFuture[String](new RuntimeException("Test Failure")).asScala
 
-    val exception                              = new RuntimeException("Test Failure")
-    val failedVertxFuture: VertxFuture[String] = VertxFuture.failedFuture(exception)
-    failedVertxFuture.asScala
-      .onComplete {
-        case Success(_)  => fail("The future should not succeed")
-        case Failure(ex) => ex is exception
-      }(Implicits.global)
+    whenReady(successVertxFuture) { result =>
+      result is "Success"
+    }
+
+    whenReady(failureVertxFuture.failed) { exception =>
+      exception is a[RuntimeException]
+      exception.getMessage is "Test Failure"
+    }
+  }
+
+  "Scala Future" should "convert to VertxFuture" in {
+    val successfulFuture: Future[String] = Future.successful("Success")
+    val failedFuture: Future[String]     = Future.failed(new RuntimeException("Test Failure"))
+
+    val vertxFutureFromSuccess = successfulFuture.asVertx(Implicits.global)
+    val vertxFutureFromFailure = failedFuture.asVertx(Implicits.global)
+
+    vertxFutureFromSuccess.onComplete { handler =>
+      handler.succeeded() is true
+      handler.result() is "Success"
+      ()
+    }
+
+    vertxFutureFromFailure.onComplete { handler =>
+      handler.failed() is true
+      handler.cause() is a[RuntimeException]
+      handler.cause().getMessage is "Test Failure"
+      ()
+    }
   }
 }

@@ -17,7 +17,8 @@
 package org.alephium.app.ws
 
 import scala.collection.mutable
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 import io.vertx.core.{Future => VertxFuture}
 
@@ -52,12 +53,25 @@ object WsUtils {
 
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
-      val promise = Promise[T]()
+      val promise = scala.concurrent.Promise[T]()
       vertxFuture.onComplete {
         case handler if handler.succeeded() =>
           promise.success(handler.result())
         case handler if handler.failed() =>
           promise.failure(handler.cause())
+      }
+      promise.future
+    }
+  }
+
+  implicit class RichScalaFuture[T](val scalaFuture: Future[T]) {
+    def asVertx(implicit ec: ExecutionContext): VertxFuture[T] = {
+      val promise = io.vertx.core.Promise.promise[T]()
+      scalaFuture.onComplete {
+        case Success(value) =>
+          promise.complete(value)
+        case Failure(exception) =>
+          promise.fail(exception)
       }
       promise.future
     }

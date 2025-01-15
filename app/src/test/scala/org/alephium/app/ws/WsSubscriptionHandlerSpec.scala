@@ -118,30 +118,20 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   }
 
   it should "not spin ws connections over limit" in new WsBehaviorFixture {
-    override def maxServerConnections: Int = 2
+    override def maxServerConnections: Int = 0
     val wsStartBehaviors =
       AVector(
         WsStartBehavior(
           _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
           _ => (),
-          (wsEither, _) => wsEither.isRight is true
-        ),
-        WsStartBehavior(
-          _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
-          _ => (),
-          (wsEither, _) => wsEither.isRight is true
-        ),
-        WsStartBehavior(
-          _ => wsClient.connect(wsPort)(_ => ())(_ => ()),
-          _ => (),
-          (wsEither, _) => wsEither.isRight is false
+          (wsEither, _) => wsEither.leftValue.getMessage.contains("WebSocket upgrade failure")
         )
       )
     checkWS(
       initBehaviors = wsStartBehaviors,
       nextBehaviors = AVector.empty,
       expectedSubscriptions = 0,
-      openWebsocketsCount = 2
+      openWebsocketsCount = 0
     )
   }
 

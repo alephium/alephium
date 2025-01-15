@@ -18,10 +18,12 @@ package org.alephium.app.ws
 
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.{Failure, Success}
 
 import akka.actor.ActorSystem
+import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
@@ -30,6 +32,8 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket, WebSo
 
 import org.alephium.app.HttpServerLike
 import org.alephium.app.ws.WsParams.WsId
+import org.alephium.app.ws.WsSubscriptionHandler.ConnectResult
+import org.alephium.app.ws.WsUtils._
 import org.alephium.flow.client.Node
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.util.{ActorRefT, Duration, EventBus}
@@ -42,6 +46,7 @@ final case class WsServer(
 
 object WsServer extends StrictLogging {
 
+  // scalastyle:off parameter.number
   def apply(
       system: ActorSystem,
       node: Node,
@@ -51,6 +56,7 @@ object WsServer extends StrictLogging {
       pingFrequency: Duration,
       options: HttpServerOptions
   )(implicit
+      executionContext: ExecutionContext,
       networkConfig: NetworkConfig
   ): WsServer = {
     val vertx  = Vertx.vertx()
@@ -69,13 +75,26 @@ object WsServer extends StrictLogging {
       WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
     server.webSocketHandler { ws =>
       if (ws.path().equals("/ws")) {
-        subscriptionHandler ! WsSubscriptionHandler.Connect(ServerWs(ws))
+        // async rejection is not supported, using handshaking instead https://github.com/eclipse-vertx/vert.x/issues/2858
+        ws.setHandshake(
+          subscriptionHandler
+            .ask(WsSubscriptionHandler.Connect(ServerWs(ws)))(Timeout(100.millis))
+            .mapTo[ConnectResult]
+            .map(result => Integer.valueOf(result.status.code()))
+            .asVertx
+        ).asScala
+          .onComplete {
+            case Success(_) =>
+            case Failure(ex) =>
+              logger.warn("Handshaking ws connection failed", ex)
+          }
       } else {
         ws.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
     }
     WsServer(server, eventHandler, subscriptionHandler)
   }
+  // scalastyle:on parameter.number
 }
 
 trait ServerWsLike {

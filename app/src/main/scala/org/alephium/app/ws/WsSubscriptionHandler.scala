@@ -76,8 +76,10 @@ protected[ws] object WsSubscriptionHandler {
   sealed trait Command         extends SubscriptionMsg
   sealed trait CommandResponse extends SubscriptionMsg
 
-  final case class Connect(socket: ServerWsLike) extends Command
-  final case object GetSubscriptions             extends Command
+  final case class Connect(socket: ServerWsLike)             extends Command
+  final case class ConnectResult(status: HttpResponseStatus) extends CommandResponse
+
+  final case object GetSubscriptions extends Command
 
   final case class WsImmutableSubscriptions(
       connections: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
@@ -152,7 +154,8 @@ protected[ws] class WsSubscriptionHandler(
         if (ws.isClosed) self ! Disconnect(wsId) else ws.writePing(Buffer.buffer("ping"))
       }
     case Connect(ws) =>
-      connect(ws)
+      val httpResponseStatus = connect(ws)
+      sender() ! ConnectResult(httpResponseStatus)
     case Subscribe(id, ws, params) =>
       subscribe(id, ws, params)
     case Unsubscribe(id, ws, subscriptionId) =>
@@ -224,11 +227,11 @@ protected[ws] class WsSubscriptionHandler(
     }
   }
 
-  private def connect(ws: ServerWsLike): Unit = {
+  private def connect(ws: ServerWsLike): HttpResponseStatus = {
     val connectionsCount = openedWsConnections.size
     if (connectionsCount >= maxConnections) {
       log.warning(s"WebSocket connections reached max limit $connectionsCount")
-      ws.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
+      HttpResponseStatus.SERVICE_UNAVAILABLE
     } else {
       ws.frameHandler { frame =>
         if (frame.isPing) {
@@ -242,6 +245,7 @@ protected[ws] class WsSubscriptionHandler(
       ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
       val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
       val _ = openedWsConnections.put(ws.textHandlerID(), ws)
+      HttpResponseStatus.SWITCHING_PROTOCOLS
     }
   }
 
