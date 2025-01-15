@@ -225,10 +225,10 @@ protected[ws] class WsSubscriptionHandler(
   }
 
   private def connect(ws: ServerWsLike): Unit = {
-    val connectionsCount = subscriptionsState.connections.size
+    val connectionsCount = openedWsConnections.size
     if (connectionsCount >= maxConnections) {
       log.warning(s"WebSocket connections reached max limit $connectionsCount")
-      ws.reject(HttpResponseStatus.TOO_MANY_REQUESTS.code())
+      ws.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
     } else {
       ws.frameHandler { frame =>
         if (frame.isPing) {

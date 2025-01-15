@@ -127,15 +127,13 @@ final case class ClientWs(
           case Success(_) =>
             ongoingRequests.put(request.id.id, promise)
           case Failure(exception) =>
-            ongoingRequests.remove(request.id.id).foreach { _ =>
-              promise
-                .failure(
-                  WsException(
-                    s"Failed to write message with id ${request.id.id}: ${exception.getMessage}",
-                    Option(exception)
-                  )
+            promise
+              .failure(
+                WsException(
+                  s"Failed to write message with id ${request.id.id}: ${exception.getMessage}",
+                  Option(exception)
                 )
-            }
+              )
         }
       promise.future
     }

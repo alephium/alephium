@@ -73,7 +73,9 @@ protected[ws] class WsEventHandler(subscriptionHandlerRef: ActorRefT[Subscriptio
           val params = WsBlockNotificationParams.from(BlockAndEvents(blockEntry, contractEvents))
           subscriptionHandlerRef ! NotificationPublished(params)
         case Left(error) =>
-          log.error(error)
+          log.error(
+            s"Failed to build BlockEntry from block ${block.hash.toHexString} at height $height due to: $error"
+          )
       }
   }
 
