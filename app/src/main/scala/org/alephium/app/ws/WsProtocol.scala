@@ -82,6 +82,8 @@ protected[ws] object WsParams {
       Hash
         .hash(
           addresses
+            .map(_.toBase58)
+            .sorted
             .map(address => s"${eventIndex.getOrElse("")}/$address")
             .mkString(",")
         )

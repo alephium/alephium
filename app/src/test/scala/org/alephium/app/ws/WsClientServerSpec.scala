@@ -106,7 +106,7 @@ class WsClientServerSpec extends AlephiumSpec {
         Future
           .sequence(
             AVector
-              .tabulate(50) { index =>
+              .tabulate(node.config.network.wsMaxSubscriptionsPerConnection) { index =>
                 val req = WsRequest(
                   Correlation(index.toLong),
                   ContractEventsSubscribeParams(params_addr_01_eventIndex_0.addresses, Some(index))

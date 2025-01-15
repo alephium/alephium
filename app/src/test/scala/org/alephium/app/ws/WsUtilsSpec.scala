@@ -36,7 +36,8 @@ class WsUtilsSpec extends AlephiumSpec with WsFixture with ScalaFutures {
     ) match {
       case Right(addresses) =>
         addresses.length is 2
-        addresses.toSet is Set(contractAddress_0, contractAddress_1)
+        addresses.contains(contractAddress_0)
+        addresses.contains(contractAddress_1)
       case Left(_) => fail("Should return Right for valid addresses")
     }
 

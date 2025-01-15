@@ -64,6 +64,18 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
       .isLeft is true
   }
 
+  "ContractEventsSubscribeParams" should "build subscriptionId regardless of address order" in {
+    val sId_1 = ContractEventsSubscribeParams(
+      AVector(contractAddress_0, contractAddress_1),
+      None
+    ).subscriptionId
+    val sId_2 = ContractEventsSubscribeParams(
+      AVector(contractAddress_1, contractAddress_0),
+      None
+    ).subscriptionId
+    sId_1 is sId_2
+  }
+
   "WsRequest" should "pass ser/deser round-trip for simple subscription/unsubscription" in {
     AVector(SimpleSubscribeParams.Block, SimpleSubscribeParams.Tx).foreach { params =>
       val validSubscriptionReqJson =

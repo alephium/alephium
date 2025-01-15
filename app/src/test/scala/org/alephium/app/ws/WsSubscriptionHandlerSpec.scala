@@ -69,16 +69,16 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
           id is 0
+          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
         }
         inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
           id is 1
+          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
           id is 2
+          result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
         }
         ws
       }
@@ -141,7 +141,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         ws <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         successfulSubscriptions <- Future.sequence(
           AVector
-            .tabulate(50) { index =>
+            .tabulate(node.config.network.wsMaxSubscriptionsPerConnection) { index =>
               ws.subscribeToContractEvents(
                 index.toLong,
                 params_addr_01_eventIndex_0.addresses,
@@ -296,24 +296,24 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
           id is 0
+          result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
         }
         inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
           id is 1
+          result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse_0) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
           id is 2
+          result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse_1) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(params_addr_12_eventIndex_1.subscriptionId.toHexString)
           id is 3
+          result is ujson.Str(params_addr_12_eventIndex_1.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse_2) { case JsonRPC.Response.Success(result, id) =>
-          result is ujson.Str(params_addr_3_unfiltered.subscriptionId.toHexString)
           id is 4
+          result is ujson.Str(params_addr_3_unfiltered.subscriptionId.toHexString)
         }
         ws
       }
