@@ -26,7 +26,6 @@ import org.scalatest.exceptions.TestFailedException
 
 import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
-import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, WsImmutableSubscriptions}
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.rpc.model.JsonRPC
@@ -37,18 +36,22 @@ class WsClientServerSpec extends AlephiumSpec {
 
   "WsClient" should "fail gracefully when correlationId is reused" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
-      val _ = ws.subscribeToBlock(0)
-      ws.subscribeToTx(0).failed.futureValue.getMessage.contains("being already handled") is true
+      val _ = ws.subscribeToBlock(corId_0)
+      ws.subscribeToTx(corId_0)
+        .failed
+        .futureValue
+        .getMessage
+        .contains("being already handled") is true
     }
   }
 
   "WsClient" should "allow for reusing correlationId when request in flight finished" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
-      inside(ws.subscribeToBlock(0).futureValue) { case JsonRPC.Response.Success(_, id) =>
-        id is 0L
+      inside(ws.subscribeToBlock(corId_0).futureValue) { case JsonRPC.Response.Success(_, id) =>
+        id is corId_0
       }
-      inside(ws.subscribeToTx(0).futureValue) { case JsonRPC.Response.Success(_, id) =>
-        id is 0L
+      inside(ws.subscribeToTx(corId_0).futureValue) { case JsonRPC.Response.Success(_, id) =>
+        id is corId_0
       }
     }
   }
@@ -80,7 +83,7 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsServer" should "reject invalid contract events subscription requests with duplicate addresses" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val duplicateAddressRequest = WsRequest(
-        Correlation(0),
+        corId_0,
         ContractEventsSubscribeParams(duplicateAddresses, Some(EventIndex_0))
       )
       ws.writeRequestToSocket(duplicateAddressRequest).futureValue is Response
@@ -95,7 +98,7 @@ class WsClientServerSpec extends AlephiumSpec {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val emptyAddressRequest =
         WsRequest(
-          Correlation(0),
+          corId_0,
           ContractEventsSubscribeParams(AVector.empty, Some(EventIndex_0))
         )
       ws.writeRequestToSocket(emptyAddressRequest).futureValue is Response
@@ -109,11 +112,11 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsServer" should "handle ws connection with maximum contract event addresses within wsMaxFrameSize" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val req = WsRequest(
-        Correlation(0L),
+        corId_0,
         ContractEventsSubscribeParams(tooManyContractAddresses.tail, Some(EventIndex_0))
       )
       inside(ws.writeRequestToSocket(req).futureValue) { case JsonRPC.Response.Success(_, id) =>
-        id is 0L
+        id is corId_0
       }
     }
   }
@@ -126,7 +129,7 @@ class WsClientServerSpec extends AlephiumSpec {
             AVector
               .tabulate(node.config.network.wsMaxSubscriptionsPerConnection) { index =>
                 val req = WsRequest(
-                  Correlation(index.toLong),
+                  index.toLong,
                   ContractEventsSubscribeParams(params_addr_01_eventIndex_0.addresses, Some(index))
                 )
                 ws.writeRequestToSocket(req)
@@ -140,7 +143,7 @@ class WsClientServerSpec extends AlephiumSpec {
         case JsonRPC.Response.Failure(error, _) =>
           fail(error.getMessage)
       }
-      val requestOverLimit = WsRequest(Correlation(50L), params_addr_12_eventIndex_1)
+      val requestOverLimit = WsRequest(50L, params_addr_12_eventIndex_1)
       ws.writeRequestToSocket(requestOverLimit).futureValue is Response
         .failed(
           requestOverLimit.id,
@@ -152,7 +155,7 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsServer" should "reject invalid contract events subscription requests with too many addresses" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val tooManyAddressesRequest = WsRequest(
-        Correlation(0),
+        corId_0,
         ContractEventsSubscribeParams(tooManyContractAddresses, Some(EventIndex_0))
       )
       ws.writeRequestToSocket(tooManyAddressesRequest).futureValue is Response
@@ -166,44 +169,47 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsClient and WsServer" should "subscribe/unsubscribe and acknowledge by response" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       // for block notification
-      ws.subscribeToBlock(0).futureValue is Response.successful(
-        Correlation(0),
+      ws.subscribeToBlock(corId_0).futureValue is Response.successful(
+        corId_0,
         Block.subscriptionId
       )
-      ws.unsubscribeFromBlock(1).futureValue is Response.successful(Correlation(1))
+      ws.unsubscribeFromBlock(corId_1).futureValue is Response.successful(corId_1)
 
       // for tx notification
-      ws.subscribeToTx(2).futureValue is Response.successful(Correlation(2), Tx.subscriptionId)
-      ws.unsubscribeFromTx(3).futureValue is Response.successful(Correlation(3))
+      ws.subscribeToTx(corId_2).futureValue is Response.successful(corId_2, Tx.subscriptionId)
+      ws.unsubscribeFromTx(corId_3).futureValue is Response.successful(corId_3)
 
       // for filtered contract events notifications
       val filteredParams =
         ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
-      ws.subscribeToContractEvents(4, filteredParams.addresses, filteredParams.eventIndex)
+      ws.subscribeToContractEvents(corId_4, filteredParams.addresses, filteredParams.eventIndex)
         .futureValue is Response
-        .successful(Correlation(4), filteredParams.subscriptionId)
-      ws.unsubscribeFromContractEvents(5, filteredParams.subscriptionId).futureValue is Response
-        .successful(Correlation(5))
+        .successful(corId_4, filteredParams.subscriptionId)
+      ws.unsubscribeFromContractEvents(corId_5, filteredParams.subscriptionId)
+        .futureValue is Response
+        .successful(corId_5)
 
       // for all contract events notifications
       val params = ContractEventsSubscribeParams.fromSingle(contractAddress_0, None)
-      ws.subscribeToContractEvents(5, params.addresses, params.eventIndex).futureValue is Response
-        .successful(Correlation(5), params.subscriptionId)
-      ws.unsubscribeFromContractEvents(6, params.subscriptionId).futureValue is Response
-        .successful(Correlation(6))
+      ws.subscribeToContractEvents(corId_6, params.addresses, params.eventIndex)
+        .futureValue is Response
+        .successful(corId_6, params.subscriptionId)
+      ws.unsubscribeFromContractEvents(corId_7, params.subscriptionId).futureValue is Response
+        .successful(corId_7)
     }
   }
 
   "WsClient and WsServer" should "unregister and clean all subscriptions on websocket disconnection" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
-      ws.subscribeToBlock(0).futureValue is Response.successful(
-        Correlation(0),
+      ws.subscribeToBlock(corId_0).futureValue is Response.successful(
+        corId_0,
         Block.subscriptionId
       )
-      ws.subscribeToTx(2).futureValue is Response.successful(Correlation(2), Tx.subscriptionId)
+      ws.subscribeToTx(corId_1).futureValue is Response.successful(corId_1, Tx.subscriptionId)
       val params = ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
-      ws.subscribeToContractEvents(4, params.addresses, params.eventIndex).futureValue is Response
-        .successful(Correlation(4), params.subscriptionId)
+      ws.subscribeToContractEvents(corId_2, params.addresses, params.eventIndex)
+        .futureValue is Response
+        .successful(corId_2, params.subscriptionId)
 
       val responseBeforeClose =
         subscriptionHandler.ask(GetSubscriptions).mapTo[WsImmutableSubscriptions].futureValue
@@ -229,48 +235,50 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsServer" should "respond already subscribed or unsubscribed" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       // for block
-      ws.subscribeToBlock(0).futureValue is Response.successful(
-        Correlation(0),
+      ws.subscribeToBlock(corId_0).futureValue is Response.successful(
+        corId_0,
         Block.subscriptionId
       )
-      ws.subscribeToBlock(1).futureValue is
-        Response.failed(Correlation(1), WsError.alreadySubscribed(Block.subscriptionId))
-      ws.unsubscribeFromBlock(2).futureValue is Response.successful(Correlation(2))
-      ws.unsubscribeFromBlock(3).futureValue is
-        Response.failed(Correlation(3), WsError.alreadyUnSubscribed(Block.subscriptionId))
+      ws.subscribeToBlock(corId_1).futureValue is
+        Response.failed(corId_1, WsError.alreadySubscribed(Block.subscriptionId))
+      ws.unsubscribeFromBlock(corId_2).futureValue is Response.successful(corId_2)
+      ws.unsubscribeFromBlock(corId_3).futureValue is
+        Response.failed(corId_3, WsError.alreadyUnSubscribed(Block.subscriptionId))
 
       // for tx
-      ws.subscribeToTx(4).futureValue is Response.successful(Correlation(4), Tx.subscriptionId)
-      ws.subscribeToTx(5).futureValue is
-        Response.failed(Correlation(5), WsError.alreadySubscribed(Tx.subscriptionId))
-      ws.unsubscribeFromTx(6).futureValue is Response.successful(Correlation(6))
-      ws.unsubscribeFromTx(7).futureValue is
-        Response.failed(Correlation(7), WsError.alreadyUnSubscribed(Tx.subscriptionId))
+      ws.subscribeToTx(corId_4).futureValue is Response.successful(corId_4, Tx.subscriptionId)
+      ws.subscribeToTx(corId_5).futureValue is
+        Response.failed(corId_5, WsError.alreadySubscribed(Tx.subscriptionId))
+      ws.unsubscribeFromTx(corId_6).futureValue is Response.successful(corId_6)
+      ws.unsubscribeFromTx(corId_7).futureValue is
+        Response.failed(corId_7, WsError.alreadyUnSubscribed(Tx.subscriptionId))
 
       // for filtered contract events
       val filteredParams =
         ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
-      ws.subscribeToContractEvents(8, filteredParams.addresses, filteredParams.eventIndex)
+      ws.subscribeToContractEvents(corId_8, filteredParams.addresses, filteredParams.eventIndex)
         .futureValue is Response
-        .successful(Correlation(8), filteredParams.subscriptionId)
-      ws.subscribeToContractEvents(9, filteredParams.addresses, filteredParams.eventIndex)
+        .successful(corId_8, filteredParams.subscriptionId)
+      ws.subscribeToContractEvents(corId_9, filteredParams.addresses, filteredParams.eventIndex)
         .futureValue is
-        Response.failed(Correlation(9), WsError.alreadySubscribed(filteredParams.subscriptionId))
-      ws.unsubscribeFromContractEvents(10, filteredParams.subscriptionId).futureValue is Response
-        .successful(Correlation(10))
-      ws.unsubscribeFromContractEvents(11, filteredParams.subscriptionId).futureValue is
-        Response.failed(Correlation(11), WsError.alreadyUnSubscribed(filteredParams.subscriptionId))
+        Response.failed(corId_9, WsError.alreadySubscribed(filteredParams.subscriptionId))
+      ws.unsubscribeFromContractEvents(corId_10, filteredParams.subscriptionId)
+        .futureValue is Response
+        .successful(corId_10)
+      ws.unsubscribeFromContractEvents(corId_11, filteredParams.subscriptionId).futureValue is
+        Response.failed(corId_11, WsError.alreadyUnSubscribed(filteredParams.subscriptionId))
 
       // for all contract events
       val params = ContractEventsSubscribeParams.fromSingle(contractAddress_0, None)
-      ws.subscribeToContractEvents(12, params.addresses, params.eventIndex).futureValue is Response
-        .successful(Correlation(12), params.subscriptionId)
-      ws.subscribeToContractEvents(13, params.addresses, params.eventIndex).futureValue is
-        Response.failed(Correlation(13), WsError.alreadySubscribed(params.subscriptionId))
-      ws.unsubscribeFromContractEvents(14, params.subscriptionId).futureValue is Response
-        .successful(Correlation(14))
-      ws.unsubscribeFromContractEvents(15, params.subscriptionId).futureValue is
-        Response.failed(Correlation(15), WsError.alreadyUnSubscribed(params.subscriptionId))
+      ws.subscribeToContractEvents(corId_12, params.addresses, params.eventIndex)
+        .futureValue is Response
+        .successful(corId_12, params.subscriptionId)
+      ws.subscribeToContractEvents(corId_13, params.addresses, params.eventIndex).futureValue is
+        Response.failed(corId_13, WsError.alreadySubscribed(params.subscriptionId))
+      ws.unsubscribeFromContractEvents(corId_14, params.subscriptionId).futureValue is Response
+        .successful(corId_14)
+      ws.unsubscribeFromContractEvents(corId_15, params.subscriptionId).futureValue is
+        Response.failed(corId_15, WsError.alreadyUnSubscribed(params.subscriptionId))
     }
   }
 

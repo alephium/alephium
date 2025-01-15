@@ -116,22 +116,22 @@ final case class ClientWs(
     new ConcurrentSkipListMap[WsCorrelationId, Promise[Response]]().asScala
 
   protected[ws] def writeRequestToSocket(request: WsRequest): Future[Response] = {
-    if (ongoingRequests.contains(request.id.id)) {
-      Future.failed(WsException(s"Request with id ${request.id.id} is being already handled."))
+    if (ongoingRequests.contains(request.id)) {
+      Future.failed(WsException(s"Request with id ${request.id} is being already handled."))
     } else {
       val promise = Promise[Response]()
-      ongoingRequests.put(request.id.id, promise)
+      ongoingRequests.put(request.id, promise)
       underlying
         .writeTextMessage(write(request))
         .asScala
         .onComplete {
           case Success(_) =>
           case Failure(exception) =>
-            ongoingRequests.remove(request.id.id)
+            ongoingRequests.remove(request.id)
             promise
               .failure(
                 WsException(
-                  s"Failed to write message with id ${request.id.id}: ${exception.getMessage}",
+                  s"Failed to write message with id ${request.id}: ${exception.getMessage}",
                   Option(exception)
                 )
               )

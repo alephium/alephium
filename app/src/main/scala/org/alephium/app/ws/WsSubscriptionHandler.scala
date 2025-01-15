@@ -28,7 +28,6 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 
 import org.alephium.app.ws.WsParams._
-import org.alephium.app.ws.WsRequest.Correlation
 import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
 import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json.write
@@ -66,7 +65,7 @@ protected[ws] object WsSubscriptionHandler {
 
   final protected[ws] case class NotificationPublished(params: WsNotificationParams) extends Event
   final private case class NotificationFailed(
-      id: Correlation,
+      id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId,
       msg: String,
@@ -88,24 +87,24 @@ protected[ws] object WsSubscriptionHandler {
   ) extends CommandResponse
 
   final protected[ws] case class Subscribe(
-      id: Correlation,
+      id: WsCorrelationId,
       ws: ServerWsLike,
       params: WsSubscriptionParams
   ) extends Command
   final private case class Subscribed(
-      id: Correlation,
+      id: WsCorrelationId,
       ws: ServerWsLike,
       params: WsSubscriptionParams,
       consumer: MessageConsumer[String]
   ) extends CommandResponse
 
   final protected[ws] case class Unsubscribe(
-      id: Correlation,
+      id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
   ) extends Command
   final private case class Unsubscribed(
-      id: Correlation,
+      id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
   ) extends CommandResponse
@@ -260,8 +259,8 @@ protected[ws] class WsSubscriptionHandler(
     }
   }
 
-  private def subscribe(id: Correlation, ws: ServerWsLike, params: WsSubscriptionParams)(implicit
-      ec: ExecutionContext
+  private def subscribe(id: WsCorrelationId, ws: ServerWsLike, params: WsSubscriptionParams)(
+      implicit ec: ExecutionContext
   ): Unit = {
     val subscriptionId = params.subscriptionId
 
@@ -311,7 +310,7 @@ protected[ws] class WsSubscriptionHandler(
   }
 
   private def unsubscribe(
-      id: Correlation,
+      id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
   ): Unit = {

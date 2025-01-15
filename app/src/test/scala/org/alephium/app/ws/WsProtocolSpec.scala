@@ -101,7 +101,12 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
       unSubscribeRequest is read[WsRequest](validUnSubscriptionReqJson)
 
       val jsonRpcSubscribeRequest =
-        RequestUnsafe("2.0", WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(params.eventType)), 0)
+        RequestUnsafe(
+          "2.0",
+          WsMethod.SubscribeMethod,
+          ujson.Arr(ujson.Str(params.eventType)),
+          0
+        )
       val expectedSubscribeRequest =
         WsRequest.fromJsonRpc(jsonRpcSubscribeRequest, contractAddressLimit).rightValue
       expectedSubscribeRequest is read[WsRequest](write(expectedSubscribeRequest))
@@ -304,7 +309,8 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
     txNotificationRpc("method") is WsMethod.SubscriptionMethod
     txNotificationRpc("params") is writeJs(txNotificationParams)
 
-    val contractEventParams = ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(0))
+    val contractEventParams =
+      ContractEventsSubscribeParams.fromSingle(contractAddress_0, Some(EventIndex_0))
     val contractEventNotificationParams: WsNotificationParams =
       WsContractEventNotificationParams(contractEventParams.subscriptionId, contractEvent)
     val contractEventNotificationJson = write(contractEventNotificationParams)

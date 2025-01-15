@@ -20,8 +20,7 @@ import scala.util.{Failure, Success, Try}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
-import org.alephium.app.ws.WsParams.WsSubscriptionParams
-import org.alephium.app.ws.WsRequest.Correlation
+import org.alephium.app.ws.WsParams.{WsCorrelationId, WsSubscriptionParams}
 import org.alephium.app.ws.WsSubscriptionsState.{
   AddressKey,
   AddressWithEventIndexKey,
@@ -204,22 +203,20 @@ protected[ws] object WsParams {
   ) extends WsNotificationParams
 }
 
-final case class WsRequest(id: Correlation, params: WsSubscriptionParams)
+final case class WsRequest(id: WsCorrelationId, params: WsSubscriptionParams)
 object WsRequest extends ApiModelCodec {
   import WsParams._
-
-  final case class Correlation(id: WsCorrelationId) extends WithId
 
   implicit protected[ws] val wsRequestWriter: Writer[WsRequest] = writer[Request].comap[WsRequest] {
     req =>
       req.params match {
         case SimpleSubscribeParams(eventType) =>
-          Request(WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(eventType)), req.id.id)
+          Request(WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(eventType)), req.id)
         case UnsubscribeParams(subscriptionId) =>
           Request(
             WsMethod.UnsubscribeMethod,
             ujson.Arr(ujson.Str(subscriptionId.toHexString)),
-            req.id.id
+            req.id
           )
         case ContractEventsSubscribeParams(addresses, eventIndexOpt) =>
           val addressArr =
@@ -241,7 +238,7 @@ object WsRequest extends ApiModelCodec {
                 optionalEventIndexEntry.toList*
               )
             ),
-            req.id.id
+            req.id
           )
       }
   }
@@ -272,7 +269,7 @@ object WsRequest extends ApiModelCodec {
         case unsupported =>
           Left(WsError.invalidParamsFormat(unsupported))
       }
-    readParams.map(params => WsRequest(Correlation(r.id), params))
+    readParams.map(params => WsRequest(r.id, params))
   }
 
   protected[ws] def fromJsonString(
@@ -288,13 +285,13 @@ object WsRequest extends ApiModelCodec {
   }
 
   protected[ws] def subscribe(id: WsCorrelationId, params: WsSubscriptionParams): WsRequest = {
-    WsRequest(Correlation(id), params)
+    WsRequest(id, params)
   }
 
   protected[ws] def unsubscribe(
       id: WsCorrelationId,
       subscriptionId: WsSubscriptionId
   ): WsRequest = {
-    WsRequest(Correlation(id), UnsubscribeParams(subscriptionId))
+    WsRequest(id, UnsubscribeParams(subscriptionId))
   }
 }

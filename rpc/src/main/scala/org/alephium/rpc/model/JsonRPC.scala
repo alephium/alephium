@@ -191,10 +191,14 @@ object JsonRPC extends StrictLogging {
 
   sealed trait Response
   object Response {
+    def failed(id: Long, error: Error): Failure                = Failure(error, Some(id))
     def failed[T <: WithId](request: T, error: Error): Failure = Failure(error, Some(request.id))
     def failed(error: Error): Failure                          = Failure(error, None)
     def failed(error: String): Failure                         = failed(Error.server(error))
     def successful[T <: WithId](request: T): Success           = Success(ujson.True, request.id)
+    def successful(id: Long): Success                          = Success(ujson.True, id)
+    def successful[R](id: Long, result: R)(implicit writer: Writer[R]): Success =
+      Success(writeJs(result), id)
     def successful[T <: WithId, R](request: T, result: R)(implicit writer: Writer[R]): Success =
       Success(writeJs(result), request.id)
 
