@@ -437,10 +437,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] def downloadBlocks(): Unit = {
     val chains = syncingChains.values.filter(!_.isTaskQueueEmpty)
     if (chains.nonEmpty) {
-      val allTasks = collectAndAssignTasks(
-        AVector.from(chains),
-        mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
-      )
+      val allTasks = collectAndAssignTasks(AVector.from(chains))
       allTasks.foreachEntry { case (brokerActor, tasksPerBroker) =>
         val tasks = AVector.from(tasksPerBroker)
         log.debug(
@@ -452,23 +449,20 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def collectAndAssignTasks(
-      chains: AVector[SyncStatePerChain],
-      acc: mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
+      chains: AVector[SyncStatePerChain]
   ): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
-    val orderedChains  = AVector.from(chains).sortBy(_.taskSize)(Ordering[Int].reverse)
+    val orderedChains  = chains.sortBy(_.taskSize)(Ordering[Int].reverse)
     val orderedBrokers = brokers.sortBy(_._2.requestNum)
-    collectAndAssignTasks(orderedChains, orderedBrokers, acc)
-  }
+    val acc            = mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
 
-  @scala.annotation.tailrec
-  private def collectAndAssignTasks(
-      orderedChains: AVector[SyncStatePerChain],
-      orderedBrokers: scala.collection.Seq[(BrokerActor, BrokerStatus)],
-      acc: mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
-  ): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
-    val newTasks = collectAndAssignTasks(orderedChains, orderedBrokers)
-    newTasks.foreach { case (broker, task) => addToMap(acc, broker, task) }
-    if (newTasks.nonEmpty) collectAndAssignTasks(orderedChains, orderedBrokers, acc) else acc
+    @scala.annotation.tailrec
+    def iter(): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
+      val newTasks = collectAndAssignTasks(orderedChains, orderedBrokers)
+      newTasks.foreach { case (broker, task) => addToMap(acc, broker, task) }
+      if (newTasks.nonEmpty) iter() else acc
+    }
+
+    iter()
   }
 
   private def collectAndAssignTasks(
