@@ -117,16 +117,17 @@ final case class ClientWs(
 
   protected[ws] def writeRequestToSocket(request: WsRequest): Future[Response] = {
     if (ongoingRequests.contains(request.id.id)) {
-      Future.failed(WsException(s"Request with id ${request.id.id} already executed."))
+      Future.failed(WsException(s"Request with id ${request.id.id} is being already handled."))
     } else {
       val promise = Promise[Response]()
+      ongoingRequests.put(request.id.id, promise)
       underlying
         .writeTextMessage(write(request))
         .asScala
         .onComplete {
           case Success(_) =>
-            ongoingRequests.put(request.id.id, promise)
           case Failure(exception) =>
+            ongoingRequests.remove(request.id.id)
             promise
               .failure(
                 WsException(

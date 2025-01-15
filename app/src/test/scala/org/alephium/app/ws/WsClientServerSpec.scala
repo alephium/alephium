@@ -35,6 +35,24 @@ import org.alephium.util._
 
 class WsClientServerSpec extends AlephiumSpec {
 
+  "WsClient" should "fail gracefully when correlationId is reused" in new WsClientServerFixture {
+    testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
+      val _ = ws.subscribeToBlock(0)
+      ws.subscribeToTx(0).failed.futureValue.getMessage.contains("being already handled") is true
+    }
+  }
+
+  "WsClient" should "allow for reusing correlationId when request in flight finished" in new WsClientServerFixture {
+    testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
+      inside(ws.subscribeToBlock(0).futureValue) { case JsonRPC.Response.Success(_, id) =>
+        id is 0L
+      }
+      inside(ws.subscribeToTx(0).futureValue) { case JsonRPC.Response.Success(_, id) =>
+        id is 0L
+      }
+    }
+  }
+
   "WsServer" should "keep ws connection alive" in new WsClientServerFixture {
     override val keepAliveInterval = Duration.ofMillisUnsafe(20)
     val keepAliveProbe             = TestProbe()
