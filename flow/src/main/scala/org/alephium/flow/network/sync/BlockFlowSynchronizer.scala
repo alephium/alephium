@@ -560,7 +560,7 @@ object SyncState {
   import BrokerStatusTracker.BrokerActor
 
   val SkeletonSize: Int           = 16
-  val BatchSize: Int              = maxSyncBlocksPerChain
+  val BatchSize: Int              = 128
   val MaxQueueSize: Int           = SkeletonSize * BatchSize
   val FallbackThreshold: Duration = Duration.ofMinutesUnsafe(2)
 
@@ -695,8 +695,8 @@ object SyncState {
     }
 
     def tryValidateMoreBlocks(acc: mutable.ArrayBuffer[DownloadedBlock]): Unit = {
-      if (validating.size < BatchSize && blockQueue.nonEmpty) {
-        val selected = blockQueue.view.take(BatchSize).map(_._2).toSeq
+      if (validating.size < maxSyncBlocksPerChain && blockQueue.nonEmpty) {
+        val selected = blockQueue.view.take(maxSyncBlocksPerChain).map(_._2).toSeq
         logger.debug(
           s"Sending more blocks for validation: ${selected.size}, chain index: $chainIndex"
         )
