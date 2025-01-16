@@ -26,40 +26,6 @@ import org.alephium.app.ws.WsUtils._
 import org.alephium.util.AlephiumSpec
 
 class WsUtilsSpec extends AlephiumSpec with WsFixture with ScalaFutures {
-  it should "build unique contract addresses or fail" in {
-    WsUtils.buildUniqueContractAddresses(ujson.Arr(ujson.Str("")).arr).isLeft is true
-    WsUtils
-      .buildUniqueContractAddresses(ujson.Arr(ujson.Str(contractAddress_0.toBase58)).arr)
-      .isRight is true
-    WsUtils.buildUniqueContractAddresses(
-      ujson.Arr(ujson.Str(contractAddress_0.toBase58), ujson.Str(contractAddress_1.toBase58)).arr
-    ) match {
-      case Right(addresses) =>
-        addresses.length is 2
-        addresses.contains(contractAddress_0)
-        addresses.contains(contractAddress_1)
-      case Left(_) => fail("Should return Right for valid addresses")
-    }
-
-    WsUtils.buildUniqueContractAddresses(
-      ujson.Arr(ujson.Str(contractAddress_0.toBase58), ujson.Str("invalid-address")).arr
-    ) match {
-      case Right(_)    => fail("Should return Left for invalid address")
-      case Left(error) => error is WsError.invalidContractAddress("invalid-address")
-    }
-
-    val duplicateAddresses = ujson
-      .Arr(
-        ujson.Str(contractAddress_0.toBase58),
-        ujson.Str(contractAddress_1.toBase58),
-        ujson.Str(contractAddress_0.toBase58)
-      )
-      .arr
-    WsUtils.buildUniqueContractAddresses(duplicateAddresses) match {
-      case Right(_)    => fail("Should return Left for duplicate addresses")
-      case Left(error) => error is WsError.duplicatedAddresses(contractAddress_0.toBase58)
-    }
-  }
 
   "VertxFuture" should "convert to Scala Future" in {
     val successVertxFuture = VertxFuture.succeededFuture("Success").asScala

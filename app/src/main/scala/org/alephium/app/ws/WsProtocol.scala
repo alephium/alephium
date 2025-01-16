@@ -16,6 +16,7 @@
 
 package org.alephium.app.ws
 
+import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 import org.alephium.api.ApiModelCodec
@@ -29,9 +30,10 @@ import org.alephium.app.ws.WsSubscriptionsState.{
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.{AVector, EitherF, Hex}
 
 protected[ws] object WsMethod {
   private type WsMethodType = String
@@ -103,6 +105,26 @@ protected[ws] object WsParams {
     ): ContractEventsSubscribeParams =
       ContractEventsSubscribeParams(AVector(address), eventIndex)
 
+    protected[ws] def buildUniqueContractAddresses(
+        addressArr: mutable.ArrayBuffer[ujson.Value]
+    ): Either[Error, AVector[Address.Contract]] = {
+      EitherF
+        .foldTry(addressArr, mutable.Set.empty[Address.Contract]) { case (addresses, addressVal) =>
+          addressVal.strOpt match {
+            case Some(address) =>
+              LockupScript.p2c(address).map(Address.Contract(_)) match {
+                case Some(contractAddress) if addresses.contains(contractAddress) =>
+                  Left(WsError.duplicatedAddresses(address))
+                case Some(contractAddress) =>
+                  Right(addresses.addOne(contractAddress))
+                case None => Left(WsError.invalidContractAddress(address))
+              }
+            case None => Left(WsError.invalidContractAddressType)
+          }
+        }
+        .map(AVector.from)
+    }
+
     protected[ws] def read(
         jsonObj: ujson.Obj,
         contractAddressLimit: Int
@@ -113,8 +135,7 @@ protected[ws] object WsParams {
         case Some(ujson.Arr(addressArr)) if addressArr.length > contractAddressLimit =>
           Left(WsError.tooManyContractAddresses(contractAddressLimit))
         case Some(ujson.Arr(addressArr)) =>
-          WsUtils
-            .buildUniqueContractAddresses(addressArr)
+          buildUniqueContractAddresses(addressArr)
             .flatMap { addresses =>
               jsonObj.value.get(EventIndexField) match {
                 case Some(ujson.Num(eventIndex)) if eventIndex.toInt >= LowestContractEventIndex =>

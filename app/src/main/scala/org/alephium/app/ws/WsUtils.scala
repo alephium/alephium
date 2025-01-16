@@ -16,38 +16,12 @@
 
 package org.alephium.app.ws
 
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import io.vertx.core.{Future => VertxFuture}
 
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.rpc.model.JsonRPC.Error
-import org.alephium.util.{AVector, EitherF}
-
 object WsUtils {
-  def buildUniqueContractAddresses(
-      addressArr: mutable.ArrayBuffer[ujson.Value]
-  ): Either[Error, AVector[Address.Contract]] = {
-    EitherF
-      .foldTry(addressArr, mutable.Set.empty[Address.Contract]) { case (addresses, addressVal) =>
-        addressVal.strOpt match {
-          case Some(address) =>
-            LockupScript.p2c(address).map(Address.Contract(_)) match {
-              case Some(contractAddress) if addresses.contains(contractAddress) =>
-                Left(WsError.duplicatedAddresses(address))
-              case Some(contractAddress) =>
-                Right(addresses.addOne(contractAddress))
-              case None => Left(WsError.invalidContractAddress(address))
-            }
-          case None => Left(WsError.invalidContractAddressType)
-        }
-      }
-      .map(AVector.from)
-  }
-
   implicit class RichVertxFuture[T](val vertxFuture: VertxFuture[T]) {
     def asScala: Future[T] = {
       val promise = scala.concurrent.Promise[T]()

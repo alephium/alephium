@@ -76,6 +76,43 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
     sId_1 is sId_2
   }
 
+  "ContractEventsSubscribeParams" should "build unique contract addresses or fail" in {
+    ContractEventsSubscribeParams
+      .buildUniqueContractAddresses(ujson.Arr(ujson.Str("")).arr)
+      .isLeft is true
+    ContractEventsSubscribeParams
+      .buildUniqueContractAddresses(ujson.Arr(ujson.Str(contractAddress_0.toBase58)).arr)
+      .isRight is true
+    ContractEventsSubscribeParams.buildUniqueContractAddresses(
+      ujson.Arr(ujson.Str(contractAddress_0.toBase58), ujson.Str(contractAddress_1.toBase58)).arr
+    ) match {
+      case Right(addresses) =>
+        addresses.length is 2
+        addresses.contains(contractAddress_0)
+        addresses.contains(contractAddress_1)
+      case Left(_) => fail("Should return Right for valid addresses")
+    }
+
+    ContractEventsSubscribeParams.buildUniqueContractAddresses(
+      ujson.Arr(ujson.Str(contractAddress_0.toBase58), ujson.Str("invalid-address")).arr
+    ) match {
+      case Right(_)    => fail("Should return Left for invalid address")
+      case Left(error) => error is WsError.invalidContractAddress("invalid-address")
+    }
+
+    val duplicateAddresses = ujson
+      .Arr(
+        ujson.Str(contractAddress_0.toBase58),
+        ujson.Str(contractAddress_1.toBase58),
+        ujson.Str(contractAddress_0.toBase58)
+      )
+      .arr
+    ContractEventsSubscribeParams.buildUniqueContractAddresses(duplicateAddresses) match {
+      case Right(_)    => fail("Should return Left for duplicate addresses")
+      case Left(error) => error is WsError.duplicatedAddresses(contractAddress_0.toBase58)
+    }
+  }
+
   "WsRequest" should "pass ser/deser round-trip for simple subscription/unsubscription" in {
     AVector(SimpleSubscribeParams.Block, SimpleSubscribeParams.Tx).foreach { params =>
       val validSubscriptionReqJson =
