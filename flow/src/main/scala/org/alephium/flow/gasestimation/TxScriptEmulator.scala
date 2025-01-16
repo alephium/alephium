@@ -30,6 +30,7 @@ final case class TxScriptEmulationResult(gasUsed: GasBox, generatedOutputs: AVec
 trait TxScriptEmulator {
   def emulate(
       inputWithAssets: AVector[TxInputWithAsset],
+      fixedOutputs: AVector[AssetOutput],
       script: StatefulScript
   ): Either[String, TxScriptEmulationResult]
 }
@@ -46,6 +47,7 @@ object TxScriptEmulator {
   ) extends TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
+        fixedOutputs: AVector[AssetOutput],
         script: StatefulScript
     ): Either[String, TxScriptEmulationResult] = {
       assume(inputWithAssets.nonEmpty)
@@ -59,7 +61,7 @@ object TxScriptEmulator {
           preOutputs: AVector[AssetOutput]
       ): Either[String, TxScriptExecution] = {
         val txTemplate = TransactionTemplate(
-          UnsignedTransaction(Some(script), inputWithAssets.map(_.input), AVector.empty),
+          UnsignedTransaction(Some(script), inputWithAssets.map(_.input), fixedOutputs),
           inputSignatures = AVector.fill(16)(Signature.generate),
           scriptSignatures = AVector.fill(16)(Signature.generate)
         )
@@ -101,6 +103,7 @@ object TxScriptEmulator {
   object Mock extends TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
+        fixedOutputs: AVector[AssetOutput],
         script: StatefulScript
     ): Either[String, TxScriptEmulationResult] = {
       Right(TxScriptEmulationResult(defaultGasPerInput, AVector.empty))
@@ -110,6 +113,7 @@ object TxScriptEmulator {
   object NotImplemented extends TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
+        fixedOutputs: AVector[AssetOutput],
         script: StatefulScript
     ): Either[String, TxScriptEmulationResult] = {
       throw new NotImplementedError("TxScriptEmulator not implemented")

@@ -4596,8 +4596,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     generatedAssetOutputs.length is 1
-    // It should not be ~1 ALPH, but it is ~(5+1) ALPH
-    generatedAssetOutputs.head.amount is U256.unsafe(5998000000000000000L)
+    generatedAssetOutputs.head.amount is U256.unsafe(1001229600000000000L)
   }
 
   it should "get ghost uncles" in new Fixture {
