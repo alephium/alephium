@@ -83,7 +83,7 @@ protected[ws] object WsParams {
           addresses
             .map(_.toBase58)
             .sorted
-            .map(address => s"${eventIndex.getOrElse("")}/$address")
+            .map(address => s"${eventIndex.getOrElse("*")}/$address")
             .mkString(",")
         )
     def toContractEventKeys: AVector[ContractEventKey] = eventIndex match {
@@ -95,6 +95,7 @@ protected[ws] object WsParams {
     protected[ws] val ContractEvent: WsEventType = "contract"
     protected[ws] val AddressesField             = "addresses"
     protected[ws] val EventIndexField            = "eventIndex"
+    private val LowestContractEventIndex         = 0
 
     protected[ws] def fromSingle(
         address: Address.Contract,
@@ -116,7 +117,7 @@ protected[ws] object WsParams {
             .buildUniqueContractAddresses(addressArr)
             .flatMap { addresses =>
               jsonObj.value.get(EventIndexField) match {
-                case Some(ujson.Num(eventIndex)) =>
+                case Some(ujson.Num(eventIndex)) if eventIndex.toInt >= LowestContractEventIndex =>
                   Right(ContractEventsSubscribeParams(addresses, Option(eventIndex.toInt)))
                 case None =>
                   Right(ContractEventsSubscribeParams(addresses, None))

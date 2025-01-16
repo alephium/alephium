@@ -86,7 +86,7 @@ object WsError {
   protected[ws] def invalidContractParamsEventIndexType(json: ujson.Value): Error =
     Error(
       Error.InvalidParamsCode,
-      s"Invalid contract params eventIndex field type: $json, expected integer"
+      s"Invalid contract params eventIndex field type: $json, expected integer greater or equal than 0"
     )
 
   protected[ws] def alreadySubscribed(subscriptionId: WsSubscriptionId): Error =
