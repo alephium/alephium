@@ -594,7 +594,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
-  it should "publish misbehavior and stop the broker if it receives invalid headers response" in new SyncV2Fixture {
+  it should "publish misbehavior if it receives invalid headers response" in new SyncV2Fixture {
     import SyncV2Handler._
 
     brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
@@ -606,7 +606,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
-    watch(brokerHandler)
 
     val block = emptyBlock(blockFlow, chainIndex)
     brokerHandler ! BaseBrokerHandler.Received(
@@ -614,11 +613,10 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
 
     blockFlowSynchronizer.expectNoMessage()
-    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
-    expectTerminated(brokerHandler.ref)
+    listener.expectMsg(MisbehaviorManager.InvalidResponse(brokerHandlerActor.remoteAddress))
   }
 
-  it should "publish misbehavior and stop the broker if it receives invalid blocks response" in new SyncV2Fixture {
+  it should "publish misbehavior if it receives invalid blocks response" in new SyncV2Fixture {
     import SyncV2Handler._
 
     brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
@@ -630,7 +628,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
-    watch(brokerHandler)
 
     val block = emptyBlock(blockFlow, chainIndex)
     brokerHandler ! BaseBrokerHandler.Received(
@@ -638,8 +635,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
 
     blockFlowSynchronizer.expectNoMessage()
-    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
-    expectTerminated(brokerHandler.ref)
+    listener.expectMsg(MisbehaviorManager.InvalidResponse(brokerHandlerActor.remoteAddress))
   }
 
   it should "fall back to binary search to find the ancestor" in new GetAncestorsFixture {

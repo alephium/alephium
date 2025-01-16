@@ -88,6 +88,7 @@ object MisbehaviorManager {
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Uncertain
   final case class DeepForkBlock(remoteAddress: InetSocketAddress)   extends Uncertain
+  final case class InvalidResponse(remoteAddress: InetSocketAddress) extends Uncertain
 
   sealed trait MisbehaviorStatus
   final case class Penalty(value: Int, timestamp: TimeStamp) extends MisbehaviorStatus

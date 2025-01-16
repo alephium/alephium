@@ -463,7 +463,7 @@ trait SyncV2Handler { _: BrokerHandler =>
             log.error(
               s"Received invalid BlocksByHeightsResponse from $remoteAddress, request: $info"
             )
-            stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+            publishEvent(MisbehaviorManager.InvalidResponse(remoteAddress))
         }
       case None =>
         log.warning(s"Ignore unknown BlocksByHeightsResponse from $remoteAddress, request id: $id")
@@ -577,7 +577,7 @@ trait SyncV2Handler { _: BrokerHandler =>
             log.error(
               s"Received invalid HeadersByHeightsResponse from $remoteAddress, request: $info"
             )
-            stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+            publishEvent(MisbehaviorManager.InvalidResponse(remoteAddress))
         }
       case None =>
         log.warning(s"Ignore unknown HeadersByHeightsResponse from $remoteAddress, request id: $id")
