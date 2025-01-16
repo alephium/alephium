@@ -4545,6 +4545,61 @@ class ServerUtilsSpec extends AlephiumSpec {
       generatedOutputs.filter(_.toProtocol().isAsset).map(o => (o.hint, o.key))
   }
 
+  it should "should estimate the generated output correctly" in new ChainedTransactionsFixture {
+    val tokenContract =
+      s"""
+         |Contract TokenContract() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenContractAddress = deployContract(
+      tokenContract,
+      initialAttoAlphAmount = Amount(ALPH.alph(5)),
+      keyPair = (genesisPrivateKey, genesisPublicKey),
+      issueTokenAmount = None
+    )
+
+    val withdrawALPHScript =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${tokenContractAddress}).withdraw()
+         |}
+         |$tokenContract
+         |""".stripMargin
+
+    val withdrawALPHScriptCode = Compiler.compileTxScript(withdrawALPHScript).toOption.get
+
+    val (_, testPubKey) = chainIndex.from.generateKey
+    val block           = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(5))
+    addAndCheck(blockFlow, block)
+
+    val buildWithdrawALPHExecuteScriptTx = BuildExecuteScriptTx(
+      fromPublicKey = testPubKey.bytes,
+      bytecode = serialize(withdrawALPHScriptCode)
+    )
+
+    val (_, generatedOutputs) = serverUtils
+      .buildExecuteScriptUnsignedTx(
+        blockFlow,
+        buildWithdrawALPHExecuteScriptTx,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+
+    val generatedAssetOutputs = generatedOutputs.map(_.toProtocol()).collect {
+      case output: model.AssetOutput => Some(output)
+      case _                         => None
+    }
+
+    generatedAssetOutputs.length is 1
+    // It should not be ~1 ALPH, but it is ~(5+1) ALPH
+    generatedAssetOutputs.head.amount is U256.unsafe(5998000000000000000L)
+  }
+
   it should "get ghost uncles" in new Fixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block0     = emptyBlock(blockFlow, chainIndex)
