@@ -19,7 +19,8 @@ package org.alephium.app.ws
 import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams.{
   AddressesField,
   ContractEvent,
-  EventIndexField
+  EventIndexField,
+  LowestContractEventIndex
 }
 import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{BlockEvent, TxEvent}
 import org.alephium.app.ws.WsParams.WsSubscriptionId
@@ -86,7 +87,7 @@ object WsError {
   protected[ws] def invalidContractParamsEventIndexType(json: ujson.Value): Error =
     Error(
       Error.InvalidParamsCode,
-      s"Invalid contract params eventIndex field type: $json, expected integer greater or equal than 0"
+      s"Invalid contract params eventIndex field type: $json, expected integer greater or equal than $LowestContractEventIndex"
     )
 
   protected[ws] def alreadySubscribed(subscriptionId: WsSubscriptionId): Error =

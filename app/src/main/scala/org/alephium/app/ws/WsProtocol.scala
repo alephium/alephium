@@ -95,7 +95,7 @@ protected[ws] object WsParams {
     protected[ws] val ContractEvent: WsEventType = "contract"
     protected[ws] val AddressesField             = "addresses"
     protected[ws] val EventIndexField            = "eventIndex"
-    private val LowestContractEventIndex         = 0
+    protected[ws] val LowestContractEventIndex   = -3
 
     protected[ws] def fromSingle(
         address: Address.Contract,
