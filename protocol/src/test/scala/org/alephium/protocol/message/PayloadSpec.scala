@@ -316,7 +316,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val requestId  = RequestId.unsafe(1)
     val request =
-      BlocksByHeightsRequest(requestId, AVector((chainIndex, BlockHeightRange(1, 2, 1))))
+      BlocksAndUnclesByHeightsRequest(requestId, AVector((chainIndex, BlockHeightRange(1, 2, 1))))
     verifySerde(request) {
       // code id
       hex"13" ++
@@ -332,7 +332,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val block0   = blockGen.sample.get
     val block1   = blockGen.sample.get
-    val response = BlocksByHeightsResponse(requestId, AVector(AVector(block0, block1)))
+    val response = BlocksAndUnclesByHeightsResponse(requestId, AVector(AVector(block0, block1)))
     verifySerde(response) {
       // code id
       hex"14" ++

@@ -955,7 +955,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val forkChainBlocks = chainGenOf(4, genesis).sample.get
     addBlocks(chain, mainChainBlocks)
     addBlocks(chain, forkChainBlocks)
-    val blocks = chain.getBlocksByHeightsUnsafe(AVector(1, 2, 3, 4, 5))
+    val blocks = chain.getBlocksWithUnclesByHeightsUnsafe(AVector(1, 2, 3, 4, 5))
     blocks is AVector
       .from(0 until 4)
       .flatMap(i => AVector(mainChainBlocks(i), forkChainBlocks(i))) :+ mainChainBlocks.last

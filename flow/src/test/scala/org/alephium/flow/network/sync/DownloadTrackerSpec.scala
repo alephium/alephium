@@ -40,13 +40,14 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec {
   it should "track downloading" in new Fixture {
     hashes.foreach(hash => blockFlow.contains(hash) isE true)
 
-    downloadTrack.download(AVector(hashes)) is AVector.empty[BlockHash]
+    downloadTrack.getDownloadBlockHashes(AVector(hashes)) is AVector.empty[BlockHash]
     downloadTrack.syncing.isEmpty is true
 
-    downloadTrack.download(AVector(hashes ++ randomHashes)) is randomHashes
+    downloadTrack.getDownloadBlockHashes(AVector(hashes ++ randomHashes)) is randomHashes
     downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
-    downloadTrack.download(AVector(hashes ++ randomHashes)) is AVector.empty[BlockHash]
+    downloadTrack.getDownloadBlockHashes(AVector(hashes ++ randomHashes)) is AVector
+      .empty[BlockHash]
     downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
     hashes.foreach(downloadTrack.finalized)

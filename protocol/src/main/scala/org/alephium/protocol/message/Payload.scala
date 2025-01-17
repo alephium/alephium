@@ -59,10 +59,10 @@ object Payload {
         (HeadersByHeightsRequest, HeadersByHeightsRequest.serialize(x))
       case x: HeadersByHeightsResponse =>
         (HeadersByHeightsResponse, HeadersByHeightsResponse.serialize(x))
-      case x: BlocksByHeightsRequest =>
-        (BlocksByHeightsRequest, BlocksByHeightsRequest.serialize(x))
-      case x: BlocksByHeightsResponse =>
-        (BlocksByHeightsResponse, BlocksByHeightsResponse.serialize(x))
+      case x: BlocksAndUnclesByHeightsRequest =>
+        (BlocksAndUnclesByHeightsRequest, BlocksAndUnclesByHeightsRequest.serialize(x))
+      case x: BlocksAndUnclesByHeightsResponse =>
+        (BlocksAndUnclesByHeightsResponse, BlocksAndUnclesByHeightsResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -77,27 +77,27 @@ object Payload {
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
     deserializerCode._deserialize(input).flatMap { case Staging(code, rest) =>
       code match {
-        case Hello                    => Hello._deserialize(rest)
-        case Ping                     => Ping._deserialize(rest)
-        case Pong                     => Pong._deserialize(rest)
-        case BlocksRequest            => BlocksRequest._deserialize(rest)
-        case BlocksResponse           => BlocksResponse._deserialize(rest)
-        case HeadersRequest           => HeadersRequest._deserialize(rest)
-        case HeadersResponse          => HeadersResponse._deserialize(rest)
-        case InvRequest               => InvRequest._deserialize(rest)
-        case InvResponse              => InvResponse._deserialize(rest)
-        case NewBlock                 => NewBlock._deserialize(rest)
-        case NewHeader                => NewHeader._deserialize(rest)
-        case NewInv                   => NewInv._deserialize(rest)
-        case NewBlockHash             => NewBlockHash._deserialize(rest)
-        case NewTxHashes              => NewTxHashes._deserialize(rest)
-        case TxsRequest               => TxsRequest._deserialize(rest)
-        case TxsResponse              => TxsResponse._deserialize(rest)
-        case ChainState               => ChainState._deserialize(rest)
-        case HeadersByHeightsRequest  => HeadersByHeightsRequest._deserialize(rest)
-        case HeadersByHeightsResponse => HeadersByHeightsResponse._deserialize(rest)
-        case BlocksByHeightsRequest   => BlocksByHeightsRequest._deserialize(rest)
-        case BlocksByHeightsResponse  => BlocksByHeightsResponse._deserialize(rest)
+        case Hello                            => Hello._deserialize(rest)
+        case Ping                             => Ping._deserialize(rest)
+        case Pong                             => Pong._deserialize(rest)
+        case BlocksRequest                    => BlocksRequest._deserialize(rest)
+        case BlocksResponse                   => BlocksResponse._deserialize(rest)
+        case HeadersRequest                   => HeadersRequest._deserialize(rest)
+        case HeadersResponse                  => HeadersResponse._deserialize(rest)
+        case InvRequest                       => InvRequest._deserialize(rest)
+        case InvResponse                      => InvResponse._deserialize(rest)
+        case NewBlock                         => NewBlock._deserialize(rest)
+        case NewHeader                        => NewHeader._deserialize(rest)
+        case NewInv                           => NewInv._deserialize(rest)
+        case NewBlockHash                     => NewBlockHash._deserialize(rest)
+        case NewTxHashes                      => NewTxHashes._deserialize(rest)
+        case TxsRequest                       => TxsRequest._deserialize(rest)
+        case TxsResponse                      => TxsResponse._deserialize(rest)
+        case ChainState                       => ChainState._deserialize(rest)
+        case HeadersByHeightsRequest          => HeadersByHeightsRequest._deserialize(rest)
+        case HeadersByHeightsResponse         => HeadersByHeightsResponse._deserialize(rest)
+        case BlocksAndUnclesByHeightsRequest  => BlocksAndUnclesByHeightsRequest._deserialize(rest)
+        case BlocksAndUnclesByHeightsResponse => BlocksAndUnclesByHeightsResponse._deserialize(rest)
       }
     }
   }
@@ -167,8 +167,8 @@ object Payload {
         ChainState,
         HeadersByHeightsRequest,
         HeadersByHeightsResponse,
-        BlocksByHeightsRequest,
-        BlocksByHeightsResponse
+        BlocksAndUnclesByHeightsRequest,
+        BlocksAndUnclesByHeightsResponse
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -558,35 +558,37 @@ object HeadersByHeightsResponse
     Serde.forProduct2(apply, v => (v.id, v.headers))
 }
 
-final case class BlocksByHeightsRequest(
+final case class BlocksAndUnclesByHeightsRequest(
     id: RequestId,
     data: AVector[(ChainIndex, BlockHeightRange)]
 ) extends Payload.Solicited
     with IndexedPayload[BlockHeightRange] {
-  def measure(): Unit = BlocksByHeightsRequest.payloadLabeled.inc()
+  def measure(): Unit = BlocksAndUnclesByHeightsRequest.payloadLabeled.inc()
 }
 
-object BlocksByHeightsRequest
-    extends IndexedSerding[BlockHeightRange, BlocksByHeightsRequest]
+object BlocksAndUnclesByHeightsRequest
+    extends IndexedSerding[BlockHeightRange, BlocksAndUnclesByHeightsRequest]
     with Payload.Code {
   def name: String = codeName
 
   val baseSerde: Serde[BlockHeightRange] = BlockHeightRange.serde
-  implicit val serde: Serde[BlocksByHeightsRequest] =
+  implicit val serde: Serde[BlocksAndUnclesByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
   def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
 
-  def apply(data: AVector[(ChainIndex, BlockHeightRange)]): BlocksByHeightsRequest =
-    BlocksByHeightsRequest(RequestId.random(), data)
+  def apply(data: AVector[(ChainIndex, BlockHeightRange)]): BlocksAndUnclesByHeightsRequest =
+    BlocksAndUnclesByHeightsRequest(RequestId.random(), data)
 }
 
-final case class BlocksByHeightsResponse(id: RequestId, blocks: AVector[AVector[Block]])
+final case class BlocksAndUnclesByHeightsResponse(id: RequestId, blocks: AVector[AVector[Block]])
     extends Payload.Solicited {
-  def measure(): Unit = BlocksByHeightsResponse.payloadLabeled.inc()
+  def measure(): Unit = BlocksAndUnclesByHeightsResponse.payloadLabeled.inc()
 }
 
-object BlocksByHeightsResponse extends Payload.Serding[BlocksByHeightsResponse] with Payload.Code {
-  implicit val serde: Serde[BlocksByHeightsResponse] =
+object BlocksAndUnclesByHeightsResponse
+    extends Payload.Serding[BlocksAndUnclesByHeightsResponse]
+    with Payload.Code {
+  implicit val serde: Serde[BlocksAndUnclesByHeightsResponse] =
     Serde.forProduct2(apply, v => (v.id, v.blocks))
 }

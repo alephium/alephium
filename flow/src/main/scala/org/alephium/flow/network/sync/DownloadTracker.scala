@@ -31,7 +31,7 @@ trait DownloadTracker {
     !(syncing.contains(hash) || blockflow.contains(hash).exists(identity))
   }
 
-  def download(hashes: AVector[AVector[BlockHash]]): AVector[BlockHash] = {
+  def getDownloadBlockHashes(hashes: AVector[AVector[BlockHash]]): AVector[BlockHash] = {
     val currentTs  = TimeStamp.now()
     val toDownload = hashes.flatMap(_.filter(needToDownload))
     toDownload.foreach(hash => syncing.addOne(hash -> currentTs))

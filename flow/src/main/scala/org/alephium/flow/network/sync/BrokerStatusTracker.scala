@@ -21,7 +21,7 @@ import scala.util.Random
 
 import org.alephium.flow.core.maxSyncBlocksPerChain
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.flow.network.sync.SyncState.{BlockDownloadTask, TaskId}
+import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
@@ -40,7 +40,7 @@ object BrokerStatusTracker {
   ) {
     private[sync] var requestNum   = 0
     private[sync] val pendingTasks = mutable.Set.empty[BlockDownloadTask]
-    private[sync] val missedBlocks = mutable.HashMap.empty[ChainIndex, mutable.Set[TaskId]]
+    private[sync] val missedBlocks = mutable.HashMap.empty[ChainIndex, mutable.Set[BlockBatch]]
 
     def updateTips(newTips: AVector[ChainTip])(implicit groupConfig: GroupConfig): Unit =
       newTips.foreach(tip => tips(tip.chainIndex.flattenIndex) = Some(tip))
@@ -66,7 +66,7 @@ object BrokerStatusTracker {
     }
     def getPendingTasks: collection.Set[BlockDownloadTask] = pendingTasks
 
-    def addMissedBlocks(chainIndex: ChainIndex, taskId: TaskId): Unit = {
+    def addMissedBlocks(chainIndex: ChainIndex, taskId: BlockBatch): Unit = {
       missedBlocks.get(chainIndex) match {
         case Some(values) => values.addOne(taskId)
         case None         => missedBlocks(chainIndex) = mutable.Set(taskId)
@@ -76,7 +76,7 @@ object BrokerStatusTracker {
       missedBlocks.remove(chainIndex)
       ()
     }
-    def containsMissedBlocks(chainIndex: ChainIndex, taskId: TaskId): Boolean = {
+    def containsMissedBlocks(chainIndex: ChainIndex, taskId: BlockBatch): Boolean = {
       missedBlocks.get(chainIndex).exists(_.contains(taskId))
     }
 

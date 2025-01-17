@@ -157,7 +157,7 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
       }
     case SyncInventories(hashes) =>
-      val blockHashes = download(hashes)
+      val blockHashes = getDownloadBlockHashes(hashes)
       if (blockHashes.nonEmpty) {
         sender() ! BrokerHandler.DownloadBlocks(blockHashes)
       }
@@ -176,7 +176,7 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
       }
       scheduleSync()
 
-    case chainState: FlowHandler.ChainState =>
+    case chainState: FlowHandler.UpdateChainState =>
       samplePeers(ProtocolV2).foreach { case (actor, broker) =>
         actor ! BrokerHandler.SendChainState(chainState.filterFor(broker.info))
       }
@@ -263,7 +263,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def checkMissedBlocks(state: SyncStatePerChain, taskId: TaskId): Boolean = {
+  private def checkMissedBlocks(state: SyncStatePerChain, taskId: BlockBatch): Boolean = {
     val isOriginBrokerInvalid = brokers.view
       .filter(_._2.getChainTip(state.chainIndex).exists(_.height >= taskId.to))
       .forall(_._2.containsMissedBlocks(state.chainIndex, taskId))
@@ -571,12 +571,12 @@ object SyncState {
     }
   }
 
-  final case class TaskId(from: Int, to: Int) {
+  final case class BlockBatch(from: Int, to: Int) {
     def size: Int                 = to - from + 1
     override def toString: String = s"[$from .. $to]"
   }
-  object TaskId {
-    implicit val ordering: Ordering[TaskId] = Ordering.by(_.from)
+  object BlockBatch {
+    implicit val ordering: Ordering[BlockBatch] = Ordering.by(_.from)
   }
 
   final case class BlockDownloadTask(
@@ -587,7 +587,7 @@ object SyncState {
   ) {
     def heightRange: BlockHeightRange = BlockHeightRange.from(fromHeight, toHeight, 1)
     def size: Int                     = toHeight - fromHeight + 1
-    def id: TaskId                    = TaskId(fromHeight, toHeight)
+    def id: BlockBatch                = BlockBatch(fromHeight, toHeight)
 
     override def toString: String = s"${chainIndex.from.value}->${chainIndex.to.value}:$id"
   }
@@ -605,15 +605,16 @@ object SyncState {
   ) extends LazyLogging {
     private[sync] var nextFromHeight                                = ALPH.GenesisHeight
     private[sync] var skeletonHeightRange: Option[BlockHeightRange] = None
-    private[sync] val taskIds   = mutable.SortedSet.empty[TaskId]
+    private[sync] val taskIds   = mutable.SortedSet.empty[BlockBatch]
     private[sync] val taskQueue = mutable.Queue.empty[BlockDownloadTask]
 
     // Although we download blocks in order of height, the blocks we receive
     // may not be sorted by height. `downloadedBlocks` is used to sort the
     // downloaded blocks by height and place them into the `blockQueue`
-    private[sync] val downloadedBlocks = mutable.SortedMap.empty[TaskId, AVector[DownloadedBlock]]
-    private[sync] val blockQueue       = mutable.LinkedHashMap.empty[BlockHash, DownloadedBlock]
-    private[sync] var validating       = mutable.Set.empty[BlockHash]
+    private[sync] val downloadedBlocks =
+      mutable.SortedMap.empty[BlockBatch, AVector[DownloadedBlock]]
+    private[sync] val pendingQueue = mutable.LinkedHashMap.empty[BlockHash, DownloadedBlock]
+    private[sync] var validating   = mutable.Set.empty[BlockHash]
 
     private def addNewTask(task: BlockDownloadTask): Unit = {
       taskIds.addOne(task.id)
@@ -671,7 +672,7 @@ object SyncState {
     def onBlockDownloaded(
         from: BrokerActor,
         info: BrokerInfo,
-        taskId: TaskId,
+        taskId: BlockBatch,
         blocks: AVector[Block]
     ): Unit = {
       if (taskIds.contains(taskId)) {
@@ -686,7 +687,7 @@ object SyncState {
     private def moveToBlockQueue(): Unit = {
       downloadedBlocks.headOption match {
         case Some((taskId, blocks)) if taskIds.headOption.contains(taskId) =>
-          blockQueue.addAll(blocks.map(b => (b.block.hash, b)))
+          pendingQueue.addAll(blocks.map(b => (b.block.hash, b)))
           taskIds.remove(taskId)
           downloadedBlocks.remove(taskId)
           moveToBlockQueue()
@@ -695,14 +696,14 @@ object SyncState {
     }
 
     def tryValidateMoreBlocks(acc: mutable.ArrayBuffer[DownloadedBlock]): Unit = {
-      if (validating.size < maxSyncBlocksPerChain && blockQueue.nonEmpty) {
-        val selected = blockQueue.view.take(maxSyncBlocksPerChain).map(_._2).toSeq
+      if (validating.size < maxSyncBlocksPerChain && pendingQueue.nonEmpty) {
+        val selected = pendingQueue.view.take(maxSyncBlocksPerChain).map(_._2).toSeq
         logger.debug(
           s"Sending more blocks for validation: ${selected.size}, chain index: $chainIndex"
         )
         val hashes = selected.map(_.block.hash)
         validating.addAll(hashes)
-        blockQueue.subtractAll(hashes)
+        pendingQueue.subtractAll(hashes)
         acc.addAll(selected)
       }
     }
@@ -715,7 +716,7 @@ object SyncState {
     }
 
     def tryMoveOn(): Option[BlockHeightRange] = {
-      val queueSize = blockQueue.size + validating.size
+      val queueSize = pendingQueue.size + validating.size
       if (
         nextFromHeight > ALPH.GenesisHeight && // We don't know the common ancestor height yet
         nextFromHeight <= bestTip.height &&

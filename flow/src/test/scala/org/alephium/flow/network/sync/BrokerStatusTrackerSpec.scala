@@ -21,7 +21,7 @@ import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.sync.BrokerStatusTracker.BrokerStatus
-import org.alephium.flow.network.sync.SyncState.{BlockDownloadTask, TaskId}
+import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
@@ -169,8 +169,8 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
 
   it should "add/contains/clear missed blocks" in new BrokerStatusFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val taskId0    = TaskId(1, 5)
-    val taskId1    = TaskId(6, 10)
+    val taskId0    = BlockBatch(1, 5)
+    val taskId1    = BlockBatch(6, 10)
     status.containsMissedBlocks(chainIndex, taskId0) is false
     status.containsMissedBlocks(chainIndex, taskId1) is false
 
@@ -190,7 +190,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.addPendingTask(BlockDownloadTask(chainIndex, 1, 5, None))
     status.pendingTasks.nonEmpty is true
     status.requestNum is 5
-    status.addMissedBlocks(chainIndex, TaskId(1, 5))
+    status.addMissedBlocks(chainIndex, BlockBatch(1, 5))
     status.missedBlocks.nonEmpty is true
 
     status.clear()

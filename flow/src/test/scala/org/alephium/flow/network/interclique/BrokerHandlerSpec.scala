@@ -609,7 +609,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
     val block = emptyBlock(blockFlow, chainIndex)
     brokerHandler ! BaseBrokerHandler.Received(
-      BlocksByHeightsResponse(defaultRequestId, AVector(AVector(block)))
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(AVector(block)))
     )
 
     blockFlowSynchronizer.expectNoMessage()
@@ -620,7 +620,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     import SyncV2Handler._
 
     brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
-      BlocksByHeightsRequest(
+      BlocksAndUnclesByHeightsRequest(
         defaultRequestId,
         AVector(chainIndex -> BlockHeightRange.from(1, 1, 1))
       ),
@@ -802,7 +802,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
     def prepare(tasks: AVector[BlockDownloadTask]) = {
       val chains      = tasks.map(t => (t.chainIndex, t.heightRange))
-      val request     = BlocksByHeightsRequest(defaultRequestId, chains)
+      val request     = BlocksAndUnclesByHeightsRequest(defaultRequestId, chains)
       val requestInfo = RequestInfo(request, Some(BaseBrokerHandler.DownloadBlockTasks(tasks)))
       brokerHandlerActor.pendingRequests.addOne((request.id, requestInfo))
     }
@@ -816,7 +816,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
         .deserialize(message)
         .rightValue
         .payload
-        .asInstanceOf[BlocksByHeightsRequest]
+        .asInstanceOf[BlocksAndUnclesByHeightsRequest]
       payload.data is AVector((chainIndex, BlockHeightRange.from(1, 50, 1)))
     }
   }
@@ -824,13 +824,15 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "handle blocks request" in new DownloadBlocksFixture {
     val blocks  = genBlocks(4)
     val heights = AVector((chainIndex, BlockHeightRange.from(1, 4, 1)))
-    brokerHandler ! BaseBrokerHandler.Received(BlocksByHeightsRequest(defaultRequestId, heights))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, heights)
+    )
     connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
       val payload = Message
         .deserialize(message)
         .rightValue
         .payload
-        .asInstanceOf[BlocksByHeightsResponse]
+        .asInstanceOf[BlocksAndUnclesByHeightsResponse]
       payload.id is defaultRequestId
       payload.blocks is AVector(blocks)
     }
@@ -842,7 +844,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     prepare(AVector(task0))
 
     brokerHandler ! BaseBrokerHandler.Received(
-      BlocksByHeightsResponse(defaultRequestId, AVector(blocks))
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(blocks))
     )
     eventually(brokerHandlerActor.pendingRequests.contains(defaultRequestId) is false)
     blockFlowSynchronizer.expectMsg(
@@ -852,7 +854,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val task1 = task0.copy(toHeader = None)
     prepare(AVector(task1))
     brokerHandler ! BaseBrokerHandler.Received(
-      BlocksByHeightsResponse(defaultRequestId, AVector(blocks))
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(blocks))
     )
     blockFlowSynchronizer.expectMsg(
       BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task1, blocks, true)))
@@ -861,7 +863,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val task2 = task0.copy(toHeader = Some(blocks.head.header))
     prepare(AVector(task2))
     brokerHandler ! BaseBrokerHandler.Received(
-      BlocksByHeightsResponse(defaultRequestId, AVector(blocks))
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(blocks))
     )
     blockFlowSynchronizer.expectMsg(
       BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task2, blocks, false)))
@@ -878,7 +880,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     }
 
     val blockchain = blockFlow.getBlockChain(chainIndex)
-    val blocks     = blockchain.getBlocksByHeightsUnsafe(AVector.from(1 to 4))
+    val blocks     = blockchain.getBlocksWithUnclesByHeightsUnsafe(AVector.from(1 to 4))
     blocks.length is blockSize
 
     def getHeader(height: Int): BlockHeader = {

@@ -50,7 +50,7 @@ object FlowHandler {
         .map { case (_, locators) => locators }
     }
   }
-  final case class ChainState(tips: AVector[ChainTip]) extends Command {
+  final case class UpdateChainState(tips: AVector[ChainTip]) extends Command {
     def filterFor(
         another: BrokerGroupInfo
     )(implicit groupConfig: GroupConfig): AVector[ChainTip] = {
@@ -79,6 +79,6 @@ class FlowHandler(blockFlow: BlockFlow) extends IOBaseActor with Stash {
         sender() ! SyncInventories(None, inventories)
       }
     case GetChainState =>
-      escapeIOError(blockFlow.getChainTips()) { tips => sender() ! ChainState(tips) }
+      escapeIOError(blockFlow.getChainTips()) { tips => sender() ! UpdateChainState(tips) }
   }
 }

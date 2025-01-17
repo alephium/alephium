@@ -369,14 +369,14 @@ trait SyncV2Handler { _: BrokerHandler =>
       case cmd: BaseBrokerHandler.DownloadBlockTasks =>
         handleDownloadBlocksRequest(cmd)
 
-      case BaseBrokerHandler.Received(BlocksByHeightsRequest(id, chains)) =>
+      case BaseBrokerHandler.Received(BlocksAndUnclesByHeightsRequest(id, chains)) =>
         log.debug(
           s"Received BlocksByHeightsRequest from $remoteAddress: " +
             s"${BrokerHandler.showIndexedHeights(chains)}, id: ${id.value.v}"
         )
         handleBlocksRequest(id, chains)
 
-      case BaseBrokerHandler.Received(BlocksByHeightsResponse(id, blockss)) =>
+      case BaseBrokerHandler.Received(BlocksAndUnclesByHeightsResponse(id, blockss)) =>
         log.debug(
           s"Received BlocksByHeightsResponse from $remoteAddress: " +
             s"${BrokerHandler.showFlowData(blockss)}, id: ${id.value.v}"
@@ -425,7 +425,7 @@ trait SyncV2Handler { _: BrokerHandler =>
 
   private def handleDownloadBlocksRequest(cmd: BaseBrokerHandler.DownloadBlockTasks): Unit = {
     val heights = cmd.tasks.map(task => (task.chainIndex, task.heightRange))
-    val request = BlocksByHeightsRequest(heights)
+    val request = BlocksAndUnclesByHeightsRequest(heights)
     log.debug(
       s"Sending BlocksByHeightsRequest to $remoteAddress: " +
         s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value.v}"
@@ -506,8 +506,9 @@ trait SyncV2Handler { _: BrokerHandler =>
     handleFlowDataRequest(
       id,
       chains,
-      (chainIndex, range) => blockflow.getBlockChain(chainIndex).getBlocksByHeights(range.heights),
-      BlocksByHeightsResponse.apply,
+      (chainIndex, range) =>
+        blockflow.getBlockChain(chainIndex).getBlocksWithUnclesByHeights(range.heights),
+      BlocksAndUnclesByHeightsResponse.apply,
       "BlocksByHeights"
     )
   }

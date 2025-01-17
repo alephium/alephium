@@ -401,11 +401,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     checkCompletenessHelper(hash, blockStorage.existsUnsafe, super.checkCompletenessUnsafe)
   }
 
-  def getBlocksByHeights(heights: AVector[Int]): IOResult[AVector[Block]] = {
-    IOUtils.tryExecute(getBlocksByHeightsUnsafe(heights))
+  def getBlocksWithUnclesByHeights(heights: AVector[Int]): IOResult[AVector[Block]] = {
+    IOUtils.tryExecute(getBlocksWithUnclesByHeightsUnsafe(heights))
   }
 
-  def getBlocksByHeightsUnsafe(heights: AVector[Int]): AVector[Block] = {
+  def getBlocksWithUnclesByHeightsUnsafe(heights: AVector[Int]): AVector[Block] = {
     heights.flatMap(height => getHashesUnsafe(height).map(getBlockUnsafe))
   }
 }
