@@ -63,7 +63,30 @@ object BrokerStatusTracker {
         requestNum -= task.size
       }
     }
-    def getPendingTasks: collection.Set[BlockDownloadTask] = pendingTasks
+    def recycleTasks(
+        chains: FlattenIndexedArray[SyncState.SyncStatePerChain]
+    )(implicit groupConfig: GroupConfig): Int = {
+      if (pendingTasks.nonEmpty) {
+        var count = 0
+        pendingTasks.foreach { task =>
+          if (chains(task.chainIndex).exists(_.putBack(task))) {
+            count += 1
+          }
+        }
+        count
+      } else {
+        0
+      }
+    }
+
+    def handleBlockDownloaded(
+        result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
+    ): Unit = {
+      result.foreach { case (task, _, isValid) =>
+        removePendingTask(task)
+        if (!isValid) addMissedBlocks(task.chainIndex, task.id)
+      }
+    }
 
     def addMissedBlocks(chainIndex: ChainIndex, taskId: BlockBatch): Unit = {
       missedBlocks.get(chainIndex) match {
@@ -75,8 +98,16 @@ object BrokerStatusTracker {
       missedBlocks.remove(chainIndex)
       ()
     }
-    def containsMissedBlocks(chainIndex: ChainIndex, taskId: BlockBatch): Boolean = {
-      missedBlocks.get(chainIndex).exists(_.contains(taskId))
+    def containsMissedBlocks(
+        chainIndex: ChainIndex,
+        taskId: BlockBatch
+    )(implicit groupConfig: GroupConfig): Boolean = {
+      val chainTip = getChainTip(chainIndex)
+      if (chainTip.exists(_.height >= taskId.to)) {
+        missedBlocks.get(chainIndex).exists(_.contains(taskId))
+      } else {
+        false
+      }
     }
 
     def clear(): Unit = {

@@ -1063,16 +1063,28 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import SyncState._
 
     val state = newState()
-    val tasks = AVector(
-      BlockDownloadTask(chainIndex, 51, 100, None),
-      BlockDownloadTask(chainIndex, 101, 150, None),
-      BlockDownloadTask(chainIndex, 1, 50, None)
-    )
-    state.taskIds.add(tasks(0).id)
-    state.taskIds.add(tasks(2).id)
+    val orderedTasks = AVector.from(1.to(500, 50)).map { from =>
+      BlockDownloadTask(chainIndex, from, from + 50 - 1, None)
+    }
+    val tasks = orderedTasks.shuffle()
+    tasks.length is 10
+    val tasks0 = tasks.take(5)
+    val tasks1 = tasks.drop(5)
 
-    state.putBack(tasks)
-    AVector.from(state.taskQueue) is AVector(tasks(2), tasks(0))
+    tasks0.foreach(t => state.taskIds.add(t.id))
+    tasks0.foreach(state.putBack(_) is true)
+    tasks1.foreach(state.putBack(_) is false)
+    tasks0.foreach(state.taskQueue.contains(_) is true)
+    tasks1.foreach(state.taskQueue.contains(_) is false)
+
+    tasks1.foreach(t => state.taskIds.add(t.id))
+    tasks1.foreach(state.putBack(_) is true)
+    AVector.from(state.taskQueue.map(_.id)) is orderedTasks.map(_.id)
+
+    val task = BlockDownloadTask(chainIndex, 1001, 1050, None)
+    state.taskIds.add(task.id)
+    state.putBack(task) is true
+    AVector.from(state.taskQueue.map(_.id)) is (orderedTasks.map(_.id) :+ task.id)
   }
 
   it should "try to validate more blocks" in new SyncStatePerChainFixture with BlockGenerators {

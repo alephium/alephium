@@ -215,7 +215,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
       result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
   ): Unit = {
     val broker: BrokerActor = ActorRefT(sender())
-    getBrokerStatus(broker).foreach(handleBlockDownloaded(broker, _, result))
+    getBrokerStatus(broker).foreach { status =>
+      status.handleBlockDownloaded(result)
+      handleBlockDownloaded(broker, status.info, result)
+    }
     tryValidateMoreBlocks()
     downloadBlocks()
   }
@@ -237,36 +240,28 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def handleBlockDownloaded(
       broker: BrokerActor,
-      brokerStatus: BrokerStatus,
+      brokerInfo: BrokerInfo,
       result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
   ): Unit = {
-    var continue = true
-    var index    = 0
-    while (continue && index < result.length) {
-      val (task, blocks, isValid) = result(index)
-      brokerStatus.removePendingTask(task)
+    result.foreach { case (task, blocks, isValid) =>
       syncingChains(task.chainIndex).foreach { state =>
         if (isValid) {
-          state.onBlockDownloaded(broker, brokerStatus.info, task.id, blocks)
+          state.onBlockDownloaded(broker, brokerInfo, task.id, blocks)
           if (state.isSkeletonFilled) clearMissedBlocks(state.chainIndex)
         } else {
           log.warning(
-            s"The broker ${brokerStatus.info.address} do not have the required blocks, " +
+            s"The broker ${brokerInfo.address} do not have the required blocks, " +
               s"put back the task to the queue, chain: ${state.chainIndex}, task id: ${task.id}"
           )
           state.putBack(task)
-          brokerStatus.addMissedBlocks(task.chainIndex, task.id)
-          continue = !checkMissedBlocks(state, task.id)
+          handleMissedBlocks(state, task.id)
         }
       }
-      index += 1
     }
   }
 
-  private def checkMissedBlocks(state: SyncStatePerChain, taskId: BlockBatch): Boolean = {
-    val isOriginBrokerInvalid = brokers.view
-      .filter(_._2.getChainTip(state.chainIndex).exists(_.height >= taskId.to))
-      .forall(_._2.containsMissedBlocks(state.chainIndex, taskId))
+  private def handleMissedBlocks(state: SyncStatePerChain, taskId: BlockBatch): Unit = {
+    val isOriginBrokerInvalid = brokers.forall(_._2.containsMissedBlocks(state.chainIndex, taskId))
     if (isOriginBrokerInvalid) {
       log.error(
         "All the brokers do not have the required blocks, stop the origin broker and resync"
@@ -275,7 +270,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
       publishEvent(misbehavior)
       context.stop(state.originBroker.ref)
     }
-    isOriginBrokerInvalid
   }
 
   def handlePeerChainState(tips: AVector[ChainTip]): Unit = {
@@ -458,9 +452,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
     @scala.annotation.tailrec
     def iter(): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
-      val newTasks = collectAndAssignTasks(orderedChains, orderedBrokers)
-      newTasks.foreach { case (broker, task) => addToMap(acc, broker, task) }
-      if (newTasks.nonEmpty) iter() else acc
+      val continue = collectAndAssignTasks(orderedChains, orderedBrokers, acc)
+      if (continue) iter() else acc
     }
 
     iter()
@@ -468,9 +461,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def collectAndAssignTasks(
       orderedChains: AVector[SyncStatePerChain],
-      orderedBrokers: scala.collection.Seq[(BrokerActor, BrokerStatus)]
+      orderedBrokers: scala.collection.Seq[(BrokerActor, BrokerStatus)],
+      acc: mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
   ) = {
-    val acc = mutable.ArrayBuffer.empty[(BrokerActor, BlockDownloadTask)]
+    var size = 0
     orderedChains.foreach { state =>
       state.nextTask { task =>
         val selectedBroker = if (task.toHeader.isDefined) {
@@ -488,13 +482,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
         selectedBroker match {
           case Some((broker, brokerStatus)) =>
             brokerStatus.addPendingTask(task)
-            acc.addOne((broker, task))
+            addToMap(acc, broker, task)
+            size += 1
             true
           case None => false
         }
       }
     }
-    acc
+    size > 0
   }
 
   private def clearSyncState(): Unit = {
@@ -537,15 +532,12 @@ trait SyncState { _: BlockFlowSynchronizer =>
         log.info(s"Resync due to the origin broker ${status.info.address} terminated")
         resync()
       } else {
-        val pendingTasks = status.getPendingTasks
-        if (pendingTasks.nonEmpty) {
+        val recycledTaskSize = status.recycleTasks(syncingChains)
+        if (recycledTaskSize > 0) {
           log.debug(
             s"Reschedule the pending tasks from the terminated broker ${status.info.address}, " +
-              s"tasks: ${SyncState.showTasks(AVector.from(pendingTasks))}"
+              s"task size: $recycledTaskSize"
           )
-          pendingTasks.groupBy(_.chainIndex).foreachEntry { case (chainIndex, tasks) =>
-            syncingChains(chainIndex).foreach(_.putBack(AVector.from(tasks)))
-          }
           downloadBlocks()
         }
       }
@@ -729,15 +721,25 @@ object SyncState {
       }
     }
 
-    def putBack(task: BlockDownloadTask): Unit = {
+    def putBack(task: BlockDownloadTask): Boolean = {
       if (taskIds.contains(task.id)) {
-        taskQueue.prepend(task)
+        if (taskQueue.isEmpty) {
+          taskQueue.prepend(task)
+        } else {
+          val index = taskQueue.indexWhere(queued => BlockBatch.ordering.gt(queued.id, task.id))
+          if (index == -1) {
+            taskQueue.insert(taskQueue.length, task)
+          } else {
+            taskQueue.insert(index, task)
+          }
+        }
+        true
+      } else {
+        false
       }
     }
 
-    def putBack(tasks: AVector[BlockDownloadTask]): Unit = {
-      tasks.sortBy(_.id).foreachReversed(putBack)
-    }
+    def putBack(tasks: AVector[BlockDownloadTask]): Unit = tasks.foreach(putBack)
 
     def taskSize: Int             = taskQueue.length
     def isTaskQueueEmpty: Boolean = taskQueue.isEmpty

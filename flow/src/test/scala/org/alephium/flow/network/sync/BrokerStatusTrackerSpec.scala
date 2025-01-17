@@ -130,13 +130,21 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   }
 
   it should "add/get/remove pending requests" in new BrokerStatusFixture {
-    val task0 = BlockDownloadTask(ChainIndex.unsafe(0, 0), 1, 5, None)
-    val task1 = task0.copy(fromHeight = 6, toHeight = 10)
-    val task2 = task0.copy(fromHeight = 11, toHeight = 15)
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val task0      = BlockDownloadTask(chainIndex, 1, 5, None)
+    val task1      = task0.copy(fromHeight = 6, toHeight = 10)
+    val task2      = task0.copy(fromHeight = 11, toHeight = 15)
+
+    val chains = FlattenIndexedArray.empty[SyncState.SyncStatePerChain]
+    val chain =
+      SyncState.SyncStatePerChain(chainIndex, chainTipGen.sample.get, ActorRefT(TestProbe().ref))
+    chain.taskIds.add(task0.id)
+    chains(chainIndex) = chain
 
     status.pendingTasks.contains(task0) is false
     status.pendingTasks.contains(task1) is false
     status.pendingTasks.contains(task2) is false
+    status.recycleTasks(chains) is 0
     status.addPendingTask(task0)
     status.requestNum is 5
     status.addPendingTask(task1)
@@ -145,7 +153,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.pendingTasks.contains(task0) is true
     status.pendingTasks.contains(task1) is true
     status.pendingTasks.contains(task2) is false
-    status.getPendingTasks.toSet is Set(task0, task1)
+    status.recycleTasks(chains) is 1
 
     status.removePendingTask(task0)
     status.requestNum is 5
@@ -172,15 +180,42 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.containsMissedBlocks(chainIndex, taskId0) is false
     status.containsMissedBlocks(chainIndex, taskId1) is false
 
+    val block = emptyBlock(blockFlow, chainIndex)
+    status.tips(chainIndex) = ChainTip(block.hash, 10, Weight.zero)
+
     status.addMissedBlocks(chainIndex, taskId0)
     status.addMissedBlocks(chainIndex, taskId1)
 
     status.containsMissedBlocks(chainIndex, taskId0) is true
     status.containsMissedBlocks(chainIndex, taskId1) is true
+    status.tips(chainIndex) = ChainTip(block.hash, 9, Weight.zero)
+    status.containsMissedBlocks(chainIndex, taskId0) is true
+    status.containsMissedBlocks(chainIndex, taskId1) is false
 
     status.clearMissedBlocks(chainIndex)
     status.containsMissedBlocks(chainIndex, taskId0) is false
     status.containsMissedBlocks(chainIndex, taskId1) is false
+  }
+
+  it should "handleBlockDownload" in new BrokerStatusFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val task0      = BlockDownloadTask(chainIndex, 1, 5, None)
+    val task1      = BlockDownloadTask(chainIndex, 6, 10, None)
+    status.addPendingTask(task0)
+    status.addPendingTask(task1)
+
+    val blockDownloaded0 = AVector((task0, AVector.empty[Block], true))
+    status.handleBlockDownloaded(blockDownloaded0)
+    status.pendingTasks.contains(task0) is false
+    status.pendingTasks.contains(task1) is true
+    status.missedBlocks.isEmpty is true
+
+    val blockDownloaded1 = AVector((task1, AVector.empty[Block], false))
+    status.handleBlockDownloaded(blockDownloaded1)
+    status.pendingTasks.contains(task0) is false
+    status.pendingTasks.contains(task1) is false
+    status.missedBlocks.keys.toSeq is Seq(chainIndex)
+    status.missedBlocks(chainIndex).toSeq is Seq(task1.id)
   }
 
   it should "clear state" in new BrokerStatusFixture {
