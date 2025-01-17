@@ -138,7 +138,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     val chains = FlattenIndexedArray.empty[SyncState.SyncStatePerChain]
     val chain =
       SyncState.SyncStatePerChain(chainIndex, chainTipGen.sample.get, ActorRefT(TestProbe().ref))
-    chain.taskIds.add(task0.id)
+    chain.batchIds.add(task0.id)
     chains(chainIndex) = chain
 
     status.pendingTasks.contains(task0) is false
@@ -175,26 +175,26 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
 
   it should "add/contains/clear missed blocks" in new BrokerStatusFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val taskId0    = BlockBatch(1, 5)
-    val taskId1    = BlockBatch(6, 10)
-    status.containsMissedBlocks(chainIndex, taskId0) is false
-    status.containsMissedBlocks(chainIndex, taskId1) is false
+    val batchId0   = BlockBatch(1, 5)
+    val batchId1   = BlockBatch(6, 10)
+    status.containsMissedBlocks(chainIndex, batchId0) is false
+    status.containsMissedBlocks(chainIndex, batchId1) is false
 
     val block = emptyBlock(blockFlow, chainIndex)
     status.tips(chainIndex) = ChainTip(block.hash, 10, Weight.zero)
 
-    status.addMissedBlocks(chainIndex, taskId0)
-    status.addMissedBlocks(chainIndex, taskId1)
+    status.addMissedBlocks(chainIndex, batchId0)
+    status.addMissedBlocks(chainIndex, batchId1)
 
-    status.containsMissedBlocks(chainIndex, taskId0) is true
-    status.containsMissedBlocks(chainIndex, taskId1) is true
+    status.containsMissedBlocks(chainIndex, batchId0) is true
+    status.containsMissedBlocks(chainIndex, batchId1) is true
     status.tips(chainIndex) = ChainTip(block.hash, 9, Weight.zero)
-    status.containsMissedBlocks(chainIndex, taskId0) is true
-    status.containsMissedBlocks(chainIndex, taskId1) is false
+    status.containsMissedBlocks(chainIndex, batchId0) is true
+    status.containsMissedBlocks(chainIndex, batchId1) is false
 
     status.clearMissedBlocks(chainIndex)
-    status.containsMissedBlocks(chainIndex, taskId0) is false
-    status.containsMissedBlocks(chainIndex, taskId1) is false
+    status.containsMissedBlocks(chainIndex, batchId0) is false
+    status.containsMissedBlocks(chainIndex, batchId1) is false
   }
 
   it should "handleBlockDownload" in new BrokerStatusFixture {

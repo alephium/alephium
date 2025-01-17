@@ -260,8 +260,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def handleMissedBlocks(state: SyncStatePerChain, taskId: BlockBatch): Unit = {
-    val isOriginBrokerInvalid = brokers.forall(_._2.containsMissedBlocks(state.chainIndex, taskId))
+  private def handleMissedBlocks(state: SyncStatePerChain, batchId: BlockBatch): Unit = {
+    val isOriginBrokerInvalid = brokers.forall(_._2.containsMissedBlocks(state.chainIndex, batchId))
     if (isOriginBrokerInvalid) {
       log.error(
         "All the brokers do not have the required blocks, stop the origin broker and resync"
@@ -594,7 +594,7 @@ object SyncState {
   ) extends LazyLogging {
     private[sync] var nextFromHeight                                = ALPH.GenesisHeight
     private[sync] var skeletonHeightRange: Option[BlockHeightRange] = None
-    private[sync] val taskIds   = mutable.SortedSet.empty[BlockBatch]
+    private[sync] val batchIds  = mutable.SortedSet.empty[BlockBatch]
     private[sync] val taskQueue = mutable.Queue.empty[BlockDownloadTask]
 
     // Although we download blocks in order of height, the blocks we receive
@@ -606,7 +606,7 @@ object SyncState {
     private[sync] var validating   = mutable.Set.empty[BlockHash]
 
     private def addNewTask(task: BlockDownloadTask): Unit = {
-      taskIds.addOne(task.id)
+      batchIds.addOne(task.id)
       taskQueue.enqueue(task)
     }
 
@@ -661,13 +661,13 @@ object SyncState {
     def onBlockDownloaded(
         from: BrokerActor,
         info: BrokerInfo,
-        taskId: BlockBatch,
+        batchId: BlockBatch,
         blocks: AVector[Block]
     ): Unit = {
-      if (taskIds.contains(taskId)) {
-        logger.debug(s"Add the downloaded blocks $taskId to the buffer, chain index: $chainIndex")
+      if (batchIds.contains(batchId)) {
+        logger.debug(s"Add the downloaded blocks $batchId to the buffer, chain index: $chainIndex")
         val fromBroker = (from, info)
-        downloadedBlocks.addOne((taskId, blocks.map(b => DownloadedBlock(b, fromBroker))))
+        downloadedBlocks.addOne((batchId, blocks.map(b => DownloadedBlock(b, fromBroker))))
         moveToBlockQueue()
       }
     }
@@ -675,10 +675,10 @@ object SyncState {
     @scala.annotation.tailrec
     private def moveToBlockQueue(): Unit = {
       downloadedBlocks.headOption match {
-        case Some((taskId, blocks)) if taskIds.headOption.contains(taskId) =>
+        case Some((batchId, blocks)) if batchIds.headOption.contains(batchId) =>
           pendingQueue.addAll(blocks.map(b => (b.block.hash, b)))
-          taskIds.remove(taskId)
-          downloadedBlocks.remove(taskId)
+          batchIds.remove(batchId)
+          downloadedBlocks.remove(batchId)
           moveToBlockQueue()
         case _ => ()
       }
@@ -697,7 +697,7 @@ object SyncState {
       }
     }
 
-    def isSkeletonFilled: Boolean = taskIds.forall(downloadedBlocks.contains)
+    def isSkeletonFilled: Boolean = batchIds.forall(downloadedBlocks.contains)
 
     def handleFinalizedBlock(hash: BlockHash): Unit = {
       validating.remove(hash)
@@ -722,7 +722,7 @@ object SyncState {
     }
 
     def putBack(task: BlockDownloadTask): Boolean = {
-      if (taskIds.contains(task.id)) {
+      if (batchIds.contains(task.id)) {
         if (taskQueue.isEmpty) {
           taskQueue.prepend(task)
         } else {

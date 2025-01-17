@@ -88,10 +88,10 @@ object BrokerStatusTracker {
       }
     }
 
-    def addMissedBlocks(chainIndex: ChainIndex, taskId: BlockBatch): Unit = {
+    def addMissedBlocks(chainIndex: ChainIndex, batchId: BlockBatch): Unit = {
       missedBlocks.get(chainIndex) match {
-        case Some(values) => values.addOne(taskId)
-        case None         => missedBlocks(chainIndex) = mutable.Set(taskId)
+        case Some(values) => values.addOne(batchId)
+        case None         => missedBlocks(chainIndex) = mutable.Set(batchId)
       }
     }
     def clearMissedBlocks(chainIndex: ChainIndex): Unit = {
@@ -100,11 +100,11 @@ object BrokerStatusTracker {
     }
     def containsMissedBlocks(
         chainIndex: ChainIndex,
-        taskId: BlockBatch
+        batchId: BlockBatch
     )(implicit groupConfig: GroupConfig): Boolean = {
       val chainTip = getChainTip(chainIndex)
-      if (chainTip.exists(_.height >= taskId.to)) {
-        missedBlocks.get(chainIndex).exists(_.contains(taskId))
+      if (chainTip.exists(_.height >= batchId.to)) {
+        missedBlocks.get(chainIndex).exists(_.contains(batchId))
       } else {
         false
       }
