@@ -36,17 +36,17 @@ object BrokerStatusTracker {
   final class BrokerStatus(
       val info: BrokerInfo,
       val version: ProtocolVersion,
-      private[sync] val tips: Array[Option[ChainTip]]
+      private[sync] val tips: FlattenIndexedArray[ChainTip]
   ) {
     private[sync] var requestNum   = 0
     private[sync] val pendingTasks = mutable.Set.empty[BlockDownloadTask]
     private[sync] val missedBlocks = mutable.HashMap.empty[ChainIndex, mutable.Set[BlockBatch]]
 
     def updateTips(newTips: AVector[ChainTip])(implicit groupConfig: GroupConfig): Unit =
-      newTips.foreach(tip => tips(tip.chainIndex.flattenIndex) = Some(tip))
+      newTips.foreach(tip => tips(tip.chainIndex) = tip)
 
     def getChainTip(chainIndex: ChainIndex)(implicit groupConfig: GroupConfig): Option[ChainTip] =
-      tips(chainIndex.flattenIndex)
+      tips(chainIndex)
 
     def canDownload(task: BlockDownloadTask)(implicit groupConfig: GroupConfig): Boolean = {
       requestNum < MaxRequestNum &&
@@ -54,7 +54,6 @@ object BrokerStatusTracker {
       !containsMissedBlocks(task.chainIndex, task.id) &&
       getChainTip(task.chainIndex).exists(_.height >= task.toHeight)
     }
-    def getRequestNum: Int = requestNum
     def addPendingTask(task: BlockDownloadTask): Unit = {
       requestNum += task.size
       pendingTasks.addOne(task)
@@ -91,7 +90,7 @@ object BrokerStatusTracker {
     def apply(info: BrokerInfo, version: ProtocolVersion)(implicit
         groupConfig: GroupConfig
     ): BrokerStatus = {
-      new BrokerStatus(info, version, Array.fill(groupConfig.chainNum)(None))
+      new BrokerStatus(info, version, FlattenIndexedArray.empty)
     }
   }
 }

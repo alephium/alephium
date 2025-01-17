@@ -206,9 +206,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
   import SyncState._
 
   private[sync] var isSyncing     = false
-  private[sync] val bestChainTips = mutable.HashMap.empty[ChainIndex, (BrokerActor, ChainTip)]
-  private[sync] var selfChainTips: Option[AVector[ChainTip]] = None
-  private[sync] val syncingChains = mutable.HashMap.empty[ChainIndex, SyncStatePerChain]
+  private[sync] val bestChainTips = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
+  private[sync] var selfChainTips = FlattenIndexedArray.empty[ChainTip]
+  private[sync] var syncingChains = FlattenIndexedArray.empty[SyncStatePerChain]
   private[sync] var startTime: Option[TimeStamp] = None
 
   def handleBlockDownloaded(
@@ -222,7 +222,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def tryValidateMoreBlocks(): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
-    syncingChains.foreach(_._2.tryValidateMoreBlocks(acc))
+    syncingChains.foreach(_.tryValidateMoreBlocks(acc))
     acc.groupBy(_.from).foreachEntry { case (from, blocks) =>
       val dataOrigin = DataOrigin.InterClique(from._2)
       val addFlowData =
@@ -245,7 +245,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     while (continue && index < result.length) {
       val (task, blocks, isValid) = result(index)
       brokerStatus.removePendingTask(task)
-      syncingChains.get(task.chainIndex).foreach { state =>
+      syncingChains(task.chainIndex).foreach { state =>
         if (isValid) {
           state.onBlockDownloaded(broker, brokerStatus.info, task.id, blocks)
           if (state.isSkeletonFilled) clearMissedBlocks(state.chainIndex)
@@ -283,7 +283,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     getBrokerStatus(brokerActor).foreach(_.updateTips(tips))
     tips.foreach { chainTip =>
       val chainIndex = chainTip.chainIndex
-      bestChainTips.get(chainIndex) match {
+      bestChainTips(chainIndex) match {
         case Some((_, current)) =>
           if (chainTip.weight > current.weight) {
             bestChainTips(chainIndex) = (brokerActor, chainTip)
@@ -293,20 +293,16 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def getSelfTip(chainIndex: ChainIndex): ChainTip = {
-    assume(selfChainTips.isDefined)
-    val groupIndex = brokerConfig.groupIndexOfBroker(chainIndex.from)
-    selfChainTips.get(groupIndex * brokerConfig.groups + chainIndex.to.value)
-  }
-
   private def hasBestChainTips: Boolean = {
-    val chainIndexes = brokerConfig.chainIndexes
-    chainIndexes.length == bestChainTips.size && chainIndexes.forall(bestChainTips.contains)
+    brokerConfig.chainIndexes.forall { chainIndex =>
+      bestChainTips(chainIndex).isDefined
+    }
   }
 
-  def handleSelfChainState(selfChainTips: AVector[ChainTip]): Unit = {
-    this.selfChainTips = Some(selfChainTips)
+  def handleSelfChainState(chainTips: AVector[ChainTip]): Unit = {
+    chainTips.foreach { chainTip =>
+      this.selfChainTips(chainTip.chainIndex) = Some(chainTip)
+    }
     if (!isSyncing) tryStartSync()
   }
 
@@ -318,7 +314,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
       }
       val block = event.data
       if (isBlockValid) {
-        syncingChains.get(block.chainIndex).foreach(_.handleFinalizedBlock(block.hash))
+        syncingChains(block.chainIndex).foreach(_.handleFinalizedBlock(block.hash))
         tryValidateMoreBlocks()
         if (isSynced) {
           resync()
@@ -333,20 +329,20 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def isSynced: Boolean = {
-    syncingChains.forall { case (chainIndex, state) =>
-      state.isSynced(getSelfTip(chainIndex))
+  private[sync] def isSynced: Boolean = {
+    syncingChains.forall { state =>
+      val selfChainTip = selfChainTips(state.chainIndex)
+      selfChainTip.exists(state.isSynced)
     }
   }
 
   private def tryMoveOn(): Unit = {
     val requests =
       mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, BlockHeightRange)]]
-    syncingChains.foreachEntry { case (chainIndex, state) =>
+    syncingChains.foreach { state =>
       state.tryMoveOn() match {
-        case Some(range) =>
-          addToMap(requests, state.originBroker, (chainIndex, range))
-        case None => ()
+        case Some(range) => addToMap(requests, state.originBroker, (state.chainIndex, range))
+        case None        => ()
       }
     }
     requests.foreachEntry { case (broker, requestsPerActor) =>
@@ -359,10 +355,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
       startTime = None
       val chains = mutable.ArrayBuffer.empty[(ChainIndex, BrokerActor, ChainTip, ChainTip)]
       brokerConfig.chainIndexes.foreach { chainIndex =>
-        val selfTip                = getSelfTip(chainIndex)
-        val (brokerActor, bestTip) = bestChainTips(chainIndex)
-        if (bestTip.weight > selfTip.weight) {
-          chains.addOne((chainIndex, brokerActor, bestTip, selfTip))
+        for {
+          selfTip <- selfChainTips(chainIndex)
+          bestTip <- bestChainTips(chainIndex)
+        } yield {
+          if (bestTip._2.weight > selfTip.weight) {
+            chains.addOne((chainIndex, bestTip._1, bestTip._2, selfTip))
+          }
         }
       }
       if (chains.nonEmpty) startSync(chains)
@@ -370,8 +369,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
       startTime match {
         case Some(ts) =>
           if (ts.plusUnsafe(FallbackThreshold) < TimeStamp.now()) {
-            selfChainTips = None
-            bestChainTips.clear()
+            selfChainTips.reset()
+            bestChainTips.reset()
             startTime = None
             clearSyncState()
             switchToV1()
@@ -389,7 +388,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     val requestsPerBroker = mutable.HashMap
       .empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, ChainTip, ChainTip)]]
     chains.foreach { case (chainIndex, brokerActor, bestTip, selfTip) =>
-      syncingChains(chainIndex) = SyncStatePerChain.apply(chainIndex, bestTip, brokerActor)
+      syncingChains(chainIndex) = Some(SyncStatePerChain(chainIndex, bestTip, brokerActor))
       requestsPerBroker.get(brokerActor) match {
         case Some(value) => value.addOne((chainIndex, bestTip, selfTip))
         case None =>
@@ -408,7 +407,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     val brokerActor: BrokerActor = ActorRefT(sender())
     val requests                 = mutable.ArrayBuffer.empty[(ChainIndex, BlockHeightRange)]
     ancestors.foreach { case (chainIndex, height) =>
-      syncingChains.get(chainIndex).foreach { state =>
+      syncingChains(chainIndex).foreach { state =>
         state.initSkeletonHeights(brokerActor, height + 1) match {
           case Some(range) => requests.addOne((chainIndex, range))
           case None        => ()
@@ -429,13 +428,15 @@ trait SyncState { _: BlockFlowSynchronizer =>
     assume(requests.length == responses.length)
     requests.foreachWithIndex { case ((chainIndex, range), index) =>
       val headers = responses(index)
-      syncingChains.get(chainIndex).foreach(_.onSkeletonFetched(brokerActor, range, headers))
+      syncingChains(chainIndex).foreach(_.onSkeletonFetched(brokerActor, range, headers))
     }
     downloadBlocks()
   }
 
   private[sync] def downloadBlocks(): Unit = {
-    val chains = syncingChains.values.filter(!_.isTaskQueueEmpty)
+    val chains = syncingChains.array.collect {
+      case Some(chain) if !chain.isTaskQueueEmpty => chain
+    }
     if (chains.nonEmpty) {
       val allTasks = collectAndAssignTasks(AVector.from(chains))
       allTasks.foreachEntry { case (brokerActor, tasksPerBroker) =>
@@ -497,7 +498,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def clearSyncState(): Unit = {
-    syncingChains.clear()
+    syncingChains.reset()
     isSyncing = false
     brokers.foreach(_._2.clear())
   }
@@ -510,18 +511,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def updateBestChainTips(terminatedBroker: BrokerActor): Unit = {
     assume(getBrokerStatus(terminatedBroker).isEmpty)
-    val tipsFromBroker = bestChainTips.filter(_._2._1 == terminatedBroker)
-    if (tipsFromBroker.nonEmpty) {
-      tipsFromBroker.foreachEntry { case (chainIndex, _) =>
+    bestChainTips.foreach { case (brokerActor, chainTip) =>
+      if (brokerActor == terminatedBroker) {
         val selected = brokers.view
           .flatMap { case (newBroker, status) =>
-            status.getChainTip(chainIndex).map(chainTip => (newBroker, chainTip))
+            status.getChainTip(chainTip.chainIndex).map(chainTip => (newBroker, chainTip))
           }
           .maxByOption(_._2.weight)
-        selected match {
-          case Some(selected) => bestChainTips(chainIndex) = selected
-          case None           => bestChainTips.remove(chainIndex)
-        }
+        bestChainTips(chainTip.chainIndex) = selected
       }
     }
   }
@@ -535,19 +532,19 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private def onBrokerTerminated(broker: BrokerActor, status: BrokerStatus): Unit = {
     updateBestChainTips(broker)
     if (isSyncing) {
-      val needToResync = syncingChains.exists(_._2.isOriginPeer(broker))
+      val needToResync = syncingChains.exists(_.isOriginPeer(broker))
       if (needToResync) {
         log.info(s"Resync due to the origin broker ${status.info.address} terminated")
         resync()
       } else {
         val pendingTasks = status.getPendingTasks
         if (pendingTasks.nonEmpty) {
-          log.info(
+          log.debug(
             s"Reschedule the pending tasks from the terminated broker ${status.info.address}, " +
               s"tasks: ${SyncState.showTasks(AVector.from(pendingTasks))}"
           )
           pendingTasks.groupBy(_.chainIndex).foreachEntry { case (chainIndex, tasks) =>
-            syncingChains.get(chainIndex).foreach(_.putBack(AVector.from(tasks)))
+            syncingChains(chainIndex).foreach(_.putBack(AVector.from(tasks)))
           }
           downloadBlocks()
         }

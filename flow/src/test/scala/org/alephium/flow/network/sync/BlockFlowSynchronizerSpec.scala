@@ -17,6 +17,7 @@
 package org.alephium.flow.network.sync
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import akka.actor.PoisonPill
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
@@ -127,6 +128,14 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
   behavior of "BlockFlowSynchronizerV2"
 
+  implicit class RichFlattenIndexedArray[T: ClassTag](array: FlattenIndexedArray[T]) {
+    def toAVector: AVector[T] = {
+      AVector.from(array.array.collect { case Some(value) => value })
+    }
+
+    def size: Int = array.array.count(_.isDefined)
+  }
+
   trait BlockFlowSynchronizerV2Fixture extends Fixture {
     import SyncState._
 
@@ -142,8 +151,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
         InterCliqueManager.HandShaked(probe.ref, brokerInfo, InboundConnection, "", version)
       )
       val brokerStatus = blockFlowSynchronizerActor.getBrokerStatus(brokerActor).get
-      brokerStatus.tips.length is brokerConfig.chainNum
-      brokerStatus.tips.foreach(_.isEmpty is true)
       (brokerActor, brokerStatus, probe)
     }
 
@@ -170,7 +177,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       val bestTip = chainTipGen.sample.get.copy(hash = genBlockHash(chainIndex), height = tipHeight)
       blockFlowSynchronizerActor.getBrokerStatus(originPeer).foreach(_.updateTips(AVector(bestTip)))
       val syncState = SyncStatePerChain(chainIndex, bestTip, originPeer)
-      blockFlowSynchronizerActor.syncingChains(chainIndex) = syncState
+      blockFlowSynchronizerActor.syncingChains(chainIndex) = Some(syncState)
       syncState
     }
 
@@ -178,7 +185,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       blockFlowSynchronizerActor
         .getBrokerStatus(chain.originBroker)
         .foreach(_.updateTips(AVector(chain.bestTip)))
-      blockFlowSynchronizerActor.syncingChains(chain.chainIndex) = chain
+      blockFlowSynchronizerActor.syncingChains(chain.chainIndex) = Some(chain)
     }
 
     def genTasks(chainIndex: ChainIndex, size: Int) = {
@@ -200,10 +207,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle self chain state" in new BlockFlowSynchronizerV2Fixture {
     val (_, _, probe) = addBrokerAndSwitchToV2()
     val chainTips     = genChainTips
-    blockFlowSynchronizerActor.selfChainTips is None
+    blockFlowSynchronizerActor.selfChainTips.size is 0
     blockFlowSynchronizerActor.isSyncing is false
     blockFlowSynchronizer ! FlowHandler.UpdateChainState(chainTips)
-    blockFlowSynchronizerActor.selfChainTips is Some(chainTips)
+    blockFlowSynchronizerActor.selfChainTips.toAVector is chainTips
     blockFlowSynchronizerActor.isSyncing is false
     probe.expectMsg(BrokerHandler.SendChainState(chainTips))
   }
@@ -214,9 +221,11 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer.tell(BlockFlowSynchronizer.UpdateChainState(chainTips0), brokerActor0.ref)
     brokerConfig.chainIndexes.foreach { chainIndex =>
       val index = chainIndex.from.value * brokerConfig.groups + chainIndex.to.value
-      blockFlowSynchronizerActor.bestChainTips(chainIndex) is (brokerActor0, chainTips0(index))
+      blockFlowSynchronizerActor.bestChainTips(chainIndex) is Some(
+        (brokerActor0, chainTips0(index))
+      )
     }
-    brokerStatus0.tips is Array.from(chainTips0.map(Option.apply))
+    brokerStatus0.tips.toAVector is chainTips0
 
     val (brokerActor1, brokerStatus1, _) = addBroker()
     val chainTips1                       = genChainTips
@@ -226,12 +235,12 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       val chainTip0 = chainTips0(index)
       val chainTip1 = chainTips1(index)
       if (chainTip1.weight > chainTip0.weight) {
-        blockFlowSynchronizerActor.bestChainTips(chainIndex) is (brokerActor1, chainTip1)
+        blockFlowSynchronizerActor.bestChainTips(chainIndex) is Some((brokerActor1, chainTip1))
       } else {
-        blockFlowSynchronizerActor.bestChainTips(chainIndex) is (brokerActor0, chainTip0)
+        blockFlowSynchronizerActor.bestChainTips(chainIndex) is Some((brokerActor0, chainTip0))
       }
     }
-    brokerStatus1.tips is Array.from(chainTips1.map(Option.apply))
+    brokerStatus1.tips.toAVector is chainTips1
   }
 
   it should "handle self chain state and start syncing" in new BlockFlowSynchronizerV2Fixture {
@@ -250,7 +259,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.syncingChains.size is brokerConfig.chainIndexes.length
     brokerConfig.chainIndexes.foreach { chainIndex =>
       val index     = chainIndex.from.value * brokerConfig.groups + chainIndex.to.value
-      val syncState = blockFlowSynchronizerActor.syncingChains(chainIndex)
+      val syncState = blockFlowSynchronizerActor.syncingChains(chainIndex).value
       syncState.chainIndex is chainIndex
       syncState.originBroker is brokerActor
       syncState.bestTip is bestChainTips(index)
@@ -282,7 +291,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     blockFlowSynchronizerActor.syncingChains.size is 1
-    val syncState = blockFlowSynchronizerActor.syncingChains(chainIndex)
+    val syncState = blockFlowSynchronizerActor.syncingChains(chainIndex).value
     syncState.chainIndex is chainIndex
     syncState.originBroker is brokerActor
     syncState.bestTip is bestChainTip
@@ -336,11 +345,11 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val chainIndex0 = ChainIndex.unsafe(0, 0)
     val chainIndex1 = ChainIndex.unsafe(0, 1)
     blockFlowSynchronizerActor.syncingChains.size is 2
-    val syncState0 = blockFlowSynchronizerActor.syncingChains(chainIndex0)
+    val syncState0 = blockFlowSynchronizerActor.syncingChains(chainIndex0).value
     syncState0.chainIndex is chainIndex0
     syncState0.originBroker is brokerActor0
     syncState0.bestTip is bestChainTip0
-    val syncState1 = blockFlowSynchronizerActor.syncingChains(chainIndex1)
+    val syncState1 = blockFlowSynchronizerActor.syncingChains(chainIndex1).value
     syncState1.chainIndex is chainIndex1
     syncState1.originBroker is brokerActor1
     syncState1.bestTip is bestChainTip1
@@ -400,7 +409,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       blockProcessed(emptyBlock(blockFlow, chainIndex))
     }
     blockFlowSynchronizerActor.isSyncing is false
-    blockFlowSynchronizerActor.syncingChains.isEmpty is true
+    blockFlowSynchronizerActor.syncingChains.size is 0
   }
 
   it should "try move on" in new BlockFlowSynchronizerV2Fixture {
@@ -724,7 +733,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     brokerStatus0.updateTips(bestChainTips)
     brokerStatus1.updateTips(bestChainTips)
     blockFlowSynchronizerActor.isSyncing = true
-    blockFlowSynchronizerActor.selfChainTips = Some(selfChainTips)
+    selfChainTips.foreach(tip => blockFlowSynchronizerActor.selfChainTips(tip.chainIndex) = tip)
     syncingChain.taskQueue.addOne(task)
     blockFlowSynchronizerActor.downloadBlocks()
     probe0.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
@@ -757,7 +766,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     syncingChain.taskQueue.head is task
     blockFlowSynchronizerActor.getBrokerStatus(brokerActor0).isEmpty is true
     blockFlowSynchronizerActor.getBrokerStatus(brokerActor1).isDefined is true
-    blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor1
+    blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is brokerActor1
   }
 
   it should "resync if the origin peer is terminated" in new BlockFlowSynchronizerV2Fixture {
@@ -777,14 +786,14 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSyncing is false
     blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfTips)
     blockFlowSynchronizerActor.isSyncing is true
-    blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor1
-    blockFlowSynchronizerActor.bestChainTips(chainIndex)._1 is brokerActor1
+    blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is brokerActor1
+    blockFlowSynchronizerActor.bestChainTips(chainIndex).value._1 is brokerActor1
 
     probe1.ref ! PoisonPill
     eventually {
       blockFlowSynchronizerActor.getBrokerStatus(brokerActor1).isEmpty is true
-      blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor0
-      blockFlowSynchronizerActor.bestChainTips(chainIndex)._1 is brokerActor0
+      blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is brokerActor0
+      blockFlowSynchronizerActor.bestChainTips(chainIndex).value._1 is brokerActor0
     }
   }
 
@@ -830,9 +839,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
     blockFlowSynchronizerActor.currentVersion is ProtocolV1
     blockFlowSynchronizerActor.startTime.isEmpty is true
-    blockFlowSynchronizerActor.selfChainTips.isEmpty is true
-    blockFlowSynchronizerActor.bestChainTips.isEmpty is true
-    blockFlowSynchronizerActor.syncingChains.isEmpty is true
+    blockFlowSynchronizerActor.selfChainTips.size is 0
+    blockFlowSynchronizerActor.bestChainTips.size is 0
+    blockFlowSynchronizerActor.syncingChains.size is 0
 
     addBroker(ProtocolV2)
     blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
@@ -857,8 +866,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     probe0.send(blockFlowSynchronizer, BlockFlowSynchronizer.UpdateChainState(broker0ChainTips))
     blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
     blockFlowSynchronizerActor.isSyncing is true
-    blockFlowSynchronizerActor.syncingChains.keys.toSeq is Seq(chainIndex)
-    blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor0
+    blockFlowSynchronizerActor.syncingChains.size is 1
+    blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is brokerActor0
 
     val broker1ChainTips =
       selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(2)))
@@ -869,8 +878,24 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       DataOrigin.InterClique(brokerStatus0.info)
     )
     blockFlowSynchronizerActor.isSyncing is true
-    blockFlowSynchronizerActor.syncingChains.keys.toSeq is Seq(chainIndex)
-    blockFlowSynchronizerActor.syncingChains(chainIndex).originBroker is brokerActor1
+    blockFlowSynchronizerActor.syncingChains.size is 1
+    blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is brokerActor1
+  }
+
+  it should "check if the node is synced" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.isSynced is true
+
+    val chainIndex0         = ChainIndex.unsafe(0, 0)
+    val chainIndex1         = ChainIndex.unsafe(0, 1)
+    val broker: BrokerActor = ActorRefT(TestProbe().ref)
+    val chain0              = addSyncingChain(chainIndex0, 10, broker)
+    val chain1              = addSyncingChain(chainIndex1, 10, broker)
+    blockFlowSynchronizerActor.isSynced is false
+
+    blockFlowSynchronizerActor.selfChainTips(chainIndex0) = chain0.bestTip
+    blockFlowSynchronizerActor.isSynced is false
+    blockFlowSynchronizerActor.selfChainTips(chainIndex1) = chain1.bestTip
+    blockFlowSynchronizerActor.isSynced is true
   }
 
   behavior of "SyncStatePerChain"
