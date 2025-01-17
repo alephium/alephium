@@ -37,10 +37,8 @@ object FlowHandler {
   case object GetIntraSyncInventories extends Command
   case object GetChainState           extends Command
 
-  sealed trait Event
-  final case class BlocksLocated(blocks: AVector[Block]) extends Event
   final case class SyncInventories(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
-      extends Event
+      extends Command
   final case class SyncLocators(
       hashes: AVector[(ChainIndex, AVector[BlockHash])]
   ) extends Command {
