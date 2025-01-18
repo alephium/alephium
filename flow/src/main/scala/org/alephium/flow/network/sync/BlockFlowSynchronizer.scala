@@ -107,7 +107,8 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
         log.debug(s"Clean up #$sizeDelta hashes from syncing pool")
       }
 
-    case BlockAnnouncement(hash) => handleBlockAnnouncement(hash)
+    case BlockAnnouncement(hash) =>
+      if (!isSyncing) handleBlockAnnouncement(hash)
   }
 
   def addBroker(

@@ -927,6 +927,18 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSynced is true
   }
 
+  it should "ignore the block announcement when syncing" in new BlockFlowSynchronizerV2Fixture {
+    val (_, _, probe) = addBrokerAndSwitchToV2()
+    blockFlowSynchronizerActor.isSyncing is false
+    val blockHash = BlockHash.generate
+    probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+    probe.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
+
+    blockFlowSynchronizerActor.isSyncing = true
+    probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+    probe.expectNoMessage()
+  }
+
   behavior of "SyncStatePerChain"
 
   trait SyncStatePerChainFixture extends Fixture {
