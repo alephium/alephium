@@ -818,6 +818,35 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(probe1.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task))))
   }
 
+  it should "test shouldSwitchToV2" in {
+    new BlockFlowSynchronizerV2Fixture {
+      override val configValues: Map[String, Any] = Map(
+        ("alephium.broker.broker-num", 1),
+        ("alephium.network.enable-sync-protocol-v2", false)
+      )
+
+      blockFlowSynchronizerActor.currentVersion is ProtocolV1
+      blockFlowSynchronizerActor.shouldSwitchToV2() is false
+      (0 until BlockFlowSynchronizer.V2SwitchThreshold).foreach(_ => addBroker(ProtocolV2))
+      blockFlowSynchronizerActor.shouldSwitchToV2() is false
+      blockFlowSynchronizerActor.currentVersion is ProtocolV1
+    }
+
+    new BlockFlowSynchronizerV2Fixture {
+      networkConfig.enableSyncProtocolV2 is true
+      blockFlowSynchronizerActor.currentVersion is ProtocolV1
+      blockFlowSynchronizerActor.shouldSwitchToV2() is false
+      (0 until BlockFlowSynchronizer.V2SwitchThreshold - 1).foreach(_ => addBroker(ProtocolV2))
+      blockFlowSynchronizerActor.shouldSwitchToV2() is false
+      blockFlowSynchronizerActor.brokers.addOne(blockFlowSynchronizerActor.brokers.last)
+      blockFlowSynchronizerActor.shouldSwitchToV2() is true
+      blockFlowSynchronizerActor.currentVersion is ProtocolV1
+      blockFlowSynchronizerActor.switchToV2()
+      blockFlowSynchronizerActor.currentVersion is ProtocolV2
+      blockFlowSynchronizerActor.shouldSwitchToV2() is false
+    }
+  }
+
   it should "switch between V1 and V2" in new BlockFlowSynchronizerV2Fixture {
     import SyncState.FallbackThreshold
 

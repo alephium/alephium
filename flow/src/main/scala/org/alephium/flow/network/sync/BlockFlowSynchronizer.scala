@@ -90,10 +90,16 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
   private def v1: Receive = common orElse handleV1 orElse updateNodeSyncStatus
   private def v2: Receive = common orElse handleV2 orElse updateNodeSyncStatus
 
+  private[sync] def shouldSwitchToV2(): Boolean = {
+    networkSetting.enableSyncProtocolV2 &&
+    currentVersion == ProtocolV1 &&
+    peerSizeUsingV2 >= V2SwitchThreshold
+  }
+
   def common: Receive = {
     case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, protocolVersion) =>
       addBroker(broker, remoteBrokerInfo, protocolVersion)
-      if (currentVersion == ProtocolV1 && peerSizeUsingV2 >= V2SwitchThreshold) switchToV2()
+      if (shouldSwitchToV2()) switchToV2()
 
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)

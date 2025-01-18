@@ -62,6 +62,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.connectionBufferCapacityInByte is 100000000L
     config.network.syncPeerSampleSizeV1 is 3
     config.network.syncPeerSampleSizeV2 is 5
+    config.network.enableSyncProtocolV2 is true
   }
 
   it should "load mainnet config" in {
@@ -86,6 +87,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.genesisBlocks.flatMap(_.map(_.shortHex)).mkString("-") is
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
     config.network.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    config.network.enableSyncProtocolV2 is false
 
     config.node.assetTrieCacheMaxByteSize is 200_000_000
     config.node.contractTrieCacheMaxByteSize is 20_000_000
