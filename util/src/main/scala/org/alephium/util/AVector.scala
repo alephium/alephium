@@ -548,6 +548,14 @@ final class AVector[@sp A](
     Right(None)
   }
 
+  def findReversed(f: A => Boolean): Option[A] = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
+      val elem = elems(i)
+      if (f(elem)) return Some(elem)
+    }
+    None
+  }
+
   def findReversedE[L](f: A => Either[L, Boolean]): Either[L, Option[A]] = {
     cfor(end - 1)(_ >= start, _ - 1) { i =>
       val elem = elems(i)

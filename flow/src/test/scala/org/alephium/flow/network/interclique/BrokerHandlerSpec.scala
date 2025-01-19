@@ -37,7 +37,7 @@ import org.alephium.flow.network.broker.{ChainTipInfo, ConnectionHandler, Misbeh
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.network.sync.SyncState.BlockDownloadTask
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.Generators
+import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
@@ -528,7 +528,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       state.chainIndex is chainIndex
       state.bestTip is bestTip
       state.binarySearch is None
-      state.ancestor is None
+      state.ancestorHeight is None
       requests.addOne(
         (chainIndex, SyncV2Handler.calculateRequestSpan(bestTip.height, selfTip.height))
       )
@@ -559,6 +559,21 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 4))))
     brokerHandlerActor.pendingRequests.isEmpty is true
     brokerHandlerActor.findingAncestorStates.isEmpty is true
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    prepare(chainIndex, 1)
+    val state = brokerHandlerActor.findingAncestorStates.value.head
+    state.binarySearch = Some((0, 2))
+    val invalidHeaders = blocks.take(2).map(_.header)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(invalidHeaders))
+    )
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
   }
 
   it should "publish misbehavior and stop broker if the ancestors response is invalid" in {
@@ -648,35 +663,35 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       HeadersByHeightsResponse(defaultRequestId, AVector(AVector(unknownHeader)))
     )
     state.binarySearch is Some((0, 30))
-    state.ancestor is None
+    state.ancestorHeight is None
 
     val requestId0 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(15))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId0, AVector(AVector(unknownHeader)))
     )
     state.binarySearch is Some((0, 15))
-    state.ancestor is None
+    state.ancestorHeight is None
 
     val requestId1 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(7))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId1, AVector(AVector(headers(6))))
     )
     state.binarySearch is Some((7, 15))
-    state.ancestor is Some(headers(6))
+    state.ancestorHeight is Some(7)
 
     val requestId2 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(11))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId2, AVector(AVector(headers(10))))
     )
     state.binarySearch is Some((11, 15))
-    state.ancestor is Some(headers(10))
+    state.ancestorHeight is Some(11)
 
     val requestId3 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(13))))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsResponse(requestId3, AVector(AVector(unknownHeader)))
     )
     state.binarySearch is Some((11, 13))
-    state.ancestor is Some(headers(10))
+    state.ancestorHeight is Some(11)
 
     val requestId4 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(12))))
     brokerHandler ! BaseBrokerHandler.Received(
@@ -953,31 +968,82 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "get next height" in new Fixture {
     val bestTip = genChainTip(chainIndex).copy(height = 21)
     val state   = SyncV2Handler.StatePerChain(chainIndex, bestTip)
-    state.ancestor.isEmpty is true
+    state.ancestorHeight.isEmpty is true
     state.binarySearch.isEmpty is true
 
-    state.startBinarySearch()
-    state.binarySearch is Some((0, 21))
-    state.ancestor.isEmpty is true
+    state.startBinarySearch() is 10
+    state.ancestorHeight.isEmpty is true
 
-    val header0 = emptyBlock(blockFlow, chainIndex).header
-    state.getNextHeight(Some(header0)) is Some(15)
+    state.updateBinarySearch(true)
+    state.ancestorHeight is Some(10)
     state.binarySearch is Some((10, 21))
-    state.ancestor is Some(header0)
+    state.getNextHeight() is Some(15)
 
-    state.getNextHeight(None) is Some(12)
+    state.updateBinarySearch(false)
+    state.ancestorHeight is Some(10)
     state.binarySearch is Some((10, 15))
-    state.ancestor is Some(header0)
+    state.getNextHeight() is Some(12)
 
-    state.getNextHeight(None) is Some(11)
-    state.binarySearch is Some((10, 12))
-    state.ancestor is Some(header0)
+    state.updateBinarySearch(true)
+    state.ancestorHeight is Some(12)
+    state.binarySearch is Some((12, 15))
+    state.getNextHeight() is Some(13)
 
-    val header1 = emptyBlock(blockFlow, chainIndex).header
-    state.getNextHeight(Some(header1)) is None
-    state.binarySearch is Some((11, 12))
-    state.ancestor is Some(header1)
-    state.getNextHeight(None) is None
+    state.updateBinarySearch(false)
+    state.ancestorHeight is Some(12)
+    state.binarySearch is Some((12, 13))
+    state.getNextHeight() is None
+  }
+
+  it should "handle ancestor response properly" in new Fixture {
+    import SyncV2Handler._
+
+    val headers = (0 until 12).map { _ =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block.header
+    }
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 12
+    val bestTip = genChainTip(chainIndex).copy(height = 21)
+    val state   = SyncV2Handler.StatePerChain(chainIndex, bestTip)
+    val header  = emptyBlock(blockFlow, chainIndex).header
+
+    state.ancestorHeight = Some(1)
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is a[InvalidState]
+    state.ancestorHeight = None
+
+    state.handleAncestorResponseUnsafe(
+      blockFlow,
+      AVector(header, headers(5), headers.last)
+    ) is AncestorFound
+    state.ancestorHeight is Some(12)
+
+    state.ancestorHeight = None
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header, headers(5))) is AncestorFound
+    state.ancestorHeight is Some(6)
+
+    state.ancestorHeight = None
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is StartBinarySearch(10)
+    state.ancestorHeight is None
+    state.binarySearch is Some((0, 21))
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(headers(9))) is ContinueBinarySearch(15)
+    state.ancestorHeight is Some(10)
+    state.binarySearch is Some((10, 21))
+
+    state.binarySearch = Some((12, 15))
+    state.ancestorHeight = Some(12)
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is AncestorFound
+    state.ancestorHeight is Some(12)
+
+    state.binarySearch = Some((0, 2))
+    state.ancestorHeight = None
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is AncestorFound
+    state.ancestorHeight is Some(ALPH.GenesisHeight)
+
+    state.binarySearch = Some((0, 2))
+    state.ancestorHeight = None
+    state
+      .handleAncestorResponseUnsafe(blockFlow, AVector(header, headers.last)) is a[InvalidResponse]
   }
 
   trait Fixture extends FlowFixture {

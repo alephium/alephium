@@ -423,6 +423,21 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "findReversed" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversed(_ => false) is None
+    empty.findReversed(_ => true) is None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversed(e => e._1 == elem) is Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversed(_ => false) is None
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
