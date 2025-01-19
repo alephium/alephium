@@ -791,15 +791,22 @@ object SyncV2Handler {
               case None => StartBinarySearch(startBinarySearch())
             }
           }
-        case Some((_, _)) =>
+        case Some((start, end)) =>
           if (headers.length == 1) { // we have checked that the headers are not empty
-            updateBinarySearch(blockFlow.containsUnsafe(headers.head.hash))
-            getNextHeight() match {
-              case Some(height) => ContinueBinarySearch(height)
-              case None =>
-                if (!isAncestorFound) ancestorHeight = Some(ALPH.GenesisHeight)
-                resetBinarySearch()
-                AncestorFound
+            val ancestorHash = headers.head.hash
+            val found        = blockFlow.containsUnsafe(ancestorHash)
+            val lastHeight   = (start + end) / 2
+            if (found && (blockFlow.getHeightUnsafe(ancestorHash) != lastHeight)) {
+              InvalidResponse(s"the received header height does not match, expected $lastHeight")
+            } else {
+              updateBinarySearch(found)
+              getNextHeight() match {
+                case Some(height) => ContinueBinarySearch(height)
+                case None =>
+                  if (!isAncestorFound) ancestorHeight = Some(ALPH.GenesisHeight)
+                  resetBinarySearch()
+                  AncestorFound
+              }
             }
           } else {
             InvalidResponse(s"the expected headers length is 1, but got ${headers.length}")

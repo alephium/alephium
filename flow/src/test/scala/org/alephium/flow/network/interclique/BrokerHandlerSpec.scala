@@ -1030,6 +1030,10 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     state.ancestorHeight is Some(10)
     state.binarySearch is Some((10, 21))
 
+    state.binarySearch = Some((10, 15))
+    state.ancestorHeight = Some(10)
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(headers.head)) is a[InvalidResponse]
+
     state.binarySearch = Some((12, 15))
     state.ancestorHeight = Some(12)
     state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is AncestorFound
