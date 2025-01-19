@@ -59,24 +59,24 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
         ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
-        blockSubscriptionResponse <- ws.subscribeToBlock(corId_0)
-        txSubscriptionResponse    <- ws.subscribeToTx(corId_1)
+        blockSubscriptionResponse <- ws.subscribeToBlock(corId(0))
+        txSubscriptionResponse    <- ws.subscribeToTx(corId(1))
         contractEventsSubscriptionResponse <- ws.subscribeToContractEvents(
-          corId_2,
+          corId(2),
           params_addr_01_eventIndex_0.addresses,
           params_addr_01_eventIndex_0.eventIndex
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_0
+          id is corId(0)
           result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
         }
         inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_1
+          id is corId(1)
           result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_2
+          id is corId(2)
           result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
         }
         ws
@@ -211,7 +211,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       wsEither match {
         case Right(clientWs) =>
           clientWs.underlying
-            .writeTextMessage(write(WsRequest.subscribe(corId_0, SimpleSubscribeParams(""))))
+            .writeTextMessage(write(WsRequest.subscribe(corId(0), SimpleSubscribeParams(""))))
             .asScala
             .mapTo[Unit]
             .futureValue
@@ -276,42 +276,42 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
       for {
         ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
-        blockSubscriptionResponse <- ws.subscribeToBlock(corId_0)
-        txSubscriptionResponse    <- ws.subscribeToTx(corId_1)
+        blockSubscriptionResponse <- ws.subscribeToBlock(corId(0))
+        txSubscriptionResponse    <- ws.subscribeToTx(corId(1))
         contractEventsSubscriptionResponse_0 <- ws.subscribeToContractEvents(
-          corId_2,
+          corId(2),
           params_addr_01_eventIndex_0.addresses,
           params_addr_01_eventIndex_0.eventIndex
         )
         contractEventsSubscriptionResponse_1 <- ws.subscribeToContractEvents(
-          corId_3,
+          corId(3),
           params_addr_12_eventIndex_1.addresses,
           params_addr_12_eventIndex_1.eventIndex
         )
         contractEventsSubscriptionResponse_2 <- ws.subscribeToContractEvents(
-          corId_4,
+          corId(4),
           params_addr_3_unfiltered.addresses,
           params_addr_3_unfiltered.eventIndex
         )
       } yield {
         inside(blockSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_0
+          id is corId(0)
           result is ujson.Str(SimpleSubscribeParams.Block.subscriptionId.toHexString)
         }
         inside(txSubscriptionResponse) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_1
+          id is corId(1)
           result is ujson.Str(SimpleSubscribeParams.Tx.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse_0) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_2
+          id is corId(2)
           result is ujson.Str(params_addr_01_eventIndex_0.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse_1) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_3
+          id is corId(3)
           result is ujson.Str(params_addr_12_eventIndex_1.subscriptionId.toHexString)
         }
         inside(contractEventsSubscriptionResponse_2) { case JsonRPC.Response.Success(result, id) =>
-          id is corId_4
+          id is corId(4)
           result is ujson.Str(params_addr_3_unfiltered.subscriptionId.toHexString)
         }
         ws
@@ -347,17 +347,17 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
           fail(s"Expected Right, but got Left with exception: $ex")
       }
       (for {
-        _ <- ws.unsubscribeFromBlock(corId_5).map(testResponse(corId_5))
-        _ <- ws.unsubscribeFromTx(corId_6).map(testResponse(corId_6))
+        _ <- ws.unsubscribeFromBlock(corId(5)).map(testResponse(corId(5)))
+        _ <- ws.unsubscribeFromTx(corId(6)).map(testResponse(corId(6)))
         _ <- ws
-          .unsubscribeFromContractEvents(corId_7, params_addr_01_eventIndex_0.subscriptionId)
-          .map(testResponse(corId_7))
+          .unsubscribeFromContractEvents(corId(7), params_addr_01_eventIndex_0.subscriptionId)
+          .map(testResponse(corId(7)))
         _ <- ws
-          .unsubscribeFromContractEvents(corId_8, params_addr_12_eventIndex_1.subscriptionId)
-          .map(testResponse(corId_8))
+          .unsubscribeFromContractEvents(corId(8), params_addr_12_eventIndex_1.subscriptionId)
+          .map(testResponse(corId(8)))
         _ <- ws
-          .unsubscribeFromContractEvents(corId_9, params_addr_3_unfiltered.subscriptionId)
-          .map(testResponse(corId_9))
+          .unsubscribeFromContractEvents(corId(9), params_addr_3_unfiltered.subscriptionId)
+          .map(testResponse(corId(9)))
       } yield ()).futureValue
     }
 

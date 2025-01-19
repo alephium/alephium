@@ -40,6 +40,7 @@ import org.alephium.app.ws.WsParams.{
   ContractEventsSubscribeParams,
   WsBlockNotificationParams,
   WsContractEventNotificationParams,
+  WsCorrelationId,
   WsId,
   WsNotificationParams,
   WsSubscriptionId,
@@ -114,23 +115,6 @@ trait WsFixture extends ServerFixture {
       AVector(ValU256(U256.unsafe(5)))
     )
   }
-
-  protected val corId_0: Long  = 0L
-  protected val corId_1: Long  = 1L
-  protected val corId_2: Long  = 2L
-  protected val corId_3: Long  = 3L
-  protected val corId_4: Long  = 4L
-  protected val corId_5: Long  = 5L
-  protected val corId_6: Long  = 6L
-  protected val corId_7: Long  = 7L
-  protected val corId_8: Long  = 8L
-  protected val corId_9: Long  = 9L
-  protected val corId_10: Long = 10L
-  protected val corId_11: Long = 11L
-  protected val corId_12: Long = 12L
-  protected val corId_13: Long = 13L
-  protected val corId_14: Long = 14L
-  protected val corId_15: Long = 15L
 }
 
 trait WsClientServerFixture
@@ -255,6 +239,8 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
     override def writePong(data: Buffer): Future[Unit]                       = Future.successful(())
     override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
   }
+
+  protected def corId(n: Long): WsCorrelationId = n
 
   protected def testSubscriptionHandlerInitialized(
       subscriptionHandler: ActorRefT[SubscriptionMsg]

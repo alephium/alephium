@@ -129,6 +129,9 @@ protected[ws] object WsParams {
         jsonObj: ujson.Obj,
         contractAddressLimit: Int
     ): Either[Error, ContractEventsSubscribeParams] = {
+      def isValidEventIndex(eventIndex: Double) =
+        eventIndex.isValidInt && eventIndex.toInt >= LowestContractEventIndex
+
       jsonObj.value.get(AddressesField) match {
         case Some(ujson.Arr(addressArr)) if addressArr.isEmpty =>
           Left(WsError.emptyContractAddress)
@@ -138,7 +141,7 @@ protected[ws] object WsParams {
           buildUniqueContractAddresses(addressArr)
             .flatMap { addresses =>
               jsonObj.value.get(EventIndexField) match {
-                case Some(ujson.Num(eventIndex)) if eventIndex.toInt >= LowestContractEventIndex =>
+                case Some(ujson.Num(eventIndex)) if isValidEventIndex(eventIndex) =>
                   Right(ContractEventsSubscribeParams(addresses, Option(eventIndex.toInt)))
                 case None =>
                   Right(ContractEventsSubscribeParams(addresses, None))
