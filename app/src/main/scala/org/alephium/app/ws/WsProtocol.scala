@@ -22,11 +22,6 @@ import scala.util.{Failure, Success, Try}
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
 import org.alephium.app.ws.WsParams.{WsCorrelationId, WsSubscriptionParams}
-import org.alephium.app.ws.WsSubscriptionsState.{
-  AddressKey,
-  AddressWithEventIndexKey,
-  ContractEventKey
-}
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
@@ -88,10 +83,6 @@ protected[ws] object WsParams {
             .map(address => s"${eventIndex.getOrElse("*")}/$address")
             .mkString(",")
         )
-    def toContractEventKeys: AVector[ContractEventKey] = eventIndex match {
-      case Some(index) => addresses.map(addr => AddressWithEventIndexKey(addr.toBase58, index))
-      case None        => addresses.map(addr => AddressKey(addr.toBase58))
-    }
   }
   object ContractEventsSubscribeParams {
     protected[ws] val ContractEvent: WsEventType = "contract"

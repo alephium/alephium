@@ -19,7 +19,7 @@ package org.alephium.app.ws
 import scala.collection.mutable
 
 import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsSubscriptionId}
-import org.alephium.app.ws.WsSubscriptionsState.SubscriptionOfConnection
+import org.alephium.app.ws.WsSubscriptionsState.{buildContractEventKeys, SubscriptionOfConnection}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
@@ -40,13 +40,14 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 
   it should "be idempotent on adding new contract event subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
+    val contractEventKeys  = buildContractEventKeys(params_addr_01_eventIndex_0)
     subscriptionsState.addSubscriptionForContractEventKeys(
-      params_addr_01_eventIndex_0.toContractEventKeys,
+      contractEventKeys,
       subscription_addr_01_eventIndex_0
     )
     val result_1 = subscriptionsState.subscriptionsByContractKey.toMap
     subscriptionsState.addSubscriptionForContractEventKeys(
-      params_addr_01_eventIndex_0.toContractEventKeys,
+      contractEventKeys,
       subscription_addr_01_eventIndex_0
     )
     val result_2 = subscriptionsState.subscriptionsByContractKey.toMap
@@ -66,14 +67,13 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
       wsId_0 -> AVector(params_addr_01_eventIndex_0.subscriptionId -> consumer_0)
     )
 
+    val contractEventKeys = buildContractEventKeys(params_addr_01_eventIndex_0)
     subscriptionsState.contractKeysBySubscription is mutable.Map(
-      subscription_addr_01_eventIndex_0 -> params_addr_01_eventIndex_0.toContractEventKeys
+      subscription_addr_01_eventIndex_0 -> contractEventKeys
     )
 
     subscriptionsState.subscriptionsByContractKey is mutable.Map.from(
-      params_addr_01_eventIndex_0.toContractEventKeys.map(
-        _ -> AVector(subscription_addr_01_eventIndex_0)
-      )
+      contractEventKeys.map(_ -> AVector(subscription_addr_01_eventIndex_0))
     )
   }
 
@@ -146,17 +146,19 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
     )
 
     subscriptionsState.contractKeysBySubscription is mutable.Map(
-      subscription_addr_12_eventIndex_1 -> params_addr_12_eventIndex_1.toContractEventKeys,
-      subscription_addr_2_eventIndex_1  -> params_addr_2_eventIndex_1.toContractEventKeys
+      subscription_addr_12_eventIndex_1 -> buildContractEventKeys(params_addr_12_eventIndex_1),
+      subscription_addr_2_eventIndex_1  -> buildContractEventKeys(params_addr_2_eventIndex_1)
     )
 
-    val expectedKeys =
-      params_addr_12_eventIndex_1.toContractEventKeys ++ params_addr_2_eventIndex_1.toContractEventKeys
+    val contractEventKeys_1 = buildContractEventKeys(params_addr_12_eventIndex_1)
+    val contractEventKeys_0 = buildContractEventKeys(params_addr_2_eventIndex_1)
+
+    val expectedKeys = contractEventKeys_1 ++ contractEventKeys_0
     subscriptionsState.subscriptionsByContractKey.keys.toSet is expectedKeys.toSet
 
     val sharedSubscriptionsByContractEventKey =
       AVector(subscription_addr_12_eventIndex_1, subscription_addr_2_eventIndex_1)
-    val sharedContractKeyBySubscriptions = params_addr_2_eventIndex_1.toContractEventKeys.head
+    val sharedContractKeyBySubscriptions = contractEventKeys_0.head
     subscriptionsState.subscriptionsByContractKey(
       sharedContractKeyBySubscriptions
     ) is sharedSubscriptionsByContractEventKey
@@ -168,10 +170,10 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
     )
 
     subscriptionsState.contractKeysBySubscription is mutable.Map(
-      subscription_addr_2_eventIndex_1 -> params_addr_2_eventIndex_1.toContractEventKeys
+      subscription_addr_2_eventIndex_1 -> contractEventKeys_0
     )
 
-    subscriptionsState.subscriptionsByContractKey.keys.toSet is params_addr_2_eventIndex_1.toContractEventKeys.toSet
+    subscriptionsState.subscriptionsByContractKey.keys.toSet is contractEventKeys_0.toSet
     subscriptionsState.subscriptionsByContractKey.foreachEntry { case (_, subscriptions) =>
       subscriptions.length is 1
       subscriptions.head is subscription_addr_2_eventIndex_1
@@ -181,7 +183,7 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   "removing subscription by contract event key" should "not allow for contract event keys with 0 subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
     subscriptionsState.addNewSubscription(wsId_0, params_addr_12_eventIndex_1, consumer_0)
-    params_addr_12_eventIndex_1.toContractEventKeys.map { contractKey =>
+    buildContractEventKeys(params_addr_12_eventIndex_1).map { contractKey =>
       subscriptionsState.removeSubscriptionByContractEventKey(
         contractKey,
         subscription_addr_12_eventIndex_1

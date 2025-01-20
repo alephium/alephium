@@ -113,7 +113,7 @@ final case class WsSubscriptionsState[C: ClassTag](
     params match {
       case contractParams: ContractEventsSubscribeParams =>
         val subscriptionOfConnection = SubscriptionOfConnection(wsId, subscriptionId)
-        val contractEventKeys        = contractParams.toContractEventKeys
+        val contractEventKeys        = WsSubscriptionsState.buildContractEventKeys(contractParams)
         addSubscriptionForContractEventKeys(contractEventKeys, subscriptionOfConnection)
         contractKeysBySubscription.put(subscriptionOfConnection, contractEventKeys)
         ()
@@ -187,4 +187,12 @@ object WsSubscriptionsState {
       mutable.Map.empty[ContractEventKey, AVector[SubscriptionOfConnection]],
       mutable.Map.empty[SubscriptionOfConnection, AVector[ContractEventKey]]
     )
+
+  def buildContractEventKeys(params: ContractEventsSubscribeParams): AVector[ContractEventKey] =
+    params.eventIndex match {
+      case Some(index) =>
+        params.addresses.map(addr => AddressWithEventIndexKey(addr.toBase58, index))
+      case None => params.addresses.map(addr => AddressKey(addr.toBase58))
+    }
+
 }
