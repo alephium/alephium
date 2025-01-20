@@ -41,27 +41,25 @@ class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
   it should "be idempotent on adding new contract event subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
     val contractEventKeys  = buildContractEventKeys(params_addr_01_eventIndex_0)
-    subscriptionsState.addSubscriptionForContractEventKeys(
-      contractEventKeys,
-      subscription_addr_01_eventIndex_0
-    )
-    val result_1 = subscriptionsState.subscriptionsByContractKey.toMap
-    subscriptionsState.addSubscriptionForContractEventKeys(
-      contractEventKeys,
-      subscription_addr_01_eventIndex_0
-    )
-    val result_2 = subscriptionsState.subscriptionsByContractKey.toMap
-    result_1 is result_2
+
+    def addSubscription() = {
+      subscriptionsState.addSubscriptionForContractEventKeys(
+        contractEventKeys,
+        subscription_addr_01_eventIndex_0
+      )
+      subscriptionsState.subscriptionsByContractKey.toMap
+    }
+    addSubscription() is addSubscription()
   }
 
   it should "be idempotent on adding new subscriptions" in {
     val subscriptionsState = WsSubscriptionsState.empty[String]()
 
-    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
-    val result_1 = subscriptionsState.subscriptionsByContractKey.toMap
-    subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
-    val result_2 = subscriptionsState.subscriptionsByContractKey.toMap
-    result_1 is result_2
+    def addSubscription() = {
+      subscriptionsState.addNewSubscription(wsId_0, params_addr_01_eventIndex_0, consumer_0)
+      subscriptionsState.subscriptionsByContractKey.toMap
+    }
+    addSubscription() is addSubscription()
 
     subscriptionsState.connections is mutable.Map(
       wsId_0 -> AVector(params_addr_01_eventIndex_0.subscriptionId -> consumer_0)

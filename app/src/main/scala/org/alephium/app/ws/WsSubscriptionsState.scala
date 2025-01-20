@@ -144,23 +144,21 @@ final case class WsSubscriptionsState[C: ClassTag](
   def removeAllSubscriptions(wsId: WsId): Unit = {
     connections.remove(wsId)
 
-    val contractKeysToRemove =
-      AVector.from(contractKeysBySubscription.keysIterator).map {
-        case subscriptionOfConnection if subscriptionOfConnection.wsId == wsId =>
-          contractKeysBySubscription
-            .remove(subscriptionOfConnection)
-            .getOrElse(AVector.empty[ContractEventKey])
+    contractKeysBySubscription.keysIterator
+      .map {
+        case subscription if subscription.wsId == wsId =>
+          contractKeysBySubscription.remove(subscription).getOrElse(AVector.empty[ContractEventKey])
         case _ =>
           AVector.empty[ContractEventKey]
       }
-    contractKeysToRemove.foreach { contractEventKeys =>
-      contractEventKeys.foreach { contractEventKey =>
-        subscriptionsByContractKey.updateWith(contractEventKey) {
-          case Some(ss) => Option(ss.filterNot(_.wsId == wsId)).filter(_.nonEmpty)
-          case None     => None
+      .foreach { affectedContractKeys =>
+        affectedContractKeys.foreach { affectedContractKey =>
+          subscriptionsByContractKey.updateWith(affectedContractKey) {
+            case Some(ss) => Option(ss.filterNot(_.wsId == wsId)).filter(_.nonEmpty)
+            case None     => None
+          }
         }
       }
-    }
   }
 }
 
@@ -188,11 +186,11 @@ object WsSubscriptionsState {
       mutable.Map.empty[SubscriptionOfConnection, AVector[ContractEventKey]]
     )
 
-  def buildContractEventKeys(params: ContractEventsSubscribeParams): AVector[ContractEventKey] =
+  def buildContractEventKeys(params: ContractEventsSubscribeParams): AVector[ContractEventKey] = {
+    val addresses = params.addresses
     params.eventIndex match {
-      case Some(index) =>
-        params.addresses.map(addr => AddressWithEventIndexKey(addr.toBase58, index))
-      case None => params.addresses.map(addr => AddressKey(addr.toBase58))
+      case Some(index) => addresses.map(addr => AddressWithEventIndexKey(addr.toBase58, index))
+      case None        => addresses.map(addr => AddressKey(addr.toBase58))
     }
-
+  }
 }

@@ -413,7 +413,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       )
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 
-    val websockets    = AVector(dummyServerWs("dummy_0"), dummyServerWs("dummy_1"))
+    val websockets    = AVector(dummyServerWs(id = "dummy_0"), dummyServerWs(id = "dummy_1"))
     var correlationId = 0L
     val contractEventParams =
       AVector(
@@ -469,7 +469,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     websockets.foreach { ws =>
       contractEventParams.foreach { params =>
         subscriptionHandler ! Unsubscribe(
-          correlationId.toLong,
+          correlationId,
           ws,
           params.subscriptionId
         )
