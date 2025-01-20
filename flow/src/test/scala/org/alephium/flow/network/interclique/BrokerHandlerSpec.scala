@@ -1078,6 +1078,59 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       .handleAncestorResponseUnsafe(blockFlow, AVector(header, headers.last)) is a[InvalidResponse]
   }
 
+  it should "handle block announcement properly" in new Fixture {
+    val blockHash = emptyBlock(blockFlow, chainIndex).hash
+
+    def reset(): Unit = {
+      setRemoteBrokerInfo()
+      brokerHandlerActor.selfChainTips.reset()
+      brokerHandlerActor.remoteChainTips.reset()
+      brokerHandlerActor.seenBlocks.remove(blockHash)
+      ()
+    }
+
+    reset()
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    reset()
+    val chainTips = genChainTips(100)
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandlerActor.selfChainTips.isEmpty is false
+    brokerHandlerActor.remoteChainTips.isEmpty is true
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    reset()
+    blockFlowSynchronizer.ignoreMsg { case _: BlockFlowSynchronizer.UpdateChainState => true }
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
+    brokerHandlerActor.selfChainTips.isEmpty is true
+    brokerHandlerActor.remoteChainTips.isEmpty is false
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    def testWithHeight(height: Int) = {
+      reset()
+      brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+      val index           = chainIndex.to.value
+      val remoteChainTips = chainTips.replace(index, chainTips(index).copy(height = height))
+      brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteChainTips))
+      brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    }
+
+    val height0 = nextInt(0, 50)
+    testWithHeight(height0)
+    blockFlowSynchronizer.expectNoMessage()
+
+    val height1 = nextInt(51, 149)
+    testWithHeight(height1)
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    val height2 = nextInt(150, Int.MaxValue)
+    testWithHeight(height2)
+    blockFlowSynchronizer.expectNoMessage()
+  }
+
   trait Fixture extends FlowFixture {
     val cliqueManager         = TestProbe()
     val connectionHandler     = TestProbe()
@@ -1129,12 +1182,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       )
     }
 
-    def genChainTip(chainIndex: ChainIndex) = {
+    def genChainTip(chainIndex: ChainIndex, height: Int = 1) = {
       val block = emptyBlock(blockFlow, chainIndex)
-      ChainTip(block.hash, 1, block.weight)
+      ChainTip(block.hash, height, block.weight)
     }
 
-    def genChainTips() = brokerConfig.chainIndexes.map(genChainTip)
+    def genChainTips(height: Int = 1) = brokerConfig.chainIndexes.map(genChainTip(_, height))
 
     def checkInvalidTips(invalidTips: AVector[ChainTip]) = {
       setRemoteBrokerInfo()

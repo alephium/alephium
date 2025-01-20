@@ -19,7 +19,7 @@ package org.alephium.flow.network.interclique
 import scala.collection.mutable
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -214,12 +214,35 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
     }
   }
 
+  private def handleBlockAnnouncement(hash: BlockHash): Unit = {
+    // If the current client version is V0 and the sync protocol V2 enable version is V1, we need to handle the following three cases:
+    // 1. V0 < V1, which means the client will sync using protocol V1, and both `selfChainTips` and `remoteChainTips` will be empty.
+    // 2. V0 >= V1 and the peer’s client version is also greater than V1, but the client syncs using sync protocol V1.
+    //    This means we won’t receive the `UpdateSelfChainTips` command from `BlockFlowSynchronizer`, and in this case,
+    //    we need to send the hash to the `BlockFlowSynchronizer`.
+    // 3. V0 >= V1 and the client syncs using sync protocol V2. We will only need to handle the
+    //    announcement if the local chain height satisfies the conditions.
+    val command = BlockFlowSynchronizer.BlockAnnouncement(hash)
+    if (selfChainTips.isEmpty || remoteChainTips.isEmpty) {
+      blockFlowSynchronizer ! command
+    } else {
+      val chainIndex = ChainIndex.from(hash)
+      val needToDownload = for {
+        selfTip   <- selfChainTips(chainIndex)
+        remoteTip <- remoteChainTips(chainIndex)
+      } yield math.abs(selfTip.height - remoteTip.height) < BrokerHandler.newBlockHashHeightDiff
+      if (needToDownload.getOrElse(false)) {
+        blockFlowSynchronizer ! command
+      }
+    }
+  }
+
   private def handleNewBlockHash(hash: BlockHash): Unit = {
     if (validateBlockHash(hash)) {
       if (!seenBlocks.contains(hash)) {
         log.debug(s"Receive new block hash ${hash.shortHex} from $remoteAddress")
         seenBlocks.put(hash, ())
-        blockFlowSynchronizer ! BlockFlowSynchronizer.BlockAnnouncement(hash)
+        handleBlockAnnouncement(hash)
       }
     } else {
       log.warning(s"Invalid new block hash ${hash.shortHex} from $remoteAddress")
@@ -282,6 +305,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
 
 object BrokerHandler {
   val seenTxExpiryDuration: Duration = Duration.ofMinutesUnsafe(5)
+  val newBlockHashHeightDiff: Int    = maxSyncBlocksPerChain
 
   def showChainState(tips: AVector[ChainTip]): String = {
     tips
