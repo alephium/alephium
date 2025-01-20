@@ -217,8 +217,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private[sync] var isSyncing     = false
   private[sync] val bestChainTips = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
-  private[sync] var selfChainTips = FlattenIndexedArray.empty[ChainTip]
-  private[sync] var syncingChains = FlattenIndexedArray.empty[SyncStatePerChain]
+  private[sync] val selfChainTips = FlattenIndexedArray.empty[ChainTip]
+  private[sync] val syncingChains = FlattenIndexedArray.empty[SyncStatePerChain]
   private[sync] var startTime: Option[TimeStamp] = None
 
   def handleBlockDownloaded(
