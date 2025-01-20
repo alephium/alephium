@@ -28,7 +28,7 @@ import org.alephium.flow.network.broker.{
   ChainTipInfo,
   MisbehaviorManager
 }
-import org.alephium.flow.network.sync.{BlockFlowSynchronizer, SyncState}
+import org.alephium.flow.network.sync.{BlockFlowSynchronizer, FlattenIndexedArray, SyncState}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.message._
@@ -308,8 +308,8 @@ trait SyncV2Handler { _: BrokerHandler =>
   private[interclique] var findingAncestorStates: Option[AVector[StatePerChain]] = None
   private[interclique] val pendingRequests = mutable.Map.empty[RequestId, RequestInfo]
 
-  private var selfChainTips: Option[AVector[ChainTip]]   = None
-  private var remoteChainTips: Option[AVector[ChainTip]] = None
+  private[interclique] val selfChainTips   = FlattenIndexedArray.empty[ChainTip]
+  private[interclique] val remoteChainTips = FlattenIndexedArray.empty[ChainTip]
 
   // scalastyle:off method.length
   def syncingV2: Receive = {
@@ -319,8 +319,8 @@ trait SyncV2Handler { _: BrokerHandler =>
       case BaseBrokerHandler.SendChainState(tips) =>
         log.debug(s"Send chain state to $remoteAddress: ${BrokerHandler.showChainState(tips)}")
         send(ChainState(tips))
-        selfChainTips = Some(tips)
-        remoteChainTips.foreach(checkSyncedByChainState(tips, _))
+        tips.foreach(tip => selfChainTips(tip.chainIndex) = tip)
+        checkSyncedByChainState()
 
       case BaseBrokerHandler.Received(ChainState(tips)) =>
         if (checkChainState(tips)) {
@@ -328,8 +328,8 @@ trait SyncV2Handler { _: BrokerHandler =>
             s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
           )
           blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(tips)
-          selfChainTips.foreach(checkSyncedByChainState(_, tips))
-          remoteChainTips = Some(tips)
+          tips.foreach(tip => remoteChainTips(tip.chainIndex) = tip)
+          checkSyncedByChainState()
         } else {
           log.warning(
             s"Invalid chain state ${BrokerHandler.showChainState(tips)} from $remoteAddress"
@@ -390,20 +390,18 @@ trait SyncV2Handler { _: BrokerHandler =>
   }
   // scalastyle:on method.length
 
-  private def checkSyncedByChainState(
-      selfTips: AVector[ChainTip],
-      remoteTips: AVector[ChainTip]
-  ): Unit = {
-    assume(selfTips.length == remoteTips.length)
-    if (!selfSynced) {
-      val synced = selfTips.forallWithIndex { case (selfTip, index) =>
-        selfTip.weight >= remoteTips(index).weight
+  private def checkSyncedByChainState(): Unit = {
+    if (!selfSynced && selfChainTips.nonEmpty) {
+      val synced = selfChainTips.forall { selfTip =>
+        val remoteTip = remoteChainTips(selfTip.chainIndex)
+        remoteTip.exists(selfTip.weight >= _.weight)
       }
       if (synced) setSelfSynced()
     }
-    if (!remoteSynced) {
-      val synced = remoteTips.forallWithIndex { case (remoteTip, index) =>
-        remoteTip.weight >= selfTips(index).weight
+    if (!remoteSynced && remoteChainTips.nonEmpty) {
+      val synced = remoteChainTips.forall { remoteTip =>
+        val selfTip = selfChainTips(remoteTip.chainIndex)
+        selfTip.exists(remoteTip.weight >= _.weight)
       }
       if (synced) setRemoteSynced()
     }

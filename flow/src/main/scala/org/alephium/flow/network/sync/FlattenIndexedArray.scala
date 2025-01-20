@@ -19,7 +19,7 @@ package org.alephium.flow.network.sync
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 
-final private[sync] class FlattenIndexedArray[T] private (val array: Array[Option[T]]) {
+final private[network] class FlattenIndexedArray[T] private (val array: Array[Option[T]]) {
   @inline def apply(chainIndex: ChainIndex)(implicit groupConfig: GroupConfig): Option[T] =
     array(chainIndex.flattenIndex)
 
@@ -38,6 +38,9 @@ final private[sync] class FlattenIndexedArray[T] private (val array: Array[Optio
   def forall(func: T => Boolean): Boolean = array.forall(_.forall(func))
 
   def exists(func: T => Boolean): Boolean = array.exists(_.exists(func))
+
+  def isEmpty: Boolean  = array.forall(_.isEmpty)
+  def nonEmpty: Boolean = !isEmpty
 }
 
 object FlattenIndexedArray {

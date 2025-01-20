@@ -949,18 +949,46 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is false
 
-    val selfChainTips = genChainTips()
-    brokerHandler ! BaseBrokerHandler.SendChainState(selfChainTips)
+    def reset(): Unit = {
+      brokerHandlerActor.selfChainTips.reset()
+      brokerHandlerActor.remoteChainTips.reset()
+      brokerHandlerActor.selfSynced = false
+      brokerHandlerActor.remoteSynced = false
+    }
+
+    reset()
+    val chainTips = genChainTips()
+    chainTips.length is 3
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is false
 
-    val remoteChainTips =
-      selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
-    brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteChainTips))
+    reset()
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is false
+
+    reset()
+    val index0  = nextInt(0, chainTips.length - 1)
+    val newTip0 = chainTips(index0).copy(weight = chainTips(index0).weight + Weight(1))
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips.replace(index0, newTip0)))
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is true
 
-    brokerHandler ! BaseBrokerHandler.SendChainState(remoteChainTips)
+    reset()
+    val index1 = (index0 + 1) % chainTips.length
+    val newTip1 = chainTips(index1).copy(weight =
+      chainTips(index1).weight.copy(value = chainTips(index1).weight.value.subtract(1))
+    )
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips.replace(index1, newTip1)))
+    brokerHandlerActor.selfSynced is true
+    brokerHandlerActor.remoteSynced is false
+
+    reset()
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
     brokerHandlerActor.selfSynced is true
     brokerHandlerActor.remoteSynced is true
   }

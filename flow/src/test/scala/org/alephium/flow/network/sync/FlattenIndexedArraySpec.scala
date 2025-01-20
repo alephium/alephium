@@ -101,4 +101,16 @@ class FlattenIndexedArraySpec extends AlephiumSpec with GroupConfigFixture.Defau
     array.exists(_ < 0) is false
     array.exists(_ >= 0) is true
   }
+
+  it should "isEmpty" in new Fixture {
+    val array = emptyArray
+    array.isEmpty is true
+    array.nonEmpty is false
+
+    chainIndexes.foreach { chainIndex =>
+      array(chainIndex) = 1
+      array.isEmpty is false
+      array.nonEmpty is true
+    }
+  }
 }
