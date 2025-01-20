@@ -310,7 +310,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     )
   }
 
-  it should "serialize/deserialize the BlocksByHeightsRequest/BlocksByHeightsResponse payload" in {
+  it should "serialize/deserialize the BlocksAndUnclesByHeightsRequest/BlocksAndUnclesByHeightsResponse payload" in {
     import Hex._
 
     val chainIndex = ChainIndex.unsafe(0, 0)
@@ -362,7 +362,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"010201"
       )
       .leftValue is SerdeError.validation(
-      "Invalid ChainIndex or data in BlocksByHeightsRequest payload"
+      "Invalid ChainIndex or data in BlocksAndUnclesByHeightsRequest payload"
     )
 
     Payload
@@ -379,7 +379,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"020101"
       )
       .leftValue is SerdeError.validation(
-      "Invalid ChainIndex or data in BlocksByHeightsRequest payload"
+      "Invalid ChainIndex or data in BlocksAndUnclesByHeightsRequest payload"
     )
   }
 
