@@ -42,6 +42,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
@@ -1473,7 +1474,9 @@ class ServerUtils(implicit
             extraUtxosInfo
           )
         } yield {
-          val (unsignedTx, generatedOutputs) = buildUnsignedTxResult
+          val (unsignedTx, txScriptExecution) = buildUnsignedTxResult
+          val generatedOutputs =
+            Output.fromGeneratedOutputs(unsignedTx, txScriptExecution.generatedOutputs)
           val generatedAssetOutputs = generatedOutputs.collect {
             case o: model.AssetOutput =>
               val txOutputRef =
@@ -1483,7 +1486,10 @@ class ServerUtils(implicit
           }
           (
             BuildChainedExecuteScriptTxResult(
-              BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
+              BuildExecuteScriptTxResult.from(
+                unsignedTx,
+                SimulationResult.from(unsignedTx, txScriptExecution)
+              )
             ),
             extraUtxosInfo
               .updateWithUnsignedTx(unsignedTx)
@@ -1544,7 +1550,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo
-  ): Try[(UnsignedTransaction, AVector[model.Output])] = {
+  ): Try[(UnsignedTransaction, TxScriptExecution)] = {
     for {
       _          <- query.check().left.map(badRequest)
       multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
@@ -1575,11 +1581,7 @@ class ServerUtils(implicit
         .left
         .map(failed)
     } yield {
-      val fixedOutputsLength = unsignedTx.fixedOutputs.length
-      val generatedOutputs = emulationResult.generatedOutputs.mapWithIndex { case (output, index) =>
-        Output.from(output, unsignedTx.id, fixedOutputsLength + index)
-      }
-      (unsignedTx, generatedOutputs)
+      (unsignedTx, emulationResult.value)
     }
   }
 
@@ -1590,8 +1592,11 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
     buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo).map {
-      case (unsignedTx, generatedOutputs) =>
-        BuildExecuteScriptTxResult.from(unsignedTx, generatedOutputs)
+      case (unsignedTx, txScriptExecution) =>
+        BuildExecuteScriptTxResult.from(
+          unsignedTx,
+          SimulationResult.from(unsignedTx, txScriptExecution)
+        )
     }
   }
 

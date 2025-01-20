@@ -981,7 +981,7 @@ object TxValidation {
               blockEnv,
               txIndex
             ) match {
-              case Right(TxScriptExecution(remaining, contractInputs, _, generatedOutputs)) =>
+              case Right(TxScriptExecution(remaining, _, contractInputs, _, generatedOutputs)) =>
                 if (contractInputs != tx.contractInputs) {
                   invalidTx(InvalidContractInputs)
                 } else if (generatedOutputs != tx.generatedOutputs) {
