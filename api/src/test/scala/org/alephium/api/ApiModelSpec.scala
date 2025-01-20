@@ -701,19 +701,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       AVector(
         AddressAssetState(
           address,
-          AssetState.from(
-            model.dustUtxoAmount,
-            AVector(Token(TokenId.hash("token1"), ALPH.oneAlph))
-          )
+          model.dustUtxoAmount,
+          Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
         )
       ),
       AVector(
         AddressAssetState(
           address,
-          AssetState.from(
-            model.dustUtxoAmount,
-            AVector(Token(TokenId.hash("token2"), ALPH.oneAlph))
-          )
+          model.dustUtxoAmount,
+          Some(AVector(Token(TokenId.hash("token2"), ALPH.oneAlph)))
         )
       )
     )
@@ -743,29 +739,25 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |     "inputs":[
          |       {
          |         "address": "$address",
-         |         "assetState": {
-         |            "attoAlphAmount":"1000000000000000",
-         |            "tokens":[
-         |              {
-         |                "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-         |                "amount":"1000000000000000000"
-         |              }
-         |            ]
-         |         }
+         |         "attoAlphAmount":"1000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1000000000000000000"
+         |            }
+         |         ]
          |       }
          |     ],
          |     "outputs":[
          |       {
          |         "address": "$address",
-         |         "assetState": {
-         |            "attoAlphAmount":"1000000000000000",
-         |            "tokens":[
-         |              {
-         |                "id":"bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-         |                "amount":"1000000000000000000"
-         |              }
-         |            ]
-         |         }
+         |         "attoAlphAmount":"1000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+         |              "amount":"1000000000000000000"
+         |            }
+         |          ]
          |       }
          |     ]
          |   }
@@ -1181,8 +1173,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       AVector(
         AddressAssetState(
           address,
-          AssetState.from(
-            model.dustUtxoAmount,
+          model.dustUtxoAmount,
+          Some(
             AVector(Token(TokenId.hash("token1"), ALPH.oneAlph))
           )
         )
@@ -1211,15 +1203,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |     "inputs":[
          |       {
          |         "address": "$address",
-         |         "assetState": {
-         |            "attoAlphAmount":"1000000000000000",
-         |            "tokens":[
-         |              {
-         |                "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-         |                "amount":"1000000000000000000"
-         |              }
-         |            ]
-         |         }
+         |         "attoAlphAmount":"1000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1000000000000000000"
+         |            }
+         |          ]
          |       }
          |     ],
          |     "outputs":[]

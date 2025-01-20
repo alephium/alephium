@@ -16,29 +16,17 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{ContractId, ContractOutput}
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.model.Address
 import org.alephium.util.{AVector, U256}
+final case class AddressAssetState(address: Address, attoAlphAmount: U256, tokens: Option[AVector[Token]])
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class AssetState(attoAlphAmount: U256, tokens: Option[AVector[Token]] = None) {
-  lazy val flatTokens: AVector[Token] = tokens.getOrElse(AVector.empty)
-
-  def toContractOutput(contractId: ContractId): ContractOutput = {
-    ContractOutput(
-      attoAlphAmount,
-      LockupScript.p2c(contractId),
-      flatTokens.map(token => (token.id, token.amount))
+object AddressAssetState {
+  def from(output: model.TxOutput): AddressAssetState = {
+    AddressAssetState(
+      Address.from(output.lockupScript),
+      output.amount,
+      Some(output.tokens.map(pair => Token(pair._1, pair._2)))
     )
   }
 }
 
-object AssetState {
-  def from(attoAlphAmount: U256, tokens: AVector[Token]): AssetState = {
-    AssetState(attoAlphAmount, Some(tokens))
-  }
-
-  def from(output: model.TxOutput): AssetState = {
-    AssetState.from(output.amount, output.tokens.map(pair => Token(pair._1, pair._2)))
-  }
-}

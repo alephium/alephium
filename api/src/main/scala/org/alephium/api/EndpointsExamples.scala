@@ -278,15 +278,13 @@ trait EndpointsExamples extends ErrorExamples {
     AVector(
       AddressAssetState(
         address,
-        AssetState.from(
-          model.dustUtxoAmount,
-          AVector(Token(TokenId.hash("token1"), alph(1).value))
-        )
+        model.dustUtxoAmount,
+        Some(AVector(Token(TokenId.hash("token1"), alph(1).value)))
       ),
       AddressAssetState(
         contractAddress,
-        AssetState.from(
-          model.minimalAlphInContract,
+        model.minimalAlphInContract,
+        Some(
           AVector(
             Token(TokenId.hash("token1"), alph(100).value),
             Token(TokenId.hash("token2"), alph(100).value)
@@ -297,15 +295,13 @@ trait EndpointsExamples extends ErrorExamples {
     AVector(
       AddressAssetState(
         address,
-        AssetState.from(
-          model.dustUtxoAmount,
-          AVector(Token(TokenId.hash("token2"), alph(1).value))
-        )
+        model.dustUtxoAmount,
+        Some(AVector(Token(TokenId.hash("token2"), alph(1).value)))
       ),
       AddressAssetState(
         contractAddress,
-        AssetState.from(
-          model.minimalAlphInContract,
+        model.minimalAlphInContract,
+        Some(
           AVector(
             Token(TokenId.hash("token1"), alph(99).value),
             Token(TokenId.hash("token2"), alph(101).value)
