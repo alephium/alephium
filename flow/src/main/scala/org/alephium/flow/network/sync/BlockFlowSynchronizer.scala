@@ -46,9 +46,10 @@ object BlockFlowSynchronizer {
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
+  sealed trait V1Command                                                extends Command
   sealed trait V2Command                                                extends Command
   case object Sync                                                      extends Command
-  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
+  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends V1Command
   case object CleanDownloading                                          extends Command
   final case class BlockAnnouncement(hash: BlockHash)                   extends Command
   final case class UpdateChainState(tips: AVector[ChainTip])            extends V2Command
@@ -205,7 +206,8 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
     case event: ChainHandler.FlowDataValidationEvent =>
       onBlockProcessed(event)
 
-    case Terminated(actor) => onBrokerTerminated(ActorRefT(actor))
+    case Terminated(actor)                  => onBrokerTerminated(ActorRefT(actor))
+    case _: BlockFlowSynchronizer.V1Command => ()
   }
 }
 
@@ -296,9 +298,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def hasBestChainTips: Boolean = {
-    brokerConfig.chainIndexes.forall { chainIndex =>
-      bestChainTips(chainIndex).isDefined
-    }
+    brokerConfig.chainIndexes.forall(bestChainTips.contains)
   }
 
   def handleSelfChainState(chainTips: AVector[ChainTip]): Unit = {

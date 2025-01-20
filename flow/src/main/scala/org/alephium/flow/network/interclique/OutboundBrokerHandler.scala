@@ -62,8 +62,8 @@ class OutboundBrokerHandler(
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
-    extends BaseOutboundBrokerHandler
-    with BrokerHandler {
+    extends BrokerHandler
+    with BaseOutboundBrokerHandler {
   val remoteAddress: InetSocketAddress = expectedRemoteBroker.address
 
   override def handleHandshakeInfo(

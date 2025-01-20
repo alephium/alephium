@@ -19,7 +19,9 @@ package org.alephium.flow.network.sync
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ChainIndex
 
-final private[network] class FlattenIndexedArray[T] private (val array: Array[Option[T]]) {
+@SuppressWarnings(Array("org.wartremover.warts.ArrayEquals"))
+final private[network] class FlattenIndexedArray[T] private (val array: Array[Option[T]])
+    extends AnyVal {
   @inline def apply(chainIndex: ChainIndex)(implicit groupConfig: GroupConfig): Option[T] =
     array(chainIndex.flattenIndex)
 
@@ -41,6 +43,9 @@ final private[network] class FlattenIndexedArray[T] private (val array: Array[Op
 
   def isEmpty: Boolean  = array.forall(_.isEmpty)
   def nonEmpty: Boolean = !isEmpty
+
+  def contains(chainIndex: ChainIndex)(implicit groupConfig: GroupConfig): Boolean =
+    this.apply(chainIndex).isDefined
 }
 
 object FlattenIndexedArray {

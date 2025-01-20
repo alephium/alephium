@@ -945,6 +945,18 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSynced is true
   }
 
+  it should "ignore v1 commands" in new BlockFlowSynchronizerV2Fixture {
+    import BlockFlowSynchronizer._
+
+    val broker                   = addBrokerAndSwitchToV2()._3
+    val commands: Seq[V1Command] = Seq(SyncInventories(AVector.empty))
+    commands.foreach { command =>
+      EventFilter.warning(start = "unhandled message", occurrences = 0).intercept {
+        broker.send(blockFlowSynchronizer, command)
+      }
+    }
+  }
+
   behavior of "SyncStatePerChain"
 
   trait SyncStatePerChainFixture extends Fixture {

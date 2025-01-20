@@ -631,20 +631,19 @@ trait SyncV2Handler { _: BrokerHandler =>
 
   private def handleAncestorResponseUnsafe(headerss: AVector[AVector[BlockHeader]]): Unit = {
     val heights = mutable.ArrayBuffer.empty[(ChainIndex, BlockHeightRange)]
-    val result = headerss.foreachE { headers =>
+    val isResponseValid = headerss.forall { headers =>
       val chainIndex = headers.head.chainIndex
       getChainState(chainIndex) match {
         case Some(state) =>
           val (isResponseValid, heightOpt) = handleAncestorResponseUnsafe(state, headers)
           if (isResponseValid) {
-            Right(heightOpt.foreach(h => heights.addOne(chainIndex -> h)))
-          } else {
-            Left(())
+            heightOpt.foreach(h => heights.addOne(chainIndex -> h))
           }
-        case None => Right(())
+          isResponseValid
+        case None => true
       }
     }
-    if (result.isLeft) {
+    if (!isResponseValid) {
       stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
     } else if (heights.nonEmpty) {
       val request = HeadersByHeightsRequest(AVector.from(heights))
@@ -804,7 +803,7 @@ object SyncV2Handler {
       binarySearch match {
         case None =>
           if (isAncestorFound) {
-            InvalidState(s"the ancestor height is already found: ${ancestorHeight}")
+            InvalidState(s"The ancestor height is already found: ${ancestorHeight}")
           } else {
             headers.findReversed(h => blockFlow.containsUnsafe(h.hash)) match {
               case Some(header) =>
@@ -819,7 +818,7 @@ object SyncV2Handler {
             val found        = blockFlow.containsUnsafe(ancestorHash)
             val lastHeight   = (start + end) / 2
             if (found && (blockFlow.getHeightUnsafe(ancestorHash) != lastHeight)) {
-              InvalidResponse(s"the received header height does not match, expected $lastHeight")
+              InvalidResponse(s"The received header height does not match, expected $lastHeight")
             } else {
               updateBinarySearch(found)
               getNextHeight() match {
@@ -831,7 +830,7 @@ object SyncV2Handler {
               }
             }
           } else {
-            InvalidResponse(s"the expected headers length is 1, but got ${headers.length}")
+            InvalidResponse(s"The expected headers length is 1, but got ${headers.length}")
           }
       }
     }
@@ -855,7 +854,11 @@ object SyncV2Handler {
 
   def calculateRequestSpan(remoteHeight: Int, localHeight: Int): BlockHeightRange = {
     assume(remoteHeight >= 0 && localHeight >= 0)
-    val maxCount      = 12
+    val maxCount = 12
+    // requestHead is the highest block that we will ask for. If requestHead is not offset,
+    // the highest block that we will get is 16 blocks back from head, which means we
+    // will fetch 14 or 15 blocks unnecessarily in the case the height difference
+    // between us and the peer is 1-2 blocks, which is most common
     val requestHead   = math.max(remoteHeight - 1, ALPH.GenesisHeight)
     val requestBottom = math.max(localHeight - 1, ALPH.GenesisHeight)
     val totalSpan     = requestHead - requestBottom
