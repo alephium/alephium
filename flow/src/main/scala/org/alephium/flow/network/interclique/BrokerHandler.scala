@@ -546,6 +546,8 @@ trait SyncV2Handler { _: BrokerHandler =>
   private def handleGetAncestors(chains: AVector[ChainTipInfo]): Unit = {
     assume(chains.nonEmpty)
     val states = mutable.ArrayBuffer.empty[StatePerChain]
+    // We first send the latest height to try to find the common ancestor.
+    // If it's not found, we fall back to binary search to find the common ancestor.
     val heights = chains.map { case ChainTipInfo(chainIndex, bestTip, selfTip) =>
       val heightsPerChain = SyncV2Handler.calculateRequestSpan(bestTip.height, selfTip.height)
       states.addOne(StatePerChain(chainIndex, bestTip))
@@ -868,6 +870,9 @@ object SyncV2Handler {
     BlockHeightRange.from(from, from + (count - 1) * span, span)
   }
 
+  // This function does the following two checks:
+  // 1. Check if the downloaded blocks form a valid chain
+  // 2. Check if the latest mainchain block matches the `toHeader`
   def validateBlocks(
       blocks: AVector[Block],
       mainChainBlockSize: Int,

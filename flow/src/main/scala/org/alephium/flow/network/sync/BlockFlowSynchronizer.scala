@@ -273,6 +273,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private def handleMissedBlocks(state: SyncStatePerChain, batchId: BlockBatch): Unit = {
     val isOriginBrokerInvalid = brokers.forall(_._2.containsMissedBlocks(state.chainIndex, batchId))
     if (isOriginBrokerInvalid) {
+      // No one can fill in the skeleton, disconnect from the origin peer and restart the sync
+      // once we receive the `Terminated` message.
       log.error(
         "All the brokers do not have the required blocks, stop the origin broker and resync"
       )
@@ -382,6 +384,11 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
+  // The sync process consists of three steps:
+  // 1. Find the common ancestor height `h` between the local node and the origin peer
+  // 2. Start constructing the header chain skeletons from `h + 1` using the origin peer
+  // 3. Download blocks from all nodes to fill in the header chain skeletons. If no one can
+  //    fill in the skeleton it's assumed invalid and the origin peer is dropped
   def startSync(chains: collection.Seq[(ChainIndex, BrokerActor, ChainTip, ChainTip)]): Unit = {
     assume(!isSyncing)
     isSyncing = true
@@ -631,6 +638,7 @@ object SyncState {
     private[sync] def nextSkeletonHeights(from: Int, size: Int): Option[BlockHeightRange] = {
       assume(from <= bestTip.height && size > BatchSize)
       if (bestTip.height - from < BatchSize) {
+        // If the skeleton's finished, download any remaining blocks directly from the `originBroker`
         nextFromHeight = bestTip.height + 1
         skeletonHeightRange = None
         val task = BlockDownloadTask(chainIndex, from, bestTip.height, None)
@@ -682,6 +690,8 @@ object SyncState {
 
     @scala.annotation.tailrec
     private def moveToBlockQueue(): Unit = {
+      // The `blockDownloaded` is ordered by height. If the first downloaded task is not what we need,
+      // we will wait for the first task to complete and move all the downloaded blocks into the `blockQueue` in height order
       downloadedBlocks.headOption match {
         case Some((batchId, blocks)) if batchIds.headOption.contains(batchId) =>
           pendingQueue.addAll(blocks.map(b => (b.block.hash, b)))
