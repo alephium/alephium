@@ -15,8 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup SBT
-        if: matrix.os == 'macos-latest'
-        run: brew install sbt
+        uses: sbt/setup-sbt@v1
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
