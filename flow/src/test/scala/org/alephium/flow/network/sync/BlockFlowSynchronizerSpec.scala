@@ -126,6 +126,24 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.syncing.isEmpty is true
   }
 
+  it should "ignore v2 commands" in new Fixture {
+    import BlockFlowSynchronizer._
+
+    val broker = TestProbe()
+    blockFlowSynchronizerActor.switchToV1()
+    val commands: Seq[V2Command] = Seq(
+      UpdateChainState(AVector.empty),
+      UpdateAncestors(AVector.empty),
+      UpdateSkeletons(AVector.empty, AVector.empty),
+      UpdateBlockDownloaded(AVector.empty)
+    )
+    commands.foreach { command =>
+      EventFilter.warning(start = "unhandled message", occurrences = 0).intercept {
+        broker.send(blockFlowSynchronizer, command)
+      }
+    }
+  }
+
   behavior of "BlockFlowSynchronizerV2"
 
   implicit class RichFlattenIndexedArray[T: ClassTag](array: FlattenIndexedArray[T]) {

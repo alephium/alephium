@@ -46,19 +46,20 @@ object BlockFlowSynchronizer {
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
+  sealed trait V2Command                                                extends Command
   case object Sync                                                      extends Command
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
   case object CleanDownloading                                          extends Command
   final case class BlockAnnouncement(hash: BlockHash)                   extends Command
-  final case class UpdateChainState(tips: AVector[ChainTip])            extends Command
-  final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)])  extends Command
+  final case class UpdateChainState(tips: AVector[ChainTip])            extends V2Command
+  final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)])  extends V2Command
   final case class UpdateSkeletons(
       requests: AVector[(ChainIndex, BlockHeightRange)],
       responses: AVector[AVector[BlockHeader]]
-  ) extends Command
+  ) extends V2Command
   final case class UpdateBlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
-  ) extends Command
+  ) extends V2Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -171,6 +172,7 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
     case event: ChainHandler.FlowDataValidationEvent =>
       finalized(event.data.hash)
     case Terminated(actor) => removeBroker(ActorRefT(actor))
+    case _: V2Command      => ()
   }
 }
 
