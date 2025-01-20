@@ -60,11 +60,14 @@ object SimulationResult {
   def from(
       unsignedTx: UnsignedTransaction,
       txScriptExecution: TxScriptExecution
-  ): SimulationResult = {
+  ): Either[String, SimulationResult] = {
     val fixedInputs      = txScriptExecution.fixedInputsPrevOutputs.map(AddressAssetState.from)
     val fixedOutputs     = unsignedTx.fixedOutputs.map(AddressAssetState.from)
     val contractInputs   = txScriptExecution.contractPrevOutputs.map(AddressAssetState.from)
     val generatedOutputs = txScriptExecution.generatedOutputs.map(AddressAssetState.from)
-    SimulationResult(fixedInputs ++ contractInputs, fixedOutputs ++ generatedOutputs)
+    for {
+      inputs  <- AddressAssetState.merge(fixedInputs ++ contractInputs)
+      outputs <- AddressAssetState.merge(fixedOutputs ++ generatedOutputs)
+    } yield SimulationResult(inputs, outputs)
   }
 }

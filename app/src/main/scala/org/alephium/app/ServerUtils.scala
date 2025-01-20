@@ -1473,6 +1473,10 @@ class ServerUtils(implicit
             buildExecuteScript.value,
             extraUtxosInfo
           )
+          simulationResult <- SimulationResult
+            .from(buildUnsignedTxResult._1, buildUnsignedTxResult._2)
+            .left
+            .map(failed)
         } yield {
           val (unsignedTx, txScriptExecution) = buildUnsignedTxResult
           val generatedOutputs =
@@ -1488,7 +1492,7 @@ class ServerUtils(implicit
             BuildChainedExecuteScriptTxResult(
               BuildExecuteScriptTxResult.from(
                 unsignedTx,
-                SimulationResult.from(unsignedTx, txScriptExecution)
+                simulationResult
               )
             ),
             extraUtxosInfo
@@ -1591,13 +1595,13 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
-    buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo).map {
-      case (unsignedTx, txScriptExecution) =>
-        BuildExecuteScriptTxResult.from(
-          unsignedTx,
-          SimulationResult.from(unsignedTx, txScriptExecution)
-        )
-    }
+    for {
+      buildUnsignedTxResult <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
+      simulationResult <- SimulationResult
+        .from(buildUnsignedTxResult._1, buildUnsignedTxResult._2)
+        .left
+        .map(failed)
+    } yield BuildExecuteScriptTxResult.from(buildUnsignedTxResult._1, simulationResult)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

@@ -1174,9 +1174,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AddressAssetState(
           address,
           model.dustUtxoAmount,
-          Some(
-            AVector(Token(TokenId.hash("token1"), ALPH.oneAlph))
-          )
+          Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
         )
       ),
       AVector.empty

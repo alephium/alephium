@@ -18,7 +18,11 @@ package org.alephium.api.model
 import org.alephium.protocol.model
 import org.alephium.protocol.model.Address
 import org.alephium.util.{AVector, U256}
-final case class AddressAssetState(address: Address, attoAlphAmount: U256, tokens: Option[AVector[Token]])
+final case class AddressAssetState(
+    address: Address,
+    attoAlphAmount: U256,
+    tokens: Option[AVector[Token]]
+)
 
 object AddressAssetState {
   def from(output: model.TxOutput): AddressAssetState = {
@@ -28,5 +32,39 @@ object AddressAssetState {
       Some(output.tokens.map(pair => Token(pair._1, pair._2)))
     )
   }
-}
 
+  def merge(assets: AVector[AddressAssetState]): Either[String, AVector[AddressAssetState]] = {
+    AVector.from(assets.groupBy(_.address)).mapE { case (address, assetsPerAddress) =>
+      assetsPerAddress
+        .foldE(AddressAssetState(address, U256.Zero, None)) {
+          case (accAddressAssetState, addressAsset) =>
+            for {
+              updatedAlphAmount <- accAddressAssetState.attoAlphAmount
+                .add(addressAsset.attoAlphAmount)
+                .toRight(s"Amount overflow for alph for address $address")
+              updatedTokens <- addressAsset.tokens match {
+                case Some(tokens) =>
+                  tokens.foldE(accAddressAssetState.tokens) {
+                    case (None, token) =>
+                      Right(Some(AVector(token)))
+                    case (Some(accTokens), token) =>
+                      val index = accTokens.indexWhere(_.id == token.id)
+                      if (index == -1) {
+                        Right(Some(accTokens :+ token))
+                      } else {
+                        accTokens(index).amount
+                          .add(token.amount)
+                          .toRight(s"Amount overflow for token ${token.id} for address $address")
+                          .map { amt =>
+                            Some(accTokens.replace(index, token.copy(amount = amt)))
+                          }
+                      }
+                  }
+                case None =>
+                  Right(accAddressAssetState.tokens)
+              }
+            } yield AddressAssetState(address, updatedAlphAmount, updatedTokens)
+        }
+    }
+  }
+}
