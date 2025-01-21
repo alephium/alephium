@@ -34,7 +34,7 @@ trait TxScriptEmulator {
       fixedOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasAmountOpt: Option[GasBox] = None,
-      gasFeeOpt: Option[GasPrice] = None
+      gasPriceOpt: Option[GasPrice] = None
   ): Either[String, TxScriptEmulationResult]
 }
 
@@ -54,7 +54,7 @@ object TxScriptEmulator {
         fixedOutputs: AVector[AssetOutput],
         script: StatefulScript,
         gasAmountOpt: Option[GasBox],
-        gasFeeOpt: Option[GasPrice]
+        gasPriceOpt: Option[GasPrice]
     ): Either[String, TxScriptEmulationResult] = {
       assume(inputWithAssets.nonEmpty)
       val groupIndex      = inputWithAssets.head.input.fromGroup
@@ -67,12 +67,12 @@ object TxScriptEmulator {
           preOutputs: AVector[AssetOutput]
       ): Either[String, TxScriptExecution] = {
         val gasAmount = gasAmountOpt.getOrElse(minimalGas)
-        val gasFee    = gasFeeOpt.getOrElse(nonCoinbaseMinGasPrice)
+        val gasPrice  = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
         val txTemplate = TransactionTemplate(
           UnsignedTransaction(
             Some(script),
             gasAmount,
-            gasFee,
+            gasPrice,
             inputWithAssets.map(_.input),
             fixedOutputs
           ),
