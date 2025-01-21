@@ -700,7 +700,8 @@ trait SyncV2Handler { _: BrokerHandler =>
         (true, None)
       case StartBinarySearch(height) =>
         log.info(
-          s"Fallback to binary search to find the ancestor between self and the peer $remoteAddress"
+          s"Fallback to binary search to find the ancestor between self " +
+            s"and the peer $remoteAddress, chain index: ${state.chainIndex}"
         )
         (true, Some(BlockHeightRange.fromHeight(height)))
       case ContinueBinarySearch(height) =>

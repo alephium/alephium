@@ -373,11 +373,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
       startTime match {
         case Some(ts) =>
           if (ts.plusUnsafe(FallbackThreshold) < TimeStamp.now()) {
-            selfChainTips.reset()
-            bestChainTips.reset()
-            startTime = None
-            clearSyncState()
-            switchToV1()
+            clearV2StateAndSwitchToV1()
           }
         case None => startTime = Some(TimeStamp.now())
       }
@@ -507,7 +503,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     size > 0
   }
 
-  private def clearSyncState(): Unit = {
+  private def clearSyncingState(): Unit = {
     syncingChains.reset()
     isSyncing = false
     brokers.foreach(_._2.clear())
@@ -515,8 +511,16 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def resync(): Unit = {
     log.debug("Clear syncing state and resync")
-    clearSyncState()
+    clearSyncingState()
     tryStartSync()
+  }
+
+  private def clearV2StateAndSwitchToV1(): Unit = {
+    selfChainTips.reset()
+    bestChainTips.reset()
+    startTime = None
+    clearSyncingState()
+    switchToV1()
   }
 
   private def updateBestChainTips(terminatedBroker: BrokerActor): Unit = {
@@ -536,7 +540,11 @@ trait SyncState { _: BlockFlowSynchronizer =>
   def onBrokerTerminated(broker: BrokerActor): Unit = {
     val status = getBrokerStatus(broker)
     removeBroker(broker)
-    status.foreach(onBrokerTerminated(broker, _))
+    if (peerSizeUsingV2 < BlockFlowSynchronizer.V2SwitchThreshold) {
+      clearV2StateAndSwitchToV1()
+    } else {
+      status.foreach(onBrokerTerminated(broker, _))
+    }
   }
 
   private def onBrokerTerminated(broker: BrokerActor, status: BrokerStatus): Unit = {
