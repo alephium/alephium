@@ -4531,11 +4531,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     genesisAddressUtxos.length is 1
     val genesisAddressUtxosAmount = genesisAddressUtxos.head.amount.value
 
-    val fixedInputsPrevOutputs = txScriptExecution.fixedInputsPrevOutputs
-    fixedInputsPrevOutputs.length is 1
-    fixedInputsPrevOutputs.head.amount is genesisAddressUtxosAmount
-    fixedInputsPrevOutputs.head.tokens is AVector.empty[(TokenId, U256)]
-
     val fixedOutputs = unsignedTx.fixedOutputs
     fixedOutputs.length is 1
     fixedOutputs.head.lockupScript is genesisAddress.lockupScript
@@ -4625,10 +4620,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         ExtraUtxosInfo.empty
       )
       .rightValue
-
-    val fixedInputsPrevOutputs = txScriptExecution.fixedInputsPrevOutputs
-    fixedInputsPrevOutputs.length is 1
-    fixedInputsPrevOutputs.head.amount is ALPH.alph(5)
 
     val fixedOutputs = unsignedTx.fixedOutputs
     fixedOutputs.length is 1

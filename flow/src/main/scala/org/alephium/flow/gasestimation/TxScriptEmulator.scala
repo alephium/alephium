@@ -111,7 +111,6 @@ object TxScriptEmulator {
           defaultGasPerInput,
           TxScriptExecution(
             defaultGasPerInput,
-            inputWithAssets.map(_.asset.output),
             AVector.empty,
             AVector.empty,
             AVector.empty

@@ -472,7 +472,6 @@ object StatelessVM {
 object StatefulVM {
   final case class TxScriptExecution(
       gasBox: GasBox,
-      fixedInputsPrevOutputs: AVector[AssetOutput],
       contractInputs: AVector[ContractOutputRef],
       contractPrevOutputs: AVector[ContractOutput],
       generatedOutputs: AVector[TxOutput]
@@ -537,7 +536,6 @@ object StatefulVM {
   private def prepareResultMockup(context: StatefulContext): TxScriptExecution = {
     TxScriptExecution(
       context.gasRemaining,
-      context.txEnv.prevOutputs,
       AVector.from(context.contractInputs.view.map(_._1)),
       AVector.from(context.contractInputs.view.map(_._2)),
       AVector.from(context.generatedOutputs)
@@ -576,7 +574,6 @@ object StatefulVM {
     } yield {
       TxScriptExecution(
         context.gasRemaining,
-        context.txEnv.prevOutputs,
         AVector.from(context.contractInputs.view.map(_._1)),
         AVector.from(context.contractInputs.view.map(_._2)),
         AVector.from(context.generatedOutputs)
