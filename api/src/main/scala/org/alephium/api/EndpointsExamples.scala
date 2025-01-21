@@ -274,6 +274,43 @@ trait EndpointsExamples extends ErrorExamples {
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
+  private val simulationResult = SimulationResult(
+    AVector(
+      AddressAssetState(
+        address,
+        model.dustUtxoAmount,
+        Some(AVector(Token(TokenId.hash("token1"), alph(1).value)))
+      ),
+      AddressAssetState(
+        contractAddress,
+        model.minimalAlphInContract,
+        Some(
+          AVector(
+            Token(TokenId.hash("token1"), alph(100).value),
+            Token(TokenId.hash("token2"), alph(100).value)
+          )
+        )
+      )
+    ),
+    AVector(
+      AddressAssetState(
+        address,
+        model.dustUtxoAmount,
+        Some(AVector(Token(TokenId.hash("token2"), alph(1).value)))
+      ),
+      AddressAssetState(
+        contractAddress,
+        model.minimalAlphInContract,
+        Some(
+          AVector(
+            Token(TokenId.hash("token1"), alph(99).value),
+            Token(TokenId.hash("token2"), alph(101).value)
+          )
+        )
+      )
+    )
+  )
+
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
@@ -917,7 +954,7 @@ trait EndpointsExamples extends ErrorExamples {
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
         txId = txId,
-        simulatedOutputs = AVector(outputAsset.upCast())
+        simulationResult
       )
     )
 
@@ -932,7 +969,7 @@ trait EndpointsExamples extends ErrorExamples {
           model.minimalGas,
           model.nonCoinbaseMinGasPrice,
           txId = txId,
-          simulatedOutputs = AVector(outputAsset.upCast())
+          simulationResult
         )
       )
     )
@@ -959,7 +996,7 @@ trait EndpointsExamples extends ErrorExamples {
             model.minimalGas,
             model.nonCoinbaseMinGasPrice,
             txId = txId,
-            simulatedOutputs = AVector(outputAsset.upCast())
+            simulationResult
           )
         )
       )

@@ -25,7 +25,7 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
-final case class TxScriptEmulationResult(gasUsed: GasBox, generatedOutputs: AVector[TxOutput])
+final case class TxScriptEmulationResult(gasUsed: GasBox, value: TxScriptExecution)
 
 trait TxScriptEmulator {
   def emulate(
@@ -94,7 +94,7 @@ object TxScriptEmulator {
         result <- runScript(blockEnv, groupView, preOutputs)
       } yield TxScriptEmulationResult(
         maximalGasPerTx.subUnsafe(result.gasBox),
-        result.generatedOutputs
+        result
       )
     }
   }
@@ -106,7 +106,17 @@ object TxScriptEmulator {
         fixedOutputs: AVector[AssetOutput],
         script: StatefulScript
     ): Either[String, TxScriptEmulationResult] = {
-      Right(TxScriptEmulationResult(defaultGasPerInput, AVector.empty))
+      Right(
+        TxScriptEmulationResult(
+          defaultGasPerInput,
+          TxScriptExecution(
+            defaultGasPerInput,
+            AVector.empty,
+            AVector.empty,
+            AVector.empty
+          )
+        )
+      )
     }
   }
 

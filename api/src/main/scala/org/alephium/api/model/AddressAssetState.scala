@@ -13,23 +13,23 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, ContractId}
-import org.alephium.protocol.vm.StatefulContract
-import org.alephium.util.AVector
+import org.alephium.protocol.model
+import org.alephium.protocol.model.Address
+import org.alephium.util.{AVector, U256}
+final case class AddressAssetState(
+    address: Address,
+    attoAlphAmount: U256,
+    tokens: Option[AVector[Token]]
+)
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class ContractState(
-    address: Address.Contract,
-    bytecode: StatefulContract,
-    codeHash: Hash,
-    initialStateHash: Option[Hash] = None,
-    immFields: AVector[Val],
-    mutFields: AVector[Val],
-    asset: AssetState
-) {
-  def id: ContractId = address.lockupScript.contractId
+object AddressAssetState {
+  def from(output: model.TxOutput): AddressAssetState = {
+    AddressAssetState(
+      Address.from(output.lockupScript),
+      output.amount,
+      Some(output.tokens.map(pair => Token(pair._1, pair._2)))
+    )
+  }
 }
