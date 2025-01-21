@@ -1578,7 +1578,13 @@ class ServerUtils(implicit
       (unsignedTx, inputWithAssets) = buildUnsignedTxResult
       emulationResult <- TxScriptEmulator
         .Default(blockFlow)
-        .emulate(inputWithAssets, unsignedTx.fixedOutputs, unsignedTx.scriptOpt.get)
+        .emulate(
+          inputWithAssets,
+          unsignedTx.fixedOutputs,
+          unsignedTx.scriptOpt.get,
+          Some(unsignedTx.gasAmount),
+          Some(unsignedTx.gasPrice)
+        )
         .left
         .map(failed)
     } yield {

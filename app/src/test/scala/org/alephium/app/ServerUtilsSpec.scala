@@ -4548,7 +4548,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     simulatedGeneratedOutputs(0).amount is dustUtxoAmount
     simulatedGeneratedOutputs(0).tokens is AVector(tokenId -> U256.unsafe(1))
     simulatedGeneratedOutputs(1).lockupScript is genesisAddress.lockupScript
-    simulatedGeneratedOutputs(1).amount is 1000679800000000000L // Roughly 1 ALPH
+    simulatedGeneratedOutputs(1).amount is 999000000000000000L
     simulatedGeneratedOutputs(1).tokens is AVector.empty[(TokenId, U256)]
     simulatedGeneratedOutputs(2).lockupScript is tokenContractLockupScript
     simulatedGeneratedOutputs(2).amount is ALPH.alph(5)
@@ -4634,7 +4634,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val simulatedGeneratedOutputs = txScriptExecution.generatedOutputs
     simulatedGeneratedOutputs.length is 2
     simulatedGeneratedOutputs(0).lockupScript is testLockupScript
-    simulatedGeneratedOutputs(0).amount is U256.unsafe(1001229600000000000L)
+    simulatedGeneratedOutputs(0).amount is U256.unsafe(1000000000000000000L)
     simulatedGeneratedOutputs(1).lockupScript is tokenContractLockupScript
     simulatedGeneratedOutputs(1).amount is ALPH.alph(4)
   }
