@@ -738,9 +738,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "resync if the origin peer is bad" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val chainIndex                            = ChainIndex.unsafe(0, 0)
-    val (brokerActor0, brokerStatus0, probe0) = addBrokerAndSwitchToV2()
-    val (brokerActor1, brokerStatus1, probe1) = addBroker()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val brokers    = Seq.fill(BlockFlowSynchronizer.V2SwitchThreshold + 1)(addBroker())
+    val (brokerActor0, brokerStatus0, probe0) = brokers(0)
+    val (brokerActor1, _, probe1)             = brokers(1)
     val selfChainTips                         = genChainTips
     val bestChainTips =
       selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
@@ -748,8 +749,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
 
     syncingChain.batchIds.addOne(task.id)
-    brokerStatus0.updateTips(bestChainTips)
-    brokerStatus1.updateTips(bestChainTips)
+    brokers.foreach(_._2.updateTips(bestChainTips))
     blockFlowSynchronizerActor.isSyncing = true
     selfChainTips.foreach(tip => blockFlowSynchronizerActor.selfChainTips(tip.chainIndex) = tip)
     syncingChain.taskQueue.addOne(task)
@@ -771,6 +771,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     watch(brokerActor0.ref)
 
+    brokers.drop(2).foreach(_._2.missedBlocks.update(chainIndex, mutable.Set(task.id)))
+
     EventFilter.debug(start = "Clear syncing state and resync", occurrences = 1).intercept {
       blockFlowSynchronizer.tell(
         BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task, AVector.empty, false))),
@@ -788,9 +790,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "resync if the origin peer is terminated" in new BlockFlowSynchronizerV2Fixture {
-    val chainIndex                = ChainIndex.unsafe(0, 0)
-    val (brokerActor0, _, _)      = addBrokerAndSwitchToV2()
-    val (brokerActor1, _, probe1) = addBroker()
+    val chainIndex           = ChainIndex.unsafe(0, 0)
+    val brokers              = Seq.fill(BlockFlowSynchronizer.V2SwitchThreshold + 1)(addBroker())
+    val (brokerActor0, _, _) = brokers(0)
+    val (brokerActor1, _, probe1) = brokers(1)
     val chainTips0                = genChainTips
     val chainTips1 =
       chainTips0.replace(0, chainTips0(0).copy(weight = chainTips0(0).weight + Weight(1)))
@@ -818,9 +821,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "reschedule download tasks if the peer is terminated" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val chainIndex                 = ChainIndex.unsafe(0, 0)
-    val (_, brokerStatus0, probe0) = addBrokerAndSwitchToV2()
-    val (brokerActor1, _, probe1)  = addBroker()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val brokers    = Seq.fill(BlockFlowSynchronizer.V2SwitchThreshold + 1)(addBroker())
+    val (_, brokerStatus0, probe0) = brokers(0)
+    val (brokerActor1, _, probe1)  = brokers(1)
     val syncingChain               = addSyncingChain(chainIndex, Int.MaxValue, brokerActor1)
     brokerStatus0.updateTips(AVector(syncingChain.bestTip))
     blockFlowSynchronizerActor.isSyncing = true
