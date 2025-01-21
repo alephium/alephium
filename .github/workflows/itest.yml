@@ -14,13 +14,13 @@ jobs:
         java: [ '11' ]
     steps:
       - uses: actions/checkout@v2
-      - name: Setup SBT
-        uses: sbt/setup-sbt@v1
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: sbt
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
       - run: sbt it:test
         shell: bash
