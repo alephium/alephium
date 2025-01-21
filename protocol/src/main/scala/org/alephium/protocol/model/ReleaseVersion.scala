@@ -64,7 +64,7 @@ object ReleaseVersion {
     )
   )
 
-  val p2pProtocolV2Version: ReleaseVersion = ReleaseVersion(3, 7, 0)
+  val p2pProtocolV2Version: ReleaseVersion = ReleaseVersion(3, 12, 0)
 
   val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
 
