@@ -49,13 +49,7 @@ trait BlockFlow
   def calWeight(block: Block): IOResult[Weight]
 
   override protected def getSyncLocatorsUnsafe(): AVector[(ChainIndex, AVector[BlockHash])] = {
-    getSyncLocatorsUnsafe(brokerConfig)
-  }
-
-  private def getSyncLocatorsUnsafe(
-      peerBrokerInfo: BrokerGroupInfo
-  ): AVector[(ChainIndex, AVector[BlockHash])] = {
-    val range = brokerConfig.calIntersection(peerBrokerInfo)
+    val range = brokerConfig.groupRange
     AVector.tabulate(range.length * groups) { index =>
       val offset     = index / groups
       val fromGroup  = range(offset)
@@ -98,6 +92,13 @@ trait BlockFlow
       } else {
         chain.getSyncDataUnsafe(locatorsPerChain)
       }
+    }
+  }
+
+  def getChainTipsUnsafe(): AVector[ChainTip] = {
+    brokerConfig.chainIndexes.map { chainIndex =>
+      val chain = getBlockChain(chainIndex)
+      chain.maxWeightTipUnsafe
     }
   }
 
