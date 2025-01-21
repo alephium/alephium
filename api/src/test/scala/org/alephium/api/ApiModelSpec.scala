@@ -696,20 +696,26 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(deploy, deployJson)
 
-    val address = Address.p2pkh(PublicKey.generate)
+    val address         = generateAddress()
+    val contractAddress = generateContractAddress()
     val simulationResult = SimulationResult(
       AVector(
         AddressAssetState(
-          address,
-          model.dustUtxoAmount,
+          contractAddress,
+          model.minimalAlphInContract,
           Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
         )
       ),
       AVector(
         AddressAssetState(
+          contractAddress,
+          model.minimalAlphInContract,
+          Some(AVector(Token(TokenId.hash("token2"), ALPH.oneAlph)))
+        ),
+        AddressAssetState(
           address,
           model.dustUtxoAmount,
-          Some(AVector(Token(TokenId.hash("token2"), ALPH.oneAlph)))
+          Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
         )
       )
     )
@@ -736,10 +742,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    "gasPrice":"1",
          |    "txId": "${txId.toHexString}",
          |    "simulationResult": {
-         |     "inputs":[
+         |     "contractInputs":[
          |       {
-         |         "address": "$address",
-         |         "attoAlphAmount":"1000000000000000",
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"100000000000000000",
          |         "tokens":[
          |            {
          |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -748,19 +754,30 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |         ]
          |       }
          |     ],
-         |     "outputs":[
+         |     "generatedOutputs":[
          |       {
-         |         "address": "$address",
-         |         "attoAlphAmount":"1000000000000000",
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"100000000000000000",
          |         "tokens":[
          |            {
          |              "id":"bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
          |              "amount":"1000000000000000000"
          |            }
          |          ]
+         |       },
+         |       {
+         |         "address": "$address",
+         |         "attoAlphAmount":"1000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1000000000000000000"
+         |            }
+         |          ]
          |       }
          |     ]
          |   }
+         |  }
          |}
          |""".stripMargin
 
@@ -1167,17 +1184,29 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildExecuteScriptTxResult" in {
-    val txId    = TransactionId.generate
-    val address = Address.p2pkh(PublicKey.generate)
+    val txId            = TransactionId.generate
+    val address         = Address.p2pkh(PublicKey.generate)
+    val contractAddress = generateContractAddress()
     val simulationResult = SimulationResult(
       AVector(
         AddressAssetState(
-          address,
-          model.dustUtxoAmount,
-          Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
+          contractAddress,
+          model.minimalAlphInContract,
+          Some(AVector(Token(TokenId.hash("token1"), U256.Two)))
         )
       ),
-      AVector.empty
+      AVector(
+        AddressAssetState(
+          contractAddress,
+          model.minimalAlphInContract.addUnsafe(ALPH.oneAlph),
+          Some(AVector(Token(TokenId.hash("token1"), U256.One)))
+        ),
+        AddressAssetState(
+          address,
+          model.dustUtxoAmount,
+          Some(AVector(Token(TokenId.hash("token1"), U256.One)))
+        )
+      )
     )
     val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
       fromGroup = 1,
@@ -1198,19 +1227,40 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasPrice":"1",
          |  "txId": "${txId.toHexString}",
          |  "simulationResult": {
-         |     "inputs":[
+         |     "contractInputs":[
+         |       {
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"100000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"2"
+         |            }
+         |          ]
+         |       }
+         |     ],
+         |     "generatedOutputs":[
+         |       {
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"1100000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1"
+         |            }
+         |          ]
+         |       },
          |       {
          |         "address": "$address",
          |         "attoAlphAmount":"1000000000000000",
          |         "tokens":[
          |            {
          |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-         |              "amount":"1000000000000000000"
+         |              "amount":"1"
          |            }
          |          ]
          |       }
-         |     ],
-         |     "outputs":[]
+         |     ]
          |   }
          |}
          |""".stripMargin
