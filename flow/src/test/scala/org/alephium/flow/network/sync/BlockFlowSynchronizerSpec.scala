@@ -930,11 +930,12 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "check if the node is synced" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
     blockFlowSynchronizerActor.isSynced is true
 
     val chainIndex0         = ChainIndex.unsafe(0, 0)
     val chainIndex1         = ChainIndex.unsafe(0, 1)
-    val broker: BrokerActor = ActorRefT(TestProbe().ref)
+    val (broker, status, _) = addBroker()
     val chain0              = addSyncingChain(chainIndex0, 10, broker)
     val chain1              = addSyncingChain(chainIndex1, 10, broker)
     blockFlowSynchronizerActor.isSynced is false
@@ -942,6 +943,28 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.selfChainTips(chainIndex0) = chain0.bestTip
     blockFlowSynchronizerActor.isSynced is false
     blockFlowSynchronizerActor.selfChainTips(chainIndex1) = chain1.bestTip
+    blockFlowSynchronizerActor.isSynced is true
+
+    blockFlowSynchronizerActor.selfChainTips(chainIndex1) =
+      chain1.bestTip.copy(weight = Weight(chain1.bestTip.weight.value.subtract(1)))
+    blockFlowSynchronizerActor.isSynced is false
+
+    chain1.nextFromHeight = 1
+    chain1.skeletonHeightRange = Some(BlockHeightRange(1, 10, 1))
+    chain1.batchIds.addOne(BlockBatch(1, 10))
+    val block = emptyBlock(blockFlow, chainIndex1)
+    chain1.pendingQueue.addOne(block.hash -> DownloadedBlock(block, (broker, status.info)))
+    blockFlowSynchronizerActor.isSynced is false
+
+    chain1.nextFromHeight = 11
+    blockFlowSynchronizerActor.isSynced is false
+    chain1.skeletonHeightRange = None
+    blockFlowSynchronizerActor.isSynced is false
+    chain1.batchIds.clear()
+    blockFlowSynchronizerActor.isSynced is false
+    chain1.pendingQueue.clear()
+    blockFlowSynchronizerActor.isSynced is true
+    chain1.validating.addOne(block.hash)
     blockFlowSynchronizerActor.isSynced is true
   }
 

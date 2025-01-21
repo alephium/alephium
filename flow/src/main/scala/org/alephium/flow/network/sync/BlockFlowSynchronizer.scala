@@ -761,7 +761,19 @@ object SyncState {
     def taskSize: Int             = taskQueue.length
     def isTaskQueueEmpty: Boolean = taskQueue.isEmpty
 
-    def isSynced(selfTip: ChainTip): Boolean = selfTip.weight >= bestTip.weight
+    def isSynced(selfTip: ChainTip): Boolean = {
+      selfTip.weight >= bestTip.weight || (
+        // When syncing different chains from different nodes, it is possible that a block has already
+        // been downloaded and sent to the `DependencyHandler`, but due to dependencies not being ready,
+        // it cannot be added to the blockchain. This means that `selfTip.weight >= bestTip.weight` does not hold.
+        // In this case, if all tasks have already been downloaded and sent to the `DependencyHandler`,
+        // we consider the chain to be synced and start the next round of sync.
+        nextFromHeight > bestTip.height &&
+          skeletonHeightRange.isEmpty &&
+          batchIds.isEmpty &&
+          pendingQueue.isEmpty
+      )
+    }
 
     def isOriginPeer(broker: BrokerActor): Boolean = originBroker == broker
   }
