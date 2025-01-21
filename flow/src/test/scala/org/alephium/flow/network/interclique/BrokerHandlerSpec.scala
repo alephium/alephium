@@ -484,6 +484,44 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
+  it should "publish misbehavior and stop broker if the headers request is invalid" in new SyncV2Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val heights =
+      brokerConfig.chainIndexes.map(chainIndex => (chainIndex, BlockHeightRange(1, 4, 1)))
+    brokerHandler ! BaseBrokerHandler.Received(HeadersByHeightsRequest(defaultRequestId, heights))
+    listener.expectNoMessage()
+
+    val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsRequest(defaultRequestId, invalidHeights)
+    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  it should "publish misbehavior and stop broker if the blocks request is invalid" in new SyncV2Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val heights =
+      brokerConfig.chainIndexes.map(chainIndex => (chainIndex, BlockHeightRange(1, 4, 1)))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, heights)
+    )
+    listener.expectNoMessage()
+
+    val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, invalidHeights)
+    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
   trait GetAncestorsFixture extends SyncV2Fixture {
     import SyncV2Handler._
 
@@ -820,6 +858,106 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       val request     = BlocksAndUnclesByHeightsRequest(defaultRequestId, chains)
       val requestInfo = RequestInfo(request, Some(BaseBrokerHandler.DownloadBlockTasks(tasks)))
       brokerHandlerActor.pendingRequests.addOne((request.id, requestInfo))
+    }
+
+    def genBlocksResponse(size: Int, genUncleBlock: Boolean = false): AVector[AVector[Block]] = {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        (0 until size).foreach { _ =>
+          val block0 = emptyBlock(blockFlow, chainIndex)
+          val block1 = emptyBlock(blockFlow, chainIndex)
+          addAndCheck(blockFlow, block0)
+          if (genUncleBlock && Random.nextBoolean()) {
+            addAndCheck(blockFlow, block1)
+          }
+        }
+      }
+      val heights = AVector.from(1 to size)
+      brokerConfig.chainIndexes.map { chainIndex =>
+        val chain = blockFlow.getBlockChain(chainIndex)
+        chain.maxHeightUnsafe is size
+        chain.getBlocksWithUnclesByHeights(heights).rightValue
+      }
+    }
+
+    def checkValidBlocks(blockss: AVector[AVector[Block]]) = {
+      setRemoteBrokerInfo()
+      val tasks = brokerConfig.chainIndexes.map(BlockDownloadTask(_, 1, 4, None))
+      prepare(tasks)
+      brokerHandler ! BaseBrokerHandler.Received(
+        BlocksAndUnclesByHeightsResponse(defaultRequestId, blockss)
+      )
+      blockFlowSynchronizer.expectMsg(
+        BlockFlowSynchronizer.UpdateBlockDownloaded(
+          tasks.zipWithIndex.map { case (task, index) =>
+            (task, blockss(index), true)
+          }
+        )
+      )
+    }
+
+    def checkInvalidBlocks(blockss: AVector[AVector[Block]]) = {
+      setRemoteBrokerInfo()
+
+      val listener = TestProbe()
+      system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+      watch(brokerHandler)
+
+      val tasks = brokerConfig.chainIndexes.map(BlockDownloadTask(_, 0, 4, None))
+      prepare(tasks)
+      brokerHandler ! BaseBrokerHandler.Received(
+        BlocksAndUnclesByHeightsResponse(defaultRequestId, blockss)
+      )
+      blockFlowSynchronizer.expectNoMessage()
+      listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+      expectTerminated(brokerHandler.ref)
+    }
+  }
+
+  it should "publish misbehavior and stop broker if the blocks response is invalid" in {
+    info("valid blocks")
+    new DownloadBlocksFixture {
+      checkValidBlocks(genBlocksResponse(4))
+    }
+
+    info("valid blocks and uncles")
+    new DownloadBlocksFixture {
+      checkValidBlocks(genBlocksResponse(4, genUncleBlock = true))
+    }
+
+    info("invalid chain size")
+    new DownloadBlocksFixture {
+      val blockss        = genBlocksResponse(4)
+      val invalidBlockss = blockss.slice(0, nextInt(blockss.length - 1))
+      checkInvalidBlocks(invalidBlockss)
+    }
+
+    info("invalid block size")
+    new DownloadBlocksFixture {
+      val blockss        = genBlocksResponse(4)
+      val index          = nextInt(blockss.length - 1)
+      val invalidBlockss = blockss.replace(index, blockss(index).drop(1))
+      checkInvalidBlocks(invalidBlockss)
+    }
+
+    info("invalid block hash")
+    new DownloadBlocksFixture {
+      override val configValues: Map[String, Any] =
+        Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+      val blockss        = genBlocksResponse(4)
+      val invalidBlock   = invalidNonceBlock(blockFlow, chainIndex)
+      val index          = nextInt(blockss.length - 1)
+      val invalidBlockss = blockss.replace(index, blockss(index) :+ invalidBlock)
+      checkInvalidBlocks(invalidBlockss)
+    }
+
+    info("invalid chain index")
+    new DownloadBlocksFixture {
+      val blockss        = genBlocksResponse(4)
+      val index0         = nextInt(blockss.length - 1)
+      val index1         = (index0 + 1) % blockss.length
+      val invalidBlockss = blockss.replace(index0, blockss(index0) :+ blockss(index1).head)
+      checkInvalidBlocks(invalidBlockss)
     }
   }
 

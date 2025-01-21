@@ -184,6 +184,17 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     }
   }
 
+  it should "not forward block validation message to BlockFlowSynchronizer" in new Fixture {
+    brokerHandler ! BlockChainHandler.BlockAdded
+    blockFlowSynchronizer.expectNoMessage()
+
+    brokerHandler ! BlockChainHandler.BlockAddingFailed
+    blockFlowSynchronizer.expectNoMessage()
+
+    brokerHandler ! BlockChainHandler.InvalidBlock(BlockHash.generate, InvalidHeaderFlow)
+    blockFlowSynchronizer.expectNoMessage()
+  }
+
   trait Fixture extends FlowFixture with Generators {
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()

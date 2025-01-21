@@ -576,7 +576,6 @@ object SyncState {
   }
 
   final case class BlockBatch(from: Int, to: Int) {
-    def size: Int                 = to - from + 1
     override def toString: String = s"[$from .. $to]"
   }
   object BlockBatch {

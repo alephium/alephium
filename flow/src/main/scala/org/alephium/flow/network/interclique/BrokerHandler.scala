@@ -396,14 +396,14 @@ trait SyncV2Handler { _: BrokerHandler =>
 
       case BaseBrokerHandler.Received(BlocksAndUnclesByHeightsRequest(id, chains)) =>
         log.debug(
-          s"Received BlocksByHeightsRequest from $remoteAddress: " +
+          s"Received BlocksAndUnclesByHeightsRequest from $remoteAddress: " +
             s"${BrokerHandler.showIndexedHeights(chains)}, id: ${id.value.v}"
         )
         handleBlocksRequest(id, chains)
 
       case BaseBrokerHandler.Received(BlocksAndUnclesByHeightsResponse(id, blockss)) =>
         log.debug(
-          s"Received BlocksByHeightsResponse from $remoteAddress: " +
+          s"Received BlocksAndUnclesByHeightsResponse from $remoteAddress: " +
             s"${BrokerHandler.showFlowData(blockss)}, id: ${id.value.v}"
         )
         handleBlocksResponse(id, blockss)
@@ -450,7 +450,7 @@ trait SyncV2Handler { _: BrokerHandler =>
     val heights = cmd.tasks.map(task => (task.chainIndex, task.heightRange))
     val request = BlocksAndUnclesByHeightsRequest(heights)
     log.debug(
-      s"Sending BlocksByHeightsRequest to $remoteAddress: " +
+      s"Sending BlocksAndUnclesByHeightsRequest to $remoteAddress: " +
         s"${BrokerHandler.showIndexedHeights(heights)}, id: ${request.id.value.v}"
     )
     sendRequest(request, Some(cmd))
@@ -464,12 +464,14 @@ trait SyncV2Handler { _: BrokerHandler =>
             handleDownloadedBlocks(blockss, tasks)
           case _ =>
             log.error(
-              s"Received invalid BlocksByHeightsResponse from $remoteAddress, request: $info"
+              s"Received invalid BlocksAndUnclesByHeightsResponse from $remoteAddress, request: $info"
             )
             publishEvent(MisbehaviorManager.InvalidResponse(remoteAddress))
         }
       case None =>
-        log.warning(s"Ignore unknown BlocksByHeightsResponse from $remoteAddress, request id: $id")
+        log.warning(
+          s"Ignore unknown BlocksAndUnclesByHeightsResponse from $remoteAddress, request id: $id"
+        )
     }
   }
 
@@ -494,7 +496,7 @@ trait SyncV2Handler { _: BrokerHandler =>
       blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateBlockDownloaded(result)
     } else {
       log.error(
-        s"Received invalid BlocksByHeightsResponse from $remoteAddress: ${BrokerHandler.showFlowData(blockss)}"
+        s"Received invalid BlocksAndUnclesByHeightsResponse from $remoteAddress: ${BrokerHandler.showFlowData(blockss)}"
       )
       stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
     }
@@ -539,7 +541,7 @@ trait SyncV2Handler { _: BrokerHandler =>
       (chainIndex, range) =>
         blockflow.getBlockChain(chainIndex).getBlocksWithUnclesByHeights(range.heights),
       BlocksAndUnclesByHeightsResponse.apply,
-      "BlocksByHeights"
+      "BlocksAndUnclesByHeights"
     )
   }
 
