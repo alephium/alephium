@@ -251,9 +251,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
     validateMoreBlocks(acc)
   }
 
-  private def tryValidateMoreBlocksFromChain(chainIndex: ChainIndex): Unit = {
+  private def tryValidateMoreBlocksFromChain(chainState: SyncStatePerChain): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
-    syncingChains(chainIndex).foreach(_.tryValidateMoreBlocks(acc))
+    chainState.tryValidateMoreBlocks(acc)
     validateMoreBlocks(acc)
   }
 
@@ -320,7 +320,11 @@ trait SyncState { _: BlockFlowSynchronizer =>
     chainTips.foreach { chainTip =>
       this.selfChainTips(chainTip.chainIndex) = Some(chainTip)
     }
-    if (!isSyncing) tryStartSync()
+    if (!isSyncing) {
+      tryStartSync()
+    } else if (isSynced) {
+      tryStartNextSyncRound()
+    }
   }
 
   def onBlockProcessed(event: ChainHandler.FlowDataValidationEvent): Unit = {
@@ -331,12 +335,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
       }
       val block = event.data
       if (isBlockValid) {
-        syncingChains(block.chainIndex).foreach(_.handleFinalizedBlock(block.hash))
-        tryValidateMoreBlocksFromChain(block.chainIndex)
-        if (isSynced) {
-          resync()
-        } else {
-          tryMoveOn(block.chainIndex)
+        syncingChains(block.chainIndex).foreach { chainState =>
+          chainState.handleFinalizedBlock(block.hash)
+          tryValidateMoreBlocksFromChain(chainState)
+          tryMoveOn(chainState)
           downloadBlocks()
         }
       } else {
@@ -353,14 +355,12 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def tryMoveOn(chainIndex: ChainIndex): Unit = {
-    syncingChains(chainIndex).foreach { state =>
-      state.tryMoveOn() match {
-        case Some(range) =>
-          val request = AVector(chainIndex -> range)
-          state.originBroker ! BrokerHandler.GetSkeletons(request)
-        case None => ()
-      }
+  private def tryMoveOn(chainState: SyncStatePerChain): Unit = {
+    chainState.tryMoveOn() match {
+      case Some(range) =>
+        val request = AVector(chainState.chainIndex -> range)
+        chainState.originBroker ! BrokerHandler.GetSkeletons(request)
+      case None => ()
     }
   }
 
@@ -523,6 +523,21 @@ trait SyncState { _: BlockFlowSynchronizer =>
     log.debug("Clear syncing state and resync")
     clearSyncingState()
     tryStartSync()
+  }
+
+  private[sync] def needToStartNextSyncRound(): Boolean = {
+    // Only start the next round of sync if the best tip is better than the best tip being used for syncing
+    // This helps avoid re-downloading the latest blocks while they are still cached in the `DependencyHandler`
+    brokerConfig.chainIndexes.exists { chainIndex =>
+      (for {
+        usedBestTip   <- syncingChains(chainIndex).map(_.bestTip)
+        latestBestTip <- bestChainTips(chainIndex).map(_._2)
+      } yield latestBestTip.weight > usedBestTip.weight).getOrElse(false)
+    }
+  }
+
+  @inline private def tryStartNextSyncRound(): Unit = {
+    if (needToStartNextSyncRound()) resync()
   }
 
   private def clearV2StateAndSwitchToV1(): Unit = {
