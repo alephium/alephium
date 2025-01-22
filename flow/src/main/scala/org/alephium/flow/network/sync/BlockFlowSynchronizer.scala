@@ -36,6 +36,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
+// scalastyle:off file.size.limit
 object BlockFlowSynchronizer {
   val V2SwitchThreshold: Int = 3
 
@@ -229,19 +230,31 @@ trait SyncState { _: BlockFlowSynchronizer =>
       status.handleBlockDownloaded(result)
       handleBlockDownloaded(broker, status.info, result)
     }
-    tryValidateMoreBlocks()
+    tryValidateMoreBlocksFromAllChains()
     downloadBlocks()
   }
 
-  private def tryValidateMoreBlocks(): Unit = {
+  private def validateMoreBlocks(blocks: mutable.ArrayBuffer[DownloadedBlock]) = {
+    if (blocks.nonEmpty) {
+      blocks.groupBy(_.from).foreachEntry { case (from, blocks) =>
+        val dataOrigin = DataOrigin.InterClique(from._2)
+        val addFlowData =
+          DependencyHandler.AddFlowData(AVector.from(blocks.map(_.block)), dataOrigin)
+        allHandlers.dependencyHandler.tell(addFlowData, from._1.ref)
+      }
+    }
+  }
+
+  private def tryValidateMoreBlocksFromAllChains(): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
     syncingChains.foreach(_.tryValidateMoreBlocks(acc))
-    acc.groupBy(_.from).foreachEntry { case (from, blocks) =>
-      val dataOrigin = DataOrigin.InterClique(from._2)
-      val addFlowData =
-        DependencyHandler.AddFlowData(AVector.from(blocks.map(_.block)), dataOrigin)
-      allHandlers.dependencyHandler.tell(addFlowData, from._1.ref)
-    }
+    validateMoreBlocks(acc)
+  }
+
+  private def tryValidateMoreBlocksFromChain(chainIndex: ChainIndex): Unit = {
+    val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
+    syncingChains(chainIndex).foreach(_.tryValidateMoreBlocks(acc))
+    validateMoreBlocks(acc)
   }
 
   private def clearMissedBlocks(chainIndex: ChainIndex): Unit = {
@@ -319,11 +332,11 @@ trait SyncState { _: BlockFlowSynchronizer =>
       val block = event.data
       if (isBlockValid) {
         syncingChains(block.chainIndex).foreach(_.handleFinalizedBlock(block.hash))
-        tryValidateMoreBlocks()
+        tryValidateMoreBlocksFromChain(block.chainIndex)
         if (isSynced) {
           resync()
         } else {
-          tryMoveOn()
+          tryMoveOn(block.chainIndex)
           downloadBlocks()
         }
       } else {
@@ -340,17 +353,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def tryMoveOn(): Unit = {
-    val requests =
-      mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, BlockHeightRange)]]
-    syncingChains.foreach { state =>
+  private def tryMoveOn(chainIndex: ChainIndex): Unit = {
+    syncingChains(chainIndex).foreach { state =>
       state.tryMoveOn() match {
-        case Some(range) => addToMap(requests, state.originBroker, (state.chainIndex, range))
-        case None        => ()
+        case Some(range) =>
+          val request = AVector(chainIndex -> range)
+          state.originBroker ! BrokerHandler.GetSkeletons(request)
+        case None => ()
       }
-    }
-    requests.foreachEntry { case (broker, requestsPerActor) =>
-      broker ! BrokerHandler.GetSkeletons(AVector.from(requestsPerActor))
     }
   }
 
@@ -732,11 +742,11 @@ object SyncState {
     def tryMoveOn(): Option[BlockHeightRange] = {
       val queueSize = pendingQueue.size + validating.size
       if (
+        queueSize <= MaxQueueSize / 2 &&
         nextFromHeight > ALPH.GenesisHeight && // We don't know the common ancestor height yet
         nextFromHeight <= bestTip.height &&
         skeletonHeightRange.isEmpty &&
         taskQueue.isEmpty &&
-        queueSize <= MaxQueueSize / 2 &&
         isSkeletonFilled
       ) {
         val size = ((MaxQueueSize - queueSize) / BatchSize) * BatchSize
