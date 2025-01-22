@@ -339,7 +339,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
           chainState.handleFinalizedBlock(block.hash)
           tryValidateMoreBlocksFromChain(chainState)
           tryMoveOn(chainState)
-          downloadBlocks()
         }
       } else {
         log.info(s"Block ${block.hash.toHexString} is invalid, resync")
@@ -356,11 +355,16 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def tryMoveOn(chainState: SyncStatePerChain): Unit = {
+    val taskSize = chainState.taskSize
     chainState.tryMoveOn() match {
       case Some(range) =>
         val request = AVector(chainState.chainIndex -> range)
         chainState.originBroker ! BrokerHandler.GetSkeletons(request)
-      case None => ()
+      case None =>
+        // We need to attempt to download the blocks only when the remaining blocks cannot form a skeleton
+        if (chainState.taskSize > taskSize) {
+          downloadBlocks()
+        }
     }
   }
 

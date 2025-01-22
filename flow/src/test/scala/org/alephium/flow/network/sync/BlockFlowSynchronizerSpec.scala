@@ -640,6 +640,22 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     allProbes.dependencyHandler.expectNoMessage()
   }
 
+  it should "attempt to download blocks when necessary" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    blockFlowSynchronizerActor.isSyncing = true
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val syncingChain = addSyncingChain(chainIndex, 200, brokerActor)
+    syncingChain.nextFromHeight = BatchSize + 1
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    blockProcessed(block)
+    probe.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
+      tasks is AVector(BlockDownloadTask(chainIndex, BatchSize + 1, 200, None))
+    }
+  }
+
   it should "download blocks from multiple peers" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
     override val configValues: Map[String, Any] =
