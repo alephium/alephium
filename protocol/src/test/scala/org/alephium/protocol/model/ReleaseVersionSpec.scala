@@ -103,8 +103,8 @@ class ReleaseVersionSpec extends AlephiumSpec {
   }
 
   it should "if it is using protocol v2" in {
-    ReleaseVersion(3, 6, Int.MaxValue).protocolVersion is ProtocolV1
     ReleaseVersion(3, 11, Int.MaxValue).protocolVersion is ProtocolV1
     ReleaseVersion(3, 12, 0).protocolVersion is ProtocolV2
+    ReleaseVersion(3, 12, 1).protocolVersion is ProtocolV2
   }
 }
