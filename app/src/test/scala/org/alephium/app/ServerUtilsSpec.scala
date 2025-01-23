@@ -4047,6 +4047,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     lazy val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(0)
+    lazy val genesisAddress                           = Address.p2pkh(genesisPublicKey)
 
     val groupInfo0 = groupInfo(0)
     val groupInfo1 = groupInfo(1)
@@ -4442,7 +4443,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       tokens = Some(AVector(Token(tokenId1, U256.unsafe(1))))
     )
 
-    val genesisAddress = Address.p2pkh(genesisPublicKey)
     failedExecuteTxScript(
       buildWithdrawToken2ExecuteScriptTx,
       errorDetails =
@@ -4500,6 +4500,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       keyPair = (genesisPrivateKey, genesisPublicKey),
       issueTokenAmount = Some(Amount(U256.unsafe(100)))
     )
+    val tokenId                   = TokenId.from(tokenContractAddress.contractId)
+    val tokenContractLockupScript = LockupScript.p2c(tokenContractAddress.contractId)
 
     val withdrawTokenScript =
       s"""
@@ -4516,7 +4518,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       bytecode = serialize(withdrawTokenScriptCode)
     )
 
-    val (unsignedTx, generatedOutputs) = serverUtils
+    val (unsignedTx, txScriptExecution) = serverUtils
       .buildExecuteScriptUnsignedTx(
         blockFlow,
         buildWithdrawTokenExecuteScriptTx,
@@ -4524,10 +4526,33 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    val generatedAssetOutputs = generatedOutputs.map(_.toProtocol()).collect {
-      case output: model.AssetOutput => Some(output)
-      case _                         => None
-    }
+    val genesisAddressUtxos =
+      serverUtils.getUTXOsIncludePool(blockFlow, genesisAddress).rightValue.utxos
+    genesisAddressUtxos.length is 1
+    val genesisAddressUtxosAmount = genesisAddressUtxos.head.amount.value
+
+    val fixedOutputs = unsignedTx.fixedOutputs
+    fixedOutputs.length is 1
+    fixedOutputs.head.lockupScript is genesisAddress.lockupScript
+    fixedOutputs.head.amount is genesisAddressUtxosAmount - ALPH.alph(1) - unsignedTx.gasFee
+    fixedOutputs.head.tokens is AVector.empty[(TokenId, U256)]
+
+    val contractPrevOutputs = txScriptExecution.contractPrevOutputs
+    contractPrevOutputs.length is 1
+    contractPrevOutputs.head.amount is ALPH.alph(5)
+    contractPrevOutputs.head.tokens is AVector(tokenId -> U256.unsafe(100))
+
+    val simulatedGeneratedOutputs = txScriptExecution.generatedOutputs
+    simulatedGeneratedOutputs.length is 3
+    simulatedGeneratedOutputs(0).lockupScript is genesisAddress.lockupScript
+    simulatedGeneratedOutputs(0).amount is dustUtxoAmount
+    simulatedGeneratedOutputs(0).tokens is AVector(tokenId -> U256.unsafe(1))
+    simulatedGeneratedOutputs(1).lockupScript is genesisAddress.lockupScript
+    simulatedGeneratedOutputs(1).amount is 999000000000000000L
+    simulatedGeneratedOutputs(1).tokens is AVector.empty[(TokenId, U256)]
+    simulatedGeneratedOutputs(2).lockupScript is tokenContractLockupScript
+    simulatedGeneratedOutputs(2).amount is ALPH.alph(5)
+    simulatedGeneratedOutputs(2).tokens is AVector(tokenId -> U256.unsafe(99))
 
     val (_, extraUtxosInfo) = serverUtils
       .buildChainedTransaction(
@@ -4537,12 +4562,81 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    unsignedTx.fixedOutputs.length is 1
-    generatedOutputs.length is 3
+    val generatedOutputs = Output.fromGeneratedOutputs(unsignedTx, simulatedGeneratedOutputs)
+    val generatedAssetOutputs = txScriptExecution.generatedOutputs.collect {
+      case output: model.AssetOutput => Some(output)
+      case _                         => None
+    }
+
     generatedAssetOutputs.length is 2
     extraUtxosInfo.newUtxos.map(_.output) is (unsignedTx.fixedOutputs ++ generatedAssetOutputs)
     extraUtxosInfo.newUtxos.tail.map(o => (o.ref.hint.value, o.ref.key.value)) is
       generatedOutputs.filter(_.toProtocol().isAsset).map(o => (o.hint, o.key))
+  }
+
+  it should "should estimate the generated output correctly" in new ChainedTransactionsFixture {
+    val tokenContract =
+      s"""
+         |Contract TokenContract() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenContractAddress = deployContract(
+      tokenContract,
+      initialAttoAlphAmount = Amount(ALPH.alph(5)),
+      keyPair = (genesisPrivateKey, genesisPublicKey),
+      issueTokenAmount = None
+    )
+    val tokenContractLockupScript = LockupScript.p2c(tokenContractAddress.contractId)
+
+    val withdrawALPHScript =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${tokenContractAddress}).withdraw()
+         |}
+         |$tokenContract
+         |""".stripMargin
+
+    val withdrawALPHScriptCode = Compiler.compileTxScript(withdrawALPHScript).toOption.get
+
+    val (_, testPubKey)  = chainIndex.from.generateKey
+    val testLockupScript = LockupScript.p2pkh(testPubKey)
+    val block            = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(5))
+    addAndCheck(blockFlow, block)
+
+    val buildWithdrawALPHExecuteScriptTx = BuildExecuteScriptTx(
+      fromPublicKey = testPubKey.bytes,
+      bytecode = serialize(withdrawALPHScriptCode)
+    )
+
+    val (unsignedTx, txScriptExecution) = serverUtils
+      .buildExecuteScriptUnsignedTx(
+        blockFlow,
+        buildWithdrawALPHExecuteScriptTx,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+
+    val fixedOutputs = unsignedTx.fixedOutputs
+    fixedOutputs.length is 1
+    fixedOutputs.head.lockupScript is testLockupScript
+    fixedOutputs.head.amount is ALPH.alph(5) - unsignedTx.gasFee
+
+    val contractPrevOutputs = txScriptExecution.contractPrevOutputs
+    contractPrevOutputs.length is 1
+    contractPrevOutputs.head.lockupScript is tokenContractLockupScript
+    contractPrevOutputs.head.amount is ALPH.alph(5)
+
+    val simulatedGeneratedOutputs = txScriptExecution.generatedOutputs
+    simulatedGeneratedOutputs.length is 2
+    simulatedGeneratedOutputs(0).lockupScript is testLockupScript
+    simulatedGeneratedOutputs(0).amount is U256.unsafe(1000000000000000000L)
+    simulatedGeneratedOutputs(1).lockupScript is tokenContractLockupScript
+    simulatedGeneratedOutputs(1).amount is ALPH.alph(4)
   }
 
   it should "get ghost uncles" in new Fixture {
