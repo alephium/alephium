@@ -16,6 +16,8 @@ jobs:
           distribution: temurin
           java-version: 11
           cache: sbt
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
       - run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck it:scalafmtCheck scalastyle test:scalastyle it:scalastyle doc
       - run: make assembly
       - run: sbt app/docker

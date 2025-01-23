@@ -14,22 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.protocol.model
 
-import org.alephium.protocol.WireVersion
-import org.alephium.serde.Serde
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.serde.{intSerde, Serde}
 
-final case class Header(version: WireVersion)
+final case class ChainTip(hash: BlockHash, height: Int, weight: Weight) {
+  private var _chainIndex: Option[ChainIndex] = None
 
-object Header {
-  implicit val serde: Serde[Header] = WireVersion.serde
-    .validate(_version =>
-      // Fix this in the next hardfork
-      if (_version == WireVersion.currentWireVersion) {
-        Right(())
-      } else {
-        Left(s"Invalid version: got ${_version}, expect: ${WireVersion.currentWireVersion.value}")
-      }
-    )
-    .xmap(apply, _.version)
+  def chainIndex(implicit config: GroupConfig): ChainIndex = {
+    _chainIndex match {
+      case Some(index) => index
+      case None =>
+        val index = ChainIndex.from(hash)
+        _chainIndex = Some(index)
+        index
+    }
+  }
+}
+
+object ChainTip {
+  implicit val serde: Serde[ChainTip] =
+    Serde.forProduct3(ChainTip.apply, v => (v.hash, v.height, v.weight))
 }
