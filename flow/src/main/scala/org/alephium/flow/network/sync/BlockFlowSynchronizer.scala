@@ -111,7 +111,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
 
     case BlockAnnouncement(hash) =>
-      if (!isSyncing) handleBlockAnnouncement(hash)
+      if (!isSyncingUsingV2) handleBlockAnnouncement(hash)
   }
 
   def addBroker(
@@ -217,10 +217,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
   import BrokerStatusTracker._
   import SyncState._
 
-  private[sync] var isSyncing     = false
-  private[sync] val bestChainTips = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
-  private[sync] val selfChainTips = FlattenIndexedArray.empty[ChainTip]
-  private[sync] val syncingChains = FlattenIndexedArray.empty[SyncStatePerChain]
+  private[sync] var isSyncingUsingV2 = false
+  private[sync] val bestChainTips    = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
+  private[sync] val selfChainTips    = FlattenIndexedArray.empty[ChainTip]
+  private[sync] val syncingChains    = FlattenIndexedArray.empty[SyncStatePerChain]
   private[sync] var startTime: Option[TimeStamp] = None
 
   def handleBlockDownloaded(
@@ -321,7 +321,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     chainTips.foreach { chainTip =>
       this.selfChainTips(chainTip.chainIndex) = Some(chainTip)
     }
-    if (!isSyncing) {
+    if (!isSyncingUsingV2) {
       tryStartSync()
     } else if (isSynced) {
       tryStartNextSyncRound()
@@ -329,7 +329,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   def onBlockProcessed(event: ChainHandler.FlowDataValidationEvent): Unit = {
-    if (isSyncing) {
+    if (isSyncingUsingV2) {
       val isBlockValid = event match {
         case _: ChainHandler.FlowDataAdded   => true
         case _: ChainHandler.InvalidFlowData => false
@@ -401,8 +401,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
   // 3. Download blocks from all nodes to fill in the header chain skeletons. If no one can
   //    fill in the skeleton it's assumed invalid and the origin peer is dropped
   def startSync(chains: collection.Seq[(ChainIndex, BrokerActor, ChainTip, ChainTip)]): Unit = {
-    assume(!isSyncing)
-    isSyncing = true
+    assume(!isSyncingUsingV2)
+    isSyncingUsingV2 = true
     log.debug("Start syncing")
 
     val requestsPerBroker = mutable.HashMap
@@ -520,7 +520,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def clearSyncingState(): Unit = {
     syncingChains.reset()
-    isSyncing = false
+    isSyncingUsingV2 = false
     brokers.foreach(_._2.clear())
   }
 
@@ -579,7 +579,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def onBrokerTerminated(broker: BrokerActor, status: BrokerStatus): Unit = {
     updateBestChainTips(broker)
-    if (isSyncing) {
+    if (isSyncingUsingV2) {
       val needToResync = syncingChains.exists(_.isOriginPeer(broker))
       if (needToResync) {
         log.info(s"Resync due to the origin broker ${status.info.address} terminated")
