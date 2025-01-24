@@ -287,6 +287,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         code(s"group = 0, $$group = 1$$"),
         "These test settings are defined multiple times: group"
       )
+      testContractError(
+        code(s"$$invalidKey = 0$$"),
+        "Invalid setting key invalidKey, it must be one of [group,blockHash,blockTimeStamp]"
+      )
     }
 
     {

@@ -1351,16 +1351,8 @@ class StatefulParser(val fileURI: Option[java.net.URI])
 }
 
 trait TestingParser { self: StatefulParser =>
-  private def groupDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
-    PP("group" ~ "=" ~ expr)(Testing.GroupDef.apply)
-  private def blockHashDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
-    PP("blockHash" ~ "=" ~ expr)(Testing.BlockHashDef.apply)
-  private def blockTimeStampDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
-    PP("blockTimeStamp" ~ "=" ~ expr)(Testing.BlockTimeStampDef.apply)
-  private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] = P(
-    groupDef | blockHashDef | blockTimeStampDef
-  )
-
+  private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
+    PP(Lexer.ident ~ "=" ~ expr) { case (ident, expr) => Testing.SettingDef(ident.name, expr) }
   private def settingsDef[Unknown: P]: P[Testing.SettingsDef[StatefulContext]] =
     PP("with" ~ "Settings" ~ "(" ~ settingDef.rep(0, ",") ~ ")")(Testing.SettingsDef.apply)
 

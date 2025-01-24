@@ -47,48 +47,59 @@ object Testing {
     }
   }
 
-  sealed trait SettingDef[Ctx <: StatelessContext] extends Ast.UniqueDef with Ast.Positioned
-  final case class GroupDef[Ctx <: StatelessContext](expr: Ast.Expr[Ctx]) extends SettingDef[Ctx] {
-    def name: String = "group"
-    def compile(state: Compiler.State[Ctx]): Int = {
-      val value = checkAndGetValue[Ctx, Val.U256](state, expr, Val.U256, name)
-      value.v.toBigInt.intValue()
-    }
-  }
-  final case class BlockHashDef[Ctx <: StatelessContext](expr: Ast.Expr[Ctx])
-      extends SettingDef[Ctx] {
-    def name: String = "blockHash"
-    def compile(state: Compiler.State[Ctx]): BlockHash = {
-      val value = checkAndGetValue[Ctx, Val.ByteVec](state, expr, Val.ByteVec, name)
-      BlockHash
-        .from(value.bytes)
-        .getOrElse(
-          throw Compiler.Error(s"Invalid block hash ${Hex.toHexString(value.bytes)}", sourceIndex)
-        )
-    }
-  }
-  final case class BlockTimeStampDef[Ctx <: StatelessContext](expr: Ast.Expr[Ctx])
-      extends SettingDef[Ctx] {
-    def name: String = "blockTimeStamp"
-    def compile(state: Compiler.State[Ctx]): TimeStamp = {
-      val value = checkAndGetValue[Ctx, Val.U256](state, expr, Val.U256, name)
-      TimeStamp.unsafe(value.v.toBigInt.longValue())
-    }
-  }
+  final case class SettingDef[Ctx <: StatelessContext](name: String, value: Ast.Expr[Ctx])
+      extends Ast.UniqueDef
+      with Ast.Positioned
 
   final case class SettingsDef[Ctx <: StatelessContext](defs: Seq[SettingDef[Ctx]])
       extends Ast.Positioned {
+
+    private def getSetting[V <: Val](
+        state: Compiler.State[Ctx],
+        tpe: Val.Type,
+        name: String
+    ): Option[V] = {
+      defs.find(_.name == name).map(d => checkAndGetValue[Ctx, V](state, d.value, tpe, "group"))
+    }
+
+    private def getGroup(state: Compiler.State[Ctx]): Option[Int] = {
+      getSetting[Val.U256](state, Val.U256, "group").map(_.v.toBigInt.intValue())
+    }
+
+    private def getBlockHash(state: Compiler.State[Ctx]): Option[BlockHash] = {
+      getSetting[Val.ByteVec](state, Val.ByteVec, "blockHash").map { v =>
+        BlockHash
+          .from(v.bytes)
+          .getOrElse(
+            throw Compiler.Error(s"Invalid block hash ${Hex.toHexString(v.bytes)}", sourceIndex)
+          )
+      }
+    }
+
+    private def getBlockTimeStamp(state: Compiler.State[Ctx]): Option[TimeStamp] = {
+      getSetting[Val.U256](state, Val.U256, "blockTimeStamp").map { v =>
+        TimeStamp.unsafe(v.v.toBigInt.longValue())
+      }
+    }
+
     def compile(state: Compiler.State[Ctx]): SettingsValue = {
       Ast.UniqueDef.checkDuplicates(defs, "test settings")
-      val groupDef          = defs.collectFirst { case g @ GroupDef(_) => g }
-      val blockHashDef      = defs.collectFirst { case b @ BlockHashDef(_) => b }
-      val blockTimeStampDef = defs.collectFirst { case b @ BlockTimeStampDef(_) => b }
+      defs.find(d => !SettingsDef.keys.contains(d.name)).foreach { invalidDef =>
+        throw Compiler.Error(
+          s"Invalid setting key ${invalidDef.name}, it must be one of ${SettingsDef.keys
+              .mkString("[", ",", "]")}",
+          invalidDef.sourceIndex
+        )
+      }
       SettingsValue(
-        groupDef.map(_.compile(state)).getOrElse(0),
-        blockHashDef.map(_.compile(state)),
-        blockTimeStampDef.map(_.compile(state))
+        getGroup(state).getOrElse(0),
+        getBlockHash(state),
+        getBlockTimeStamp(state)
       )
     }
+  }
+  object SettingsDef {
+    val keys: Seq[String] = Seq("group", "blockHash", "blockTimeStamp")
   }
   final case class SettingsValue(
       group: Int,

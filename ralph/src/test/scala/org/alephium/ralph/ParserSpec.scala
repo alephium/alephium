@@ -2708,7 +2708,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse(withSettings, StatefulParser.unitTestDef(_)).get.value is
       Testing.UnitTestDef[StatefulContext](
         "foo",
-        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
             Seq(
@@ -2739,7 +2739,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse(withAssets, StatefulParser.unitTestDef(_)).get.value is
       Testing.UnitTestDef[StatefulContext](
         "foo",
-        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
             Seq(
@@ -2780,7 +2780,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse(withMultipleContracts, StatefulParser.unitTestDef(_)).get.value is
       Testing.UnitTestDef[StatefulContext](
         "foo",
-        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
             Seq(
@@ -2823,7 +2823,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse(withMultipleTests, StatefulParser.unitTestDef(_)).get.value is
       Testing.UnitTestDef[StatefulContext](
         "foo",
-        Some(Testing.SettingsDef(Seq(Testing.GroupDef(Variable(Ident("GroupIndex")))))),
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
             Seq(
