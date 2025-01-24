@@ -25,6 +25,7 @@ import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
+// scalastyle:off file.size.limit
 abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Ordering[A])
     extends AlephiumSpec {
 
@@ -250,6 +251,19 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "reverseForeach" in new Fixture {
+    val empty  = AVector.empty[A]
+    val buffer = ArrayBuffer.empty[A]
+    empty.foreachReversed(buffer.append)
+    buffer.isEmpty is true
+
+    forAll(vectorGen) { vc =>
+      val buffer = ArrayBuffer.empty[A]
+      vc.foreachReversed(buffer.append)
+      checkEq(vc.reverse, buffer)
+    }
+  }
+
   it should "map" in new Fixture {
     forAll(vectorGen) { vc =>
       val vc0 = vc.map(identity)
@@ -390,6 +404,36 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
         vc.findE(e => Right(e == elem)) isE arr.find(_ == elem)
         vc.findE(_ => Right(false)) isE arr.find(_ => false)
         vc.findE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
+  it should "findReversedE" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversedE(_ => Right(false)) isE None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversedE(e => Right(e._1 == elem)) isE Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversedE(_ => Right(false)) isE None
+        vector.findReversedE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
+  it should "findReversed" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversed(_ => false) is None
+    empty.findReversed(_ => true) is None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversed(e => e._1 == elem) is Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversed(_ => false) is None
       }
     }
   }

@@ -265,6 +265,13 @@ final class AVector[@sp A](
     AVector.unsafe(arr)
   }
 
+  def foreachReversed[U](f: A => U): Unit = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
+      f(elems(i))
+      ()
+    }
+  }
+
   def foreach[U](f: A => U): Unit = {
     cfor(start)(_ < end, _ + 1) { i =>
       f(elems(i))
@@ -532,6 +539,25 @@ final class AVector[@sp A](
 
   def findE[L](f: A => Either[L, Boolean]): Either[L, Option[A]] = {
     cfor(start)(_ < end, _ + 1) { i =>
+      val elem = elems(i)
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(b) => if (b) return Right(Some(elem))
+      }
+    }
+    Right(None)
+  }
+
+  def findReversed(f: A => Boolean): Option[A] = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
+      val elem = elems(i)
+      if (f(elem)) return Some(elem)
+    }
+    None
+  }
+
+  def findReversedE[L](f: A => Either[L, Boolean]): Either[L, Option[A]] = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
       val elem = elems(i)
       f(elem) match {
         case Left(l)  => return Left(l)

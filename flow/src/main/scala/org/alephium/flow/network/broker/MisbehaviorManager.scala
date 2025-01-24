@@ -78,6 +78,7 @@ object MisbehaviorManager {
   final case class InvalidPoW(remoteAddress: InetSocketAddress)              extends Critical
   final case class InvalidPingPongCritical(remoteAddress: InetSocketAddress) extends Critical
   final case class InvalidClientVersion(remoteAddress: InetSocketAddress)    extends Critical
+  final case class InvalidChainState(remoteAddress: InetSocketAddress)       extends Critical
 
   final case class Spamming(remoteAddress: InetSocketAddress)              extends Warning
   final case class InvalidFlowChainIndex(remoteAddress: InetSocketAddress) extends Warning
@@ -87,6 +88,7 @@ object MisbehaviorManager {
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Uncertain
   final case class DeepForkBlock(remoteAddress: InetSocketAddress)   extends Uncertain
+  final case class InvalidResponse(remoteAddress: InetSocketAddress) extends Uncertain
 
   sealed trait MisbehaviorStatus
   final case class Penalty(value: Int, timestamp: TimeStamp) extends MisbehaviorStatus

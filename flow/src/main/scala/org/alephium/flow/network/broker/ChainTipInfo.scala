@@ -14,22 +14,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.flow.network.broker
 
-import org.alephium.protocol.WireVersion
-import org.alephium.serde.Serde
+import org.alephium.protocol.model.{ChainIndex, ChainTip}
 
-final case class Header(version: WireVersion)
-
-object Header {
-  implicit val serde: Serde[Header] = WireVersion.serde
-    .validate(_version =>
-      // Fix this in the next hardfork
-      if (_version == WireVersion.currentWireVersion) {
-        Right(())
-      } else {
-        Left(s"Invalid version: got ${_version}, expect: ${WireVersion.currentWireVersion.value}")
-      }
-    )
-    .xmap(apply, _.version)
-}
+final case class ChainTipInfo(chainIndex: ChainIndex, bestTip: ChainTip, selfTip: ChainTip)

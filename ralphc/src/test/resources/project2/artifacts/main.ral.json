@@ -1,5 +1,5 @@
 {
-  "version": "v3.11.1",
+  "version": "v3.12.0",
   "name": "Main",
   "bytecodeTemplate": "01010300000005{0}{1}300c7b",
   "fieldsSig": {
