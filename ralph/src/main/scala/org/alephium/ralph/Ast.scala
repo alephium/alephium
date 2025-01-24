@@ -1629,7 +1629,8 @@ object Ast {
       val variable = state.getVariable(ident)
       variable.tpe match {
         case map: Type.Map =>
-          val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
+          val pathCodesExpr = selectorIndexVariables.getOrElse(0, mapKeyIndex)
+          val pathCodes     = MapOps.genSubContractPath(state, ident, pathCodesExpr)
           MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
           val ref              = state.getVariablesRef(ident)
@@ -1650,7 +1651,7 @@ object Ast {
               val indexVarIdent = Ident(state.freshName())
               state.addLocalVariable(
                 indexVarIdent,
-                Type.U256,
+                expr.getType(state)(0),
                 isMutable = false,
                 isUnused = false,
                 isGenerated = true
@@ -1668,9 +1669,11 @@ object Ast {
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val variable = state.getVariable(ident)
+
       variable.tpe match {
         case map: Type.Map =>
-          val pathCodes = MapOps.genSubContractPath(state, ident, mapKeyIndex)
+          val pathCodesExpr = selectorIndexVariables.getOrElse(0, mapKeyIndex)
+          val pathCodes     = MapOps.genSubContractPath(state, ident, pathCodesExpr)
           MapOps.genLoad(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
           val ref              = state.getVariablesRef(ident)

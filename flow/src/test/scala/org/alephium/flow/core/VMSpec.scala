@@ -37,6 +37,7 @@ import org.alephium.protocol.vm._
 import org.alephium.ralph.{Compiler, CompoundAssignmentOperator}
 import org.alephium.serde._
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 
 // scalastyle:off file.size.limit method.length number.of.methods
 class VMSpec extends AlephiumSpec with Generators {
@@ -6993,7 +6994,16 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "work when compound assignment selectors have side effect" in new CompoundAssignmentFixture {
     val contract =
       s"""
-         |Contract TestContract(mut index: U256) {  // set init value is 0
+         |Contract TestContract(mut index: U256, mut mapKey: ByteVec) {  // set init value to 0 and #01
+         |
+         |  mapping[ByteVec, U256] map
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn initMaps() -> () {
+         |    map.insert!(@$genesisAddress, #01, 1)
+         |    map.insert!(@$genesisAddress, #02, 2)
+         |  }
+         |
          |  @using(updateFields = true)
          |  pub fn compoundAssign() -> () {
          |    let mut array = [0; 2]
@@ -7006,6 +7016,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |    array[updateAndGetIndex()] += 1
          |    assert!(array[0] == 1, 4)
          |    assert!(array[1] == 2, 5)
+         |
+         |    assert!(mapKey == #01, 6)
+         |    assert!(map[#01] == 1, 7)
+         |    map[updateAndGetMapKey()] += 10
+         |    assert!(map[#01] == 11, 8)
+         |    assert!(mapKey == #02, 9)
          |  }
          |
          |  pub fn updateAndGetIndex() -> U256 {
@@ -7013,9 +7029,27 @@ class VMSpec extends AlephiumSpec with Generators {
          |    index = index + 1
          |    return originIndex
          |  }
+         |
+         |  pub fn updateAndGetMapKey() -> ByteVec {
+         |    let originMapKey = mapKey
+         |    mapKey = #02
+         |    return originMapKey
+         |  }
          |}
          |""".stripMargin
-    val contractId = createContract(contract, initialMutState = AVector(Val.U256(U256.Zero)))._1
+    val contractId = createContract(
+      contract,
+      initialMutState = AVector(Val.U256(U256.Zero), Val.ByteVec(hex"01"))
+    )._1
+
+    callTxScript(
+      s"""
+         |TxScript Main {
+         |  TestContract(#${contractId.toHexString}).initMaps{@$genesisAddress -> ALPH: minimalContractDeposit!() * 2}()
+         |}
+         |$contract
+         |""".stripMargin
+    )
 
     testSimpleScript(
       s"""
