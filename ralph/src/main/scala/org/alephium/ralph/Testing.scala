@@ -16,9 +16,13 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable
+import scala.util.Random
+
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockHash => _, _}
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 object Testing {
@@ -266,7 +270,8 @@ object Testing {
     def compile(
         state: Compiler.State[Ctx],
         settings: Option[SettingsValue],
-        scopeId: Ast.FuncId
+        name: String,
+        index: Int
     ): CompiledUnitTest[Ctx] = {
       val (selfContracts, dependencies) = contracts.partition(_.typeId.name == "Self")
       if (selfContracts.isEmpty) {
@@ -275,6 +280,7 @@ object Testing {
       if (selfContracts.length > 1) {
         throw Compiler.Error(s"Self contract is defined multiple times", sourceIndex)
       }
+      val scopeId = Ast.FuncId(s"$name:$index", false)
       state.setFuncScope(scopeId)
       state.withScope(this) {
         val compiledDeps   = AVector.from(dependencies.map(_.compile(state)))
@@ -291,7 +297,7 @@ object Testing {
           returnLength = 0,
           instrs = AVector.from(body.flatMap(_.genCode(state)))
         )
-        CompiledUnitTest(scopeId.name, settings, compiledSelf, compiledDeps, compiledAssets, method)
+        CompiledUnitTest(name, settings, compiledSelf, compiledDeps, compiledAssets, method)
       }
     }
   }
@@ -307,8 +313,7 @@ object Testing {
 
       val settingsValue = settings.map(_.compile(state))
       AVector.from(tests).mapWithIndex { case (test, index) =>
-        val scopeId = Ast.FuncId(s"UnitTest:$name:$index", false)
-        test.compile(state, settingsValue, scopeId)
+        test.compile(state, settingsValue, name, index)
       }
     }
   }
@@ -326,6 +331,57 @@ object Testing {
     def getGroupIndex(implicit groupConfig: GroupConfig): Either[String, GroupIndex] = {
       val group = settings.map(_.group).getOrElse(0)
       GroupIndex.from(group).toRight(s"Invalid group setting $group in test $name")
+    }
+  }
+
+  final case class CompiledUnitTests[Ctx <: StatelessContext](
+      tests: AVector[CompiledUnitTest[Ctx]],
+      errorCodes: Map[Int, Option[SourceIndex]]
+  ) {
+    def getError(
+        testName: String,
+        errorCode: Option[Int],
+        detail: String,
+        debugMessages: Option[String]
+    ): Compiler.Error = {
+      val message     = s"Test failed: $testName, detail: $detail"
+      val sourceIndex = errorCode.flatMap(errorCodes.get).flatten
+      CompilerError.TestError(message, sourceIndex, debugMessages)
+    }
+  }
+
+  trait State[Ctx <: StatelessContext] { _: Compiler.State[Ctx] =>
+    private var _isInTestContext: Boolean                                 = false
+    private val testCheckCalls: mutable.HashMap[Int, Option[SourceIndex]] = mutable.HashMap.empty
+
+    def isInTestContext: Boolean = _isInTestContext
+    private def withinTestContext[T](func: => T): T = {
+      _isInTestContext = true
+      val result = func
+      _isInTestContext = false
+      result
+    }
+
+    @scala.annotation.tailrec
+    private def nextErrorCode: Int = {
+      val errorCode = Random.between(0, Int.MaxValue)
+      if (testCheckCalls.contains(errorCode)) nextErrorCode else errorCode
+    }
+
+    def addTestCheckCall(ast: Ast.Positioned): Int = {
+      val errorCode = nextErrorCode
+      testCheckCalls.addOne(errorCode -> ast.sourceIndex)
+      errorCode
+    }
+
+    def genUnitTestCode(unitTestDefs: Seq[UnitTestDef[Ctx]]): CompiledUnitTests[Ctx] = {
+      Ast.UniqueDef.checkDuplicates(unitTestDefs, "tests")
+      withinTestContext {
+        val tests      = AVector.from(unitTestDefs.flatMap(_.compile(this)))
+        val errorCodes = testCheckCalls.toMap
+        testCheckCalls.clear()
+        CompiledUnitTests(tests, errorCodes)
+      }
     }
   }
 }

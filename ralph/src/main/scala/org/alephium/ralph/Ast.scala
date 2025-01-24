@@ -657,7 +657,7 @@ object Ast {
             val instrs = genApproveCode(state, func) ++
               func.genCodeForArgs(args, state) ++
               variadicInstrs ++
-              func.genCode(argsType)
+              func.genCode(this, state, argsType)
             if (ignoreReturn) {
               val returnType = positionedError(func.getReturnType(argsType, state))
               instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
@@ -2689,8 +2689,8 @@ object Ast {
 
     def genUnitTestCode(
         state: Compiler.State[StatefulContext]
-    ): AVector[Testing.CompiledUnitTest[StatefulContext]] = {
-      AVector.from(unitTests).flatMap(_.compile(state))
+    ): Testing.CompiledUnitTests[StatefulContext] = {
+      state.genUnitTestCode(unitTests)
     }
 
     // the state must have been updated in the check pass

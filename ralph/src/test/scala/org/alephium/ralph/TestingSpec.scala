@@ -19,6 +19,7 @@ package org.alephium.ralph
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{BlockHash, TokenId}
 import org.alephium.protocol.vm.{BlockHash => _, _}
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixture {
@@ -33,11 +34,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v0 + v1
            |  }
            |  test "foo" with Self(0, 1) {
-           |    assert!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.head
+      val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
       test.contracts.length is 1
       val contract = test.contracts.head
@@ -57,11 +58,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v
            |  }
            |  test "foo" with Self(Value) {
-           |    assert!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.head
+      val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
       test.contracts.length is 1
       val contract = test.contracts.head
@@ -80,11 +81,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v
            |  }
            |  test "foo" with Self{ ALPH: 1 alph }(0) {
-           |    assert!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.head
+      val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
       test.contracts.length is 1
       val contract = test.contracts.head
@@ -110,12 +111,12 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    [Bar { a: 0, b: false }, Bar { a: 1, b: true }],
            |    Bar { a: 2, b: false }
            |  ) {
-           |    assert!(foo() == 0, 0)
+           |    testCheck!(foo() == 0)
            |  }
            |}
            |""".stripMargin
 
-      val test = compileContractFull(code).rightValue.tests.head
+      val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
       test.contracts.length is 1
       val contract = test.contracts.head
@@ -139,7 +140,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    Bar(20)@addr1
            |    Self(addr0, addr1)
            |  {
-           |    assert!(add() == 30, 0)
+           |    testCheck!(add() == 30)
            |  }
            |}
            |Contract Bar(v: U256) {
@@ -149,7 +150,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      val test = compileContractFull(code).rightValue.tests.head
+      val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
       test.contracts.length is 3
 
@@ -180,7 +181,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return bar.bar()
            |  }
            |  test "foo" with Bar(0)@addr Self(addr) {
-           |    assert!(foo() == 0, 0)
+           |    testCheck!(foo() == 0)
            |  }
            |}
            |Interface IBar {
@@ -192,7 +193,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val contracts = compileContractFull(code).rightValue.tests.head.contracts
+      val contracts = compileContractFull(code).rightValue.tests.tests.head.contracts
       contracts.length is 2
       val bar = contracts.head
       bar.typeId is Ast.TypeId("Bar")
@@ -215,10 +216,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |  test "foo0"
            |  with Self(0) {
-           |    assert!(foo0() == 1, 0)
+           |    testCheck!(foo0() == 1)
            |  }
            |  with Self(1) {
-           |    assert!(foo0() == 2, 0)
+           |    testCheck!(foo0() == 2)
            |  }
            |
            |  pub fn foo1() -> U256 {
@@ -227,15 +228,15 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |  test "foo1"
            |  with Self(2) {
-           |    assert!(foo1() == 1, 0)
+           |    testCheck!(foo1() == 1)
            |  }
            |  with Self(3) {
-           |    assert!(foo1() == 2, 0)
+           |    testCheck!(foo1() == 2)
            |  }
            |}
            |""".stripMargin
 
-      val tests = compileContractFull(code).rightValue.tests
+      val tests = compileContractFull(code).rightValue.tests.tests
       tests.length is 4
       tests.zipWithIndex.foreach { case (test, index) =>
         test.settings.isEmpty is true
@@ -260,13 +261,13 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  test "foo"
            |  with Settings($settings)
            |  with Self(0, 1) {
-           |    assert!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
 
       def checkSettings(str: String, value: Testing.SettingsValue) = {
-        val test = compileContractFull(code(str)).rightValue.tests.head
+        val test = compileContractFull(code(str)).rightValue.tests.tests.head
         test.settings is Some(value)
       }
 
@@ -304,11 +305,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    Self(1)
            |    ApproveAssets{@$address0 -> ALPH: 1 alph; @$address1 -> ALPH: 2 alph, #${tokenId.toHexString}: 1 alph}
            |  {
-           |    assert!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.head
+      val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
       test.assets is Some(
         Testing.ApprovedAssetsValue(
@@ -322,5 +323,43 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         )
       )
     }
+  }
+
+  it should "throw an error if `testCheck!` is called in non-test code" in {
+    val code =
+      s"""
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> () {
+         |    $$testCheck!(v == 0)$$
+         |  }
+         |}
+         |""".stripMargin
+    testContractError(code, "The `testCheck!` function can only be used in unit tests")
+  }
+
+  it should "get error" in {
+    val code =
+      s"""
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> U256 { return v  }
+         |  test "foo" with Self(0) {
+         |    testCheck!(foo() == 0)
+         |  }
+         |}
+         |""".stripMargin
+    val contract    = compileContractFull(code).rightValue
+    val tests       = contract.tests
+    val sourceIndex = contract.ast.unitTests.head.tests.head.body.head.sourceIndex
+    tests.getError("foo", None, "error", None) is CompilerError.TestError(
+      "Test failed: foo, detail: error",
+      None,
+      None
+    )
+    tests.getError("foo", Some(tests.errorCodes.keys.head), "error", None) is CompilerError
+      .TestError(
+        "Test failed: foo, detail: error",
+        sourceIndex,
+        None
+      )
   }
 }

@@ -18,6 +18,7 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
+import scala.annotation.nowarn
 import scala.collection.{immutable, mutable}
 
 import akka.util.ByteString
@@ -35,7 +36,7 @@ final case class CompiledContract(
     ast: Ast.Contract,
     warnings: AVector[Warning],
     debugCode: StatefulContract,
-    tests: AVector[Testing.CompiledUnitTest[StatefulContext]]
+    tests: Testing.CompiledUnitTests[StatefulContext]
 )
 final case class CompiledScript(
     code: StatefulScript,
@@ -160,6 +161,11 @@ object Compiler {
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
+    def genCode[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        @nowarn state: State[C],
+        inputType: Seq[Type]
+    ): Seq[Instr[Ctx]] = genCode(inputType)
     def genInlineCode[C <: Ctx](
         args: Seq[Ast.Expr[C]],
         state: Compiler.State[C],
@@ -573,7 +579,8 @@ object Compiler {
       with Scope
       with VariableScoped
       with PhaseLike
-      with Constants[Ctx] {
+      with Constants[Ctx]
+      with Testing.State[Ctx] {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]

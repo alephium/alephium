@@ -1630,7 +1630,7 @@ class ServerUtils(implicit
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
       .left
       .map(error => failed(error.format(query.code)))
-      .flatMap(result => runTests(blockFlow, result._1).map(_ => result))
+      .flatMap(result => runTests(blockFlow, query.code, result._1).map(_ => result))
       .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
   }
 
@@ -1862,7 +1862,8 @@ class ServerUtils(implicit
         params.inputAssets.getOrElse(AVector.empty),
         params.methodIndex,
         params.args.getOrElse(AVector.empty),
-        method
+        method,
+        (_, detail) => detail
       )
     } yield result
   }
@@ -1922,13 +1923,33 @@ class ServerUtils(implicit
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def getUnitTestError(
+      sourceCode: String,
+      testingContract: CompiledContract,
+      testName: String,
+      exeFailure: vm.ExeFailure,
+      debugMessages: String
+  ): String = {
+    val (errorCode, msg) = exeFailure match {
+      case error @ vm.AssertionFailedWithErrorCode(_, errorCode) =>
+        (Some(errorCode), error.getErrorMessageWithoutErrorCode)
+      case _ => (None, exeFailure.toString())
+    }
+    val detail = s"VM execution error: $msg"
+    testingContract.tests
+      .getError(testName, errorCode, detail, Option.when(debugMessages.nonEmpty)(debugMessages))
+      .format(sourceCode)
+  }
+
   private def runTests(
       blockFlow: BlockFlow,
+      sourceCode: String,
       contracts: AVector[CompiledContract]
   ): Try[Unit] = {
     val contractMap = contracts.map(c => (c.ast.ident.name, c)).iterator.toMap
     contracts.foreachE { testingContract =>
-      testingContract.tests.foreachE { test =>
+      testingContract.tests.tests.foreachE { test =>
         for {
           groupIndex <- test.getGroupIndex.left.map(badRequest)
           blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
@@ -1954,13 +1975,16 @@ class ServerUtils(implicit
             test.assets.map(TestInputAsset.from).getOrElse(AVector.empty),
             testingContract.debugCode.methodsLength,
             AVector.empty,
-            test.method
+            test.method,
+            (exeFailure, debugMessages) =>
+              getUnitTestError(sourceCode, testingContract, test.name, exeFailure, debugMessages)
           )
         } yield ()
       }
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
@@ -1985,7 +2009,9 @@ class ServerUtils(implicit
         testContract.inputAssets,
         testContract.testMethodIndex,
         testContract.testArgs,
-        method
+        method,
+        (exeFailure, debugMessages) =>
+          debugMessages ++ s"VM execution error: ${exeFailure.toString()}"
       )
       events = fetchContractEvents(worldState)
       contractIds <- getCreatedAndDestroyedContractIds(events)
@@ -2132,7 +2158,8 @@ class ServerUtils(implicit
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
       args: AVector[Val],
-      method: Method[StatefulContext]
+      method: Method[StatefulContext],
+      errorFormatter: (vm.ExeFailure, String) => String
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv   = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
     val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
@@ -2149,7 +2176,8 @@ class ServerUtils(implicit
         methodIndex,
         args,
         method,
-        testGasFee
+        testGasFee,
+        errorFormatter
       )
     } yield result
   }
@@ -2180,8 +2208,7 @@ class ServerUtils(implicit
     }
   }
 
-  // scalastyle:off method.length
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  // scalastyle:off method.length parameter.number
   def runWithDebugError(
       context: StatefulContext,
       contractId: ContractId,
@@ -2190,7 +2217,8 @@ class ServerUtils(implicit
       methodIndex: Int,
       args: AVector[Val],
       method: Method[StatefulContext],
-      testGasFee: U256
+      testGasFee: U256,
+      errorFormatter: (vm.ExeFailure, String) => String
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val executionResult = callerContractIdOpt match {
       case None =>
@@ -2247,15 +2275,13 @@ class ServerUtils(implicit
       case Right(result)         => Right(result)
       case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
       case Left(Right(exeFailure)) =>
-        val errorString = s"VM execution error: ${exeFailure.toString()}"
-        val events      = fetchContractEvents(context.worldState)
+        val events = fetchContractEvents(context.worldState)
         extractDebugMessages(events).flatMap { case (_, debugMessages) =>
-          val detail = showDebugMessages(debugMessages) ++ errorString
-          Left(failed(detail))
+          Left(failed(errorFormatter(exeFailure, showDebugMessages(debugMessages))))
         }
     }
   }
-  // scalastyle:on method.length
+  // scalastyle:on method.length parameter.number
 
   def showDebugMessages(messages: AVector[DebugMessage]): String = {
     if (messages.isEmpty) {

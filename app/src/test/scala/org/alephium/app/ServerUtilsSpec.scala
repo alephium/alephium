@@ -5699,7 +5699,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  test "foo"
            |  with Settings(blockTimeStamp = ${now.millis})
            |  with Self(0) {
-           |    assert!(foo() == ${blockTimeStamp.millis}, 0)
+           |    testCheck!(foo() == ${blockTimeStamp.millis})
            |  }
            |}
            |""".stripMargin
@@ -5708,7 +5708,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code(now.plusMillisUnsafe(1))))
         .leftValue
         .detail
-        .contains("Error Code: 0") is true
+        .contains("Test failed: foo") is true
     }
 
     {
@@ -5724,7 +5724,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    Bar(20)@addr1
            |    Self(addr0, addr1)
            |  {
-           |    assert!(add() == $result, 0)
+           |    testCheck!(add() == $result)
            |  }
            |}
            |Contract Bar(v: U256) {
@@ -5739,7 +5739,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code(20)))
         .leftValue
         .detail
-        .contains("Error Code: 0") is true
+        .contains("Test failed: add") is true
     }
 
     {
@@ -5760,7 +5760,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    Self(0)
            |    ApproveAssets{@$fromAddress -> ALPH: 2 alph}
            |  {
-           |    assert!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result, 0)
+           |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }
            |}
            |""".stripMargin
@@ -5770,7 +5770,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
         .leftValue
         .detail
-        .contains("Error Code: 0") is true
+        .contains("Test failed: transfer") is true
     }
   }
 
