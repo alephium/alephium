@@ -362,4 +362,17 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         None
       )
   }
+
+  it should "throw an error if `assert!` is called in test code" in {
+    val code =
+      s"""
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> U256 { return v }
+         |  test "foo" with Self(0) {
+         |    $$assert!(foo() == 0, 0)$$
+         |  }
+         |}
+         |""".stripMargin
+    testContractError(code, "Please use `testCheck!` instead of `assert!` in unit tests")
+  }
 }
