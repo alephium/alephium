@@ -1629,8 +1629,8 @@ object Ast {
       val variable = state.getVariable(ident)
       variable.tpe match {
         case map: Type.Map =>
-          val pathCodesExpr = selectorIndexVariables.getOrElse(0, mapKeyIndex)
-          val pathCodes     = MapOps.genSubContractPath(state, ident, pathCodesExpr)
+          val updatedMapKeyIndex = selectorIndexVariables.getOrElse(0, mapKeyIndex)
+          val pathCodes          = MapOps.genSubContractPath(state, ident, updatedMapKeyIndex)
           MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
           val ref              = state.getVariablesRef(ident)
@@ -1672,8 +1672,8 @@ object Ast {
 
       variable.tpe match {
         case map: Type.Map =>
-          val pathCodesExpr = selectorIndexVariables.getOrElse(0, mapKeyIndex)
-          val pathCodes     = MapOps.genSubContractPath(state, ident, pathCodesExpr)
+          val updatedMapKeyIndex = selectorIndexVariables.getOrElse(0, mapKeyIndex)
+          val pathCodes          = MapOps.genSubContractPath(state, ident, updatedMapKeyIndex)
           MapOps.genLoad(state, map.value, getType(state), pathCodes, selectors.tail)
         case _ =>
           val ref              = state.getVariablesRef(ident)

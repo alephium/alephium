@@ -7022,6 +7022,9 @@ class VMSpec extends AlephiumSpec with Generators {
          |    map[updateAndGetMapKey()] += 10
          |    assert!(map[#01] == 11, 8)
          |    assert!(mapKey == #02, 9)
+         |    assert!(map[mapKey] == 2, 10)
+         |    map[mapKey] += 2
+         |    assert!(map[mapKey] == 4, 12)
          |  }
          |
          |  pub fn updateAndGetIndex() -> U256 {
