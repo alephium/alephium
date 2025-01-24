@@ -2118,11 +2118,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils = new ServerUtils()
 
-    def buildTestParam(callerAddressOpt: Option[Address.Contract]): TestContract.Complete = {
+    def buildTestParam(
+        callerContractAddressOpt: Option[Address.Contract]
+    ): TestContract.Complete = {
       TestContract(
         bytecode = childContract,
         address = Some(childAddress),
-        callerAddress = callerAddressOpt,
+        callerContractAddress = callerContractAddressOpt,
         initialImmFields = Option(
           AVector[Val](
             ValByteVec(parentContractId.bytes),
@@ -3198,6 +3200,35 @@ class ServerUtilsSpec extends AlephiumSpec {
       .runTestContract(blockFlow, testContract)
       .leftValue
       .detail is "The number of parameters is different from the number specified by the target method"
+  }
+
+  it should "report error when gas fee is not enough from the asset input" in new Fixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!(1 == 1, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val serverUtils = new ServerUtils()
+    val caller      = Address.p2pkh(PublicKey.generate)
+
+    val testContract0 = TestContract(bytecode = code).toComplete().rightValue
+    serverUtils.runTestContract(blockFlow, testContract0).rightValue
+
+    val inputAssets1  = AVector(TestInputAsset(caller, AssetState(ALPH.oneAlph / 2)))
+    val testContract1 = testContract0.copy(inputAssets = inputAssets1)
+    serverUtils.runTestContract(blockFlow, testContract1).rightValue
+
+    val inputAssets2  = AVector(TestInputAsset(caller, AssetState(ALPH.oneAlph / 2 - 1)))
+    val testContract2 = testContract0.copy(inputAssets = inputAssets2)
+    serverUtils
+      .runTestContract(blockFlow, testContract2)
+      .leftValue
+      .detail is "First input asset should have at least 0.5 ALPH to cover gas"
   }
 
   it should "test utxo splits for generated outputs" in new Fixture {
