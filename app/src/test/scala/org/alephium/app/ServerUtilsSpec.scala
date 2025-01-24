@@ -5760,6 +5760,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    Self(0)
            |    ApproveAssets{@$fromAddress -> ALPH: 2 alph}
            |  {
+           |    emit Debug(`balance: $${balance}`)
            |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }
            |}

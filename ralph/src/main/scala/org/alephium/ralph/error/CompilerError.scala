@@ -237,7 +237,8 @@ object CompilerError {
       sourceIndex.map(_.width).getOrElse(0)
     override def fileURI: Option[java.net.URI] =
       sourceIndex.flatMap(_.fileURI)
-    override def footer: Option[String] = debugMessages
+    override def footer: Option[String] =
+      debugMessages.map(msg => s"Debug messages:\n$msg")
   }
   // scalastyle:on null
 }
