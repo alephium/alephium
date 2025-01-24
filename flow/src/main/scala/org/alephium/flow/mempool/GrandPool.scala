@@ -18,7 +18,6 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.MemPoolSetting
-import org.alephium.flow.validation._
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
 import org.alephium.util.{AVector, OptionF, TimeStamp}
@@ -49,7 +48,7 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
       index: ChainIndex,
       tx: TransactionTemplate,
       timestamp: TimeStamp
-  ): MemPool.NewTxCategory = {
+  ): MemPool.AddToMemPoolResult = {
     val result = getMemPool(index.from).add(index, tx, timestamp)
     if (index.isIntraGroup) {
       result
@@ -58,32 +57,6 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
         getMemPool(index.to).addXGroupTx(index, tx, timestamp)
       }
       result
-    }
-  }
-
-  def validateAndAddTx(
-      blockFlow: BlockFlow,
-      txValidation: TxValidation,
-      tx: TransactionTemplate,
-      cacheOrphanTx: Boolean
-  ): Either[TxValidationError, MemPool.NewTxCategory] = {
-    val chainIndex = tx.chainIndex
-    assume(!brokerConfig.isIncomingChain(chainIndex))
-    val mempool = getMemPool(chainIndex.from)
-    if (mempool.contains(tx)) {
-      Right(MemPool.AlreadyExisted)
-    } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      Right(MemPool.DoubleSpending)
-    } else {
-      txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case Left(Right(NonExistInput)) if cacheOrphanTx =>
-          orphanPool.add(tx, TimeStamp.now()) match {
-            case MemPool.AddedToMemPool => Right(MemPool.AddedToOrphanPool)
-            case result                 => Right(result)
-          }
-        case Right(_)    => Right(add(chainIndex, tx, TimeStamp.now()))
-        case Left(error) => Left(error)
-      }
     }
   }
 

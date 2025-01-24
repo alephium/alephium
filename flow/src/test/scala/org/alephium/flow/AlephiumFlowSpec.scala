@@ -108,11 +108,21 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       txScript: StatefulScript,
-      gas: Int = 100000
+      gas: Int = 100000,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
     mineWithTxs(blockFlow, chainIndex)(
-      transferTxs(_, _, ALPH.alph(1), 1, Some(txScript), true, scriptGas = gas)
+      transferTxs(
+        _,
+        _,
+        ALPH.alph(1),
+        1,
+        Some(txScript),
+        true,
+        scriptGas = gas,
+        keyPairOpt = keyPairOpt
+      )
     )
   }
 
@@ -274,10 +284,14 @@ trait FlowFixture
       gasFeeInTheAmount: Boolean,
       lockTimeOpt: Option[TimeStamp] = None,
       scriptGas: Int = 100000,
-      validation: Boolean = true
+      validation: Boolean = true,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): AVector[Transaction] = {
-    val mainGroup                  = chainIndex.from
-    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
+    val mainGroup = chainIndex.from
+    val (privateKey, publicKey) = keyPairOpt.getOrElse {
+      val keys = genesisKeys(mainGroup.value)
+      (keys._1, keys._2)
+    }
     val gasAmount = txScriptOpt match {
       case None =>
         if (numReceivers > 1) {
@@ -662,7 +676,8 @@ trait FlowFixture
         tx,
         preOutputs,
         txScript,
-        tx.unsigned.gasAmount
+        tx.unsigned.gasAmount,
+        0
       )
       .rightValue
     result.contractInputs -> result.generatedOutputs
@@ -847,7 +862,8 @@ trait FlowFixture
       None
     )
     val txValidation = TxValidation.build
-    val gasLeft = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false).rightValue
+    val gasLeft =
+      txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv, false, 0).rightValue
     val gasUsed = initialGas.use(gasLeft).rightValue
     print(s"length: ${tx0.unsigned.inputs.length}\n")
     print(s"gasUsed $gasUsed\n")
@@ -981,14 +997,15 @@ trait FlowFixture
 
   def callCompiledTxScript(
       script: StatefulScript,
-      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0),
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
     script.toTemplateString() is Hex.toHexString(serialize(script))
     val block =
       if (script.entryMethod.usePreapprovedAssets) {
-        payableCall(blockFlow, chainIndex, script)
+        payableCall(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
       } else {
-        simpleScript(blockFlow, chainIndex, script)
+        simpleScript(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
       }
     addAndCheck(blockFlow, block)
     block
@@ -1017,6 +1034,22 @@ trait FlowFixture
       block.nonCoinbase.head
     }
     AVector.fill(n)(createTx())
+  }
+
+  def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {
+    val chainIndex   = block.chainIndex
+    val lockupScript = getGenesisLockupScript(chainIndex)
+    val template0    = BlockFlowTemplate.from(block, height)
+    val parentIndex  = brokerConfig.groups - 1 + chainIndex.to.value
+    val newDeps      = template0.deps.replace(parentIndex, parentHash)
+    val template1 = blockFlow
+      .rebuild(template0, template0.transactions.init, AVector.empty, lockupScript)
+      .copy(
+        deps = newDeps,
+        depStateHash =
+          blockFlow.getDepStateHash(BlockDeps.unsafe(newDeps), chainIndex.from).rightValue
+      )
+    mine(blockFlow, template1)
   }
 }
 

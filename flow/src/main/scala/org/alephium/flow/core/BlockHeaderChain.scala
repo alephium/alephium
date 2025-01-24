@@ -21,7 +21,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex, Target, Weight}
@@ -247,6 +247,19 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
 
       currentHeight = nextHeight
       currentHeader = getBlockHeaderUnsafe(nextHash)
+    }
+  }
+
+  def getHeadersByHeights(heights: AVector[Int]): IOResult[AVector[BlockHeader]] = {
+    IOUtils.tryExecute(getHeadersByHeightsUnsafe(heights))
+  }
+
+  def getHeadersByHeightsUnsafe(heights: AVector[Int]): AVector[BlockHeader] = {
+    heights.fold(AVector.ofCapacity[BlockHeader](heights.length)) { case (acc, height) =>
+      getHashesUnsafe(height).headOption match {
+        case Some(hash) => acc :+ getBlockHeaderUnsafe(hash)
+        case None       => acc
+      }
     }
   }
 }

@@ -19,17 +19,23 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.IOResult
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
-import org.alephium.protocol.model.ContractId
+import org.alephium.io.{IOError, IOResult}
+import org.alephium.protocol.model.{BlockHash, ContractId, TxOutput, TxOutputRef}
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
 
 trait NodeIndexesUtils { Self: FlowUtils =>
-  def getTxIdFromOutputRef(
+  def getTxIdTxOutputLocatorsFromOutputRef(
       outputRef: TxOutputRef
-  ): IOResult[Option[TransactionId]] = {
-    txOutputRefIndexStorage(outputRef.hint.groupIndex).flatMap(_.getOpt(outputRef.key))
+  ): IOResult[Option[TxIdTxOutputLocators]] = {
+    getTxIdTxOutputLocatorsFromOutputRef(outputRef.key)
+  }
+
+  def getTxIdTxOutputLocatorsFromOutputRef(
+      outputRefKey: TxOutputRef.Key
+  ): IOResult[Option[TxIdTxOutputLocators]] = {
+    txOutputRefIndexStorage.flatMap(_.getOpt(outputRefKey))
   }
 
   def getParentContractId(contractId: ContractId): IOResult[Option[ContractId]] = {
@@ -78,5 +84,76 @@ trait NodeIndexesUtils { Self: FlowUtils =>
 
   def getSubContractsCurrentCount(parentContractId: ContractId): IOResult[Option[Int]] = {
     subContractIndexStorage.flatMap(_.subContractIndexCounterState.getOpt(parentContractId))
+  }
+
+  def getTxOutput(outputRef: TxOutputRef, spentBlockHash: BlockHash): IOResult[Option[TxOutput]] = {
+    getTxOutput(outputRef, spentBlockHash, maxForkDepth)
+  }
+
+  def getTxOutput(
+      outputRef: TxOutputRef,
+      spentBlockHash: BlockHash,
+      maxForkDepth: Int
+  ): IOResult[Option[TxOutput]] = {
+    for {
+      resultOpt <- getTxIdTxOutputLocatorsFromOutputRef(outputRef)
+      txOutputOpt <- resultOpt match {
+        case Some(TxIdTxOutputLocators(_, txOutputLocators)) =>
+          for {
+            locator <- getOutputLocator(blockFlow, spentBlockHash, txOutputLocators, maxForkDepth)
+            block   <- blockFlow.getBlock(locator.blockHash)
+          } yield Some(block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
+        case None =>
+          Right(None)
+      }
+    } yield {
+      txOutputOpt
+    }
+  }
+
+  private def getOutputLocator(
+      blockFlow: BlockFlow,
+      spentBlockHash: BlockHash,
+      locators: AVector[TxOutputLocator],
+      maxForkDepth: Int
+  ): IOResult[TxOutputLocator] = {
+    assume(locators.nonEmpty)
+    // There is only one locator, must be it!
+    if (locators.length == 1) {
+      Right(locators(0))
+    } else {
+      for {
+        spentBlockHeight <- blockFlow.getHeight(spentBlockHash)
+        partitioned <- locators.partitionE(locator =>
+          blockFlow.getHeight(locator.blockHash).map(spentBlockHeight - _ > maxForkDepth)
+        )
+        (deepLocators, shallowLocators) = partitioned
+        deepMainChainLocators <- deepLocators.filterE(p => isBlockInMainChain(p.blockHash))
+        locator <-
+          if (deepMainChainLocators.nonEmpty) {
+            // When there are deep locators, we only take the mainchain locator
+            Right(deepMainChainLocators.head)
+          } else if (shallowLocators.length == 1) {
+            Right(shallowLocators.head)
+          } else {
+            getOutputLocatorSlowly(blockFlow, spentBlockHash, shallowLocators)
+          }
+      } yield locator
+    }
+  }
+
+  private def getOutputLocatorSlowly(
+      blockFlow: BlockFlow,
+      spentBlockHash: BlockHash,
+      locators: AVector[TxOutputLocator]
+  ): IOResult[TxOutputLocator] = {
+    val headerChain = blockFlow.getHeaderChain(spentBlockHash)
+
+    locators
+      .findE(locator => headerChain.isBefore(locator.blockHash, spentBlockHash))
+      .flatMap {
+        case Some(locator) => Right(locator)
+        case None          => Left(IOError.keyNotFound("Cannot find the input info for the TX"))
+      }
   }
 }

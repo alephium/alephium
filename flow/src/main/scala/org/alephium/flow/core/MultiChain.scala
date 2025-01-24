@@ -187,6 +187,13 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
     getBlockChain(hash).getBlockBytes(hash)
   }
 
+  def isBlockInMainChain(blockHash: BlockHash): IOResult[Boolean] = {
+    for {
+      height <- getHeight(blockHash)
+      hashes <- getHashes(ChainIndex.from(blockHash), height)
+    } yield hashes.headOption.contains(blockHash)
+  }
+
   private def getMainChainBlockByGhostUncleUnsafe(
       chainIndex: ChainIndex,
       ghostUncleHash: BlockHash

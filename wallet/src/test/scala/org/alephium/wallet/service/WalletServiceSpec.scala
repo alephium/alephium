@@ -146,7 +146,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.getAddresses(wrongWalletName).leftValue is notFound
     walletService.getMinerAddresses(wrongWalletName).leftValue is notFound
     walletService
-      .transfer(wrongWalletName, AVector(Destination(address, Amount.Zero)), None, None, None)
+      .transfer(wrongWalletName, AVector(Destination(address, Some(Amount.Zero))), None, None, None)
       .futureValue
       .leftValue is notFound
     walletService.deriveNextAddress(wrongWalletName, None).leftValue is notFound

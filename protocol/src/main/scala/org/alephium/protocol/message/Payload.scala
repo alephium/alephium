@@ -54,6 +54,15 @@ object Payload {
       case x: NewTxHashes     => (NewTxHashes, NewTxHashes.serialize(x))
       case x: TxsRequest      => (TxsRequest, TxsRequest.serialize(x))
       case x: TxsResponse     => (TxsResponse, TxsResponse.serialize(x))
+      case x: ChainState      => (ChainState, ChainState.serialize(x))
+      case x: HeadersByHeightsRequest =>
+        (HeadersByHeightsRequest, HeadersByHeightsRequest.serialize(x))
+      case x: HeadersByHeightsResponse =>
+        (HeadersByHeightsResponse, HeadersByHeightsResponse.serialize(x))
+      case x: BlocksAndUnclesByHeightsRequest =>
+        (BlocksAndUnclesByHeightsRequest, BlocksAndUnclesByHeightsRequest.serialize(x))
+      case x: BlocksAndUnclesByHeightsResponse =>
+        (BlocksAndUnclesByHeightsResponse, BlocksAndUnclesByHeightsResponse.serialize(x))
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
@@ -68,22 +77,27 @@ object Payload {
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
     deserializerCode._deserialize(input).flatMap { case Staging(code, rest) =>
       code match {
-        case Hello           => Hello._deserialize(rest)
-        case Ping            => Ping._deserialize(rest)
-        case Pong            => Pong._deserialize(rest)
-        case BlocksRequest   => BlocksRequest._deserialize(rest)
-        case BlocksResponse  => BlocksResponse._deserialize(rest)
-        case HeadersRequest  => HeadersRequest._deserialize(rest)
-        case HeadersResponse => HeadersResponse._deserialize(rest)
-        case InvRequest      => InvRequest._deserialize(rest)
-        case InvResponse     => InvResponse._deserialize(rest)
-        case NewBlock        => NewBlock._deserialize(rest)
-        case NewHeader       => NewHeader._deserialize(rest)
-        case NewInv          => NewInv._deserialize(rest)
-        case NewBlockHash    => NewBlockHash._deserialize(rest)
-        case NewTxHashes     => NewTxHashes._deserialize(rest)
-        case TxsRequest      => TxsRequest._deserialize(rest)
-        case TxsResponse     => TxsResponse._deserialize(rest)
+        case Hello                            => Hello._deserialize(rest)
+        case Ping                             => Ping._deserialize(rest)
+        case Pong                             => Pong._deserialize(rest)
+        case BlocksRequest                    => BlocksRequest._deserialize(rest)
+        case BlocksResponse                   => BlocksResponse._deserialize(rest)
+        case HeadersRequest                   => HeadersRequest._deserialize(rest)
+        case HeadersResponse                  => HeadersResponse._deserialize(rest)
+        case InvRequest                       => InvRequest._deserialize(rest)
+        case InvResponse                      => InvResponse._deserialize(rest)
+        case NewBlock                         => NewBlock._deserialize(rest)
+        case NewHeader                        => NewHeader._deserialize(rest)
+        case NewInv                           => NewInv._deserialize(rest)
+        case NewBlockHash                     => NewBlockHash._deserialize(rest)
+        case NewTxHashes                      => NewTxHashes._deserialize(rest)
+        case TxsRequest                       => TxsRequest._deserialize(rest)
+        case TxsResponse                      => TxsResponse._deserialize(rest)
+        case ChainState                       => ChainState._deserialize(rest)
+        case HeadersByHeightsRequest          => HeadersByHeightsRequest._deserialize(rest)
+        case HeadersByHeightsResponse         => HeadersByHeightsResponse._deserialize(rest)
+        case BlocksAndUnclesByHeightsRequest  => BlocksAndUnclesByHeightsRequest._deserialize(rest)
+        case BlocksAndUnclesByHeightsResponse => BlocksAndUnclesByHeightsResponse._deserialize(rest)
       }
     }
   }
@@ -149,7 +163,12 @@ object Payload {
         NewBlockHash,
         NewTxHashes,
         TxsRequest,
-        TxsResponse
+        TxsResponse,
+        ChainState,
+        HeadersByHeightsRequest,
+        HeadersByHeightsResponse,
+        BlocksAndUnclesByHeightsRequest,
+        BlocksAndUnclesByHeightsResponse
       )
 
     val toInt: Map[Code, Int] = values.toIterable.zipWithIndex.toMap
@@ -406,30 +425,36 @@ object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
   implicit val serde: Serde[NewBlockHash] = Serde.forProduct1(apply, _.hash)
 }
 
-trait IndexedHashes {
-  def hashes: AVector[(ChainIndex, AVector[TransactionId])]
+trait IndexedPayload[T] {
+  def data: AVector[(ChainIndex, T)]
 }
 
-sealed trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
-  override def validate(input: T)(implicit config: GroupConfig): Either[String, Unit] = {
-    if (input.hashes.forall(p => IndexedSerding.check(p._1))) {
-      Right(())
-    } else {
-      Left("Invalid ChainIndex in Tx payload")
-    }
-  }
-}
-
-object IndexedSerding {
-  implicit private[message] val txSerde: Serde[(ChainIndex, AVector[TransactionId])] = {
+sealed trait IndexedSerding[T, P <: IndexedPayload[T] with Payload]
+    extends Payload.ValidatedSerding[P] {
+  protected def baseSerde: Serde[T]
+  implicit protected lazy val dataSerde: Serde[(ChainIndex, T)] = {
     implicit val indexSerde: Serde[ChainIndex] =
       Serde.forProduct2[Int, Int, ChainIndex](
         (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
         chainIndex => (chainIndex.from.value, chainIndex.to.value)
       )
-    Serde.tuple2[ChainIndex, AVector[TransactionId]]
+    Serde.tuple2[ChainIndex, T](indexSerde, baseSerde)
   }
 
+  def name: String
+
+  def checkDataPerChain(values: T): Boolean
+
+  override def validate(input: P)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (input.data.forall(p => IndexedSerding.check(p._1) && checkDataPerChain(p._2))) {
+      Right(())
+    } else {
+      Left(s"Invalid ChainIndex or data in $name payload")
+    }
+  }
+}
+
+object IndexedSerding {
   @inline private def check(
       chainIndex: ChainIndex
   )(implicit config: GroupConfig): Boolean = {
@@ -439,24 +464,34 @@ object IndexedSerding {
 
 final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.UnSolicited
-    with IndexedHashes {
-  override def measure(): Unit = NewTxHashes.payloadLabeled.inc()
+    with IndexedPayload[AVector[TransactionId]] {
+  def data: AVector[(ChainIndex, AVector[TransactionId])] = hashes
+  override def measure(): Unit                            = NewTxHashes.payloadLabeled.inc()
 }
 
-object NewTxHashes extends IndexedSerding[NewTxHashes] with Payload.Code {
-  import IndexedSerding.txSerde
-  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+object NewTxHashes extends IndexedSerding[AVector[TransactionId], NewTxHashes] with Payload.Code {
+  def name: String = codeName
+
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+
+  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
+  implicit val serde: Serde[NewTxHashes]       = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
 }
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.Solicited
-    with IndexedHashes {
-  override def measure(): Unit = TxsRequest.payloadLabeled.inc()
+    with IndexedPayload[AVector[TransactionId]] {
+  def data: AVector[(ChainIndex, AVector[TransactionId])] = hashes
+  override def measure(): Unit                            = TxsRequest.payloadLabeled.inc()
 }
 
-object TxsRequest extends IndexedSerding[TxsRequest] with Payload.Code {
-  import IndexedSerding.txSerde
-  implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+object TxsRequest extends IndexedSerding[AVector[TransactionId], TxsRequest] with Payload.Code {
+  def name: String = codeName
+
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+
+  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
+  implicit val serde: Serde[TxsRequest]        = Serde.forProduct2(apply, p => (p.id, p.hashes))
 
   def apply(hashes: AVector[(ChainIndex, AVector[TransactionId])]): TxsRequest =
     TxsRequest(RequestId.random(), hashes)
@@ -470,4 +505,90 @@ final case class TxsResponse(id: RequestId, txs: AVector[TransactionTemplate])
 object TxsResponse extends Payload.Serding[TxsResponse] with Payload.Code {
   implicit val serde: Serde[TxsResponse] =
     Serde.forProduct2(apply, p => (p.id, p.txs))
+}
+
+final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited {
+  def measure(): Unit = ChainState.payloadLabeled.inc()
+}
+
+object ChainState extends Payload.ValidatedSerding[ChainState] with Payload.Code {
+  implicit val serde: Serde[ChainState] = Serde.forProduct1(ChainState.apply, c => c.tips)
+
+  override def validate(t: ChainState)(implicit config: GroupConfig): Either[String, Unit] = {
+    if (t.tips.forall(_.height >= 0)) {
+      Right(())
+    } else {
+      Left("Invalid height in ChainState payload")
+    }
+  }
+}
+
+final case class HeadersByHeightsRequest(
+    id: RequestId,
+    data: AVector[(ChainIndex, BlockHeightRange)]
+) extends Payload.Solicited
+    with IndexedPayload[BlockHeightRange] {
+  def measure(): Unit = HeadersByHeightsRequest.payloadLabeled.inc()
+}
+
+object HeadersByHeightsRequest
+    extends IndexedSerding[BlockHeightRange, HeadersByHeightsRequest]
+    with Payload.Code {
+  def name: String = codeName
+
+  val baseSerde: Serde[BlockHeightRange] = BlockHeightRange.serde
+  implicit val serde: Serde[HeadersByHeightsRequest] =
+    Serde.forProduct2(apply, v => (v.id, v.data))
+
+  def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
+
+  def apply(data: AVector[(ChainIndex, BlockHeightRange)]): HeadersByHeightsRequest =
+    HeadersByHeightsRequest(RequestId.random(), data)
+}
+
+final case class HeadersByHeightsResponse(id: RequestId, headers: AVector[AVector[BlockHeader]])
+    extends Payload.Solicited {
+  def measure(): Unit = HeadersByHeightsResponse.payloadLabeled.inc()
+}
+
+object HeadersByHeightsResponse
+    extends Payload.Serding[HeadersByHeightsResponse]
+    with Payload.Code {
+  implicit val serde: Serde[HeadersByHeightsResponse] =
+    Serde.forProduct2(apply, v => (v.id, v.headers))
+}
+
+final case class BlocksAndUnclesByHeightsRequest(
+    id: RequestId,
+    data: AVector[(ChainIndex, BlockHeightRange)]
+) extends Payload.Solicited
+    with IndexedPayload[BlockHeightRange] {
+  def measure(): Unit = BlocksAndUnclesByHeightsRequest.payloadLabeled.inc()
+}
+
+object BlocksAndUnclesByHeightsRequest
+    extends IndexedSerding[BlockHeightRange, BlocksAndUnclesByHeightsRequest]
+    with Payload.Code {
+  def name: String = codeName
+
+  val baseSerde: Serde[BlockHeightRange] = BlockHeightRange.serde
+  implicit val serde: Serde[BlocksAndUnclesByHeightsRequest] =
+    Serde.forProduct2(apply, v => (v.id, v.data))
+
+  def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
+
+  def apply(data: AVector[(ChainIndex, BlockHeightRange)]): BlocksAndUnclesByHeightsRequest =
+    BlocksAndUnclesByHeightsRequest(RequestId.random(), data)
+}
+
+final case class BlocksAndUnclesByHeightsResponse(id: RequestId, blocks: AVector[AVector[Block]])
+    extends Payload.Solicited {
+  def measure(): Unit = BlocksAndUnclesByHeightsResponse.payloadLabeled.inc()
+}
+
+object BlocksAndUnclesByHeightsResponse
+    extends Payload.Serding[BlocksAndUnclesByHeightsResponse]
+    with Payload.Code {
+  implicit val serde: Serde[BlocksAndUnclesByHeightsResponse] =
+    Serde.forProduct2(apply, v => (v.id, v.blocks))
 }

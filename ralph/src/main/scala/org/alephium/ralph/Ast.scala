@@ -1724,6 +1724,38 @@ object Ast {
   ) extends GlobalDefinition
       with ConstantDefinition
 
+  final case class RawEnumField[Ctx <: StatelessContext](ident: Ident, value: Option[Const[Ctx]])
+      extends UniqueDef
+      with ConstantDefinition {
+    def validateAsFirstField(): EnumField[Ctx] = {
+      value match {
+        case Some(v) =>
+          EnumField(ident, v).atSourceIndex(sourceIndex)
+        case None =>
+          throw Compiler.Error(
+            s"Enum field ${ident.name} must have explicit value",
+            ident.sourceIndex
+          )
+      }
+    }
+
+    def validate(enumName: String, firstFieldVal: Val): Unit = {
+      value match {
+        case Some(v) if v.v.tpe != firstFieldVal.tpe =>
+          throw Compiler.Error(
+            s"Fields have different types in Enum $enumName",
+            ident.sourceIndex
+          )
+        case None if firstFieldVal.tpe != Val.U256 =>
+          throw Compiler.Error(
+            s"Enum field ${ident.name} must have explicit value",
+            ident.sourceIndex
+          )
+        case _ => ()
+      }
+    }
+  }
+
   final case class EnumField[Ctx <: StatelessContext](ident: Ident, value: Const[Ctx])
       extends UniqueDef
       with ConstantDefinition

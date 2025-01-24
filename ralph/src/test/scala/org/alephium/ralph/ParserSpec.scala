@@ -1226,7 +1226,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
   it should "parse enum definitions" in {
     {
-      info("Invalid enum type")
+      info("Valid enum type")
       val definition =
         s"""
            |enum errorCodes {
@@ -1349,6 +1349,68 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           )
         )
       )
+    }
+
+    {
+      info("Enum definition with U256 fields with optional values")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = 0
+           |  Error1
+           |  Error10 = 10
+           |  Error11
+           |}
+           |""".stripMargin
+      parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.U256(U256.Zero))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.U256(U256.One))),
+          EnumField(Ident("Error10"), Const[StatefulContext](Val.U256(U256.unsafe(10)))),
+          EnumField(Ident("Error11"), Const[StatefulContext](Val.U256(U256.unsafe(11))))
+        )
+      )
+    }
+
+    {
+      info("First enum field value can not be optional")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0
+           |  Error10 = 10
+           |  Error11 = 11
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Enum field Error0 must have explicit value"
+    }
+
+    {
+      info("Non-U256 enum field value can not be optional")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error10
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Enum field Error10 must have explicit value"
+    }
+
+    {
+      info("Non-U256 enum field value can not overflow")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  ErrorMax = ${U256.MaxValue}
+           |  ErrorOverflow
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is s"Enum field ErrorOverflow value overflows, it must not exceed ${U256.MaxValue}"
     }
   }
 

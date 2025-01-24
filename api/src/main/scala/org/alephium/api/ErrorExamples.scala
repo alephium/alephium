@@ -34,4 +34,7 @@ trait ErrorExamples extends Examples {
 
   implicit val serviceUnavailableExamples: List[Example[ApiError.ServiceUnavailable]] =
     simpleExample(ApiError.ServiceUnavailable("Self clique unsynced"))
+
+  implicit val gateawayTimeoutExamples: List[Example[ApiError.GatewayTimeout]] =
+    simpleExample(ApiError.GatewayTimeout("The network is slow"))
 }
