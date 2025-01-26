@@ -130,12 +130,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   }
 
-  def indexSelector[Unknown: P]: P[Ast.DataSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
-    case (from, expr, to) =>
+  def indexSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] =
+    P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map { case (from, expr, to) =>
       Ast
         .IndexSelector(expr.overwriteSourceIndex(from, to, fileURI))
         .atSourceIndex(from, to, fileURI)
-  }
+    }
 
   // Optimize chained comparisons
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
@@ -286,12 +286,12 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
 
-  def identSelector[Unknown: P]: P[Ast.DataSelector] = P(
+  def identSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def dataSelector[Unknown: P]: P[Ast.DataSelector] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(identSelector | indexSelector)
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
     PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
@@ -306,6 +306,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
       val sourceIndex = SourceIndex(targets.headOption.flatMap(_.sourceIndex), expr.sourceIndex)
       Ast.Assign(targets, expr).atSourceIndex(sourceIndex)
+    }
+
+  def compoundAssignOperator[Unknown: P]: P[CompoundAssignmentOperator] =
+    Lexer.opAddAssign | Lexer.opSubAssign | Lexer.opMulAssign | Lexer.opDivAssign
+  def compoundAssign[Unknown: P]: P[Ast.CompoundAssign[Ctx]] =
+    P(assignmentTarget ~ compoundAssignOperator ~ expr).map { case (target, op, expr) =>
+      val sourceIndex = SourceIndex(target.sourceIndex, expr.sourceIndex)
+      Ast.CompoundAssign(target, op, expr).atSourceIndex(sourceIndex)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -929,7 +937,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(
-      varDef | structDestruction | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
+      varDef | structDestruction | assign | compoundAssign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
     )
 
   private def globalDefinitions[Unknown: P]: P[Ast.GlobalDefinition] = P(
@@ -989,7 +997,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     selectorOrCallAbss.foldLeft(base)((acc, selectorOrCallAbs) => {
       val sourceIndex = SourceIndex(acc.sourceIndex, selectorOrCallAbs.sourceIndex)
       val expr = selectorOrCallAbs match {
-        case selector: Ast.DataSelector =>
+        case selector: Ast.DataSelector[StatefulContext @unchecked] =>
           acc match {
             case Ast.LoadDataBySelectors(base, selectors) =>
               Ast.LoadDataBySelectors(base, selectors :+ selector)
@@ -1035,7 +1043,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | structDestruction | assign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =

@@ -278,7 +278,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Seq.empty,
           Seq.empty
         ),
-        Seq(IdentSelector(Ident("d")), IndexSelector(Const(Val.U256(U256.Zero))))
+        Seq(
+          IdentSelector[StatefulContext](Ident("d")),
+          IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
+        )
       )
     parse("a.b.foo()[0].bar().c.d[0]", StatefulParser.expr(_)).get.value is
       LoadDataBySelectors(
@@ -297,9 +300,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Seq.empty
         ),
         Seq(
-          IdentSelector(Ident("c")),
-          IdentSelector(Ident("d")),
-          IndexSelector(Const(Val.U256(U256.Zero)))
+          IdentSelector[StatefulContext](Ident("c")),
+          IdentSelector[StatefulContext](Ident("d")),
+          IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
         )
       )
   }
@@ -1018,6 +1021,33 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     exprs.foreach { case (str, expr) =>
       checkParseExpr(str, expr)
     }
+  }
+
+  it should "parse compound assign statement" in {
+    def stats(op: CompoundAssignmentOperator): List[(String, Ast.Statement[StatelessContext])] =
+      List(
+        s"a ${op.operatorName} b" -> Ast
+          .CompoundAssign(
+            AssignmentSimpleTarget(Ident("a")),
+            op,
+            Ast.Variable(Ast.Ident("b"))
+          ),
+        s"a[0] ${op.operatorName} b" -> Ast.CompoundAssign(
+          AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0)))),
+          op,
+          Ast.Variable(Ast.Ident("b"))
+        ),
+        s"a.b[0] ${op.operatorName} c" -> Ast.CompoundAssign(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
+          ),
+          op,
+          Ast.Variable(Ast.Ident("c"))
+        )
+      )
+
+    CompoundAssignmentOperator.values.foreach { stats(_).foreach(checkParseStat.tupled) }
   }
 
   it should "parse assign statement" in {
