@@ -7089,6 +7089,101 @@ class VMSpec extends AlephiumSpec with Generators {
     )
   }
 
+  it should "report compilation error when map key and array index do not have the right type" in new CompoundAssignmentFixture {
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssignArray() -> () {
+           |    let mut array = [0; 2]
+           |    array[arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> ByteVec {
+           |    return #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "ByteVec", expected "U256""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssignArray() -> () {
+           |    let mut array = [0; 2]
+           |    array[arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> (U256, ByteVec) {
+           |    return 0, #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "List(U256, ByteVec)", expected "U256""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, U256] map
+           |
+           |  pub fn compoundAssignMap() -> () {
+           |    map[mapKey()] += 1
+           |  }
+           |
+           |  pub fn mapKey() -> U256 {
+           |    return 0
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid map key type "U256", expected "ByteVec""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, U256] map
+           |
+           |  pub fn compoundAssignMap() -> () {
+           |    map[mapKey()] += 1
+           |  }
+           |
+           |  pub fn mapKey() -> (U256, ByteVec) {
+           |    return 0, #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid map key type "List(U256, ByteVec)", expected "ByteVec""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, [U256; 2]] map
+           |
+           |  pub fn compoundAssignMapArray() -> () {
+           |    map[#00][arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> ByteVec {
+           |    return #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "ByteVec", expected "U256""""
+  }
+
   it should "be able to use assets in the inline function" in new ContractFixture {
     val foo =
       s"""
