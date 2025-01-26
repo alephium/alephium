@@ -1626,16 +1626,16 @@ object Ast {
     }
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      val variable = state.getVariable(ident)
+      val variable         = state.getVariable(ident)
+      val updatedSelectors = updateSelectorsWithVariables(selectors)
       variable.tpe match {
         case map: Type.Map =>
           val updatedMapKeyIndex = selectorIndexVariables.getOrElse(0, mapKeyIndex)
           val pathCodes          = MapOps.genSubContractPath(state, ident, updatedMapKeyIndex)
-          MapOps.genStore(state, map.value, getType(state), pathCodes, selectors.tail)
+          MapOps.genStore(state, map.value, getType(state), pathCodes, updatedSelectors.tail)
         case _ =>
-          val ref              = state.getVariablesRef(ident)
-          val updatedSelectors = updateSelectorsWithVariables(selectors)
-          val subRef           = ref.subRef(state, updatedSelectors.init)
+          val ref    = state.getVariablesRef(ident)
+          val subRef = ref.subRef(state, updatedSelectors.init)
           subRef.genStoreCode(state, updatedSelectors.last)
       }
     }
@@ -1668,17 +1668,16 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val variable = state.getVariable(ident)
-
+      val variable         = state.getVariable(ident)
+      val updatedSelectors = updateSelectorsWithVariables(selectors)
       variable.tpe match {
         case map: Type.Map =>
           val updatedMapKeyIndex = selectorIndexVariables.getOrElse(0, mapKeyIndex)
           val pathCodes          = MapOps.genSubContractPath(state, ident, updatedMapKeyIndex)
-          MapOps.genLoad(state, map.value, getType(state), pathCodes, selectors.tail)
+          MapOps.genLoad(state, map.value, getType(state), pathCodes, updatedSelectors.tail)
         case _ =>
-          val ref              = state.getVariablesRef(ident)
-          val updatedSelectors = updateSelectorsWithVariables(selectors)
-          val subRef           = ref.subRef(state, updatedSelectors.init)
+          val ref    = state.getVariablesRef(ident)
+          val subRef = ref.subRef(state, updatedSelectors.init)
           subRef.genLoadCode(state, updatedSelectors.last)
       }
     }

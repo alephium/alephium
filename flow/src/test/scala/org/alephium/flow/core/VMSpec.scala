@@ -6994,61 +6994,84 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "work when compound assignment selectors have side effect" in new CompoundAssignmentFixture {
     val contract =
       s"""
-         |Contract TestContract(mut index: U256, mut mapKey: ByteVec) {  // set init value to 0 and #01
+         |Contract TestContract(
+         |  mut arrayIndex: U256,
+         |  mut map1Key: ByteVec,
+         |  mut map2Key: U256
+         |) {  // set init value to 0, #01 and 0
          |
-         |  mapping[ByteVec, U256] map
+         |  mapping[ByteVec, U256] map1
+         |  mapping[U256, [U256; 2]] map2
          |
          |  @using(preapprovedAssets = true)
          |  pub fn initMaps() -> () {
-         |    map.insert!(@$genesisAddress, #01, 1)
-         |    map.insert!(@$genesisAddress, #02, 2)
+         |    map1.insert!(@$genesisAddress, #01, 1)
+         |    map1.insert!(@$genesisAddress, #02, 2)
+         |    map2.insert!(@$genesisAddress, 0, [1, 2])
+         |    map2.insert!(@$genesisAddress, 1, [3, 4])
          |  }
          |
          |  @using(updateFields = true)
          |  pub fn compoundAssign() -> () {
          |    let mut array = [0; 2]
          |    array[1] = 1
-         |    assert!(index == 0, 0)
-         |    array[updateAndGetIndex()] += 1
+         |    assert!(arrayIndex == 0, 0)
+         |    array[updateAndGetArrayIndex()] += 1
          |    assert!(array[0] == 1, 1)
          |    assert!(array[1] == 1, 2)
-         |    assert!(index == 1, 3)
-         |    array[updateAndGetIndex()] += 1
+         |    assert!(arrayIndex == 1, 3)
+         |    array[updateAndGetArrayIndex()] += 1
          |    assert!(array[0] == 1, 4)
          |    assert!(array[1] == 2, 5)
          |
-         |    assert!(mapKey == #01, 6)
-         |    assert!(map[#01] == 1, 7)
-         |    map[updateAndGetMapKey()] += 10
-         |    assert!(map[#01] == 11, 8)
-         |    assert!(mapKey == #02, 9)
-         |    assert!(map[mapKey] == 2, 10)
-         |    map[mapKey] += 2
-         |    assert!(map[mapKey] == 4, 12)
+         |    assert!(map1Key == #01, 6)
+         |    assert!(map1[#01] == 1, 7)
+         |    map1[updateAndGetMap1Key()] += 10
+         |    assert!(map1[#01] == 11, 8)
+         |    assert!(map1Key == #02, 9)
+         |    assert!(map1[map1Key] == 2, 10)
+         |    map1[map1Key] += 2
+         |    assert!(map1[map1Key] == 4, 12)
+         |
+         |    arrayIndex = 0
+         |    assert!(map2[0][0] == 1, 13)
+         |    map2[updateAndGetMap2Key()][updateAndGetArrayIndex()] += 1
+         |    assert!(map2[0][0] == 2, 14)
+         |    assert!(arrayIndex == 1, 15)
+         |    assert!(map2Key == 1, 16)
+         |    assert!(map2[1][1] == 4, 17)
+         |    map2[updateAndGetMap2Key()][updateAndGetArrayIndex()] += 2
+         |    assert!(map2[1][1] == 6, 18)
          |  }
          |
-         |  pub fn updateAndGetIndex() -> U256 {
-         |    let originIndex = index
-         |    index = index + 1
+         |  pub fn updateAndGetArrayIndex() -> U256 {
+         |    let originIndex = arrayIndex
+         |    arrayIndex = arrayIndex + 1
          |    return originIndex
          |  }
          |
-         |  pub fn updateAndGetMapKey() -> ByteVec {
-         |    let originMapKey = mapKey
-         |    mapKey = #02
+         |  pub fn updateAndGetMap1Key() -> ByteVec {
+         |    let originMapKey = map1Key
+         |    map1Key = #02
+         |    return originMapKey
+         |  }
+         |
+         |  pub fn updateAndGetMap2Key() -> U256 {
+         |    let originMapKey = map2Key
+         |    map2Key = map2Key + 1
          |    return originMapKey
          |  }
          |}
          |""".stripMargin
     val contractId = createContract(
       contract,
-      initialMutState = AVector(Val.U256(U256.Zero), Val.ByteVec(hex"01"))
+      initialMutState = AVector(Val.U256(U256.Zero), Val.ByteVec(hex"01"), Val.U256(U256.Zero))
     )._1
 
     callTxScript(
       s"""
          |TxScript Main {
-         |  TestContract(#${contractId.toHexString}).initMaps{@$genesisAddress -> ALPH: minimalContractDeposit!() * 2}()
+         |  TestContract(#${contractId.toHexString}).initMaps{@$genesisAddress -> ALPH: minimalContractDeposit!() * 4}()
          |}
          |$contract
          |""".stripMargin
