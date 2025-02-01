@@ -48,6 +48,7 @@ trait EmptyBlockFlow extends BlockFlow {
   def getBestTipUnsafe(): BlockHash                                                            = ???
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
   def updateBestDeps(): IOResult[Unit]                                                         = ???
+  def updateBestFlowSkelton(): IOResult[Unit]                                                  = ???
   def updateBestDepsUnsafe(): Unit                                                             = ???
   def getBestIntraGroupTip(): BlockHash                                                        = ???
   def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]              = ???

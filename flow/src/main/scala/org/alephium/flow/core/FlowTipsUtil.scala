@@ -142,6 +142,17 @@ trait FlowTipsUtil {
     FlowTips(targetGroup, inTips, targetTips)
   }
 
+  def getBlockFlowSkeltonUnsafe(intraGroupTip: BlockHash): BlockFlowSkelton = {
+    val header = getBlockHeaderUnsafe(intraGroupTip)
+
+    val builder = BlockFlowSkelton.Builder(groups)
+    brokerConfig.cliqueGroups.foreach { g =>
+      val tip = getGroupTip(header, g)
+      builder.setTip(g, tip, getOutTipsUnsafe(tip))
+    }
+    builder.getResult()
+  }
+
   private[core] def getFlowTipsDiffUnsafe(
       newTips: FlowTips,
       oldTips: FlowTips
@@ -247,6 +258,43 @@ trait FlowTipsUtil {
       Some(flowTips)
     } else {
       tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
+    }
+  }
+
+  def tryExtendBlockFlowSkeltonUnsafe(
+      flow: BlockFlowSkelton,
+      group: GroupIndex,
+      tip: BlockHash
+  ): Option[BlockFlowSkelton] = {
+    val currentGroupTip = flow.intraGroupTips(group.value)
+    if (tip != currentGroupTip && isExtendingUnsafe(tip, currentGroupTip)) {
+      val builder = BlockFlowSkelton.Builder(groups)
+      var canExtend                                       = true
+
+      builder.setTip(group, currentGroupTip, getOutTipsUnsafe(currentGroupTip))
+
+      val tipHeader = getBlockHeaderUnsafe(tip)
+      brokerConfig.cliqueGroups.filter(_ != group).foreach { g =>
+        if (canExtend) {
+          val intraGroupTipOfTip  = getGroupTip(tipHeader, g)
+          val intraGroupTipOfFlow = flow.intraGroupTips(g.value)
+          if (isExtendingUnsafe(intraGroupTipOfFlow, intraGroupTipOfTip)) {
+            builder.setTip(group, intraGroupTipOfFlow, getOutTipsUnsafe(intraGroupTipOfFlow))
+          } else if (isExtendingUnsafe(intraGroupTipOfTip, intraGroupTipOfFlow)) {
+            builder.setTip(group, intraGroupTipOfTip, getOutTipsUnsafe(intraGroupTipOfTip))
+          } else {
+            canExtend = false
+          }
+        }
+      }
+
+      if (canExtend) {
+        Some(builder.getResult())
+      } else {
+        None
+      }
+    } else {
+      None
     }
   }
 

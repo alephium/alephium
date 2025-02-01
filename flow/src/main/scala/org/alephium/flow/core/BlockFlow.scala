@@ -358,6 +358,23 @@ object BlockFlow extends StrictLogging {
         }
     }
 
+    def tryExtendBlockFlowSkeltonUnsafe(
+        flow: BlockFlowSkelton,
+        group: GroupIndex,
+        toTry: AVector[BlockHash]
+    ): BlockFlowSkelton = {
+      var updatedFlow: Option[BlockFlowSkelton] = None
+      toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
+        if (updatedFlow.isEmpty) {
+          tryExtendBlockFlowSkeltonUnsafe(flow, group, tip).foreach { extendedFlow =>
+            updatedFlow = Some(extendedFlow)
+          }
+        }
+      }
+
+      updatedFlow.getOrElse(flow)
+    }
+
     def getBestIntraGroupTip(): BlockHash = {
       intraGroupHeaderChains.reduceBy(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
@@ -388,6 +405,17 @@ object BlockFlow extends StrictLogging {
       flowTips2.toBlockDeps
     }
 
+    def calBestFlowSkeltonUnsafe(): BlockFlowSkelton = {
+      val bestIntraGroupTip = getBestIntraGroupTip()
+      val bestIndex         = ChainIndex.from(bestIntraGroupTip)
+      val startFlow         = getBlockFlowSkeltonUnsafe(bestIntraGroupTip)
+
+      brokerConfig.cliqueGroups.filter(_ != bestIndex.from).fold(startFlow) { case (flow, g) =>
+        val toTry = getHashChain(g, g).getAllTips
+        tryExtendBlockFlowSkeltonUnsafe(flow, g, toTry)
+      }
+    }
+
     def updateBestDepsUnsafe(): Unit =
       brokerConfig.groupRange.foreach { mainGroup =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
@@ -405,6 +433,15 @@ object BlockFlow extends StrictLogging {
 
     def updateBestDeps(): IOResult[Unit] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
+    }
+
+    def updateBestFlowSkelton(): IOResult[Unit] = {
+      IOUtils.tryExecute(updateBestFlowSkeltonUnsafe())
+    }
+
+    def updateBestFlowSkeltonUnsafe(): Unit = {
+      val bestFlowSkelton = calBestFlowSkeltonUnsafe()
+      updateBestFlowSkelton(bestFlowSkelton)
     }
   }
 

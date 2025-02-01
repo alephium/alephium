@@ -38,3 +38,31 @@ object FlowTips {
     FlowTips(targetGroup, blockDeps.inDeps, blockDeps.outDeps)
   }
 }
+
+/** This is used to represent the best blockflow with intra-group tips There are #groups dependent
+  * hashes, each from a intra-group chain
+  * @param intraGroupTips
+  *   the tips of all intra-group chains
+  * @param intraGroupTipOutDeps
+  *   the cache for the outDeps of all tips
+  */
+final case class BlockFlowSkelton(
+    intraGroupTips: AVector[BlockHash],
+    intraGroupTipOutDeps: AVector[AVector[BlockHash]]
+)
+
+object BlockFlowSkelton {
+  final case class Builder(groups: Int) {
+    val intraGroupTips: Array[BlockHash]                = Array.ofDim(groups)
+    val intraGroupTipOutDeps: Array[AVector[BlockHash]] = Array.ofDim(groups)
+
+    def setTip(group: GroupIndex, tip: BlockHash, tipOutTips: AVector[BlockHash]): Unit = {
+      intraGroupTips(group.value) = tip
+      intraGroupTipOutDeps(group.value) = tipOutTips
+    }
+
+    def getResult(): BlockFlowSkelton = {
+      BlockFlowSkelton(AVector.unsafe(intraGroupTips), AVector.unsafe(intraGroupTipOutDeps))
+    }
+  }
+}

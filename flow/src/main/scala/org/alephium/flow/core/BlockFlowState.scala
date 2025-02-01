@@ -57,6 +57,13 @@ trait BlockFlowState extends FlowTipsUtil {
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
     BlockDeps.build(deps1 ++ deps2)
   }
+  @volatile protected[core] var bestFlowSkelton = {
+    val flow = BlockFlowSkelton.Builder(groups)
+    brokerConfig.cliqueGroups.foreach { g =>
+      flow.setTip(g, genesisHashes(g.value)(g.value), genesisHashes(g.value))
+    }
+    flow.getResult()
+  }
 
   def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState
   def blockchainBuilder: Block => BlockChain
@@ -370,6 +377,10 @@ trait BlockFlowState extends FlowTipsUtil {
     assume(brokerConfig.containsRaw(mainGroup))
     val groupShift = brokerConfig.groupIndexOfBrokerUnsafe(mainGroup)
     bestDeps(groupShift) = deps
+  }
+
+  def updateBestFlowSkelton(skelton: BlockFlowSkelton): Unit = {
+    bestFlowSkelton = skelton
   }
 
   def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {

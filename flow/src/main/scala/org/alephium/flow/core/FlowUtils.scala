@@ -140,6 +140,8 @@ trait FlowUtils
 
   def updateBestDeps(): IOResult[Unit]
 
+  def updateBestFlowSkelton(): IOResult[Unit]
+
   def updateBestDepsUnsafe(): Unit
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
