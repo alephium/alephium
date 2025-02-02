@@ -253,6 +253,21 @@ final class AVector[@sp A](
     slice(0, length - m)
   }
 
+  // TODO: add tests
+  def remove(k: Int): AVector[A] = {
+    assume(k >= 0 && k < length)
+    if (k == 0) {
+      this.tail
+    } else if (k == length - 1) {
+      this.init
+    } else {
+      val arr = new Array[A](length - 1)
+      Array.copy(elems, 0, arr, 0, k)
+      Array.copy(elems, k + 1, arr, k, length - k - 1)
+      AVector.unsafe(arr)
+    }
+  }
+
   def reverse: AVector[A] = {
     if (length < 2) this else _reverse
   }

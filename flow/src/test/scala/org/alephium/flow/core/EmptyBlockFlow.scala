@@ -46,6 +46,7 @@ trait EmptyBlockFlow extends BlockFlow {
 
   def getAllTips: AVector[BlockHash]                                                           = ???
   def getBestTipUnsafe(): BlockHash                                                            = ???
+  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps                              = ???
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
   def updateBestDeps(): IOResult[Unit]                                                         = ???
   def updateBestFlowSkelton(): IOResult[Unit]                                                  = ???

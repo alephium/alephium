@@ -283,6 +283,10 @@ trait BlockFlowState extends FlowTipsUtil {
     bestDeps(groupShift)
   }
 
+  def getBestFlowSkelton(): BlockFlowSkelton = {
+    bestFlowSkelton
+  }
+
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
     val chainIndex = ChainIndex.from(hash)
     assume(brokerConfig.contains(chainIndex.from))

@@ -375,6 +375,28 @@ object BlockFlow extends StrictLogging {
       updatedFlow.getOrElse(flow)
     }
 
+    def extendFlowPerChainUnsafe(flowTips: FlowTips, chainIndex: ChainIndex): FlowTips = {
+      var updatedFlow: Option[FlowTips] = None
+      val currentChainTip               = flowTips.outTips(chainIndex.to.value)
+
+      val chain       = getHashChain(chainIndex)
+      val targetGroup = chainIndex.from
+      val toTry       = chain.getAllTips
+      toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
+        if (
+          updatedFlow.isEmpty && tip != currentChainTip && isExtendingUnsafe(tip, currentChainTip)
+        ) {
+          val header = getBlockHeaderUnsafe(tip)
+          tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(header, targetGroup)).foreach {
+            newFlow =>
+              updatedFlow = Some(newFlow)
+          }
+        }
+      }
+
+      updatedFlow.getOrElse(flowTips)
+    }
+
     def getBestIntraGroupTip(): BlockHash = {
       intraGroupHeaderChains.reduceBy(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
@@ -414,6 +436,14 @@ object BlockFlow extends StrictLogging {
         val toTry = getHashChain(g, g).getAllTips
         tryExtendBlockFlowSkeltonUnsafe(flow, g, toTry)
       }
+    }
+
+    def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
+      val bestSkelton      = getBestFlowSkelton()
+      val initialDeps      = bestSkelton.createBlockDeps(chainIndex.from)
+      val initialFlowTips  = FlowTips.from(initialDeps, chainIndex.from)
+      val extendedflowTips = extendFlowPerChainUnsafe(initialFlowTips, chainIndex)
+      BlockDeps(extendedflowTips.inTips ++ extendedflowTips.outTips)
     }
 
     def updateBestDepsUnsafe(): Unit =

@@ -49,7 +49,12 @@ object FlowTips {
 final case class BlockFlowSkelton(
     intraGroupTips: AVector[BlockHash],
     intraGroupTipOutDeps: AVector[AVector[BlockHash]]
-)
+) {
+  def createBlockDeps(groupIndex: GroupIndex): BlockDeps = {
+    val deps = intraGroupTips.remove(groupIndex.value) ++ intraGroupTipOutDeps(groupIndex.value)
+    BlockDeps(deps)
+  }
+}
 
 object BlockFlowSkelton {
   final case class Builder(groups: Int) {

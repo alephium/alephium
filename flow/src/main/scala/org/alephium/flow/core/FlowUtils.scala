@@ -138,6 +138,10 @@ trait FlowUtils
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
+  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
+
+  def getBestFlowSkelton(): BlockFlowSkelton
+
   def updateBestDeps(): IOResult[Unit]
 
   def updateBestFlowSkelton(): IOResult[Unit]
@@ -251,12 +255,21 @@ trait FlowUtils
     IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
+  def findBestDepsForNewBlock(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
+    if (hardfork.isDanubeEnabled()) {
+      calBestFlowPerChainIndex(chainIndex)
+    } else {
+      getBestDeps(chainIndex.from)
+    }
+  }
+
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
   ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
-    val bestDeps = getBestDeps(chainIndex.from)
+    val hardForkGuess = networkConfig.getHardFork(TimeStamp.now())
+    val bestDeps      = findBestDepsForNewBlock(chainIndex, hardForkGuess)
     for {
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
