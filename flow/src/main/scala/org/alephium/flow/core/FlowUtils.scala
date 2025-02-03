@@ -189,7 +189,12 @@ trait FlowUtils
       // some tx inputs might from bestDeps, but not loosenDeps
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
-      val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
+      val candidates3 = if (hardFork.isDanubeEnabled()) {
+        // For performance, conflicted TXs in parallel chains are fine since Danube upgrade
+        candidates2
+      } else {
+        filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
+      }
       FlowUtils.truncateTxs(
         candidates3,
         maximalTxsInOneBlock,
