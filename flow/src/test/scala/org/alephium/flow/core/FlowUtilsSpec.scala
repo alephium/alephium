@@ -50,11 +50,17 @@ class FlowUtilsSpec extends AlephiumSpec {
         assets.map(asset => SignatureSchema.sign(unsignedTx.id, asset.privateKey)),
         AVector.empty
       )
+      val blockEnv = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
       assets.foreach { asset =>
         worldState
-          .addAsset(asset.txInput.outputRef, asset.referredOutput, tx.id)
+          .addAsset(
+            asset.txInput.outputRef,
+            asset.referredOutput,
+            tx.id,
+            None
+          )
           .isRight is true
       }
       val firstInput = assets.head.referredOutput
@@ -64,8 +70,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       )
       val bestDeps  = blockFlow.getBestDeps(groupIndex)
       val groupView = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
-      val blockEnv  = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
-      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script).rightValue is
+      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script, 0).rightValue is
         Transaction(
           unsignedTx,
           scriptExecutionOk = false,
@@ -281,10 +286,11 @@ class FlowUtilsSpec extends AlephiumSpec {
       networkConfig.getHardFork(TimeStamp.now())
     ) is true
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
-    val miningReward = consensusConfigs.rhone.emission
+    val emission   = consensusConfigs.rhone.emission
+    val miningReward = emission
       .reward(emptyBlock.header)
       .miningReward
-    miningReward is (ALPH.alph(30) / 9 / 4)
+    miningReward is emission.rewardWrtTime(emptyBlock.header.timestamp, ALPH.LaunchTimestamp)
     emptyBlock.coinbase.unsigned.fixedOutputs.length is 1
     val mainChainReward = Coinbase.calcMainChainReward(miningReward)
     emptyBlock.coinbaseReward is mainChainReward

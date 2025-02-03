@@ -20,7 +20,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
-    max-clique-from-same-ip = 3
+    max-clique-from-same-ip = 10
 
     ping-frequency = 10 second
     retry-timeout = 10 second
@@ -34,7 +34,9 @@ alephium {
 
     fast-sync-frequency = 2 second
     stable-sync-frequency = 20 second
-    sync-peer-sample-size = 5
+    sync-peer-sample-size-v1 = 3
+    sync-peer-sample-size-v2 = 5
+    enable-sync-protocol-v2 = true
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 2 minute
@@ -77,6 +79,7 @@ alephium {
     gas-fee-cap = "1000000000000000000"// 1 ALPH
     default-utxos-limit = 512
     max-form-buffered-bytes = 131072 // 128 * 1024
+    enable-http-metrics = false
   }
 
   mempool {

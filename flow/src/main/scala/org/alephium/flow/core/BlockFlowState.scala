@@ -28,6 +28,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
@@ -82,12 +83,11 @@ trait BlockFlowState extends FlowTipsUtil {
     intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.logStorage
   }
 
-  def txOutputRefIndexStorage(
-      groupIndex: GroupIndex
-  ): IOResult[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
-    getBlockChainWithState(
-      groupIndex
-    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+  lazy val txOutputRefIndexStorage
+      : IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
       case Some(storage) =>
         Right(storage)
       case None =>
@@ -534,17 +534,17 @@ object BlockFlowState {
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
       // note that script execution is already done in validation
-      block.transactions.foreachE { tx =>
-        updateStateForInOutBlock(worldState, tx, targetGroup, block.timestamp)
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForInOutBlock(worldState, tx, txIndex, targetGroup, block)
       }
     } else if (chainIndex.from == targetGroup) {
-      block.transactions.foreachE(
-        updateStateForOutBlock(worldState, _, targetGroup, block.timestamp)
-      )
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForOutBlock(worldState, tx, txIndex, targetGroup, block)
+      }
     } else if (chainIndex.to == targetGroup) {
-      block.transactions.foreachE(
-        updateStateForInBlock(worldState, _, targetGroup, block.timestamp)
-      )
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForInBlock(worldState, tx, txIndex, targetGroup, block)
+      }
     } else {
       // dead branch
       Right(())
@@ -554,34 +554,37 @@ object BlockFlowState {
   def updateStateForInOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+      _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
     } yield ()
   }
 
   def updateStateForOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+      _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
     } yield ()
   }
 
   def updateStateForInBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+    updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
   }
 
   // Note: contract inputs are updated during the execution of tx script
@@ -592,16 +595,23 @@ object BlockFlowState {
   private def updateStateForOutputs(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+    val blockTs = block.timestamp
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id)
+        worldState.addAsset(
+          outputRef,
+          outputUpdated,
+          tx.id,
+          Some(TxOutputLocator(block.hash, txIndex, index))
+        )
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

@@ -23,7 +23,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.{Block, ChainIndex, TransactionTemplate}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, EventBus}
 
@@ -195,4 +195,5 @@ object AllHandlers {
   }
 
   final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
+  final case class TxNotify(tx: TransactionTemplate)      extends EventBus.Event
 }

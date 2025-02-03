@@ -18,7 +18,7 @@ unit-test:
 	sbt test
 
 integration-test:
-	sbt it:test
+	sbt integration/test
 
 test-all: clean format unit-test integration-test
 	sbt doc

@@ -14,14 +14,13 @@ jobs:
         java: [ '11' ]
     steps:
       - uses: actions/checkout@v2
-      - name: Setup SBT
-        if: matrix.os == 'macos-latest'
-        run: brew install sbt
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: sbt
-      - run: sbt it:test
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
+      - run: sbt integration/test
         shell: bash

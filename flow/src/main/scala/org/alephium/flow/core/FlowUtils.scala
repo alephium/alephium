@@ -229,7 +229,14 @@ trait FlowUtils
       order
         .foreachE[IOError] { scriptTxIndex =>
           val tx = txTemplates(scriptTxIndex)
-          generateFullTx(chainIndex, groupView, blockEnv, tx, tx.unsigned.scriptOpt.get)
+          generateFullTx(
+            chainIndex,
+            groupView,
+            blockEnv,
+            tx,
+            tx.unsigned.scriptOpt.get,
+            scriptTxIndex
+          )
             .map(fullTx => fullTxs(scriptTxIndex) = fullTx)
         }
         .map { _ =>
@@ -340,7 +347,15 @@ trait FlowUtils
   ): IOResult[BlockFlowTemplate] = {
     val blockEnv = if (hardFork.isRhoneEnabled()) {
       val refCache = Some(mutable.HashMap.empty[AssetOutputRef, AssetOutput])
-      BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, refCache)
+      BlockEnv(
+        chainIndex,
+        networkConfig.networkId,
+        templateTs,
+        target,
+        None,
+        hardFork,
+        refCache
+      )
     } else {
       BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None, hardFork, None)
     }
@@ -463,7 +478,8 @@ trait FlowUtils
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       tx: TransactionTemplate,
-      script: StatefulScript
+      script: StatefulScript,
+      txIndex: Int
   ): IOResult[Transaction] = {
     val validator = TxValidation.build
     for {
@@ -482,7 +498,8 @@ trait FlowUtils
           chainIndex,
           groupView,
           blockEnv,
-          preOutputs
+          preOutputs,
+          txIndex
         )
         result match {
           case Right(successfulTx) => Right(successfulTx)
@@ -670,6 +687,9 @@ trait SyncUtils {
   ): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators, peerBrokerInfo))
 
+  def getChainTips(): IOResult[AVector[ChainTip]] =
+    IOUtils.tryExecute(getChainTipsUnsafe())
+
   protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]]
 
   protected def getSyncLocatorsUnsafe(): AVector[(ChainIndex, AVector[BlockHash])]
@@ -678,4 +698,6 @@ trait SyncUtils {
       locators: AVector[AVector[BlockHash]],
       peerBrokerInfo: BrokerGroupInfo
   ): AVector[AVector[BlockHash]]
+
+  protected def getChainTipsUnsafe(): AVector[ChainTip]
 }

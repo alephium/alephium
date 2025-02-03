@@ -24,22 +24,16 @@ import akka.util.ByteString
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
+import org.alephium.flow.handler.TxHandler.SubmitToMemPoolResult
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.flow.network.sync.SyncState.BlockDownloadTask
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderStatus, InvalidTestnetMiner, Validation}
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{
-  Block,
-  BlockHash,
-  BrokerInfo,
-  ChainIndex,
-  FlowData,
-  ReleaseVersion,
-  TransactionId
-}
+import org.alephium.protocol.model._
 import org.alephium.util._
 
 object BrokerHandler {
@@ -49,17 +43,19 @@ object BrokerHandler {
   final case class Received(payload: Payload)                                   extends Command
   case object SendPing                                                          extends Command
   final case class SyncLocators(hashes: AVector[AVector[BlockHash]])            extends Command
-  final case class DownloadHeaders(fromHashes: AVector[BlockHash])              extends Command
   final case class DownloadBlocks(hashes: AVector[BlockHash])                   extends Command
   final case class RelayBlock(hash: BlockHash)                                  extends Command
   final case class RelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]) extends Command
   final case class DownloadTxs(hashes: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
-
-  final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
+  final case class SendChainState(tips: AVector[ChainTip])                       extends Command
+  final case class GetAncestors(chains: AVector[ChainTipInfo])                   extends Command
+  final case class GetSkeletons(chains: AVector[(ChainIndex, BlockHeightRange)]) extends Command
+  final case object CheckPendingRequest                                          extends Command
+  final case class DownloadBlockTasks(tasks: AVector[BlockDownloadTask])         extends Command
 }
 
-trait BrokerHandler extends FlowDataHandler {
+trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataHandler {
   import BrokerHandler._
 
   def connectionType: ConnectionType
@@ -72,8 +68,6 @@ trait BrokerHandler extends FlowDataHandler {
 
   var remoteBrokerInfo: BrokerInfo = _
 
-  def handShakeDuration: Duration
-
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
 
@@ -82,51 +76,27 @@ trait BrokerHandler extends FlowDataHandler {
 
   override def receive: Receive = handShaking
 
-  def handShakeMessage: Payload
-
-  private var handshakeTimeoutTickOpt: Option[Cancellable] = None
-  @inline private def cancelHandshakeTick(): Unit = {
-    handshakeTimeoutTickOpt.foreach(_.cancel())
-    handshakeTimeoutTickOpt = None
+  private def handleInvalidClientId(clientId: String): Unit = {
+    log.warning(s"Unknown client id from ${remoteAddress}: ${clientId}")
+    stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
   }
 
-  def handShaking: Receive = {
-    send(handShakeMessage)
-    handshakeTimeoutTickOpt = Some(
-      scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
-    )
-
-    def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
-      cancelHandshakeTick()
-      publishEvent(misbehavior)
-      context.stop(self)
-    }
-
-    val receive: Receive = {
-      case Received(hello: Hello) =>
-        log.debug(s"Hello message received: $hello")
-        cancelHandshakeTick()
-
-        if (!ReleaseVersion.checkClientId(hello.clientId)) {
-          log.warning(s"Unknown client id from ${remoteAddress}: ${hello.clientId}")
-          stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
-        } else {
-          handleHandshakeInfo(BrokerInfo.from(remoteAddress, hello.brokerInfo), hello.clientId)
-
-          pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
-          context become (exchanging orElse pingPong)
+  def onHandshakeCompleted(hello: Hello): Unit = {
+    ReleaseVersion.fromClientId(hello.clientId) match {
+      case Some(clientVersion) =>
+        val protocolVersion = clientVersion.protocolVersion
+        handleHandshakeInfo(
+          BrokerInfo.from(remoteAddress, hello.brokerInfo),
+          hello.clientId,
+          protocolVersion
+        )
+        protocolVersion match {
+          case ProtocolV1 => context become (exchangingV1 orElse pingPong)
+          case ProtocolV2 => context become (exchangingV2 orElse pingPong)
         }
-      case HandShakeTimeout =>
-        log.warning(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
-        stop(MisbehaviorManager.RequestTimeout(remoteAddress))
-      case Received(message) =>
-        log.warning(s"Unexpected message from $brokerAlias, $message")
-        stop(MisbehaviorManager.Spamming(remoteAddress))
+      case None => handleInvalidClientId(hello.clientId)
     }
-    receive
   }
-
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit
 
   @inline def escapeIOError[T](f: => IOResult[T], action: String)(g: T => Unit): Unit =
     f match {
@@ -135,7 +105,9 @@ trait BrokerHandler extends FlowDataHandler {
         log.error(s"IO error in $action: $error")
     }
 
-  def exchanging: Receive
+  def exchangingV1: Receive
+
+  def exchangingV2: Receive
 
   def handleNewBlock(block: Block): Unit =
     handleFlowData(AVector(block), dataOrigin, isBlock = true)
@@ -192,12 +164,10 @@ trait BrokerHandler extends FlowDataHandler {
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def flowEvents: Receive = {
-    case BlockChainHandler.BlockAdded(hash) =>
-      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    case _: BlockChainHandler.BlockAdded => ()
     case BlockChainHandler.BlockAddingFailed =>
       log.debug(s"Failed in adding new block")
-    case BlockChainHandler.InvalidBlock(hash, reason) =>
-      blockFlowSynchronizer ! BlockFlowSynchronizer.BlockFinalized(hash)
+    case BlockChainHandler.InvalidBlock(_, reason) =>
       if (reason.isInstanceOf[InvalidHeaderStatus] || reason == InvalidTestnetMiner) {
         handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
       }
@@ -208,56 +178,11 @@ trait BrokerHandler extends FlowDataHandler {
     case HeaderChainHandler.InvalidHeader(hash) =>
       log.debug(s"Invalid header received ${hash.shortHex}")
       handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
-    case TxHandler.AddSucceeded(hash) =>
-      log.debug(s"Tx ${hash.shortHex} was added successfully")
-    case TxHandler.AddFailed(hash, reason) =>
-      log.debug(s"Failed in adding new TX ${hash.shortHex}. Reason: ${reason}")
+    case cmdResponse: SubmitToMemPoolResult =>
+      log.debug(s"${cmdResponse.message}")
   }
 
   def dataOrigin: DataOrigin
-
-  def pingPong: Receive = {
-    case SendPing             => sendPing()
-    case Received(ping: Ping) => handlePing(ping.id, ping.timestamp)
-    case Received(pong: Pong) => handlePong(pong.id)
-  }
-
-  final var pingPongTickOpt: Option[Cancellable] = None
-  final var pingRequestId: RequestId             = RequestId.unsafe(0)
-
-  def pingFrequency: Duration
-
-  def sendPing(): Unit = {
-    if (pingRequestId.value != U32.Zero) {
-      log.info(s"No Pong message received in time from $remoteAddress")
-      handleMisbehavior(MisbehaviorManager.RequestTimeout(remoteAddress))
-    }
-
-    pingRequestId = RequestId.random()
-    send(Ping(pingRequestId, TimeStamp.now()))
-  }
-
-  def handlePing(requestId: RequestId, timestamp: TimeStamp): Unit = {
-    if (requestId.value == U32.Zero) {
-      handleMisbehavior(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
-    } else {
-      val delay = System.currentTimeMillis() - timestamp.millis
-      log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")
-      send(Pong(requestId))
-    }
-  }
-
-  def handlePong(requestId: RequestId): Unit = {
-    if (requestId == pingRequestId) {
-      log.debug(s"Pong received from broker $brokerAlias")
-      pingRequestId = RequestId(U32.Zero)
-    } else {
-      log.debug(
-        s"Pong received from broker $brokerAlias wrong requestId: expect $pingRequestId, got $requestId"
-      )
-      handleMisbehavior(MisbehaviorManager.InvalidPingPong(remoteAddress))
-    }
-  }
 
   def send(payload: Payload): Unit = {
     brokerConnectionHandler !
@@ -274,10 +199,122 @@ trait BrokerHandler extends FlowDataHandler {
       case _ => super.unhandled(message)
     }
 
+  def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
+    publishEvent(misbehavior)
+    context.stop(self)
+  }
+
   override def postStop(): Unit = {
     super.postStop()
     cancelHandshakeTick()
+    cancelPingPongTick()
+  }
+}
+
+trait HandshakeHandler extends BaseHandler {
+  import BrokerHandler._
+
+  implicit def networkSetting: NetworkSetting
+  def remoteAddress: InetSocketAddress
+  def brokerAlias: String
+  def handShakeDuration: Duration
+  def handShakeMessage: Payload
+
+  private var handshakeTimeoutTickOpt: Option[Cancellable] = None
+
+  def send(payload: Payload): Unit
+  def onHandshakeCompleted(hello: Hello): Unit
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit
+  def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit
+
+  def handShaking: Receive = {
+    send(handShakeMessage)
+    handshakeTimeoutTickOpt = Some(
+      scheduleCancellableOnce(self, HandShakeTimeout, handShakeDuration)
+    )
+
+    val receive: Receive = {
+      case Received(hello: Hello) =>
+        log.debug(s"Hello message received: $hello")
+        cancelHandshakeTick()
+        onHandshakeCompleted(hello)
+      case HandShakeTimeout =>
+        log.warning(s"HandShake timeout when connecting to $brokerAlias, closing the connection")
+        stop(MisbehaviorManager.RequestTimeout(remoteAddress))
+      case Received(message) =>
+        log.warning(s"Unexpected message from $brokerAlias, $message")
+        stop(MisbehaviorManager.Spamming(remoteAddress))
+    }
+    receive
+  }
+
+  @inline final protected def cancelHandshakeTick(): Unit = {
+    handshakeTimeoutTickOpt.foreach(_.cancel())
+    handshakeTimeoutTickOpt = None
+  }
+}
+
+trait PingPongHandler extends BaseHandler {
+  import BrokerHandler._
+
+  final var pingPongTickOpt: Option[Cancellable] = None
+  final var pingRequestId: RequestId             = RequestId.unsafe(0)
+
+  def pingFrequency: Duration
+  def remoteAddress: InetSocketAddress
+  def brokerAlias: String
+  def send(payload: Payload): Unit
+
+  protected def pingPong: Receive = {
+    pingPongTickOpt = Some(scheduleCancellable(self, SendPing, pingFrequency))
+
+    val receive: Receive = {
+      case SendPing             => sendPing()
+      case Received(ping: Ping) => handlePing(ping.id, ping.timestamp)
+      case Received(pong: Pong) => handlePong(pong.id)
+    }
+    receive
+  }
+
+  private def sendPing(): Unit = {
+    if (pingRequestId.value != U32.Zero) {
+      log.info(s"No Pong message received in time from $remoteAddress")
+      handleMisbehavior(MisbehaviorManager.RequestTimeout(remoteAddress))
+    }
+
+    pingRequestId = RequestId.random()
+    send(Ping(pingRequestId, TimeStamp.now()))
+  }
+
+  private def handlePing(requestId: RequestId, timestamp: TimeStamp): Unit = {
+    if (requestId.value == U32.Zero) {
+      handleMisbehavior(MisbehaviorManager.InvalidPingPongCritical(remoteAddress))
+    } else {
+      val delay = System.currentTimeMillis() - timestamp.millis
+      log.debug(s"Ping received with ${delay}ms delay; Replying with Pong")
+      send(Pong(requestId))
+    }
+  }
+
+  private def handlePong(requestId: RequestId): Unit = {
+    if (requestId == pingRequestId) {
+      log.debug(s"Pong received from broker $brokerAlias")
+      pingRequestId = RequestId(U32.Zero)
+    } else {
+      log.debug(
+        s"Pong received from broker $brokerAlias wrong requestId: expect $pingRequestId, got $requestId"
+      )
+      handleMisbehavior(MisbehaviorManager.InvalidPingPong(remoteAddress))
+    }
+  }
+
+  @inline final protected def cancelPingPongTick(): Unit = {
     pingPongTickOpt.foreach(_.cancel())
+    pingPongTickOpt = None
   }
 }
 

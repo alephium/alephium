@@ -19,6 +19,7 @@ package org.alephium.api.model
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
@@ -29,7 +30,7 @@ final case class BuildExecuteScriptTxResult(
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: TransactionId,
-    simulatedOutputs: AVector[Output]
+    simulationResult: SimulationResult
 ) extends GasInfo
     with ChainIndexInfo
     with TransactionInfo
@@ -37,7 +38,7 @@ final case class BuildExecuteScriptTxResult(
 object BuildExecuteScriptTxResult {
   def from(
       unsignedTx: UnsignedTransaction,
-      generatedOutputs: AVector[Output]
+      simulationResult: SimulationResult
   )(implicit groupConfig: GroupConfig): BuildExecuteScriptTxResult =
     BuildExecuteScriptTxResult(
       unsignedTx.fromGroup.value,
@@ -46,6 +47,19 @@ object BuildExecuteScriptTxResult {
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
       unsignedTx.id,
-      generatedOutputs
+      simulationResult
     )
+}
+
+final case class SimulationResult(
+    contractInputs: AVector[AddressAssetState],
+    generatedOutputs: AVector[AddressAssetState]
+)
+
+object SimulationResult {
+  def from(txScriptExecution: TxScriptExecution): SimulationResult = {
+    val contractInputs   = txScriptExecution.contractPrevOutputs.map(AddressAssetState.from)
+    val generatedOutputs = txScriptExecution.generatedOutputs.map(AddressAssetState.from)
+    SimulationResult(contractInputs, generatedOutputs)
+  }
 }

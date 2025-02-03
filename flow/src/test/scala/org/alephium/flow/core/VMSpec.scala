@@ -35,9 +35,10 @@ import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
-import org.alephium.ralph.Compiler
+import org.alephium.ralph.{Compiler, CompoundAssignmentOperator}
 import org.alephium.serde._
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 
 // scalastyle:off file.size.limit method.length number.of.methods
 class VMSpec extends AlephiumSpec with Generators {
@@ -3916,10 +3917,41 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "encode values" in new ContractFixture {
     val foo: String =
       s"""
+         |struct Struct1 {
+         |  a: Bool,
+         |  b: U256,
+         |  c: Bool
+         |}
+         |
+         |struct Struct2 {
+         |  a: Bool,
+         |  b: [U256; 2]
+         |}
+         |
+         |struct Struct3 {
+         |  a: Bool,
+         |  b: Struct2
+         |}
+         |
          |Contract Foo() {
          |  pub fn foo() -> () {
-         |    let bytes = encodeToByteVec!(true, 1, false)
-         |    assert!(bytes == #03000102010000, 0)
+         |    let struct1 = Struct1 { a: true, b: 1, c: false }
+         |    let struct1Bytes = encodeToByteVec!(struct1)
+         |    assert!(struct1Bytes == #03000102010000, 0)
+         |
+         |    let struct2 = Struct2 { a: true, b: [1, 2] }
+         |    let struct2Bytes = encodeToByteVec!(struct2)
+         |    assert!(struct2Bytes == #03000102010202, 1)
+         |
+         |    let struct3 = Struct3 { a: true, b: struct2 }
+         |    let struct3Bytes = encodeToByteVec!(struct3)
+         |    assert!(struct3Bytes == #040001000102010202, 3)
+         |
+         |    let allStructs = encodeToByteVec!(struct1, struct2, struct3)
+         |    assert!(allStructs == #0a0001020100000001020102020001000102010202, 4)
+         |
+         |    let bytes = encodeToByteVec!(true, 1, false, [1, 2], struct3)
+         |    assert!(bytes == #09000102010000020102020001000102010202, 5)
          |  }
          |}
          |""".stripMargin
@@ -3934,6 +3966,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |$foo
          |""".stripMargin
     testSimpleScript(main)
+  }
+
+  it should "return compilation error when encoding nothing" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes = encodeToByteVec!()
+         |    assert!(bytes == #00, 0)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(foo).leftValue.getMessage is
+      "Builtin func encodeToByteVec expects at least one argument"
   }
 
   it should "test Contract.encodeFields" in new ContractFixture {
@@ -6684,12 +6730,13 @@ class VMSpec extends AlephiumSpec with Generators {
     subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
     blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
     blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
-
-    blockFlow
-      .getSubContractIds(parentContractId, 0, 5)
-      .leftValue
-      .reason
-      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
+    blockFlow.getSubContractIds(parentContractId, 0, 5) isE (4, AVector.from(subContracts))
+    blockFlow.getSubContractIds(parentContractId, 2, 5) isE (4, AVector.from(
+      subContractId5 +: subContracts678
+    ))
+    blockFlow.getSubContractIds(parentContractId, 3, 10) isE (4, AVector.from(subContracts678))
+    blockFlow.getSubContractIds(parentContractId, 4, 10) isE (4, AVector.empty)
+    blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
   // Inactive instrs check will be enabled in future upgrades
@@ -6778,6 +6825,500 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     testSimpleScript(script)
+  }
+
+  trait CompoundAssignmentFixture extends ContractFixture {
+    def verify(contract: String) = {
+      val contractId = createContract(contract)._1
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  TestContract(#${contractId.toHexString}).compoundAssign()
+           |}
+           |
+           |$contract
+           |""".stripMargin
+      )
+    }
+
+    def getValueType(value: String): String = {
+      value.last match {
+        case 'u' => "U256"
+        case 'i' => "I256"
+        case _   => fail(s"Invalid value type: $value")
+      }
+    }
+
+    def verifySimpleNumber(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let $mutKeyword x = $initValue
+           |    x $op $operationValue
+           |    assert!(x == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable variable x."
+    }
+
+    def verifyArray(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let $mutKeyword x = [$initValue; 2]
+           |    x[0] $op $operationValue
+           |    assert!(x[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable variable x."
+    }
+
+    def verifySimpleStruct(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |struct TestStruct {
+           |  $mutKeyword x: $valueType,
+           |  y: $valueType
+           |}
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let mut testStruct = TestStruct{x: $initValue, y: $initValue}
+           |    testStruct.x $op $operationValue
+           |    assert!(testStruct.x == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable field x in struct TestStruct."
+    }
+
+    def verifyNestedStruct(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |struct TestStruct0 {
+           |  $mutKeyword x: [$valueType; 2],
+           |  y: $valueType
+           |}
+           |struct TestStruct1 {
+           |  $mutKeyword testStruct0: TestStruct0
+           |}
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let mut testStruct1 = TestStruct1{testStruct0: TestStruct0{x: [$initValue, $initValue], y: $initValue}}
+           |    testStruct1.testStruct0.x[0] $op $operationValue
+           |    assert!(testStruct1.testStruct0.x[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable field testStruct0 in struct TestStruct1."
+    }
+
+    def verifyMapping(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      val contractCode =
+        s"""
+           |Contract TestContract() {
+           |  mapping[U256, $valueType] map
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn compoundAssign() -> () {
+           |    map.insert!(@$genesisAddress, 0, $initValue)
+           |    map[0] $op $operationValue
+           |    assert!(map[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      val contractId = createContract(contractCode)._1
+      val scriptCode =
+        s"""
+           |@using(preapprovedAssets = true)
+           |TxScript Main {
+           |  TestContract(#${contractId.toHexString}).compoundAssign{
+           |    @$genesisAddress -> ALPH: minimalContractDeposit!()
+           |}()
+           |}
+           |
+           |$contractCode
+           |""".stripMargin
+      val script = Compiler.compileTxScript(scriptCode).rightValue
+      payableCall(blockFlow, chainIndex, script)
+    }
+
+    def verifySingleTarget(op: String, initValue: String) = {
+      val valueType = getValueType(initValue)
+      verify(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssign() -> () {
+           |    let mut x = $initValue
+           |    x $op getValues()
+           |  }
+           |
+           |  fn getValues() -> ($valueType, $valueType) {
+           |    return $initValue, $initValue
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
+  }
+
+  it should "work for compound assignment" in new CompoundAssignmentFixture {
+    val testCases = Seq(
+      ("+=", "0u", "1u", "1u"),
+      ("-=", "10u", "1u", "9u"),
+      ("*=", "2u", "2u", "4u"),
+      ("/=", "10u", "1u", "10u"),
+      ("+=", "0i", "1i", "1i"),
+      ("-=", "10i", "1i + 2i", "7i"),
+      ("-=", "1i", "10i", "-9i"),
+      ("*=", "2i", "2i * 3i", "12i"),
+      ("/=", "10i", "1i", "10i")
+    )
+
+    testCases.foreach(verifySimpleNumber.tupled)
+    testCases.foreach(verifyArray.tupled)
+    testCases.foreach(verifyMapping.tupled)
+    testCases.foreach(verifySimpleStruct.tupled)
+    testCases.foreach(verifyNestedStruct.tupled)
+
+    CompoundAssignmentOperator.values.foreach { op =>
+      intercept[AssertionError] {
+        verifySingleTarget(op.operatorName, "1u")
+      }.getCause.getMessage is s"""Compound assignment "${op.operatorName}" requires single value on both sides"""
+    }
+
+    intercept[AssertionError] {
+      CompoundAssignmentOperator.values.foreach { op =>
+        verifySimpleNumber(op.operatorName, "1u", "1i", "1i")
+      }
+    }.getCause.getMessage is """Cannot assign "I256" to "U256""""
+  }
+
+  it should "work when compound assignment selectors have side effect" in new CompoundAssignmentFixture {
+    val contract =
+      s"""
+         |Contract TestContract(
+         |  mut arrayIndex: U256,
+         |  mut map1Key: ByteVec,
+         |  mut map2Key: U256
+         |) {  // set init value to 0, #01 and 0
+         |
+         |  mapping[ByteVec, U256] map1
+         |  mapping[U256, [U256; 2]] map2
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn initMaps() -> () {
+         |    map1.insert!(@$genesisAddress, #01, 1)
+         |    map1.insert!(@$genesisAddress, #02, 2)
+         |    map2.insert!(@$genesisAddress, 0, [1, 2])
+         |    map2.insert!(@$genesisAddress, 1, [3, 4])
+         |  }
+         |
+         |  @using(updateFields = true)
+         |  pub fn compoundAssign() -> () {
+         |    let mut array = [0; 2]
+         |    array[1] = 1
+         |    assert!(arrayIndex == 0, 0)
+         |    array[updateAndGetArrayIndex()] += 1
+         |    assert!(array[0] == 1, 1)
+         |    assert!(array[1] == 1, 2)
+         |    assert!(arrayIndex == 1, 3)
+         |    array[updateAndGetArrayIndex()] += 1
+         |    assert!(array[0] == 1, 4)
+         |    assert!(array[1] == 2, 5)
+         |
+         |    assert!(map1Key == #01, 6)
+         |    assert!(map1[#01] == 1, 7)
+         |    map1[updateAndGetMap1Key()] += 10
+         |    assert!(map1[#01] == 11, 8)
+         |    assert!(map1Key == #02, 9)
+         |    assert!(map1[map1Key] == 2, 10)
+         |    map1[map1Key] += 2
+         |    assert!(map1[map1Key] == 4, 12)
+         |
+         |    arrayIndex = 0
+         |    assert!(map2[0][0] == 1, 13)
+         |    map2[updateAndGetMap2Key()][updateAndGetArrayIndex()] += 1
+         |    assert!(map2[0][0] == 2, 14)
+         |    assert!(arrayIndex == 1, 15)
+         |    assert!(map2Key == 1, 16)
+         |    assert!(map2[1][1] == 4, 17)
+         |    map2[updateAndGetMap2Key()][updateAndGetArrayIndex()] += 2
+         |    assert!(map2[1][1] == 6, 18)
+         |  }
+         |
+         |  pub fn updateAndGetArrayIndex() -> U256 {
+         |    let originIndex = arrayIndex
+         |    arrayIndex = arrayIndex + 1
+         |    return originIndex
+         |  }
+         |
+         |  pub fn updateAndGetMap1Key() -> ByteVec {
+         |    let originMapKey = map1Key
+         |    map1Key = #02
+         |    return originMapKey
+         |  }
+         |
+         |  pub fn updateAndGetMap2Key() -> U256 {
+         |    let originMapKey = map2Key
+         |    map2Key = map2Key + 1
+         |    return originMapKey
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(
+      contract,
+      initialMutState = AVector(Val.U256(U256.Zero), Val.ByteVec(hex"01"), Val.U256(U256.Zero))
+    )._1
+
+    callTxScript(
+      s"""
+         |TxScript Main {
+         |  TestContract(#${contractId.toHexString}).initMaps{@$genesisAddress -> ALPH: minimalContractDeposit!() * 4}()
+         |}
+         |$contract
+         |""".stripMargin
+    )
+
+    testSimpleScript(
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  TestContract(#${contractId.toHexString}).compoundAssign()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    )
+  }
+
+  it should "report compilation error when map key and array index do not have the right type" in new CompoundAssignmentFixture {
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssignArray() -> () {
+           |    let mut array = [0; 2]
+           |    array[arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> ByteVec {
+           |    return #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "ByteVec", expected "U256""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssignArray() -> () {
+           |    let mut array = [0; 2]
+           |    array[arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> (U256, ByteVec) {
+           |    return 0, #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "List(U256, ByteVec)", expected "U256""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, U256] map
+           |
+           |  pub fn compoundAssignMap() -> () {
+           |    map[mapKey()] += 1
+           |  }
+           |
+           |  pub fn mapKey() -> U256 {
+           |    return 0
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid map key type "U256", expected "ByteVec""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, U256] map
+           |
+           |  pub fn compoundAssignMap() -> () {
+           |    map[mapKey()] += 1
+           |  }
+           |
+           |  pub fn mapKey() -> (U256, ByteVec) {
+           |    return 0, #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid map key type "List(U256, ByteVec)", expected "ByteVec""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, [U256; 2]] map
+           |
+           |  pub fn compoundAssignMapArray() -> () {
+           |    map[#00][arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> ByteVec {
+           |    return #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "ByteVec", expected "U256""""
+  }
+
+  it should "be able to use assets in the inline function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @inline fn transfer() -> () {
+         |    let caller = callerAddress!()
+         |    assert!(caller == @$genesisAddress, 0)
+         |    transferTokenToSelf!(caller, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> () {
+         |    checkCaller!(callerAddress!() == @$genesisAddress, 0)
+         |    transfer{callerAddress!() -> ALPH: 1 alph}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val fooId = createCompiledContract(compiled.code)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo{@$genesisAddress -> ALPH: 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is ALPH.oneAlph.addUnsafe(minimalAlphInContract)
+  }
+
+  it should "call multiple inline functions that use contract assets" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(checkExternalCaller = false, preapprovedAssets = true)
+         |  pub fn f0() -> () {
+         |    f1{callerAddress!() -> ALPH: 2 alph}()
+         |    f2()
+         |  }
+         |
+         |  @using(payToContractOnly = true, preapprovedAssets = true)
+         |  @inline fn f1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 2 alph)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  @inline fn f2() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val initialAlphAmount = ALPH.alph(2)
+    val fooId = createCompiledContract(compiled.code, initialAttoAlphAmount = initialAlphAmount)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.f0{@$genesisAddress -> ALPH: 2 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
   }
 
   private def getEvents(

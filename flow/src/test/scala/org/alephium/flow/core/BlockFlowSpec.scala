@@ -375,6 +375,25 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.getIntraSyncInventories() isE blocks.map(_.hash).map(AVector(_))
   }
 
+  it should "get chain state" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+
+    val tips0 = blockFlow.getChainTipsUnsafe()
+    tips0 is brokerConfig.chainIndexes.map { chainIndex =>
+      val blockChain = blockFlow.getBlockChain(chainIndex)
+      ChainTip(blockChain.genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)
+    }
+
+    val tips1 = brokerConfig.chainIndexes.map { chainIndex =>
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block1)
+      val weight = blockFlow.getWeightUnsafe(block1.hash)
+      ChainTip(block1.hash, 2, weight)
+    }
+    blockFlow.getChainTipsUnsafe() is tips1
+  }
+
   behavior of "Mining"
 
   it should "sanity check rewards" in new FlowFixture {
@@ -1028,10 +1047,12 @@ trait TxOutputRefIndexFixture extends FlowFixture {
     utxos.length is 1
     val txOutputRef = utxos.head.ref
     if (enableTxOutputRefIndex) {
-      blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
+      blockFlow.getTxIdTxOutputLocatorsFromOutputRef(txOutputRef).map(_.map(_.txId)) isE Some(
+        block.nonCoinbase.head.id
+      )
     } else {
       blockFlow
-        .getTxIdFromOutputRef(txOutputRef)
+        .getTxIdTxOutputLocatorsFromOutputRef(txOutputRef)
         .leftValue
         .reason
         .getMessage is "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"

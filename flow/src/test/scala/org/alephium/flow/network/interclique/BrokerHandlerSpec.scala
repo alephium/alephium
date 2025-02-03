@@ -19,6 +19,8 @@ package org.alephium.flow.network.interclique
 import java.net.InetSocketAddress
 
 import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.util.Random
 
 import akka.actor.Props
 import akka.io.Tcp
@@ -31,16 +33,18 @@ import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
-import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
+import org.alephium.flow.network.broker.{ChainTipInfo, ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
+import org.alephium.flow.network.sync.SyncState.BlockDownloadTask
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.Generators
+import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
 import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp, UnsecureRandom}
 
+// scalastyle:off file.size.limit
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "set remote synced" in new Fixture {
     brokerHandlerActor.selfSynced is false
@@ -384,6 +388,887 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash3) is true)
   }
 
+  it should "send chain state to peer" in new Fixture {
+    val tips = genChainTips()
+    brokerHandler ! BaseBrokerHandler.SendChainState(tips)
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      Message
+        .deserialize(message)
+        .rightValue
+        .payload
+        .asInstanceOf[ChainState]
+        .tips is tips
+    }
+  }
+
+  it should "receive valid chain state from peer" in new Fixture {
+    setRemoteBrokerInfo()
+    val tips = genChainTips()
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(tips))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateChainState(tips))
+  }
+
+  it should "stop handler and publish misbehavior if the tip size is invalid" in new Fixture {
+    val invalidTips = genChainTips().drop(1)
+    checkInvalidTips(invalidTips)
+  }
+
+  it should "stop handler and publish misbehavior if the tip hash is invalid" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+    val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
+    val invalidTip   = ChainTip(invalidBlock.hash, 1, invalidBlock.weight)
+    val invalidTips  = genChainTips().replace(0, invalidTip)
+    checkInvalidTips(invalidTips)
+  }
+
+  it should "stop handler and publish misbehavior if the tip chain index is invalid" in new Fixture {
+    val tips        = genChainTips()
+    val invalidTips = tips.replace(1, tips(0))
+    checkInvalidTips(invalidTips)
+  }
+
+  it should "calculate request span" in {
+    // the test vectors are from go-ethereum
+    val testCases = Seq(
+      (1500, 1000, AVector(1323, 1339, 1355, 1371, 1387, 1403, 1419, 1435, 1451, 1467, 1483, 1499)),
+      (
+        15000,
+        13006,
+        AVector(14823, 14839, 14855, 14871, 14887, 14903, 14919, 14935, 14951, 14967, 14983, 14999)
+      ),
+      (1200, 1150, AVector(1149, 1154, 1159, 1164, 1169, 1174, 1179, 1184, 1189, 1194, 1199)),
+      (1500, 1500, AVector(1497, 1499)),
+      (1000, 1500, AVector(997, 999)),
+      (0, 1500, AVector(0, 2)),
+      (
+        6000000,
+        0,
+        AVector(5999823, 5999839, 5999855, 5999871, 5999887, 5999903, 5999919, 5999935, 5999951,
+          5999967, 5999983, 5999999)
+      ),
+      (0, 0, AVector(0, 2))
+    )
+    testCases.foreach { case (remoteHeight, localHeight, requestHeights) =>
+      SyncV2Handler.calculateRequestSpan(remoteHeight, localHeight).heights is requestHeights
+    }
+  }
+
+  trait SyncV2Fixture extends Fixture {
+    val defaultRequestId = RequestId.unsafe(1)
+
+    def expectHeadersRequest(chains: AVector[(ChainIndex, BlockHeightRange)]): RequestId = {
+      var requestId: RequestId = RequestId.unsafe(0)
+      connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+        val payload = Message
+          .deserialize(message)
+          .rightValue
+          .payload
+          .asInstanceOf[HeadersByHeightsRequest]
+        brokerHandlerActor.pendingRequests.contains(payload.id) is true
+        requestId = payload.id
+        payload.data is AVector.from(chains)
+      }
+      requestId
+    }
+
+    def genBlocks(size: Int): AVector[Block] = {
+      val blocks = (0 until size).map { _ =>
+        val block = emptyBlock(blockFlow, chainIndex)
+        addAndCheck(blockFlow, block)
+        block
+      }
+      blockFlow.getMaxHeightByWeight(chainIndex) isE size
+      AVector.from(blocks)
+    }
+  }
+
+  it should "publish misbehavior and stop broker if the headers request is invalid" in new SyncV2Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val heights =
+      brokerConfig.chainIndexes.map(chainIndex => (chainIndex, BlockHeightRange(1, 4, 1)))
+    brokerHandler ! BaseBrokerHandler.Received(HeadersByHeightsRequest(defaultRequestId, heights))
+    listener.expectNoMessage()
+
+    val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsRequest(defaultRequestId, invalidHeights)
+    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  it should "publish misbehavior and stop broker if the blocks request is invalid" in new SyncV2Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val heights =
+      brokerConfig.chainIndexes.map(chainIndex => (chainIndex, BlockHeightRange(1, 4, 1)))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, heights)
+    )
+    listener.expectNoMessage()
+
+    val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, invalidHeights)
+    )
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  trait GetAncestorsFixture extends SyncV2Fixture {
+    import SyncV2Handler._
+
+    def prepare(chainIndex: ChainIndex, bestHeight: Int): Unit = {
+      val bestTip = ChainTip(BlockHash.random, bestHeight, Weight.zero)
+      val state   = StatePerChain(chainIndex, bestTip)
+      brokerHandlerActor.findingAncestorStates = Some(AVector(state))
+      val request = HeadersByHeightsRequest(
+        defaultRequestId,
+        AVector((chainIndex, BlockHeightRange.fromHeight(0)))
+      )
+      brokerHandlerActor.pendingRequests(request.id) = RequestInfo(request, None)
+    }
+
+    def checkInvalidHeaders(headerss: AVector[AVector[BlockHeader]]) = {
+      setRemoteBrokerInfo()
+
+      val listener = TestProbe()
+      system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+      watch(brokerHandler)
+
+      prepare(chainIndex, 1)
+      brokerHandler ! BaseBrokerHandler.Received(
+        HeadersByHeightsResponse(defaultRequestId, headerss)
+      )
+      blockFlowSynchronizer.expectNoMessage()
+      listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+      expectTerminated(brokerHandler.ref)
+    }
+  }
+
+  it should "handle GetAncestors request" in new GetAncestorsFixture {
+    val chains = brokerConfig.chainIndexes.map { chainIndex =>
+      ChainTipInfo(chainIndex, genChainTip(chainIndex), genChainTip(chainIndex))
+    }
+    brokerHandler ! BaseBrokerHandler.GetAncestors(chains)
+
+    val requests = mutable.ArrayBuffer.empty[(ChainIndex, BlockHeightRange)]
+    brokerHandlerActor.findingAncestorStates.isDefined is true
+    brokerHandlerActor.findingAncestorStates.get.foreachWithIndex { case (state, index) =>
+      val ChainTipInfo(chainIndex, bestTip, selfTip) = chains(index)
+      state.chainIndex is chainIndex
+      state.bestTip is bestTip
+      state.binarySearch is None
+      state.ancestorHeight is None
+      requests.addOne(
+        (chainIndex, SyncV2Handler.calculateRequestSpan(bestTip.height, selfTip.height))
+      )
+    }
+    expectHeadersRequest(AVector.from(requests))
+  }
+
+  it should "clear the pending requests when the GetAncestors request is received" in new GetAncestorsFixture {
+    brokerHandler ! BaseBrokerHandler.GetSkeletons(
+      AVector((chainIndex, BlockHeightRange.from(50, 100, 50)))
+    )
+    eventually(brokerHandlerActor.pendingRequests.nonEmpty is true)
+    val requestId = brokerHandlerActor.pendingRequests.head._1
+
+    val chains = brokerConfig.chainIndexes.map { chainIndex =>
+      ChainTipInfo(chainIndex, genChainTip(chainIndex), genChainTip(chainIndex))
+    }
+    brokerHandler ! BaseBrokerHandler.GetAncestors(chains)
+    eventually(brokerHandlerActor.pendingRequests.contains(requestId) is false)
+  }
+
+  it should "handle GetAncestors response" in new GetAncestorsFixture {
+    prepare(chainIndex, 1)
+    val blocks = genBlocks(4)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(blocks.map(_.header)))
+    )
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 4))))
+    brokerHandlerActor.pendingRequests.isEmpty is true
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    prepare(chainIndex, 1)
+    val state = brokerHandlerActor.findingAncestorStates.value.head
+    state.binarySearch = Some((0, 2))
+    val invalidHeaders = blocks.take(2).map(_.header)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(invalidHeaders))
+    )
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  it should "publish misbehavior and stop broker if the ancestors response is invalid" in {
+    info("invalid chain size")
+    new GetAncestorsFixture {
+      checkInvalidHeaders(AVector.empty)
+    }
+
+    info("invalid header size")
+    new GetAncestorsFixture {
+      checkInvalidHeaders(AVector(AVector.empty))
+    }
+
+    info("invalid header hash")
+    new GetAncestorsFixture {
+      override val configValues: Map[String, Any] =
+        Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+      val invalidBlock = invalidNonceBlock(blockFlow, chainIndex)
+      checkInvalidHeaders(AVector(AVector(invalidBlock.header)))
+    }
+
+    info("invalid chain index")
+    new GetAncestorsFixture {
+      override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(
+        blockFlow,
+        ChainIndex.unsafe(chainIndex.from.value, (chainIndex.to.value + 1) % brokerConfig.groups)
+      )
+      checkInvalidHeaders(AVector(AVector(block0.header, block1.header)))
+    }
+  }
+
+  it should "publish misbehavior if it receives invalid headers response" in new SyncV2Fixture {
+    import SyncV2Handler._
+
+    brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
+      HeadersByHeightsRequest(
+        defaultRequestId,
+        AVector(chainIndex -> BlockHeightRange.from(1, 1, 1))
+      ),
+      None
+    )
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(AVector(block)))
+    )
+
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidResponse(brokerHandlerActor.remoteAddress))
+  }
+
+  it should "publish misbehavior if it receives invalid blocks response" in new SyncV2Fixture {
+    import SyncV2Handler._
+
+    brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(
+      BlocksAndUnclesByHeightsRequest(
+        defaultRequestId,
+        AVector(chainIndex -> BlockHeightRange.from(1, 1, 1))
+      ),
+      None
+    )
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(AVector(block.header)))
+    )
+
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidResponse(brokerHandlerActor.remoteAddress))
+  }
+
+  it should "fall back to binary search to find the ancestor" in new GetAncestorsFixture {
+    val headers       = genBlocks(12).map(_.header)
+    val unknownHeader = emptyBlock(blockFlow, chainIndex).header
+    prepare(chainIndex, 30)
+
+    val state = brokerHandlerActor.findingAncestorStates.get.head
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(AVector(unknownHeader)))
+    )
+    state.binarySearch is Some((0, 30))
+    state.ancestorHeight is None
+
+    val requestId0 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(15))))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(requestId0, AVector(AVector(unknownHeader)))
+    )
+    state.binarySearch is Some((0, 15))
+    state.ancestorHeight is None
+
+    val requestId1 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(7))))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(requestId1, AVector(AVector(headers(6))))
+    )
+    state.binarySearch is Some((7, 15))
+    state.ancestorHeight is Some(7)
+
+    val requestId2 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(11))))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(requestId2, AVector(AVector(headers(10))))
+    )
+    state.binarySearch is Some((11, 15))
+    state.ancestorHeight is Some(11)
+
+    val requestId3 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(13))))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(requestId3, AVector(AVector(unknownHeader)))
+    )
+    state.binarySearch is Some((11, 13))
+    state.ancestorHeight is Some(11)
+
+    val requestId4 = expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(12))))
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(requestId4, AVector(AVector(headers(11))))
+    )
+    blockFlowSynchronizer.expectMsg(
+      BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 12)))
+    )
+    state.binarySearch.isEmpty is true
+    connectionHandler.expectNoMessage()
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
+  }
+
+  it should "work when receiving genesis header" in new GetAncestorsFixture {
+    import SyncV2Handler.RequestInfo
+    prepare(chainIndex, 2)
+    val request = HeadersByHeightsRequest(
+      defaultRequestId,
+      AVector((chainIndex, BlockHeightRange.from(0, 2, 2)))
+    )
+    brokerHandlerActor.pendingRequests(defaultRequestId) = RequestInfo(request, None)
+
+    val header        = emptyBlock(blockFlow, chainIndex).header
+    val blockchain    = blockFlow.getBlockChain(chainIndex)
+    val genesisHeader = blockFlow.getBlockHeaderUnsafe(blockchain.genesisHash)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(AVector(genesisHeader, header)))
+    )
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 0))))
+    connectionHandler.expectNoMessage()
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
+  }
+
+  it should "work if the self chain height is genesis height" in new GetAncestorsFixture {
+    val unknownHeader = emptyBlock(blockFlow, chainIndex).header
+    prepare(chainIndex, 30)
+
+    val state         = brokerHandlerActor.findingAncestorStates.get.head
+    var lastRequestId = defaultRequestId
+    var lastHeight    = 30
+    (0 until 4).foreach { _ =>
+      brokerHandler ! BaseBrokerHandler.Received(
+        HeadersByHeightsResponse(lastRequestId, AVector(AVector(unknownHeader)))
+      )
+      state.binarySearch is Some((0, lastHeight))
+      lastHeight = lastHeight / 2
+      lastRequestId =
+        expectHeadersRequest(AVector((chainIndex, BlockHeightRange.fromHeight(lastHeight))))
+      blockFlowSynchronizer.expectNoMessage()
+      brokerHandlerActor.findingAncestorStates.isDefined is true
+    }
+
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(lastRequestId, AVector(AVector(unknownHeader)))
+    )
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateAncestors(AVector((chainIndex, 0))))
+    connectionHandler.expectNoMessage()
+    brokerHandlerActor.findingAncestorStates.isEmpty is true
+  }
+
+  it should "handle HeadersByHeightsRequest" in new Fixture {
+    val request = HeadersByHeightsRequest(
+      RequestId.unsafe(1),
+      AVector((chainIndex, BlockHeightRange.fromHeight(0)))
+    )
+    val blockchain = blockFlow.getBlockChain(chainIndex)
+    val headers    = AVector(AVector(blockchain.getBlockHeaderUnsafe(blockchain.genesisHash)))
+    brokerHandler ! BaseBrokerHandler.Received(request)
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      val payload = Message
+        .deserialize(message)
+        .rightValue
+        .payload
+        .asInstanceOf[HeadersByHeightsResponse]
+      payload.id is RequestId.unsafe(1)
+      payload.headers is headers
+    }
+  }
+
+  trait GetSkeletonFixture extends SyncV2Fixture {
+    import SyncV2Handler._
+
+    def prepare(chains: AVector[(ChainIndex, BlockHeightRange)]) = {
+      val request     = HeadersByHeightsRequest(defaultRequestId, chains)
+      val requestInfo = RequestInfo(request, None)
+      brokerHandlerActor.pendingRequests.addOne((request.id, requestInfo))
+    }
+  }
+
+  it should "handle GetSkeleton request" in new GetSkeletonFixture {
+    val chains = AVector((chainIndex, BlockHeightRange.from(50, 100, 50)))
+    brokerHandler ! BaseBrokerHandler.GetSkeletons(chains)
+    expectHeadersRequest(AVector.from(chains))
+  }
+
+  it should "handle GetSkeleton response" in new GetSkeletonFixture {
+    val chains = AVector((chainIndex, BlockHeightRange.from(50, 100, 50)))
+    prepare(chains)
+
+    val headers = AVector.fill(2)(emptyBlock(blockFlow, chainIndex).header)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(headers))
+    )
+    eventually(brokerHandlerActor.pendingRequests.contains(defaultRequestId) is false)
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateSkeletons(chains, AVector(headers)))
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    val invalidHeaders = headers.drop(1)
+    prepare(chains)
+    brokerHandler ! BaseBrokerHandler.Received(
+      HeadersByHeightsResponse(defaultRequestId, AVector(invalidHeaders))
+    )
+    blockFlowSynchronizer.expectNoMessage()
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  trait DownloadBlocksFixture extends SyncV2Fixture {
+    import SyncV2Handler._
+
+    def prepare(tasks: AVector[BlockDownloadTask]) = {
+      val chains      = tasks.map(t => (t.chainIndex, t.heightRange))
+      val request     = BlocksAndUnclesByHeightsRequest(defaultRequestId, chains)
+      val requestInfo = RequestInfo(request, Some(BaseBrokerHandler.DownloadBlockTasks(tasks)))
+      brokerHandlerActor.pendingRequests.addOne((request.id, requestInfo))
+    }
+
+    def genBlocksResponse(size: Int, genUncleBlock: Boolean = false): AVector[AVector[Block]] = {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        (0 until size).foreach { _ =>
+          val block0 = emptyBlock(blockFlow, chainIndex)
+          val block1 = emptyBlock(blockFlow, chainIndex)
+          addAndCheck(blockFlow, block0)
+          if (genUncleBlock && Random.nextBoolean()) {
+            addAndCheck(blockFlow, block1)
+          }
+        }
+      }
+      val heights = AVector.from(1 to size)
+      brokerConfig.chainIndexes.map { chainIndex =>
+        val chain = blockFlow.getBlockChain(chainIndex)
+        chain.maxHeightUnsafe is size
+        chain.getBlocksWithUnclesByHeights(heights).rightValue
+      }
+    }
+
+    def checkValidBlocks(blockss: AVector[AVector[Block]]) = {
+      setRemoteBrokerInfo()
+      val tasks = brokerConfig.chainIndexes.map(BlockDownloadTask(_, 1, 4, None))
+      prepare(tasks)
+      brokerHandler ! BaseBrokerHandler.Received(
+        BlocksAndUnclesByHeightsResponse(defaultRequestId, blockss)
+      )
+      blockFlowSynchronizer.expectMsg(
+        BlockFlowSynchronizer.UpdateBlockDownloaded(
+          tasks.zipWithIndex.map { case (task, index) =>
+            (task, blockss(index), true)
+          }
+        )
+      )
+    }
+
+    def checkInvalidBlocks(blockss: AVector[AVector[Block]]) = {
+      setRemoteBrokerInfo()
+
+      val listener = TestProbe()
+      system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+      watch(brokerHandler)
+
+      val tasks = brokerConfig.chainIndexes.map(BlockDownloadTask(_, 0, 4, None))
+      prepare(tasks)
+      brokerHandler ! BaseBrokerHandler.Received(
+        BlocksAndUnclesByHeightsResponse(defaultRequestId, blockss)
+      )
+      blockFlowSynchronizer.expectNoMessage()
+      listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+      expectTerminated(brokerHandler.ref)
+    }
+  }
+
+  it should "publish misbehavior and stop broker if the blocks response is invalid" in {
+    info("valid blocks")
+    new DownloadBlocksFixture {
+      checkValidBlocks(genBlocksResponse(4))
+    }
+
+    info("valid blocks and uncles")
+    new DownloadBlocksFixture {
+      checkValidBlocks(genBlocksResponse(4, genUncleBlock = true))
+    }
+
+    info("invalid chain size")
+    new DownloadBlocksFixture {
+      val blockss        = genBlocksResponse(4)
+      val invalidBlockss = blockss.slice(0, nextInt(blockss.length - 1))
+      checkInvalidBlocks(invalidBlockss)
+    }
+
+    info("invalid block size")
+    new DownloadBlocksFixture {
+      val blockss        = genBlocksResponse(4)
+      val index          = nextInt(blockss.length - 1)
+      val invalidBlockss = blockss.replace(index, blockss(index).drop(1))
+      checkInvalidBlocks(invalidBlockss)
+    }
+
+    info("invalid block hash")
+    new DownloadBlocksFixture {
+      override val configValues: Map[String, Any] =
+        Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
+
+      val blockss        = genBlocksResponse(4)
+      val invalidBlock   = invalidNonceBlock(blockFlow, chainIndex)
+      val index          = nextInt(blockss.length - 1)
+      val invalidBlockss = blockss.replace(index, blockss(index) :+ invalidBlock)
+      checkInvalidBlocks(invalidBlockss)
+    }
+
+    info("invalid chain index")
+    new DownloadBlocksFixture {
+      val blockss        = genBlocksResponse(4)
+      val index0         = nextInt(blockss.length - 1)
+      val index1         = (index0 + 1) % blockss.length
+      val invalidBlockss = blockss.replace(index0, blockss(index0) :+ blockss(index1).head)
+      checkInvalidBlocks(invalidBlockss)
+    }
+  }
+
+  it should "handle download block tasks" in new DownloadBlocksFixture {
+    val task = BlockDownloadTask(chainIndex, 1, 50, None)
+    brokerHandler ! BaseBrokerHandler.DownloadBlockTasks(AVector(task))
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      val payload = Message
+        .deserialize(message)
+        .rightValue
+        .payload
+        .asInstanceOf[BlocksAndUnclesByHeightsRequest]
+      payload.data is AVector((chainIndex, BlockHeightRange.from(1, 50, 1)))
+    }
+  }
+
+  it should "handle blocks request" in new DownloadBlocksFixture {
+    val blocks  = genBlocks(4)
+    val heights = AVector((chainIndex, BlockHeightRange.from(1, 4, 1)))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, heights)
+    )
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      val payload = Message
+        .deserialize(message)
+        .rightValue
+        .payload
+        .asInstanceOf[BlocksAndUnclesByHeightsResponse]
+      payload.id is defaultRequestId
+      payload.blocks is AVector(blocks)
+    }
+  }
+
+  it should "handle blocks response" in new DownloadBlocksFixture {
+    val blocks = genBlocks(4)
+    val task0  = BlockDownloadTask(chainIndex, 1, 4, Some(blocks.last.header))
+    prepare(AVector(task0))
+
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(blocks))
+    )
+    eventually(brokerHandlerActor.pendingRequests.contains(defaultRequestId) is false)
+    blockFlowSynchronizer.expectMsg(
+      BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task0, blocks, true)))
+    )
+
+    val task1 = task0.copy(toHeader = None)
+    prepare(AVector(task1))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(blocks))
+    )
+    blockFlowSynchronizer.expectMsg(
+      BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task1, blocks, true)))
+    )
+
+    val task2 = task0.copy(toHeader = Some(blocks.head.header))
+    prepare(AVector(task2))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsResponse(defaultRequestId, AVector(blocks))
+    )
+    blockFlowSynchronizer.expectMsg(
+      BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task2, blocks, false)))
+    )
+  }
+
+  it should "validate blocks response" in new DownloadBlocksFixture {
+    var blockSize = 0
+    (0 until 4).foreach { _ =>
+      val uncleSize = Random.nextInt(3)
+      val blocks    = (0 to uncleSize).map(_ => emptyBlock(blockFlow, chainIndex))
+      blocks.foreach(block => addAndCheck(blockFlow, block))
+      blockSize += uncleSize + 1
+    }
+
+    val blockchain = blockFlow.getBlockChain(chainIndex)
+    val blocks     = blockchain.getBlocksWithUnclesByHeightsUnsafe(AVector.from(1 to 4))
+    blocks.length is blockSize
+
+    def getHeader(height: Int): BlockHeader = {
+      val hash = blockchain.getHashesUnsafe(height).head
+      blockchain.getBlockHeaderUnsafe(hash)
+    }
+    val toHeader        = getHeader(4)
+    val invalidToHeader = getHeader(3)
+
+    SyncV2Handler.validateBlocks(blocks, 4, None) is true
+    SyncV2Handler.validateBlocks(blocks, 4, Some(toHeader)) is true
+    SyncV2Handler.validateBlocks(blocks, 3, None) is false
+    SyncV2Handler.validateBlocks(blocks, 5, None) is false
+    SyncV2Handler.validateBlocks(blocks, 4, Some(invalidToHeader)) is false
+
+    val index         = blocks.indexWhere(_.header == invalidToHeader)
+    val invalidBlocks = blocks.replace(index, blocks.last)
+    SyncV2Handler.validateBlocks(invalidBlocks, 4, None) is false
+    SyncV2Handler.validateBlocks(invalidBlocks, 4, Some(toHeader)) is false
+  }
+
+  it should "check pending requests" in new SyncV2Fixture {
+    import SyncV2Handler.RequestInfo
+
+    val now = TimeStamp.now()
+    val request = HeadersByHeightsRequest(
+      defaultRequestId,
+      AVector((chainIndex, BlockHeightRange.fromHeight(1)))
+    )
+    val requestInfo = RequestInfo(request, None, now.minusUnsafe(Duration.ofSecondsUnsafe(3)))
+    brokerHandlerActor.pendingRequests.addOne((defaultRequestId, requestInfo))
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+
+    brokerHandler ! BaseBrokerHandler.CheckPendingRequest
+    brokerHandlerActor.pendingRequests.size is 1
+
+    brokerHandlerActor.pendingRequests.update(
+      defaultRequestId,
+      requestInfo.copy(expiry = now.plusSecondsUnsafe(2))
+    )
+    brokerHandler ! BaseBrokerHandler.CheckPendingRequest
+    listener.expectMsg(MisbehaviorManager.RequestTimeout(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler.ref)
+  }
+
+  it should "check if the node is synced by chain state" in new SyncV2Fixture {
+    setRemoteBrokerInfo()
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is false
+
+    def reset(): Unit = {
+      brokerHandlerActor.selfChainTips.reset()
+      brokerHandlerActor.remoteChainTips.reset()
+      brokerHandlerActor.selfSynced = false
+      brokerHandlerActor.remoteSynced = false
+    }
+
+    reset()
+    val chainTips = genChainTips()
+    chainTips.length is 3
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is false
+
+    reset()
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is false
+
+    reset()
+    val index0  = nextInt(0, chainTips.length - 1)
+    val newTip0 = chainTips(index0).copy(weight = chainTips(index0).weight + Weight(1))
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips.replace(index0, newTip0)))
+    brokerHandlerActor.selfSynced is false
+    brokerHandlerActor.remoteSynced is true
+
+    reset()
+    val index1 = (index0 + 1) % chainTips.length
+    val newTip1 = chainTips(index1).copy(weight =
+      chainTips(index1).weight.copy(value = chainTips(index1).weight.value.subtract(1))
+    )
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips.replace(index1, newTip1)))
+    brokerHandlerActor.selfSynced is true
+    brokerHandlerActor.remoteSynced is false
+
+    reset()
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
+    brokerHandlerActor.selfSynced is true
+    brokerHandlerActor.remoteSynced is true
+  }
+
+  it should "get next height" in new Fixture {
+    val bestTip = genChainTip(chainIndex).copy(height = 21)
+    val state   = SyncV2Handler.StatePerChain(chainIndex, bestTip)
+    state.ancestorHeight.isEmpty is true
+    state.binarySearch.isEmpty is true
+
+    state.startBinarySearch() is 10
+    state.ancestorHeight.isEmpty is true
+
+    state.updateBinarySearch(true)
+    state.ancestorHeight is Some(10)
+    state.binarySearch is Some((10, 21))
+    state.getNextHeight() is Some(15)
+
+    state.updateBinarySearch(false)
+    state.ancestorHeight is Some(10)
+    state.binarySearch is Some((10, 15))
+    state.getNextHeight() is Some(12)
+
+    state.updateBinarySearch(true)
+    state.ancestorHeight is Some(12)
+    state.binarySearch is Some((12, 15))
+    state.getNextHeight() is Some(13)
+
+    state.updateBinarySearch(false)
+    state.ancestorHeight is Some(12)
+    state.binarySearch is Some((12, 13))
+    state.getNextHeight() is None
+  }
+
+  it should "handle ancestor response properly" in new Fixture {
+    import SyncV2Handler._
+
+    val headers = (0 until 12).map { _ =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block.header
+    }
+    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 12
+    val bestTip = genChainTip(chainIndex).copy(height = 21)
+    val state   = SyncV2Handler.StatePerChain(chainIndex, bestTip)
+    val header  = emptyBlock(blockFlow, chainIndex).header
+
+    state.ancestorHeight = Some(1)
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is a[InvalidState]
+    state.ancestorHeight = None
+
+    state.handleAncestorResponseUnsafe(
+      blockFlow,
+      AVector(header, headers(5), headers.last)
+    ) is AncestorFound
+    state.ancestorHeight is Some(12)
+
+    state.ancestorHeight = None
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header, headers(5))) is AncestorFound
+    state.ancestorHeight is Some(6)
+
+    state.ancestorHeight = None
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is StartBinarySearch(10)
+    state.ancestorHeight is None
+    state.binarySearch is Some((0, 21))
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(headers(9))) is ContinueBinarySearch(15)
+    state.ancestorHeight is Some(10)
+    state.binarySearch is Some((10, 21))
+
+    state.binarySearch = Some((10, 15))
+    state.ancestorHeight = Some(10)
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(headers.head)) is a[InvalidResponse]
+
+    state.binarySearch = Some((12, 15))
+    state.ancestorHeight = Some(12)
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is AncestorFound
+    state.ancestorHeight is Some(12)
+
+    state.binarySearch = Some((0, 2))
+    state.ancestorHeight = None
+    state.handleAncestorResponseUnsafe(blockFlow, AVector(header)) is AncestorFound
+    state.ancestorHeight is Some(ALPH.GenesisHeight)
+
+    state.binarySearch = Some((0, 2))
+    state.ancestorHeight = None
+    state
+      .handleAncestorResponseUnsafe(blockFlow, AVector(header, headers.last)) is a[InvalidResponse]
+  }
+
+  it should "handle block announcement properly" in new Fixture {
+    val blockHash = emptyBlock(blockFlow, chainIndex).hash
+
+    def reset(): Unit = {
+      setRemoteBrokerInfo()
+      brokerHandlerActor.selfChainTips.reset()
+      brokerHandlerActor.remoteChainTips.reset()
+      brokerHandlerActor.seenBlocks.remove(blockHash)
+      ()
+    }
+
+    reset()
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    reset()
+    val chainTips = genChainTips(100)
+    brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+    brokerHandlerActor.selfChainTips.isEmpty is false
+    brokerHandlerActor.remoteChainTips.isEmpty is true
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    reset()
+    blockFlowSynchronizer.ignoreMsg { case _: BlockFlowSynchronizer.UpdateChainState => true }
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
+    brokerHandlerActor.selfChainTips.isEmpty is true
+    brokerHandlerActor.remoteChainTips.isEmpty is false
+    brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    def testWithHeight(height: Int) = {
+      reset()
+      brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
+      val index           = chainIndex.to.value
+      val remoteChainTips = chainTips.replace(index, chainTips(index).copy(height = height))
+      brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteChainTips))
+      brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(blockHash))
+    }
+
+    val height0 = nextInt(0, 50)
+    testWithHeight(height0)
+    blockFlowSynchronizer.expectNoMessage()
+
+    val height1 = nextInt(51, 149)
+    testWithHeight(height1)
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+
+    val height2 = nextInt(150, Int.MaxValue)
+    testWithHeight(height2)
+    blockFlowSynchronizer.expectNoMessage()
+  }
+
   trait Fixture extends FlowFixture {
     val cliqueManager         = TestProbe()
     val connectionHandler     = TestProbe()
@@ -426,6 +1311,34 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       }
     }
 
+    def setRemoteBrokerInfo() = {
+      brokerHandler.underlyingActor.remoteBrokerInfo = BrokerInfo.unsafe(
+        CliqueId.generate,
+        brokerConfig.brokerId,
+        brokerConfig.brokerNum,
+        brokerHandlerActor.remoteAddress
+      )
+    }
+
+    def genChainTip(chainIndex: ChainIndex, height: Int = 1) = {
+      val block = emptyBlock(blockFlow, chainIndex)
+      ChainTip(block.hash, height, block.weight)
+    }
+
+    def genChainTips(height: Int = 1) = brokerConfig.chainIndexes.map(genChainTip(_, height))
+
+    def checkInvalidTips(invalidTips: AVector[ChainTip]) = {
+      setRemoteBrokerInfo()
+
+      val listener = TestProbe()
+      system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+      watch(brokerHandler)
+
+      brokerHandler ! BaseBrokerHandler.Received(ChainState(invalidTips))
+      blockFlowSynchronizer.expectNoMessage()
+      listener.expectMsg(MisbehaviorManager.InvalidChainState(brokerHandlerActor.remoteAddress))
+      expectTerminated(brokerHandler.ref)
+    }
   }
 }
 
@@ -472,5 +1385,5 @@ class TestBrokerHandler(
     with BrokerHandler {
   context.watch(brokerConnectionHandler.ref)
 
-  override def receive: Receive = exchanging
+  override def receive: Receive = exchangingV2
 }
