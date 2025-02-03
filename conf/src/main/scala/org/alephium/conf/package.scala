@@ -39,7 +39,7 @@ import org.alephium.util.{AVector, Duration, U256}
 package object conf {
 
   implicit val nameMapper: NameMapper = new NameMapper {
-    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?<=[a-zA-Z])[0-9]|(?!^)[A-Z](?=[a-z]))".r
+    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))".r
 
     /** Maps from a camelCasedName to a hyphenated-name
       */

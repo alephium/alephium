@@ -142,16 +142,22 @@ sealed trait VariablesRef[Ctx <: StatelessContext] {
   def isTemplate: Boolean
   def tpe: Type
 
-  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector): VariablesRef[Ctx]
-  def subRef(state: Compiler.State[Ctx], selectors: Seq[Ast.DataSelector]): VariablesRef[Ctx] = {
+  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector[Ctx]): VariablesRef[Ctx]
+  def subRef(
+      state: Compiler.State[Ctx],
+      selectors: Seq[Ast.DataSelector[Ctx]]
+  ): VariablesRef[Ctx] = {
     selectors.foldLeft(this) { case (acc, selector) => acc.subRef(state, selector) }
   }
   def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
 
   def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
-  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.DataSelector): Seq[Instr[Ctx]]
+  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.DataSelector[Ctx]): Seq[Instr[Ctx]]
   def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
-  def genStoreCode(state: Compiler.State[Ctx], selector: Ast.DataSelector): Seq[Seq[Instr[Ctx]]]
+  def genStoreCode(
+      state: Compiler.State[Ctx],
+      selector: Ast.DataSelector[Ctx]
+  ): Seq[Seq[Instr[Ctx]]]
 }
 
 object VariablesRef {
@@ -232,15 +238,15 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   def calcRefOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VariablesRefOffset[Ctx]
   def calcDataOffset(state: Compiler.State[Ctx], selector: Ast.Ident): VarOffset[Ctx]
 
-  private def getIdentSelector(selector: Ast.DataSelector): Ast.IdentSelector = {
+  private def getIdentSelector(selector: Ast.DataSelector[Ctx]): Ast.IdentSelector[Ctx] = {
     selector match {
       case Ast.IndexSelector(index) =>
         throw Compiler.Error(s"Expected ident selector, got index selector", index.sourceIndex)
-      case selector: Ast.IdentSelector => selector
+      case selector: Ast.IdentSelector[Ctx @unchecked] => selector
     }
   }
 
-  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector): VariablesRef[Ctx] = {
+  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector[Ctx]): VariablesRef[Ctx] = {
     subRef(state, getIdentSelector(selector).ident)
   }
 
@@ -280,7 +286,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
 
   def genStoreCode(
       state: Compiler.State[Ctx],
-      selector: Ast.DataSelector
+      selector: Ast.DataSelector[Ctx]
   ): Seq[Seq[Instr[Ctx]]] = {
     val ident = getIdentSelector(selector).ident
     val field = ast.getField(ident)
@@ -322,7 +328,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
     genLoadCode(state, field.ident, state.resolveType(field.tpe))
   }
 
-  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.DataSelector): Seq[Instr[Ctx]] = {
+  def genLoadCode(state: Compiler.State[Ctx], selector: Ast.DataSelector[Ctx]): Seq[Instr[Ctx]] = {
     genLoadCode(state, getIdentSelector(selector).ident)
   }
 }
@@ -390,7 +396,7 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
 
   def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRefOffset[Ctx]
 
-  private def getIndexSelector(selector: Ast.DataSelector): Ast.IndexSelector[Ctx] = {
+  private def getIndexSelector(selector: Ast.DataSelector[Ctx]): Ast.IndexSelector[Ctx] = {
     selector match {
       case selector: Ast.IndexSelector[Ctx @unchecked] => selector
       case Ast.IdentSelector(ident) =>
@@ -424,14 +430,14 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
 
   def genLoadCode(
       state: Compiler.State[Ctx],
-      selector: Ast.DataSelector
+      selector: Ast.DataSelector[Ctx]
   ): Seq[Instr[Ctx]] = {
     genLoadCode(state, getIndexSelector(selector).index)
   }
 
   def genStoreCode(
       state: Compiler.State[Ctx],
-      selector: Ast.DataSelector
+      selector: Ast.DataSelector[Ctx]
   ): Seq[Seq[Instr[Ctx]]] = {
     val index = getIndexSelector(selector).index
     tpe.baseType match {
@@ -460,7 +466,7 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
     }
   }
 
-  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector): VariablesRef[Ctx] = {
+  def subRef(state: Compiler.State[Ctx], selector: Ast.DataSelector[Ctx]): VariablesRef[Ctx] = {
     subRef(state, getIndexSelector(selector).index)
   }
 

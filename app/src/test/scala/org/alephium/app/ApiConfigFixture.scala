@@ -32,6 +32,7 @@ trait ApiConfigFixture extends SocketUtil {
     AVector.empty,
     ALPH.oneAlph,
     ALPH.MaxTxInputNum * 2,
-    128
+    128,
+    enableHttpMetrics = true
   )
 }

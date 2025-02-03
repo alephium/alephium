@@ -17,13 +17,14 @@
 package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.{CachedKVStorage, IOResult}
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.CachedLog
+import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.CachedSubContractIndex
 
 final case class CachedNodeIndexes(
     logStorageCache: CachedLog,
-    txOutputRefIndexCache: Option[CachedKVStorage[TxOutputRef.Key, TransactionId]],
+    txOutputRefIndexCache: Option[CachedKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexCache: Option[CachedSubContractIndex]
 ) {
   def persist(): IOResult[NodeIndexesStorage] = {
@@ -37,7 +38,11 @@ final case class CachedNodeIndexes(
         case Some(cache) => cache.persist().map(Some(_))
         case None        => Right(None)
       }
-    } yield NodeIndexesStorage(logStorage, txOutputRefIndexStorage, subContractIndexStorage)
+    } yield NodeIndexesStorage(
+      logStorage,
+      txOutputRefIndexStorage,
+      subContractIndexStorage
+    )
   }
 
   def staging(): StagingNodeIndexes = {

@@ -153,7 +153,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         val toAddress = Address.Asset(assetLockupGen(groupIndex).sample.get)
         Destination(
           toAddress,
-          alphTransferAmount,
+          Some(Amount(alphTransferAmount)),
           Some(AVector(Token(tokenId, tokenTransferAmount)))
         )
       }
@@ -215,7 +215,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
     val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
     val destination0 =
-      Destination(toAddress, ALPH.alph(2), Some(AVector(Token(tokenId, ALPH.alph(2)))))
+      Destination(
+        toAddress,
+        Some(Amount(ALPH.alph(2))),
+        Some(AVector(Token(tokenId, ALPH.alph(2))))
+      )
     val query0 = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query0)
@@ -223,7 +227,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       .detail is "Not enough ALPH balance, requires an additional 0.502 ALPH"
 
     val destination1 =
-      Destination(toAddress, ALPH.oneAlph, Some(AVector(Token(tokenId, ALPH.alph(3)))))
+      Destination(
+        toAddress,
+        Some(Amount(ALPH.oneAlph)),
+        Some(AVector(Token(tokenId, ALPH.alph(3))))
+      )
     val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
@@ -236,7 +244,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
-    val destination0 = Destination(toAddress, ALPH.alph(1), None)
+    val destination0 = Destination(toAddress, Some(Amount(ALPH.oneAlph)), None)
     val query0       = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query0)
@@ -245,7 +253,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
     val destination1 =
-      Destination(toAddress, ALPH.alph(1), Some(AVector(Token(tokenId, ALPH.alph(2)))))
+      Destination(
+        toAddress,
+        Some(Amount(ALPH.oneAlph)),
+        Some(AVector(Token(tokenId, ALPH.alph(2))))
+      )
     val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)

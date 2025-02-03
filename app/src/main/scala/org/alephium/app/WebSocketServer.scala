@@ -31,7 +31,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.rpc.model.JsonRPC._
@@ -155,6 +155,7 @@ object WebSocketServer {
             case _ => // this should never happen
               log.error(s"Received invalid block $block")
           }
+        case _: TxNotify =>
       }
     }
   }

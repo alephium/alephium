@@ -29,6 +29,7 @@ import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Math, TimeStamp, U256}
 
@@ -335,10 +336,10 @@ trait GrouplessUtils { self: ServerUtils =>
         query.targetBlockHash
       )
     } yield {
-      val (transferTxs, executeScriptTx, outputs) = result
+      val (transferTxs, executeScriptTx, txScriptExecution) = result
       BuildGrouplessExecuteScriptTxResult(
         transferTxs.map(BuildTransferTxResult.from),
-        BuildExecuteScriptTxResult.from(executeScriptTx, outputs)
+        BuildExecuteScriptTxResult.from(executeScriptTx, SimulationResult.from(txScriptExecution))
       )
     }
   }
@@ -354,7 +355,7 @@ trait GrouplessUtils { self: ServerUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash]
-  ): Try[(AVector[UnsignedTransaction], UnsignedTransaction, AVector[Output])] = {
+  ): Try[(AVector[UnsignedTransaction], UnsignedTransaction, TxScriptExecution)] = {
     buildExecuteScriptTx(
       blockFlow,
       amounts,

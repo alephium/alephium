@@ -33,6 +33,7 @@ import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Balance => _, Transaction => _, _}
+import org.alephium.protocol.vm.StatefulContract
 import org.alephium.util.{AVector, TimeStamp}
 
 //scalastyle:off file.size.limit
@@ -572,6 +573,13 @@ trait Endpoints
       .in("state")
       .out(jsonBody[ContractState])
       .summary("Get contract state")
+
+  lazy val contractCode: BaseEndpoint[Hash, StatefulContract] =
+    contractsEndpoint.get
+      .in(path[Hash]("codeHash"))
+      .in("code")
+      .out(jsonBody[StatefulContract])
+      .summary("Get contract code by code hash")
 
   lazy val testContract: BaseEndpoint[TestContract, TestContractResult] =
     contractsEndpoint.post

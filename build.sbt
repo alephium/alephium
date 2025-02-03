@@ -218,8 +218,10 @@ lazy val app = mainProject("app")
           "-XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=static -XX:+UnlockExperimentalVMOptions -XX:ShenandoahGuaranteedGCInterval=16000 -XX:ShenandoahUncommitDelay=60000 -XX:MaxGCPauseMillis=1 -XX:+ParallelRefProcEnabled -XX:-UseGCOverheadLimit -XX:+DisableExplicitGC"
         )
 
+        env("JAVA_EXTRA_OPTS", "")
+
         entryPointRaw(
-          s"java $${JAVA_NET_OPTS} $${JAVA_MEM_OPTS} $${JAVA_GC_OPTS} -jar ${artifactTargetPath}"
+          s"java $${JAVA_NET_OPTS} $${JAVA_MEM_OPTS} $${JAVA_GC_OPTS} $${JAVA_EXTRA_OPTS} -jar ${artifactTargetPath}"
         )
       }
     },
@@ -264,7 +266,8 @@ lazy val http = project("http")
       `tapir-vertx`,
       `tapir-client`,
       `tapir-files`,
-      `sttp-backend`
+      `sttp-backend`,
+      `tapir-prometheus-metrics`
     )
   )
 

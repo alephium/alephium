@@ -18,11 +18,14 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.BuildInfo
 import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
+import org.alephium.protocol.model.ReleaseVersion.p2pProtocolV2Version
 import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.TimeStamp
 
 final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
     extends Ordered[ReleaseVersion] {
+
   override def compare(that: ReleaseVersion): Int = {
     major.compare(that.major) match {
       case 0 =>
@@ -37,22 +40,24 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
   override def toString: String = s"v$major.$minor.$patch"
 
   // scalastyle:off magic.number
-  def checkUpgrade()(implicit networkConfig: NetworkConfig): Boolean = {
-    networkConfig.getHardFork(TimeStamp.now()) match {
-      case HardFork.Danube =>
-        true // TODO: Update this once we release the version for the Danube upgrade
-      case HardFork.Rhone =>
-        if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
-          this >= ReleaseVersion(3, 0, 0)
-        } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
-          this >= ReleaseVersion(2, 14, 6)
-        } else {
-          true
-        }
-      case _ => true
+  def checkRhoneUpgrade()(implicit networkConfig: NetworkConfig): Boolean = {
+    if (networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled()) {
+      if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
+        this >= ReleaseVersion(3, 0, 0)
+      } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
+        this >= ReleaseVersion(2, 14, 6)
+      } else {
+        true
+      }
+    } else {
+      true
     }
   }
   // scalastyle:on magic.number
+
+  def protocolVersion: ProtocolVersion = {
+    if (this >= p2pProtocolV2Version) ProtocolV2 else ProtocolV1
+  }
 }
 
 object ReleaseVersion {
@@ -62,13 +67,22 @@ object ReleaseVersion {
     )
   )
 
+  // scalastyle:off magic.number
+  val p2pProtocolV2Version: ReleaseVersion = ReleaseVersion(3, 12, 0)
+  // scalastyle:on magic.number
+
   val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
 
-  def checkClientId(clientId: String)(implicit networkConfig: NetworkConfig): Boolean = {
-    ReleaseVersion.fromClientId(clientId).exists(_.checkUpgrade())
+  def fromClientId(
+      clientId: String
+  )(implicit networkConfig: NetworkConfig): Option[ReleaseVersion] = {
+    fromClientIdStr(clientId) match {
+      case Some(version) if version.checkRhoneUpgrade() => Some(version)
+      case _                                            => None
+    }
   }
 
-  def fromClientId(clientId: String): Option[ReleaseVersion] = {
+  private def fromClientIdStr(clientId: String): Option[ReleaseVersion] = {
     val parts = clientId.split("/")
     if (parts.length < 2) {
       None

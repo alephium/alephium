@@ -53,7 +53,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       Generators.socketAddressGen.sample.get
     )
     watch(brokerHandler)
-    brokerHandlerActor.handleHandshakeInfo(invalidBrokerInfo, clientInfo)
+    brokerHandlerActor.handleHandshakeInfo(invalidBrokerInfo, clientInfo, ProtocolV1)
     expectTerminated(brokerHandler)
   }
 
@@ -70,7 +70,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       config.broker.brokerNum,
       Generators.socketAddressGen.sample.get
     )
-    brokerHandlerActor.handleHandshakeInfo(brokerInfo, clientInfo)
+    brokerHandlerActor.handleHandshakeInfo(brokerInfo, clientInfo, ProtocolV1)
 
     val blocks0 = AVector.tabulate(groups0) { _ =>
       blockGenOf(GroupIndex.unsafe(0)).sample.get
@@ -192,5 +192,5 @@ class TestBrokerHandler(
     with BrokerHandler {
   context.watch(brokerConnectionHandler.ref)
 
-  override def receive: Receive = exchanging
+  override def receive: Receive = exchangingV1
 }
