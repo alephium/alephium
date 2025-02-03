@@ -50,16 +50,9 @@ def mainProject(id: String): Project =
 
 def project(path: String): Project = {
   baseProject(path)
-    .configs(IntegrationTest extend Test)
     .settings(
-      Defaults.itSettings,
-      inConfig(IntegrationTest)(org.scalafmt.sbt.ScalafmtPlugin.scalafmtConfigSettings),
       Compile / scalastyleConfig := root.base / scalastyleCfgFile,
       Test / scalastyleConfig    := root.base / scalastyleTestCfgFile,
-      inConfig(IntegrationTest)(ScalastylePlugin.rawScalastyleSettings()),
-      IntegrationTest / scalastyleConfig  := root.base / scalastyleTestCfgFile,
-      IntegrationTest / scalastyleTarget  := target.value / "scalastyle-it-results.xml",
-      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value,
       apiMappings +=
         APIMapping.scalaDocs(
           classPath = (Compile / fullClasspath).value,
@@ -137,9 +130,9 @@ lazy val app = mainProject("app")
     api,
     rpc,
     http % "compile->compile;test->test",
-    util % "it,test->test",
+    util % "test->test",
     flow,
-    flow % "it,test->test",
+    flow % "test->test",
     wallet
   )
   .enablePlugins(sbtdocker.DockerPlugin, BuildInfoPlugin)
@@ -446,6 +439,13 @@ lazy val ralphc = project("ralphc")
     }
   )
 
+lazy val integration = project("integration")
+  .dependsOn(app % "test->test")
+  .settings(
+    publish / skip                   := true,
+    Test / envVars += "ALEPHIUM_ENV" -> "it"
+  )
+
 val publishSettings = Seq(
   organization := "org.alephium",
   homepage     := Some(url("https://github.com/alephium/alephium")),
@@ -503,15 +503,13 @@ val commonSettings = publishSettings ++ Seq(
     "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:silent"
   ),
   Compile / console / scalacOptions --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
-  Compile / compile / wartremoverErrors      := Warts.allBut(wartsCompileExcludes: _*),
-  Test / test / wartremoverErrors            := Warts.allBut(wartsTestExcludes: _*),
-  IntegrationTest / test / wartremoverErrors := Warts.allBut(wartsTestExcludes: _*),
-  fork                                       := true,
+  Compile / compile / wartremoverErrors := Warts.allBut(wartsCompileExcludes: _*),
+  Test / test / wartremoverErrors       := Warts.allBut(wartsTestExcludes: _*),
+  fork                                  := true,
   javaOptions += "-Xss2m",
   Test / scalacOptions ++= Seq("-Xcheckinit"),
   Test / envVars += "ALEPHIUM_ENV" -> "test",
   Test / testOptions += Tests.Argument("-oD"),
-  IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",
   libraryDependencies ++= Seq(
     `akka-test`,
     scalacheck,
@@ -567,5 +565,5 @@ addCommandAlias(
 
 addCommandAlias(
   "integrationTest",
-  "it:scalafmtCheck;it:scalastyle;it:test"
+  "integration/scalafmtCheck;integration/scalastyle;integration/test"
 )
