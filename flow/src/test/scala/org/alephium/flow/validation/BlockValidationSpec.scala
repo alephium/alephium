@@ -548,7 +548,7 @@ class BlockValidationSpec extends AlephiumSpec {
         val block =
           mineWithTxs(blockFlow, ChainIndex.unsafe(from, to))((_, _) => block0.nonCoinbase)
         block.nonCoinbaseLength is 1
-        checkFlow(block, blockFlow) is Left(Right(InvalidFlowTxs))
+        checkFlow(block, blockFlow, HardFork.Rhone) is Left(Right(InvalidFlowTxs))
       }
     }
   }
@@ -585,7 +585,7 @@ class BlockValidationSpec extends AlephiumSpec {
       blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, newBlock.blockDeps).toSet is
         Set(block0.hash, block1.hash)
 
-      checkFlow(newBlock, blockFlow) is Left(Right(InvalidFlowTxs))
+      checkFlow(newBlock, blockFlow, HardFork.Rhone) is Left(Right(InvalidFlowTxs))
     }
   }
 

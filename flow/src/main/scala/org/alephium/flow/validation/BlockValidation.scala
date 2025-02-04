@@ -124,14 +124,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
+    val hardFork = networkConfig.getHardFork(block.timestamp)
     for {
       _          <- checkGroup(block)
       _          <- checkNonEmptyTransactions(block)
       _          <- checkTxNumber(block)
       _          <- checkGasPriceDecreasing(block)
-      _          <- checkTotalGas(block, networkConfig.getHardFork(block.timestamp))
+      _          <- checkTotalGas(block, hardFork)
       _          <- checkMerkleRoot(block)
-      _          <- checkFlow(block, flow)
+      _          <- checkFlow(block, flow, hardFork)
       sideResult <- checkTxs(block.chainIndex, block, flow)
     } yield sideResult
   }
@@ -705,15 +706,22 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(implicit
-      brokerConfig: BrokerConfig
-  ): BlockValidationResult[Unit] = {
-    if (brokerConfig.contains(block.chainIndex.from)) {
-      ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { ok =>
-        if (ok) validBlock(()) else invalidBlock(InvalidFlowTxs)
-      }
-    } else {
-      validBlock(())
+  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow, hardfork: HardFork)
+      (implicit brokerConfig: BrokerConfig): BlockValidationResult[Unit] = {
+    // Post-Danube upgrade, we skip this validation since conflicted transactions are allowed for parallel chains
+    // Pre-Danube upgrade, we validate that transactions are not conflicted
+    if (hardfork.isDanubeEnabled()) {
+      return validBlock(())
+    }
+
+    // If the block is not from the broker, we skip this validation
+    if (!brokerConfig.contains(block.chainIndex.from)) {
+      return validBlock(())
+    }
+    
+    ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { 
+      case true  => validBlock(())
+      case false => invalidBlock(InvalidFlowTxs)
     }
   }
 }
