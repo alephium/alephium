@@ -274,7 +274,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     if (brokerConfig.contains(chainIndex.from)) {
       val hardFork = networkConfig.getHardFork(block.timestamp)
       for {
-        groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
+        groupView <- from(flow.getMutableGroupView(chainIndex, block.blockDeps, hardFork))
         _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
         _ <- checkCoinbase(
           flow,

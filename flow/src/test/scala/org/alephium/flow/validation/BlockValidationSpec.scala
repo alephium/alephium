@@ -393,7 +393,7 @@ class BlockValidationSpec extends AlephiumSpec {
     )
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
@@ -408,7 +408,7 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check gas reward cap for Genesis fork" in new GenesisForkFixture {
 
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Mainnet)
     }
 
@@ -440,7 +440,7 @@ class BlockValidationSpec extends AlephiumSpec {
     networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
@@ -836,7 +836,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "check coinbase reward rhone" in new RhoneCoinbaseFixture {
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Rhone)
     }
 
@@ -1426,7 +1426,7 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check PoLW coinbase tx" in new PoLWCoinbaseFixture {
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
       val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 
@@ -1530,7 +1530,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
       val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 

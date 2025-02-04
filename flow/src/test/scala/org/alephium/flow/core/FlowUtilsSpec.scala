@@ -69,7 +69,7 @@ class FlowUtilsSpec extends AlephiumSpec {
         additionalData = ByteString.empty
       )
       val bestDeps  = blockFlow.getBestDeps(groupIndex)
-      val groupView = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(groupIndex, bestDeps, worldState).rightValue
       blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script, 0).rightValue is
         Transaction(
           unsignedTx,

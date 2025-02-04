@@ -288,7 +288,7 @@ trait FlowUtils
       hardFork   = networkConfig.getHardFork(templateTs)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
       target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
-      groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
+      groupView    <- getMutableGroupView(chainIndex, loosenDeps, hardFork)
       uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps, hardFork)
       template <- prepareBlockFlow(

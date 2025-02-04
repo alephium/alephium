@@ -305,6 +305,7 @@ trait BlockFlowState extends FlowTipsUtil {
     getCachedWorldState(deps, groupIndex)
   }
 
+  // This should only be used for mempool tx handling
   def getImmutableGroupView(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
@@ -315,20 +316,23 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
   }
 
+  // This should only be used for mempool tx handling
   def getMutableGroupView(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
-    getMutableGroupView(mainGroup, getBestDeps(mainGroup))
+    getMutableGroupViewPreDanube(mainGroup, getBestDeps(mainGroup))
   }
 
   def getMemPool(mainGroup: GroupIndex): MemPool
 
+  // This should only be used for mempool tx handling
   def getImmutableGroupViewIncludePool(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
     getImmutableGroupViewIncludePool(mainGroup, None)
   }
 
+  // This should only be used for mempool tx handling
   def getImmutableGroupViewIncludePool(
       mainGroup: GroupIndex,
       targetBlockHashOpt: Option[BlockHash]
@@ -343,6 +347,7 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
   }
 
+  // This should only be used for mempool tx handling
   def getMutableGroupViewIncludePool(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
@@ -353,11 +358,20 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
   }
 
-  def getMutableGroupView(block: Block): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
-    getMutableGroupView(block.chainIndex.from, block.blockDeps)
+  def getMutableGroupViewForTxHandling(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupViewPreDanube(mainGroup, blockDeps)
   }
 
-  def getMutableGroupView(
+  def getMutableGroupViewPreDanube(
+      block: Block
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupViewPreDanube(block.chainIndex.from, block.blockDeps)
+  }
+
+  def getMutableGroupViewPreDanube(
       mainGroup: GroupIndex,
       blockDeps: BlockDeps
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
@@ -367,7 +381,32 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
   }
 
+  def getMutableGroupViewDanube(
+      chainIndex: ChainIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    if (chainIndex.isIntraGroup) {
+      getCachedWorldState(blockDeps, chainIndex.from).map { worldState =>
+        BlockFlowGroupView.onlyBlocks(worldState, AVector.empty)
+      }
+    } else {
+      getMutableGroupViewPreDanube(chainIndex.from, blockDeps)
+    }
+  }
+
   def getMutableGroupView(
+      chainIndex: ChainIndex,
+      blockDeps: BlockDeps,
+      hardFork: HardFork
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    if (hardFork.isDanubeEnabled()) {
+      getMutableGroupViewDanube(chainIndex, blockDeps)
+    } else {
+      getMutableGroupViewPreDanube(chainIndex.from, blockDeps)
+    }
+  }
+
+  def getMutableGroupViewPreDanube(
       mainGroup: GroupIndex,
       blockDeps: BlockDeps,
       worldState: WorldState.Cached
