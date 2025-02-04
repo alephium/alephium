@@ -715,7 +715,7 @@ trait Endpoints
 
   lazy val buildGrouplessTransfer
       : BaseEndpoint[BuildGrouplessTransferTx, AVector[BuildTransferTxResult]] =
-    grouplessEndpoint
+    grouplessEndpoint.post
       .in("transfer")
       .in(jsonBodyWithAlph[BuildGrouplessTransferTx])
       .out(jsonBody[AVector[BuildTransferTxResult]])
