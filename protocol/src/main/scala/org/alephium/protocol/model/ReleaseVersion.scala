@@ -74,8 +74,8 @@ object ReleaseVersion {
       clientId: String
   )(implicit networkConfig: NetworkConfig): Option[ReleaseVersion] = {
     fromClientIdStr(clientId) match {
-      case Some(version) if version.checkRhoneUpgrade() => Some(version)
-      case _                                            => None
+      case Some(version) if version.checkUpgrade() => Some(version)
+      case _                                       => None
     }
   }
 

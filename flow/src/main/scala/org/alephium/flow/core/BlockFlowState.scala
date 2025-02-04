@@ -387,12 +387,12 @@ trait BlockFlowState extends FlowTipsUtil {
     bestFlowSkelton = skelton
   }
 
-  def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
+  def getInterGroupBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.isIntraGroup)
     for {
       diffs  <- getHashesForUpdates(chainIndex.from, block.blockDeps)
-      blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash)).map(_ :+ block)
+      blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
     } yield blocks
   }
 
@@ -444,15 +444,21 @@ trait BlockFlowState extends FlowTipsUtil {
   // Note: update state only for intra group blocks
   def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit] = {
     val chainIndex = block.chainIndex
+    val hardfork   = networkConfig.getHardFork(block.timestamp)
     assume(chainIndex.isIntraGroup)
     if (block.header.isGenesis) {
-      BlockFlowState.updateState(worldState, block, chainIndex.from)
+      BlockFlowState.updateState(worldState, block, chainIndex.from, hardfork)
     } else {
       for {
-        blocks <- getBlocksForUpdates(block)
+        interGroupBlocks <- getInterGroupBlocksForUpdates(block)
+        // From the Danube upgrade, we execute the intra-group block first for two reasons:
+        // 1. The state changes from contract execution can be reused
+        // 2. Inter-group transactions are simple transfers, making it easier to handle potential conflicts
+        blocks =
+          if (hardfork.isDanubeEnabled()) block +: interGroupBlocks else interGroupBlocks :+ block
         _ <- blocks
           .sortBy(_.timestamp)
-          .foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
+          .foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from, hardfork))
       } yield ()
     }
   }
@@ -527,7 +533,15 @@ object BlockFlowState {
     }
   }
 
-  def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
+  // Transaction validation for inter-group blocks:
+  // - Post-Danube upgrade: Validate transactions to ensure inputs exist and are unspent
+  // - Pre-Danube upgrade: Skip validation since it was not required in the protocol
+  def updateState(
+      worldState: WorldState.Cached,
+      block: Block,
+      targetGroup: GroupIndex,
+      hardfork: HardFork
+  )(implicit
       brokerConfig: GroupConfig
   ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
@@ -539,7 +553,7 @@ object BlockFlowState {
       }
     } else if (chainIndex.from == targetGroup) {
       block.transactions.foreachWithIndexE { case (tx, txIndex) =>
-        updateStateForOutBlock(worldState, tx, txIndex, targetGroup, block)
+        updateStateForOutBlock(worldState, tx, txIndex, targetGroup, block, hardfork)
       }
     } else if (chainIndex.to == targetGroup) {
       block.transactions.foreachWithIndexE { case (tx, txIndex) =>
@@ -551,6 +565,10 @@ object BlockFlowState {
     }
   }
 
+  // For intra-group blocks (blocks within the same group), we skip input validation during state updates
+  // because:
+  // 1. Input validation was already performed during block validation
+  // 2. Intra-group blocks are executed before inter-group blocks
   def updateStateForInOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
@@ -564,19 +582,41 @@ object BlockFlowState {
     } yield ()
   }
 
+  // Outgoing blocks are executed with inputs validation
+  // All outgoing blocks are inter-group blocks
   def updateStateForOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
       txIndex: Int,
       targetGroup: GroupIndex,
-      block: Block
+      block: Block,
+      hardfork: HardFork
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    for {
-      _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
-    } yield ()
+    // Post-Danube upgrade, we validate that transaction inputs exist and are unspent
+    // Pre-Danube upgrade, we skip this validation since it was not required in the protocol
+    val conflictedTxE = if (hardfork.isDanubeEnabled()) {
+      tx.unsigned.inputs.forallE(input => worldState.existOutput(input.outputRef))
+    } else {
+      Right(true)
+    }
+
+    conflictedTxE.flatMap { conflictedTx =>
+      if (!conflictedTx) {
+        for {
+          _ <- updateStateForInputs(worldState, tx)
+          _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
+        } yield ()
+      } else {
+        Right(()) // Skip the transaction since its inputs are already spent (conflicted)
+      }
+    }
   }
 
+  // For the Danube upgrade, we need to detect transaction conflicts before processing:
+  // - For blocks from our own broker: Check the cache for conflicted transaction info
+  // - For blocks from other brokers: Peers should send conflicted transaction info
+  //
+  // Note: All incoming blocks are inter-group blocks
   def updateStateForInBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
