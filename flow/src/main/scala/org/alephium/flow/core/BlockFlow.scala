@@ -258,7 +258,8 @@ object BlockFlow extends StrictLogging {
       assume(index.relateTo(brokerConfig))
 
       cacheBlock(block)
-      if (brokerConfig.contains(block.chainIndex.from)) {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      if (brokerConfig.contains(block.chainIndex.from) && !hardFork.isDanubeEnabled()) {
         cacheForConflicts(block)
       }
       for {
