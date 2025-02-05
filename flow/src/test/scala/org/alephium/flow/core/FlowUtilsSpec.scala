@@ -68,8 +68,9 @@ class FlowUtilsSpec extends AlephiumSpec {
         amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe),
         additionalData = ByteString.empty
       )
-      val bestDeps  = blockFlow.getBestDeps(groupIndex)
-      val groupView = blockFlow.getMutableGroupViewPreDanube(groupIndex, bestDeps, worldState).rightValue
+      val bestDeps = blockFlow.getBestDeps(groupIndex)
+      val groupView =
+        blockFlow.getMutableGroupViewPreDanube(groupIndex, bestDeps, worldState).rightValue
       blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script, 0).rightValue is
         Transaction(
           unsignedTx,

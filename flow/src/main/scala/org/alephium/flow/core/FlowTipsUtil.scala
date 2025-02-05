@@ -268,8 +268,8 @@ trait FlowTipsUtil {
   ): Option[BlockFlowSkeleton] = {
     val currentGroupTip = flow.intraGroupTips(group.value)
     if (tip != currentGroupTip && isExtendingUnsafe(tip, currentGroupTip)) {
-      val builder = BlockFlowSkeleton.Builder(groups)
-      var canExtend                                       = true
+      val builder   = BlockFlowSkeleton.Builder(groups)
+      var canExtend = true
 
       builder.setTip(group, currentGroupTip, getOutTipsUnsafe(currentGroupTip))
 

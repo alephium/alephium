@@ -440,7 +440,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
-      val bestSkeleton      = getBestFlowSkeleton()
+      val bestSkeleton     = getBestFlowSkeleton()
       val initialDeps      = bestSkeleton.createBlockDeps(chainIndex.from)
       val initialFlowTips  = FlowTips.from(initialDeps, chainIndex.from)
       val extendedflowTips = extendFlowPerChainUnsafe(initialFlowTips, chainIndex)

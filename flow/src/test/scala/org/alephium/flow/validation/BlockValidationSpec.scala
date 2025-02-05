@@ -1425,8 +1425,9 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "check PoLW coinbase tx" in new PoLWCoinbaseFixture {
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
-      val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val groupView =
+        blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 
@@ -1529,8 +1530,9 @@ class BlockValidationSpec extends AlephiumSpec {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
 
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
-      val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val groupView =
+        blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 

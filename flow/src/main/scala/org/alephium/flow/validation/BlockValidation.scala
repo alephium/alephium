@@ -706,8 +706,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow, hardfork: HardFork)
-      (implicit brokerConfig: BrokerConfig): BlockValidationResult[Unit] = {
+  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow, hardfork: HardFork)(implicit
+      brokerConfig: BrokerConfig
+  ): BlockValidationResult[Unit] = {
     // Post-Danube upgrade, we skip this validation since conflicted transactions are allowed for parallel chains
     // Pre-Danube upgrade, we validate that transactions are not conflicted
     if (hardfork.isDanubeEnabled()) {
@@ -718,8 +719,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     if (!brokerConfig.contains(block.chainIndex.from)) {
       return validBlock(())
     }
-    
-    ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { 
+
+    ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap {
       case true  => validBlock(())
       case false => invalidBlock(InvalidFlowTxs)
     }
