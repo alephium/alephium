@@ -238,11 +238,11 @@ trait BlockFlowUpdaterState extends IOBaseActor {
         val hardForkSoon = blockFlow.networkConfig.getHardFork(now.plusSecondsUnsafe(10))
         val updateResult = if (hardForkNow.isDanubeEnabled()) {
           // If Danube is currently enabled
-          blockFlow.updateBestFlowSkelton()
+          blockFlow.updateBestFlowSkeleton()
         } else if (hardForkSoon.isDanubeEnabled()) {
           // If Danube will be enabled within the next 10 seconds
           for {
-            _ <- blockFlow.updateBestFlowSkelton()
+            _ <- blockFlow.updateBestFlowSkeleton()
             _ <- blockFlow.updateBestDeps()
           } yield ()
         } else {

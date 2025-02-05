@@ -142,10 +142,10 @@ trait FlowTipsUtil {
     FlowTips(targetGroup, inTips, targetTips)
   }
 
-  def getBlockFlowSkeltonUnsafe(intraGroupTip: BlockHash): BlockFlowSkelton = {
+  def getBlockFlowSkeletonUnsafe(intraGroupTip: BlockHash): BlockFlowSkeleton = {
     val header = getBlockHeaderUnsafe(intraGroupTip)
 
-    val builder = BlockFlowSkelton.Builder(groups)
+    val builder = BlockFlowSkeleton.Builder(groups)
     brokerConfig.cliqueGroups.foreach { g =>
       val tip = getGroupTip(header, g)
       builder.setTip(g, tip, getOutTipsUnsafe(tip))
@@ -261,14 +261,14 @@ trait FlowTipsUtil {
     }
   }
 
-  def tryExtendBlockFlowSkeltonUnsafe(
-      flow: BlockFlowSkelton,
+  def tryExtendBlockFlowSkeletonUnsafe(
+      flow: BlockFlowSkeleton,
       group: GroupIndex,
       tip: BlockHash
-  ): Option[BlockFlowSkelton] = {
+  ): Option[BlockFlowSkeleton] = {
     val currentGroupTip = flow.intraGroupTips(group.value)
     if (tip != currentGroupTip && isExtendingUnsafe(tip, currentGroupTip)) {
-      val builder = BlockFlowSkelton.Builder(groups)
+      val builder = BlockFlowSkeleton.Builder(groups)
       var canExtend                                       = true
 
       builder.setTip(group, currentGroupTip, getOutTipsUnsafe(currentGroupTip))

@@ -359,15 +359,15 @@ object BlockFlow extends StrictLogging {
         }
     }
 
-    def tryExtendBlockFlowSkeltonUnsafe(
-        flow: BlockFlowSkelton,
+    def tryExtendBlockFlowSkeletonUnsafe(
+        flow: BlockFlowSkeleton,
         group: GroupIndex,
         toTry: AVector[BlockHash]
-    ): BlockFlowSkelton = {
-      var updatedFlow: Option[BlockFlowSkelton] = None
+    ): BlockFlowSkeleton = {
+      var updatedFlow: Option[BlockFlowSkeleton] = None
       toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
         if (updatedFlow.isEmpty) {
-          tryExtendBlockFlowSkeltonUnsafe(flow, group, tip).foreach { extendedFlow =>
+          tryExtendBlockFlowSkeletonUnsafe(flow, group, tip).foreach { extendedFlow =>
             updatedFlow = Some(extendedFlow)
           }
         }
@@ -428,20 +428,20 @@ object BlockFlow extends StrictLogging {
       flowTips2.toBlockDeps
     }
 
-    def calBestFlowSkeltonUnsafe(): BlockFlowSkelton = {
+    def calBestFlowSkeletonUnsafe(): BlockFlowSkeleton = {
       val bestIntraGroupTip = getBestIntraGroupTip()
       val bestIndex         = ChainIndex.from(bestIntraGroupTip)
-      val startFlow         = getBlockFlowSkeltonUnsafe(bestIntraGroupTip)
+      val startFlow         = getBlockFlowSkeletonUnsafe(bestIntraGroupTip)
 
       brokerConfig.cliqueGroups.filter(_ != bestIndex.from).fold(startFlow) { case (flow, g) =>
         val toTry = getHashChain(g, g).getAllTips
-        tryExtendBlockFlowSkeltonUnsafe(flow, g, toTry)
+        tryExtendBlockFlowSkeletonUnsafe(flow, g, toTry)
       }
     }
 
     def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
-      val bestSkelton      = getBestFlowSkelton()
-      val initialDeps      = bestSkelton.createBlockDeps(chainIndex.from)
+      val bestSkeleton      = getBestFlowSkeleton()
+      val initialDeps      = bestSkeleton.createBlockDeps(chainIndex.from)
       val initialFlowTips  = FlowTips.from(initialDeps, chainIndex.from)
       val extendedflowTips = extendFlowPerChainUnsafe(initialFlowTips, chainIndex)
       BlockDeps(extendedflowTips.inTips ++ extendedflowTips.outTips)
@@ -466,13 +466,13 @@ object BlockFlow extends StrictLogging {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
 
-    def updateBestFlowSkelton(): IOResult[Unit] = {
-      IOUtils.tryExecute(updateBestFlowSkeltonUnsafe())
+    def updateBestFlowSkeleton(): IOResult[Unit] = {
+      IOUtils.tryExecute(updateBestFlowSkeletonUnsafe())
     }
 
-    def updateBestFlowSkeltonUnsafe(): Unit = {
-      val bestFlowSkelton = calBestFlowSkeltonUnsafe()
-      updateBestFlowSkelton(bestFlowSkelton)
+    def updateBestFlowSkeletonUnsafe(): Unit = {
+      val bestFlowSkeleton = calBestFlowSkeletonUnsafe()
+      updateBestFlowSkeleton(bestFlowSkeleton)
     }
   }
 

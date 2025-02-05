@@ -46,7 +46,7 @@ object FlowTips {
   * @param intraGroupTipOutDeps
   *   the cache for the outDeps of all tips
   */
-final case class BlockFlowSkelton(
+final case class BlockFlowSkeleton(
     intraGroupTips: AVector[BlockHash],
     intraGroupTipOutDeps: AVector[AVector[BlockHash]]
 ) {
@@ -56,7 +56,7 @@ final case class BlockFlowSkelton(
   }
 }
 
-object BlockFlowSkelton {
+object BlockFlowSkeleton {
   final case class Builder(groups: Int) {
     val intraGroupTips: Array[BlockHash]                = Array.ofDim(groups)
     val intraGroupTipOutDeps: Array[AVector[BlockHash]] = Array.ofDim(groups)
@@ -66,8 +66,8 @@ object BlockFlowSkelton {
       intraGroupTipOutDeps(group.value) = tipOutTips
     }
 
-    def getResult(): BlockFlowSkelton = {
-      BlockFlowSkelton(AVector.unsafe(intraGroupTips), AVector.unsafe(intraGroupTipOutDeps))
+    def getResult(): BlockFlowSkeleton = {
+      BlockFlowSkeleton(AVector.unsafe(intraGroupTips), AVector.unsafe(intraGroupTipOutDeps))
     }
   }
 }

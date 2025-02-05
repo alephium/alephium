@@ -58,8 +58,8 @@ trait BlockFlowState extends FlowTipsUtil {
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
     BlockDeps.build(deps1 ++ deps2)
   }
-  @volatile protected[core] var bestFlowSkelton = {
-    val flow = BlockFlowSkelton.Builder(groups)
+  @volatile protected[core] var bestFlowSkeleton = {
+    val flow = BlockFlowSkeleton.Builder(groups)
     brokerConfig.cliqueGroups.foreach { g =>
       flow.setTip(g, genesisHashes(g.value)(g.value), genesisHashes(g.value))
     }
@@ -283,8 +283,8 @@ trait BlockFlowState extends FlowTipsUtil {
     bestDeps(groupShift)
   }
 
-  def getBestFlowSkelton(): BlockFlowSkelton = {
-    bestFlowSkelton
+  def getBestFlowSkeleton(): BlockFlowSkeleton = {
+    bestFlowSkeleton
   }
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
@@ -422,8 +422,8 @@ trait BlockFlowState extends FlowTipsUtil {
     bestDeps(groupShift) = deps
   }
 
-  def updateBestFlowSkelton(skelton: BlockFlowSkelton): Unit = {
-    bestFlowSkelton = skelton
+  def updateBestFlowSkeleton(skeleton: BlockFlowSkeleton): Unit = {
+    bestFlowSkeleton = skeleton
   }
 
   def getInterGroupBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {

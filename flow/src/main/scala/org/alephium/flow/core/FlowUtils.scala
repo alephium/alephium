@@ -140,11 +140,11 @@ trait FlowUtils
 
   def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
 
-  def getBestFlowSkelton(): BlockFlowSkelton
+  def getBestFlowSkeleton(): BlockFlowSkeleton
 
   def updateBestDeps(): IOResult[Unit]
 
-  def updateBestFlowSkelton(): IOResult[Unit]
+  def updateBestFlowSkeleton(): IOResult[Unit]
 
   def updateBestDepsUnsafe(): Unit
 
