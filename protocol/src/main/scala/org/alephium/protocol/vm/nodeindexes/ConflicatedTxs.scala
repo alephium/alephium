@@ -64,4 +64,29 @@ final case class CachedConflictedTxsStorage(
       conflictedTxsReversedIndexStorage
     )
   }
+
+  def addConflicts(
+      checkpointBlock: BlockHash,
+      block: BlockHash,
+      txs: AVector[TransactionId]
+  ): IOResult[Unit] = {
+    val elem0 = ConflictedTxsPerBlock(block, txs)
+    val update0 = conflictedTxsPerIntraBlock.getOpt(checkpointBlock).flatMap {
+      case Some(conflicts) =>
+        conflictedTxsPerIntraBlock
+          .put(checkpointBlock, conflicts :+ elem0)
+      case None => conflictedTxsPerIntraBlock.put(checkpointBlock, AVector(elem0))
+    }
+    val elem1 = ConflictedTxsSource(checkpointBlock, txs)
+    val update1 = conflictedTxsReversedIndex.getOpt(block).flatMap {
+      case Some(conflicts) =>
+        conflictedTxsReversedIndex.put(block, conflicts :+ elem1)
+      case None =>
+        conflictedTxsReversedIndex.put(block, AVector(elem1))
+    }
+    for {
+      _ <- update0
+      _ <- update1
+    } yield ()
+  }
 }

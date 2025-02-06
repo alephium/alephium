@@ -611,8 +611,10 @@ object BlockFlowState {
   // Transaction validation for inter-group blocks:
   // - Post-Danube upgrade: Validate transactions to ensure inputs exist and are unspent
   // - Pre-Danube upgrade: Skip validation since it was not required in the protocol
+  // scalastyle:off method.length
   def updateState(
       worldState: WorldState.Cached,
+      checkpointBlock: Block,
       block: Block,
       targetGroup: GroupIndex,
       hardfork: HardFork,
@@ -628,8 +630,30 @@ object BlockFlowState {
         updateStateForInOutBlock(worldState, tx, txIndex, targetGroup, block)
       }
     } else if (chainIndex.from == targetGroup) {
-      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
-        updateStateForOutBlock(worldState, tx, txIndex, targetGroup, block, hardfork)
+      val conflictedTxs = mutable.ArrayBuffer.empty[TransactionId]
+      val resultE = block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForOutBlock(
+          worldState,
+          tx,
+          txIndex,
+          targetGroup,
+          block,
+          hardfork,
+          conflictedTxs
+        )
+      }
+      resultE.flatMap { result =>
+        if (conflictedTxs.nonEmpty) {
+          worldState.nodeIndexesState.conflictedTxsStorageCache
+            .addConflicts(
+              checkpointBlock.hash,
+              block.hash,
+              AVector.from(conflictedTxs)
+            )
+            .map(_ => result)
+        } else {
+          Right(result)
+        }
       }
     } else if (chainIndex.to == targetGroup) {
       block.transactions.foreachWithIndexE { case (tx, txIndex) =>
@@ -648,6 +672,7 @@ object BlockFlowState {
       Right(())
     }
   }
+  // scalastyle:on method.length
 
   // For intra-group blocks (blocks within the same group), we skip input validation during state updates
   // because:
@@ -674,7 +699,8 @@ object BlockFlowState {
       txIndex: Int,
       targetGroup: GroupIndex,
       block: Block,
-      hardfork: HardFork
+      hardfork: HardFork,
+      conflictedTxs: mutable.ArrayBuffer[TransactionId]
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     // Post-Danube upgrade, we validate that transaction inputs exist and are unspent
     // Pre-Danube upgrade, we skip this validation since it was not required in the protocol
@@ -691,6 +717,7 @@ object BlockFlowState {
           _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
         } yield ()
       } else {
+        conflictedTxs += tx.id
         Right(()) // Skip the transaction since its inputs are already spent (conflicted)
       }
     }
