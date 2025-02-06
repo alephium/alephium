@@ -22,13 +22,17 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSettings
-import org.alephium.io.{IOError, IOResult, KeyValueStorage}
+import org.alephium.io.{IOError, IOResult, IOUtils, KeyValueStorage}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
+import org.alephium.protocol.vm.nodeindexes.{
+  ConflictedTxsStorage,
+  TxIdTxOutputLocators,
+  TxOutputLocator
+}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
@@ -111,6 +115,11 @@ trait BlockFlowState extends FlowTipsUtil {
           )
         )
     }
+  }
+
+  val conflictedTxsStorage: ConflictedTxsStorage = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.conflictedTxsStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =
@@ -480,13 +489,32 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield groupBlockCaches ++ incomingBlockCaches
   }
 
+  /** Checks if a given intra-group block hash is part of the block flow by verifying if the tip of
+    * the checkpoint block extends from the test block
+    *
+    * @param checkpointBlock
+    *   The block used as a reference point for checking whether the test block is part of the block
+    *   flow
+    * @param testIntraBlock
+    *   Hash of the intra-group block to test
+    * @return
+    *   true if testIntraBlock descends from the group tip at checkpointBlock, false otherwise
+    */
+  private def isInBlockFlowUnsafe(checkpointBlock: Block, testIntraBlock: BlockHash): Boolean = {
+    val testBlockIndex = ChainIndex.from(testIntraBlock)
+    assume(testBlockIndex.isIntraGroup) // Verify the test block is an intra-group block
+
+    val tip = getGroupTip(checkpointBlock.header, testBlockIndex.from)
+    isExtendingUnsafe(tip, testIntraBlock) // Check if the test block descends from the group tip
+  }
+
   // Note: update state only for intra group blocks
   def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     val hardfork   = networkConfig.getHardFork(block.timestamp)
     assume(chainIndex.isIntraGroup)
     if (block.header.isGenesis) {
-      BlockFlowState.updateState(worldState, block, chainIndex.from, hardfork)
+      BlockFlowState.updateState(worldState, block, chainIndex.from, hardfork, _ => true)
     } else {
       for {
         interGroupBlocks <- getInterGroupBlocksForUpdates(block)
@@ -497,7 +525,15 @@ trait BlockFlowState extends FlowTipsUtil {
           if (hardfork.isDanubeEnabled()) block +: interGroupBlocks else interGroupBlocks :+ block
         _ <- blocks
           .sortBy(_.timestamp)
-          .foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from, hardfork))
+          .foreachE(blockToUpdate =>
+            BlockFlowState.updateState(
+              worldState,
+              blockToUpdate,
+              chainIndex.from,
+              hardfork,
+              sourceIntraBlock => isInBlockFlowUnsafe(block, sourceIntraBlock)
+            )
+          )
       } yield ()
     }
   }
@@ -579,7 +615,8 @@ object BlockFlowState {
       worldState: WorldState.Cached,
       block: Block,
       targetGroup: GroupIndex,
-      hardfork: HardFork
+      hardfork: HardFork,
+      isInBlockFlowUnsafe: BlockHash => Boolean
   )(implicit
       brokerConfig: GroupConfig
   ): IOResult[Unit] = {
@@ -596,7 +633,15 @@ object BlockFlowState {
       }
     } else if (chainIndex.to == targetGroup) {
       block.transactions.foreachWithIndexE { case (tx, txIndex) =>
-        updateStateForInBlock(worldState, tx, txIndex, targetGroup, block)
+        updateStateForInBlock(
+          worldState,
+          tx,
+          txIndex,
+          targetGroup,
+          block,
+          hardfork,
+          isInBlockFlowUnsafe
+        )
       }
     } else {
       // dead branch
@@ -661,9 +706,30 @@ object BlockFlowState {
       tx: Transaction,
       txIndex: Int,
       targetGroup: GroupIndex,
-      block: Block
+      block: Block,
+      hardFork: HardFork,
+      isInBlockFlowUnsafe: BlockHash => Boolean
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
+    val shouldUpdateE = if (hardFork.isDanubeEnabled()) {
+      val conflictedTxsIndex =
+        worldState.nodeIndexesState.conflictedTxsStorageCache.conflictedTxsReversedIndex
+      conflictedTxsIndex.getOpt(block.hash).flatMap {
+        case Some(sources) =>
+          IOUtils.tryExecute(
+            !sources.exists(source =>
+              source.txs.contains(tx.id) && isInBlockFlowUnsafe(source.intraBlock)
+            )
+          )
+        case None => Right(true)
+      }
+    } else {
+      Right(true)
+    }
+    shouldUpdateE.flatMap {
+      case true =>
+        updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
+      case false => Right(())
+    }
   }
 
   // Note: contract inputs are updated during the execution of tx script
