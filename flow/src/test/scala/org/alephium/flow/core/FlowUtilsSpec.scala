@@ -138,11 +138,9 @@ class FlowUtilsSpec extends AlephiumSpec {
   it should "detect tx conflicts using bestDeps for pre-rhone hardfork" in new TxConflictsFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.consensus.mainnet.uncle-dependency-gap-time", "10 seconds"),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis),
       ("alephium.broker.broker-num", 1)
     )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    setHardForkBefore(HardFork.Rhone)
     test()
   }
 
