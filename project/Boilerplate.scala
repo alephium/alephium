@@ -30,6 +30,11 @@ object Boilerplate {
       tgtFile
     }
 
+  def genSerde(): Unit = {
+    genSrc(new File("./serde/src/main/scala/"))
+    genTest(new File("./serde/src/test/scala/"))
+  }
+
   def genSrc(dir: File): Seq[File]  = _gen(templatesSrc, dir)
   def genTest(dir: File): Seq[File] = _gen(templatesTest, dir)
 
@@ -80,7 +85,8 @@ object Boilerplate {
   val templatesTest: Seq[Template] = Seq(GenProductSerdeTest)
 
   object GenProductSerde extends Template {
-    override def filename(root: File): File = root / "org" / "alephium" / "ProductSerde.scala"
+    override def filename(root: File): File =
+      root / "org" / "alephium" / "serde" / "ProductSerde.scala"
 
     // scalastyle:off method.length
     override def content(tv: TemplateVals): String = {
@@ -141,7 +147,8 @@ object Boilerplate {
   }
 
   object GenProductSerializer extends Template {
-    override def filename(root: File): File = root / "org" / "alephium" / "ProductSerializer.scala"
+    override def filename(root: File): File =
+      root / "org" / "alephium" / "serde" / "ProductSerializer.scala"
 
     // scalastyle:off method.length
     override def content(tv: TemplateVals): String = {
@@ -191,7 +198,8 @@ object Boilerplate {
   }
 
   object GenProductSerdeTest extends TemplateTest {
-    override def filename(root: File): File = root / "org" / "alephium" / "ProductSerdeSpec.scala"
+    override def filename(root: File): File =
+      root / "org" / "alephium" / "serde" / "ProductSerdeSpec.scala"
 
     override def content(tv: TemplateVals): String = {
       import tv._
