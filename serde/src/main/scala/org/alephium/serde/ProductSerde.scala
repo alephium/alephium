@@ -1,4 +1,6 @@
+// scalastyle:off
 // auto-generated boilerplate
+// format: off
 package org.alephium.serde
 
 import akka.util.ByteString
