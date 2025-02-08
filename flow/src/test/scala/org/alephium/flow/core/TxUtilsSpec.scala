@@ -2754,11 +2754,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "check gas amount: pre-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     blockFlow.checkProvidedGasAmount(None) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
@@ -2775,8 +2771,8 @@ class TxUtilsSpec extends AlephiumSpec {
       .isLeft is true
   }
 
-  it should "check gas amount: rhone" in new FlowFixture {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+  it should "check gas amount: since-rhone" in new FlowFixture {
+    setHardForkSince(HardFork.Rhone)
 
     blockFlow.checkProvidedGasAmount(None) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()

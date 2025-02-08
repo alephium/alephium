@@ -108,11 +108,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait GenesisForkFixture extends Fixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
+    setHardFork(HardFork.Mainnet)
   }
 
   it should "validate group for block" in new Fixture {
@@ -228,9 +224,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait PreRhoneForkFixture extends Fixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
+    setHardForkBefore(HardFork.Rhone)
   }
 
   trait CoinbaseDataFixture extends Fixture {
@@ -256,10 +250,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase data for pre-rhone hardfork" in new CoinbaseDataFixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     implicit val validator: (Block) => BlockValidationResult[Unit] =
       (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
@@ -287,16 +278,12 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check uncles for pre-rhone hardfork" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     val ghostUncles = AVector.fill(ALPH.MaxGhostUncleSize)(
       GhostUncleData(BlockHash.random, assetLockupGen(chainIndex.to).sample.get)
     )
 
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      networkConfig.getHardFork(blk.timestamp) is HardFork.Leman
       checkGhostUncles(blockFlow, blk.chainIndex, blk, ghostUncles).map(_ => ())
     }
 
@@ -304,10 +291,8 @@ class BlockValidationSpec extends AlephiumSpec {
     block.fail(InvalidGhostUnclesBeforeRhoneHardFork)
   }
 
-  it should "check coinbase data for rhone hardfork" in new CoinbaseDataFixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", 0))
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+  it should "check coinbase data for since-rhone hardfork" in new CoinbaseDataFixture {
+    setHardForkSince(HardFork.Rhone)
 
     implicit val validator: (Block) => BlockValidationResult[Unit] =
       (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
@@ -349,8 +334,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase locked amount pre-rhone" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
+    setHardForkBefore(HardFork.Rhone)
     val block           = emptyBlock(blockFlow, chainIndex)
     val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
     val miningReward    = consensusConfig.emission.reward(block.header).miningReward
@@ -369,8 +353,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase reward pre-rhone" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
+    setHardForkBefore(HardFork.Rhone)
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
@@ -413,10 +396,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check gas reward for Leman fork" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled() is true
-
+    setHardFork(HardFork.Leman)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
@@ -620,16 +600,17 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate blocks with breaking instrs" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
+    setHardFork(HardFork.Leman)
     override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
     val newStorages = StoragesFixture.buildStorages(rootPath.resolve(Hash.generate.toHexString))
     val genesisNetworkConfig = new NetworkConfigFixture.Default {
-      override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
-      override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
+      override def lemanHardForkTimestamp: TimeStamp  = TimeStamp.now().plusHoursUnsafe(1)
+      override def rhoneHardForkTimestamp: TimeStamp  = TimeStamp.Max
+      override def danubeHardForkTimestamp: TimeStamp = TimeStamp.Max
     }.networkConfig
     val lemanNetworkConfig = new NetworkConfigFixture.Default {
-      override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
+      override def rhoneHardForkTimestamp: TimeStamp  = TimeStamp.Max
+      override def danubeHardForkTimestamp: TimeStamp = TimeStamp.Max
     }.networkConfig
 
     genesisNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
@@ -888,11 +869,8 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  trait RhoneFixture extends Fixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+  trait SinceRhoneFixture extends Fixture {
+    setHardForkSince(HardFork.Rhone)
     lazy val miner = getGenesisLockupScript(chainIndex.to)
 
     def mineBlocks(size: Int): AVector[BlockHash] = {
@@ -914,7 +892,7 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "invalidate block with invalid uncles size" in new RhoneFixture {
+  it should "invalidate block with invalid uncles size" in new SinceRhoneFixture {
     val hashes        = mineBlocks(ALPH.MaxGhostUncleSize + 1)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is ALPH.MaxGhostUncleSize
@@ -929,7 +907,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block, blockFlow).left.value isE InvalidGhostUncleSize
   }
 
-  it should "invalidate block with unsorted uncles" in new RhoneFixture {
+  it should "invalidate block with unsorted uncles" in new SinceRhoneFixture {
     mineBlocks(ALPH.MaxGhostUncleSize)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is 2
@@ -980,7 +958,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block3, blockFlow).left.value isE UnsortedGhostUncles
   }
 
-  it should "invalidate block if the uncle miner is invalid" in new RhoneFixture {
+  it should "invalidate block if the uncle miner is invalid" in new SinceRhoneFixture {
     mineBlocks(ALPH.MaxGhostUncleSize)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is 2
@@ -994,7 +972,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block, blockFlow).left.value isE InvalidGhostUncleMiner
   }
 
-  it should "invalidate block with used uncles" in new RhoneFixture {
+  it should "invalidate block with used uncles" in new SinceRhoneFixture {
     mineBlocks(ALPH.MaxGhostUncleSize)
     val block0 = mineBlockTemplate(blockFlow, chainIndex)
     addAndCheck(blockFlow, block0)
@@ -1010,7 +988,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block1, blockFlow).left.value isE GhostUnclesAlreadyUsed
   }
 
-  it should "invalidate block if uncle is sibling" in new RhoneFixture {
+  it should "invalidate block if uncle is sibling" in new SinceRhoneFixture {
     val block0 = emptyBlockWithMiner(blockFlow, chainIndex, miner)
     addAndCheck(blockFlow, block0)
     val block10 = emptyBlockWithMiner(blockFlow, chainIndex, miner)
@@ -1029,7 +1007,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block11, blockFlow).left.value isE GhostUncleHashConflictWithParentHash
   }
 
-  it should "invalidate block if uncle is ancestor" in new RhoneFixture {
+  it should "invalidate block if uncle is ancestor" in new SinceRhoneFixture {
     val block0 = emptyBlockWithMiner(blockFlow, chainIndex, miner)
     addAndCheck(blockFlow, block0)
 
@@ -1060,7 +1038,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(invalidBlock, blockFlow).left.value isE GhostUncleHashConflictWithParentHash
   }
 
-  it should "invalidate block if uncles' parent is not from mainchain" in new RhoneFixture {
+  it should "invalidate block if uncles' parent is not from mainchain" in new SinceRhoneFixture {
     val (blocks0, blocks1) = (mineChain(4), mineChain(4))
     addAndCheck(blockFlow, blocks0.toSeq: _*)
     addAndCheck(blockFlow, blocks1.toSeq: _*)
@@ -1077,11 +1055,9 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block, blockFlow).left.value isE GhostUncleHashConflictWithParentHash
   }
 
-  it should "invalidate block with invalid uncle intra deps" in new Fixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.broker-num", 1),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().millis)
-    )
+  it should "invalidate block with invalid uncle intra deps: since-rhone" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
     override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(1, 2)
     val chain00                              = ChainIndex.unsafe(0, 0)
     val depBlock0                            = emptyBlock(blockFlow, chain00)
@@ -1135,7 +1111,7 @@ class BlockValidationSpec extends AlephiumSpec {
     checkBlock(block2, blockFlow).leftValue is Right(InvalidGhostUncleDeps)
   }
 
-  it should "validate block with valid uncles" in new RhoneFixture {
+  it should "validate block with valid uncles" in new SinceRhoneFixture {
     mineBlocks(ALPH.MaxGhostUncleSize)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is ALPH.MaxGhostUncleSize
@@ -1149,7 +1125,7 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "validate block if uncle header used by another uncle block" in new RhoneFixture {
+  it should "validate block if uncle header used by another uncle block" in new SinceRhoneFixture {
     val block10 = emptyBlock(blockFlow, chainIndex)
     val block11 = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block10, block11)
@@ -1173,9 +1149,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate blocks with sequential txs for pre-rhone hardfork" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    setHardForkBefore(HardFork.Rhone)
     override lazy val chainIndex = ChainIndex.unsafe(0, 0)
 
     val genesisKey              = genesisKeys(chainIndex.from.value)._1
@@ -1192,8 +1166,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   trait SequentialTxsFixture extends Fixture {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
-
+    setHardForkSince(HardFork.Rhone)
     val genesisKey = genesisKeys(chainIndex.from.value)._1
     val privateKey = {
       val (privateKey, publicKey) = chainIndex.from.generateKey
@@ -1463,10 +1436,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check PoLW coinbase tx pre-rhone" in new PoLWCoinbaseFixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
       val hardFork  = networkConfig.getHardFork(block.timestamp)
       val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
@@ -1498,12 +1468,9 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "check miner for tesnet" in new TestnetFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.network-id", 1),
-      ("alephium.network.rhone-hard-fork-timestamp", 0)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+  it should "check miner for tesnet: since-rhone" in new TestnetFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    setHardForkSince(HardFork.Rhone)
     networkConfig.networkId is NetworkId.AlephiumTestNet
 
     newBlock(whitelistedMiner).pass()
@@ -1511,12 +1478,8 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "not check miner for testnet pre-Rhone" in new TestnetFixture {
-    override val configValues: Map[String, Any] =
-      Map(
-        ("alephium.network.network-id", 1),
-        ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis)
-      )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    setHardForkBefore(HardFork.Rhone)
     networkConfig.networkId is NetworkId.AlephiumTestNet
 
     newBlock(whitelistedMiner).pass()
@@ -1524,9 +1487,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "not check miner for devnet" in new TestnetFixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis))
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    setHardForkBefore(HardFork.Rhone)
     networkConfig.networkId is NetworkId.AlephiumDevNet
 
     newBlock(whitelistedMiner).pass()

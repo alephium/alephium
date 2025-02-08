@@ -173,7 +173,8 @@ class TransactionSpec
       info("pre-rhone coinbase transaction")
 
       implicit val networkConfig = new NetworkConfigFixture.Default {
-        override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
+        override def rhoneHardForkTimestamp: TimeStamp  = TimeStamp.Max
+        override def danubeHardForkTimestamp: TimeStamp = TimeStamp.Max
       }.networkConfig
       val tx = coinbaseTransaction(AVector.empty)
       tx.verify("coinbase")

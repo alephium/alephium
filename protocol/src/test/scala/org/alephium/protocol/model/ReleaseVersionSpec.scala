@@ -49,12 +49,17 @@ class ReleaseVersionSpec extends AlephiumSpec {
   }
 
   it should "check client id" in {
-    def buildNetworkConfig(_networkId: NetworkId, rhoneActivationTS: TimeStamp): NetworkConfig = {
+    def buildNetworkConfig(
+        _networkId: NetworkId,
+        rhoneActivationTS: TimeStamp,
+        danubeActivationTS: TimeStamp = TimeStamp.Max
+    ): NetworkConfig = {
       new NetworkConfig {
-        override def networkId              = _networkId
-        override def noPreMineProof         = ByteString.empty
-        override def lemanHardForkTimestamp = TimeStamp.zero
-        override def rhoneHardForkTimestamp = rhoneActivationTS
+        override def networkId               = _networkId
+        override def noPreMineProof          = ByteString.empty
+        override def lemanHardForkTimestamp  = TimeStamp.zero
+        override def rhoneHardForkTimestamp  = rhoneActivationTS
+        override def danubeHardForkTimestamp = danubeActivationTS
       }
     }
 
@@ -98,6 +103,27 @@ class ReleaseVersionSpec extends AlephiumSpec {
       ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is false
       ReleaseVersion.checkClientId("scala-alephium/v2.14.6/Linux") is true
       ReleaseVersion.checkClientId("scala-alephium/v3.0.0/Linux") is true
+    }
+
+    {
+      info("Test mainnet Danube")
+      implicit val config =
+        buildNetworkConfig(NetworkId.AlephiumMainNet, TimeStamp.zero, now.plusHoursUnsafe(-1))
+      config.getHardFork(now) is HardFork.Danube
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is false
+      ReleaseVersion.checkClientId("scala-alephium/v4.0.0/Linux") is false
+    }
+
+    {
+      info("Test testnet Danube")
+      implicit val config =
+        buildNetworkConfig(NetworkId.AlephiumTestNet, TimeStamp.zero, now.plusHoursUnsafe(-1))
+      config.getHardFork(now) is HardFork.Danube
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("xxx") is false
+      ReleaseVersion.checkClientId("scala-alephium/v2.14.5/Linux") is true
+      ReleaseVersion.checkClientId("scala-alephium/v4.0.0/Linux") is true
     }
   }
 }

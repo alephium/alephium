@@ -757,9 +757,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     }
   }
 
-  it should "switch back frames properly: Rhone" in new SwitchBackFixture
+  it should "switch back frames properly: since-rhone" in new SwitchBackFixture
     with NetworkConfigFixture.SinceRhoneT {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    Seq(HardFork.Rhone, HardFork.Danube).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
 
     addAndCheckBalance(0)
     for {
