@@ -51,7 +51,7 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
           true
         }
       case HardFork.Leman | HardFork.Mainnet => true
-      case _ => false
+      case _                                 => false
     }
   }
   // scalastyle:on magic.number
