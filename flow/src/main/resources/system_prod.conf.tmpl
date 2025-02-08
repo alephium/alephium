@@ -42,7 +42,9 @@ alephium {
 
     fast-sync-frequency = 1 second
     stable-sync-frequency = 20 second
-    sync-peer-sample-size = 5
+    sync-peer-sample-size-v1 = 3
+    sync-peer-sample-size-v2 = 5
+    enable-sync-protocol-v2 = false
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 2 minute
@@ -106,6 +108,7 @@ alephium {
     gas-fee-cap = "1000000000000000000"// 1 ALPH
     default-utxos-limit = 5000
     max-form-buffered-bytes = 131072 // 128 * 1024
+    enable-http-metrics = false
   }
 
   wallet {

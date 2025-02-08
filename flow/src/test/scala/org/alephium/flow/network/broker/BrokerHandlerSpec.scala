@@ -106,18 +106,10 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "notify synchronizer when block added" in new Fixture {
-    receivedHandshakeMessage()
-    val hash = BlockHash.generate
-    brokerHandler ! BlockChainHandler.BlockAdded(hash)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
-  }
-
   it should "publish misbehavior if block is invalid" in new Fixture {
     receivedHandshakeMessage()
     val hash = BlockHash.generate
     brokerHandler ! BlockChainHandler.InvalidBlock(hash, InvalidHeaderFlow)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
     listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
   }
 
@@ -190,6 +182,17 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
         DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
       )
     }
+  }
+
+  it should "not forward block validation message to BlockFlowSynchronizer" in new Fixture {
+    brokerHandler ! BlockChainHandler.BlockAdded
+    blockFlowSynchronizer.expectNoMessage()
+
+    brokerHandler ! BlockChainHandler.BlockAddingFailed
+    blockFlowSynchronizer.expectNoMessage()
+
+    brokerHandler ! BlockChainHandler.InvalidBlock(BlockHash.generate, InvalidHeaderFlow)
+    blockFlowSynchronizer.expectNoMessage()
   }
 
   trait Fixture extends FlowFixture with Generators {
@@ -270,11 +273,16 @@ class TestBrokerHandler(
 
   override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
 
-  override def exchanging: Receive = exchangingCommon orElse flowEvents
+  override def exchangingV1: Receive = exchangingCommon orElse flowEvents
+  override def exchangingV2: Receive = exchangingV1
 
   override def dataOrigin: DataOrigin = DataOrigin.Local
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      protocolVersion: ProtocolVersion
+  ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 }

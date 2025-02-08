@@ -55,6 +55,16 @@ object Output {
         )
     }
   }
+
+  def fromGeneratedOutputs(
+      unsignedTx: model.UnsignedTransaction,
+      generatedOutputs: AVector[TxOutput]
+  ): AVector[Output] = {
+    val fixedOutputsLength = unsignedTx.fixedOutputs.length
+    generatedOutputs.mapWithIndex { case (output, index) =>
+      Output.from(output, unsignedTx.id, fixedOutputsLength + index)
+    }
+  }
 }
 
 @upickle.implicits.key("AssetOutput")

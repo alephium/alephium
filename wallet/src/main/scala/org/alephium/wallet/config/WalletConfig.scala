@@ -35,6 +35,7 @@ final case class WalletConfig(
     secretDir: Path,
     lockingTimeout: Duration,
     apiKey: AVector[ApiKey],
+    enableHttpMetrics: Boolean,
     blockflow: WalletConfig.BlockFlow
 )
 
@@ -68,6 +69,7 @@ object WalletConfig {
         as[Path]("secretDir"),
         as[Duration]("lockingTimeout"),
         apiKeys,
+        as[Option[Boolean]]("enableHttpMetrics").getOrElse(false),
         as[WalletConfig.BlockFlow]("blockflow")
       )
     }
