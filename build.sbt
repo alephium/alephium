@@ -16,13 +16,19 @@ def baseProject(id: String): Project = {
 val scalastyleCfgFile     = "project/scalastyle-config.xml"
 val scalastyleTestCfgFile = "project/scalastyle-test-config.xml"
 
+val genSerde = Command.command("genSerde") { state =>
+  Boilerplate.genSerde()
+  state
+}
+
 lazy val root: Project = Project("alephium-scala-blockflow", file("."))
   .settings(commonSettings: _*)
   .settings(
     name              := "alephium",
     scalastyle        := {},
     Test / scalastyle := {},
-    publish / skip    := true
+    publish / skip    := true,
+    commands += genSerde
   )
   .aggregate(
     macros,
@@ -80,10 +86,7 @@ lazy val util = project("util")
   )
 
 lazy val serde = project("serde")
-  .settings(
-    Compile / sourceGenerators += (Compile / sourceManaged).map(Boilerplate.genSrc).taskValue,
-    Test / sourceGenerators += (Test / sourceManaged).map(Boilerplate.genTest).taskValue
-  )
+  .settings(coverageExcludedFiles := ".*ProductSerde.scala;.*ProductSerializer.scala")
   .dependsOn(util % "test->test;compile->compile")
 
 lazy val crypto = project("crypto")

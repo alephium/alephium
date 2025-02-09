@@ -1,2 +1,3 @@
 -Xms1g
 -Xmx4g
+-XX:-MaxFDLimit
