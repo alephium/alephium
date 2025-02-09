@@ -736,14 +736,6 @@ trait Endpoints
       .in(jsonBody[BuildGrouplessDeployContractTx])
       .out(jsonBody[BuildGrouplessDeployContractTxResult])
       .summary("Build an unsigned deploy contract transaction from a groupless address")
-
-  lazy val getGrouplessBalance: BaseEndpoint[(Address, Option[Boolean]), Balance] =
-    grouplessEndpoint.get
-      .in(path[Address]("address"))
-      .in("balance")
-      .in(query[Option[Boolean]]("mempool"))
-      .out(jsonBodyWithAlph[Balance])
-      .summary("Get the balance of a groupless address")
 }
 
 object Endpoints {

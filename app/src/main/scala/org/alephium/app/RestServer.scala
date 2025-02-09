@@ -147,8 +147,7 @@ class RestServer(
       metricsLogic,
       buildGrouplessTransferLogic,
       buildGrouplessExecuteScriptTxLogic,
-      buildGrouplessDeployContractTxLogic,
-      getGrouplessBalanceLogic
+      buildGrouplessDeployContractTxLogic
     ).map(route(_)) ++ swaggerUiRoute
 
   val routes: AVector[Router => Route] =
