@@ -86,6 +86,7 @@ lazy val util = project("util")
   )
 
 lazy val serde = project("serde")
+  .settings(coverageExcludedFiles := ".*ProductSerde.scala;.*ProductSerializer.scala")
   .dependsOn(util % "test->test;compile->compile")
 
 lazy val crypto = project("crypto")
