@@ -1239,7 +1239,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
             constantVars.toSeq,
             enums.toSeq,
             contractInheritances.getOrElse(Seq.empty),
-            unitTests.toSeq
+            unitTests.map(_.withOrigin(typeId)).toSeq
           )
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }

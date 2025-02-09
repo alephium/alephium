@@ -2873,7 +2873,7 @@ object Ast {
         case script: TxScript =>
           script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
-          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums) =
+          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums, unitTests) =
             MultiContract.extractContract(parentsCache, methodSelectorTable, c)
           Contract(
             Some(stdIdEnabled),
@@ -2888,7 +2888,7 @@ object Ast {
             constantVars,
             enums,
             c.inheritances,
-            c.unitTests
+            unitTests
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
           val (stdId, funcs, events) =
@@ -3322,14 +3322,17 @@ object Ast {
         Seq[MapDef],
         Seq[EventDef],
         Seq[ConstantVarDef[StatefulContext]],
-        Seq[EnumDef[StatefulContext]]
+        Seq[EnumDef[StatefulContext]],
+        Seq[Testing.UnitTestDef[StatefulContext]]
     ) = {
-      val parents                       = parentsCache(contract.ident)
-      val (allContracts, allInterfaces) = (parents :+ contract).partition(_.isInstanceOf[Contract])
-      val sortedInterfaces =
-        sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
-      val stdId        = getStdId(sortedInterfaces)
-      val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
+      val parents = parentsCache(contract.ident)
+      val (parentContracts, parentInterfaces) =
+        (parents :+ contract).partition(_.isInstanceOf[Contract])
+      val allContracts     = parentContracts.map(_.asInstanceOf[Contract])
+      val allInterfaces    = parentInterfaces.map(_.asInstanceOf[ContractInterface])
+      val sortedInterfaces = sortInterfaces(parentsCache, allInterfaces)
+      val stdId            = getStdId(sortedInterfaces)
+      val stdIdEnabled     = getStdIdEnabled(allContracts, contract.ident)
 
       val interfaceFuncs = sortedInterfaces.flatMap { interface =>
         interface.funcs.foreach(func =>
@@ -3361,7 +3364,8 @@ object Ast {
       } else {
         rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
       }
-      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums)
+      val allUnitTests = allContracts.flatMap(_.unitTests)
+      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums, allUnitTests)
     }
     // scalastyle:on method.length
 

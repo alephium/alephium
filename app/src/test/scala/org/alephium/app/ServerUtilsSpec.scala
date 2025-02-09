@@ -5708,7 +5708,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code(now.plusMillisUnsafe(1))))
         .leftValue
         .detail
-        .contains("Test failed: foo") is true
+        .contains("Test failed: Foo:foo") is true
     }
 
     {
@@ -5739,7 +5739,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code(20)))
         .leftValue
         .detail
-        .contains("Test failed: add") is true
+        .contains("Test failed: Foo:add") is true
     }
 
     {
@@ -5771,7 +5771,39 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
         .leftValue
         .detail
-        .contains("Test failed: transfer") is true
+        .contains("Test failed: Foo:transfer") is true
+    }
+
+    {
+      def code(a: Int, b: Int) =
+        s"""
+           |Contract Foo(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn foo() -> U256 { return base() }
+           |  fn base() -> U256 { return a + b }
+           |  fn isSum() -> Bool { return true }
+           |}
+           |Contract Bar(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn bar() -> U256 { return base() }
+           |  fn base() -> U256 { return a - b }
+           |  fn isSum() -> Bool { return false }
+           |}
+           |Abstract Contract Base(a: U256, b: U256) {
+           |  fn isSum() -> Bool
+           |  fn base() -> U256
+           |  test "base" with Self(20, 10) {
+           |    let result = if (isSum()) $a else $b
+           |    testCheck!(base() == result)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30, 10))).isRight is true
+      Seq(code(20, 10), code(30, 20)).foreach { code =>
+        serverUtils
+          .compileProject(blockFlow, api.Compile.Project(code))
+          .leftValue
+          .detail
+          .contains("Test failed: Base:base") is true
+      }
     }
   }
 

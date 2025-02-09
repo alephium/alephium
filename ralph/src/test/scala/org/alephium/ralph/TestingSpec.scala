@@ -17,7 +17,7 @@
 package org.alephium.ralph
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{BlockHash, TokenId}
+import org.alephium.protocol.model.{BlockHash, ContractId, TokenId}
 import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
@@ -315,17 +315,101 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |""".stripMargin
       val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
-      test.assets is Some(
-        Testing.ApprovedAssetsValue(
-          AVector(
-            LockupScript.asset(address0).value -> AVector(TokenId.alph -> ALPH.alph(1)),
-            LockupScript.asset(address1).value -> AVector(
-              TokenId.alph -> ALPH.alph(2),
-              tokenId      -> ALPH.alph(1)
-            )
-          )
-        )
+      val assets = test.assets.value.assets
+      assets.length is 2
+      assets(0) is LockupScript.asset(address0).value -> AVector(TokenId.alph -> ALPH.alph(1))
+      assets(1)._1 is LockupScript.asset(address1).value
+      assets(1)._2.toSet is Set(TokenId.alph -> ALPH.alph(2), tokenId -> ALPH.alph(1))
+    }
+
+    {
+      info("Duplicate tests")
+      val code =
+        s"""
+           |Contract Foo(v: U256) {
+           |  pub fn foo() -> U256 { return v }
+           |  test "foo" with Self(1) {
+           |    testCheck!(foo() == 1, 0)
+           |  }
+           |  $$test "foo" with Self(2) {
+           |    testCheck!(foo() == 2, 0)
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(code, "These tests are defined multiple times: Foo:foo")
+    }
+
+    {
+      info("Use default values")
+      val code =
+        s"""
+           |struct Foo {
+           |  mut a: U256,
+           |  b: U256
+           |}
+           |Contract Bar(@unused mut foos: [Foo; 2], @unused baz: Baz, mut b: U256, a: U256) extends Base(a, b) {
+           |  pub fn update(v: U256) -> () { b = v }
+           |}
+           |Contract Baz(v: U256) {
+           |  pub fn baz() -> U256 { return v }
+           |}
+           |Abstract Contract Base(a: U256, mut b: U256) {
+           |  pub fn sum() -> U256 { return a + b }
+           |  test "sum" with Self(10, 20) {
+           |    testCheck!(sum() == 30)
+           |  }
+           |}
+           |""".stripMargin
+      val tests       = compileContractFull(code).rightValue.tests
+      val barContract = tests.tests.head.contracts.head
+      barContract.typeId is Ast.TypeId("Bar")
+      barContract.immFields is AVector[Val](
+        Val.U256(0),
+        Val.U256(0),
+        Val.ByteVec(ContractId.zero.bytes),
+        Val.U256(10)
       )
+      barContract.mutFields is AVector[Val](Val.U256(0), Val.U256(0), Val.U256(20))
+    }
+
+    {
+      info("Unit tests in abstract contracts")
+      val code =
+        s"""
+           |Contract Foo(a: U256, b: U256, @unused mut c: Bool) extends Base(a, b) {
+           |  pub fn foo() -> U256 { return base() }
+           |  fn base() -> U256 { return a + b }
+           |  fn isSum() -> Bool { return true }
+           |}
+           |Contract Bar(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn bar() -> U256 { return base() }
+           |  fn base() -> U256 { return a - b }
+           |  fn isSum() -> Bool { return false }
+           |}
+           |Abstract Contract Base(a: U256, b: U256) {
+           |  fn isSum() -> Bool
+           |  fn base() -> U256
+           |  test "base" with Self(20, 10) {
+           |    let result = if (isSum()) 30 else 10
+           |    testCheck!(base() == result)
+           |  }
+           |}
+           |""".stripMargin
+      val contracts = Compiler.compileProject(code).rightValue._1
+      contracts.length is 2
+      val fooTests = contracts(0).tests.tests
+      fooTests.length is 1
+      val fooContract = fooTests.head.contracts.head
+      fooContract.typeId is Ast.TypeId("Foo")
+      fooContract.immFields is AVector[Val](Val.U256(20), Val.U256(10))
+      fooContract.mutFields is AVector[Val](Val.False)
+
+      val barTests = contracts(1).tests.tests
+      barTests.length is 1
+      val barContract = barTests.head.contracts.head
+      barContract.typeId is Ast.TypeId("Bar")
+      barContract.immFields is AVector[Val](Val.U256(20), Val.U256(10))
+      barContract.mutFields.isEmpty is true
     }
   }
 
