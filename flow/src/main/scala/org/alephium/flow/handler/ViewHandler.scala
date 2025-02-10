@@ -194,6 +194,7 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def updateSubscribers(hardFork: HardFork, chainIndex: Option[ChainIndex]): Unit = {
     if (isNodeSynced) {
       minerAddressesOpt.foreach { minerAddresses =>

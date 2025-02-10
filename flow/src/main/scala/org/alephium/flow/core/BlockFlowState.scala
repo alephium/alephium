@@ -514,7 +514,7 @@ trait BlockFlowState extends FlowTipsUtil {
     val hardfork   = networkConfig.getHardFork(block.timestamp)
     assume(chainIndex.isIntraGroup)
     if (block.header.isGenesis) {
-      BlockFlowState.updateState(worldState, block, chainIndex.from, hardfork, _ => true)
+      BlockFlowState.updateState(worldState, block, block, chainIndex.from, hardfork, _ => true)
     } else {
       for {
         interGroupBlocks <- getInterGroupBlocksForUpdates(block)
@@ -528,6 +528,7 @@ trait BlockFlowState extends FlowTipsUtil {
           .foreachE(blockToUpdate =>
             BlockFlowState.updateState(
               worldState,
+              block,
               blockToUpdate,
               chainIndex.from,
               hardfork,
