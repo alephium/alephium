@@ -20,7 +20,6 @@ import akka.util.ByteString
 
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2}
 import org.alephium.util.{AlephiumSpec, TimeStamp}
 
 class ReleaseVersionSpec extends AlephiumSpec {
@@ -100,11 +99,5 @@ class ReleaseVersionSpec extends AlephiumSpec {
       ReleaseVersion.fromClientId("scala-alephium/v2.14.6/Linux") is Some(ReleaseVersion(2, 14, 6))
       ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
     }
-  }
-
-  it should "if it is using protocol v2" in {
-    ReleaseVersion(3, 11, Int.MaxValue).protocolVersion is ProtocolV1
-    ReleaseVersion(3, 12, 0).protocolVersion is ProtocolV2
-    ReleaseVersion(3, 12, 1).protocolVersion is ProtocolV2
   }
 }

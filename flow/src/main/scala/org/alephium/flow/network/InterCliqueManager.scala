@@ -35,7 +35,7 @@ import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrok
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.ProtocolVersion
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model._
 import org.alephium.util._
 
@@ -67,7 +67,7 @@ object InterCliqueManager {
       brokerInfo: BrokerInfo,
       connectionType: ConnectionType,
       clientInfo: String,
-      protocolVersion: ProtocolVersion
+      p2pVersion: P2PVersion
   ) extends Command
       with EventStream.Event
   final case object GetSyncStatuses        extends Command

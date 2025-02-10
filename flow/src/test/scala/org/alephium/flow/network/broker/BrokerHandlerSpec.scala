@@ -195,6 +195,20 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer.expectNoMessage()
   }
 
+  it should "use sync protocol v1" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.enable-p2p-v2", false))
+    brokerHandlerActor.selfP2PVersion is P2PV1
+    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v1")
+  }
+
+  it should "use sync protocol v2" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.enable-p2p-v2", true))
+    brokerHandlerActor.selfP2PVersion is P2PV2
+    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v2")
+  }
+
   trait Fixture extends FlowFixture with Generators {
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
@@ -226,7 +240,8 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
 
     def receivedHandshakeMessage() = {
-      val hello = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+      val hello =
+        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, brokerHandlerActor.selfP2PVersion)
       brokerHandler ! BrokerHandler.Received(hello)
     }
   }
@@ -271,7 +286,8 @@ class TestBrokerHandler(
 
   val brokerInfo = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
 
-  override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+  override val handShakeMessage: Payload =
+    Hello.unsafe(brokerInfo.interBrokerInfo, priKey, selfP2PVersion)
 
   override def exchangingV1: Receive = exchangingCommon orElse flowEvents
   override def exchangingV2: Receive = exchangingV1
@@ -281,7 +297,7 @@ class TestBrokerHandler(
   def handleHandshakeInfo(
       _remoteBrokerInfo: BrokerInfo,
       clientInfo: String,
-      protocolVersion: ProtocolVersion
+      p2pVersion: P2PVersion
   ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
