@@ -240,12 +240,12 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
   trait P2PV1V2SyncFixture extends SyncFixtureBase {
     val clientId1 =
-      s"scala-alephium/${ReleaseVersion(0, 0, 0)}/${System.getProperty("os.name")}"
+      s"scala-alephium/${ReleaseVersion(0, 0, 0)}/${System.getProperty("os.name")}/${ProtocolV1}"
     val injectionP2PV1: PartialFunction[Payload, Payload] = { case hello: Hello =>
       Hello.unsafe(clientId1, hello.timestamp, hello.brokerInfo, hello.signature)
     }
     val clientId2 =
-      s"scala-alephium/${ReleaseVersion.p2pProtocolV2Version}/${System.getProperty("os.name")}"
+      s"scala-alephium/v3.12.0/${System.getProperty("os.name")}/${ProtocolV2}"
     val injectionP2PV2: PartialFunction[Payload, Payload] = { case hello: Hello =>
       Hello.unsafe(clientId2, hello.timestamp, hello.brokerInfo, hello.signature)
     }
@@ -254,7 +254,6 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       case InvRequest(id, locators) => InvRequest(id, AVector.fill(locators.length)(AVector.empty))
       case InvResponse(id, hashes)  => InvResponse(id, AVector.fill(hashes.length)(AVector.empty))
     }
-
     // scalastyle:off method.length
     def test(
         connectionBuilds: Seq[ActorRef => ActorRefT[Tcp.Command]]
@@ -298,7 +297,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
   trait P2PV2SyncFixture extends SyncFixtureBase {
     val clientId =
-      s"scala-alephium/${ReleaseVersion.p2pProtocolV2Version}/${System.getProperty("os.name")}"
+      s"scala-alephium/v3.12.0/${System.getProperty("os.name")}/${ProtocolV2}"
     val chainStateMessageCount = new AtomicInteger(0)
     val otherSyncMessageCount  = new AtomicInteger(0)
     val injection: PartialFunction[Payload, Payload] = {

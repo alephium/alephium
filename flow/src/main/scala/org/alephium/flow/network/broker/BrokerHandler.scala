@@ -82,9 +82,15 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   }
 
   def onHandshakeCompleted(hello: Hello): Unit = {
-    ReleaseVersion.fromClientId(hello.clientId) match {
-      case Some(clientVersion) =>
-        val protocolVersion = clientVersion.protocolVersion
+    val versions = for {
+      releaseVersion  <- ReleaseVersion.fromClientId(hello.clientId)
+      protocolVersion <- ProtocolVersion.fromClientId(hello.clientId)
+    } yield {
+      (releaseVersion, protocolVersion)
+    }
+
+    versions match {
+      case Some((_, protocolVersion)) =>
         handleHandshakeInfo(
           BrokerInfo.from(remoteAddress, hello.brokerInfo),
           hello.clientId,
@@ -215,6 +221,9 @@ trait HandshakeHandler extends BaseHandler {
   import BrokerHandler._
 
   implicit def networkSetting: NetworkSetting
+  final lazy val selfProtocolVersion: ProtocolVersion =
+    if (networkSetting.enableSyncProtocolV2) ProtocolV2 else ProtocolV1
+
   def remoteAddress: InetSocketAddress
   def brokerAlias: String
   def handShakeDuration: Duration

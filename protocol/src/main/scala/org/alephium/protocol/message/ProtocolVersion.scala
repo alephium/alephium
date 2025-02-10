@@ -18,5 +18,20 @@ package org.alephium.protocol.message
 
 sealed trait ProtocolVersion
 
-case object ProtocolV1 extends ProtocolVersion
-case object ProtocolV2 extends ProtocolVersion
+object ProtocolVersion {
+  def fromClientId(clientId: String): Option[ProtocolVersion] = {
+    clientId.split("/") match {
+      case Array(_, _, _)            => Some(ProtocolV1)
+      case Array(_, _, _, "sync-v1") => Some(ProtocolV1)
+      case Array(_, _, _, "sync-v2") => Some(ProtocolV2)
+      case _                         => None
+    }
+  }
+}
+
+case object ProtocolV1 extends ProtocolVersion {
+  override def toString: String = "sync-v1"
+}
+case object ProtocolV2 extends ProtocolVersion {
+  override def toString: String = "sync-v2"
+}

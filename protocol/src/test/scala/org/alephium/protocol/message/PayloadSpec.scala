@@ -18,6 +18,8 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
+import scala.util.Random
+
 import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.compatible.Assertion
@@ -44,11 +46,12 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val (priKey2, _)       = SignatureSchema.secureGeneratePriPub()
     val validBrokerInfo    = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
 
-    val validInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey1)
-    val validOutput = Hello._deserialize(Hello.serde.serialize(validInput))
+    val protocolVersion = if (Random.nextBoolean()) ProtocolV1 else ProtocolV2
+    val validInput      = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey1, protocolVersion)
+    val validOutput     = Hello._deserialize(Hello.serde.serialize(validInput))
     validOutput.map(_.value) isE validInput
 
-    val invalidInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey2)
+    val invalidInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey2, protocolVersion)
     val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
     invalidOutput.leftValue is a[SerdeError]
 
@@ -60,7 +63,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
       BrokerInfo.unsafe(CliqueId(pubKey1), 1, groupConfig.groups + 1, address),
       BrokerInfo.unsafe(CliqueId(pubKey1), 1, 2, address)
     ).foreach { invalidBrokerInfo =>
-      val invalidInput  = Hello.unsafe(invalidBrokerInfo.interBrokerInfo, priKey1)
+      val invalidInput =
+        Hello.unsafe(invalidBrokerInfo.interBrokerInfo, priKey1, protocolVersion)
       val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
       invalidOutput.leftValue is a[SerdeError]
     }

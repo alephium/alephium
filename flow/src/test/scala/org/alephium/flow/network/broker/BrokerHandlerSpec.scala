@@ -195,6 +195,20 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer.expectNoMessage()
   }
 
+  it should "use sync protocol v1" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.enable-sync-protocol-v2", false))
+    brokerHandlerActor.selfProtocolVersion is ProtocolV1
+    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("sync-v1")
+  }
+
+  it should "use sync protocol v2" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.enable-sync-protocol-v2", true))
+    brokerHandlerActor.selfProtocolVersion is ProtocolV2
+    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("sync-v2")
+  }
+
   trait Fixture extends FlowFixture with Generators {
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
@@ -226,7 +240,8 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
 
     def receivedHandshakeMessage() = {
-      val hello = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+      val hello =
+        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, brokerHandlerActor.selfProtocolVersion)
       brokerHandler ! BrokerHandler.Received(hello)
     }
   }
@@ -271,7 +286,8 @@ class TestBrokerHandler(
 
   val brokerInfo = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
 
-  override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+  override val handShakeMessage: Payload =
+    Hello.unsafe(brokerInfo.interBrokerInfo, priKey, selfProtocolVersion)
 
   override def exchangingV1: Receive = exchangingCommon orElse flowEvents
   override def exchangingV2: Receive = exchangingV1
