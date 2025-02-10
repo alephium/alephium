@@ -1135,7 +1135,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     setRemoteBrokerInfo()
-    brokerHandlerActor.remoteProtocolVersion = ProtocolV1
+    brokerHandlerActor.remoteP2PVersion = P2PV1
     brokerHandlerActor.selfSynced is false
 
     brokerHandler ! BaseBrokerHandler.Received(

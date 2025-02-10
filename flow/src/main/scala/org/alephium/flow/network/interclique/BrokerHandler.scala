@@ -52,7 +52,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   override def handleHandshakeInfo(
       _remoteBrokerInfo: BrokerInfo,
       clientInfo: String,
-      protocolVersion: ProtocolVersion
+      p2pVersion: P2PVersion
   ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
     val event = InterCliqueManager.HandShaked(
@@ -60,7 +60,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
       _remoteBrokerInfo,
       connectionType,
       clientInfo,
-      protocolVersion
+      p2pVersion
     )
     publishEvent(event)
   }
@@ -80,7 +80,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   private def tryUpdateSyncStatus(locators: AVector[AVector[BlockHash]]): Unit = {
     // When our node is V2 but the peer is V1, since it is impossible to receive the
     // chain state from V1, we need to update the sync state by checking the locators
-    if (!selfSynced && selfProtocolVersion == ProtocolV2 && remoteProtocolVersion == ProtocolV1) {
+    if (!selfSynced && selfP2PVersion == P2PV2 && remoteP2PVersion == P2PV1) {
       val result = locators.forallE { locatorsPerChain =>
         if (locatorsPerChain.isEmpty) {
           Right(true)

@@ -16,22 +16,22 @@
 
 package org.alephium.protocol.message
 
-sealed trait ProtocolVersion
+sealed trait P2PVersion
 
-object ProtocolVersion {
-  def fromClientId(clientId: String): Option[ProtocolVersion] = {
+object P2PVersion {
+  def fromClientId(clientId: String): Option[P2PVersion] = {
     clientId.split("/") match {
-      case Array(_, _, _)            => Some(ProtocolV1)
-      case Array(_, _, _, "sync-v1") => Some(ProtocolV1)
-      case Array(_, _, _, "sync-v2") => Some(ProtocolV2)
-      case _                         => None
+      case Array(_, _, _)           => Some(P2PV1)
+      case Array(_, _, _, "p2p-v1") => Some(P2PV1)
+      case Array(_, _, _, "p2p-v2") => Some(P2PV2)
+      case _                        => None
     }
   }
 }
 
-case object ProtocolV1 extends ProtocolVersion {
-  override def toString: String = "sync-v1"
+case object P2PV1 extends P2PVersion {
+  override def toString: String = "p2p-v1"
 }
-case object ProtocolV2 extends ProtocolVersion {
-  override def toString: String = "sync-v2"
+case object P2PV2 extends P2PVersion {
+  override def toString: String = "p2p-v2"
 }

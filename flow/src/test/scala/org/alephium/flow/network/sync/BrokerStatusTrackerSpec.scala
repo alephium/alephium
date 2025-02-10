@@ -24,7 +24,7 @@ import org.alephium.flow.network.sync.BrokerStatusTracker.BrokerStatus
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
+import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -34,7 +34,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   trait Fixture extends BrokerStatusTracker {
     def networkSetting: NetworkSetting = config.network
 
-    def addNewBroker(version: ProtocolVersion): ActorRef = {
+    def addNewBroker(version: P2PVersion): ActorRef = {
       val broker = TestProbe().ref
       brokers += ActorRefT(broker) -> BrokerStatus(brokerInfo, version)
       broker
@@ -44,32 +44,32 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   it should "sample the right size" in new Fixture {
     networkSetting.syncPeerSampleSizeV1 is 3
 
-    (1 until 4).foreach(_ => addNewBroker(ProtocolV1))
-    samplePeersSize(brokers.size, ProtocolV1) is 1
-    samplePeers(ProtocolV1).toSeq.toMap.size is 1
-    samplePeers(ProtocolV2).isEmpty is true
-    (4 until 9).foreach(_ => addNewBroker(ProtocolV2))
-    samplePeersSize(brokers.size, ProtocolV1) is 2
-    samplePeers(ProtocolV1).toSeq.toMap.size is 2
-    (9 until 1024).foreach(_ => addNewBroker(ProtocolV1))
-    samplePeersSize(brokers.size, ProtocolV1) is 3
-    samplePeers(ProtocolV1).toSeq.toMap.size is 3
+    (1 until 4).foreach(_ => addNewBroker(P2PV1))
+    samplePeersSize(brokers.size, P2PV1) is 1
+    samplePeers(P2PV1).toSeq.toMap.size is 1
+    samplePeers(P2PV2).isEmpty is true
+    (4 until 9).foreach(_ => addNewBroker(P2PV2))
+    samplePeersSize(brokers.size, P2PV1) is 2
+    samplePeers(P2PV1).toSeq.toMap.size is 2
+    (9 until 1024).foreach(_ => addNewBroker(P2PV1))
+    samplePeersSize(brokers.size, P2PV1) is 3
+    samplePeers(P2PV1).toSeq.toMap.size is 3
 
     networkSetting.syncPeerSampleSizeV2 is 5
-    samplePeers(ProtocolV2).toSeq.toMap.size is 2
-    (1 until 4).foreach(_ => addNewBroker(ProtocolV2))
-    samplePeers(ProtocolV2).toSeq.toMap.size is 2
-    addNewBroker(ProtocolV2)
-    samplePeers(ProtocolV2).toSeq.toMap.size is 3
-    (9 until 1024).foreach(_ => addNewBroker(ProtocolV2))
-    samplePeers(ProtocolV2).toSeq.toMap.size is 5
+    samplePeers(P2PV2).toSeq.toMap.size is 2
+    (1 until 4).foreach(_ => addNewBroker(P2PV2))
+    samplePeers(P2PV2).toSeq.toMap.size is 2
+    addNewBroker(P2PV2)
+    samplePeers(P2PV2).toSeq.toMap.size is 3
+    (9 until 1024).foreach(_ => addNewBroker(P2PV2))
+    samplePeers(P2PV2).toSeq.toMap.size is 5
   }
 
   behavior of "BrokerStatus"
 
   trait BrokerStatusFixture {
     val info   = BrokerInfo.unsafe(brokerInfo.cliqueId, 0, brokerConfig.groups, brokerInfo.address)
-    val status = BrokerStatus(info, ProtocolV2)
+    val status = BrokerStatus(info, P2PV2)
     val groupRange = AVector.from(brokerConfig.calIntersection(status.info))
     groupRange is AVector(0)
 

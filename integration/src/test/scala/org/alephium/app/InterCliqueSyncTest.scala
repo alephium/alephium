@@ -120,7 +120,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         bootClique(
           nbOfNodes = nbOfNodesClique1,
           connectionBuild = clique1ConnectionBuild,
-          configOverrides = Map(("alephium.network.enable-sync-protocol-v2", false))
+          configOverrides = Map(("alephium.network.enable-p2p-v2", false))
         )
       val masterPortClique1 = clique1.masterTcpPort
 
@@ -137,7 +137,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
           nbOfNodes = nbOfNodesClique2,
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
           connectionBuild = clique2ConnectionBuild,
-          configOverrides = Map(("alephium.network.enable-sync-protocol-v2", false))
+          configOverrides = Map(("alephium.network.enable-p2p-v2", false))
         )
       val masterPortClique2 = clique2.masterTcpPort
 
@@ -192,15 +192,15 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "test p2p protocol v2, v2 cliques: 4" in new P2PV1V2SyncFixture {
-    test(Seq.fill(4)(ProtocolV2))
+    test(Seq.fill(4)(P2PV2))
   }
 
   it should "test p2p protocol v2, v1 cliques: 1, v2 cliques: 3" in new P2PV1V2SyncFixture {
-    test(Seq(ProtocolV2, ProtocolV2, ProtocolV2, ProtocolV1))
+    test(Seq(P2PV2, P2PV2, P2PV2, P2PV1))
   }
 
   it should "test p2p protocol v2, v1 cliques: 2, v2 cliques: 2" in new P2PV1V2SyncFixture {
-    test(Seq(ProtocolV2, ProtocolV2, ProtocolV1, ProtocolV1))
+    test(Seq(P2PV2, P2PV2, P2PV1, P2PV1))
   }
 
   trait SyncFixtureBase extends CliqueFixture {
@@ -231,11 +231,11 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
   trait P2PV1V2SyncFixture extends SyncFixtureBase {
     // scalastyle:off method.length
-    def test(protocolVersions: Seq[ProtocolVersion]) = {
-      assume(protocolVersions.length == 4)
+    def test(p2pVersions: Seq[P2PVersion]) = {
+      assume(p2pVersions.length == 4)
 
       val fromTs  = TimeStamp.now()
-      val clique1 = bootClique(1, configOverrides = Map(("alephium.network.enable-sync-protocol-v2", protocolVersions.head == ProtocolV2)))
+      val clique1 = bootClique(1, configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions.head == P2PV2)))
 
       clique1.start()
       clique1.startWs()
@@ -248,7 +248,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         val clique = bootClique(
           1,
           Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
-          configOverrides = Map(("alephium.network.enable-sync-protocol-v2", protocolVersions(index) == ProtocolV2))
+          configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions(index) == P2PV2))
         )
         clique.startWithoutCheckSyncState()
         clique
@@ -291,7 +291,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         1,
         None,
         Injected.payload(injection, _),
-        Map(("alephium.network.enable-sync-protocol-v2", true))
+        Map(("alephium.network.enable-p2p-v2", true))
       )
       clique1.start()
 
@@ -300,7 +300,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
           1,
           Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
           Injected.payload(injection, _),
-          Map(("alephium.network.enable-sync-protocol-v2", true))
+          Map(("alephium.network.enable-p2p-v2", true))
         )
       }
 

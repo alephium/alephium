@@ -33,7 +33,7 @@ import org.alephium.flow.network.broker.{
   MisbehaviorManager
 }
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
+import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, TimeStamp}
 
@@ -45,7 +45,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
   trait Fixture extends FlowFixture with Generators {
     override val configValues: Map[String, Any] = Map(
-      ("alephium.network.enable-sync-protocol-v2", false)
+      ("alephium.network.enable-p2p-v2", false)
     )
 
     lazy val (allHandlers, allProbes) = TestUtils.createAllHandlersProbe
@@ -66,7 +66,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val broker = brokerInfoGen.sample.get
     probe.send(
       blockFlowSynchronizer,
-      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "", ProtocolV1)
+      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "", P2PV1)
     )
     eventually(blockFlowSynchronizerActor.brokers.toMap.contains(probe.ref) is true)
 
@@ -81,7 +81,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     broker.send(
       blockFlowSynchronizer,
-      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "", ProtocolV1)
+      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "", P2PV1)
     )
     eventually(blockFlowSynchronizerActor.brokers.toMap.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
@@ -156,10 +156,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.network.enable-sync-protocol-v2", true)
+      ("alephium.network.enable-p2p-v2", true)
     )
 
-    def addBroker(version: ProtocolVersion = ProtocolV2): (BrokerActor, BrokerStatus, TestProbe) = {
+    def addBroker(version: P2PVersion = P2PV2): (BrokerActor, BrokerStatus, TestProbe) = {
       val brokerInfo =
         BrokerInfo.unsafe(CliqueId.generate, 0, 1, socketAddressGen.sample.get)
       val probe                    = TestProbe()
@@ -655,7 +655,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 4),
-      ("alephium.network.enable-sync-protocol-v2", true)
+      ("alephium.network.enable-p2p-v2", true)
     )
 
     val (brokerActor0, brokerStatus0, probe0) = addBroker()
@@ -708,7 +708,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 4),
-      ("alephium.network.enable-sync-protocol-v2", true)
+      ("alephium.network.enable-p2p-v2", true)
     )
 
     val (brokerActor, brokerStatus, probe) = addBroker()

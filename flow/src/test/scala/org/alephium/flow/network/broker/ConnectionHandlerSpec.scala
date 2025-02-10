@@ -25,7 +25,7 @@ import akka.util.ByteString
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{SignatureSchema, WireVersion}
-import org.alephium.protocol.message.{Header, Hello, Message, Ping, ProtocolV1, RequestId}
+import org.alephium.protocol.message.{Header, Hello, Message, P2PV1, Ping, RequestId}
 import org.alephium.protocol.model.{BrokerInfo, CliqueId}
 import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
@@ -64,7 +64,7 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
     val handshakeMessage =
       Message(
         Header(invalidVersion),
-        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, ProtocolV1)
+        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, P2PV1)
       )
     val handshakeMessageBytes = Message.serialize(handshakeMessage)
 

@@ -66,8 +66,8 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  var remoteBrokerInfo: BrokerInfo           = _
-  var remoteProtocolVersion: ProtocolVersion = _
+  var remoteBrokerInfo: BrokerInfo = _
+  var remoteP2PVersion: P2PVersion = _
 
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
@@ -83,24 +83,22 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   }
 
   def onHandshakeCompleted(hello: Hello): Unit = {
-    val versions = for {
-      releaseVersion  <- ReleaseVersion.fromClientId(hello.clientId)
-      protocolVersion <- ProtocolVersion.fromClientId(hello.clientId)
-    } yield {
-      (releaseVersion, protocolVersion)
-    }
+    val p2pVersionOpt = for {
+      _          <- ReleaseVersion.fromClientId(hello.clientId)
+      p2pVersion <- P2PVersion.fromClientId(hello.clientId)
+    } yield p2pVersion
 
-    versions match {
-      case Some((_, protocolVersion)) =>
-        remoteProtocolVersion = protocolVersion
+    p2pVersionOpt match {
+      case Some(p2pVersion) =>
+        remoteP2PVersion = p2pVersion
         handleHandshakeInfo(
           BrokerInfo.from(remoteAddress, hello.brokerInfo),
           hello.clientId,
-          protocolVersion
+          p2pVersion
         )
-        protocolVersion match {
-          case ProtocolV1 => context become (exchangingV1 orElse pingPong)
-          case ProtocolV2 => context become (exchangingV2 orElse pingPong)
+        p2pVersion match {
+          case P2PV1 => context become (exchangingV1 orElse pingPong)
+          case P2PV2 => context become (exchangingV2 orElse pingPong)
         }
       case None => handleInvalidClientId(hello.clientId)
     }
@@ -223,8 +221,8 @@ trait HandshakeHandler extends BaseHandler {
   import BrokerHandler._
 
   implicit def networkSetting: NetworkSetting
-  final lazy val selfProtocolVersion: ProtocolVersion =
-    if (networkSetting.enableSyncProtocolV2) ProtocolV2 else ProtocolV1
+  final lazy val selfP2PVersion: P2PVersion =
+    if (networkSetting.enableP2pV2) P2PV2 else P2PV1
 
   def remoteAddress: InetSocketAddress
   def brokerAlias: String
@@ -238,7 +236,7 @@ trait HandshakeHandler extends BaseHandler {
   def handleHandshakeInfo(
       _remoteBrokerInfo: BrokerInfo,
       clientInfo: String,
-      protocolVersion: ProtocolVersion
+      p2pVersion: P2PVersion
   ): Unit
   def stop(misbehavior: MisbehaviorManager.Misbehavior): Unit
 

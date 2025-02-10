@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.BuildInfo
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.message.ProtocolVersion
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.TimeStamp
 
@@ -60,8 +60,8 @@ object ReleaseVersion {
     )
   )
 
-  def clientId(protocolVersion: ProtocolVersion): String = {
-    s"scala-alephium/$current/${System.getProperty("os.name")}/${protocolVersion}"
+  def clientId(p2pVersion: P2PVersion): String = {
+    s"scala-alephium/$current/${System.getProperty("os.name")}/${p2pVersion}"
   }
 
   def fromClientId(
