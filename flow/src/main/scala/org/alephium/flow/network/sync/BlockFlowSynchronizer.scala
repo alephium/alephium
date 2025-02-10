@@ -33,13 +33,11 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 // scalastyle:off file.size.limit
 object BlockFlowSynchronizer {
-  val V2SwitchThreshold: Int = 3
-
   def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
       networkSetting: NetworkSetting,
       brokerConfig: BrokerConfig
@@ -87,22 +85,14 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     subscribeEvent(self, classOf[ChainHandler.FlowDataValidationEvent])
   }
 
-  override def receive: Receive = v1
+  override def receive: Receive = if (networkSetting.enableSyncProtocolV2) v2 else v1
 
-  private[sync] var currentVersion: ProtocolVersion = ProtocolV1
   private def v1: Receive = common orElse handleV1 orElse updateNodeSyncStatus
   private def v2: Receive = common orElse handleV2 orElse updateNodeSyncStatus
-
-  private[sync] def shouldSwitchToV2(): Boolean = {
-    networkSetting.enableSyncProtocolV2 &&
-    currentVersion == ProtocolV1 &&
-    peerSizeUsingV2 >= V2SwitchThreshold
-  }
 
   def common: Receive = {
     case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, protocolVersion) =>
       addBroker(broker, remoteBrokerInfo, protocolVersion)
-      if (shouldSwitchToV2()) switchToV2()
 
     case CleanDownloading =>
       val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
@@ -138,17 +128,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     val frequency =
       if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
     scheduleOnce(self, Sync, frequency)
-  }
-
-  def switchToV1(): Unit = {
-    log.info("Switch to sync protocol V1")
-    currentVersion = ProtocolV1
-    context become v1
-  }
-  def switchToV2(): Unit = {
-    log.info("Switch to sync protocol V2")
-    currentVersion = ProtocolV2
-    context become v2
   }
 }
 
@@ -221,7 +200,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] val bestChainTips    = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
   private[sync] val selfChainTips    = FlattenIndexedArray.empty[ChainTip]
   private[sync] val syncingChains    = FlattenIndexedArray.empty[SyncStatePerChain]
-  private[sync] var startTime: Option[TimeStamp] = None
 
   def handleBlockDownloaded(
       result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
@@ -371,7 +349,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def tryStartSync(): Unit = {
     if (hasBestChainTips) {
-      startTime = None
       val chains = mutable.ArrayBuffer.empty[(ChainIndex, BrokerActor, ChainTip, ChainTip)]
       brokerConfig.chainIndexes.foreach { chainIndex =>
         for {
@@ -384,14 +361,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
         }
       }
       if (chains.nonEmpty) startSync(chains)
-    } else {
-      startTime match {
-        case Some(ts) =>
-          if (ts.plusUnsafe(FallbackThreshold) < TimeStamp.now()) {
-            clearV2StateAndSwitchToV1()
-          }
-        case None => startTime = Some(TimeStamp.now())
-      }
     }
   }
 
@@ -545,14 +514,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
     if (needToStartNextSyncRound()) resync()
   }
 
-  private def clearV2StateAndSwitchToV1(): Unit = {
-    selfChainTips.reset()
-    bestChainTips.reset()
-    startTime = None
-    clearSyncingState()
-    switchToV1()
-  }
-
   private def updateBestChainTips(terminatedBroker: BrokerActor): Unit = {
     assume(getBrokerStatus(terminatedBroker).isEmpty)
     bestChainTips.foreach { case (brokerActor, chainTip) =>
@@ -570,11 +531,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
   def onBrokerTerminated(broker: BrokerActor): Unit = {
     val status = getBrokerStatus(broker)
     removeBroker(broker)
-    if (peerSizeUsingV2 < BlockFlowSynchronizer.V2SwitchThreshold) {
-      clearV2StateAndSwitchToV1()
-    } else {
-      status.foreach(onBrokerTerminated(broker, _))
-    }
+    status.foreach(onBrokerTerminated(broker, _))
   }
 
   private def onBrokerTerminated(broker: BrokerActor, status: BrokerStatus): Unit = {
@@ -601,10 +558,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
 object SyncState {
   import BrokerStatusTracker.BrokerActor
 
-  val SkeletonSize: Int           = 16
-  val BatchSize: Int              = 128
-  val MaxQueueSize: Int           = SkeletonSize * BatchSize
-  val FallbackThreshold: Duration = Duration.ofMinutesUnsafe(2)
+  val SkeletonSize: Int = 16
+  val BatchSize: Int    = 128
+  val MaxQueueSize: Int = SkeletonSize * BatchSize
 
   def addToMap[K, V](map: mutable.HashMap[K, mutable.ArrayBuffer[V]], key: K, value: V): Unit = {
     map.get(key) match {
