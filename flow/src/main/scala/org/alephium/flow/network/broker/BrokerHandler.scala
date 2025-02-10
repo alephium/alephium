@@ -66,7 +66,8 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def remoteAddress: InetSocketAddress
   def brokerAlias: String = remoteAddress.toString
 
-  var remoteBrokerInfo: BrokerInfo = _
+  var remoteBrokerInfo: BrokerInfo           = _
+  var remoteProtocolVersion: ProtocolVersion = _
 
   def blockflow: BlockFlow
   def allHandlers: AllHandlers
@@ -91,6 +92,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
 
     versions match {
       case Some((_, protocolVersion)) =>
+        remoteProtocolVersion = protocolVersion
         handleHandshakeInfo(
           BrokerInfo.from(remoteAddress, hello.brokerInfo),
           hello.clientId,

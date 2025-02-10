@@ -1131,6 +1131,32 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.remoteSynced is true
   }
 
+  it should "update the sync state when receiving the locators from v1 peer" in new SyncV2Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    setRemoteBrokerInfo()
+    brokerHandlerActor.remoteProtocolVersion = ProtocolV1
+    brokerHandlerActor.selfSynced is false
+
+    brokerHandler ! BaseBrokerHandler.Received(
+      InvRequest(AVector.fill(brokerConfig.chainNum)(AVector.empty[BlockHash]))
+    )
+    eventually(brokerHandlerActor.selfSynced is true)
+
+    brokerHandlerActor.selfSynced = false
+    val blocks = brokerConfig.chainIndexes.map(emptyBlock(blockFlow, _))
+    (1 until blocks.length).foreach { size =>
+      val hashes0 = blocks.take(size).map(b => AVector(b.hash))
+      val hashes1 = AVector.fill(brokerConfig.chainIndexes.length - size)(AVector.empty[BlockHash])
+      brokerHandler ! BaseBrokerHandler.Received(InvRequest(hashes0 ++ hashes1))
+      eventually(brokerHandlerActor.selfSynced is false)
+      addAndCheck(blockFlow, blocks(size - 1))
+    }
+    addAndCheck(blockFlow, blocks.last)
+    brokerHandler ! BaseBrokerHandler.Received(InvRequest(blocks.map(b => AVector(b.hash))))
+    eventually(brokerHandlerActor.selfSynced is true)
+  }
+
   it should "get next height" in new Fixture {
     val bestTip = genChainTip(chainIndex).copy(height = 21)
     val state   = SyncV2Handler.StatePerChain(chainIndex, bestTip)

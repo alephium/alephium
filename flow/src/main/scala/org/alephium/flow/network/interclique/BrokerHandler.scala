@@ -77,6 +77,23 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   def exchangingV1: Receive = exchangingCommon orElse syncingV1 orElse flowEvents
   def exchangingV2: Receive = exchangingV1 orElse syncingV2
 
+  private def tryUpdateSyncStatus(locators: AVector[AVector[BlockHash]]): Unit = {
+    // When our node is V2 but the peer is V1, since it is impossible to receive the
+    // chain state from V1, we need to update the sync state by checking the locators
+    if (!selfSynced && selfProtocolVersion == ProtocolV2 && remoteProtocolVersion == ProtocolV1) {
+      val result = locators.forallE { locatorsPerChain =>
+        if (locatorsPerChain.isEmpty) {
+          Right(true)
+        } else {
+          blockflow.contains(locatorsPerChain.last)
+        }
+      }
+      escapeIOError(result, "tryUpdateSyncStatus") { synced =>
+        if (synced) setSelfSynced()
+      }
+    }
+  }
+
   def syncingV1: Receive = {
     case BaseBrokerHandler.SyncLocators(locators) =>
       val showLocators = Utils.showFlow(locators)
@@ -90,6 +107,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
           locators,
           remoteBrokerInfo
         )
+        tryUpdateSyncStatus(locators)
       } else {
         log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
       }
