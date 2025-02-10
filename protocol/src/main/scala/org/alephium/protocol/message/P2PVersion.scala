@@ -16,7 +16,22 @@
 
 package org.alephium.protocol.message
 
-sealed trait ProtocolVersion
+sealed trait P2PVersion
 
-case object ProtocolV1 extends ProtocolVersion
-case object ProtocolV2 extends ProtocolVersion
+object P2PVersion {
+  def fromClientId(clientId: String): Option[P2PVersion] = {
+    clientId.split("/") match {
+      case Array(_, _, _)           => Some(P2PV1)
+      case Array(_, _, _, "p2p-v1") => Some(P2PV1)
+      case Array(_, _, _, "p2p-v2") => Some(P2PV2)
+      case _                        => None
+    }
+  }
+}
+
+case object P2PV1 extends P2PVersion {
+  override def toString: String = "p2p-v1"
+}
+case object P2PV2 extends P2PVersion {
+  override def toString: String = "p2p-v2"
+}

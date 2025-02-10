@@ -32,7 +32,6 @@ import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
-import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.{Compiler, CompoundAssignmentOperator}
@@ -2304,12 +2303,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in random order" in new TxExecutionOrderFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
+    setHardFork(HardFork.Mainnet)
 
     def contractCreationPreLeman(
         code: StatefulContract,
@@ -2387,13 +2381,9 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in sequential order" in new TxExecutionOrderFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
+    setHardForkSince(HardFork.Leman)
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
     val block      = callScript(contractId, identity)
-    networkConfig.getHardFork(block.timestamp) is HardFork.Leman
 
     val expected = (0L until block.nonCoinbaseLength.toLong).fold(0L)(_ * 10 + _)
     checkState(expected, contractId)
@@ -3811,54 +3801,28 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
+    setHardForkBefore(HardFork.Rhone)
+    val hardFork                            = networkConfig.getHardFork(TimeStamp.now())
     override def useMethodSelector: Boolean = false
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
-
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-    errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+    if (hardFork == HardFork.Mainnet) {
+      errorMessage.contains(s"Right(TxScriptExeFailed(Deserialization error") is true
+    } else {
+      errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+    }
   }
 
   it should "not load contract assets just after creation from Rhone upgrade" in new CreateContractFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
-
+    setHardForkSince(HardFork.Rhone)
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetAlreadyFlushed)") is true
   }
 
   it should "load contract fields just after creation from Rhone upgrade" in new CreateContractFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
+    setHardForkSince(HardFork.Rhone)
     override def useAssets: Boolean = false
-
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
 
     val block = payableCall(blockFlow, chainIndex, script)
     addAndCheck(blockFlow, block)
@@ -6166,19 +6130,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "call multiple asset functions in the same contract: since-rhone" in new ReentrancyFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+    setHardForkSince(HardFork.Rhone)
     callTxScript(script(s"""
                            |  foo.withdraw0(callerAddress!())
                            |  foo.withdraw2(callerAddress!())
@@ -6203,12 +6155,8 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
+    setHardFork(HardFork.Leman)
     override def useMethodSelector: Boolean = false
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     failCallTxScript(
       script(s"""
                 |  foo.withdraw0(callerAddress!())
@@ -6275,32 +6223,14 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "call the same deposit function multiple times in the same contract: since-rhone" in new PayToContractOnlyFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
-
+    setHardForkSince(HardFork.Rhone)
     getContractAsset(fooId).amount is ALPH.alph(100)
     callTxScript(script)
     getContractAsset(fooId).amount is ALPH.alph(100 + 20 + 10 * 6 - 1)
   }
 
   it should "not call the same deposit function multiple times in the same contract: Leman" in new PayToContractOnlyFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardFork(HardFork.Leman)
     intercept[AssertionError](callTxScript(script)).getMessage is
       s"Right(TxScriptExeFailed($InvalidMethodModifierBeforeRhone))"
   }
@@ -6741,11 +6671,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
   // Inactive instrs check will be enabled in future upgrades
   ignore should "check inactive instrs when creating contract" in new ContractFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    setHardFork(HardFork.Leman)
 
     val code =
       s"""

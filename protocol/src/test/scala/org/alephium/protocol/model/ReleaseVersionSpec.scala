@@ -20,7 +20,6 @@ import akka.util.ByteString
 
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2}
 import org.alephium.util.{AlephiumSpec, TimeStamp}
 
 class ReleaseVersionSpec extends AlephiumSpec {
@@ -50,13 +49,17 @@ class ReleaseVersionSpec extends AlephiumSpec {
   }
 
   it should "check client id" in {
-    def buildNetworkConfig(_networkId: NetworkId, rhoneActivationTS: TimeStamp): NetworkConfig = {
+    def buildNetworkConfig(
+        _networkId: NetworkId,
+        rhoneActivationTS: TimeStamp,
+        danubeActivationTS: TimeStamp = TimeStamp.Max
+    ): NetworkConfig = {
       new NetworkConfig {
         override def networkId               = _networkId
         override def noPreMineProof          = ByteString.empty
         override def lemanHardForkTimestamp  = TimeStamp.zero
         override def rhoneHardForkTimestamp  = rhoneActivationTS
-        override def danubeHardForkTimestamp = TimeStamp.Max
+        override def danubeHardForkTimestamp = danubeActivationTS
       }
     }
 
@@ -101,11 +104,5 @@ class ReleaseVersionSpec extends AlephiumSpec {
       ReleaseVersion.fromClientId("scala-alephium/v2.14.6/Linux") is Some(ReleaseVersion(2, 14, 6))
       ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
     }
-  }
-
-  it should "if it is using protocol v2" in {
-    ReleaseVersion(3, 11, Int.MaxValue).protocolVersion is ProtocolV1
-    ReleaseVersion(3, 12, 0).protocolVersion is ProtocolV2
-    ReleaseVersion(3, 12, 1).protocolVersion is ProtocolV2
   }
 }
