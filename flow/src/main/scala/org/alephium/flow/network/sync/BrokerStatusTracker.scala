@@ -24,7 +24,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
+import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -35,7 +35,7 @@ object BrokerStatusTracker {
 
   final class BrokerStatus(
       val info: BrokerInfo,
-      val version: ProtocolVersion,
+      val version: P2PVersion,
       private[sync] val tips: FlattenIndexedArray[ChainTip]
   ) {
     private[sync] var requestNum   = 0
@@ -118,7 +118,7 @@ object BrokerStatusTracker {
   }
 
   object BrokerStatus {
-    def apply(info: BrokerInfo, version: ProtocolVersion)(implicit
+    def apply(info: BrokerInfo, version: P2PVersion)(implicit
         groupConfig: GroupConfig
     ): BrokerStatus = {
       new BrokerStatus(info, version, FlattenIndexedArray.empty)
@@ -136,8 +136,8 @@ trait BrokerStatusTracker {
   def getBrokerStatus(broker: BrokerActor): Option[BrokerStatus] =
     brokers.find(_._1 == broker).map(_._2)
 
-  def samplePeersSize(brokerSize: Int, protocolVersion: ProtocolVersion): Int = {
-    val syncPeerSampleSize = if (protocolVersion == ProtocolV1) {
+  def samplePeersSize(brokerSize: Int, p2pVersion: P2PVersion): Int = {
+    val syncPeerSampleSize = if (p2pVersion == P2PV1) {
       networkSetting.syncPeerSampleSizeV1
     } else {
       networkSetting.syncPeerSampleSizeV2
@@ -146,12 +146,10 @@ trait BrokerStatusTracker {
     Math.min(peerSize, syncPeerSampleSize)
   }
 
-  def peerSizeUsingV2: Int = brokers.count(_._2.version == ProtocolV2)
-
-  def samplePeers(version: ProtocolVersion): AVector[(BrokerActor, BrokerStatus)] = {
+  def samplePeers(version: P2PVersion): AVector[(BrokerActor, BrokerStatus)] = {
     val filtered = version match {
-      case ProtocolV2 => brokers.filter(_._2.version == ProtocolV2)
-      case ProtocolV1 => brokers
+      case P2PV2 => brokers.filter(_._2.version == P2PV2)
+      case P2PV1 => brokers
     }
     if (filtered.isEmpty) {
       AVector.empty

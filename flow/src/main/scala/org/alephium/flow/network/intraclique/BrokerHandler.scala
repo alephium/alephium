@@ -35,7 +35,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def handleHandshakeInfo(
       _remoteBrokerInfo: BrokerInfo,
       clientInfo: String,
-      protocolVersion: ProtocolVersion
+      p2pVersion: P2PVersion
   ): Unit = {
     if (_remoteBrokerInfo.cliqueId == selfCliqueInfo.id) {
       remoteBrokerInfo = _remoteBrokerInfo

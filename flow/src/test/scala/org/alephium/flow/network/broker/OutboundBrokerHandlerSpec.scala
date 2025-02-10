@@ -30,7 +30,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.ProtocolVersion
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
@@ -95,7 +95,7 @@ class TestOutboundBrokerHandler(
   def handleHandshakeInfo(
       _remoteBrokerInfo: BrokerInfo,
       clientInfo: String,
-      protocolVersion: ProtocolVersion
+      p2pVersion: P2PVersion
   ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }

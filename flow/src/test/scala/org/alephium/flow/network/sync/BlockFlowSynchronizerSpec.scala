@@ -33,7 +33,7 @@ import org.alephium.flow.network.broker.{
   MisbehaviorManager
 }
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
+import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, TimeStamp}
 
@@ -44,6 +44,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   override def actorSystemConfig = AlephiumActorSpec.debugConfig
 
   trait Fixture extends FlowFixture with Generators {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.enable-p2p-v2", false)
+    )
+
     lazy val (allHandlers, allProbes) = TestUtils.createAllHandlersProbe
     lazy val blockFlowSynchronizer = TestActorRef[BlockFlowSynchronizer](
       BlockFlowSynchronizer.props(blockFlow, allHandlers)
@@ -62,7 +66,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val broker = brokerInfoGen.sample.get
     probe.send(
       blockFlowSynchronizer,
-      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "", ProtocolV1)
+      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "", P2PV1)
     )
     eventually(blockFlowSynchronizerActor.brokers.toMap.contains(probe.ref) is true)
 
@@ -77,7 +81,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     broker.send(
       blockFlowSynchronizer,
-      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "", ProtocolV1)
+      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "", P2PV1)
     )
     eventually(blockFlowSynchronizerActor.brokers.toMap.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
@@ -88,8 +92,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   behavior of "BlockFlowSynchronizerV1"
 
   it should "cleanup expired downloading accordingly" in new Fixture {
-    blockFlowSynchronizerActor.switchToV1()
-
     val now   = TimeStamp.now()
     val hash0 = BlockHash.generate
     val hash1 = BlockHash.generate
@@ -104,8 +106,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "download blocks by inventories" in new Fixture {
-    blockFlowSynchronizerActor.switchToV1()
-
     val now   = TimeStamp.now()
     val hash0 = BlockHash.generate
     val hash1 = BlockHash.generate
@@ -118,8 +118,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "handle finalized blocks" in new Fixture {
-    blockFlowSynchronizerActor.switchToV1()
-
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     blockFlowSynchronizerActor.syncing.addOne((block.hash, TimeStamp.now()))
     blockProcessed(block)
@@ -130,7 +128,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import BlockFlowSynchronizer._
 
     val broker = TestProbe()
-    blockFlowSynchronizerActor.switchToV1()
     val commands: Seq[V2Command] = Seq(
       UpdateChainState(AVector.empty),
       UpdateAncestors(AVector.empty),
@@ -157,9 +154,12 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   trait BlockFlowSynchronizerV2Fixture extends Fixture {
     import SyncState._
 
-    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.enable-p2p-v2", true)
+    )
 
-    def addBroker(version: ProtocolVersion = ProtocolV2): (BrokerActor, BrokerStatus, TestProbe) = {
+    def addBroker(version: P2PVersion = P2PV2): (BrokerActor, BrokerStatus, TestProbe) = {
       val brokerInfo =
         BrokerInfo.unsafe(CliqueId.generate, 0, 1, socketAddressGen.sample.get)
       val probe                    = TestProbe()
@@ -170,12 +170,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       )
       val brokerStatus = blockFlowSynchronizerActor.getBrokerStatus(brokerActor).get
       (brokerActor, brokerStatus, probe)
-    }
-
-    def addBrokerAndSwitchToV2() = {
-      val broker = addBroker()
-      blockFlowSynchronizerActor.switchToV2()
-      broker
     }
 
     @scala.annotation.tailrec
@@ -217,13 +211,13 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "schedule sync" in new BlockFlowSynchronizerV2Fixture {
-    addBrokerAndSwitchToV2()
+    addBroker()
     blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
     allProbes.flowHandler.expectMsg(FlowHandler.GetChainState)
   }
 
   it should "handle self chain state" in new BlockFlowSynchronizerV2Fixture {
-    val (_, _, probe) = addBrokerAndSwitchToV2()
+    val (_, _, probe) = addBroker()
     val chainTips     = genChainTips
     blockFlowSynchronizerActor.selfChainTips.size is 0
     blockFlowSynchronizerActor.isSyncingUsingV2 is false
@@ -234,7 +228,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "handle peer chain state" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor0, brokerStatus0, _) = addBrokerAndSwitchToV2()
+    val (brokerActor0, brokerStatus0, _) = addBroker()
     val chainTips0                       = genChainTips
     blockFlowSynchronizer.tell(BlockFlowSynchronizer.UpdateChainState(chainTips0), brokerActor0.ref)
     brokerConfig.chainIndexes.foreach { chainIndex =>
@@ -262,7 +256,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "handle self chain state and start syncing" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     val selfChainTips           = genChainTips
     val bestChainTips = selfChainTips.map(tip => tip.copy(weight = tip.weight + Weight(1)))
 
@@ -293,7 +287,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "only sync those chains that need to be synchronized" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     val selfChainTips           = genChainTips
     val selfChainTip            = selfChainTips(0)
     val bestChainTip            = selfChainTip.copy(weight = selfChainTip.weight + Weight(1))
@@ -319,7 +313,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "not start syncing if self chain tip better than peers" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     val bestChainTips           = genChainTips
     val selfChainTips = bestChainTips.map(tip => tip.copy(weight = tip.weight + Weight(1)))
 
@@ -335,7 +329,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "start syncing from multiple peers" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor0, _, probe0) = addBrokerAndSwitchToV2()
+    val (brokerActor0, _, probe0) = addBroker()
     val (brokerActor1, _, probe1) = addBroker()
 
     val selfChainTips  = genChainTips
@@ -382,7 +376,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "download latest blocks from the origin broker" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor0, brokerStatus0, probe0) = addBrokerAndSwitchToV2()
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val (_, brokerStatus1, probe1)            = addBroker()
     val chainIndex                            = ChainIndex.unsafe(0, 0)
 
@@ -439,7 +433,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "start the next sync round only if necessary" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     probe.ignoreMsg { case _: BrokerHandler.SendChainState => true }
 
     val selfChainTips    = genChainTips
@@ -474,7 +468,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "try move on" in new BlockFlowSynchronizerV2Fixture {
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     val chainIndex              = ChainIndex.unsafe(0, 0)
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
     val syncingChain = addSyncingChain(chainIndex, 300, brokerActor)
@@ -497,7 +491,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle ancestors response" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor0, _, probe0) = addBrokerAndSwitchToV2()
+    val (brokerActor0, _, probe0) = addBroker()
     val (brokerActor1, _, probe1) = addBroker()
     val chainIndex0               = ChainIndex.unsafe(0, 0)
     val chainIndex1               = ChainIndex.unsafe(0, 1)
@@ -521,7 +515,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle skeleton response" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     val chainIndex              = ChainIndex.unsafe(0, 0)
     val syncingChain            = addSyncingChain(chainIndex, 300, brokerActor)
     val heights                 = BlockHeightRange.from(128, 256, 128)
@@ -549,7 +543,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle downloaded blocks" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor, brokerStatus, _) = addBrokerAndSwitchToV2()
+    val (brokerActor, brokerStatus, _) = addBroker()
     val dataOrigin                     = DataOrigin.InterClique(brokerStatus.info)
     val chainIndex                     = ChainIndex.unsafe(0, 0)
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
@@ -603,7 +597,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "handle finalized blocks and validate more blocks" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor, brokerStatus, _) = addBrokerAndSwitchToV2()
+    val (brokerActor, brokerStatus, _) = addBroker()
     val dataOrigin                     = DataOrigin.InterClique(brokerStatus.info)
     val chainIndex                     = ChainIndex.unsafe(0, 0)
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
@@ -643,7 +637,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "attempt to download blocks when necessary" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val (brokerActor, _, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, _, probe) = addBroker()
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val syncingChain = addSyncingChain(chainIndex, 200, brokerActor)
@@ -658,10 +652,13 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
   it should "download blocks from multiple peers" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
-    override val configValues: Map[String, Any] =
-      Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 4))
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.groups", 4),
+      ("alephium.network.enable-p2p-v2", true)
+    )
 
-    val (brokerActor0, brokerStatus0, probe0) = addBrokerAndSwitchToV2()
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val (brokerActor1, brokerStatus1, probe1) = addBroker()
     val allTasks = brokerConfig.chainIndexes.map { chainIndex =>
       val syncingChain  = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
@@ -708,10 +705,13 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "collect tasks in order of task size" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    override val configValues: Map[String, Any] =
-      Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 4))
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.groups", 4),
+      ("alephium.network.enable-p2p-v2", true)
+    )
 
-    val (brokerActor, brokerStatus, probe) = addBrokerAndSwitchToV2()
+    val (brokerActor, brokerStatus, probe) = addBroker()
     val maxTaskSize                        = 20
     val allChains = brokerConfig.chainIndexes.mapWithIndex { case (chainIndex, index) =>
       val syncingChain  = SyncStatePerChain(chainIndex, chainTipGen.sample.get, brokerActor)
@@ -731,7 +731,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "collect tasks in order of broker capacity" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    blockFlowSynchronizerActor.switchToV2()
     val brokers      = AVector.from((0 until 4).map(_ => addBroker()))
     val chainIndex   = ChainIndex.unsafe(0, 0)
     val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokers.head._1)
@@ -763,7 +762,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import SyncState._
 
     val chainIndex                            = ChainIndex.unsafe(0, 0)
-    val (brokerActor0, brokerStatus0, probe0) = addBrokerAndSwitchToV2()
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val (brokerActor1, brokerStatus1, probe1) = addBroker()
     val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
     val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
@@ -797,8 +796,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "resync if the origin peer is bad" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val brokers    = Seq.fill(BlockFlowSynchronizer.V2SwitchThreshold + 1)(addBroker())
+    val chainIndex                            = ChainIndex.unsafe(0, 0)
+    val brokers                               = Seq.fill(2)(addBroker())
     val (brokerActor0, brokerStatus0, probe0) = brokers(0)
     val (brokerActor1, _, probe1)             = brokers(1)
     val selfChainTips                         = genChainTips
@@ -849,9 +848,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "resync if the origin peer is terminated" in new BlockFlowSynchronizerV2Fixture {
-    val chainIndex           = ChainIndex.unsafe(0, 0)
-    val brokers              = Seq.fill(BlockFlowSynchronizer.V2SwitchThreshold + 1)(addBroker())
-    val (brokerActor0, _, _) = brokers(0)
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val brokers                   = Seq.fill(2)(addBroker())
+    val (brokerActor0, _, _)      = brokers(0)
     val (brokerActor1, _, probe1) = brokers(1)
     val chainTips0                = genChainTips
     val chainTips1 =
@@ -880,8 +879,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "reschedule download tasks if the peer is terminated" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val brokers    = Seq.fill(BlockFlowSynchronizer.V2SwitchThreshold + 1)(addBroker())
+    val chainIndex                 = ChainIndex.unsafe(0, 0)
+    val brokers                    = Seq.fill(2)(addBroker())
     val (_, brokerStatus0, probe0) = brokers(0)
     val (brokerActor1, _, probe1)  = brokers(1)
     val syncingChain               = addSyncingChain(chainIndex, Int.MaxValue, brokerActor1)
@@ -899,103 +898,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(probe1.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task))))
   }
 
-  it should "test shouldSwitchToV2" in {
-    new BlockFlowSynchronizerV2Fixture {
-      override val configValues: Map[String, Any] = Map(
-        ("alephium.broker.broker-num", 1),
-        ("alephium.network.enable-sync-protocol-v2", false)
-      )
-
-      blockFlowSynchronizerActor.currentVersion is ProtocolV1
-      blockFlowSynchronizerActor.shouldSwitchToV2() is false
-      (0 until BlockFlowSynchronizer.V2SwitchThreshold).foreach(_ => addBroker(ProtocolV2))
-      blockFlowSynchronizerActor.shouldSwitchToV2() is false
-      blockFlowSynchronizerActor.currentVersion is ProtocolV1
-    }
-
-    new BlockFlowSynchronizerV2Fixture {
-      networkConfig.enableSyncProtocolV2 is true
-      blockFlowSynchronizerActor.currentVersion is ProtocolV1
-      blockFlowSynchronizerActor.shouldSwitchToV2() is false
-      (0 until BlockFlowSynchronizer.V2SwitchThreshold - 1).foreach(_ => addBroker(ProtocolV2))
-      blockFlowSynchronizerActor.shouldSwitchToV2() is false
-      blockFlowSynchronizerActor.brokers.addOne(blockFlowSynchronizerActor.brokers.last)
-      blockFlowSynchronizerActor.shouldSwitchToV2() is true
-      blockFlowSynchronizerActor.currentVersion is ProtocolV1
-      blockFlowSynchronizerActor.switchToV2()
-      blockFlowSynchronizerActor.currentVersion is ProtocolV2
-      blockFlowSynchronizerActor.shouldSwitchToV2() is false
-    }
-  }
-
-  it should "switch between V1 and V2" in new BlockFlowSynchronizerV2Fixture {
-    import SyncState.FallbackThreshold
-
-    val selfChainTips = genChainTips
-    blockFlowSynchronizerActor.currentVersion is ProtocolV1
-    (0 until BlockFlowSynchronizer.V2SwitchThreshold - 1).foreach(_ => addBroker(ProtocolV2))
-    blockFlowSynchronizerActor.currentVersion is ProtocolV1
-
-    addBroker(ProtocolV2)
-    blockFlowSynchronizerActor.startTime.isDefined is false
-    blockFlowSynchronizerActor.isSyncingUsingV2 is false
-    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
-    blockFlowSynchronizerActor.currentVersion is ProtocolV2
-    blockFlowSynchronizerActor.startTime.isDefined is true
-    blockFlowSynchronizerActor.isSyncingUsingV2 is false
-
-    blockFlowSynchronizerActor.startTime =
-      Some(TimeStamp.now().minusUnsafe(FallbackThreshold.timesUnsafe(2)))
-    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
-    blockFlowSynchronizerActor.currentVersion is ProtocolV1
-    blockFlowSynchronizerActor.startTime.isEmpty is true
-    blockFlowSynchronizerActor.selfChainTips.size is 0
-    blockFlowSynchronizerActor.bestChainTips.size is 0
-    blockFlowSynchronizerActor.syncingChains.size is 0
-
-    addBroker(ProtocolV2)
-    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
-    blockFlowSynchronizerActor.currentVersion is ProtocolV2
-    val selfChainTip    = selfChainTips(0)
-    val bestChainTip    = selfChainTip.copy(weight = selfChainTip.weight + Weight(1))
-    val remoteChainTips = selfChainTips.replace(0, bestChainTip)
-    blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(remoteChainTips)
-    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
-    blockFlowSynchronizerActor.startTime.isDefined is false
-    blockFlowSynchronizerActor.isSyncingUsingV2 is true
-  }
-
-  it should "switch from v2 to v1 if the number of v2 nodes is less than the required" in new BlockFlowSynchronizerV2Fixture {
-    import BlockFlowSynchronizer.V2SwitchThreshold
-
-    blockFlowSynchronizerActor.currentVersion is ProtocolV1
-    val brokers = Seq.fill(V2SwitchThreshold)(addBroker(ProtocolV2))
-    blockFlowSynchronizerActor.currentVersion is ProtocolV2
-    val chainTips = genChainTips
-    blockFlowSynchronizer ! FlowHandler.UpdateChainState(chainTips)
-    blockFlowSynchronizer.tell(
-      BlockFlowSynchronizer.UpdateChainState(chainTips),
-      brokers.head._3.ref
-    )
-    addSyncingChain(chainTips.head.chainIndex, Int.MaxValue, brokers.head._1)
-    blockFlowSynchronizerActor.syncingChains.isEmpty is false
-    blockFlowSynchronizerActor.selfChainTips.isEmpty is false
-    blockFlowSynchronizerActor.bestChainTips.isEmpty is false
-
-    brokers.head._1.ref ! PoisonPill
-    eventually {
-      blockFlowSynchronizerActor.syncingChains.isEmpty is true
-      blockFlowSynchronizerActor.selfChainTips.isEmpty is true
-      blockFlowSynchronizerActor.bestChainTips.isEmpty is true
-      blockFlowSynchronizerActor.peerSizeUsingV2 is 2
-      blockFlowSynchronizerActor.currentVersion is ProtocolV1
-    }
-  }
-
   it should "resync if an invalid block is received" in new BlockFlowSynchronizerV2Fixture {
     val chainIndex                            = ChainIndex.unsafe(0, 0)
     val selfChainTips                         = genChainTips
-    val (brokerActor0, brokerStatus0, probe0) = addBrokerAndSwitchToV2()
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val (brokerActor1, _, probe1)             = addBroker()
     val broker0ChainTips =
       selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
@@ -1061,7 +967,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "ignore v1 commands" in new BlockFlowSynchronizerV2Fixture {
     import BlockFlowSynchronizer._
 
-    val broker                   = addBrokerAndSwitchToV2()._3
+    val broker                   = addBroker()._3
     val commands: Seq[V1Command] = Seq(SyncInventories(AVector.empty))
     commands.foreach { command =>
       EventFilter.warning(start = "unhandled message", occurrences = 0).intercept {
@@ -1071,7 +977,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "ignore block announcements when syncing using v2" in new BlockFlowSynchronizerV2Fixture {
-    val (_, _, probe) = addBrokerAndSwitchToV2()
+    val (_, _, probe) = addBroker()
     blockFlowSynchronizerActor.isSyncingUsingV2 is false
     val blockHash = BlockHash.generate
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))

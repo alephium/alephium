@@ -206,9 +206,13 @@ sealed trait HandShakeSerding[T <: HandShake] extends Payload.ValidatedSerding[T
       signature: Signature
   ): T
 
-  def unsafe(brokerInfo: InterBrokerInfo, privateKey: PrivateKey): T = {
+  def unsafe(
+      brokerInfo: InterBrokerInfo,
+      privateKey: PrivateKey,
+      p2pVersion: P2PVersion
+  ): T = {
     val signature = SignatureSchema.sign(brokerInfo.hash.bytes, privateKey)
-    unsafe(ReleaseVersion.clientId, TimeStamp.now(), brokerInfo, signature)
+    unsafe(ReleaseVersion.clientId(p2pVersion), TimeStamp.now(), brokerInfo, signature)
   }
 
   implicit private val stringSerde: Serde[String] = new Serde[String] {

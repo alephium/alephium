@@ -18,8 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.BuildInfo
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.message.{ProtocolV1, ProtocolV2, ProtocolVersion}
-import org.alephium.protocol.model.ReleaseVersion.p2pProtocolV2Version
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.TimeStamp
 
@@ -57,9 +56,6 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
     }
   }
   // scalastyle:on magic.number
-
-  def protocolVersion: ProtocolVersion =
-    if (this >= p2pProtocolV2Version) ProtocolV2 else ProtocolV1
 }
 
 object ReleaseVersion {
@@ -69,9 +65,9 @@ object ReleaseVersion {
     )
   )
 
-  val p2pProtocolV2Version: ReleaseVersion = ReleaseVersion(3, 12, 0)
-
-  val clientId: String = s"scala-alephium/$current/${System.getProperty("os.name")}"
+  def clientId(p2pVersion: P2PVersion): String = {
+    s"scala-alephium/$current/${System.getProperty("os.name")}/${p2pVersion}"
+  }
 
   def fromClientId(
       clientId: String
