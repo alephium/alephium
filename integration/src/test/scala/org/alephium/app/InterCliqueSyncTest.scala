@@ -35,7 +35,7 @@ import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.protocol.WireVersion
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, NetworkId, ReleaseVersion}
+import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, NetworkId}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -117,7 +117,11 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     ) = {
       val fromTs = TimeStamp.now()
       val clique1 =
-        bootClique(nbOfNodes = nbOfNodesClique1, connectionBuild = clique1ConnectionBuild)
+        bootClique(
+          nbOfNodes = nbOfNodesClique1,
+          connectionBuild = clique1ConnectionBuild,
+          configOverrides = Map(("alephium.network.enable-sync-protocol-v2", false))
+        )
       val masterPortClique1 = clique1.masterTcpPort
 
       clique1.start()
@@ -132,7 +136,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         bootClique(
           nbOfNodes = nbOfNodesClique2,
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
-          connectionBuild = clique2ConnectionBuild
+          connectionBuild = clique2ConnectionBuild,
+          configOverrides = Map(("alephium.network.enable-sync-protocol-v2", false))
         )
       val masterPortClique2 = clique2.masterTcpPort
 
@@ -187,29 +192,15 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "test p2p protocol v2, v2 cliques: 4" in new P2PV1V2SyncFixture {
-    test(Seq.fill(4)(Injected.payload(injectionP2PV2.orElse(ignoreP2PV1SyncMessages), _)))
+    test(Seq.fill(4)(ProtocolV2))
   }
 
   it should "test p2p protocol v2, v1 cliques: 1, v2 cliques: 3" in new P2PV1V2SyncFixture {
-    test(
-      Seq(
-        Injected.payload(injectionP2PV1, _),
-        Injected.payload(injectionP2PV2, _),
-        Injected.payload(injectionP2PV2, _),
-        Injected.payload(injectionP2PV2, _)
-      )
-    )
+    test(Seq(ProtocolV2, ProtocolV2, ProtocolV2, ProtocolV1))
   }
 
-  it should "test p2p protocol v2, v1 cliques: 3, v2 cliques: 1" in new P2PV1V2SyncFixture {
-    test(
-      Seq(
-        Injected.payload(injectionP2PV2, _),
-        Injected.payload(injectionP2PV1, _),
-        Injected.payload(injectionP2PV1, _),
-        Injected.payload(injectionP2PV1, _)
-      )
-    )
+  it should "test p2p protocol v2, v1 cliques: 2, v2 cliques: 2" in new P2PV1V2SyncFixture {
+    test(Seq(ProtocolV2, ProtocolV2, ProtocolV1, ProtocolV1))
   }
 
   trait SyncFixtureBase extends CliqueFixture {
@@ -239,29 +230,12 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   trait P2PV1V2SyncFixture extends SyncFixtureBase {
-    val clientId1 =
-      s"scala-alephium/${ReleaseVersion(0, 0, 0)}/${System.getProperty("os.name")}/${ProtocolV1}"
-    val injectionP2PV1: PartialFunction[Payload, Payload] = { case hello: Hello =>
-      Hello.unsafe(clientId1, hello.timestamp, hello.brokerInfo, hello.signature)
-    }
-    val clientId2 =
-      s"scala-alephium/v3.12.0/${System.getProperty("os.name")}/${ProtocolV2}"
-    val injectionP2PV2: PartialFunction[Payload, Payload] = { case hello: Hello =>
-      Hello.unsafe(clientId2, hello.timestamp, hello.brokerInfo, hello.signature)
-    }
-
-    val ignoreP2PV1SyncMessages: PartialFunction[Payload, Payload] = {
-      case InvRequest(id, locators) => InvRequest(id, AVector.fill(locators.length)(AVector.empty))
-      case InvResponse(id, hashes)  => InvResponse(id, AVector.fill(hashes.length)(AVector.empty))
-    }
     // scalastyle:off method.length
-    def test(
-        connectionBuilds: Seq[ActorRef => ActorRefT[Tcp.Command]]
-    ) = {
-      assume(connectionBuilds.length == 4)
+    def test(protocolVersions: Seq[ProtocolVersion]) = {
+      assume(protocolVersions.length == 4)
 
       val fromTs  = TimeStamp.now()
-      val clique1 = bootClique(1, connectionBuild = connectionBuilds(0))
+      val clique1 = bootClique(1, configOverrides = Map(("alephium.network.enable-sync-protocol-v2", protocolVersions.head == ProtocolV2)))
 
       clique1.start()
       clique1.startWs()
@@ -274,7 +248,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         val clique = bootClique(
           1,
           Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
-          connectionBuilds(index)
+          configOverrides = Map(("alephium.network.enable-sync-protocol-v2", protocolVersions(index) == ProtocolV2))
         )
         clique.startWithoutCheckSyncState()
         clique
@@ -296,13 +270,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   trait P2PV2SyncFixture extends SyncFixtureBase {
-    val clientId =
-      s"scala-alephium/v3.12.0/${System.getProperty("os.name")}/${ProtocolV2}"
     val chainStateMessageCount = new AtomicInteger(0)
     val otherSyncMessageCount  = new AtomicInteger(0)
     val injection: PartialFunction[Payload, Payload] = {
-      case hello: Hello =>
-        Hello.unsafe(clientId, hello.timestamp, hello.brokerInfo, hello.signature)
       case msg: Ping => msg
       case msg: Pong => msg
       case msg: ChainState =>
@@ -317,14 +287,20 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     def test(cliqueSize: Int, mining: Boolean) = {
       val fromTs = TimeStamp.now()
 
-      val clique1 = bootClique(1, connectionBuild = Injected.payload(injection, _))
+      val clique1 = bootClique(
+        1,
+        None,
+        Injected.payload(injection, _),
+        Map(("alephium.network.enable-sync-protocol-v2", true))
+      )
       clique1.start()
 
       val remainCliques = (0 until cliqueSize - 1).map { _ =>
         bootClique(
           1,
           Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
-          Injected.payload(injection, _)
+          Injected.payload(injection, _),
+          Map(("alephium.network.enable-sync-protocol-v2", true))
         )
       }
 
