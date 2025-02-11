@@ -114,14 +114,18 @@ class ViewHandler(
         updateBestViewCount += 1
         tryUpdateBestView(hardFork)
       }
-      updateSubscribers(hardFork, Some(data.chainIndex))
+      if (hardFork.isDanubeEnabled()) {
+        updateSubscribers(hardFork, Some(data.chainIndex))
+      }
     case ViewHandler.BestDepsUpdated =>
       updatingBestDeps = false
       val hardFork = getHardForkNow()
       // If Danube is not enabled, we update the subscribers
       // If Danube is enabled, we don't need to update the subscribers, as it's done when the data event is received
-      if (isNodeSynced && !hardFork.isDanubeEnabled()) { updateSubscribers(hardFork, None) }
-      tryUpdateBestView(hardFork)
+      if (!hardFork.isDanubeEnabled()) { updateSubscribers(hardFork, None) }
+      if (isNodeSynced) {
+        tryUpdateBestView(hardFork)
+      }
     case ViewHandler.BestDepsUpdateFailed =>
       updatingBestDeps = false
       log.warning("Updating blockflow deps failed")
