@@ -271,9 +271,10 @@ object BlockFlow extends StrictLogging {
     }
 
     def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
       for {
         _ <- add(block, worldStateOpt)
-        _ <- updateBestDeps()
+        _ <- if (hardFork.isDanubeEnabled()) updateBestFlowSkeleton() else updateBestDeps()
       } yield ()
     }
 
@@ -290,9 +291,10 @@ object BlockFlow extends StrictLogging {
     }
 
     def addAndUpdateView(header: BlockHeader): IOResult[Unit] = {
+      val hardFork = networkConfig.getHardFork(header.timestamp)
       for {
         _ <- add(header)
-        _ <- updateBestDeps()
+        _ <- if (hardFork.isDanubeEnabled()) updateBestFlowSkeleton() else updateBestDeps()
       } yield ()
     }
 

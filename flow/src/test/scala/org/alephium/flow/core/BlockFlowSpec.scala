@@ -1011,6 +1011,71 @@ class BlockFlowSpec extends AlephiumSpec {
     testTxScriptCalling()
   }
 
+  trait ExtendBlockFlowFixture extends FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    val groupIndex0                             = GroupIndex.random
+    val groupIndex1 = GroupIndex.unsafe((groupIndex0.value + 1) % brokerConfig.groups)
+    val groupIndex2 = GroupIndex.unsafe((groupIndex1.value + 1) % brokerConfig.groups)
+  }
+
+  it should "extend block flow for intra-chain" in new ExtendBlockFlowFixture {
+    val chainIndex0      = ChainIndex(groupIndex0, groupIndex0)
+    val blockDeps0       = blockFlow.getBestFlowSkeleton().createBlockDeps(chainIndex0.from).deps
+    val (block0, block1) = mineTwoBlocksAndAdd(chainIndex0)
+    blockDeps0.contains(block0.hash) is false
+    blockDeps0.contains(block1.hash) is false
+
+    val blockDeps1 = blockFlow.calBestFlowPerChainIndex(chainIndex0).deps
+    blockDeps1.contains(block0.hash) is true
+    blockDeps1.contains(block1.hash) is false
+
+    val chainIndex1 = ChainIndex(groupIndex0, groupIndex1)
+    val block2      = emptyBlock(blockFlow, chainIndex1)
+    val block3      = mineBlockWithDep(chainIndex1, block1.hash)
+    addAndCheck(blockFlow, block2, block3)
+    val blockDeps2 = blockFlow.calBestFlowPerChainIndex(chainIndex0).deps
+    blockDeps2.contains(block0.hash) is true
+    blockDeps2.contains(block2.hash) is true
+    blockDeps2.contains(block3.hash) is false
+
+    val chainIndex2 = ChainIndex(groupIndex0, groupIndex2)
+    val block4      = emptyBlock(blockFlow, chainIndex2)
+    addAndCheck(blockFlow, block4)
+    val blockDeps3 = blockFlow.calBestFlowPerChainIndex(chainIndex0).deps
+    blockDeps3.contains(block0.hash) is true
+    blockDeps3.contains(block2.hash) is true
+    blockDeps3.contains(block4.hash) is true
+  }
+
+  it should "extend block flow for inter-chain" in new ExtendBlockFlowFixture {
+    val chainIndex0      = ChainIndex(groupIndex0, groupIndex0)
+    val (_, blockAtH1C0) = mineTwoBlocksAndAdd(chainIndex0)
+
+    val chainIndex1 = ChainIndex(groupIndex1, groupIndex0)
+    val block0      = mineBlockWithDep(chainIndex1, blockAtH1C0.hash)
+    val block1      = emptyBlock(blockFlow, chainIndex1)
+    val blockAtH2C0 = emptyBlock(blockFlow, chainIndex0)
+    addAndCheck(blockFlow, blockAtH2C0)
+    val block2 = emptyBlock(blockFlow, chainIndex1)
+    block2.blockDeps.deps.contains(blockAtH2C0.hash) is true
+
+    addAndCheck(blockFlow, block0)
+    blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block0.hash) is false
+
+    addAndCheck(blockFlow, block1)
+    blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block1.hash) is true
+
+    addAndCheck(blockFlow, block2)
+    val blockDeps = blockFlow.calBestFlowPerChainIndex(chainIndex1).deps
+    blockDeps.contains(block2.hash) is true
+    blockDeps.contains(block1.hash) is false
+
+    val chainIndex2 = ChainIndex(groupIndex1, groupIndex2)
+    val block3      = emptyBlock(blockFlow, chainIndex2)
+    addAndCheck(blockFlow, block3)
+    blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block3.hash) is false
+  }
+
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
     blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
   }

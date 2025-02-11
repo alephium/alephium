@@ -1064,6 +1064,26 @@ trait FlowFixture
       )
     mine(blockFlow, template1)
   }
+
+  def mineBlockWithDep(chainIndex: ChainIndex, depHash: BlockHash): Block = {
+    assume(blockFlow.containsUnsafe(depHash))
+    val height        = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
+    val block         = emptyBlock(blockFlow, chainIndex)
+    val template0     = BlockFlowTemplate.from(block, height)
+    val depChainIndex = ChainIndex.from(depHash)
+    val index         = template0.deps.indexWhere(ChainIndex.from(_) == depChainIndex)
+    val template1     = template0.copy(deps = template0.deps.replace(index, depHash))
+    mine(blockFlow, template1)
+  }
+
+  def mineTwoBlocksAndAdd(chainIndex: ChainIndex): (Block, Block) = {
+    val blocks = Seq.fill(2)(emptyBlock(blockFlow, chainIndex))
+    blocks.foreach(addAndCheck(blockFlow, _))
+    val height = blockFlow.getBlockChain(chainIndex).maxHeightUnsafe
+    val hashes = blockFlow.getHashes(chainIndex, height).rightValue
+    hashes.length is 2
+    (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
+  }
 }
 
 trait AlephiumFlowSpec extends AlephiumSpec with FlowFixture

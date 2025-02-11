@@ -245,4 +245,118 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       blockFlow.getIncomingBlockDeps(targetGroupIndex, bestDeps0) isE newBlocks
     }
   }
+
+  it should "get genesis block flow skeleton" in new Fixture {
+    val intraHashes = brokerConfig.cliqueGroups.map(g => blockFlow.genesisHashes(g.value)(g.value))
+    brokerConfig.cliqueGroups.foreach { group =>
+      val intraHash = intraHashes(group.value)
+      val skeleton  = blockFlow.getBlockFlowSkeletonUnsafe(intraHash)
+      skeleton.intraGroupTips is intraHashes
+      skeleton.intraGroupTipOutTips is blockFlow.genesisHashes
+    }
+  }
+
+  it should "get block flow skeleton" in new Fixture {
+    val blocks = AVector.tabulate(brokerConfig.groups, brokerConfig.groups) { case (from, to) =>
+      val chainIndex = ChainIndex.unsafe(from, to)
+      val block      = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block
+    }
+    val intraHashes = brokerConfig.cliqueGroups.map(g => blocks(g.value)(g.value).hash)
+    intraHashes.length is 3
+
+    val genesisHashes = blockFlow.genesisHashes
+    val skeleton0     = blockFlow.getBlockFlowSkeletonUnsafe(intraHashes(0))
+    skeleton0.intraGroupTips is AVector(intraHashes(0), genesisHashes(1)(1), genesisHashes(2)(2))
+    skeleton0.intraGroupTipOutTips is AVector(
+      genesisHashes(0).replace(0, blocks(0)(0).hash),
+      genesisHashes(1),
+      genesisHashes(2)
+    )
+
+    val skeleton1 = blockFlow.getBlockFlowSkeletonUnsafe(intraHashes(1))
+    skeleton1.intraGroupTips is AVector(intraHashes(0), intraHashes(1), genesisHashes(2)(2))
+    skeleton1.intraGroupTipOutTips is AVector(
+      genesisHashes(0).replace(0, blocks(0)(0).hash),
+      blocks(1).map(_.hash).replace(2, genesisHashes(1)(2)),
+      genesisHashes(2)
+    )
+
+    val skeleton2 = blockFlow.getBlockFlowSkeletonUnsafe(intraHashes(2))
+    skeleton2.intraGroupTips is intraHashes
+    skeleton2.intraGroupTipOutTips is AVector(
+      genesisHashes(0).replace(0, blocks(0)(0).hash),
+      blocks(1).map(_.hash).replace(2, genesisHashes(1)(2)),
+      blocks(2).map(_.hash)
+    )
+  }
+
+  it should "extend block flow skeleton" in new Fixture {
+    val chainIndex0                    = ChainIndex.unsafe(0, 0)
+    val (blockAtH1G0_0, blockAtH1G0_1) = mineTwoBlocksAndAdd(chainIndex0)
+    val blockAtH2G0_0                  = emptyBlock(blockFlow, chainIndex0)
+
+    val chainIndex2                    = ChainIndex.unsafe(2, 2)
+    val (blockAtH1G2_0, blockAtH1G2_1) = mineTwoBlocksAndAdd(chainIndex2)
+
+    val blockAtH2G0_1 = emptyBlock(blockFlow, chainIndex0)
+    val blockAtH2G0_2 = mineBlockWithDep(chainIndex0, blockAtH1G2_1.hash)
+
+    val blockAtH2G2 = emptyBlock(blockFlow, chainIndex2)
+    addAndCheck(blockFlow, blockAtH2G2)
+
+    val genesisHashes = blockFlow.genesisHashes
+    val blockAtH2G0_3 = emptyBlock(blockFlow, chainIndex0)
+    blockAtH2G0_0.blockDeps.inDeps(1) is genesisHashes(2)(2)
+    blockAtH2G0_1.blockDeps.inDeps(1) is blockAtH1G2_0.hash
+    blockAtH2G0_2.blockDeps.inDeps(1) is blockAtH1G2_1.hash
+    blockAtH2G0_3.blockDeps.inDeps(1) is blockAtH2G2.hash
+    addAndCheck(blockFlow, blockAtH2G0_0, blockAtH2G0_1, blockAtH2G0_2, blockAtH2G0_3)
+
+    val skeleton = blockFlow.getBlockFlowSkeletonUnsafe(blockAtH1G2_0.hash)
+    skeleton.intraGroupTips is AVector(blockAtH1G0_0.hash, genesisHashes(1)(1), blockAtH1G2_0.hash)
+    skeleton.intraGroupTipOutTips is AVector(
+      genesisHashes(0).replace(0, blockAtH1G0_0.hash),
+      genesisHashes(1),
+      genesisHashes(2).replace(2, blockAtH1G2_0.hash)
+    )
+
+    val group0 = chainIndex0.from
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, genesisHashes(0)(0)) is None
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, blockAtH1G0_0.hash) is None
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, blockAtH1G0_1.hash) is None
+
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, blockAtH2G0_0.hash) is Some(
+      BlockFlowSkeleton(
+        AVector(blockAtH2G0_0.hash, genesisHashes(1)(1), blockAtH1G2_0.hash),
+        AVector(
+          genesisHashes(0).replace(0, blockAtH2G0_0.hash),
+          genesisHashes(1),
+          genesisHashes(2).replace(2, blockAtH1G2_0.hash)
+        )
+      )
+    )
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, blockAtH2G0_1.hash) is Some(
+      BlockFlowSkeleton(
+        AVector(blockAtH2G0_1.hash, genesisHashes(1)(1), blockAtH1G2_0.hash),
+        AVector(
+          genesisHashes(0).replace(0, blockAtH2G0_1.hash),
+          genesisHashes(1),
+          genesisHashes(2).replace(2, blockAtH1G2_0.hash)
+        )
+      )
+    )
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, blockAtH2G0_2.hash) is None
+    blockFlow.tryExtendBlockFlowSkeletonUnsafe(skeleton, group0, blockAtH2G0_3.hash) is Some(
+      BlockFlowSkeleton(
+        AVector(blockAtH2G0_3.hash, genesisHashes(1)(1), blockAtH2G2.hash),
+        AVector(
+          genesisHashes(0).replace(0, blockAtH2G0_3.hash),
+          genesisHashes(1),
+          genesisHashes(2).replace(2, blockAtH2G2.hash)
+        )
+      )
+    )
+  }
 }

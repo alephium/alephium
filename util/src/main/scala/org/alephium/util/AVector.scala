@@ -253,7 +253,6 @@ final class AVector[@sp A](
     slice(0, length - m)
   }
 
-  // TODO: add tests
   def remove(k: Int): AVector[A] = {
     assume(k >= 0 && k < length)
     if (k == 0) {
