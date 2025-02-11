@@ -441,7 +441,7 @@ trait BlockFlowState extends FlowTipsUtil {
     for {
       diffs  <- getHashesForUpdates(chainIndex.from, block.blockDeps)
       blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
-    } yield blocks
+    } yield blocks.sortBy(_.timestamp)
   }
 
   def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
@@ -524,7 +524,6 @@ trait BlockFlowState extends FlowTipsUtil {
         blocks =
           if (hardfork.isDanubeEnabled()) block +: interGroupBlocks else interGroupBlocks :+ block
         _ <- blocks
-          .sortBy(_.timestamp)
           .foreachE(blockToUpdate =>
             BlockFlowState.updateState(
               worldState,
