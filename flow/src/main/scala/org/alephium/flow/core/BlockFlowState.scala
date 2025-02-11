@@ -707,7 +707,7 @@ object BlockFlowState {
     val conflictedTxE = if (hardfork.isDanubeEnabled()) {
       tx.unsigned.inputs.forallE(input => worldState.existOutput(input.outputRef))
     } else {
-      Right(true)
+      Right(false)
     }
 
     conflictedTxE.flatMap { conflictedTx =>

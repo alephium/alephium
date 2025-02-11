@@ -111,7 +111,7 @@ class ViewHandler(
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
       if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
-        updateBestViewCount += 1
+        updatingBestViewCount += 1
         tryUpdateBestView(hardFork)
       }
       if (hardFork.isDanubeEnabled()) {
@@ -229,14 +229,14 @@ trait ViewHandlerState extends IOBaseActor {
 
 trait BlockFlowUpdaterState extends IOBaseActor {
   def blockFlow: BlockFlow
-  protected[handler] var updateBestViewCount: Int  = 0
+  protected[handler] var updatingBestViewCount: Int  = 0
   protected[handler] var updatingBestDeps: Boolean = false
 
   implicit def executionContext: ExecutionContext = context.dispatcher
 
   def tryUpdateBestView(hardForkNow: HardFork): Unit = {
-    if (updateBestViewCount > 0 && !updatingBestDeps) {
-      updateBestViewCount = 0
+    if (updatingBestViewCount > 0 && !updatingBestDeps) {
+      updatingBestViewCount = 0
       updatingBestDeps = true
       Future[ViewHandler.Command] {
         val now          = TimeStamp.now()

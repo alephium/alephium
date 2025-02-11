@@ -21,10 +21,10 @@ import org.alephium.protocol.model.{BlockHash, TransactionId}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
-final case class ConflictedTxsPerBlock(block: BlockHash, txs: AVector[TransactionId])
+final case class ConflictedTxsPerBlock(interBlock: BlockHash, txs: AVector[TransactionId])
 object ConflictedTxsPerBlock {
   implicit val serde: Serde[ConflictedTxsPerBlock] =
-    Serde.forProduct2(ConflictedTxsPerBlock.apply, t => (t.block, t.txs))
+    Serde.forProduct2(ConflictedTxsPerBlock.apply, t => (t.interBlock, t.txs))
 }
 final case class ConflictedTxsSource(
     intraBlock: BlockHash,
