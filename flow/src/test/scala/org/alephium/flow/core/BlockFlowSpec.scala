@@ -1076,6 +1076,14 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block3.hash) is false
   }
 
+  it should "not update conflicted blocks cache since danube" in new FlowFixture with Generators {
+    setHardForkSince(HardFork.Danube)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    blockFlow.getCache(block).blockCache.contains(block.hash) is false
+  }
+
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
     blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
   }

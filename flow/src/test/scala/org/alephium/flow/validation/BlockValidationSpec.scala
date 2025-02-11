@@ -1495,4 +1495,13 @@ class BlockValidationSpec extends AlephiumSpec {
     newBlock(whitelistedMiner).pass()
     newBlock(randomMiner).pass()
   }
+
+  it should "allow conflicted txs since danube" in new Fixture {
+    setHardForkSince(HardFork.Danube)
+    val block = transfer(blockFlow, chainIndex)
+    validate(block, blockFlow).isRight is true
+    blockFlow.getCache(block).blockCache.contains(block.hash) is false
+    blockFlow.getCache(block).add(block)
+    validate(block, blockFlow).isRight is true
+  }
 }
