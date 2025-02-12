@@ -378,6 +378,17 @@ object BlockFlow extends StrictLogging {
     }
 
     def extendFlowPerChainUnsafe(flowTips: FlowTips, chainIndex: ChainIndex): FlowTips = {
+      if (chainIndex.isIntraGroup) {
+        (0 until brokerConfig.groups).foldLeft(flowTips) { case (acc, toGroup) =>
+          val tipChainIndex = ChainIndex(chainIndex.from, GroupIndex.unsafe(toGroup))
+          extendFlowFromChainUnsafe(acc, tipChainIndex)
+        }
+      } else {
+        extendFlowFromChainUnsafe(flowTips, chainIndex)
+      }
+    }
+
+    def extendFlowFromChainUnsafe(flowTips: FlowTips, chainIndex: ChainIndex): FlowTips = {
       var updatedFlow: Option[FlowTips] = None
       val currentChainTip               = flowTips.outTips(chainIndex.to.value)
 
