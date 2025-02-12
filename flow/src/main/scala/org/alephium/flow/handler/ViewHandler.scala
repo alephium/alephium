@@ -229,8 +229,8 @@ trait ViewHandlerState extends IOBaseActor {
 
 trait BlockFlowUpdaterState extends IOBaseActor {
   def blockFlow: BlockFlow
-  protected[handler] var updatingBestViewCount: Int  = 0
-  protected[handler] var updatingBestDeps: Boolean = false
+  protected[handler] var updatingBestViewCount: Int = 0
+  protected[handler] var updatingBestDeps: Boolean  = false
 
   implicit def executionContext: ExecutionContext = context.dispatcher
 

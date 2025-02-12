@@ -64,10 +64,12 @@ class ViewHandlerSpec extends AlephiumActorSpec {
         Address.Asset(addressGen(GroupIndex.unsafe(i)).sample.get._1)
       )
     lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow))
+
+    def setSynced(): Unit = viewHandler ! InterCliqueManager.SyncedResult(true)
   }
 
   trait SyncedFixture extends Fixture {
-    viewHandler ! InterCliqueManager.SyncedResult(true)
+    setSynced()
   }
 
   it should "not subscribe when miner addresses are not set" in new SyncedFixture {
@@ -273,6 +275,90 @@ class ViewHandlerSpec extends AlephiumActorSpec {
       viewHandler.underlyingActor.updatingBestViewCount is 2
       viewHandler.underlyingActor.updatingBestDeps is false
       blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+    }
+  }
+
+  trait DanubeFixture extends Fixture {
+    setHardForkSince(HardFork.Danube)
+
+    def createSubscriber(): TestProbe = {
+      val probe = TestProbe()
+      viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
+      probe.send(viewHandler, ViewHandler.Subscribe)
+      eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe.ref))
+      probe
+    }
+  }
+
+  it should "notify subscribers once the block is added since danube" in new DanubeFixture {
+    setSynced()
+    val probe = createSubscriber()
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+  }
+
+  it should "not notify subscribers when the best view is updated since danube" in new DanubeFixture {
+    setSynced()
+    val probe = createSubscriber()
+    viewHandler ! ViewHandler.BestDepsUpdated
+    eventually(probe.expectNoMessage())
+  }
+
+  it should "only update the best flow skeleton if the danube upgrade is activated" in new DanubeFixture {
+    setSynced()
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addWithoutViewUpdate(blockFlow, block)
+
+    blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+    blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
+      blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+    }
+  }
+
+  it should "only update the best deps if the danube upgrade will not be activated for a long time" in new Fixture {
+    val now = TimeStamp.now()
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.rhone-hard-fork-timestamp", now.millis),
+      ("alephium.network.danube-hard-fork-timestamp", now.plusSecondsUnsafe(20).millis)
+    )
+    setSynced()
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addWithoutViewUpdate(blockFlow, block)
+
+    blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+    blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+      blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "update the best view when the danube upgrade is about to be activated" in new Fixture {
+    val now = TimeStamp.now()
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.rhone-hard-fork-timestamp", now.millis),
+      ("alephium.network.danube-hard-fork-timestamp", now.plusSecondsUnsafe(5).millis)
+    )
+    setSynced()
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addWithoutViewUpdate(blockFlow, block)
+
+    blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+    blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
+      blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is true
     }
   }
 }
