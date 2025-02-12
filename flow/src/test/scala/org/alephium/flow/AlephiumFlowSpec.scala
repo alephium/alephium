@@ -515,6 +515,19 @@ trait FlowFixture
     mine(blockFlow, chainIndex, txs, miner, None)
   }
 
+  private def calcBlockDeps(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      timestamp: Option[TimeStamp]
+  ): BlockDeps = {
+    val hardFork = networkConfig.getHardFork(timestamp.getOrElse(TimeStamp.now()))
+    if (hardFork.isDanubeEnabled()) {
+      blockFlow.calBestFlowPerChainIndex(chainIndex)
+    } else {
+      blockFlow.calBestDepsUnsafe(chainIndex.from)
+    }
+  }
+
   def mine(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -522,7 +535,7 @@ trait FlowFixture
       miner: LockupScript.Asset,
       timestamp: Option[TimeStamp]
   ): Block = {
-    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val deps = calcBlockDeps(blockFlow, chainIndex, timestamp)
     val blockTs = timestamp.getOrElse {
       val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
       FlowUtils.nextTimeStamp(parentTs)
@@ -540,7 +553,7 @@ trait FlowFixture
       blockTs: TimeStamp,
       uncles: AVector[SelectedGhostUncle] = AVector.empty
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val deps             = calcBlockDeps(blockFlow, chainIndex, Some(blockTs))
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val consensusConfig  = consensusConfigs.getConsensusConfig(blockTs)
