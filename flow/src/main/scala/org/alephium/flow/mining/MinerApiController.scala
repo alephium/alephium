@@ -73,6 +73,10 @@ object MinerApiController {
     val targetBytes = headerBlob.takeRight(Target.byteLength)
     headerBlob.dropRight(length) ++ targetBytes
   }
+
+  private[mining] def calcJobIndex(chainIndex: ChainIndex)(implicit config: BrokerConfig): Int = {
+    chainIndex.from.value / config.brokerNum * config.groups + chainIndex.to.value
+  }
 }
 
 class MinerApiController(allHandlers: AllHandlers)(implicit
@@ -165,9 +169,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   def publishTemplate(template: BlockFlowTemplate): Unit = {
     val job = Job.fromWithoutTxs(template)
     val newJobs = latestJobs.map { existingJobs =>
-      // TODO: test this!!!
-      val jobIndex =
-        template.index.from.value / brokerConfig.brokerNum * brokerConfig.groups + template.index.to.value
+      val jobIndex = MinerApiController.calcJobIndex(template.index)
       existingJobs.replace(jobIndex, job -> template)
     }
     latestJobs = newJobs
