@@ -402,10 +402,12 @@ object BlockFlow extends StrictLogging {
           updatedFlow.isEmpty && tip != currentChainTip && isExtendingUnsafe(tip, currentChainTip)
         ) {
           val header = getBlockHeaderUnsafe(tip)
-          tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(header, targetGroup)).foreach {
-            newFlow =>
-              updatedFlow = Some(newFlow)
-          }
+          tryMergeUnsafe(
+            HardFork.Danube,
+            targetGroup,
+            flowTips,
+            getLightTipsUnsafe(header, targetGroup)
+          ).foreach { newFlow => updatedFlow = Some(newFlow) }
         }
       }
 

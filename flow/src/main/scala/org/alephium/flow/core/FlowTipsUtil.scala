@@ -257,7 +257,7 @@ trait FlowTipsUtil {
     if (flowTips.outTips.contains(tip) || flowTips.inTips.contains(tip)) {
       Some(flowTips)
     } else {
-      tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
+      tryMergeUnsafe(HardFork.Rhone, targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
     }
   }
 
@@ -299,13 +299,14 @@ trait FlowTipsUtil {
   }
 
   private[core] def tryMergeUnsafe(
+      hardFork: HardFork,
       targetGroup: GroupIndex,
       flowTips: FlowTips,
       newTips: FlowTips.Light
   ): Option[FlowTips] = {
     for {
       newInTips  <- mergeInTips(flowTips.inTips, newTips.inTips)
-      newOutTips <- mergeOutTips(targetGroup, flowTips.outTips, newTips.outTip)
+      newOutTips <- mergeOutTips(hardFork, targetGroup, flowTips.outTips, newTips.outTip)
     } yield FlowTips(flowTips.targetGroup, newInTips, newOutTips)
   }
 
@@ -348,6 +349,7 @@ trait FlowTipsUtil {
   }
 
   private[core] def mergeOutTips(
+      hardFork: HardFork,
       targetGroup: GroupIndex,
       outTips: AVector[BlockHash],
       newTip: BlockHash
@@ -360,13 +362,17 @@ trait FlowTipsUtil {
     } else {
       val newOutTips = getOutTipsUnsafe(newTip)
       mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
-        val intraDep0 = outTips(targetGroup.value)
-        val intraDep1 = getOutTip(getBlockHeaderUnsafe(newTip), targetGroup)
-        val commonIntraDep =
-          if (getHeightUnsafe(intraDep0) <= getHeightUnsafe(intraDep1)) intraDep0 else intraDep1
-        val commonOutTips = getOutTips(getBlockHeaderUnsafe(commonIntraDep))
-        val diffs         = getTipsDiffUnsafe(mergedDeps, commonOutTips)
-        Option.when(diffs.isEmpty || (!isConflicted(diffs, getBlockUnsafe)))(mergedDeps)
+        if (hardFork.isDanubeEnabled()) {
+          Some(mergedDeps)
+        } else {
+          val intraDep0 = outTips(targetGroup.value)
+          val intraDep1 = getOutTip(getBlockHeaderUnsafe(newTip), targetGroup)
+          val commonIntraDep =
+            if (getHeightUnsafe(intraDep0) <= getHeightUnsafe(intraDep1)) intraDep0 else intraDep1
+          val commonOutTips = getOutTips(getBlockHeaderUnsafe(commonIntraDep))
+          val diffs         = getTipsDiffUnsafe(mergedDeps, commonOutTips)
+          Option.when(diffs.isEmpty || (!isConflicted(diffs, getBlockUnsafe)))(mergedDeps)
+        }
       }
     }
   }
