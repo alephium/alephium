@@ -899,7 +899,7 @@ trait EndpointsLogic extends Endpoints {
       withSyncedClique {
         Future.successful(serverUtils.buildGrouplessTransferTx(blockFlow, query))
       },
-    query => Right(Some(query.fromAddress.groupIndex))
+    _.groupIndex().map(Some(_))
   )
 
   val buildGrouplessExecuteScriptTxLogic = serverLogicRedirect(buildGrouplessExecuteScriptTx)(
@@ -907,7 +907,7 @@ trait EndpointsLogic extends Endpoints {
       withSyncedClique {
         Future.successful(serverUtils.buildGrouplessExecuteScriptTx(blockFlow, query))
       },
-    query => Right(Some(query.fromAddress.groupIndex))
+    _.groupIndex().map(Some(_))
   )
 
   val buildGrouplessDeployContractTxLogic = serverLogicRedirect(buildGrouplessDeployContractTx)(
@@ -915,7 +915,7 @@ trait EndpointsLogic extends Endpoints {
       withSyncedClique {
         Future.successful(serverUtils.buildGrouplessDeployContractTx(blockFlow, query))
       },
-    query => Right(Some(query.fromAddress.groupIndex))
+    _.groupIndex().map(Some(_))
   )
 
   def fetchChainParams(): FutureTry[ChainParams] = {

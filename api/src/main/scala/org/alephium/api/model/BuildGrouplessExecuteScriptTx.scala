@@ -19,13 +19,15 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{BlockHash, GroupIndex}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.serde.deserialize
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessExecuteScriptTx(
-    fromAddress: Address.Asset,
+    fromAddress: String,
     bytecode: ByteString,
     attoAlphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
@@ -36,6 +38,30 @@ final case class BuildGrouplessExecuteScriptTx(
     with BuildTxCommon.ExecuteScriptTx {
   def gasAmount: Option[GasBox] = None
 
-  def getLockPair(): Try[(LockupScript.P2PK, UnlockScript)] =
+  def getLockPair()(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] =
     lockPair.left.map(badRequest)
+
+  def groupIndex()(implicit config: GroupConfig): Try[GroupIndex] = {
+    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
+      getFromAddress().map(_.groupIndex).left.map(badRequest)
+    } else {
+      deserialize[StatefulScript](bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      ) match {
+        case Right(script) =>
+          StatefulScript.deriveContractAddress(script) match {
+            case Some(contractAddress) =>
+              Right(contractAddress.groupIndex)
+            case None =>
+              Left(
+                badRequest(
+                  "Can not determine group: `fromAddress` has no explicit group and no contract address can be derived from TxScript"
+                )
+              )
+          }
+        case Left(error) =>
+          Left(error)
+      }
+    }
+  }
 }

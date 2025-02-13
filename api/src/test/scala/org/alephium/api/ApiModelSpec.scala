@@ -29,8 +29,8 @@ import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model.{AssetOutput => _, Balance => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
-import org.alephium.ralph.TypeSignatureFixture
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, PublicKeyLike, StatefulContract}
+import org.alephium.ralph.{Compiler, TypeSignatureFixture}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -242,6 +242,23 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""{"outputRef":{"hint":1234,"key":"${key.toHexString}"},"unlockScript":"abcd"}"""
     checkData(data, jsonRaw)
+  }
+
+  it should "encode/decode BuildGrouplessExecuteScriptTx" in {
+    val fromPublicKey    = PublicKey.generate
+    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
+    val fromAddress      = Address.Asset(fromLockupScript)
+    val fromAddressRaw   = fromAddress.toBase58
+    val attoAlphAmount   = Amount(U256.unsafe(1))
+    val bytecode         = ByteString(0, 0)
+    val request = BuildGrouplessExecuteScriptTx(fromAddressRaw, bytecode, Some(attoAlphAmount))
+    val jsonRaw =
+      s"""{
+         |  "fromAddress": "$fromAddressRaw",
+         |  "bytecode": "0000",
+         |  "attoAlphAmount": "1"
+         |}""".stripMargin
+    checkData(request, jsonRaw)
   }
 
   it should "encode/decode Token" in {
@@ -1933,5 +1950,79 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     BuildTxCommon
       .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Rhone)
       .leftValue is "Expect 0.1 ALPH deposit to deploy a new contract"
+  }
+
+  it should "get groupIndex for BuildGrouplessDeployContractTx" in {
+    val fromPublicKey    = PublicKey.generate
+    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
+    val fromAddress      = Address.Asset(fromLockupScript)
+    val bytecode         = ByteString(0, 0)
+
+    {
+      val fromAddressRaw = fromAddress.toBase58
+      val request        = BuildGrouplessDeployContractTx(fromAddressRaw, bytecode)
+      request
+        .groupIndex()
+        .leftValue
+        .detail is "Contract deployment requires a groupless address with explicit group information"
+    }
+
+    {
+      val groupIndex     = fromLockupScript.groupIndex
+      val fromAddressRaw = s"${fromAddress.toBase58}@${groupIndex.value}"
+      val request        = BuildGrouplessDeployContractTx(fromAddressRaw, bytecode)
+      request.groupIndex().rightValue is groupIndex
+    }
+  }
+
+  it should "get groupIndex for BuildGrouplessExecuteScriptTx" in {
+    val fromPublicKey    = PublicKey.generate
+    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
+    val fromAddress      = Address.Asset(fromLockupScript)
+
+    {
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(1 == 1, 0)
+           |}
+      """.stripMargin
+      val compiled       = Compiler.compileTxScript(script).rightValue
+      val bytecode       = serialize(compiled)
+      val fromAddressRaw = fromAddress.toBase58
+      val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, bytecode)
+      request
+        .groupIndex()
+        .leftValue
+        .detail is "Can not determine group: `fromAddress` has no explicit group and no contract address can be derived from TxScript"
+    }
+
+    {
+      val groupIndex     = fromLockupScript.groupIndex
+      val fromAddressRaw = s"${fromAddress.toBase58}@${groupIndex.value}"
+      val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, ByteString(0, 0))
+      request.groupIndex().rightValue is groupIndex
+    }
+
+    {
+      val txId            = TransactionId.generate
+      val contractId      = ContractId.from(txId, 0, GroupIndex.unsafe(0))
+      val contractAddress = Address.contract(contractId)
+      val script =
+        s"""
+           |TxScript Main() {
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled       = Compiler.compileTxScript(script).rightValue
+      val bytecode       = serialize(compiled)
+      val fromAddressRaw = fromAddress.toBase58
+      val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, bytecode)
+      request.groupIndex().rightValue is contractAddress.groupIndex
+    }
   }
 }

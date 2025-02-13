@@ -40,6 +40,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     val fromLockupScript = LockupScript.p2pk(PublicKeyLike.Passkey(fromPublicKey), None)
     val fromAddress      = Address.Asset(fromLockupScript)
+    val fromAddressRaw   = fromAddress.toBase58
     val chainIndex       = ChainIndex(fromLockupScript.groupIndex, fromLockupScript.groupIndex)
     val allLockupScripts = brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.Asset]) {
       case (acc, group) =>
@@ -157,7 +158,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           Some(AVector(Token(tokenId, tokenTransferAmount)))
         )
       }
-      val query = BuildGrouplessTransferTx(fromAddress, destinations)
+      val query = BuildGrouplessTransferTx(fromAddressRaw, destinations)
 
       val txs = buildGrouplessTransferTx(query)
       txs.length is expectedTxSize
@@ -220,7 +221,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.alph(2))),
         Some(AVector(Token(tokenId, ALPH.alph(2))))
       )
-    val query0 = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
+    val query0 = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination0))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query0)
       .leftValue
@@ -232,7 +233,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.oneAlph)),
         Some(AVector(Token(tokenId, ALPH.alph(3))))
       )
-    val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
+    val query1 = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
       .leftValue
@@ -245,7 +246,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
     val destination0 = Destination(toAddress, Some(Amount(ALPH.oneAlph)), None)
-    val query0       = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
+    val query0       = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination0))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query0)
       .leftValue
@@ -258,7 +259,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.oneAlph)),
         Some(AVector(Token(tokenId, ALPH.alph(2))))
       )
-    val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
+    val query1 = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
       .leftValue
@@ -300,7 +301,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       val compiledScript = Compiler.compileTxScript(script).rightValue
       BuildGrouplessExecuteScriptTx(
-        fromAddress,
+        fromAddressRaw,
         serialize(compiledScript),
         attoAlphAmount = Some(alphAmount),
         tokens = Some(AVector(Token(tokenId, tokenAmount)))
@@ -372,7 +373,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         AVector.empty
       )
       BuildGrouplessDeployContractTx(
-        fromAddress,
+        fromAddressRaw,
         serialize(code),
         initialAttoAlphAmount = Some(alphAmount),
         initialTokenAmounts = Some(AVector(Token(tokenId, tokenAmount)))

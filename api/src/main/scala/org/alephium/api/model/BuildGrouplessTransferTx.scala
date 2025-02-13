@@ -16,14 +16,20 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, BlockHash}
+import org.alephium.api.{badRequest, Try}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{BlockHash, GroupIndex}
 import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessTransferTx(
-    fromAddress: Address.Asset,
+    fromAddress: String,
     destinations: AVector[Destination],
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildGrouplessTx
+) extends BuildGrouplessTx {
+  def groupIndex()(implicit config: GroupConfig): Try[GroupIndex] = {
+    getFromAddress().map(_.groupIndex).left.map(badRequest)
+  }
+}

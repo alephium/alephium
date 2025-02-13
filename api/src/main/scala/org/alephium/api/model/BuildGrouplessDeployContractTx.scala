@@ -19,13 +19,14 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.model.{Address, BlockHash}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessDeployContractTx(
-    fromAddress: Address.Asset,
+    fromAddress: String,
     bytecode: ByteString,
     initialAttoAlphAmount: Option[Amount] = None,
     initialTokenAmounts: Option[AVector[Token]] = None,
@@ -36,7 +37,18 @@ final case class BuildGrouplessDeployContractTx(
 ) extends BuildGrouplessTx
     with BuildTxCommon.DeployContractTx {
   def gasAmount: Option[GasBox] = None
-
-  def getLockPair(): Try[(LockupScript.P2PK, UnlockScript)] =
+  def getLockPair()(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] =
     lockPair.left.map(badRequest)
+
+  def groupIndex()(implicit config: GroupConfig): Try[GroupIndex] = {
+    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
+      getFromAddress().map(_.groupIndex).left.map(badRequest)
+    } else {
+      Left(
+        badRequest(
+          "Contract deployment requires a groupless address with explicit group information"
+        )
+      )
+    }
+  }
 }

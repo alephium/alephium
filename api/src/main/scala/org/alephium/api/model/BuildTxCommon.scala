@@ -142,7 +142,6 @@ object BuildTxCommon {
     def attoAlphAmount: Option[Amount]
     def tokens: Option[AVector[Token]]
     def gasEstimationMultiplier: Option[Double]
-    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)]
 
     def getAmounts: Either[String, ScriptTxAmounts] = {
       BuildTxCommon.getAlphAndTokenAmounts(attoAlphAmount, tokens).flatMap {
@@ -158,7 +157,6 @@ object BuildTxCommon {
     def initialTokenAmounts: Option[AVector[Token]]
     def issueTokenAmount: Option[Amount]
     def issueTokenTo: Option[Address.Asset]
-    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)]
 
     def decodeBytecode(): Try[BuildDeployContractTx.Code] = {
       deserialize[BuildDeployContractTx.Code](bytecode).left.map(serdeError =>

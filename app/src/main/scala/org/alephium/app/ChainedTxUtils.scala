@@ -410,7 +410,9 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  private def getAvailableBalances(utxos: AVector[FlowUtils.AssetOutputInfo]): (U256, AVector[(TokenId, U256)]) = {
+  private def getAvailableBalances(
+      utxos: AVector[FlowUtils.AssetOutputInfo]
+  ): (U256, AVector[(TokenId, U256)]) = {
     var alphBalance   = U256.Zero
     val tokenBalances = new TxUtils.TokenBalances(mutable.Map.empty)
     val currentTs     = TimeStamp.now()
@@ -436,7 +438,10 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  private def getExtraUtxos(lockup: LockupScript.Asset, txs: AVector[UnsignedTransaction]): AVector[FlowUtils.AssetOutputInfo] = {
+  private def getExtraUtxos(
+      lockup: LockupScript.Asset,
+      txs: AVector[UnsignedTransaction]
+  ): AVector[FlowUtils.AssetOutputInfo] = {
     val extraUtxos = mutable.ArrayBuffer.empty[FlowUtils.AssetOutputInfo]
     txs.foreach(tx =>
       tx.fixedOutputs.mapWithIndex { case (output, index) =>

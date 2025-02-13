@@ -14968,8 +14968,7 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           },
           "bytecode": {
             "type": "string",
@@ -15031,8 +15030,7 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           },
           "bytecode": {
             "type": "string",
@@ -15090,8 +15088,7 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           },
           "destinations": {
             "type": "array",
