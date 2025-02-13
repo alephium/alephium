@@ -16,7 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.api.{badRequest, Try}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHash, GroupIndex}
 import org.alephium.protocol.vm.GasPrice
@@ -29,7 +28,7 @@ final case class BuildGrouplessTransferTx(
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
 ) extends BuildGrouplessTx {
-  def groupIndex()(implicit config: GroupConfig): Try[GroupIndex] = {
-    getFromAddress().map(_.groupIndex).left.map(badRequest)
+  def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex] = {
+    getFromAddress().map(_.groupIndex)
   }
 }

@@ -23,7 +23,7 @@ import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
@@ -147,6 +147,22 @@ object BuildTxCommon {
       BuildTxCommon.getAlphAndTokenAmounts(attoAlphAmount, tokens).flatMap {
         case (alphAmount, tokens) =>
           ScriptTxAmounts.from(alphAmount.getOrElse(U256.Zero), tokens)
+      }
+    }
+
+    var statefulScript: Option[StatefulScript] = None
+    @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+    def decodeStatefulScript(): Either[String, StatefulScript] = {
+      if (statefulScript.isDefined) {
+        Right(statefulScript.get)
+      } else {
+        deserialize[StatefulScript](bytecode)
+          .map(script => {
+            statefulScript = Some(script)
+            script
+          })
+          .left
+          .map(serdeError => serdeError.getMessage)
       }
     }
   }

@@ -1582,10 +1582,8 @@ class ServerUtils(implicit
       multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
       amounts    <- query.getAmounts.left.map(badRequest)
       lockPair   <- query.getLockPair()
-      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-      utxos <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
+      script     <- query.decodeStatefulScript().left.map(badRequest)
+      utxos      <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
       result <- buildExecuteScriptTx(
         blockFlow,
         amounts,

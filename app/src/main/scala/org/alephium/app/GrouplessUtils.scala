@@ -31,7 +31,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       query: BuildGrouplessTransferTx
   ): Try[AVector[BuildTransferTxResult]] = {
     for {
-      lockPair <- query.lockPair.left.map(badRequest)
+      lockPair <- query.getLockPair().left.map(badRequest)
       result <- buildTransferTxWithFallbackAddresses(
         blockFlow,
         lockPair,
@@ -48,13 +48,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       query: BuildGrouplessExecuteScriptTx
   ): Try[BuildGrouplessExecuteScriptTxResult] = {
     for {
-      lockPair <- query.lockPair.left.map(badRequest)
+      lockPair <- query.getLockPair().left.map(badRequest)
       amounts  <- query.getAmounts.left.map(badRequest)
+      script   <- query.decodeStatefulScript().left.map(badRequest)
       result <- buildExecuteScriptTxWithFallbackAddresses(
         blockFlow,
         lockPair,
         otherGroupsLockupPairs(lockPair._1),
-        query.bytecode,
+        script,
         amounts,
         query.gasEstimationMultiplier,
         query.gasAmount,
@@ -69,7 +70,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       query: BuildGrouplessDeployContractTx
   ): Try[BuildGrouplessDeployContractTxResult] = {
     for {
-      lockPair <- query.lockPair.left.map(badRequest)
+      lockPair <- query.getLockPair().left.map(badRequest)
       result <- buildDeployContractTxWithFallbackAddresses(
         blockFlow,
         lockPair,
