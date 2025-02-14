@@ -712,17 +712,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     // Post-Danube upgrade, we skip this validation since conflicted transactions are allowed for parallel chains
     // Pre-Danube upgrade, we validate that transactions are not conflicted
     if (hardfork.isDanubeEnabled()) {
-      return validBlock(())
-    }
-
-    // If the block is not from the broker, we skip this validation
-    if (!brokerConfig.contains(block.chainIndex.from)) {
-      return validBlock(())
-    }
-
-    ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap {
-      case true  => validBlock(())
-      case false => invalidBlock(InvalidFlowTxs)
+      validBlock(())
+    } else if (!brokerConfig.contains(block.chainIndex.from)) {
+      // If the block is not from the broker, we skip this validation
+      validBlock(())
+    } else {
+      ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap {
+        case true  => validBlock(())
+        case false => invalidBlock(InvalidFlowTxs)
+      }
     }
   }
 }
