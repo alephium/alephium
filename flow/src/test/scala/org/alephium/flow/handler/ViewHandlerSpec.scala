@@ -311,12 +311,15 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     addWithoutViewUpdate(blockFlow, block)
 
     blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
-    blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+    blockFlow.getBestDeps(block.chainIndex.from, HardFork.Rhone).deps.contains(block.hash) is false
 
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
-      blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+      blockFlow
+        .getBestDeps(block.chainIndex.from, HardFork.Rhone)
+        .deps
+        .contains(block.hash) is false
     }
   }
 

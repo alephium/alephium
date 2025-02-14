@@ -234,17 +234,14 @@ trait BlockFlowUpdaterState extends IOBaseActor {
 
   implicit def executionContext: ExecutionContext = context.dispatcher
 
-  def tryUpdateBestView(hardForkNow: HardFork): Unit = {
+  def tryUpdateBestViewPreDanube(): Unit = {
     if (updatingBestViewCount > 0 && !updatingBestDeps) {
       updatingBestViewCount = 0
       updatingBestDeps = true
       Future[ViewHandler.Command] {
         val now          = TimeStamp.now()
         val hardForkSoon = blockFlow.networkConfig.getHardFork(now.plusSecondsUnsafe(10))
-        val updateResult = if (hardForkNow.isDanubeEnabled()) {
-          // If Danube is currently enabled
-          blockFlow.updateBestFlowSkeleton()
-        } else if (hardForkSoon.isDanubeEnabled()) {
+        val updateResult = if (hardForkSoon.isDanubeEnabled()) {
           // If Danube will be enabled within the next 10 seconds
           for {
             _ <- blockFlow.updateBestFlowSkeleton()
@@ -263,6 +260,21 @@ trait BlockFlowUpdaterState extends IOBaseActor {
     }
     if (updatingBestDeps) {
       log.debug("Skip updating best deps due to pending updates")
+    }
+  }
+
+  def tryUpdateBestViewDanube(): Unit = {
+    blockFlow.updateBestFlowSkeleton() match {
+      case Left(error) => log.error(s"Failed to update best flow skeleton: $error")
+      case Right(_)    => ()
+    }
+  }
+
+  def tryUpdateBestView(hardForkNow: HardFork): Unit = {
+    if (hardForkNow.isDanubeEnabled()) {
+      tryUpdateBestViewDanube()
+    } else {
+      tryUpdateBestViewPreDanube()
     }
   }
 }
