@@ -198,8 +198,9 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  it should "compute block weight" in new FlowFixture {
+  it should "compute block weight before danube" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkBefore(HardFork.Danube)
 
     val blocks0 = for {
       from <- 0 until groups0
@@ -226,7 +227,47 @@ class BlockFlowSpec extends AlephiumSpec {
     blocks3.foreach(addAndCheck(blockFlow, _, brokerConfig.chainNum * 2 + brokerConfig.depsNum + 1))
   }
 
-  it should "update mempool when there are conflicted txs" in new FlowFixture {
+  it should "compute block weight since danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Danube)
+
+    val blocks0 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks0.foreach(addAndCheck(blockFlow, _, 1))
+
+    val blocks1 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks1.foreach { block =>
+      val weight = brokerConfig.depsNum + 1
+      addAndCheck(blockFlow, block, if (block.chainIndex.isIntraGroup) weight else weight - 1)
+    }
+
+    val blocks2 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks2.foreach { block =>
+      val weight = brokerConfig.chainNum + brokerConfig.depsNum + 1
+      addAndCheck(blockFlow, block, if (block.chainIndex.isIntraGroup) weight else weight - 1)
+    }
+
+    val blocks3 = for {
+      from <- 0 until groups0
+      to   <- 0 until groups0
+    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+    blocks3.foreach { block =>
+      val weight = brokerConfig.chainNum * 2 + brokerConfig.depsNum + 1
+      addAndCheck(blockFlow, block, if (block.chainIndex.isIntraGroup) weight else weight - 1)
+    }
+  }
+
+  it should "update mempool when there are conflicted txs before danube" in new FlowFixture {
+    setHardForkBefore(HardFork.Danube)
+
     if (brokerConfig.groups >= 2) {
       brokerConfig.groupRange.foreach { mainGroup =>
         val blockFlow  = genesisBlockFlow()
@@ -968,6 +1009,7 @@ class BlockFlowSpec extends AlephiumSpec {
         ("alephium.consensus.uncle-dependency-gap-time", "5 seconds"),
         ("alephium.broker.broker-num", 1)
       )
+    setHardForkSince(HardFork.Mainnet)
 
     val blocks0 = for {
       from <- 0 until groups0
@@ -977,15 +1019,24 @@ class BlockFlowSpec extends AlephiumSpec {
 
     Thread.sleep(5000)
 
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
     val blocks1 = for {
       from <- 0 until groups0
       to   <- 0 until groups0
     } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
-    blocks1.foreach(addAndCheck(blockFlow, _, brokerConfig.depsNum + 1))
+    blocks1.foreach { block =>
+      val weight = if (block.chainIndex.isIntraGroup || !hardFork.isDanubeEnabled()) {
+        brokerConfig.depsNum + 1
+      } else {
+        brokerConfig.depsNum
+      }
+      addAndCheck(blockFlow, block, weight)
+    }
   }
 
-  it should "support sequential transactions" in new FlowFixture with Generators {
+  it should "support sequential transactions before danube" in new FlowFixture with Generators {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkBefore(HardFork.Danube)
 
     var now = TimeStamp.now()
     def nextBlockTs: TimeStamp = {

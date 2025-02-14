@@ -472,11 +472,13 @@ object BlockFlow extends StrictLogging {
         updateBestDeps(mainGroup, newDeps) // this update must go after pool updates
       }
 
-    def updateBestDepsAfterLoadingUnsafe(): Unit =
+    def updateBestDepsAfterLoadingUnsafe(): Unit = {
       brokerConfig.groupRange.foreach { mainGroup =>
         val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
         updateBestDeps(mainGroup, deps)
       }
+      updateBestFlowSkeletonUnsafe()
+    }
 
     def updateBestDeps(): IOResult[Unit] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())

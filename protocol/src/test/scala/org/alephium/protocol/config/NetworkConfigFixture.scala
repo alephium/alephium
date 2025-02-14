@@ -56,12 +56,12 @@ object NetworkConfigFixture {
   }
 
   def getNetworkConfigSince(hardFork: HardFork): NetworkConfig = {
-    assume(hardFork != HardFork.Mainnet)
     val config = hardFork match {
-      case HardFork.Leman  => SinceLeman
-      case HardFork.Rhone  => SinceRhone
-      case HardFork.Danube => SinceDanube
-      case _               => ???
+      case HardFork.Mainnet => SinceGenesis
+      case HardFork.Leman   => SinceLeman
+      case HardFork.Rhone   => SinceRhone
+      case HardFork.Danube  => SinceDanube
+      case _                => ???
     }
     val hardForks = HardFork.All.drop(HardFork.All.indexOf(hardFork))
     assume(hardForks.contains(config.getHardFork(TimeStamp.now())))
@@ -118,6 +118,16 @@ object NetworkConfigFixture {
     override def danubeHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
   }
   val Danube = new DanubeT {}.networkConfig
+
+  lazy val sinceGenesisForks = All
+  trait SinceGenesisT extends NetworkConfigFixture {
+    override def networkId: NetworkId = NetworkId.AlephiumMainNet
+    private lazy val fork             = sinceGenesisForks(Random.nextInt(sinceGenesisForks.length))
+    override def lemanHardForkTimestamp: TimeStamp  = fork.lemanHardForkTimestamp
+    override def rhoneHardForkTimestamp: TimeStamp  = fork.rhoneHardForkTimestamp
+    override def danubeHardForkTimestamp: TimeStamp = fork.danubeHardForkTimestamp
+  }
+  val SinceGenesis = new SinceGenesisT {}.networkConfig
 
   lazy val sinceLemanForks = All.drop(1)
   trait SinceLemanT extends NetworkConfigFixture {

@@ -394,8 +394,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "prepare block with correct coinbase reward for pre-rhone hardfork" in new CoinbaseRewardFixture {
-    setHardForkBefore(HardFork.Rhone)
+  it should "prepare block with correct coinbase reward for mainnet hardfork" in new CoinbaseRewardFixture {
+    setHardFork(HardFork.Mainnet)
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
     emptyBlock.coinbaseReward is consensusConfigs.mainnet.emission
       .reward(emptyBlock.header)
@@ -404,6 +404,16 @@ class FlowUtilsSpec extends AlephiumSpec {
       .rewardWrtTime(emptyBlock.timestamp, ALPH.LaunchTimestamp)
     addAndCheck(blockFlow, emptyBlock)
 
+    val transferBlock = newTransferBlock()
+    transferBlock.coinbaseReward is consensusConfigs.mainnet.emission
+      .reward(transferBlock.header)
+      .miningReward
+      .addUnsafe(transferBlock.nonCoinbase.head.gasFeeUnsafe.divUnsafe(2))
+    addAndCheck(blockFlow, transferBlock)
+  }
+
+  it should "prepare block with correct coinbase reward for leman hardfork" in new CoinbaseRewardFixture {
+    setHardFork(HardFork.Leman)
     val transferBlock = newTransferBlock()
     transferBlock.coinbaseReward is consensusConfigs.mainnet.emission
       .reward(transferBlock.header)
@@ -507,6 +517,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
   it should "reorg" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkBefore(HardFork.Danube)
 
     val mainGroup = GroupIndex.unsafe(0)
     val deps0     = blockFlow.getBestDeps(mainGroup)
@@ -656,14 +667,15 @@ class FlowUtilsSpec extends AlephiumSpec {
     lazy val chainIndex = ChainIndex.unsafe(1, 2)
     def prepare(): BlockHash = {
       val block0 = emptyBlock(blockFlow, chainIndex)
-      val block1 = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block0, block1)
+      val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      addAndCheck(blockFlow, block1)
+      val block2 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block0, block2)
 
       blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
       val blockHashes = blockFlow.getHashes(chainIndex, 1).rightValue
-      blockHashes.length is 2
-      blockHashes.toSet is Set(block0.hash, block1.hash)
-      blockHashes.last
+      blockHashes.toSet is Set(block0.hash, block2.hash)
+      block0.hash
     }
   }
 

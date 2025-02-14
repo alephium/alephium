@@ -215,7 +215,10 @@ class ViewHandlerSpec extends AlephiumActorSpec {
 
   behavior of "update best deps"
 
-  trait UpdateBestDepsFixture extends SyncedFixture {
+  trait UpdateBestDepsFixture extends Fixture {
+    setHardForkBefore(HardFork.Danube)
+
+    setSynced()
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = emptyBlock(blockFlow, chainIndex)
     addWithoutViewUpdate(blockFlow, block)

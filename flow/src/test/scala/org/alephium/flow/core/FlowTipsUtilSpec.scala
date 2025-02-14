@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{BlockHash, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, GroupIndex, HardFork}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class FlowTipsUtilSpec extends AlephiumSpec {
@@ -49,6 +49,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
   }
 
   it should "compute light tips for new blocks" in new Fixture {
+    setHardForkSince(HardFork.Mainnet)
     val newBlocks = IndexedSeq.tabulate(groups0, groups0, groups0) { case (from, to, target) =>
       val chainIndex = ChainIndex.unsafe(from, to)
       val block      = emptyBlock(blockFlow, chainIndex)
@@ -70,6 +71,12 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       newBlocks(g)(g).map(_.hash).max(blockFlow.blockHashOrdering)
     }
 
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    val skeleton = blockFlow.getBestFlowSkeleton()
+    val getBestHash = (index: Int) => {
+      if (hardFork.isDanubeEnabled()) skeleton.intraGroupTips(index) else bestNewHashes(index)
+    }
+
     for {
       from   <- 0 until groups0
       to     <- 0 until groups0
@@ -82,8 +89,8 @@ class FlowTipsUtilSpec extends AlephiumSpec {
         val lightTips = blockFlow.getLightTipsUnsafe(block.header, GroupIndex.unsafe(target))
         lightTips.inTips.toSeq is (0 until groups0)
           .filter(_ != target)
-          .map { k => if (k equals from) block.hash else bestNewHashes(k) }
-        lightTips.outTip is (if (target equals from) block.hash else bestNewHashes(target))
+          .map { k => if (k equals from) block.hash else getBestHash(k) }
+        lightTips.outTip is (if (target equals from) block.hash else getBestHash(target))
       }
     }
   }
@@ -112,6 +119,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
   }
 
   it should "compute flow tips for new blocks" in new Fixture {
+    setHardForkSince(HardFork.Mainnet)
     val newBlocks0 = IndexedSeq.tabulate(groups0, groups0, groups0) { case (from, to, _) =>
       val chainIndex = ChainIndex.unsafe(from, to)
       emptyBlock(blockFlow, chainIndex)
@@ -143,6 +151,12 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       }
     }
 
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    val skeleton = blockFlow.getBestFlowSkeleton()
+    val getBestHash = (index: Int) => {
+      if (hardFork.isDanubeEnabled()) skeleton.intraGroupTips(index) else bestNewHashes0(index)
+    }
+
     val newBlocks1 = for {
       from <- 0 until groups0
       to   <- 0 until groups0
@@ -165,11 +179,11 @@ class FlowTipsUtilSpec extends AlephiumSpec {
         val flowTips = blockFlow.getFlowTipsUnsafe(block.header, GroupIndex.unsafe(target))
         flowTips.inTips.toSeq is (0 until groups0)
           .filter(_ != target)
-          .map { k => if (k equals from) block.hash else bestNewHashes0(k) }
+          .map { k => if (k equals from) block.hash else getBestHash(k) }
         val outTipsExpected = if (target equals from) {
           block.header.outTips
         } else {
-          val bestHash       = bestNewHashes0(target)
+          val bestHash       = getBestHash(target)
           val bestChainIndex = ChainIndex.from(bestHash)
           val genesisDeps    = blockFlow.genesisBlocks(target).map(_.hash)
           bestChainIndex.from.value is target
@@ -180,7 +194,8 @@ class FlowTipsUtilSpec extends AlephiumSpec {
     }
   }
 
-  it should "detect tx conflicts" in new FlowFixture {
+  it should "detect tx conflicts before danube" in new FlowFixture {
+    setHardForkBefore(HardFork.Danube)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val block      = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALPH.alph(10))
     val blockFlow1 = isolatedBlockFlow()

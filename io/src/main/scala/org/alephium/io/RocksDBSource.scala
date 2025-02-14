@@ -56,6 +56,7 @@ object RocksDBSource {
         All,
         Block,
         Broker,
+        ConflictedTxs,
         Header,
         Log,
         LogCounter,
@@ -65,8 +66,7 @@ object RocksDBSource {
         SubContract,
         SubContractCounter,
         Trie,
-        TxOutputRefIndex,
-        ConflictedTxs
+        TxOutputRefIndex
       )
   }
 
