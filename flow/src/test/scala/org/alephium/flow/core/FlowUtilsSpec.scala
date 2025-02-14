@@ -255,6 +255,66 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block3)
   }
 
+  it should "update mempool properly in normal case: danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    val chainIndex = ChainIndex.unsafe(0, 1)
+    val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is true
+
+    val miner     = getGenesisLockupScript(chainIndex.to)
+    val template0 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.transactions.head.id is tx.id
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is true
+
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.transactions.head.id is tx.id
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is true
+
+    val block = mine(blockFlow, template1)
+    addAndCheck(blockFlow, block)
+    val template2 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template2.transactions.length is 1 // coinbase tx
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is false
+  }
+
+  it should "update mempool properly in reorg: danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    val chainIndex  = ChainIndex.unsafe(0, 1)
+    val miner       = getGenesisLockupScript(chainIndex.to)
+    val genesisKey  = genesisKeys(0)._1
+    val toPublicKey = chainIndex.to.generateKey._2
+
+    val (privateKey0, publicKey0) = chainIndex.from.generateKey
+    addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey0, ALPH.alph(2)))
+    val block0 = transfer(blockFlow, privateKey0, toPublicKey, ALPH.oneAlph)
+    val tx0    = block0.nonCoinbase.head
+
+    val (privateKey1, publicKey1) = chainIndex.from.generateKey
+    addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey1, ALPH.alph(2)))
+    val block1 = transfer(blockFlow, privateKey1, toPublicKey, ALPH.oneAlph)
+    val tx1    = block1.nonCoinbase.head
+
+    blockFlow.grandPool.add(chainIndex, tx0.toTemplate, TimeStamp.now())
+    blockFlow.prepareBlockFlowUnsafe(chainIndex, miner).transactions.head.id is tx0.id
+    addAndCheck(blockFlow, block0)
+    val template0 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.transactions.length is 1 // coinbase tx
+    blockFlow.getMemPool(chainIndex).contains(tx0.id) is false
+
+    blockFlow.grandPool.add(chainIndex, tx1.toTemplate, TimeStamp.now())
+    blockFlow.prepareBlockFlowUnsafe(chainIndex, miner).transactions.head.id is tx1.id
+    addAndCheck(blockFlow, block1)
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.transactions.head.id is tx0.id
+    blockFlow.getMemPool(chainIndex).contains(tx0.id) is true
+    blockFlow.getMemPool(chainIndex).contains(tx1.id) is false
+  }
+
   it should "truncate txs w.r.t. tx number and gas" in new FlowFixture {
     val tx  = transfer(blockFlow, ChainIndex.unsafe(0, 0)).nonCoinbase.head.toTemplate
     val gas = tx.unsigned.gasAmount.value

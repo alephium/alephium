@@ -267,9 +267,16 @@ trait FlowUtils
     IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
-  def findBestDepsForNewBlock(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
+  private val lastBlockDepss: Array[Option[BlockDeps]] = Array.fill(brokerConfig.chainNum)(None)
+  def findBestDepsForNewBlockUnsafe(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
     if (hardfork.isDanubeEnabled()) {
-      calBestFlowPerChainIndex(chainIndex)
+      val newDeps      = calBestFlowPerChainIndex(chainIndex)
+      val flattenIndex = chainIndex.flattenIndex
+      lastBlockDepss(flattenIndex).foreach { oldDeps =>
+        updateMemPoolUnsafe(chainIndex.from, newDeps, oldDeps)
+      }
+      lastBlockDepss(flattenIndex) = Some(newDeps)
+      newDeps
     } else {
       getBestDeps(chainIndex.from)
     }
@@ -281,8 +288,8 @@ trait FlowUtils
   ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val hardForkGuess = networkConfig.getHardFork(TimeStamp.now())
-    val bestDeps      = findBestDepsForNewBlock(chainIndex, hardForkGuess)
     for {
+      bestDeps     <- IOUtils.tryExecute(findBestDepsForNewBlockUnsafe(chainIndex, hardForkGuess))
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       hardFork   = networkConfig.getHardFork(templateTs)
