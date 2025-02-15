@@ -3057,6 +3057,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract              = Compiler.compileContract(rawCode).rightValue
     val (_, fromPublicKey, _) = genesisKeys(0)
     val fromAddress           = Address.p2pkh(fromPublicKey)
+    val fromAddressStr        = fromAddress.toBase58Extended
     val (_, toPublicKey, _)   = genesisKeys(1)
     val toAddress             = Address.p2pkh(toPublicKey)
 
@@ -3069,14 +3070,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContract!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
+           |  createContract!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3094,15 +3095,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
-           |  transferToken!{@$fromAddress -> ALPH: dustAmount!()}(@$fromAddress, @$toAddress, ALPH, dustAmount!())
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
+           |  transferToken!{@$fromAddressStr -> ALPH: dustAmount!()}(@$fromAddressStr, @$toAddress, ALPH, dustAmount!())
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3122,14 +3123,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, #00, 50)
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, #00, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3147,14 +3148,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50)
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),

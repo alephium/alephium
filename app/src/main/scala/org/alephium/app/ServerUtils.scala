@@ -2354,7 +2354,7 @@ object ServerUtils {
 
   def buildDeployContractScriptRawWithParsedState(
       codeRaw: String,
-      address: Address,
+      address: String,
       initialImmFields: AVector[vm.Val],
       initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
@@ -2405,7 +2405,7 @@ object ServerUtils {
   )(implicit groupConfig: GroupConfig): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
-      address,
+      address.toBase58Extended,
       initialImmFields,
       initialMutFields,
       initialAttoAlphAmount,

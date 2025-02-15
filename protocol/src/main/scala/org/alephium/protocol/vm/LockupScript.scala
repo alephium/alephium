@@ -263,9 +263,4 @@ object LockupScript {
       )
     }
   }
-
-  def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
-    val hash = Bytes.toPosInt(Bytes.xorByte(shortKey))
-    GroupIndex.unsafe(hash % config.groups)
-  }
 }
