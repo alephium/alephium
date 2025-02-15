@@ -38,7 +38,7 @@ sealed trait Address {
 
   def toBase58Extended(implicit config: GroupConfig): String = {
     lockupScript match {
-      case script: LockupScript.P2PK => script.toBase58 + s"@${script.groupIndex.value}"
+      case script: LockupScript.P2PK => script.toBase58 + s"/${script.groupIndex.value}"
       case _                         => Base58.encode(serialize(lockupScript))
     }
   }

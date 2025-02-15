@@ -1975,7 +1975,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}@${groupIndex.value}"
+      val fromAddressRaw = s"${fromAddress.toBase58}/${groupIndex.value}"
       val request        = BuildGrouplessDeployContractTx(fromAddressRaw, bytecode)
       request.groupIndex().rightValue is groupIndex
     }
@@ -2004,7 +2004,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}@${groupIndex.value}"
+      val fromAddressRaw = s"${fromAddress.toBase58}/${groupIndex.value}"
       val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, ByteString(0, 0))
       request.groupIndex().rightValue is groupIndex
     }
@@ -2045,7 +2045,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}@${groupIndex.value}"
+      val fromAddressRaw = s"${fromAddress.toBase58}/${groupIndex.value}"
       val request        = BuildGrouplessDeployContractTx(fromAddressRaw, ByteString(0, 0))
       request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK(
         PublicKeyLike.SecP256K1
@@ -2099,7 +2099,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}@${groupIndex.value}"
+      val fromAddressRaw = s"${fromAddress.toBase58}/${groupIndex.value}"
       val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, ByteString(0, 0))
       request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK(
         PublicKeyLike.SecP256K1

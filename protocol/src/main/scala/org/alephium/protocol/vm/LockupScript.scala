@@ -213,7 +213,7 @@ object LockupScript {
     }
 
     def hasExplicitGroupIndex(input: String): Boolean = {
-      input.length > 2 && input(input.length - 2) == '@'
+      input.length > 2 && input(input.length - 2) == '/'
     }
 
     def fromDecodedBase58(bytes: ByteString, groupIndexOpt: Option[GroupIndex])(implicit
