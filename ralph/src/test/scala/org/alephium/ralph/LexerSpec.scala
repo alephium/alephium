@@ -82,12 +82,12 @@ abstract class LexerSpec(fileURI: Option[java.net.URI])
       address2.lockupScript
     )
     groupConfig.cliqueGroups.foreach { group =>
-      parsePositioned(s"@${address2.toBase58}/${group.value}", Lexer.address(_)).get.value.v is Val
+      parsePositioned(s"@${address2.toBase58}:${group.value}", Lexer.address(_)).get.value.v is Val
         .Address(LockupScript.p2pk(pubKeyLike, Some(group)))
     }
     intercept[CompilerError.`Invalid address`] {
-      parsePositioned(s"@${address2.toBase58}/${groupConfig.groups}", Lexer.address(_))
-    } is CompilerError.`Invalid address`(s"${address2.toBase58}/${groupConfig.groups}", 1, fileURI)
+      parsePositioned(s"@${address2.toBase58}:${groupConfig.groups}", Lexer.address(_))
+    } is CompilerError.`Invalid address`(s"${address2.toBase58}:${groupConfig.groups}", 1, fileURI)
     parsePositioned("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     parsePositioned("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     parsePositioned("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")

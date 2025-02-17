@@ -364,7 +364,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
   trait BuildDeployContractTxFixture extends BuildExecuteScriptTxFixture {
     val fromAddressWithGroupIndex =
-      s"${fromAddressRaw}/${fromAddress.lockupScript.groupIndex.value}"
+      s"${fromAddressRaw}:${fromAddress.lockupScript.groupIndex.value}"
     def buildDeployContractQuery(
         alphAmount: U256,
         tokenAmount: U256

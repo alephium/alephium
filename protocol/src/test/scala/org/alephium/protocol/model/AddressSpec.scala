@@ -180,18 +180,18 @@ class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default {
       .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
       .isDefined is true
     Address
-      .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L/0")
+      .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
       .isDefined is true
 
-    Address.fromBase58("/1").isDefined is false
-    Address.fromBase58("1C2/1").isDefined is false
-    Address.fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3/0").isDefined is false
-    Address.fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa/0").isDefined is false
-    Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr/0").isDefined is false
+    Address.fromBase58(":1").isDefined is false
+    Address.fromBase58("1C2:1").isDefined is false
+    Address.fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").isDefined is false
+    Address.fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").isDefined is false
+    Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").isDefined is false
     Address.fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").isDefined is false
     Address
       .fromBase58(
-        s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L/${groupConfig.groups + 1}"
+        s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:${groupConfig.groups + 1}"
       )
       .isDefined is false
   }
@@ -222,7 +222,7 @@ class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default {
     }
 
     def group(index: Int) = copy(
-      groupedAddress = Some(s"$address/$index"),
+      groupedAddress = Some(s"$address:$index"),
       groupIndex = Some(GroupIndex.unsafe(index))
     )
 
@@ -237,9 +237,9 @@ class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
       val fullAddress = Base58.encode(bytes)
       Address.fromBase58(fullAddress) is Some(Address.Asset(script))
-      Address.fromBase58(s"$fullAddress/${script.groupIndex.value}") is Some(Address.Asset(script))
+      Address.fromBase58(s"$fullAddress:${script.groupIndex.value}") is Some(Address.Asset(script))
       Address.fromBase58(
-        s"$fullAddress/${new GroupIndex(script.groupIndex.value + 1).value}"
+        s"$fullAddress:${new GroupIndex(script.groupIndex.value + 1).value}"
       ) is None
       Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get)) is None
     }
