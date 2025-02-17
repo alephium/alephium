@@ -85,7 +85,7 @@ object LockupScript {
   }
 
   def decodeFromBase58(input: String): DecodeLockupScriptResult = {
-    if (input.length > 2 && input(input.length - 2) == '@') {
+    if (input.length > 2 && input(input.length - 2) == ':') {
       decodeP2PK(input)
     } else {
       Base58
@@ -239,7 +239,7 @@ object LockupScript {
 
     def toBase58: String = {
       val bytes = serialize[LockupScript](this).dropRight(P2PK.groupByteLength)
-      s"${Base58.encode(bytes)}@$groupByte"
+      s"${Base58.encode(bytes)}:$groupByte"
     }
   }
 

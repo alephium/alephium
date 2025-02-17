@@ -164,7 +164,7 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "encode and decode between p2pk address and public key" in {
     val publicKey = "00e10a76a87b3211ca2f05be47b9ef8d2c9acedf3dfa9ee0268bf3a42ea3e29af1e1"
     (0 until groupConfig.groups).foreach { index =>
-      val address = s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@${index}"
+      val address = s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:${index}"
       AddressVerifyP2PK(address).publicKey(publicKey).group(index).success()
     }
   }
@@ -177,18 +177,18 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
       .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
       .isDefined is false
     Address
-      .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@0")
+      .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
       .isDefined is true
 
-    Address.fromBase58("@1").isDefined is false
-    Address.fromBase58("1C2@1").isDefined is false
-    Address.fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3@0").isDefined is false
-    Address.fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa@0").isDefined is false
-    Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr@0").isDefined is false
+    Address.fromBase58(":1").isDefined is false
+    Address.fromBase58("1C2:1").isDefined is false
+    Address.fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").isDefined is false
+    Address.fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").isDefined is false
+    Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").isDefined is false
     Address.fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").isDefined is false
     Address
       .fromBase58(
-        s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@${groupConfig.groups + 1}"
+        s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:${groupConfig.groups + 1}"
       )
       .isDefined is true
   }
