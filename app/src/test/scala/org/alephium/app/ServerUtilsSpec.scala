@@ -5598,34 +5598,35 @@ class ServerUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block)
     }
     val lockupScript = LockupScript.p2pkh(publicKey)
+    val assetAddress = Address.from(lockupScript)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
     val serverUtils0 = createServerUtils(9)
-    serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
+    serverUtils0.getBalance(blockFlow, assetAddress.toBase58, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
     serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
-      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .getBalance(blockFlow, assetAddress.toBase58, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
     serverUtils1
-      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .getUTXOsIncludePool(blockFlow, assetAddress)
       .rightValue
       .utxos
       .length is 10
 
     val serverUtils2 = createServerUtils(11)
     serverUtils2
-      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .getBalance(blockFlow, assetAddress.toBase58, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
     serverUtils2
-      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .getUTXOsIncludePool(blockFlow, assetAddress)
       .rightValue
       .utxos
       .length is 10
@@ -5725,7 +5726,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, address, true) isE Balance.from(
+    serverUtils.getBalance(blockFlow, address.toBase58, true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

@@ -291,9 +291,9 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Check if the block is in main chain")
 
-  val getBalance: BaseEndpoint[(Address, Option[Boolean]), Balance] =
+  val getBalance: BaseEndpoint[(String, Option[Boolean]), Balance] =
     addressesEndpoint.get
-      .in(path[Address]("address"))
+      .in(path[String]("address"))
       .in("balance")
       .in(query[Option[Boolean]]("mempool"))
       .out(jsonBodyWithAlph[Balance])
