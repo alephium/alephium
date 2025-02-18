@@ -143,7 +143,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     chain.getAllTips.toSet is Set(block11.hash)
   }
 
-  it should "get correct mutable group view since danube" in new Fixture {
+  trait DanubeGroupViewFixture extends Fixture {
     setHardForkSince(HardFork.Danube)
 
     var now = TimeStamp.now()
@@ -167,7 +167,9 @@ class BlockFlowStateSpec extends AlephiumSpec {
     val block3 = transfer(blockFlow, ChainIndex.unsafe(0, 1), nextBlockTs)
     val block4 = transfer(blockFlow, ChainIndex.unsafe(0, 2), nextBlockTs)
     addAndCheck(blockFlow, block3, block4)
+  }
 
+  it should "get correct mutable group view since danube" in new DanubeGroupViewFixture {
     val block5 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs)
     val groupView0 =
       blockFlow
@@ -199,5 +201,40 @@ class BlockFlowStateSpec extends AlephiumSpec {
       worldState.nodeIndexesStorage.conflictedTxsStorage.conflictedTxsReversedIndex
     conflictedTxsStorage1.exists(block3.hash) isE false
     conflictedTxsStorage1.exists(block4.hash) isE true
+  }
+
+  it should "get correct immutable group view since danube" in new DanubeGroupViewFixture {
+    val groupView0 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(0)).rightValue
+    groupView0
+      .getPreAssetOutputInfo(block0.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .nonEmpty is true
+    groupView0
+      .getPreAssetOutputInfo(block3.nonCoinbase.head.fixedOutputRefs.last)
+      .rightValue
+      .nonEmpty is true
+    groupView0
+      .getPreAssetOutputInfo(block4.nonCoinbase.head.fixedOutputRefs.last)
+      .rightValue
+      .isEmpty is true
+
+    val groupView1 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(2)).rightValue
+    groupView1
+      .getPreAssetOutputInfo(block1.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .isEmpty is true
+
+    val block5 = transfer(blockFlow, ChainIndex.unsafe(1, 0), nextBlockTs)
+    addAndCheck(blockFlow, block5)
+    val groupView2 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(0)).rightValue
+    groupView2
+      .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .isEmpty is true
+    val groupView3 = blockFlow.getImmutableGroupViewIncludePool(GroupIndex.unsafe(0)).rightValue
+    groupView3
+      .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .nonEmpty is true
   }
 }
