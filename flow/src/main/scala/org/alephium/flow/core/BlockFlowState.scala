@@ -36,7 +36,7 @@ import org.alephium.protocol.vm.nodeindexes.{
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 trait BlockFlowState extends FlowTipsUtil {
   import BlockFlowState._
 
@@ -446,12 +446,12 @@ trait BlockFlowState extends FlowTipsUtil {
     bestFlowSkeleton = skeleton
   }
 
-  def getInterGroupBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
+  def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.isIntraGroup)
     for {
       diffs  <- getHashesForUpdates(chainIndex.from, block.blockDeps)
-      blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
+      blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash)).map(_ :+ block)
     } yield blocks.sortBy(_.timestamp)
   }
 
@@ -528,12 +528,7 @@ trait BlockFlowState extends FlowTipsUtil {
       BlockFlowState.updateState(worldState, block, block, chainIndex.from, hardfork, _ => true)
     } else {
       for {
-        interGroupBlocks <- getInterGroupBlocksForUpdates(block)
-        // From the Danube upgrade, we execute the intra-group block first for two reasons:
-        // 1. The state changes from contract execution can be reused
-        // 2. Inter-group transactions are simple transfers, making it easier to handle potential conflicts
-        blocks =
-          if (hardfork.isDanubeEnabled()) block +: interGroupBlocks else interGroupBlocks :+ block
+        blocks <- getBlocksForUpdates(block)
         _ <- blocks
           .foreachE(blockToUpdate =>
             BlockFlowState.updateState(
@@ -715,14 +710,14 @@ object BlockFlowState {
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     // Post-Danube upgrade, we validate that transaction inputs exist and are unspent
     // Pre-Danube upgrade, we skip this validation since it was not required in the protocol
-    val conflictedTxE = if (hardfork.isDanubeEnabled()) {
+    val shouldUpdateE = if (hardfork.isDanubeEnabled()) {
       tx.unsigned.inputs.forallE(input => worldState.existOutput(input.outputRef))
     } else {
-      Right(false)
+      Right(true)
     }
 
-    conflictedTxE.flatMap { conflictedTx =>
-      if (!conflictedTx) {
+    shouldUpdateE.flatMap { shouldUpdate =>
+      if (shouldUpdate) {
         for {
           _ <- updateStateForInputs(worldState, tx)
           _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
