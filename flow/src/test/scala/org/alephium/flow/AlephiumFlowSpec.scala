@@ -96,6 +96,12 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
 
+  def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex, timestamp: TimeStamp): Block = {
+    val publicKey = chainIndex.to.generateKey._2
+    val miner     = LockupScript.p2pkh(publicKey)
+    mine(blockFlow, chainIndex, AVector.empty[Transaction], miner, Some(timestamp))
+  }
+
   def emptyBlockWithMiner(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,

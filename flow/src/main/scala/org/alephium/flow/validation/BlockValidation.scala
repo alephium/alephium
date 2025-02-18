@@ -272,10 +272,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
     if (brokerConfig.contains(chainIndex.from)) {
-      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val hardFork       = networkConfig.getHardFork(block.timestamp)
+      val checkpointHash = Option.when(chainIndex.isIntraGroup)(block.hash)
       for {
-        groupView <- from(flow.getMutableGroupView(chainIndex, block.blockDeps, hardFork))
-        _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
+        groupView <- from(
+          flow.getMutableGroupView(chainIndex, block.blockDeps, hardFork, checkpointHash)
+        )
+        _ <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
         _ <- checkCoinbase(
           flow,
           chainIndex,
