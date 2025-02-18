@@ -31,7 +31,7 @@ import org.alephium.flow.validation.{InvalidHeaderFlow, InvalidTestnetMiner}
 import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId, NetworkId}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
@@ -207,6 +207,23 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       Map(("alephium.network.enable-p2p-v2", true))
     brokerHandlerActor.selfP2PVersion is P2PV2
     brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v2")
+  }
+
+  "testnet nodes" should "only connect to v2 nodes" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    networkConfig.networkId is NetworkId.AlephiumTestNet
+
+    watch(brokerHandler)
+    brokerHandler ! BrokerHandler.Received(
+      Hello.unsafe(
+        "scala-alephium/v3.12.0/Linux/p2p-v1",
+        TimeStamp.now(),
+        brokerInfo.interBrokerInfo,
+        Signature.zero
+      )
+    )
+    expectTerminated(brokerHandler)
+    listener.expectMsg(MisbehaviorManager.InvalidP2PVersionOnTestnet(remoteAddress))
   }
 
   trait Fixture extends FlowFixture with Generators {
