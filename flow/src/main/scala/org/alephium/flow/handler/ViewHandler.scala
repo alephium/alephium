@@ -199,24 +199,27 @@ trait ViewHandlerState extends IOBaseActor {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def updateSubscribers(hardFork: HardFork, chainIndex: Option[ChainIndex]): Unit = {
+  def updateSubscribers(hardFork: HardFork, chainIndexOpt: Option[ChainIndex]): Unit = {
     if (isNodeSynced) {
-      minerAddressesOpt.foreach { minerAddresses =>
-        if (subscribers.nonEmpty) {
-          if (hardFork.isDanubeEnabled() && chainIndex.nonEmpty) {
-            escapeIOError(ViewHandler.prepareTemplate(blockFlow, chainIndex.get, minerAddresses)) {
-              template =>
-                subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
-            }
-          } else {
-            escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-              subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+      if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
+        val minerAddresses = minerAddressesOpt.get
+        if (hardFork.isDanubeEnabled() && chainIndexOpt.nonEmpty) {
+          val chainIndex = chainIndexOpt.get
+          if (brokerConfig.contains(chainIndex.from)) {
+            escapeIOError(
+              ViewHandler.prepareTemplate(blockFlow, chainIndex, minerAddresses)
+            ) { template =>
+              subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
             }
           }
-          scheduleUpdate()
+        } else {
+          escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+            subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+          }
         }
+        scheduleUpdate()
       }
-    } else {
+    } else if (subscribers.nonEmpty) {
       log.warning(s"The node is not synced, unsubscribe all actors")
       subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
     }

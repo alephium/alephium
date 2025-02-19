@@ -210,13 +210,13 @@ object TxHandler {
         blockFlow.add(block, worldStateOpt) match {
           case Left(error) => Left(s"Failed in add the mined block: $error")
           case Right(_) =>
-            blockFlow.updateBestFlowSkeleton()
-            // remove txs from mempool
-            blockFlow
-              .prepareBlockFlow(block.chainIndex, block.minerLockupScript)
-              .map(_ => ())
-              .left
-              .map(_.getMessage)
+            val result = for {
+              _ <- blockFlow.updateBestDeps()
+              _ <- blockFlow.updateBestFlowSkeleton()
+              // remove txs from mempool
+              _ <- blockFlow.prepareBlockFlow(block.chainIndex, block.minerLockupScript)
+            } yield ()
+            result.left.map(_.getMessage)
         }
     }
   }
