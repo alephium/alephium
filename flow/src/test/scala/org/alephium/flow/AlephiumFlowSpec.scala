@@ -706,6 +706,8 @@ trait FlowFixture
     val blockValidation = BlockValidation.build(blockFlow)
     val sideResult      = blockValidation.validate(block, blockFlow).rightValue
     blockFlow.addAndUpdateView(block, sideResult).rightValue
+    val hardFork = networkConfig.getHardFork(block.timestamp)
+    prepareTemplate(blockFlow, hardFork, block.chainIndex)
   }
 
   def addAndCheck(blockFlow: BlockFlow, blocks: Block*): Unit = {
@@ -1089,6 +1091,22 @@ trait FlowFixture
     val hashes = blockFlow.getHashes(chainIndex, height).rightValue
     hashes.length is 2
     (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
+  }
+
+  def prepareTemplates(blockFlow: BlockFlow, hardFork: HardFork): Unit = {
+    if (hardFork.isDanubeEnabled()) {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        val miner = getGenesisLockupScript(chainIndex.to)
+        val _     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      }
+    }
+  }
+
+  def prepareTemplate(blockFlow: BlockFlow, hardFork: HardFork, chainIndex: ChainIndex): Unit = {
+    if (hardFork.isDanubeEnabled() && blockFlow.brokerConfig.contains(chainIndex.from)) {
+      val miner = getGenesisLockupScript(chainIndex.to)
+      val _     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    }
   }
 }
 

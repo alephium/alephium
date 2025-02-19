@@ -75,10 +75,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit def flowImplicit: BlockFlow = blockFlow
 
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+      block
+    }
+
+    lazy val hardFork = networkConfig.getHardFork(TimeStamp.now())
   }
 
   trait TransferFromOneToManyGroupsFixture extends FlowFixtureWithApi with GetTxFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -1551,6 +1562,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       ("alephium.broker.broker-num", 1),
       ("alephium.node.indexes.tx-output-ref-index", "true")
     )
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val lockupScript                      = getGenesisLockupScript(chainIndex)
@@ -1614,12 +1626,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         deployContractTx.gasPrice * deployContractTx.gasAmount + initialAttoAlphAmount.value
       )
       deployContractTxResult.contractAddress
-    }
-
-    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
-      val block = mineFromMemPool(blockFlow, chainIndex)
-      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
-      addAndCheck(blockFlow, block)
     }
 
     def createContract(
@@ -3283,6 +3289,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   trait ScriptTxFixture extends Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -3328,12 +3335,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         chainIndex,
         testPriKey
       )
-    }
-
-    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
-      val block = mineFromMemPool(blockFlow, chainIndex)
-      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
-      addAndCheck(blockFlow, block)
     }
   }
 
@@ -3856,11 +3857,16 @@ class ServerUtilsSpec extends AlephiumSpec {
       .add(block.chainIndex, blockTx, TimeStamp.now())
     checkAddressBalance(testAddress, ALPH.alph(2))
     deployContract()
+
+    prepareTemplates(blockFlow, hardFork)
+
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 0))
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     // TODO: improve the calculation of bestDeps to get rid of the following line
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    // remove the cross-group tx from mempool
+    prepareTemplate(blockFlow, hardFork, ChainIndex.unsafe(0, 0))
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is true
 
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
@@ -4288,12 +4294,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildExecuteScriptTransaction0 =
       buildTransactions(2).asInstanceOf[BuildChainedExecuteScriptTxResult]
 
+    prepareTemplates(blockFlow, hardFork)
+
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction1.value, groupInfo1.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction0.value, groupInfo0.privateKey)
-    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
-    confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
-    confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
+    val block0 = confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0)))
+    val block1 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
+    val block2 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
+    block0.nonCoinbaseLength is 1
+    block1.nonCoinbaseLength is 1
+    block2.nonCoinbaseLength is 1
 
     checkAlphBalance(
       groupInfo0.address.lockupScript,

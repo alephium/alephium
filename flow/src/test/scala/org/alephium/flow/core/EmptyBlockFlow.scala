@@ -44,9 +44,11 @@ trait EmptyBlockFlow extends BlockFlow {
   lazy val blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
     BlockHeaderChain.fromGenesisUnsafe(storages)
 
-  def getAllTips: AVector[BlockHash]                                                           = ???
-  def getBestTipUnsafe(): BlockHash                                                            = ???
-  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps                              = ???
+  def getAllTips: AVector[BlockHash] = ???
+  def getBestTipUnsafe(): BlockHash  = ???
+  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
+    bestFlowSkeleton.createBlockDeps(chainIndex.from)
+  }
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
   def updateBestDeps(): IOResult[Unit]                                                         = ???
   def updateBestFlowSkeleton(): IOResult[Unit]                                                 = ???
