@@ -5698,7 +5698,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |  test "foo"
            |  with Settings(blockTimeStamp = ${now.millis})
-           |  with Self(0) {
+           |  before Self(0) {
            |    testCheck!(foo() == ${blockTimeStamp.millis})
            |  }
            |}
@@ -5719,7 +5719,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    return bar0.value() + bar1.value()
            |  }
            |  test "add"
-           |  with
+           |  before
            |    Bar(10)@addr0
            |    Bar(20)@addr1
            |    Self(addr0, addr1)
@@ -5756,7 +5756,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |
            |  test "transfer"
-           |  with
+           |  before
            |    Self(0)
            |    ApproveAssets{@$fromAddress -> ALPH: 2 alph}
            |  {
@@ -5790,7 +5790,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |Abstract Contract Base(a: U256, b: U256) {
            |  fn isSum() -> Bool
            |  fn base() -> U256
-           |  test "base" with Self(20, 10) {
+           |  test "base" before Self(20, 10) {
            |    let result = if (isSum()) $a else $b
            |    testCheck!(base() == result)
            |  }

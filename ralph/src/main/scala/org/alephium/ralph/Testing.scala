@@ -162,6 +162,51 @@ object Testing {
       assets: AVector[(LockupScript.Asset, AVector[(TokenId, U256)])]
   ) extends AnyVal
 
+  private def getContract[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      typeId: Ast.TypeId
+  ): Ast.Contract = {
+    state.getContractInfo(typeId).ast match {
+      case c: Ast.Contract =>
+        if (!c.isAbstract) {
+          c
+        } else {
+          throw Compiler.Error(
+            s"Expected a contract type ${typeId.name}, but got an abstract contract",
+            typeId.sourceIndex
+          )
+        }
+      case _ =>
+        throw Compiler.Error(s"Contract ${typeId.name} does not exist", typeId.sourceIndex)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def genDefaultValue[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      tpe: Type,
+      isMutable: Boolean
+  ): Seq[(Val, Boolean)] = {
+    state.resolveType(tpe) match {
+      case Type.Struct(id) =>
+        state
+          .getStruct(id)
+          .fields
+          .flatMap(field => genDefaultValue(state, field.tpe, isMutable && field.isMutable))
+      case t @ Type.FixedSizeArray(baseType, _) =>
+        val values = genDefaultValue(state, baseType, isMutable)
+        Seq.fill(t.getArraySize)(values).flatten
+      case _: Type.Contract             => Seq(Val.ByteVec(ContractId.zero.bytes) -> isMutable)
+      case tpe: Type if tpe.isPrimitive => Seq(tpe.toVal.default -> isMutable)
+      case tpe => throw Compiler.Error(s"Invalid type $tpe", tpe.sourceIndex)
+    }
+  }
+
+  private def getContractFields(values: Seq[(Val, Boolean)]) = {
+    val (immFields, mutFields) = values.view.partition(!_._2)
+    (AVector.from(immFields.map(_._1)), AVector.from(mutFields.map(_._1)))
+  }
+
   final case class CreateContractDef[Ctx <: StatelessContext](
       typeId: Ast.TypeId,
       tokens: Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])],
@@ -169,22 +214,6 @@ object Testing {
       address: Option[Ast.Ident]
   ) extends Ast.Positioned {
     def isSelfType: Boolean = typeId.name == "Self"
-
-    private def getContract(state: Compiler.State[Ctx], typeId: Ast.TypeId): Ast.Contract = {
-      state.getContractInfo(typeId).ast match {
-        case c: Ast.Contract =>
-          if (!c.isAbstract) {
-            c
-          } else {
-            throw Compiler.Error(
-              s"Expected a contract type ${typeId.name}, but got an abstract contract",
-              typeId.sourceIndex
-            )
-          }
-        case _ =>
-          throw Compiler.Error(s"Contract ${typeId.name} does not exist", typeId.sourceIndex)
-      }
-    }
 
     private def getAbstractContract(
         state: Compiler.State[Ctx],
@@ -246,27 +275,6 @@ object Testing {
       }
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    private def genDefaultValue(
-        state: Compiler.State[Ctx],
-        tpe: Type,
-        isMutable: Boolean
-    ): Seq[(Val, Boolean)] = {
-      state.resolveType(tpe) match {
-        case Type.Struct(id) =>
-          state
-            .getStruct(id)
-            .fields
-            .flatMap(field => genDefaultValue(state, field.tpe, isMutable && field.isMutable))
-        case t @ Type.FixedSizeArray(baseType, _) =>
-          val values = genDefaultValue(state, baseType, isMutable)
-          Seq.fill(t.getArraySize)(values).flatten
-        case _: Type.Contract             => Seq(Val.ByteVec(ContractId.zero.bytes) -> isMutable)
-        case tpe: Type if tpe.isPrimitive => Seq(tpe.toVal.default -> isMutable)
-        case tpe => throw Compiler.Error(s"Invalid type $tpe", tpe.sourceIndex)
-      }
-    }
-
     private def getFields(
         state: Compiler.State[Ctx],
         origin: Ast.Contract,
@@ -291,8 +299,7 @@ object Testing {
           genDefaultValue(state, fieldType, argument.isMutable)
         }
       }
-      val (immFields, mutFields) = values.partition(!_._2)
-      (AVector.from(immFields.map(_._1)), AVector.from(mutFields.map(_._1)))
+      getContractFields(values)
     }
 
     def compile(state: Compiler.State[Ctx], origin: Ast.TypeId): CreateContractValue = {
@@ -328,11 +335,40 @@ object Testing {
       contractId: ContractId
   )
 
+  final case class CreateContractDefs[Ctx <: StatelessContext](defs: Seq[CreateContractDef[Ctx]])
+      extends Ast.Positioned
+  object CreateContractDefs {
+    lazy val empty: CreateContractDefs[StatefulContext] = CreateContractDefs(Seq.empty)
+  }
+
   final case class SingleTestDef[Ctx <: StatelessContext](
-      contracts: Seq[CreateContractDef[Ctx]],
+      before: CreateContractDefs[Ctx],
+      after: CreateContractDefs[Ctx],
       assets: Option[ApprovedAssetsDef[Ctx]],
       body: Seq[Ast.Statement[Ctx]]
   ) extends Ast.Positioned {
+    private def getBeforeContracts(
+        state: Compiler.State[Ctx],
+        origin: Ast.TypeId
+    ): AVector[CreateContractValue] = {
+      val (selfContracts, dependencies) = before.defs.partition(_.isSelfType)
+      if (selfContracts.length > 1) {
+        throw Compiler.Error(s"Self contract is defined multiple times", sourceIndex)
+      }
+      if (selfContracts.isEmpty) {
+        val contract = getContract(state, state.typeId)
+        val values = contract.fields.flatMap { argument =>
+          genDefaultValue(state, argument.tpe, argument.isMutable)
+        }
+        val (immFields, mutFields) = getContractFields(values)
+        val selfContract =
+          CreateContractValue(state.typeId, AVector.empty, immFields, mutFields, ContractId.random)
+        AVector.from(dependencies.map(_.compile(state, origin))) :+ selfContract
+      } else {
+        AVector.from(dependencies ++ selfContracts).map(_.compile(state, origin))
+      }
+    }
+
     def compile(
         state: Compiler.State[Ctx],
         settings: Option[SettingsValue],
@@ -340,19 +376,12 @@ object Testing {
         index: Int,
         origin: Ast.TypeId
     ): CompiledUnitTest[Ctx] = {
-      val (selfContracts, dependencies) = contracts.partition(_.isSelfType)
-      if (selfContracts.isEmpty) {
-        throw Compiler.Error(s"Self contract is not defined", sourceIndex)
-      }
-      if (selfContracts.length > 1) {
-        throw Compiler.Error(s"Self contract is defined multiple times", sourceIndex)
-      }
       val scopeId = Ast.FuncId(s"$name:$index", false)
       state.setFuncScope(scopeId)
       state.withScope(this) {
-        val compiledDeps   = AVector.from(dependencies.map(_.compile(state, origin)))
-        val compiledSelf   = selfContracts(0).compile(state, origin)
-        val compiledAssets = assets.map(_.compile(state))
+        val beforeContracts = getBeforeContracts(state, origin)
+        val afterContracts  = AVector.from(after.defs.map(_.compile(state, origin)))
+        val compiledAssets  = assets.map(_.compile(state))
         body.foreach(_.check(state))
         val method = Method[Ctx](
           isPublic = true,
@@ -364,7 +393,7 @@ object Testing {
           returnLength = 0,
           instrs = AVector.from(body.flatMap(_.genCode(state)))
         )
-        CompiledUnitTest(name, settings, compiledSelf, compiledDeps, compiledAssets, method)
+        CompiledUnitTest(name, settings, beforeContracts, afterContracts, compiledAssets, method)
       }
     }
   }
@@ -391,12 +420,12 @@ object Testing {
   final case class CompiledUnitTest[Ctx <: StatelessContext](
       name: String,
       settings: Option[SettingsValue],
-      selfContract: CreateContractValue,
-      dependencies: AVector[CreateContractValue],
+      before: AVector[CreateContractValue],
+      after: AVector[CreateContractValue],
       assets: Option[ApprovedAssetsValue],
       method: Method[Ctx]
   ) {
-    lazy val contracts: AVector[CreateContractValue] = dependencies :+ selfContract
+    lazy val selfContract: CreateContractValue = before.last
 
     def getGroupIndex(implicit groupConfig: GroupConfig): Either[String, GroupIndex] = {
       val group = settings.map(_.group).getOrElse(0)

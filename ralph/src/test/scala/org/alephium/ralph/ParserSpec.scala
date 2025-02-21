@@ -2670,10 +2670,30 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       )
     )
 
+    val simpleTest =
+      s"""
+         |test "foo" {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(simpleTest, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        None,
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs.empty,
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
     val withoutSettings =
       s"""
          |test "foo"
-         |with Self(10) {
+         |before Self(10) {
          |  assert!(foo() == 10, 0)
          |}
          |""".stripMargin
@@ -2683,14 +2703,17 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         None,
         Seq(
           Testing.SingleTestDef(
-            Seq(
-              Testing.CreateContractDef(
-                TypeId("Self"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(10)))),
-                None
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
               )
             ),
+            Testing.CreateContractDefs.empty,
             None,
             statements
           )
@@ -2701,7 +2724,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       s"""
          |test "foo"
          |with Settings(group = GroupIndex)
-         |with Self(10) {
+         |before Self(10) {
          |  assert!(foo() == 10, 0)
          |}
          |""".stripMargin
@@ -2711,12 +2734,56 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
-            Seq(
-              Testing.CreateContractDef(
-                TypeId("Self"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(10)))),
-                None
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withAfter =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10)
+         |after Self(11) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withAfter, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(11)))),
+                  None
+                )
               )
             ),
             None,
@@ -2729,9 +2796,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       s"""
          |test "foo"
          |with Settings(group = GroupIndex)
-         |with
-         |  Self(10)
-         |  ApproveAssets{ From -> ALPH: 1 }
+         |before Self(10)
+         |ApproveAssets{ From -> ALPH: 1 }
          |{
          |  assert!(foo() == 10, 0)
          |}
@@ -2742,14 +2808,17 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
-            Seq(
-              Testing.CreateContractDef(
-                TypeId("Self"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(10)))),
-                None
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
               )
             ),
+            Testing.CreateContractDefs.empty,
             Some(
               Testing.ApprovedAssetsDef(
                 Seq(
@@ -2769,7 +2838,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       s"""
          |test "foo"
          |with Settings(group = GroupIndex)
-         |with
+         |before
          |  Self(10)
          |  Bar(20)@address1
          |  Bar(30)@address2
@@ -2783,26 +2852,29 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
-            Seq(
-              Testing.CreateContractDef(
-                TypeId("Self"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(10)))),
-                None
-              ),
-              Testing.CreateContractDef(
-                TypeId("Bar"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(20)))),
-                Some(Ident("address1"))
-              ),
-              Testing.CreateContractDef(
-                TypeId("Bar"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(30)))),
-                Some(Ident("address2"))
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                ),
+                Testing.CreateContractDef(
+                  TypeId("Bar"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(20)))),
+                  Some(Ident("address1"))
+                ),
+                Testing.CreateContractDef(
+                  TypeId("Bar"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(30)))),
+                  Some(Ident("address2"))
+                )
               )
             ),
+            Testing.CreateContractDefs.empty,
             None,
             statements
           )
@@ -2813,10 +2885,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       s"""
          |test "foo"
          |with Settings(group = GroupIndex)
-         |with Self(10) {
+         |before Self(10) {
          |  assert!(foo() == 10, 0)
          |}
-         |with Self(11) {
+         |before Self(11) {
          |  assert!(foo() == 10, 0)
          |}
          |""".stripMargin
@@ -2826,26 +2898,32 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
         Seq(
           Testing.SingleTestDef(
-            Seq(
-              Testing.CreateContractDef(
-                TypeId("Self"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(10)))),
-                None
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
               )
             ),
+            Testing.CreateContractDefs.empty,
             None,
             statements
           ),
           Testing.SingleTestDef(
-            Seq(
-              Testing.CreateContractDef(
-                TypeId("Self"),
-                Seq.empty,
-                Seq(Const(Val.U256(U256.unsafe(11)))),
-                None
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(11)))),
+                  None
+                )
               )
             ),
+            Testing.CreateContractDefs.empty,
             None,
             statements
           )
@@ -2858,7 +2936,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
          |  pub fn foo() -> U256 {
          |    return v
          |  }
-         |  test "foo" with Self(10) {
+         |  test "foo" before Self(10) {
          |    assert!(foo() == 10, 0)
          |  }
          |}

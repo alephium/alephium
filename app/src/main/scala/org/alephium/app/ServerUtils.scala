@@ -1903,7 +1903,7 @@ class ServerUtils(implicit
       blockHash: BlockHash,
       txId: TransactionId
   ) = {
-    test.contracts.foreachE { c =>
+    test.before.foreachE { c =>
       val contractCode = if (c.typeId == testingContract.ast.ident) {
         val code = testingContract.debugCode
         code.copy(methods = code.methods :+ test.method)

@@ -25,6 +25,30 @@ import org.alephium.util._
 class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixture {
   it should "compile unit tests" in {
     {
+      info("Create contract with default values")
+      val code =
+        s"""
+           |Contract Foo(v0: U256, mut v1: U256) {
+           |  pub fn foo() -> U256 {
+           |    v1 = v1 + 1
+           |    return v0 + v1
+           |  }
+           |  test "foo" {
+           |    testCheck!(foo() == 1)
+           |  }
+           |}
+           |""".stripMargin
+      val test = compileContractFull(code).rightValue.tests.tests.head
+      test.settings.isEmpty is true
+      test.before.length is 1
+      val contract = test.before.head
+      contract.typeId is Ast.TypeId("Foo")
+      contract.tokens.isEmpty is true
+      contract.immFields is AVector[Val](Val.U256(U256.Zero))
+      contract.mutFields is AVector[Val](Val.U256(U256.Zero))
+    }
+
+    {
       info("Create simple contract")
       val code =
         s"""
@@ -33,15 +57,15 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    v1 = v1 + 1
            |    return v0 + v1
            |  }
-           |  test "foo" with Self(0, 1) {
+           |  test "foo" before Self(0, 1) {
            |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
       val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
-      test.contracts.length is 1
-      val contract = test.contracts.head
+      test.before.length is 1
+      val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
       contract.immFields is AVector[Val](Val.U256(U256.Zero))
@@ -57,15 +81,15 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  pub fn foo() -> U256 {
            |    return v
            |  }
-           |  test "foo" with Self(Value) {
+           |  test "foo" before Self(Value) {
            |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
       val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
-      test.contracts.length is 1
-      val contract = test.contracts.head
+      test.before.length is 1
+      val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
       contract.immFields is AVector[Val](Val.U256(U256.Zero))
@@ -80,15 +104,15 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  pub fn foo() -> U256 {
            |    return v
            |  }
-           |  test "foo" with Self{ ALPH: 1 alph }(0) {
+           |  test "foo" before Self{ ALPH: 1 alph }(0) {
            |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
       val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
-      test.contracts.length is 1
-      val contract = test.contracts.head
+      test.before.length is 1
+      val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens is AVector(TokenId.alph -> ALPH.alph(1))
       contract.immFields is AVector[Val](Val.U256(U256.Zero))
@@ -107,7 +131,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  pub fn foo() -> U256 {
            |    return 0
            |  }
-           |  test "foo" with Self(
+           |  test "foo" before Self(
            |    [Bar { a: 0, b: false }, Bar { a: 1, b: true }],
            |    Bar { a: 2, b: false }
            |  ) {
@@ -118,8 +142,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
       val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
-      test.contracts.length is 1
-      val contract = test.contracts.head
+      test.before.length is 1
+      val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
       contract.immFields is AVector[Val](Val.False, Val.True, Val.U256(U256.Two), Val.False)
@@ -135,7 +159,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return bar0.value() + bar1.value()
            |  }
            |  test "add"
-           |  with
+           |  before
            |    Bar(10)@addr0
            |    Bar(20)@addr1
            |    Self(addr0, addr1)
@@ -152,17 +176,17 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
       val test = compileContractFull(code).rightValue.tests.tests.head
       test.settings.isEmpty is true
-      test.contracts.length is 3
+      test.before.length is 3
 
-      val bar0 = test.contracts(0)
+      val bar0 = test.before(0)
       bar0.immFields is AVector[Val](Val.U256(U256.unsafe(10)))
       bar0.mutFields.isEmpty is true
 
-      val bar1 = test.contracts(1)
+      val bar1 = test.before(1)
       bar1.immFields is AVector[Val](Val.U256(U256.unsafe(20)))
       bar1.mutFields.isEmpty is true
 
-      val contract = test.contracts(2)
+      val contract = test.before(2)
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
       contract.immFields is AVector[Val](
@@ -180,7 +204,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  pub fn foo() -> U256 {
            |    return bar.bar()
            |  }
-           |  test "foo" with Bar(0)@addr Self(addr) {
+           |  test "foo" before Bar(0)@addr Self(addr) {
            |    testCheck!(foo() == 0)
            |  }
            |}
@@ -193,7 +217,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val contracts = compileContractFull(code).rightValue.tests.tests.head.contracts
+      val contracts = compileContractFull(code).rightValue.tests.tests.head.before
       contracts.length is 2
       val bar = contracts.head
       bar.typeId is Ast.TypeId("Bar")
@@ -215,10 +239,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v
            |  }
            |  test "foo0"
-           |  with Self(0) {
+           |  before Self(0) {
            |    testCheck!(foo0() == 1)
            |  }
-           |  with Self(1) {
+           |  before Self(1) {
            |    testCheck!(foo0() == 2)
            |  }
            |
@@ -227,10 +251,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v
            |  }
            |  test "foo1"
-           |  with Self(2) {
+           |  before Self(2) {
            |    testCheck!(foo1() == 1)
            |  }
-           |  with Self(3) {
+           |  before Self(3) {
            |    testCheck!(foo1() == 2)
            |  }
            |}
@@ -240,8 +264,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       tests.length is 4
       tests.zipWithIndex.foreach { case (test, index) =>
         test.settings.isEmpty is true
-        test.contracts.length is 1
-        val contract = test.contracts.head
+        test.before.length is 1
+        val contract = test.before.head
         contract.typeId is Ast.TypeId("Foo")
         contract.tokens.isEmpty is true
         contract.immFields.isEmpty is true
@@ -260,7 +284,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |  test "foo"
            |  with Settings($settings)
-           |  with Self(0, 1) {
+           |  before Self(0, 1) {
            |    testCheck!(foo() == 1)
            |  }
            |}
@@ -305,7 +329,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v
            |  }
            |  test "foo"
-           |  with
+           |  before
            |    Self(1)
            |    ApproveAssets{@$address0 -> ALPH: 1 alph; @$address1 -> ALPH: 2 alph, #${tokenId.toHexString}: 1 alph}
            |  {
@@ -328,10 +352,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         s"""
            |Contract Foo(v: U256) {
            |  pub fn foo() -> U256 { return v }
-           |  test "foo" with Self(1) {
+           |  test "foo" before Self(1) {
            |    testCheck!(foo() == 1, 0)
            |  }
-           |  $$test "foo" with Self(2) {
+           |  $$test "foo" before Self(2) {
            |    testCheck!(foo() == 2, 0)
            |  }$$
            |}
@@ -355,13 +379,13 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |Abstract Contract Base(a: U256, mut b: U256) {
            |  pub fn sum() -> U256 { return a + b }
-           |  test "sum" with Self(10, 20) {
+           |  test "sum" before Self(10, 20) {
            |    testCheck!(sum() == 30)
            |  }
            |}
            |""".stripMargin
       val tests       = compileContractFull(code).rightValue.tests
-      val barContract = tests.tests.head.contracts.head
+      val barContract = tests.tests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
       barContract.immFields is AVector[Val](
         Val.U256(0),
@@ -389,7 +413,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |Abstract Contract Base(a: U256, b: U256) {
            |  fn isSum() -> Bool
            |  fn base() -> U256
-           |  test "base" with Self(20, 10) {
+           |  test "base" before Self(20, 10) {
            |    let result = if (isSum()) 30 else 10
            |    testCheck!(base() == result)
            |  }
@@ -399,14 +423,14 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       contracts.length is 2
       val fooTests = contracts(0).tests.tests
       fooTests.length is 1
-      val fooContract = fooTests.head.contracts.head
+      val fooContract = fooTests.head.before.head
       fooContract.typeId is Ast.TypeId("Foo")
       fooContract.immFields is AVector[Val](Val.U256(20), Val.U256(10))
       fooContract.mutFields is AVector[Val](Val.False)
 
       val barTests = contracts(1).tests.tests
       barTests.length is 1
-      val barContract = barTests.head.contracts.head
+      val barContract = barTests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
       barContract.immFields is AVector[Val](Val.U256(20), Val.U256(10))
       barContract.mutFields.isEmpty is true
@@ -430,7 +454,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       s"""
          |Contract Foo(v: U256) {
          |  pub fn foo() -> U256 { return v  }
-         |  test "foo" with Self(0) {
+         |  test "foo" before Self(0) {
          |    testCheck!(foo() == 0)
          |  }
          |}
@@ -456,7 +480,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       s"""
          |Contract Foo(v: U256) {
          |  pub fn foo() -> U256 { return v }
-         |  test "foo" with Self(0) {
+         |  test "foo" before Self(0) {
          |    $$assert!(foo() == 0, 0)$$
          |  }
          |}

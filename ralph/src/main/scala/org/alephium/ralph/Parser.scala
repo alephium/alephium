@@ -1367,10 +1367,21 @@ trait TestingParser { self: StatefulParser =>
   private def testName[Unknown: P]: P[String] = P("\"" ~ CharPred(_ != '"').rep.! ~ "\"")
   private def approveAssetsDef[Unknown: P]: P[Testing.ApprovedAssetsDef[StatefulContext]] =
     PP("ApproveAssets" ~ approveAssets)(Testing.ApprovedAssetsDef.apply)
+  private def contractDefs[Unknown: P](
+      key: String
+  ): P[Testing.CreateContractDefs[StatefulContext]] =
+    PP(key ~ createContractDef.rep)(Testing.CreateContractDefs.apply)
   private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
-    PP("with" ~ createContractDef.rep ~ approveAssetsDef.? ~ "{" ~ statement.rep ~ "}") {
-      case (contracts, assets, statements) =>
-        Testing.SingleTestDef(contracts, assets, statements)
+    PP(
+      contractDefs("before").? ~ contractDefs("after").? ~
+        approveAssetsDef.? ~ "{" ~ statement.rep ~ "}"
+    ) { case (before, after, assets, statements) =>
+      Testing.SingleTestDef(
+        before.getOrElse(Testing.CreateContractDefs.empty),
+        after.getOrElse(Testing.CreateContractDefs.empty),
+        assets,
+        statements
+      )
     }
 
   def rawUnitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
