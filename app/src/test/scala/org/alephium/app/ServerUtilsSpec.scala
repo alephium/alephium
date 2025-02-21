@@ -5756,10 +5756,9 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |
            |  test "transfer"
-           |  before
-           |    Self(0)
-           |    ApproveAssets{@$fromAddress -> ALPH: 2 alph}
-           |  {
+           |  before Self(0)
+           |  after Self{ALPH: 1.1 alph}(1 alph)
+           |  ApproveAssets{@$fromAddress -> ALPH: 2 alph} {
            |    emit Debug(`balance: $${balance}`)
            |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }
@@ -5804,6 +5803,79 @@ class ServerUtilsSpec extends AlephiumSpec {
           .detail
           .contains("Test failed: Base:base") is true
       }
+    }
+
+    {
+      def code(value: String) =
+        s"""
+           |struct Bar {
+           |  mut a: U256,
+           |  mut b: [U256; 2],
+           |  c: [U256; 2]
+           |}
+           |Contract Foo(mut bar: Bar) {
+           |  pub fn foo() -> () {
+           |    bar.a = bar.a + 1
+           |    bar.b[0] = bar.b[0] + 1
+           |  }
+           |  test "foo"
+           |  before Self(Bar { a: 0, b: [0; 2], c: [0; 2] })
+           |  after Self($value) {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      val correct = "Bar { a: 1, b: [1, 0], c: [0; 2] }"
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(correct))).isRight is true
+      val invalid0 = "Bar { a: 0, b: [1, 0], c: [0; 2] }"
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(invalid0)))
+        .leftValue
+        .detail
+        .contains(
+          "Test failed: Foo:foo, detail: invalid field bar.a, expected U256(0), have: U256(1)"
+        ) is true
+
+      val invalid1 = "Bar { a: 1, b: [1, 1], c: [0; 2] }"
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(invalid1)))
+        .leftValue
+        .detail
+        .contains(
+          "Test failed: Foo:foo, detail: invalid field bar.b[1], expected U256(1), have: U256(0)"
+        ) is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  @using(checkExternalCaller = false, assetsInContract = enforced)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |
+           |  test "foo"
+           |  before
+           |    Bar{ALPH: 10 alph}(0)@barId
+           |    Self(barId)
+           |  after
+           |    Bar{ALPH: 9 alph}(1)@barId
+           |    Self{ALPH: 1.1 alph}(barId)
+           |  {
+           |    foo()
+           |  }
+           |}
+           |Contract Bar(mut value: U256) {
+           |  @using(checkExternalCaller = false, assetsInContract = true)
+           |  pub fn bar() -> () {
+           |    value += 1
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
   }
 

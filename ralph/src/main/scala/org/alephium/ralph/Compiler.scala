@@ -1003,8 +1003,9 @@ object Compiler {
           varTable.get(varKey).orElse(globalState.getConstantOpt(ident)) match {
             case Some(varInfo) => (varKey, varInfo)
             case None =>
+              val varName = if (isInTestContext) name else sname
               throw Error(
-                s"Variable $sname is not defined in the current scope or is used before being defined",
+                s"Variable $varName is not defined in the current scope or is used before being defined",
                 ident.sourceIndex
               )
           }

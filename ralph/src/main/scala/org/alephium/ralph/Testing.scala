@@ -181,30 +181,48 @@ object Testing {
     }
   }
 
+  private def getArrayValues(
+      baseName: String,
+      tpe: Type.FixedSizeArray,
+      elements: Seq[(String, Val, Boolean)]
+  ) = {
+    Seq
+      .tabulate(tpe.getArraySize) { index =>
+        elements.map { case (name, value, isMutable) =>
+          (s"$baseName[$index]$name", value, isMutable)
+        }
+      }
+      .flatten
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def genDefaultValue[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
+      name: String,
       tpe: Type,
       isMutable: Boolean
-  ): Seq[(Val, Boolean)] = {
+  ): Seq[(String, Val, Boolean)] = {
     state.resolveType(tpe) match {
       case Type.Struct(id) =>
         state
           .getStruct(id)
           .fields
-          .flatMap(field => genDefaultValue(state, field.tpe, isMutable && field.isMutable))
+          .flatMap { field =>
+            val valName = s"$name.${field.name}"
+            genDefaultValue(state, valName, field.tpe, isMutable && field.isMutable)
+          }
       case t @ Type.FixedSizeArray(baseType, _) =>
-        val values = genDefaultValue(state, baseType, isMutable)
-        Seq.fill(t.getArraySize)(values).flatten
-      case _: Type.Contract             => Seq(Val.ByteVec(ContractId.zero.bytes) -> isMutable)
-      case tpe: Type if tpe.isPrimitive => Seq(tpe.toVal.default -> isMutable)
+        val values = genDefaultValue(state, "", baseType, isMutable)
+        getArrayValues(name, t, values)
+      case _: Type.Contract => Seq((name, Val.ByteVec(ContractId.zero.bytes), isMutable))
+      case tpe: Type if tpe.isPrimitive => Seq((name, tpe.toVal.default, isMutable))
       case tpe => throw Compiler.Error(s"Invalid type $tpe", tpe.sourceIndex)
     }
   }
 
-  private def getContractFields(values: Seq[(Val, Boolean)]) = {
-    val (immFields, mutFields) = values.view.partition(!_._2)
-    (AVector.from(immFields.map(_._1)), AVector.from(mutFields.map(_._1)))
+  private def getContractFields(values: Seq[(String, Val, Boolean)]) = {
+    val (immFields, mutFields) = values.view.partition(!_._3)
+    (AVector.from(immFields.map(f => (f._1, f._2))), AVector.from(mutFields.map(f => (f._1, f._2))))
   }
 
   final case class CreateContractDef[Ctx <: StatelessContext](
@@ -232,24 +250,27 @@ object Testing {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def getValues(
         state: Compiler.State[Ctx],
+        name: String,
         expr: Ast.Expr[Ctx],
         tpe: Type,
         isMutable: Boolean
-    ): Seq[(Val, Boolean)] = {
+    ): Seq[(String, Val, Boolean)] = {
       (state.resolveType(tpe), expr) match {
         case (t: Type.FixedSizeArray, Ast.CreateArrayExpr1(elements)) =>
-          elements.flatMap(getValues(state, _, t.baseType, isMutable))
-        case (t: Type.FixedSizeArray, Ast.CreateArrayExpr2(element, sizeExpr)) =>
-          val elements = getValues(state, element, t.baseType, isMutable)
-          val size     = checkAndGetValue[Ctx, Val.U256](state, sizeExpr, Val.U256, "array size")
-          Seq.fill(size.v.toBigInt.intValue())(elements).flatten
+          elements.zipWithIndex.flatMap { case (expr, index) =>
+            getValues(state, s"$name[$index]", expr, t.baseType, isMutable)
+          }
+        case (t: Type.FixedSizeArray, Ast.CreateArrayExpr2(element, _)) =>
+          val elements = getValues(state, "", element, t.baseType, isMutable)
+          getArrayValues(name, t, elements)
         case (t: Type.Struct, Ast.StructCtor(_, fields)) =>
           val struct = state.getStruct(t.id)
           struct.fields.flatMap { structField =>
             val fieldDef = fields.find(_._1 == structField.ident)
             fieldDef.flatMap(_._2) match {
               case Some(expr) =>
-                getValues(state, expr, structField.tpe, isMutable && structField.isMutable)
+                val valName = s"$name.${structField.name}"
+                getValues(state, valName, expr, structField.tpe, isMutable && structField.isMutable)
               case None =>
                 val sourceIndex = fieldDef.flatMap(_._1.sourceIndex)
                 throw Compiler.Error(
@@ -260,13 +281,13 @@ object Testing {
           }
         case (t: Type.Contract, Ast.ContractConv(_, expr)) =>
           val value = checkAndGetValue[Ctx, Val.ByteVec](state, expr, t.toVal, "contract field")
-          Seq(value -> isMutable)
+          Seq((name, value, isMutable))
         case (t: Type.Contract, expr @ Ast.Variable(_)) =>
           val value = checkAndGetValue[Ctx, Val.ByteVec](state, expr, t.toVal, "contract field")
-          Seq(value -> isMutable)
+          Seq((name, value, isMutable))
         case (t: Type, expr) if t.isPrimitive =>
           val value = checkAndGetValue[Ctx, Val](state, expr, t.toVal, "contract field")
-          Seq(value -> isMutable)
+          Seq((name, value, isMutable))
         case (t, expr) =>
           throw Compiler.Error(
             s"Invalid expression, expected a constant expression of type $t",
@@ -279,7 +300,7 @@ object Testing {
         state: Compiler.State[Ctx],
         origin: Ast.Contract,
         self: Ast.Contract
-    ): (AVector[Val], AVector[Val]) = {
+    ): (AVector[(String, Val)], AVector[(String, Val)]) = {
       if (origin.fields.length != fields.length) {
         throw Compiler.Error(s"Invalid contract field size", sourceIndex)
       }
@@ -294,44 +315,73 @@ object Testing {
               fieldExpr.sourceIndex
             )
           }
-          getValues(state, fieldExpr, fieldType, argument.isMutable)
+          getValues(state, argument.ident.name, fieldExpr, fieldType, argument.isMutable)
         } else {
-          genDefaultValue(state, fieldType, argument.isMutable)
+          genDefaultValue(state, argument.ident.name, fieldType, argument.isMutable)
         }
       }
       getContractFields(values)
     }
 
-    def compile(state: Compiler.State[Ctx], origin: Ast.TypeId): CreateContractValue = {
-      val tokenAmounts = tokens.map(token => getApprovedToken(state, token._1, token._2))
-      val (selfTypeId, (immFields, mutFields)) = if (isSelfType) {
+    private def getTypeIdAndFields(state: Compiler.State[Ctx], origin: Ast.TypeId) = {
+      if (isSelfType) {
         val selfTypeId   = state.typeId
         val selfContract = getContract(state, selfTypeId)
         val originContract =
           if (selfTypeId == origin) selfContract else getAbstractContract(state, origin)
-        (selfTypeId, getFields(state, originContract, selfContract))
+        val fields = getFields(state, originContract, selfContract)
+        (selfTypeId, fields._1, fields._2)
       } else {
         val contract = getContract(state, typeId)
-        (typeId, getFields(state, contract, contract))
+        val fields   = getFields(state, contract, contract)
+        (typeId, fields._1, fields._2)
       }
-      val contractId = ContractId.random
+    }
+
+    def compileBeforeContract(
+        state: Compiler.State[Ctx],
+        origin: Ast.TypeId
+    ): CreateContractValue = {
+      val tokenAmounts = tokens.map(token => getApprovedToken(state, token._1, token._2))
+      val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin)
+      val contractId                     = ContractId.random
       address.foreach(
-        state.addTestingConstant(_, Val.ByteVec(contractId.bytes), Type.Contract(selfTypeId))
+        state.addTestingConstant(_, Val.ByteVec(contractId.bytes), Type.Contract(typeId))
       )
-      CreateContractValue(
-        selfTypeId,
-        AVector.from(tokenAmounts),
-        immFields,
-        mutFields,
-        contractId
-      )
+      CreateContractValue(typeId, AVector.from(tokenAmounts), immFields, mutFields, contractId)
+    }
+
+    def compileAfterContract(
+        state: Compiler.State[Ctx],
+        origin: Ast.TypeId,
+        selfContractId: ContractId
+    ): CreateContractValue = {
+      val tokenAmounts = tokens.map(token => getApprovedToken(state, token._1, token._2))
+      val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin)
+      val contractId = address match {
+        case Some(ident) =>
+          val contractId = state.getConstantValue(ident) match {
+            case Val.ByteVec(bytes) => ContractId.from(bytes)
+            case _                  => None
+          }
+          contractId.getOrElse(
+            throw Compiler.Error(s"Invalid contract id in after def", sourceIndex)
+          )
+        case None =>
+          if (isSelfType) {
+            selfContractId
+          } else {
+            throw Compiler.Error(s"Expect a contract id in after def", sourceIndex)
+          }
+      }
+      CreateContractValue(typeId, AVector.from(tokenAmounts), immFields, mutFields, contractId)
     }
   }
   final case class CreateContractValue(
       typeId: Ast.TypeId,
       tokens: AVector[(TokenId, U256)],
-      immFields: AVector[Val],
-      mutFields: AVector[Val],
+      immFields: AVector[(String, Val)],
+      mutFields: AVector[(String, Val)],
       contractId: ContractId
   )
 
@@ -358,15 +408,29 @@ object Testing {
       if (selfContracts.isEmpty) {
         val contract = getContract(state, state.typeId)
         val values = contract.fields.flatMap { argument =>
-          genDefaultValue(state, argument.tpe, argument.isMutable)
+          genDefaultValue(state, argument.ident.name, argument.tpe, argument.isMutable)
         }
         val (immFields, mutFields) = getContractFields(values)
         val selfContract =
           CreateContractValue(state.typeId, AVector.empty, immFields, mutFields, ContractId.random)
-        AVector.from(dependencies.map(_.compile(state, origin))) :+ selfContract
+        AVector.from(dependencies.map(_.compileBeforeContract(state, origin))) :+ selfContract
       } else {
-        AVector.from(dependencies ++ selfContracts).map(_.compile(state, origin))
+        AVector.from(dependencies ++ selfContracts).map(_.compileBeforeContract(state, origin))
       }
+    }
+
+    private def getAfterContracts(
+        selfContractId: ContractId,
+        state: Compiler.State[Ctx],
+        origin: Ast.TypeId
+    ): AVector[CreateContractValue] = {
+      val (selfContracts, dependencies) = after.defs.partition(_.isSelfType)
+      if (selfContracts.length > 1) {
+        throw Compiler.Error(s"Self contract is defined multiple times", sourceIndex)
+      }
+      AVector
+        .from(dependencies ++ selfContracts)
+        .map(_.compileAfterContract(state, origin, selfContractId))
     }
 
     def compile(
@@ -380,7 +444,7 @@ object Testing {
       state.setFuncScope(scopeId)
       state.withScope(this) {
         val beforeContracts = getBeforeContracts(state, origin)
-        val afterContracts  = AVector.from(after.defs.map(_.compile(state, origin)))
+        val afterContracts  = getAfterContracts(beforeContracts.last.contractId, state, origin)
         val compiledAssets  = assets.map(_.compile(state))
         body.foreach(_.check(state))
         val method = Method[Ctx](
@@ -393,7 +457,15 @@ object Testing {
           returnLength = 0,
           instrs = AVector.from(body.flatMap(_.genCode(state)))
         )
-        CompiledUnitTest(name, settings, beforeContracts, afterContracts, compiledAssets, method)
+        CompiledUnitTest(
+          name,
+          this,
+          settings,
+          beforeContracts,
+          afterContracts,
+          compiledAssets,
+          method
+        )
       }
     }
   }
@@ -419,6 +491,7 @@ object Testing {
 
   final case class CompiledUnitTest[Ctx <: StatelessContext](
       name: String,
+      ast: SingleTestDef[Ctx],
       settings: Option[SettingsValue],
       before: AVector[CreateContractValue],
       after: AVector[CreateContractValue],
@@ -433,6 +506,53 @@ object Testing {
     }
   }
 
+  private def checkFields(
+      expected: AVector[(String, Val)],
+      have: AVector[Val]
+  ) = {
+    expected.foreachWithIndexE { case ((name, expectedVal), index) =>
+      val haveVal = have(index)
+      if (expectedVal != haveVal) {
+        Left(s"invalid field $name, expected $expectedVal, have: $haveVal")
+      } else {
+        Right(())
+      }
+    }
+  }
+
+  private def checkTokens(
+      expected: AVector[(TokenId, U256)],
+      have: ContractOutput
+  ) = {
+    expected.foreachE { case (tokenId, expectedAmount) =>
+      val amount = if (tokenId == TokenId.alph) {
+        have.amount
+      } else {
+        have.tokens.view.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero)
+      }
+      if (amount != expectedAmount) {
+        Left(
+          s"invalid token amount, token id: ${tokenId.toHexString}, expected: $expectedAmount, have: $amount"
+        )
+      } else {
+        Right(())
+      }
+    }
+  }
+
+  def checkContractState(
+      expected: CreateContractValue,
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
+      asset: ContractOutput
+  ): Either[String, Unit] = {
+    for {
+      _ <- checkFields(expected.immFields, immFields)
+      _ <- checkFields(expected.mutFields, mutFields)
+      _ <- checkTokens(expected.tokens, asset)
+    } yield ()
+  }
+
   final case class CompiledUnitTests[Ctx <: StatelessContext](
       tests: AVector[CompiledUnitTest[Ctx]],
       errorCodes: Map[Int, Option[SourceIndex]]
@@ -441,12 +561,22 @@ object Testing {
         testName: String,
         errorCode: Option[Int],
         detail: String,
-        debugMessages: Option[String]
+        debugMessages: String
     ): Compiler.Error = {
-      val message     = s"Test failed: $testName, detail: $detail"
       val sourceIndex = errorCode.flatMap(errorCodes.get).flatten
-      CompilerError.TestError(message, sourceIndex, debugMessages)
+      getTestError(testName, sourceIndex, detail, debugMessages)
     }
+  }
+
+  def getTestError(
+      testName: String,
+      sourceIndex: Option[SourceIndex],
+      detail: String,
+      debugMessages: String
+  ): Compiler.Error = {
+    val message = s"Test failed: $testName, detail: $detail"
+    val msg     = Option.when(debugMessages.nonEmpty)(debugMessages)
+    CompilerError.TestError(message, sourceIndex, msg)
   }
 
   trait State[Ctx <: StatelessContext] { _: Compiler.State[Ctx] =>

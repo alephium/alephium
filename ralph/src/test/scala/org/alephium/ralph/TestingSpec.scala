@@ -17,7 +17,7 @@
 package org.alephium.ralph
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{BlockHash, ContractId, TokenId}
+import org.alephium.protocol.model.{BlockHash, ContractId, ContractOutput, TokenId}
 import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
@@ -44,8 +44,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields is AVector[Val](Val.U256(U256.Zero))
-      contract.mutFields is AVector[Val](Val.U256(U256.Zero))
+      contract.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
+      contract.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
     }
 
     {
@@ -68,8 +68,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields is AVector[Val](Val.U256(U256.Zero))
-      contract.mutFields is AVector[Val](Val.U256(U256.One))
+      contract.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
+      contract.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.One)))
     }
 
     {
@@ -92,7 +92,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields is AVector[Val](Val.U256(U256.Zero))
+      contract.immFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
       contract.mutFields.isEmpty is true
     }
 
@@ -115,7 +115,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens is AVector(TokenId.alph -> ALPH.alph(1))
-      contract.immFields is AVector[Val](Val.U256(U256.Zero))
+      contract.immFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
       contract.mutFields.isEmpty is true
     }
 
@@ -146,8 +146,16 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields is AVector[Val](Val.False, Val.True, Val.U256(U256.Two), Val.False)
-      contract.mutFields is AVector[Val](Val.U256(U256.Zero), Val.U256(U256.One))
+      contract.immFields is AVector[(String, Val)](
+        ("bars[0].b", Val.False),
+        ("bars[1].b", Val.True),
+        ("bar1.a", Val.U256(U256.Two)),
+        ("bar1.b", Val.False)
+      )
+      contract.mutFields is AVector[(String, Val)](
+        ("bars[0].a", Val.U256(U256.Zero)),
+        ("bars[1].a", Val.U256(U256.One))
+      )
     }
 
     {
@@ -179,19 +187,19 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       test.before.length is 3
 
       val bar0 = test.before(0)
-      bar0.immFields is AVector[Val](Val.U256(U256.unsafe(10)))
+      bar0.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(10))))
       bar0.mutFields.isEmpty is true
 
       val bar1 = test.before(1)
-      bar1.immFields is AVector[Val](Val.U256(U256.unsafe(20)))
+      bar1.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(20))))
       bar1.mutFields.isEmpty is true
 
       val contract = test.before(2)
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields is AVector[Val](
-        Val.ByteVec(bar0.contractId.bytes),
-        Val.ByteVec(bar1.contractId.bytes)
+      contract.immFields is AVector[(String, Val)](
+        ("bar0", Val.ByteVec(bar0.contractId.bytes)),
+        ("bar1", Val.ByteVec(bar1.contractId.bytes))
       )
       contract.mutFields.isEmpty is true
     }
@@ -221,11 +229,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       contracts.length is 2
       val bar = contracts.head
       bar.typeId is Ast.TypeId("Bar")
-      bar.immFields is AVector[Val](Val.U256(U256.Zero))
+      bar.immFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
       bar.mutFields.isEmpty is true
       val foo = contracts.last
       foo.typeId is Ast.TypeId("Foo")
-      foo.immFields is AVector[Val](Val.ByteVec(bar.contractId.bytes))
+      foo.immFields is AVector[(String, Val)](("bar", Val.ByteVec(bar.contractId.bytes)))
       foo.mutFields.isEmpty is true
     }
 
@@ -269,7 +277,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         contract.typeId is Ast.TypeId("Foo")
         contract.tokens.isEmpty is true
         contract.immFields.isEmpty is true
-        contract.mutFields is AVector[Val](Val.U256(U256.unsafe(index)))
+        contract.mutFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(index))))
       }
     }
 
@@ -387,13 +395,17 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val tests       = compileContractFull(code).rightValue.tests
       val barContract = tests.tests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
-      barContract.immFields is AVector[Val](
-        Val.U256(0),
-        Val.U256(0),
-        Val.ByteVec(ContractId.zero.bytes),
-        Val.U256(10)
+      barContract.immFields is AVector[(String, Val)](
+        ("foos[0].b", Val.U256(0)),
+        ("foos[1].b", Val.U256(0)),
+        ("baz", Val.ByteVec(ContractId.zero.bytes)),
+        ("a", Val.U256(10))
       )
-      barContract.mutFields is AVector[Val](Val.U256(0), Val.U256(0), Val.U256(20))
+      barContract.mutFields is AVector[(String, Val)](
+        ("foos[0].a", Val.U256(0)),
+        ("foos[1].a", Val.U256(0)),
+        ("b", Val.U256(20))
+      )
     }
 
     {
@@ -425,14 +437,14 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       fooTests.length is 1
       val fooContract = fooTests.head.before.head
       fooContract.typeId is Ast.TypeId("Foo")
-      fooContract.immFields is AVector[Val](Val.U256(20), Val.U256(10))
-      fooContract.mutFields is AVector[Val](Val.False)
+      fooContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
+      fooContract.mutFields is AVector[(String, Val)](("c", Val.False))
 
       val barTests = contracts(1).tests.tests
       barTests.length is 1
       val barContract = barTests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
-      barContract.immFields is AVector[Val](Val.U256(20), Val.U256(10))
+      fooContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
       barContract.mutFields.isEmpty is true
     }
   }
@@ -462,12 +474,12 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     val contract    = compileContractFull(code).rightValue
     val tests       = contract.tests
     val sourceIndex = contract.ast.unitTests.head.tests.head.body.head.sourceIndex
-    tests.getError("foo", None, "error", None) is CompilerError.TestError(
+    tests.getError("foo", None, "error", "") is CompilerError.TestError(
       "Test failed: foo, detail: error",
       None,
       None
     )
-    tests.getError("foo", Some(tests.errorCodes.keys.head), "error", None) is CompilerError
+    tests.getError("foo", Some(tests.errorCodes.keys.head), "error", "") is CompilerError
       .TestError(
         "Test failed: foo, detail: error",
         sourceIndex,
@@ -486,5 +498,105 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |}
          |""".stripMargin
     testContractError(code, "Please use `testCheck!` instead of `assert!` in unit tests")
+  }
+
+  it should "throw an error if the contract id is invalid" in {
+    def code(stat: String) =
+      s"""
+         |Contract Foo(bar: Bar) {
+         |  pub fn foo() -> () { bar.bar() }
+         |  test "foo"
+         |  before Bar(0)@barId Self(barId)
+         |  after $stat {
+         |    foo()
+         |  }
+         |}
+         |Contract Bar(mut v: U256) {
+         |  pub fn bar() -> () {
+         |    v += 1
+         |  }
+         |}
+         |""".stripMargin
+    testContractError(code(s"$$Bar(1)$$"), "Expect a contract id in after def")
+    testContractError(
+      code(s"Bar(1)@$$barId0$$"),
+      "Variable barId0 is not defined in the current scope or is used before being defined"
+    )
+    compileContract(code("Bar(1)@barId")).isRight is true
+  }
+
+  it should "check contract state after testing" in {
+    val tokenId = TokenId.random
+    val code =
+      s"""
+         |struct Bar {
+         |  a: [U256; 2],
+         |  mut b: U256
+         |}
+         |Contract Foo(@unused mut bars: [Bar; 2], @unused mut bar: Bar) {
+         |  pub fn foo() -> () {}
+         |  test "foo"
+         |  before Self([Bar { a: [0; 2], b: 0 }; 2], Bar { a: [0; 2], b: 0 })
+         |  after Self{ALPH: 1 alph, #${tokenId.toHexString}: 2 alph}([Bar { a: [0, 1], b: 2 }; 2], Bar { a: [2, 3], b: 4 })
+         |  {
+         |    foo()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractState = compileContractFull(code).rightValue.tests.tests.head.after.head
+    val immFields = AVector[Val](
+      Val.U256(U256.Zero),
+      Val.U256(U256.One),
+      Val.U256(U256.Zero),
+      Val.U256(U256.One),
+      Val.U256(U256.Two),
+      Val.U256(U256.unsafe(3))
+    )
+    val mutFields = AVector[Val](Val.U256(U256.Two), Val.U256(U256.Two), Val.U256(U256.unsafe(4)))
+    val contractOutput = ContractOutput(
+      ALPH.oneAlph,
+      LockupScript.p2c(contractState.contractId),
+      AVector((tokenId, ALPH.alph(2)))
+    )
+    Testing.checkContractState(contractState, immFields, mutFields, contractOutput) isE ()
+
+    val invalidImmFields = Seq(
+      (0, Val.U256(U256.One), "invalid field bars[0].a[0], expected U256(0), have: U256(1)"),
+      (3, Val.U256(U256.Zero), "invalid field bars[1].a[1], expected U256(1), have: U256(0)"),
+      (4, Val.U256(U256.Zero), "invalid field bar.a[0], expected U256(2), have: U256(0)")
+    )
+    invalidImmFields.foreach { case (index, value, error) =>
+      val fields = immFields.replace(index, value)
+      Testing
+        .checkContractState(contractState, fields, mutFields, contractOutput)
+        .leftValue is error
+    }
+
+    val invalidMutFields = Seq(
+      (0, Val.U256(U256.One), "invalid field bars[0].b, expected U256(2), have: U256(1)"),
+      (1, Val.U256(U256.Zero), "invalid field bars[1].b, expected U256(2), have: U256(0)"),
+      (2, Val.U256(U256.Zero), "invalid field bar.b, expected U256(4), have: U256(0)")
+    )
+    invalidMutFields.foreach { case (index, value, error) =>
+      val fields = mutFields.replace(index, value)
+      Testing
+        .checkContractState(contractState, immFields, fields, contractOutput)
+        .leftValue is error
+    }
+
+    val invalidOutputs = Seq(
+      (
+        contractOutput.copy(amount = ALPH.alph(2)),
+        s"invalid token amount, token id: ${TokenId.alph.toHexString}, expected: 1000000000000000000, have: 2000000000000000000"
+      ),
+      (
+        contractOutput.copy(tokens = AVector((tokenId, ALPH.oneAlph))),
+        s"invalid token amount, token id: ${tokenId.toHexString}, expected: 2000000000000000000, have: 1000000000000000000"
+      )
+    )
+    invalidOutputs.foreach { case (output, error) =>
+      Testing.checkContractState(contractState, immFields, mutFields, output).leftValue is error
+    }
   }
 }

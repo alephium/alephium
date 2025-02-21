@@ -1914,8 +1914,8 @@ class ServerUtils(implicit
         worldState,
         c.contractId,
         contractCode,
-        c.immFields,
-        c.mutFields,
+        c.immFields.map(_._2),
+        c.mutFields.map(_._2),
         AssetState.forTesting(c.tokens),
         blockHash,
         txId
@@ -1938,8 +1938,33 @@ class ServerUtils(implicit
     }
     val detail = s"VM execution error: $msg"
     testingContract.tests
-      .getError(testName, errorCode, detail, Option.when(debugMessages.nonEmpty)(debugMessages))
+      .getError(testName, errorCode, detail, debugMessages)
       .format(sourceCode)
+  }
+
+  private def checkStateAfterTesting(
+      worldState: WorldState.Staging,
+      sourceCode: String,
+      test: Testing.CompiledUnitTest[StatefulContext]
+  ): Try[Unit] = {
+    val events = fetchContractEvents(worldState)
+    extractDebugMessages(events).flatMap { case (_, messages) =>
+      test.after.foreachWithIndexE { case (contract, index) =>
+        for {
+          state <- wrapResult(worldState.getContractState(contract.contractId))
+          asset <- wrapResult(worldState.getContractAsset(contract.contractId))
+          _ <- Testing
+            .checkContractState(contract, state.immFields, state.mutFields, asset)
+            .left
+            .map { detail =>
+              val sourceIndex     = test.ast.after.defs(index).sourceIndex
+              val debugMessageStr = showDebugMessages(messages)
+              val error = Testing.getTestError(test.name, sourceIndex, detail, debugMessageStr)
+              failed(error.format(sourceCode))
+            }
+        } yield ()
+      }
+    }
   }
 
   private def runTests(
@@ -1979,6 +2004,7 @@ class ServerUtils(implicit
             (exeFailure, debugMessages) =>
               getUnitTestError(sourceCode, testingContract, test.name, exeFailure, debugMessages)
           )
+          _ <- checkStateAfterTesting(worldState, sourceCode, test)
         } yield ()
       }
     }
