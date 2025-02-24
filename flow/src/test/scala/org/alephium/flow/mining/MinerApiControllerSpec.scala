@@ -158,6 +158,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       .put(cacheKey, newTemplate -> serialize(newTemplate.transactions))
 
     blockRejected(newBlock, newBlockBlob, "The mined block has invalid chainindex:")
+    minerApiController.underlyingActor.jobCache.contains(cacheKey) is true
   }
 
   it should "error when the mined block has invalid work" in new SubmissionFixture {
@@ -170,6 +171,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       .put(cacheKey, newTemplate -> serialize(newTemplate.transactions))
 
     blockRejected(newBlock, newBlockBlob, "The mined block has invalid work:")
+    minerApiController.underlyingActor.jobCache.contains(cacheKey) is true
   }
 
   it should "error when the protocol version is invalid" in new SubmissionFixture {
@@ -226,6 +228,20 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val reMinedBlock = reMine(blockFlow, chainIndex, newBlock)
     val blockBlob    = serialize(reMinedBlock.copy(transactions = AVector.empty))
     blockAccepted(reMinedBlock, blockBlob)
+  }
+
+  it should "remove the job from cache once the block has been submitted" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    minerApiController.underlyingActor.jobCache
+      .put(cacheKey, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+
+    val blockBlob = serialize(block.copy(transactions = AVector.empty))
+    blockAccepted(block, blockBlob)
+    eventually(minerApiController.underlyingActor.jobCache.contains(cacheKey) is false)
+
+    val reMinedBlock     = reMine(blockFlow, chainIndex, block)
+    val reMinedBlockBlob = serialize(reMinedBlock.copy(transactions = AVector.empty))
+    blockRejected(reMinedBlock, reMinedBlockBlob, "The job for the block is expired")
   }
 
   trait ConnectionFixture extends Fixture {

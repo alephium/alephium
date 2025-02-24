@@ -90,20 +90,15 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
 
     p2pVersionOpt match {
       case Some(p2pVersion) =>
-        if (networkSetting.networkId == NetworkId.AlephiumTestNet && p2pVersion != P2PV2) {
-          log.warning("Testnet nodes can only connect to v2 nodes")
-          stop(MisbehaviorManager.InvalidP2PVersionOnTestnet(remoteAddress))
-        } else {
-          remoteP2PVersion = p2pVersion
-          handleHandshakeInfo(
-            BrokerInfo.from(remoteAddress, hello.brokerInfo),
-            hello.clientId,
-            p2pVersion
-          )
-          p2pVersion match {
-            case P2PV1 => context become (exchangingV1 orElse pingPong)
-            case P2PV2 => context become (exchangingV2 orElse pingPong)
-          }
+        remoteP2PVersion = p2pVersion
+        handleHandshakeInfo(
+          BrokerInfo.from(remoteAddress, hello.brokerInfo),
+          hello.clientId,
+          p2pVersion
+        )
+        p2pVersion match {
+          case P2PV1 => context become (exchangingV1 orElse pingPong)
+          case P2PV2 => context become (exchangingV2 orElse pingPong)
         }
       case None => handleInvalidClientId(hello.clientId)
     }

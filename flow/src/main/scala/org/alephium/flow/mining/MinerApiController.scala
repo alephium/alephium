@@ -177,7 +177,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
       val blockHash = PoW.hash(header)
       val headerKey = header.drop(Nonce.byteLength)
-      jobCache.get(MinerApiController.getCacheKey(headerKey)) match {
+      val cacheKey  = MinerApiController.getCacheKey(headerKey)
+      jobCache.get(cacheKey) match {
         case Some((template, txBlob)) =>
           val blockBytes = header ++ txBlob
           if (ChainIndex.from(blockHash) != template.index) {
@@ -195,6 +196,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
             log.info(
               s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
             )
+            jobCache.remove(cacheKey)
+            ()
           }
         case None =>
           sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
