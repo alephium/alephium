@@ -196,6 +196,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     storage.conflictedTxsReversedIndex.getUnsafe(block1.hash) is AVector(
       nodeindexes.ConflictedTxsSource(block2.hash, AVector(conflictedTx.id))
     )
+    storage.conflictedTxsPerIntraBlock.getUnsafe(block2.hash) is AVector(
+      nodeindexes.ConflictedTxsPerBlock(block1.hash, AVector(conflictedTx.id))
+    )
   }
 
   it should "ignore conflicted txs when updating state since danube" in new DanubeConflictedTxsFixture {

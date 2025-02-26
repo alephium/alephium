@@ -326,7 +326,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "only update the best deps if the danube upgrade will not be activated for a long time" in new Fixture {
+  it should "only update the best deps if the danube upgrade will not be activated soon" in new Fixture {
     val now = TimeStamp.now()
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.rhone-hard-fork-timestamp", now.millis),
