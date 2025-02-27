@@ -262,7 +262,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
   it should "update best deps after receiving BestDepsUpdated event" in new UpdateBestDepsFixture {
     viewHandler.underlyingActor.updatingBestViewCount = 2
     viewHandler.underlyingActor.updatingBestDeps = true
-    viewHandler ! ViewHandler.BestDepsUpdated
+    viewHandler ! ViewHandler.BestDepsUpdatedPreDanube
     eventually {
       viewHandler.underlyingActor.updatingBestViewCount is 0
       viewHandler.underlyingActor.updatingBestDeps is false
@@ -273,7 +273,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
   it should "not update best deps after receiving BestDepsUpdateFailed event" in new UpdateBestDepsFixture {
     viewHandler.underlyingActor.updatingBestViewCount = 2
     viewHandler.underlyingActor.updatingBestDeps = true
-    viewHandler ! ViewHandler.BestDepsUpdateFailed
+    viewHandler ! ViewHandler.BestDepsUpdateFailedPreDanube
     eventually {
       viewHandler.underlyingActor.updatingBestViewCount is 2
       viewHandler.underlyingActor.updatingBestDeps is false
@@ -304,7 +304,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
   it should "not notify subscribers when the best view is updated since danube" in new DanubeFixture {
     setSynced()
     val probe = createSubscriber()
-    viewHandler ! ViewHandler.BestDepsUpdated
+    viewHandler ! ViewHandler.BestDepsUpdatedPreDanube
     eventually(probe.expectNoMessage())
   }
 

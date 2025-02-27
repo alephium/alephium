@@ -45,8 +45,8 @@ object ViewHandler {
   )
 
   sealed trait Command
-  case object BestDepsUpdated                                              extends Command
-  case object BestDepsUpdateFailed                                         extends Command
+  case object BestDepsUpdatedPreDanube                                     extends Command
+  case object BestDepsUpdateFailedPreDanube                                extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
   case object UpdateSubscribers                                            extends Command
@@ -117,13 +117,13 @@ class ViewHandler(
       if (hardFork.isDanubeEnabled()) {
         onFlowDataDanube(data.chainIndex)
       }
-    case ViewHandler.BestDepsUpdated =>
+    case ViewHandler.BestDepsUpdatedPreDanube =>
       updatingBestDeps = false
       updateSubscribers()
       if (isNodeSynced) {
         tryUpdateBestViewPreDanube()
       }
-    case ViewHandler.BestDepsUpdateFailed =>
+    case ViewHandler.BestDepsUpdateFailedPreDanube =>
       updatingBestDeps = false
       log.warning("Updating blockflow deps failed")
 
@@ -268,8 +268,8 @@ trait BlockFlowUpdaterState extends IOBaseActor {
           blockFlow.updateBestDeps()
         }
         updateResult match {
-          case Left(_)  => ViewHandler.BestDepsUpdateFailed
-          case Right(_) => ViewHandler.BestDepsUpdated
+          case Left(_)  => ViewHandler.BestDepsUpdateFailedPreDanube
+          case Right(_) => ViewHandler.BestDepsUpdatedPreDanube
         }
       }.pipeTo(self)
       ()
