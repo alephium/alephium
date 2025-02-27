@@ -3865,9 +3865,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     // TODO: improve the calculation of bestDeps to get rid of the following line
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
-    // remove the cross-group tx from mempool
-    prepareTemplate(blockFlow, hardFork, ChainIndex.unsafe(0, 0))
-    blockFlow.getGrandPool().get(blockTx.id).isEmpty is true
+    blockFlow.getMemPool(GroupIndex.unsafe(1)).contains(blockTx.id) is false
 
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))

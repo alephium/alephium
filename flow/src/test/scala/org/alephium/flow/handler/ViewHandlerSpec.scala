@@ -157,12 +157,12 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     probe1.send(viewHandler, ViewHandler.Subscribe)
     eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref))
 
-    viewHandler.underlyingActor.updateSubscribers(HardFork.Rhone, None)
+    viewHandler.underlyingActor.updateSubscribers()
     eventually(probe0.expectNoMessage())
     eventually(probe1.expectNoMessage())
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
-    viewHandler.underlyingActor.updateSubscribers(HardFork.Rhone, None)
+    viewHandler.underlyingActor.updateSubscribers()
     eventually(probe0.expectMsgType[ViewHandler.NewTemplates])
     eventually(probe1.expectMsgType[ViewHandler.NewTemplates])
 
@@ -365,6 +365,21 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     eventually {
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
       blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "update mempool properly since danube" in new DanubeFixture {
+    setSynced()
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+    val block = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck0(blockFlow, block)
+    blockFlow.getMemPool(chainIndex.from).contains(tx.id) is true
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getMemPool(chainIndex.from).contains(tx.id) is false
     }
   }
 }

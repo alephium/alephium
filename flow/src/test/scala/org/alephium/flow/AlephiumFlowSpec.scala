@@ -706,13 +706,13 @@ trait FlowFixture
     val blockValidation = BlockValidation.build(blockFlow)
     val sideResult      = blockValidation.validate(block, blockFlow).rightValue
     blockFlow.addAndUpdateView(block, sideResult).rightValue
-    val hardFork = networkConfig.getHardFork(block.timestamp)
-    prepareTemplate(blockFlow, hardFork, block.chainIndex)
   }
 
   def addAndCheck(blockFlow: BlockFlow, blocks: Block*): Unit = {
     blocks.foreach { block =>
       addAndCheck0(blockFlow, block)
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      updateMemPool(blockFlow, hardFork, block.chainIndex)
       checkOutputs(blockFlow, block)
     }
   }
@@ -1102,10 +1102,9 @@ trait FlowFixture
     }
   }
 
-  def prepareTemplate(blockFlow: BlockFlow, hardFork: HardFork, chainIndex: ChainIndex): Unit = {
+  def updateMemPool(blockFlow: BlockFlow, hardFork: HardFork, chainIndex: ChainIndex): Unit = {
     if (hardFork.isDanubeEnabled() && blockFlow.brokerConfig.contains(chainIndex.from)) {
-      val miner = getGenesisLockupScript(chainIndex.to)
-      val _     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      blockFlow.updateMemPoolDanube(chainIndex).rightValue
     }
   }
 }

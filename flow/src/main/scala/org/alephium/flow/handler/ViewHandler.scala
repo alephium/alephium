@@ -115,26 +115,21 @@ class ViewHandler(
         tryUpdateBestView(hardFork)
       }
       if (hardFork.isDanubeEnabled()) {
-        updateSubscribers(hardFork, Some(data.chainIndex))
+        onFlowDataDanube(data.chainIndex)
       }
     case ViewHandler.BestDepsUpdated =>
       updatingBestDeps = false
-      val hardFork = getHardForkNow()
-      // If Danube is not enabled, we update the subscribers
-      // If Danube is enabled, we don't need to update the subscribers, as it's done when the data event is received
-      if (!hardFork.isDanubeEnabled()) { updateSubscribers(hardFork, None) }
+      updateSubscribers()
       if (isNodeSynced) {
-        tryUpdateBestView(hardFork)
+        tryUpdateBestViewPreDanube()
       }
     case ViewHandler.BestDepsUpdateFailed =>
       updatingBestDeps = false
       log.warning("Updating blockflow deps failed")
 
-    case ViewHandler.Subscribe   => subscribe()
-    case ViewHandler.Unsubscribe => unsubscribe()
-    case ViewHandler.UpdateSubscribers =>
-      updateSubscribers(getHardForkNow(), None)
-
+    case ViewHandler.Subscribe         => subscribe()
+    case ViewHandler.Unsubscribe       => unsubscribe()
+    case ViewHandler.UpdateSubscribers => updateSubscribers()
     case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
@@ -165,7 +160,7 @@ trait ViewHandlerState extends IOBaseActor {
       minerAddressesOpt match {
         case Some(_) =>
           subscribers.addOne(sender())
-          updateSubscribers(getHardForkNow(), None)
+          updateSubscribers()
           scheduleUpdate()
           sender() ! ViewHandler.SubscribeResult(true)
         case None =>
@@ -198,30 +193,48 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def updateSubscribers(hardFork: HardFork, chainIndexOpt: Option[ChainIndex]): Unit = {
+  private def withNodeSynced(func: => Unit): Unit = {
     if (isNodeSynced) {
-      if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
-        val minerAddresses = minerAddressesOpt.get
-        if (hardFork.isDanubeEnabled() && chainIndexOpt.nonEmpty) {
-          val chainIndex = chainIndexOpt.get
-          if (brokerConfig.contains(chainIndex.from)) {
-            escapeIOError(
-              ViewHandler.prepareTemplate(blockFlow, chainIndex, minerAddresses)
-            ) { template =>
-              subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
-            }
-          }
-        } else {
-          escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-            subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
-          }
-        }
-        scheduleUpdate()
-      }
+      func
     } else if (subscribers.nonEmpty) {
       log.warning(s"The node is not synced, unsubscribe all actors")
       subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def onFlowDataDanube(chainIndex: ChainIndex): Unit = {
+    withNodeSynced {
+      if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
+        val minerAddresses = minerAddressesOpt.get
+        if (brokerConfig.contains(chainIndex.from)) {
+          escapeIOError(
+            ViewHandler.prepareTemplate(blockFlow, chainIndex, minerAddresses)
+          ) { template =>
+            subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+          }
+        }
+        scheduleUpdate()
+      } else {
+        IOUtils.tryExecute(blockFlow.updateMemPoolDanubeUnsafe(chainIndex)) match {
+          case Left(error) =>
+            log.error(s"Failed to update mempool, chain index: $chainIndex, error: $error")
+          case Right(_) =>
+        }
+      }
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def updateSubscribers(): Unit = {
+    withNodeSynced {
+      if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
+        val minerAddresses = minerAddressesOpt.get
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+        }
+        scheduleUpdate()
+      }
     }
   }
 

@@ -214,7 +214,7 @@ object TxHandler {
               _ <- blockFlow.updateBestDeps()
               _ <- blockFlow.updateBestFlowSkeleton()
               // remove txs from mempool
-              _ <- blockFlow.prepareBlockFlow(block.chainIndex, block.minerLockupScript)
+              _ <- blockFlow.updateMemPoolDanube(block.chainIndex)
             } yield ()
             result.left.map(_.getMessage)
         }

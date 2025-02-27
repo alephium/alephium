@@ -268,15 +268,24 @@ trait FlowUtils
   }
 
   private val lastBlockDepss: Array[Option[BlockDeps]] = Array.fill(brokerConfig.chainNum)(None)
+  def updateMemPoolDanubeUnsafe(chainIndex: ChainIndex): Unit = {
+    val newDeps      = calBestFlowPerChainIndex(chainIndex)
+    val flattenIndex = chainIndex.flattenIndex
+    lastBlockDepss(flattenIndex).foreach { oldDeps =>
+      updateMemPoolUnsafe(chainIndex.from, newDeps, oldDeps)
+    }
+    lastBlockDepss(flattenIndex) = Some(newDeps)
+  }
+
+  def updateMemPoolDanube(chainIndex: ChainIndex): IOResult[Unit] = {
+    IOUtils.tryExecute(updateMemPoolDanubeUnsafe(chainIndex))
+  }
+
   def findBestDepsForNewBlockUnsafe(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
     if (hardfork.isDanubeEnabled()) {
-      val newDeps      = calBestFlowPerChainIndex(chainIndex)
+      updateMemPoolDanubeUnsafe(chainIndex)
       val flattenIndex = chainIndex.flattenIndex
-      lastBlockDepss(flattenIndex).foreach { oldDeps =>
-        updateMemPoolUnsafe(chainIndex.from, newDeps, oldDeps)
-      }
-      lastBlockDepss(flattenIndex) = Some(newDeps)
-      newDeps
+      lastBlockDepss(flattenIndex).getOrElse(calBestFlowPerChainIndex(chainIndex))
     } else {
       getBestDeps(chainIndex.from)
     }
