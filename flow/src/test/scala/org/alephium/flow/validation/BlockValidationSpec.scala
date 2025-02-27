@@ -1500,12 +1500,30 @@ class BlockValidationSpec extends AlephiumSpec {
     newBlock(randomMiner).pass()
   }
 
-  it should "allow conflicted txs since danube" in new Fixture {
+  trait ConflictedTxsFixture extends Fixture {
+    lazy val fromGroup = brokerConfig.randomGroupIndex()
+    lazy val toGroup0  = GroupIndex.unsafe((fromGroup.value + 1) % brokerConfig.groups)
+    lazy val toGroup1  = GroupIndex.unsafe((toGroup0.value + 1) % brokerConfig.groups)
+    lazy val block0    = transfer(blockFlow, ChainIndex(fromGroup, toGroup0))
+    lazy val block1 = {
+      val block = transfer(blockFlow, ChainIndex(fromGroup, toGroup1))
+      addAndCheck(blockFlow, block0)
+      mineWithTxs(blockFlow, ChainIndex(fromGroup, toGroup1), block.nonCoinbase)
+    }
+  }
+
+  it should "disallow conflicted txs before danube" in new ConflictedTxsFixture {
+    setHardForkBefore(HardFork.Danube)
+    validate(block0, blockFlow).isRight is true
+    blockFlow.getCache(block0).blockCache.contains(block0.hash) is true
+    validate(block1, blockFlow).leftValue is Right(InvalidFlowTxs)
+  }
+
+  it should "allow conflicted txs since danube" in new ConflictedTxsFixture {
     setHardForkSince(HardFork.Danube)
-    val block = transfer(blockFlow, chainIndex)
-    validate(block, blockFlow).isRight is true
-    blockFlow.getCache(block).blockCache.contains(block.hash) is false
-    blockFlow.getCache(block).add(block)
-    validate(block, blockFlow).isRight is true
+    validate(block0, blockFlow).isRight is true
+    blockFlow.getCache(block0).blockCache.contains(block0.hash) is false
+    blockFlow.getCache(block0).add(block0)
+    validate(block1, blockFlow).isRight is true
   }
 }

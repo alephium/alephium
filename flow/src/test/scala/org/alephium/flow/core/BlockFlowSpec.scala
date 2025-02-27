@@ -1103,6 +1103,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val (_, blockAtH1C0) = mineTwoBlocksAndAdd(chainIndex0)
 
     val chainIndex1 = ChainIndex(groupIndex1, groupIndex0)
+    chainIndex1.isIntraGroup is false
     val block0      = mineBlockWithDep(chainIndex1, blockAtH1C0.hash)
     val block1      = emptyBlock(blockFlow, chainIndex1)
     val blockAtH2C0 = emptyBlock(blockFlow, chainIndex0)
@@ -1122,9 +1123,18 @@ class BlockFlowSpec extends AlephiumSpec {
     blockDeps.contains(block1.hash) is false
 
     val chainIndex2 = ChainIndex(groupIndex1, groupIndex2)
-    val block3      = emptyBlock(blockFlow, chainIndex2)
+    chainIndex2.isIntraGroup is false
+    val block3 = emptyBlock(blockFlow, chainIndex2)
     addAndCheck(blockFlow, block3)
     blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block3.hash) is false
+  }
+
+  it should "update conflicted blocks cache before danube" in new FlowFixture with Generators {
+    setHardForkBefore(HardFork.Danube)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    blockFlow.getCache(block).blockCache.contains(block.hash) is true
   }
 
   it should "not update conflicted blocks cache since danube" in new FlowFixture with Generators {

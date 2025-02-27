@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.FlowFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.nodeindexes
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
 class BlockFlowStateSpec extends AlephiumSpec {
@@ -164,6 +165,16 @@ class BlockFlowStateSpec extends AlephiumSpec {
     block2.blockDeps.deps.contains(block1.hash) is true
     addAndCheck(blockFlow, block2)
 
+    private val worldState = blockFlow.getBestPersistedWorldState(chainIndex0.from).rightValue
+    block0.nonCoinbase.foreach(_.fixedOutputRefs.foreach(ref => {
+      if (ref.fromGroup == chainIndex0.from) {
+        worldState.existOutput(ref) isE true
+      } else {
+        worldState.existOutput(ref) isE false
+      }
+    }))
+    block1.nonCoinbase.foreach(_.outputRefs.foreach(worldState.existOutput(_) isE false))
+
     val block3 = transfer(blockFlow, ChainIndex.unsafe(0, 1), nextBlockTs)
     val block4 = transfer(blockFlow, ChainIndex.unsafe(0, 2), nextBlockTs)
     addAndCheck(blockFlow, block3, block4)
@@ -200,7 +211,9 @@ class BlockFlowStateSpec extends AlephiumSpec {
     val conflictedTxsStorage1 =
       worldState.nodeIndexesStorage.conflictedTxsStorage.conflictedTxsReversedIndex
     conflictedTxsStorage1.exists(block3.hash) isE false
-    conflictedTxsStorage1.exists(block4.hash) isE true
+    conflictedTxsStorage1.getUnsafe(block4.hash) is AVector(
+      nodeindexes.ConflictedTxsSource(block5.hash, AVector(block4.nonCoinbase.head.id))
+    )
   }
 
   it should "get correct immutable group view since danube" in new DanubeGroupViewFixture {
