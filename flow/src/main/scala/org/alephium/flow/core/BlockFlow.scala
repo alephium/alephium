@@ -368,7 +368,7 @@ object BlockFlow extends StrictLogging {
         toTry: AVector[BlockHash]
     ): BlockFlowSkeleton = {
       var updatedFlow: Option[BlockFlowSkeleton] = None
-      toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
+      toTry.sorted(blockHashOrdering.reverse).foreach { tip =>
         if (updatedFlow.isEmpty) {
           tryExtendBlockFlowSkeletonUnsafe(flow, group, tip).foreach { extendedFlow =>
             updatedFlow = Some(extendedFlow)
@@ -397,7 +397,7 @@ object BlockFlow extends StrictLogging {
       val chain       = getHashChain(chainIndex)
       val targetGroup = chainIndex.from
       val toTry       = chain.getAllTips
-      toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
+      toTry.sorted(blockHashOrdering.reverse).foreach { tip =>
         if (
           updatedFlow.isEmpty && tip != currentChainTip && isExtendingUnsafe(tip, currentChainTip)
         ) {

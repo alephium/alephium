@@ -670,15 +670,13 @@ class FlowUtilsSpec extends AlephiumSpec {
     lazy val chainIndex = ChainIndex.unsafe(1, 2)
     def prepare(): BlockHash = {
       val block0 = emptyBlock(blockFlow, chainIndex)
-      val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1))
-      addAndCheck(blockFlow, block1)
-      val block2 = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block0, block2)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block0, block1)
 
       blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
       val blockHashes = blockFlow.getHashes(chainIndex, 1).rightValue
-      blockHashes.toSet is Set(block0.hash, block2.hash)
-      block0.hash
+      blockHashes.toSet is Set(block0.hash, block1.hash)
+      blockHashes.last
     }
   }
 

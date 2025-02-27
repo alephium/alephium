@@ -1040,18 +1040,16 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate block if uncles' parent is not from mainchain" in new SinceRhoneFixture {
-    // Since the danube upgrade, when extending the deps, the tip order is not determined
-    // if the weights are the same. So we designate `blocks0` as the main chain,
-    // which will not affect the test
-    val (blocks0, blocks1) = (mineChain(5), mineChain(4))
+    val (blocks0, blocks1) = (mineChain(4), mineChain(4))
     addAndCheck(blockFlow, blocks0.toSeq: _*)
     addAndCheck(blockFlow, blocks1.toSeq: _*)
+    val hashes = blockFlow.getHashes(chainIndex, 3).rightValue
+    hashes.length is 2
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is 1
-    blockTemplate.height is 6
-    blockTemplate.ghostUncleHashes is AVector(blocks1.head.hash)
-    val ghostUncleHashes = blockTemplate.ghostUncleHashes :+ blocks1.last.hash
+    blockTemplate.height is 5
+    val ghostUncleHashes = blockTemplate.ghostUncleHashes ++ hashes.tail
     val block = mine(
       blockFlow,
       blockTemplate.setGhostUncles(ghostUncleHashes.map(hash => SelectedGhostUncle(hash, miner, 1)))
