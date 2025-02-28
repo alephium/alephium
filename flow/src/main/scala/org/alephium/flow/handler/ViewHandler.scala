@@ -47,6 +47,8 @@ object ViewHandler {
   sealed trait Command
   case object BestDepsUpdatedPreDanube                                     extends Command
   case object BestDepsUpdateFailedPreDanube                                extends Command
+  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex)           extends Command
+  final case class BestDepsUpdateFailedDanube(chainIndex: ChainIndex)      extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
   case object UpdateSubscribers                                            extends Command
@@ -77,16 +79,6 @@ object ViewHandler {
         }
       }
     }
-
-  def prepareTemplate(
-      blockFlow: BlockFlow,
-      chainIndex: ChainIndex,
-      minerAddresses: AVector[LockupScript.Asset]
-  ): IOResult[BlockFlowTemplate] = {
-    IOUtils.tryExecute {
-      blockFlow.prepareBlockFlowUnsafe(chainIndex, minerAddresses(chainIndex.to.value))
-    }
-  }
 }
 
 class ViewHandler(
@@ -96,14 +88,17 @@ class ViewHandler(
     val brokerConfig: BrokerConfig,
     val miningSetting: MiningSetting
 ) extends ViewHandlerState
-    with BlockFlowUpdaterState
+    with BlockFlowUpdaterPreDanubeState
+    with BlockFlowUpdaterDanubeState
     with Subscriber
     with Publisher
     with InterCliqueManager.NodeSyncStatus {
   subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
 
-  override def receive: Receive = handle orElse updateNodeSyncStatus
+  override def receive: Receive                   = handle orElse updateNodeSyncStatus
+  implicit def executionContext: ExecutionContext = context.dispatcher
 
+  // scalastyle:off cyclomatic.complexity
   def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, _) =>
       val hardFork = getHardForkNow()
@@ -111,21 +106,26 @@ class ViewHandler(
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
       if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
-        updatingBestViewCount += 1
-        tryUpdateBestView(hardFork)
-      }
-      if (hardFork.isDanubeEnabled()) {
-        onFlowDataDanube(data.chainIndex)
+        tryUpdateBestView(hardFork, data.chainIndex)
       }
     case ViewHandler.BestDepsUpdatedPreDanube =>
-      updatingBestDeps = false
+      preDanubeUpdateState.setCompleted()
       updateSubscribers()
       if (isNodeSynced) {
         tryUpdateBestViewPreDanube()
       }
     case ViewHandler.BestDepsUpdateFailedPreDanube =>
-      updatingBestDeps = false
-      log.warning("Updating blockflow deps failed")
+      preDanubeUpdateState.setCompleted()
+      log.warning("Updating pre-danube blockflow deps failed")
+
+    case ViewHandler.BestDepsUpdatedDanube(chainIndex) =>
+      setDanubeUpdateCompleted(chainIndex)
+      if (isNodeSynced) {
+        tryUpdateBestViewDanube(chainIndex)
+      }
+    case ViewHandler.BestDepsUpdateFailedDanube(chainIndex) =>
+      setDanubeUpdateCompleted(chainIndex)
+      log.warning("Updating danube blockflow deps failed")
 
     case ViewHandler.Subscribe         => subscribe()
     case ViewHandler.Unsubscribe       => unsubscribe()
@@ -136,6 +136,17 @@ class ViewHandler(
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
+  }
+  // scalastyle:on cyclomatic.complexity
+
+  def tryUpdateBestView(hardForkNow: HardFork, chainIndex: ChainIndex): Unit = {
+    if (hardForkNow.isDanubeEnabled()) {
+      requestDanubeUpdate(chainIndex)
+      tryUpdateBestViewDanube(chainIndex)
+    } else {
+      preDanubeUpdateState.requestUpdate()
+      tryUpdateBestViewPreDanube()
+    }
   }
 }
 
@@ -193,41 +204,9 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
-  private def withNodeSynced(func: => Unit): Unit = {
-    if (isNodeSynced) {
-      func
-    } else if (subscribers.nonEmpty) {
-      log.warning(s"The node is not synced, unsubscribe all actors")
-      subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def onFlowDataDanube(chainIndex: ChainIndex): Unit = {
-    withNodeSynced {
-      if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
-        val minerAddresses = minerAddressesOpt.get
-        if (brokerConfig.contains(chainIndex.from)) {
-          escapeIOError(
-            ViewHandler.prepareTemplate(blockFlow, chainIndex, minerAddresses)
-          ) { template =>
-            subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
-          }
-        }
-        scheduleUpdate()
-      } else {
-        IOUtils.tryExecute(blockFlow.updateMemPoolDanubeUnsafe(chainIndex)) match {
-          case Left(error) =>
-            log.error(s"Failed to update mempool, chain index: $chainIndex, error: $error")
-          case Right(_) =>
-        }
-      }
-    }
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def updateSubscribers(): Unit = {
-    withNodeSynced {
+    if (isNodeSynced) {
       if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
         val minerAddresses = minerAddressesOpt.get
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
@@ -235,6 +214,9 @@ trait ViewHandlerState extends IOBaseActor {
         }
         scheduleUpdate()
       }
+    } else if (subscribers.nonEmpty) {
+      log.warning(s"The node is not synced, unsubscribe all actors")
+      subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
     }
   }
 
@@ -243,17 +225,14 @@ trait ViewHandlerState extends IOBaseActor {
   }
 }
 
-trait BlockFlowUpdaterState extends IOBaseActor {
+trait BlockFlowUpdaterPreDanubeState extends IOBaseActor {
   def blockFlow: BlockFlow
-  protected[handler] var updatingBestViewCount: Int = 0
-  protected[handler] var updatingBestDeps: Boolean  = false
+  protected[handler] val preDanubeUpdateState: AsyncUpdateState = AsyncUpdateState()
 
-  implicit def executionContext: ExecutionContext = context.dispatcher
+  implicit def executionContext: ExecutionContext
 
   def tryUpdateBestViewPreDanube(): Unit = {
-    if (updatingBestViewCount > 0 && !updatingBestDeps) {
-      updatingBestViewCount = 0
-      updatingBestDeps = true
+    if (preDanubeUpdateState.tryUpdate()) {
       Future[ViewHandler.Command] {
         val now          = TimeStamp.now()
         val hardForkSoon = blockFlow.networkConfig.getHardFork(now.plusSecondsUnsafe(10))
@@ -274,23 +253,88 @@ trait BlockFlowUpdaterState extends IOBaseActor {
       }.pipeTo(self)
       ()
     }
-    if (updatingBestDeps) {
-      log.debug("Skip updating best deps due to pending updates")
+    if (preDanubeUpdateState.isUpdating) {
+      log.debug("Skip updating pre-danube best deps due to pending updates")
+    }
+  }
+}
+
+trait BlockFlowUpdaterDanubeState extends IOBaseActor {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  implicit def executionContext: ExecutionContext
+  def minerAddressesOpt: Option[AVector[LockupScript.Asset]]
+  def subscribers: scala.collection.Seq[ActorRef]
+
+  protected[handler] val danubeUpdateStates: Array[AsyncUpdateState] =
+    Array.fill(brokerConfig.chainNum)(AsyncUpdateState())
+
+  def requestDanubeUpdate(chainIndex: ChainIndex): Unit = {
+    danubeUpdateStates(chainIndex.flattenIndex).requestUpdate()
+  }
+  def setDanubeUpdateCompleted(chainIndex: ChainIndex): Unit = {
+    danubeUpdateStates(chainIndex.flattenIndex).setCompleted()
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def tryUpdateBestViewDanube(chainIndex: ChainIndex): Unit = {
+    val statePerChain = danubeUpdateStates(chainIndex.flattenIndex)
+    if (statePerChain.tryUpdate()) {
+      val minerAddress   = minerAddressesOpt.map(_.apply(chainIndex.to.value))
+      val allSubscribers = AVector.from(subscribers)
+      Future[ViewHandler.Command] {
+        val result = for {
+          _ <- blockFlow.updateBestFlowSkeletonAndMemPool(chainIndex)
+          needToUpdate = brokerConfig.contains(chainIndex.from)
+          _ <-
+            if (needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty) {
+              updateBlockTemplate(chainIndex, minerAddress.get, allSubscribers)
+            } else {
+              Right(())
+            }
+        } yield ()
+        result match {
+          case Right(_) => ViewHandler.BestDepsUpdatedDanube(chainIndex)
+          case Left(error) =>
+            log.error(s"Failed to update best view: $error")
+            ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
+        }
+      }.pipeTo(self)
+    }
+    if (statePerChain.isUpdating) {
+      log.debug("Skip updating danube best deps due to pending updates")
     }
   }
 
-  def tryUpdateBestViewDanube(): Unit = {
-    blockFlow.updateBestFlowSkeleton() match {
-      case Left(error) => log.error(s"Failed to update best flow skeleton: $error")
-      case Right(_)    => ()
+  private def updateBlockTemplate(
+      chainIndex: ChainIndex,
+      minerAddress: LockupScript.Asset,
+      subscribers: AVector[ActorRef]
+  ): IOResult[Unit] = {
+    assume(minerAddress.groupIndex == chainIndex.to)
+    blockFlow.prepareBlockFlow(chainIndex, minerAddress).map { template =>
+      subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
     }
+  }
+}
+
+final class AsyncUpdateState(private var _requestCount: Int, private var _isUpdating: Boolean) {
+  @inline def requestCount: Int   = _requestCount
+  @inline def isUpdating: Boolean = _isUpdating
+
+  @inline def tryUpdate(): Boolean = {
+    val needToUpdate = _requestCount > 0 && !_isUpdating
+    if (needToUpdate) {
+      _requestCount = 0
+      _isUpdating = true
+    }
+    needToUpdate
   }
 
-  def tryUpdateBestView(hardForkNow: HardFork): Unit = {
-    if (hardForkNow.isDanubeEnabled()) {
-      tryUpdateBestViewDanube()
-    } else {
-      tryUpdateBestViewPreDanube()
-    }
-  }
+  @inline def requestUpdate(): Unit = _requestCount += 1
+  @inline def setCompleted(): Unit  = _isUpdating = false
+}
+
+object AsyncUpdateState {
+  def apply(): AsyncUpdateState = new AsyncUpdateState(0, false)
 }

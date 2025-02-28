@@ -146,6 +146,18 @@ trait FlowUtils
 
   def updateBestFlowSkeleton(): IOResult[Unit]
 
+  def updateBestFlowSkeletonAndMemPool(chainIndex: ChainIndex): IOResult[Unit] = {
+    for {
+      _ <- updateBestFlowSkeleton()
+      _ <-
+        if (brokerConfig.contains(chainIndex.from)) {
+          updateMemPoolDanube(chainIndex)
+        } else {
+          Right(())
+        }
+    } yield ()
+  }
+
   def updateBestDepsUnsafe(): Unit
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
@@ -267,7 +279,8 @@ trait FlowUtils
     IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
-  private val lastBlockDepss: Array[Option[BlockDeps]] = Array.fill(brokerConfig.chainNum)(None)
+  @volatile private val lastBlockDepss: Array[Option[BlockDeps]] =
+    Array.fill(brokerConfig.chainNum)(None)
   def updateMemPoolDanubeUnsafe(chainIndex: ChainIndex): Unit = {
     val newDeps      = calBestFlowPerChainIndex(chainIndex)
     val flattenIndex = chainIndex.flattenIndex
@@ -283,9 +296,12 @@ trait FlowUtils
 
   def findBestDepsForNewBlockUnsafe(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
     if (hardfork.isDanubeEnabled()) {
-      updateMemPoolDanubeUnsafe(chainIndex)
+      val bestDeps     = calBestFlowPerChainIndex(chainIndex)
       val flattenIndex = chainIndex.flattenIndex
-      lastBlockDepss(flattenIndex).getOrElse(calBestFlowPerChainIndex(chainIndex))
+      if (lastBlockDepss(flattenIndex).isEmpty) {
+        lastBlockDepss(flattenIndex) = Some(bestDeps)
+      }
+      bestDeps
     } else {
       getBestDeps(chainIndex.from)
     }
