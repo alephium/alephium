@@ -285,8 +285,11 @@ class TxUtilsSpec extends AlephiumSpec {
 
     addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
     val block2 = mineFromMemPool(blockFlow, chainIndex1)
-    block2.nonCoinbase.head is tx1
+    block2.nonCoinbaseLength is 0
     addAndCheck(blockFlow, block2)
+    val block3 = mineFromMemPool(blockFlow, chainIndex1)
+    block3.nonCoinbase.head is tx1
+    addAndCheck(blockFlow, block3)
   }
 
   it should "calculate getPreContractOutput" in new FlowFixture {

@@ -296,14 +296,14 @@ trait FlowUtils
 
   def findBestDepsForNewBlockUnsafe(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
     if (hardfork.isDanubeEnabled()) {
-      val bestDeps     = calBestFlowPerChainIndex(chainIndex)
       val flattenIndex = chainIndex.flattenIndex
-      if (lastBlockDepss(flattenIndex).isEmpty) {
+      lastBlockDepss(flattenIndex).getOrElse {
+        val bestDeps = calBestFlowPerChainIndex(chainIndex)
         lastBlockDepss(flattenIndex) = Some(bestDeps)
+        bestDeps
       }
-      bestDeps
     } else {
-      getBestDeps(chainIndex.from)
+      getBestDeps(chainIndex.from, hardfork)
     }
   }
 

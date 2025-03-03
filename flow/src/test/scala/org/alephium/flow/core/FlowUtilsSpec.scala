@@ -1000,6 +1000,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
   it should "not collect sequential txs if the input of the source tx from other chains" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex0               = ChainIndex.unsafe(0, 0)
     val (privateKey0, publicKey0) = chainIndex0.from.generateKey
@@ -1032,6 +1033,11 @@ class FlowUtilsSpec extends AlephiumSpec {
     template0.transactions.length is 1 // coinbase tx
 
     addAndCheck(blockFlow, mineFromMemPool(blockFlow, chainIndex1))
+
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex0))
+    }
 
     val template1 =
       blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue

@@ -3289,7 +3289,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   trait ScriptTxFixture extends Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
-    setHardFork(HardFork.Danube)
+    setHardForkSince(HardFork.Rhone)
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -3845,6 +3845,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    if (hardFork.isDanubeEnabled()) {
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    }
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
@@ -3869,6 +3872,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    if (hardFork.isDanubeEnabled()) {
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    }
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
