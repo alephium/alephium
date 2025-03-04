@@ -473,4 +473,29 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     Thread.sleep(2000)
     state.pending.isEmpty is true
   }
+
+  it should "publish the FlowDataAlreadyExist event" in new Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DependencyHandler.FlowDataAlreadyExist])
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    state.pending.contains(block.hash) is false
+    brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
+    eventually {
+      brokerProbe.expectNoMessage()
+      listener.expectNoMessage()
+      state.pending.contains(block.hash) is true
+    }
+
+    addAndCheck(blockFlow, block)
+    dependencyHandler ! ChainHandler.FlowDataAdded(block, origin, TimeStamp.now())
+    eventually(state.pending.contains(block.hash) is false)
+
+    brokerProbe.send(dependencyHandler, DependencyHandler.AddFlowData(AVector(block), origin))
+    eventually {
+      brokerProbe.expectNoMessage()
+      listener.expectMsg(DependencyHandler.FlowDataAlreadyExist(block))
+    }
+  }
 }
