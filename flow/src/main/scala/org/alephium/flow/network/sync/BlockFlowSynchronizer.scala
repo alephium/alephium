@@ -83,6 +83,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     scheduleSync()
     subscribeEvent(self, classOf[InterCliqueManager.HandShaked])
     subscribeEvent(self, classOf[ChainHandler.FlowDataValidationEvent])
+    subscribeEvent(self, classOf[DependencyHandler.FlowDataAlreadyExist])
   }
 
   override def receive: Receive = if (networkSetting.enableP2pV2) v2 else v1
@@ -148,8 +149,9 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
       }
     case event: ChainHandler.FlowDataValidationEvent =>
       finalized(event.data.hash)
-    case Terminated(actor) => removeBroker(ActorRefT(actor))
-    case _: V2Command      => ()
+    case Terminated(actor)                         => removeBroker(ActorRefT(actor))
+    case _: DependencyHandler.FlowDataAlreadyExist => ()
+    case _: V2Command                              => ()
   }
 }
 
@@ -182,6 +184,9 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
 
     case event: ChainHandler.FlowDataValidationEvent =>
       onBlockProcessed(event)
+
+    case DependencyHandler.FlowDataAlreadyExist(data) =>
+      onBlockProcessed(data)
 
     case Terminated(actor)                  => onBrokerTerminated(ActorRefT(actor))
     case _: BlockFlowSynchronizer.V1Command => ()
@@ -310,15 +315,19 @@ trait SyncState { _: BlockFlowSynchronizer =>
       }
       val block = event.data
       if (isBlockValid) {
-        syncingChains(block.chainIndex).foreach { chainState =>
-          chainState.handleFinalizedBlock(block.hash)
-          tryValidateMoreBlocksFromChain(chainState)
-          tryMoveOn(chainState)
-        }
+        onBlockProcessed(block)
       } else {
         log.info(s"Block ${block.hash.toHexString} is invalid, resync")
         resync()
       }
+    }
+  }
+
+  protected[this] def onBlockProcessed(data: FlowData): Unit = {
+    syncingChains(data.chainIndex).foreach { chainState =>
+      chainState.handleFinalizedBlock(data.hash)
+      tryValidateMoreBlocksFromChain(chainState)
+      tryMoveOn(chainState)
     }
   }
 
@@ -388,12 +397,17 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
+  @inline private[sync] def calcFromHeight(ancestorHeight: Int): Int = {
+    Math.max(ALPH.GenesisHeight, ancestorHeight - ALPH.MaxGhostUncleAge) + 1
+  }
+
   def handleAncestors(ancestors: AVector[(ChainIndex, Int)]): Unit = {
     val brokerActor: BrokerActor = ActorRefT(sender())
     val requests                 = mutable.ArrayBuffer.empty[(ChainIndex, BlockHeightRange)]
-    ancestors.foreach { case (chainIndex, height) =>
+    ancestors.foreach { case (chainIndex, ancestorHeight) =>
       syncingChains(chainIndex).foreach { state =>
-        state.initSkeletonHeights(brokerActor, height + 1) match {
+        val fromHeight = calcFromHeight(ancestorHeight)
+        state.initSkeletonHeights(brokerActor, fromHeight) match {
           case Some(range) => requests.addOne((chainIndex, range))
           case None        => ()
         }

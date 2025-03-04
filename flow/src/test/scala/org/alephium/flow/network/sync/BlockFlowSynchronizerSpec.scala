@@ -32,6 +32,7 @@ import org.alephium.flow.network.broker.{
   InboundConnection,
   MisbehaviorManager
 }
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.Generators
 import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
@@ -486,6 +487,16 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     probe.expectMsg(
       BrokerHandler.GetSkeletons(AVector((chainIndex, syncingChain.skeletonHeightRange.get)))
     )
+  }
+
+  it should "calc the from height" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.calcFromHeight(ALPH.GenesisHeight) is 1
+    (1 to ALPH.MaxGhostUncleAge).foreach { ancestorHeight =>
+      blockFlowSynchronizerActor.calcFromHeight(ancestorHeight) is 1
+    }
+    val number         = nextInt(1, 100)
+    val ancestorHeight = ALPH.MaxGhostUncleAge + number
+    blockFlowSynchronizerActor.calcFromHeight(ancestorHeight) is number + 1
   }
 
   it should "handle ancestors response" in new BlockFlowSynchronizerV2Fixture {
