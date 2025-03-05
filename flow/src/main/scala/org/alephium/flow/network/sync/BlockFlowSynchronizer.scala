@@ -102,7 +102,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
 
     case BlockAnnouncement(hash) =>
-      if (!isSyncingUsingV2) handleBlockAnnouncement(hash)
+      // When the node is synced, it should download new blocks only through block announcements.
+      // Ignoring them may trigger a new round of synchronization using v2.
+      if (!isSyncingUsingV2 || isNodeSynced) handleBlockAnnouncement(hash)
   }
 
   def addBroker(broker: BrokerActor, brokerInfo: BrokerInfo, p2pVersion: P2PVersion): Unit = {
@@ -521,7 +523,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   @inline private def tryStartNextSyncRound(): Unit = {
-    if (needToStartNextSyncRound()) resync()
+    if (needToStartNextSyncRound()) {
+      resync()
+    } else {
+      // No peer's best tip is better than the node's own best tip, which means
+      // the node is synced. Clear the sync state to reduce memory footprint.
+      clearSyncingState()
+    }
   }
 
   private def updateBestChainTips(terminatedBroker: BrokerActor): Unit = {
