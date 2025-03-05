@@ -523,7 +523,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   @inline private def tryStartNextSyncRound(): Unit = {
-    if (needToStartNextSyncRound()) resync()
+    if (needToStartNextSyncRound()) {
+      resync()
+    } else {
+      // No peer's best tip is better than the node's own best tip, which means
+      // the node is synced. Clear the sync state to reduce memory footprint.
+      clearSyncingState()
+    }
   }
 
   private def updateBestChainTips(terminatedBroker: BrokerActor): Unit = {

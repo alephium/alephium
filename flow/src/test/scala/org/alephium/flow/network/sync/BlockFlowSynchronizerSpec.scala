@@ -433,39 +433,68 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.needToStartNextSyncRound() is true
   }
 
+  it should "clear the sync state once the node is synced" in new BlockFlowSynchronizerV2Fixture {
+    val (brokerActor, brokerStatus, probe) = addBroker()
+    probe.ignoreMsg { case _: BrokerHandler.SendChainState => true }
+
+    val selfChainTips   = genChainTips
+    val remoteChainTips = selfChainTips.map(tip => tip.copy(weight = tip.weight + Weight(1)))
+    blockFlowSynchronizer.tell(
+      BlockFlowSynchronizer.UpdateChainState(remoteChainTips),
+      brokerActor.ref
+    )
+    eventually(brokerStatus.tips.toAVector is remoteChainTips)
+
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
+    eventually {
+      probe.expectMsgPF() { case _: BrokerHandler.GetAncestors => true }
+      blockFlowSynchronizerActor.selfChainTips.toAVector is selfChainTips
+      blockFlowSynchronizerActor.isSyncingUsingV2 is true
+      blockFlowSynchronizerActor.syncingChains.isEmpty is false
+    }
+
+    EventFilter.debug(start = "Clear syncing state and resync", occurrences = 0).intercept {
+      blockFlowSynchronizer ! FlowHandler.UpdateChainState(remoteChainTips)
+    }
+    eventually {
+      blockFlowSynchronizerActor.selfChainTips.toAVector is remoteChainTips
+      blockFlowSynchronizerActor.isSyncingUsingV2 is false
+      blockFlowSynchronizerActor.syncingChains.isEmpty is true
+    }
+  }
+
   it should "start the next sync round only if necessary" in new BlockFlowSynchronizerV2Fixture {
     val (brokerActor, _, probe) = addBroker()
     probe.ignoreMsg { case _: BrokerHandler.SendChainState => true }
 
-    val selfChainTips    = genChainTips
-    val chainTip         = selfChainTips.head.copy(weight = selfChainTips.head.weight + Weight(1))
-    val remoteChainTips1 = selfChainTips.replace(0, chainTip)
+    val selfChainTips = genChainTips
+    val weight        = selfChainTips.head.weight
+    val remoteChainTips1 =
+      selfChainTips.replace(0, selfChainTips.head.copy(weight = weight + Weight(1)))
     blockFlowSynchronizer.tell(
       BlockFlowSynchronizer.UpdateChainState(remoteChainTips1),
       brokerActor.ref
     )
     blockFlowSynchronizerActor.isSyncingUsingV2 is false
     blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
-    probe.expectMsgPF() { case _: BrokerHandler.GetAncestors => true }
-    blockFlowSynchronizerActor.isSyncingUsingV2 is true
-    EventFilter.debug(start = "Clear syncing state and resync", occurrences = 0).intercept {
-      blockFlowSynchronizer ! FlowHandler.UpdateChainState(remoteChainTips1)
+    eventually {
+      probe.expectMsgPF() { case _: BrokerHandler.GetAncestors => true }
+      blockFlowSynchronizerActor.isSyncingUsingV2 is true
     }
-    probe.expectNoMessage()
 
     val remoteChainTips2 =
-      selfChainTips.replace(0, chainTip.copy(weight = chainTip.weight + Weight(1)))
+      selfChainTips.replace(0, selfChainTips.head.copy(weight = weight + Weight(2)))
     blockFlowSynchronizer.tell(
       BlockFlowSynchronizer.UpdateChainState(remoteChainTips2),
       brokerActor.ref
     )
-    val chainState = blockFlowSynchronizerActor.syncingChains(ChainIndex.unsafe(0, 0)).value
-    chainState.nextFromHeight = chainState.bestTip.height + 1
     EventFilter.debug(start = "Clear syncing state and resync", occurrences = 1).intercept {
-      blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips)
+      blockFlowSynchronizer ! FlowHandler.UpdateChainState(remoteChainTips1)
     }
-    probe.expectMsgPF() { case _: BrokerHandler.GetAncestors => true }
-    blockFlowSynchronizerActor.isSyncingUsingV2 is true
+    eventually {
+      probe.expectMsgPF() { case _: BrokerHandler.GetAncestors => true }
+      blockFlowSynchronizerActor.isSyncingUsingV2 is true
+    }
   }
 
   it should "try move on" in new BlockFlowSynchronizerV2Fixture {
