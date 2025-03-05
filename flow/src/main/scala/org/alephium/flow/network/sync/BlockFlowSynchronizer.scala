@@ -102,7 +102,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       }
 
     case BlockAnnouncement(hash) =>
-      if (!isSyncingUsingV2) handleBlockAnnouncement(hash)
+      // When the node is synced, it should download new blocks only through block announcements.
+      // Ignoring them may trigger a new round of synchronization using v2.
+      if (!isSyncingUsingV2 || isNodeSynced) handleBlockAnnouncement(hash)
   }
 
   def addBroker(broker: BrokerActor, brokerInfo: BrokerInfo, p2pVersion: P2PVersion): Unit = {

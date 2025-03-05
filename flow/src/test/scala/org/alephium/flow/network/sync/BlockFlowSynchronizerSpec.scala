@@ -987,7 +987,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "ignore block announcements when syncing using v2" in new BlockFlowSynchronizerV2Fixture {
+  it should "handle block announcements properly when syncing using v2" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.isNodeSynced is false
+
     val (_, _, probe) = addBroker()
     blockFlowSynchronizerActor.isSyncingUsingV2 is false
     val blockHash = BlockHash.generate
@@ -997,6 +999,11 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     probe.expectNoMessage()
+
+    blockFlowSynchronizer ! InterCliqueManager.SyncedResult(true)
+    eventually(blockFlowSynchronizerActor.isNodeSynced is true)
+    probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
+    probe.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
   }
 
   behavior of "SyncStatePerChain"
