@@ -338,34 +338,36 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  private def getConflictedOutputs(
+  private def getOutputsInConflictedTxs(
       worldState: WorldState.Persisted,
       mainGroup: GroupIndex,
       blockDeps: BlockDeps,
       blocks: AVector[Block]
   ): IOResult[Set[TxOutputRef]] = {
-    val conflictedOutputs = mutable.Set.empty[TxOutputRef]
-    val usedInputs        = mutable.Set.empty[TxOutputRef]
+    val outputsInConflictedTxs = mutable.Set.empty[TxOutputRef]
+    val usedInputs             = mutable.Set.empty[TxOutputRef]
     blocks
       .foreachE { block =>
         val chainIndex = block.chainIndex
         if (chainIndex.to == mainGroup && !chainIndex.isIntraGroup) {
           val checkpointHash = getCheckpointHash(blockDeps, mainGroup, block.chainIndex.from)
-          getConflictedOutputsFromInBlock(
+          getOutputsInConflictedTxsFromInBlock(
             worldState,
             block,
             isInBlockFlowUnsafe(checkpointHash, _),
-            conflictedOutputs
+            outputsInConflictedTxs
           )
         } else {
           block.nonCoinbase.foreach { tx =>
-            if (tx.allInputRefs.exists(usedInputs.contains)) conflictedOutputs.addAll(tx.outputRefs)
+            if (tx.allInputRefs.exists(usedInputs.contains)) {
+              outputsInConflictedTxs.addAll(tx.outputRefs)
+            }
             usedInputs.addAll(tx.allInputRefs)
           }
           Right(())
         }
       }
-      .map(_ => conflictedOutputs.toSet)
+      .map(_ => outputsInConflictedTxs.toSet)
   }
 
   private def getImmutableGroupViewDanubeBase(
@@ -373,12 +375,12 @@ trait BlockFlowState extends FlowTipsUtil {
       blockDeps: BlockDeps
   ): IOResult[(WorldState.Persisted, AVector[BlockCache], Set[TxOutputRef])] = {
     for {
-      worldState        <- getPersistedWorldState(blockDeps, mainGroup)
-      diffs             <- getHashesForUpdates(mainGroup, blockDeps)
-      blocks            <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
-      conflictedOutputs <- getConflictedOutputs(worldState, mainGroup, blockDeps, blocks)
-      blockCaches       <- diffs.mapE(getBlockCache(mainGroup, _))
-    } yield (worldState, blockCaches, conflictedOutputs)
+      worldState             <- getPersistedWorldState(blockDeps, mainGroup)
+      diffs                  <- getHashesForUpdates(mainGroup, blockDeps)
+      blocks                 <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
+      outputsInConflictedTxs <- getOutputsInConflictedTxs(worldState, mainGroup, blockDeps, blocks)
+      blockCaches            <- diffs.mapE(getBlockCache(mainGroup, _))
+    } yield (worldState, blockCaches, outputsInConflictedTxs)
   }
 
   def getImmutableGroupViewDanube(
@@ -386,8 +388,8 @@ trait BlockFlowState extends FlowTipsUtil {
       blockDeps: BlockDeps
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
     getImmutableGroupViewDanubeBase(mainGroup, blockDeps).map {
-      case (worldState, blockCaches, conflictedOutputs) =>
-        BlockFlowGroupView.onlyBlocks(worldState, blockCaches, conflictedOutputs)
+      case (worldState, blockCaches, outputsInConflictedTxs) =>
+        BlockFlowGroupView.onlyBlocks(worldState, blockCaches, outputsInConflictedTxs)
     }
   }
 
@@ -824,7 +826,7 @@ object BlockFlowState {
     }
   }
 
-  private def getConflictedOutputsFromInBlock(
+  private def getOutputsInConflictedTxsFromInBlock(
       worldState: WorldState.Persisted,
       block: Block,
       isInBlockFlowUnsafe: BlockHash => Boolean,
