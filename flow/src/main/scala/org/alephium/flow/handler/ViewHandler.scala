@@ -63,7 +63,11 @@ object ViewHandler {
   final case class NewTemplate(template: BlockFlowTemplate) extends Event with EventStream.Event
   final case class SubscribeResult(succeeded: Boolean)      extends Event
 
-  def needUpdate(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
+  def needUpdatePreDanube(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
+    brokerConfig.contains(chainIndex.from)
+  }
+
+  def needUpdateDanube(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from) || chainIndex.isIntraGroup
   }
 
@@ -105,13 +109,21 @@ class ViewHandler(
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
-      if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
-        tryUpdateBestView(hardFork, data.chainIndex)
+      if (isNodeSynced) {
+        if (hardFork.isDanubeEnabled() && ViewHandler.needUpdateDanube(data.chainIndex)) {
+          preDanubeUpdateState.requestUpdate()
+          tryUpdateBestViewPreDanube()
+        }
+        if (!hardFork.isDanubeEnabled() && ViewHandler.needUpdatePreDanube(data.chainIndex)) {
+          requestDanubeUpdate(data.chainIndex)
+          tryUpdateBestViewDanube(data.chainIndex)
+        }
       }
     case ViewHandler.BestDepsUpdatedPreDanube =>
       preDanubeUpdateState.setCompleted()
       updateSubscribers()
       if (isNodeSynced) {
+        // Handle pending updates
         tryUpdateBestViewPreDanube()
       }
     case ViewHandler.BestDepsUpdateFailedPreDanube =>
@@ -138,16 +150,6 @@ class ViewHandler(
       }
   }
   // scalastyle:on cyclomatic.complexity
-
-  def tryUpdateBestView(hardForkNow: HardFork, chainIndex: ChainIndex): Unit = {
-    if (hardForkNow.isDanubeEnabled()) {
-      requestDanubeUpdate(chainIndex)
-      tryUpdateBestViewDanube(chainIndex)
-    } else {
-      preDanubeUpdateState.requestUpdate()
-      tryUpdateBestViewPreDanube()
-    }
-  }
 }
 
 trait ViewHandlerState extends IOBaseActor {
@@ -240,11 +242,11 @@ trait BlockFlowUpdaterPreDanubeState extends IOBaseActor {
           // If Danube will be enabled within the next 10 seconds
           for {
             _ <- blockFlow.updateBestFlowSkeleton()
-            _ <- blockFlow.updateBestDeps()
+            _ <- blockFlow.updateViewPreDanube()
           } yield ()
         } else {
           // If Danube is not enabled and won't be soon
-          blockFlow.updateBestDeps()
+          blockFlow.updateViewPreDanube()
         }
         updateResult match {
           case Left(_)  => ViewHandler.BestDepsUpdateFailedPreDanube
@@ -284,7 +286,7 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       val allSubscribers = AVector.from(subscribers)
       Future[ViewHandler.Command] {
         val result = for {
-          _ <- blockFlow.updateBestFlowSkeletonAndMemPool(chainIndex)
+          _ <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)
           _ <-
             if (needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty) {

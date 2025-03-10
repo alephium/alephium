@@ -38,9 +38,9 @@ trait BlockFlow
     with FlowUtils
     with ConflictedBlocks
     with BlockFlowValidation {
-  def add(block: Block, weight: Weight): IOResult[Unit]
+  def add(block: Block, weight: Weight): IOResult[Unit] = ???
 
-  def add(header: BlockHeader, weight: Weight): IOResult[Unit]
+  def add(header: BlockHeader, weight: Weight): IOResult[Unit] = ???
 
   def calWeight(block: Block): IOResult[Weight]
 
@@ -113,6 +113,12 @@ trait BlockFlow
   }
 
   def getBestIntraGroupTip(): BlockHash
+
+  def updateViewPreDanube(): IOResult[Unit]
+
+  def updateBestFlowSkeleton(): IOResult[Unit]
+
+  def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit]
 }
 
 object BlockFlow extends StrictLogging {
@@ -435,6 +441,7 @@ object BlockFlow extends StrictLogging {
       }
     }
 
+    // TODO: rename this to be unsafe
     def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
       val bestSkeleton     = getBestFlowSkeleton()
       val initialDeps      = bestSkeleton.createBlockDeps(chainIndex.from)
@@ -443,24 +450,24 @@ object BlockFlow extends StrictLogging {
       extendedFlowTips.toBlockDeps
     }
 
-    def updateBestDepsUnsafe(): Unit =
+    def updateViewPreDanubeUnsafe(): Unit =
       brokerConfig.groupRange.foreach { mainGroup =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
         val oldDeps        = getBestDeps(mainGroupIndex)
         val newDeps        = calBestDepsUnsafe(mainGroupIndex)
         updateGrandPoolUnsafe(mainGroupIndex, newDeps, oldDeps)
-        updateBestDeps(mainGroup, newDeps) // this update must go after pool updates
+        updateBestDepsPreDanube(mainGroup, newDeps)
       }
 
     def updateBestDepsAfterLoadingUnsafe(): Unit = {
       brokerConfig.groupRange.foreach { mainGroup =>
         val deps = calBestDepsUnsafe(GroupIndex.unsafe(mainGroup))
-        updateBestDeps(mainGroup, deps)
+        updateBestDepsPreDanube(mainGroup, deps)
       }
       updateBestFlowSkeletonUnsafe()
     }
 
-    def updateBestDeps(): IOResult[Unit] = {
+    def updateViewPreDanube(): IOResult[Unit] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
 
@@ -471,6 +478,22 @@ object BlockFlow extends StrictLogging {
     def updateBestFlowSkeletonUnsafe(): Unit = {
       val bestFlowSkeleton = calBestFlowSkeletonUnsafe()
       updateBestFlowSkeleton(bestFlowSkeleton)
+    }
+
+    def updateViewPerChainIndexDanubeUnsafe(chainIndex: ChainIndex): Unit = {
+      if (chainIndex.isIntraGroup) {
+        val bestFlowSkeleton = calBestFlowSkeletonUnsafe()
+        updateBestFlowSkeleton(bestFlowSkeleton)
+      }
+
+      val newDeps = calBestFlowPerChainIndex(chainIndex)
+      val oldDeps = getBestDeps(chainIndex, HardFork.Danube)
+      updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps)
+      updateBestDepsDanube(chainIndex, newDeps)
+    }
+
+    def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit] = {
+      IOUtils.tryExecute(updateViewPerChainIndexDanubeUnsafe(chainIndex))
     }
   }
 

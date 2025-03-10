@@ -136,29 +136,11 @@ trait FlowUtils
     }
   }
 
-  def getBestDeps(groupIndex: GroupIndex): BlockDeps
+  def getBestDeps(chainIndex: ChainIndex, hardFork: HardFork): BlockDeps
 
   def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
 
   def getBestFlowSkeleton(): BlockFlowSkeleton
-
-  def updateBestDeps(): IOResult[Unit]
-
-  def updateBestFlowSkeleton(): IOResult[Unit]
-
-  def updateBestFlowSkeletonAndMemPool(chainIndex: ChainIndex): IOResult[Unit] = {
-    for {
-      _ <- updateBestFlowSkeleton()
-      _ <-
-        if (brokerConfig.contains(chainIndex.from)) {
-          updateMemPoolDanube(chainIndex)
-        } else {
-          Right(())
-        }
-    } yield ()
-  }
-
-  def updateBestDepsUnsafe(): Unit
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
@@ -279,42 +261,14 @@ trait FlowUtils
     IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
-  @volatile private val lastBlockDepss: Array[Option[BlockDeps]] =
-    Array.fill(brokerConfig.chainNum)(None)
-  def updateMemPoolDanubeUnsafe(chainIndex: ChainIndex): Unit = {
-    val newDeps      = calBestFlowPerChainIndex(chainIndex)
-    val flattenIndex = chainIndex.flattenIndex
-    lastBlockDepss(flattenIndex).foreach { oldDeps =>
-      updateMemPoolUnsafe(chainIndex.from, newDeps, oldDeps)
-    }
-    lastBlockDepss(flattenIndex) = Some(newDeps)
-  }
-
-  def updateMemPoolDanube(chainIndex: ChainIndex): IOResult[Unit] = {
-    IOUtils.tryExecute(updateMemPoolDanubeUnsafe(chainIndex))
-  }
-
-  def findBestDepsForNewBlockUnsafe(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
-    if (hardfork.isDanubeEnabled()) {
-      val flattenIndex = chainIndex.flattenIndex
-      lastBlockDepss(flattenIndex).getOrElse {
-        val bestDeps = calBestFlowPerChainIndex(chainIndex)
-        lastBlockDepss(flattenIndex) = Some(bestDeps)
-        bestDeps
-      }
-    } else {
-      getBestDeps(chainIndex.from, hardfork)
-    }
-  }
-
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
   ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val hardForkGuess = networkConfig.getHardFork(TimeStamp.now())
+    val bestDeps      = getBestDeps(chainIndex, hardForkGuess)
     for {
-      bestDeps     <- IOUtils.tryExecute(findBestDepsForNewBlockUnsafe(chainIndex, hardForkGuess))
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       hardFork   = networkConfig.getHardFork(templateTs)

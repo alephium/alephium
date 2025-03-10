@@ -62,6 +62,10 @@ trait BlockFlowState extends FlowTipsUtil {
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
     BlockDeps.build(deps1 ++ deps2)
   }
+  protected[core] val bestDepsDanube = Array.tabulate(brokerConfig.groupNumPerBroker, groups) {
+    case (groupShift, _) =>
+      bestDeps(groupShift)
+  }
   @volatile protected[core] var bestFlowSkeleton = {
     val flow = BlockFlowSkeleton.Builder(groups)
     brokerConfig.cliqueGroups.foreach { g =>
@@ -285,6 +289,15 @@ trait BlockFlowState extends FlowTipsUtil {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps.uncleHash(groupIndex)
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
+  }
+
+  def getBestDeps(chainIndex: ChainIndex, hardFork: HardFork): BlockDeps = {
+    val groupShift = brokerConfig.groupIndexOfBroker(chainIndex.from)
+    if (hardFork.isDanubeEnabled()) {
+      bestDepsDanube(groupShift)(chainIndex.to.value)
+    } else {
+      bestDeps(groupShift)
+    }
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
@@ -635,10 +648,16 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
+  def updateBestDepsPreDanube(mainGroup: Int, deps: BlockDeps): Unit = {
     assume(brokerConfig.containsRaw(mainGroup))
     val groupShift = brokerConfig.groupIndexOfBrokerUnsafe(mainGroup)
     bestDeps(groupShift) = deps
+  }
+
+  def updateBestDepsDanube(chainIndex: ChainIndex, deps: BlockDeps): Unit = {
+    assume(brokerConfig.contains(chainIndex.from))
+    val groupShift = brokerConfig.groupIndexOfBrokerUnsafe(chainIndex.from.value)
+    bestDepsDanube(groupShift)(chainIndex.to.value) = deps
   }
 
   def updateBestFlowSkeleton(skeleton: BlockFlowSkeleton): Unit = {
