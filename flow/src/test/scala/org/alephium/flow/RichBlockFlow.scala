@@ -28,8 +28,11 @@ trait RichBlockFlowT {
       for {
         _ <- blockFlow.add(block, worldStateOpt)
         _ <-
-          if (hardFork.isDanubeEnabled()) blockFlow.updateBestFlowSkeleton()
-          else blockFlow.updateBestDeps()
+          if (hardFork.isDanubeEnabled()) {
+            blockFlow.updateViewPerChainIndexDanube(block.chainIndex)
+          } else {
+            blockFlow.updateViewPreDanube()
+          }
       } yield ()
     }
 
@@ -38,8 +41,11 @@ trait RichBlockFlowT {
       for {
         _ <- blockFlow.add(header)
         _ <-
-          if (hardFork.isDanubeEnabled()) blockFlow.updateBestFlowSkeleton()
-          else blockFlow.updateBestDeps()
+          if (hardFork.isDanubeEnabled()) {
+            blockFlow.updateViewPerChainIndexDanube(header.chainIndex)
+          } else {
+            blockFlow.updateViewPreDanube()
+          }
       } yield ()
     }
   }

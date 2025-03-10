@@ -490,6 +490,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "support Schnorr address" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
@@ -534,6 +535,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     blockFlow.getGrandPool().add(txTemplate.chainIndex, AVector(txTemplate), TimeStamp.now())
 
+    if (hardFork.isDanubeEnabled() && !txTemplate.chainIndex.isIntraGroup) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, txTemplate.chainIndex))
+    }
     val block1 = mineFromMemPool(blockFlow, txTemplate.chainIndex)
     block1.nonCoinbase.map(_.id).contains(txTemplate.id) is true
     addAndCheck(blockFlow, block1)
@@ -684,6 +688,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
       val sweepAddressChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
+      addAndCheck(blockFlow, emptyBlock(blockFlow, sweepAddressChainIndex))
       val sweepAddressTxTemplate = signAndAddToMemPool(
         sweepAddressTransaction.txId,
         sweepAddressTransaction.unsignedTx,
@@ -3861,8 +3866,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(testAddress, ALPH.alph(2))
     deployContract()
 
-    prepareTemplates(blockFlow, hardFork)
-
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 0))
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
@@ -4297,8 +4300,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       buildTransactions(1).asInstanceOf[BuildChainedExecuteScriptTxResult]
     val buildExecuteScriptTransaction0 =
       buildTransactions(2).asInstanceOf[BuildChainedExecuteScriptTxResult]
-
-    prepareTemplates(blockFlow, hardFork)
 
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction1.value, groupInfo1.privateKey)
@@ -4998,15 +4999,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (fromPrivateKey, fromPublicKey) = chainIndex.to.generateKey
     val (_, toPublicKey)                = chainIndex.to.generateKey
     val lockupScript                    = LockupScript.p2pkh(fromPublicKey)
+    val blockTs = TimeStamp.now().minusUnsafe(networkConfig.coinbaseLockupPeriod)
     val block0 = mine(
       blockFlow,
       chainIndex,
       AVector.empty[Transaction],
       lockupScript,
-      Some(ALPH.LaunchTimestamp.plusMillisUnsafe(1))
+      Some(blockTs)
     )
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, ALPH.oneAlph)
+    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, dustUtxoAmount)
     addAndCheck(blockFlow, block1)
 
     block1.nonCoinbase.length is 1

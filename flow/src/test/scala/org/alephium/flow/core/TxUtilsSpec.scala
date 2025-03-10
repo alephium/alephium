@@ -176,7 +176,6 @@ class TxUtilsSpec extends AlephiumSpec {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     setHardForkSince(HardFork.Mainnet)
     val hardFork = networkConfig.getHardFork(TimeStamp.now())
-    prepareTemplates(blockFlow, hardFork)
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
@@ -266,7 +265,6 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "be able to use the change outputs from other inter chains since danube" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     setHardForkSince(HardFork.Danube)
-    prepareTemplates(blockFlow, HardFork.Danube)
 
     val chainIndex0 = ChainIndex.unsafe(1, 0)
     val chainIndex1 = ChainIndex.unsafe(1, 2)

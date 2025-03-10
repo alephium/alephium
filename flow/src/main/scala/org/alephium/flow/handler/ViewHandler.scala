@@ -111,12 +111,12 @@ class ViewHandler(
       //  2. the header belongs to intra-group chain
       if (isNodeSynced) {
         if (hardFork.isDanubeEnabled() && ViewHandler.needUpdateDanube(data.chainIndex)) {
-          preDanubeUpdateState.requestUpdate()
-          tryUpdateBestViewPreDanube()
-        }
-        if (!hardFork.isDanubeEnabled() && ViewHandler.needUpdatePreDanube(data.chainIndex)) {
           requestDanubeUpdate(data.chainIndex)
           tryUpdateBestViewDanube(data.chainIndex)
+        }
+        if (!hardFork.isDanubeEnabled() && ViewHandler.needUpdatePreDanube(data.chainIndex)) {
+          preDanubeUpdateState.requestUpdate()
+          tryUpdateBestViewPreDanube()
         }
       }
     case ViewHandler.BestDepsUpdatedPreDanube =>

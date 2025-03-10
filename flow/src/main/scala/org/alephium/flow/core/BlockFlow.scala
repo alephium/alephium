@@ -441,8 +441,7 @@ object BlockFlow extends StrictLogging {
       }
     }
 
-    // TODO: rename this to be unsafe
-    def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
+    def calBestFlowPerChainIndexUnsafe(chainIndex: ChainIndex): BlockDeps = {
       val bestSkeleton     = getBestFlowSkeleton()
       val initialDeps      = bestSkeleton.createBlockDeps(chainIndex.from)
       val initialFlowTips  = FlowTips.from(initialDeps, chainIndex.from)
@@ -468,7 +467,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def updateViewPreDanube(): IOResult[Unit] = {
-      IOUtils.tryExecute(updateBestDepsUnsafe())
+      IOUtils.tryExecute(updateViewPreDanubeUnsafe())
     }
 
     def updateBestFlowSkeleton(): IOResult[Unit] = {
@@ -486,10 +485,12 @@ object BlockFlow extends StrictLogging {
         updateBestFlowSkeleton(bestFlowSkeleton)
       }
 
-      val newDeps = calBestFlowPerChainIndex(chainIndex)
-      val oldDeps = getBestDeps(chainIndex, HardFork.Danube)
-      updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps)
-      updateBestDepsDanube(chainIndex, newDeps)
+      if (brokerConfig.contains(chainIndex.from)) {
+        val newDeps = calBestFlowPerChainIndexUnsafe(chainIndex)
+        val oldDeps = getBestDeps(chainIndex, HardFork.Danube)
+        updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps)
+        updateBestDepsDanube(chainIndex, newDeps)
+      }
     }
 
     def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit] = {

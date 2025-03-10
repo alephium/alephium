@@ -52,14 +52,16 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       from <- Seq(0, 2)
       to   <- 0 until 4
     } {
-      ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is (from equals to)
+      ViewHandler.needUpdatePreDanube(ChainIndex.unsafe(from, to)) is false
+      ViewHandler.needUpdateDanube(ChainIndex.unsafe(from, to)) is (from equals to)
     }
 
     for {
       from <- Seq(1, 3)
       to   <- 0 until 4
     } {
-      ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is true
+      ViewHandler.needUpdatePreDanube(ChainIndex.unsafe(from, to)) is true
+      ViewHandler.needUpdateDanube(ChainIndex.unsafe(from, to)) is true
     }
   }
 
@@ -303,7 +305,7 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
     blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
     val block = mineFromMemPool(blockFlow, chainIndex)
-    addAndCheck0(blockFlow, block)
+    addWithoutViewUpdate(blockFlow, block)
     blockFlow.getMemPool(chainIndex.from).contains(tx.id) is true
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {

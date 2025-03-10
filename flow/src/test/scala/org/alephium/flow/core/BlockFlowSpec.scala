@@ -1076,7 +1076,7 @@ class BlockFlowSpec extends AlephiumSpec {
     blockDeps0.contains(block0.hash) is false
     blockDeps0.contains(block1.hash) is false
 
-    val blockDeps1 = blockFlow.calBestFlowPerChainIndex(chainIndex0).deps
+    val blockDeps1 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex0).deps
     blockDeps1.contains(block0.hash) is true
     blockDeps1.contains(block1.hash) is false
 
@@ -1084,7 +1084,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val block2      = emptyBlock(blockFlow, chainIndex1)
     val block3      = mineBlockWithDep(chainIndex1, block1.hash)
     addAndCheck(blockFlow, block2, block3)
-    val blockDeps2 = blockFlow.calBestFlowPerChainIndex(chainIndex0).deps
+    val blockDeps2 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex0).deps
     blockDeps2.contains(block0.hash) is true
     blockDeps2.contains(block2.hash) is true
     blockDeps2.contains(block3.hash) is false
@@ -1092,7 +1092,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val chainIndex2 = ChainIndex(groupIndex0, groupIndex2)
     val block4      = emptyBlock(blockFlow, chainIndex2)
     addAndCheck(blockFlow, block4)
-    val blockDeps3 = blockFlow.calBestFlowPerChainIndex(chainIndex0).deps
+    val blockDeps3 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex0).deps
     blockDeps3.contains(block0.hash) is true
     blockDeps3.contains(block2.hash) is true
     blockDeps3.contains(block4.hash) is true
@@ -1112,13 +1112,13 @@ class BlockFlowSpec extends AlephiumSpec {
     block2.blockDeps.deps.contains(blockAtH2C0.hash) is true
 
     addAndCheck(blockFlow, block0)
-    blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block0.hash) is false
+    blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block0.hash) is false
 
     addAndCheck(blockFlow, block1)
-    blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block1.hash) is true
+    blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block1.hash) is true
 
     addAndCheck(blockFlow, block2)
-    val blockDeps = blockFlow.calBestFlowPerChainIndex(chainIndex1).deps
+    val blockDeps = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps
     blockDeps.contains(block2.hash) is true
     blockDeps.contains(block1.hash) is false
 
@@ -1126,7 +1126,7 @@ class BlockFlowSpec extends AlephiumSpec {
     chainIndex2.isIntraGroup is false
     val block3 = emptyBlock(blockFlow, chainIndex2)
     addAndCheck(blockFlow, block3)
-    blockFlow.calBestFlowPerChainIndex(chainIndex1).deps.contains(block3.hash) is false
+    blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block3.hash) is false
   }
 
   it should "update conflicted blocks cache before danube" in new FlowFixture with Generators {

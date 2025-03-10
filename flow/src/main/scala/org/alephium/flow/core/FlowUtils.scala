@@ -138,7 +138,7 @@ trait FlowUtils
 
   def getBestDeps(chainIndex: ChainIndex, hardFork: HardFork): BlockDeps
 
-  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
+  def calBestFlowPerChainIndexUnsafe(chainIndex: ChainIndex): BlockDeps
 
   def getBestFlowSkeleton(): BlockFlowSkeleton
 

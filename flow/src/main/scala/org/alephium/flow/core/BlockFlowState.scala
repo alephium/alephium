@@ -305,13 +305,11 @@ trait BlockFlowState extends FlowTipsUtil {
     getBestDeps(groupIndex, hardFork)
   }
 
-  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
-
   def getBestDeps(groupIndex: GroupIndex, hardFork: HardFork): BlockDeps = {
+    val groupShift = brokerConfig.groupIndexOfBroker(groupIndex)
     if (hardFork.isDanubeEnabled()) {
-      calBestFlowPerChainIndex(ChainIndex(groupIndex, groupIndex))
+      bestDepsDanube(groupShift)(groupIndex.value)
     } else {
-      val groupShift = brokerConfig.groupIndexOfBroker(groupIndex)
       bestDeps(groupShift)
     }
   }

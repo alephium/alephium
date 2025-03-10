@@ -294,12 +294,18 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     val (privateKey0, publicKey0) = chainIndex.from.generateKey
     addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey0, ALPH.alph(2)))
-    val block0 = transfer(blockFlow, privateKey0, toPublicKey, ALPH.oneAlph)
-    val tx0    = block0.nonCoinbase.head
-
     val (privateKey1, publicKey1) = chainIndex.from.generateKey
     addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey1, ALPH.alph(2)))
-    val block1 = transfer(blockFlow, privateKey1, toPublicKey, ALPH.oneAlph)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    val blocks = {
+      val block0 = transfer(blockFlow, privateKey0, toPublicKey, ALPH.oneAlph)
+      val block1 = transfer(blockFlow, privateKey1, toPublicKey, ALPH.oneAlph)
+      AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+    }
+    val block0 = blocks.head
+    val tx0    = block0.nonCoinbase.head
+    val block1 = blocks.last
     val tx1    = block1.nonCoinbase.head
 
     blockFlow.grandPool.add(chainIndex, tx0.toTemplate, TimeStamp.now())
@@ -1032,9 +1038,15 @@ class FlowUtilsSpec extends AlephiumSpec {
       blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue
     template0.transactions.length is 1 // coinbase tx
 
-    addAndCheck(blockFlow, mineFromMemPool(blockFlow, chainIndex1))
-
     val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex1))
+    }
+
+    val block1 = mineFromMemPool(blockFlow, chainIndex1)
+    block1.nonCoinbase.head.id is tx0.id
+    addAndCheck(blockFlow, block1)
+
     if (hardFork.isDanubeEnabled()) {
       addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex0))
     }

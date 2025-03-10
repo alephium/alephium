@@ -529,7 +529,7 @@ trait FlowFixture
   ): BlockDeps = {
     val hardFork = networkConfig.getHardFork(timestamp.getOrElse(TimeStamp.now()))
     if (hardFork.isDanubeEnabled()) {
-      blockFlow.calBestFlowPerChainIndex(chainIndex)
+      blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex)
     } else {
       blockFlow.calBestDepsUnsafe(chainIndex.from)
     }
@@ -712,8 +712,6 @@ trait FlowFixture
   def addAndCheck(blockFlow: BlockFlow, blocks: Block*): Unit = {
     blocks.foreach { block =>
       addAndCheck0(blockFlow, block)
-      val hardFork = networkConfig.getHardFork(block.timestamp)
-      updateMemPool(blockFlow, hardFork, block.chainIndex)
       checkOutputs(blockFlow, block)
     }
   }
@@ -1092,21 +1090,6 @@ trait FlowFixture
     val hashes = blockFlow.getHashes(chainIndex, height).rightValue
     hashes.length is 2
     (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
-  }
-
-  def prepareTemplates(blockFlow: BlockFlow, hardFork: HardFork): Unit = {
-    if (hardFork.isDanubeEnabled()) {
-      brokerConfig.chainIndexes.foreach { chainIndex =>
-        val miner = getGenesisLockupScript(chainIndex.to)
-        val _     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-      }
-    }
-  }
-
-  def updateMemPool(blockFlow: BlockFlow, hardFork: HardFork, chainIndex: ChainIndex): Unit = {
-    if (hardFork.isDanubeEnabled() && blockFlow.brokerConfig.contains(chainIndex.from)) {
-      blockFlow.updateMemPoolDanube(chainIndex).rightValue
-    }
   }
 }
 

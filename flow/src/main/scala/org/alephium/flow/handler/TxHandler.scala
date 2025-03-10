@@ -211,10 +211,8 @@ object TxHandler {
           case Left(error) => Left(s"Failed in add the mined block: $error")
           case Right(_) =>
             val result = for {
-              _ <- blockFlow.updateBestDeps()
-              _ <- blockFlow.updateBestFlowSkeleton()
-              // remove txs from mempool
-              _ <- blockFlow.updateMemPoolDanube(block.chainIndex)
+              _ <- blockFlow.updateViewPerChainIndexDanube(block.chainIndex)
+              _ <- blockFlow.updateViewPreDanube()
             } yield ()
             result.left.map(_.getMessage)
         }
