@@ -41,6 +41,7 @@ import org.alephium.util._
 // scalastyle:off number.of.methods file.size.limit
 trait FlowFixture
     extends AlephiumSpec
+    with RichBlockFlowT
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NumericHelpers {

@@ -38,13 +38,9 @@ trait BlockFlow
     with FlowUtils
     with ConflictedBlocks
     with BlockFlowValidation {
-  def add(block: Block, weight: Weight): IOResult[Unit] = ???
+  def add(block: Block, weight: Weight): IOResult[Unit]
 
-  def add(header: BlockHeader, weight: Weight): IOResult[Unit] = ???
-
-  def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]
-
-  def addAndUpdateView(header: BlockHeader): IOResult[Unit]
+  def add(header: BlockHeader, weight: Weight): IOResult[Unit]
 
   def calWeight(block: Block): IOResult[Weight]
 
@@ -270,14 +266,6 @@ object BlockFlow extends StrictLogging {
       }
     }
 
-    def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = {
-      val hardFork = networkConfig.getHardFork(block.timestamp)
-      for {
-        _ <- add(block, worldStateOpt)
-        _ <- if (hardFork.isDanubeEnabled()) updateBestFlowSkeleton() else updateBestDeps()
-      } yield ()
-    }
-
     def add(header: BlockHeader): IOResult[Unit] = {
       val index = header.chainIndex
       assume(!index.relateTo(brokerConfig))
@@ -288,14 +276,6 @@ object BlockFlow extends StrictLogging {
       } yield {
         cacheDiffAndTimeSpan(header)
       }
-    }
-
-    def addAndUpdateView(header: BlockHeader): IOResult[Unit] = {
-      val hardFork = networkConfig.getHardFork(header.timestamp)
-      for {
-        _ <- add(header)
-        _ <- if (hardFork.isDanubeEnabled()) updateBestFlowSkeleton() else updateBestDeps()
-      } yield ()
     }
 
     def calWeight(block: Block): IOResult[Weight] = {
