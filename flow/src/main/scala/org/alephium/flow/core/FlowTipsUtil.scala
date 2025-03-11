@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 
 import org.alephium.flow.Utils
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
@@ -43,13 +43,16 @@ trait FlowTipsUtil {
   def isConflicted(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Boolean
 
   def getInTip(dep: BlockHash, currentGroup: GroupIndex): IOResult[BlockHash] = {
-    getBlockHeader(dep).map { header =>
-      val from = header.chainIndex.from
-      if (header.isGenesis) {
-        genesisHashes(from.value)(currentGroup.value)
-      } else {
-        if (currentGroup == ChainIndex.from(dep).to) dep else header.uncleHash(currentGroup)
-      }
+    IOUtils.tryExecute(getInTipUnsafe(dep, currentGroup))
+  }
+
+  def getInTipUnsafe(dep: BlockHash, currentGroup: GroupIndex): BlockHash = {
+    val header = getBlockHeaderUnsafe(dep)
+    val from   = header.chainIndex.from
+    if (header.isGenesis) {
+      genesisHashes(from.value)(currentGroup.value)
+    } else {
+      if (currentGroup == header.chainIndex.to) dep else header.uncleHash(currentGroup)
     }
   }
 

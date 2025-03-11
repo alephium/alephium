@@ -543,6 +543,26 @@ trait FlowFixture
       timestamp: Option[TimeStamp]
   ): Block = {
     val deps = calcBlockDeps(blockFlow, chainIndex, timestamp)
+    mine(blockFlow, chainIndex, deps, txs, miner, timestamp)
+  }
+
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): Block = {
+    val miner = getGenesisLockupScript(chainIndex.to)
+    mine(blockFlow, chainIndex, deps, AVector.empty, miner, None)
+  }
+
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      txs: AVector[Transaction],
+      miner: LockupScript.Asset,
+      timestamp: Option[TimeStamp]
+  ): Block = {
     val blockTs = timestamp.getOrElse {
       val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
       FlowUtils.nextTimeStamp(parentTs)

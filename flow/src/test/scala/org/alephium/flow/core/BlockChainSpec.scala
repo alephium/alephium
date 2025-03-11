@@ -962,4 +962,25 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       .from(0 until 4)
       .flatMap(i => AVector(mainChainBlocks(i), forkChainBlocks(i))) :+ mainChainBlocks.last
   }
+
+  it should "tryGetBlocksFromUnsafe" in new Fixture {
+    val chain   = buildBlockChain()
+    val blocks0 = chainGenOf(3, genesis).sample.get
+    val blocks1 = chainGenOf(3, genesis).sample.get
+    val blocks2 = chainGenOf(3, blocks1.head).sample.get
+    val blocks3 = chainGenOf(1, genesis).sample.get
+
+    addBlocks(chain, blocks0)
+    addBlocks(chain, blocks1)
+    addBlocks(chain, blocks2)
+    addBlocks(chain, blocks3)
+
+    chain.getAllTips.toSet is Set(
+      blocks0.last.hash,
+      blocks1.last.hash,
+      blocks2.last.hash,
+      blocks3.last.hash
+    )
+    chain.tryGetBlocksFromUnsafe(blocks1.head).toSet is Set.from(blocks1.tail ++ blocks2)
+  }
 }

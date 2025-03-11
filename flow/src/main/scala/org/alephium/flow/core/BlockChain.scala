@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import akka.util.ByteString
 
@@ -407,6 +408,28 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getBlocksWithUnclesByHeightsUnsafe(heights: AVector[Int]): AVector[Block] = {
     heights.flatMap(height => getHashesUnsafe(height).map(getBlockUnsafe))
+  }
+
+  def tryGetBlocksFromUnsafe(from: Block): AVector[Block] = {
+    getAllTips.flatMap(tryGetBlocksBetweenUnsafe(from, _))
+  }
+
+  private def tryGetBlocksBetweenUnsafe(from: Block, tip: BlockHash): AVector[Block] = {
+    val fromHeight = getHeightUnsafe(from.hash)
+
+    @tailrec def iter(acc: mutable.ArrayBuffer[Block], hash: BlockHash): AVector[Block] = {
+      val height = getHeightUnsafe(hash)
+      if (height > fromHeight) {
+        val block = getBlockUnsafe(hash)
+        iter(acc.addOne(block), block.parentHash)
+      } else if (height == fromHeight) {
+        if (hash == from.hash) AVector.from(acc) else AVector.empty
+      } else {
+        AVector.empty
+      }
+    }
+
+    iter(mutable.ArrayBuffer.empty[Block], tip)
   }
 }
 
