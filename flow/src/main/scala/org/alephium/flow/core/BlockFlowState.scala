@@ -580,7 +580,7 @@ trait BlockFlowState extends FlowTipsUtil {
     for {
       diffs  <- getHashesForUpdates(mainGroup, blockDeps)
       blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
-      _ <- blocks.sortBy(_.timestamp).foreachE { block =>
+      _ <- blocks.stableSortBy(_.timestamp).foreachE { block =>
         val chainIndex = block.chainIndex
         val isInBlockFlow =
           if (chainIndex.to == mainGroup && !chainIndex.isIntraGroup) {

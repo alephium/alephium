@@ -256,4 +256,37 @@ class BlockFlowStateSpec extends AlephiumSpec {
       .rightValue
       .nonEmpty is true
   }
+
+  it should "sort blocks properly" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 1)
+    )
+    setHardForkSince(HardFork.Danube)
+
+    val now = TimeStamp.now()
+    val blocks = (1 to 3).map { toGroup =>
+      val chainIndex = ChainIndex.unsafe(0, toGroup)
+      transfer(blockFlow, chainIndex, now)
+    }
+    addAndCheck(blockFlow, blocks: _*)
+
+    (1 to 3).foreach { toGroup =>
+      val chainIndex = ChainIndex.unsafe(0, toGroup)
+      (1 to 10).foreach { _ =>
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      }
+    }
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block3)
+
+    val worldState = blockFlow.getBestPersistedWorldState(GroupIndex.unsafe(0)).rightValue
+    val output0    = blocks(0).nonCoinbase.head.fixedOutputRefs.last
+    val output1    = blocks(1).nonCoinbase.head.fixedOutputRefs.last
+    val output2    = blocks(2).nonCoinbase.head.fixedOutputRefs.last
+    worldState.existOutput(output0) isE true
+    worldState.existOutput(output1) isE false
+    worldState.existOutput(output2) isE false
+  }
 }
