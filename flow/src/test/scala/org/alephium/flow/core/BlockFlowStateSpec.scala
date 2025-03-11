@@ -28,6 +28,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
   }
 
   it should "calculate all the hashes for state update" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     def prepare(chainIndex: ChainIndex): Block = {
       val block = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
@@ -231,11 +232,16 @@ class BlockFlowStateSpec extends AlephiumSpec {
       .rightValue
       .isEmpty is true
 
+    val lockupScript = getGenesisLockupScript(GroupIndex.unsafe(0))
+    val utxos        = groupView0.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue
+    utxos.exists(_.ref == block3.nonCoinbase.head.fixedOutputRefs.last) is true
+    utxos.exists(_.ref == block4.nonCoinbase.head.fixedOutputRefs.last) is false
+
     val groupView1 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(2)).rightValue
     groupView1
       .getPreAssetOutputInfo(block1.nonCoinbase.head.fixedOutputRefs.head)
       .rightValue
-      .isEmpty is true
+      .nonEmpty is true
 
     val block5 = transfer(blockFlow, ChainIndex.unsafe(1, 0), nextBlockTs)
     addAndCheck(blockFlow, block5)
@@ -243,7 +249,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     groupView2
       .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
       .rightValue
-      .isEmpty is true
+      .nonEmpty is true
     val groupView3 = blockFlow.getImmutableGroupViewIncludePool(GroupIndex.unsafe(0)).rightValue
     groupView3
       .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)

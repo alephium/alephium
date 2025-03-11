@@ -16,6 +16,10 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+import scala.collection.mutable
+
+import org.alephium.flow.core.BlockFlowState.BlockCache
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
@@ -26,6 +30,72 @@ final case class AccountView(
     outBlocks: AVector[Block]
 ) {
   private val mainGroup: GroupIndex = checkpoint.chainIndex.from
+  private var cache: Option[(AVector[BlockCache], AVector[Transaction])] = None
+
+  def getBlockCachesAndConflictedTxs(
+      blockFlowState: BlockFlowState
+  ): IOResult[(AVector[BlockCache], AVector[Transaction])] = {
+    cache match {
+      case Some(value) => Right(value)
+      case None =>
+        IOUtils.tryExecute(calcBlockCachesAndConflictedTxsUnsafe(blockFlowState)).map { result =>
+          cache = Some(result)
+          result
+        }
+    }
+  }
+
+  private def calcBlockCachesAndConflictedTxsUnsafe(blockFlowState: BlockFlowState) = {
+    val allBlocks = inBlocks ++ outBlocks
+    val filteredBlocks = AVector
+      .from(allBlocks.groupBy(_.chainIndex).flatMap(v => getMainChainBlocks(blockFlowState, v._2)))
+      .sortBy(_.timestamp)
+    val blockCaches   = mutable.ArrayBuffer.empty[BlockFlowState.BlockCache]
+    val usedInputs    = mutable.Set.empty[TxOutputRef]
+    val conflictedTxs = mutable.ArrayBuffer.empty[Transaction]
+    filteredBlocks.foreach { block =>
+      blockCaches.addOne(blockFlowState.getBlockCacheUnsafe(mainGroup, block))
+      if (block.chainIndex.from == mainGroup) {
+        block.nonCoinbase.foreach { tx =>
+          if (tx.allInputRefs.exists(usedInputs.contains)) conflictedTxs.addOne(tx)
+          usedInputs.addAll(tx.allInputRefs)
+        }
+      }
+    }
+    (AVector.from(blockCaches), AVector.from(conflictedTxs))
+  }
+
+  @inline private def getMainChainBlocks(
+      blockFlowState: BlockFlowState,
+      blocks: AVector[Block]
+  ): AVector[Block] = {
+    assume(blocks.nonEmpty)
+    if (blocks.length == 1) {
+      blocks
+    } else {
+      val chain  = blockFlowState.getBlockChain(blocks.head.chainIndex)
+      val sorted = blocks.sortBy(_.hash)(chain.blockHashOrdering.reverse)
+      val acc    = AVector.ofCapacity[Block](sorted.length) :+ sorted.head
+      getMainChainBlocks(sorted.head, sorted.tail, acc)
+    }
+  }
+
+  @tailrec private def getMainChainBlocks(
+      tip: Block,
+      remains: AVector[Block],
+      acc: AVector[Block]
+  ): AVector[Block] = {
+    if (remains.isEmpty) {
+      acc
+    } else {
+      val block = remains.head
+      if (block.hash == tip.parentHash) {
+        getMainChainBlocks(block, remains.tail, acc :+ block)
+      } else {
+        getMainChainBlocks(tip, remains.tail, acc)
+      }
+    }
+  }
 
   private def tryAddInBlockUnsafe(blockFlow: BlockFlow, block: Block): Option[AccountView] = {
     val inChainIndex = block.chainIndex

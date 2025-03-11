@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.collection.mutable
+
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector}
@@ -163,5 +165,73 @@ class AccountViewSpec extends AlephiumSpec {
       val block3 = mineBlockInForkChain(chainIndex, 1)
       accountView.tryAddOutBlock(blockFlow, block3).rightValue.isEmpty is true
     }
+  }
+
+  it should "calculate block caches and conflicted txs" in new Fixture {
+    otherGroups.foreach { from =>
+      val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(from, mainGroup.value))
+      addAndCheck(blockFlow, block0)
+      val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(from, from))
+      addAndCheck(blockFlow, block1)
+      val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(mainGroup.value, from))
+      addAndCheck(blockFlow, block2)
+    }
+
+    val checkpoint  = emptyBlock(blockFlow, ChainIndex(mainGroup, mainGroup))
+    var accountView = AccountView.from(blockFlow, checkpoint).rightValue
+    def addToView(block: Block): Unit = {
+      val newView = if (block.chainIndex.to == mainGroup) {
+        accountView.tryAddInBlock(blockFlow, block)
+      } else {
+        accountView.tryAddOutBlock(blockFlow, block)
+      }
+      accountView = newView.rightValue.get
+    }
+
+    val blocks = otherGroups.flatMap { from =>
+      val chainIndex0 = ChainIndex.unsafe(from, mainGroup.value)
+      val block0      = transfer(blockFlow, chainIndex0)
+      val block1      = transfer(blockFlow, chainIndex0)
+      val chainIndex1 = ChainIndex.unsafe(mainGroup.value, from)
+      val block2      = transfer(blockFlow, chainIndex1)
+      val block3      = transfer(blockFlow, chainIndex1)
+      AVector(block0, block1, block2, block3)
+    }
+    addAndCheck(blockFlow, blocks: _*)
+    blocks.foreach(addToView)
+
+    val mainchainBlocks = mutable.ArrayBuffer.empty[Block]
+    otherGroups.foreach { from =>
+      val chainIndex0 = ChainIndex.unsafe(from, mainGroup.value)
+      val block0      = emptyBlock(blockFlow, chainIndex0)
+      val chainIndex1 = ChainIndex.unsafe(mainGroup.value, from)
+      val block1      = emptyBlock(blockFlow, chainIndex1)
+      addAndCheck(blockFlow, block0, block1)
+      addToView(block0)
+      addToView(block1)
+      mainchainBlocks.addAll(
+        Seq(
+          blockFlow.getBlockUnsafe(block0.parentHash),
+          block0,
+          blockFlow.getBlockUnsafe(block1.parentHash),
+          block1
+        )
+      )
+    }
+
+    val (blockCaches0, conflictedTxs0) =
+      accountView.getBlockCachesAndConflictedTxs(blockFlow).rightValue
+    blockCaches0.toSet is mainchainBlocks.map(blockFlow.getBlockCacheUnsafe(mainGroup, _)).toSet
+
+    conflictedTxs0 is AVector
+      .from(otherGroups)
+      .map { to =>
+        val chainIndex = ChainIndex.unsafe(mainGroup.value, to)
+        val hash       = blockFlow.getHashes(chainIndex, 2).rightValue.head
+        blockFlow.getBlockUnsafe(hash)
+      }
+      .sortBy(_.timestamp)
+      .tail
+      .map(_.nonCoinbase.head)
   }
 }
