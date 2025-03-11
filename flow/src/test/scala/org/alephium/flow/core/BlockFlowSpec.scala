@@ -16,6 +16,7 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
 import scala.util.Random
 
 import org.scalacheck.Gen
@@ -31,7 +32,7 @@ import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, TokenIssuance}
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256, UnsecureRandom}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp, U256, UnsecureRandom}
 
 // scalastyle:off file.size.limit
 class BlockFlowSpec extends AlephiumSpec {
@@ -1143,6 +1144,80 @@ class BlockFlowSpec extends AlephiumSpec {
     val block      = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block)
     blockFlow.getCache(block).blockCache.contains(block.hash) is false
+  }
+
+  it should "update account view" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    @tailrec def mineBlock(chainIndex: ChainIndex, condition: Block => Boolean): Block = {
+      val block = emptyBlock(blockFlow, chainIndex)
+      if (condition(block)) block else mineBlock(chainIndex, condition)
+    }
+
+    val chainIndex0 = ChainIndex.unsafe(0, 1)
+    val block0      = emptyBlock(blockFlow, chainIndex0)
+    addAndCheck(blockFlow, block0)
+    blockFlow.getAccountView(chainIndex0.from).outBlocks.contains(block0) is true
+    blockFlow.getAccountView(chainIndex0.to).inBlocks.contains(block0) is true
+    blockFlow.getAccountView(chainIndex0.from).checkpoint.isGenesis is true
+
+    val chainIndex1 = ChainIndex.unsafe(0, 0)
+    val block1      = emptyBlock(blockFlow, chainIndex1)
+    val block2 = mineBlock(
+      chainIndex1,
+      b => Bytes.byteStringOrdering.compare(block1.hash.bytes, b.hash.bytes) > 0
+    )
+    val block3 = mineBlock(
+      chainIndex1,
+      b => Bytes.byteStringOrdering.compare(block1.hash.bytes, b.hash.bytes) < 0
+    )
+    addAndCheck(blockFlow, block1)
+    blockFlow.getAccountView(chainIndex0.from).checkpoint is block1
+
+    addAndCheck(blockFlow, block2)
+    blockFlow.getHashes(chainIndex1, 1) isE AVector(block1.hash, block2.hash)
+    blockFlow.getAccountView(chainIndex0.from).checkpoint is block1
+
+    addAndCheck(blockFlow, block3)
+    blockFlow.getHashes(chainIndex1, 1) isE AVector(block3.hash, block1.hash, block2.hash)
+    blockFlow.getAccountView(chainIndex0.from).checkpoint is block3
+
+    val deps   = block2.blockDeps.deps.replace(2, block2.hash)
+    val block4 = mine(blockFlow, chainIndex1, BlockDeps.unsafe(deps))
+    block4.parentHash is block2.hash
+    addAndCheck(blockFlow, block4)
+    blockFlow.getAccountView(chainIndex0.from).checkpoint is block4
+  }
+
+  it should "properly update the account view for multiple brokers" in new FlowFixture { Self =>
+    val newConfigFixture = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+      override lazy val genesisKeys               = Self.genesisKeys
+    }
+
+    val anotherConfig   = newConfigFixture.config
+    val anotherStorages = StoragesFixture.buildStorages(newConfigFixture.rootPath)
+    val blockFlow1      = BlockFlow.fromGenesisUnsafe(anotherConfig, anotherStorages)
+    val blockFlow0      = Self.blockFlow
+
+    val block0 = emptyBlock(blockFlow0, ChainIndex.unsafe(0, 1))
+    val block1 = emptyBlock(blockFlow1, ChainIndex.unsafe(1, 0))
+    addAndCheck(blockFlow0, block0)
+    addAndCheck0(blockFlow0, block1)
+    addAndCheck(blockFlow1, block1)
+    addAndCheck0(blockFlow1, block0)
+
+    val accountView0 = blockFlow0.getAccountView(GroupIndex.unsafe(0))
+    accountView0.outBlocks.contains(block0) is true
+    accountView0.outBlocks.contains(block1) is false
+    accountView0.inBlocks.contains(block0) is false
+    accountView0.inBlocks.contains(block1) is true
+
+    val accountView1 = blockFlow1.getAccountView(GroupIndex.unsafe(1))
+    accountView1.outBlocks.contains(block0) is false
+    accountView1.outBlocks.contains(block1) is true
+    accountView1.inBlocks.contains(block0) is true
+    accountView1.inBlocks.contains(block1) is false
   }
 
   def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {

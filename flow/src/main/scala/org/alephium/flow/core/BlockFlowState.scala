@@ -74,6 +74,27 @@ trait BlockFlowState extends FlowTipsUtil {
     flow.getResult()
   }
 
+  @volatile private val accountViews: Array[AccountView] = {
+    Array.tabulate(brokerConfig.groupNumPerBroker) { fromShift =>
+      val mainGroup  = brokerConfig.groupRange(fromShift)
+      val checkpoint = genesisBlocks(mainGroup)(mainGroup)
+      AccountView(checkpoint, AVector.empty, AVector.empty)
+    }
+  }
+
+  @inline def getAccountView(mainGroup: GroupIndex): AccountView = {
+    val groupShift = brokerConfig.groupIndexOfBroker(mainGroup)
+    accountViews(groupShift)
+  }
+
+  @inline def updateAccountView(
+      accountView: AccountView,
+      mainGroup: GroupIndex
+  ): Unit = {
+    val groupShift = brokerConfig.groupIndexOfBroker(mainGroup)
+    accountViews(groupShift) = accountView
+  }
+
   def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState
   def blockchainBuilder: Block => BlockChain
   def blockheaderChainBuilder: BlockHeader => BlockHeaderChain

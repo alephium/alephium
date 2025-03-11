@@ -144,6 +144,8 @@ trait FlowUtils
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
+  def updateAccountView(block: Block): IOResult[Unit]
+
   def collectPooledTxs(chainIndex: ChainIndex, hardFork: HardFork): AVector[TransactionTemplate] = {
     val mempool = getMemPool(chainIndex)
     if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {

@@ -33,7 +33,8 @@ final case class AllHandlers(
     dependencyHandler: ActorRefT[DependencyHandler.Command],
     viewHandler: ActorRefT[ViewHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]],
+    accountViewHandler: ActorRefT[Unit]
 )(implicit brokerConfig: BrokerConfig) {
   def orderedHandlers: Seq[ActorRefT[_]] = {
     (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
@@ -131,13 +132,18 @@ object AllHandlers {
     val viewHandlerProps = ViewHandler.props(blockFlow).withDispatcher(MiningDispatcher)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
+    val accountViewHandlerProps = AccountViewHandler.props(blockFlow)
+    val accountViewHandler =
+      ActorRefT.build[Unit](system, accountViewHandlerProps, s"AccountViewHandler$namePostfix")
+
     AllHandlers(
       flowHandler,
       txHandler,
       dependencyHandler,
       viewHandler,
       blockHandlers,
-      headerHandlers
+      headerHandlers,
+      accountViewHandler
     )
   }
 

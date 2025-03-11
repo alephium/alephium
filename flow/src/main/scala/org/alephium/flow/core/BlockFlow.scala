@@ -236,10 +236,12 @@ object BlockFlow extends StrictLogging {
     blockflow.sanityCheckUnsafe()
     Env.forProd(logger.info(s"Load BlockFlow from storage: #${blockflow.numHashes} blocks/headers"))
     blockflow.updateBestDepsAfterLoadingUnsafe()
+    blockflow.updateAccountViewAfterLoadingUnsafe()
     cacheBlockFlow(blockflow)
     blockflow
   }
 
+  // scalastyle:off number.of.methods
   class BlockFlowImpl(
       val genesisBlocks: AVector[AVector[Block]],
       val blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState,
@@ -466,6 +468,15 @@ object BlockFlow extends StrictLogging {
       updateBestFlowSkeletonUnsafe()
     }
 
+    def updateAccountViewAfterLoadingUnsafe(): Unit = {
+      brokerConfig.groupRange.foreach { mainGroup =>
+        val chainIndex = ChainIndex.unsafe(mainGroup, mainGroup)
+        val bestTip    = getBlockChain(chainIndex).getBestTipUnsafe()
+        val checkpoint = getBlockUnsafe(bestTip)
+        updateAccountView(AccountView.unsafe(this, checkpoint), chainIndex.from)
+      }
+    }
+
     def updateViewPreDanube(): IOResult[Unit] = {
       IOUtils.tryExecute(updateViewPreDanubeUnsafe())
     }
@@ -496,7 +507,71 @@ object BlockFlow extends StrictLogging {
     def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit] = {
       IOUtils.tryExecute(updateViewPerChainIndexDanubeUnsafe(chainIndex))
     }
+
+    @inline private def needToUpdateCheckpoint(
+        newCheckpoint: Block,
+        oldCheckpoint: Block
+    ): IOResult[Boolean] = {
+      IOUtils.tryExecute(blockHashOrdering.compare(newCheckpoint.hash, oldCheckpoint.hash) > 0)
+    }
+
+    private def updateAccountViewWithCheckpointBlock(newCheckpoint: Block): IOResult[Unit] = {
+      val chainIndex  = newCheckpoint.chainIndex
+      val currentView = getAccountView(chainIndex.from)
+      if (newCheckpoint.parentHash == currentView.checkpoint.hash) {
+        createAndUpdateAccountView(newCheckpoint)
+      } else {
+        needToUpdateCheckpoint(newCheckpoint, currentView.checkpoint).flatMap { needToUpdate =>
+          if (needToUpdate) {
+            createAndUpdateAccountView(newCheckpoint)
+          } else {
+            Right(())
+          }
+        }
+      }
+    }
+
+    @inline private def createAndUpdateAccountView(checkpointBlock: Block): IOResult[Unit] = {
+      AccountView.from(this, checkpointBlock).map { accountView =>
+        updateAccountView(accountView, checkpointBlock.chainIndex.from)
+      }
+    }
+
+    private def updateAccountViewWithInBlock(block: Block): IOResult[Unit] = {
+      val chainIndex = block.chainIndex
+      if (brokerConfig.contains(chainIndex.to)) {
+        val currentView = getAccountView(chainIndex.to)
+        currentView.tryAddInBlock(this, block).map { newViewOpt =>
+          newViewOpt.foreach(updateAccountView(_, chainIndex.to))
+        }
+      } else {
+        Right(())
+      }
+    }
+
+    private def updateAccountViewWithOutBlock(block: Block): IOResult[Unit] = {
+      val chainIndex = block.chainIndex
+      if (brokerConfig.contains(chainIndex.from)) {
+        val currentView = getAccountView(chainIndex.from)
+        currentView.tryAddOutBlock(this, block).map { newViewOpt =>
+          newViewOpt.foreach(updateAccountView(_, chainIndex.from))
+        }
+      } else {
+        Right(())
+      }
+    }
+
+    def updateAccountView(block: Block): IOResult[Unit] = {
+      val chainIndex = block.chainIndex
+      if (chainIndex.isIntraGroup) {
+        updateAccountViewWithCheckpointBlock(block)
+      } else {
+        updateAccountViewWithOutBlock(block)
+        updateAccountViewWithInBlock(block)
+      }
+    }
   }
+  // scalastyle:on number.of.methods
 
   def randomGroupOrders(hash: BlockHash)(implicit config: GroupConfig): AVector[Int] = {
     val groupOrders = Array.tabulate(config.groups)(identity)
