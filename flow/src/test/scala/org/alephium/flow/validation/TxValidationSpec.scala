@@ -1480,9 +1480,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val signature = SignatureSchema.sign(unsignedTx.id.bytes, fromPriKey)
     val tx        = Transaction.from(unsignedTx, AVector(signature))
     tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
-    tx.fail(InvalidLockupScriptPreDanue)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-    tx.fail(InvalidLockupScriptPreDanue)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-    tx.fail(InvalidLockupScriptPreDanue)(
+    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
+    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
+    tx.fail(InvalidLockupScriptPreDanube)(
       validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
     )
   }

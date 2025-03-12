@@ -578,7 +578,7 @@ object TxValidation {
         Right(())
       } else {
         output.lockupScript match {
-          case _: LockupScript.P2PK => invalidTx(InvalidLockupScriptPreDanue)
+          case _: LockupScript.P2PK => invalidTx(InvalidLockupScriptPreDanube)
           case _                    => Right(())
         }
       }

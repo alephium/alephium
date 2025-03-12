@@ -43,7 +43,7 @@ object Message {
     val header   = serde.serialize[Header](message.header)
     val payload  = Payload.serialize(message.payload)
     val data     = header ++ payload
-    val checksum = serde.serialize(Checksum.calc(data))
+    val checksum = Checksum.calcAndSerialize(data)
     val length   = MessageSerde.length(data)
 
     magic ++ checksum ++ length ++ data

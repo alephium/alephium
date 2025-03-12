@@ -234,7 +234,7 @@ object LockupScript {
     private val safePublicKeySerde: Serde[PublicKeyType] = new Serde[PublicKeyType] {
       override def serialize(input: PublicKeyType): ByteString = {
         val publicKey = PublicKeyType.serde.serialize(input)
-        val checksum  = Checksum.serde.serialize(Checksum.calc(publicKey))
+        val checksum  = Checksum.calcAndSerialize(publicKey)
         publicKey ++ checksum
       }
 

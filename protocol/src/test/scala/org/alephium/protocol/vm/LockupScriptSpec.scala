@@ -82,10 +82,10 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val lockupScript = p2pkLockupGen(GroupIndex.unsafe(1)).sample.get
     lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
     val publicKeyBytes = serialize(lockupScript.publicKey)
-    val checksum       = Checksum.calc(publicKeyBytes)
+    val checksum       = Checksum.calcAndSerialize(publicKeyBytes)
     val groupByte      = ByteString(lockupScript.groupIndex.value.toByte)
     val bytes =
-      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum.bytes ++ groupByte)}")
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum ++ groupByte)}")
     serialize[LockupScript](lockupScript) is bytes
     deserialize[LockupScript](bytes) isE lockupScript
 
