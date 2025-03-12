@@ -437,9 +437,8 @@ object AlephiumConfig {
 
   implicit val alephiumValueReader: ValueReader[AlephiumConfig] =
     valueReader { implicit cfg =>
-      implicit val brokerSetting: BrokerSetting = as[BrokerSetting]("broker")
       TempAlephiumConfig(
-        brokerSetting,
+        as[BrokerSetting]("broker"),
         as[TempConsensusSettings]("consensus"),
         as[TempMiningSetting]("mining"),
         as[TempNetworkSetting]("network"),

@@ -2881,7 +2881,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val pubKey = PublicKeyType.SecP256K1(priKey.publicKey)
     (0 until groupConfig.groups).foreach { group =>
       val genesisKey     = genesisKeys(group)._1
-      val toLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))
+      val toLockupScript = LockupScript.p2pk(pubKey, GroupIndex.unsafe(group))
       val block = transfer(
         blockFlow,
         genesisKey,
@@ -2894,7 +2894,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     (0 until groupConfig.groups).foreach { group =>
-      val fromLockupScript = LockupScript.p2pk(pubKey, Some(GroupIndex.unsafe(group)))
+      val fromLockupScript = LockupScript.p2pk(pubKey, GroupIndex.unsafe(group))
       val fromUnlockScript = UnlockScript.P2PK
       val toLockupScript   = LockupScript.p2pkh(genesisKeys(group)._2)
       val outputInfos = AVector(TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None))

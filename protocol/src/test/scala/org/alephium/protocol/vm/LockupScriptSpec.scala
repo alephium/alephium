@@ -91,7 +91,7 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     (0 until groupConfig.groups).foreach { value =>
       val groupIndex = GroupIndex.unsafe(value)
-      val p2pk       = LockupScript.P2PK.from(lockupScript.publicKey, Some(groupIndex))
+      val p2pk       = LockupScript.p2pk(lockupScript.publicKey, groupIndex)
       p2pk.groupIndex is groupIndex
     }
 

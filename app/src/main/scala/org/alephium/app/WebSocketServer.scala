@@ -111,11 +111,7 @@ object WebSocketServer {
   object EventHandler {
     def props(
         vertxEventBus: VertxEventBus
-    )(implicit
-        networkConfig: NetworkConfig,
-        groupConfig: GroupConfig,
-        apiConfig: ApiConfig
-    ): Props = {
+    )(implicit networkConfig: NetworkConfig, apiConfig: ApiConfig): Props = {
       Props(new EventHandler(vertxEventBus))
     }
 
@@ -125,7 +121,6 @@ object WebSocketServer {
   }
   class EventHandler(vertxEventBus: VertxEventBus)(implicit
       val networkConfig: NetworkConfig,
-      val groupConfig: GroupConfig,
       apiConfig: ApiConfig
   ) extends BaseActor
       with ApiModelCodec {

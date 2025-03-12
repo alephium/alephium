@@ -66,13 +66,13 @@ object LockupScript {
 
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
-  def fromBase58(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript] = {
+  def fromBase58(input: String): Option[LockupScript] = {
     if (input.length > 2 && input(input.length - 2) == '@') {
-      input.takeRight(1).toIntOption.flatMap(GroupIndex.from) match {
-        case Some(groupIndex) =>
+      input.takeRight(1).toByteOption match {
+        case Some(groupByte) =>
           Base58.decode(input.dropRight(2)) match {
             case Some(bytes) if bytes.startsWith(ByteString(4)) =>
-              P2PK.fromDecodedBase58(bytes.drop(1), Some(groupIndex))
+              P2PK.fromDecodedBase58(bytes.drop(1), groupByte)
             case _ => None
           }
         case None => None
@@ -80,7 +80,7 @@ object LockupScript {
     } else {
       Base58.decode(input).flatMap { bytes =>
         if (bytes.startsWith(ByteString(4))) {
-          P2PK.fromDecodedBase58(bytes.drop(1), None)
+          None
         } else {
           deserialize[LockupScript](bytes).toOption
         }
@@ -88,7 +88,7 @@ object LockupScript {
     }
   }
 
-  def asset(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript.Asset] = {
+  def asset(input: String): Option[LockupScript.Asset] = {
     fromBase58(input).flatMap {
       case e: LockupScript.Asset => Some(e)
       case _                     => None
@@ -107,17 +107,13 @@ object LockupScript {
     P2SH(Hash.hash(serdeImpl[StatelessScript].serialize(script)))
   def p2sh(scriptHash: Hash): P2SH     = P2SH(scriptHash)
   def p2c(contractId: ContractId): P2C = P2C(contractId)
-  def p2c(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript.P2C] = {
+  def p2c(input: String): Option[LockupScript.P2C] = {
     fromBase58(input).flatMap {
       case e: LockupScript.P2C => Some(e)
       case _                   => None
     }
   }
-  def p2pk(key: PublicKeyType, groupIndexOpt: Option[GroupIndex])(implicit
-      groupConfig: GroupConfig
-  ): P2PK = {
-    P2PK.from(key, groupIndexOpt)
-  }
+  def p2pk(key: PublicKeyType, groupIndex: GroupIndex): P2PK = P2PK(key, groupIndex)
 
   sealed trait Asset extends LockupScript {
     def hintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
@@ -204,30 +200,18 @@ object LockupScript {
   object P2PK {
     private val groupByteLength: Int = 1
 
-    def from(publicKey: PublicKeyType)(implicit groupConfig: GroupConfig): P2PK =
-      from(publicKey, None)
-
-    def from(publicKey: PublicKeyType, groupIndexOpt: Option[GroupIndex])(implicit
-        groupConfig: GroupConfig
-    ): P2PK = {
-      groupIndexOpt match {
-        case Some(groupIndex) => P2PK(publicKey, groupIndex.value.toByte)
-        case None             => P2PK(publicKey, publicKey.scriptHint.groupIndex.value.toByte)
-      }
+    def apply(publicKey: PublicKeyType, groupIndex: GroupIndex): P2PK = {
+      P2PK(publicKey, groupIndex.value.toByte)
     }
 
-    def fromDecodedBase58(bytes: ByteString, groupIndexOpt: Option[GroupIndex])(implicit
-        groupConfig: GroupConfig
-    ): Option[P2PK] = {
+    def unsafe(publicKey: PublicKeyType, groupByte: Byte): P2PK = {
+      P2PK(publicKey, groupByte)
+    }
+
+    def fromDecodedBase58(bytes: ByteString, groupByte: Byte): Option[P2PK] = {
       safePublicKeySerde._deserialize(bytes).toOption match {
-        case Some(key) if key.rest.isEmpty => Some(from(key.value, groupIndexOpt))
-        case Some(key) =>
-          serdeImpl[Byte].deserialize(key.rest).toOption match {
-            case Some(groupByte) if groupIndexOpt.forall(_.value.toByte == groupByte) =>
-              Some(P2PK(key.value, groupByte))
-            case _ => None
-          }
-        case None => None
+        case Some(key) if key.rest.isEmpty => Some(P2PK(key.value, groupByte))
+        case _                             => None
       }
     }
 
@@ -249,7 +233,7 @@ object LockupScript {
     }
 
     implicit val serde: Serde[P2PK] = {
-      Serde.forProduct2(P2PK.apply, (p: P2PK) => (p.publicKey, p.groupByte))(
+      Serde.forProduct2(P2PK.unsafe, (p: P2PK) => (p.publicKey, p.groupByte))(
         safePublicKeySerde,
         serdeImpl[Byte]
       )

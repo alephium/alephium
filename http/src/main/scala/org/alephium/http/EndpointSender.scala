@@ -28,13 +28,11 @@ import sttp.tapir.client.sttp.SttpClientInterpreter
 
 import org.alephium.api.{ApiError, BaseEndpoint}
 import org.alephium.api.model.ApiKey
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{AVector, Service}
 import org.alephium.util.Utils.getStackTrace
 
 // scalastyle:off method.length
 class EndpointSender(val maybeApiKey: Option[ApiKey])(implicit
-    val groupConfig: GroupConfig,
     val executionContext: ExecutionContext
 ) extends BaseEndpoint
     with SttpClientInterpreter

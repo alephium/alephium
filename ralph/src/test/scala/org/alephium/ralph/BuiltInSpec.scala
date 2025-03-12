@@ -16,12 +16,11 @@
 
 package org.alephium.ralph
 
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.vm._
 import org.alephium.ralph.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
 import org.alephium.util.AlephiumSpec
 
-class BuiltInSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class BuiltInSpec extends AlephiumSpec {
   it should "check all functions that can use preapproved assets" in {
     BuiltIn.statelessFuncs.values.count(_.usePreapprovedAssets) is 0
     BuiltIn.statefulFuncs.values.filter(_.usePreapprovedAssets).toSet is

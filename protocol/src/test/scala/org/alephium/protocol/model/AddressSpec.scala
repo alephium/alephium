@@ -23,13 +23,12 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Base58, Hex}
 
-class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default with NoIndexModelGenerators {
+class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "calculate group index" in {
     def testP2pkh(pubKey: String, expectedGroup: Int) = {
@@ -232,19 +231,14 @@ class AddressSpec extends AlephiumSpec with GroupConfigFixture.Default with NoIn
       Base58.encode(bytes) isnot address
 
       Address.from(script).toBase58 is address
-      Address.fromBase58(address) is Some(Address.Asset(LockupScript.p2pk(pubKey.get, None)))
+      Address.fromBase58(address) is Some(
+        Address.Asset(LockupScript.p2pk(pubKey.get, groupIndex.get))
+      )
       groupedAddress.foreach(Address.fromBase58(_) is Some(Address.Asset(script)))
-
-      val fullAddress = Base58.encode(bytes)
-      Address.fromBase58(fullAddress) is Some(Address.Asset(script))
-      Address.fromBase58(s"$fullAddress@${script.groupIndex.value}") is Some(Address.Asset(script))
-      Address.fromBase58(
-        s"$fullAddress@${new GroupIndex(script.groupIndex.value + 1).value}"
-      ) is None
-      Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get)) is None
+      Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(0, 5)).sample.get)) is None
     }
 
-    def script: LockupScript.P2PK = LockupScript.p2pk(pubKey.get, groupIndex)
+    def script: LockupScript.P2PK = LockupScript.p2pk(pubKey.get, groupIndex.get)
   }
 
   case class AddressVerifyP2PKH(

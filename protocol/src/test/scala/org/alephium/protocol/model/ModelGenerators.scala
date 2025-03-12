@@ -73,9 +73,7 @@ trait LockupScriptGenerators extends Generators {
   def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
     Gen
       .const(())
-      .map(_ =>
-        LockupScript.p2pk(PublicKeyType.SecP256K1(SecP256K1PublicKey.generate), Some(groupIndex))
-      )
+      .map(_ => LockupScript.p2pk(PublicKeyType.SecP256K1(SecP256K1PublicKey.generate), groupIndex))
   }
 
   def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {

@@ -16,10 +16,9 @@
 
 package org.alephium.ralph
 
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.util.{AlephiumFixture, AlephiumSpec, AVector}
 
-class TypeSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
     contractAst.getFieldsSignature() is
       "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2],gg:Account)"
@@ -80,7 +79,7 @@ class TypeSpec extends AlephiumSpec with GroupConfigFixture.Default {
   }
 }
 
-trait TypeSignatureFixture extends AlephiumFixture with GroupConfigFixture.Default {
+trait TypeSignatureFixture extends AlephiumFixture {
   val contractStr =
     s"""
        |struct Account {

@@ -43,9 +43,8 @@ import org.alephium.util.Hex.HexStringSyntax
 trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
-  private val lockupScript = LockupScript.p2pkh(
-    Hash.unsafe(Hex.unsafe("933bced74566a994aa03b73f8d0471772afcbc825b6a09a385ef6f399a741b8d"))
-  )
+  private val lockupScript =
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get

@@ -19,12 +19,11 @@ package org.alephium.api.model
 import org.alephium.api.{ApiModelCodec, JsonFixture}
 import org.alephium.json.Json.read
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Hex, I256, U256}
 
-class ValSpec extends ApiModelCodec with JsonFixture with GroupConfigFixture.Default {
+class ValSpec extends ApiModelCodec with JsonFixture {
   def generateContractAddress(): Address.Contract =
     Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
 

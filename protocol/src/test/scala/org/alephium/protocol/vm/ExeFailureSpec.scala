@@ -17,12 +17,11 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.{dustUtxoAmount, Address, TokenId}
 import org.alephium.protocol.vm.NotEnoughApprovedBalance
 import org.alephium.util.{AlephiumSpec, Hex, U256}
 
-class ExeFailureSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class ExeFailureSpec extends AlephiumSpec {
   it should "test NotEnoughApprovedBalance" in {
     val lockupScript =
       Address.fromBase58("1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6").get.lockupScript

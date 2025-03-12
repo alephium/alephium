@@ -1464,7 +1464,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "validate p2pk lockup script" in new Fixture {
     val (_, pubKey) = keypairGen.sample.value
     val groupIndex  = GroupIndex.unsafe(0)
-    val lockup      = LockupScript.p2pk(PublicKeyType.SecP256K1(pubKey), Some(groupIndex))
+    val lockup      = LockupScript.p2pk(PublicKeyType.SecP256K1(pubKey), groupIndex)
     val fromPriKey  = genesisKeys(groupIndex.value)._1
     val unsignedTx = blockFlow
       .transfer(
@@ -1490,7 +1490,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "validate p2pk unlock script" in new Fixture {
     val (priKey, pubKey) = keypairGen.sample.value
     val groupIndex       = GroupIndex.unsafe(0)
-    val lockup           = LockupScript.p2pk(PublicKeyType.SecP256K1(pubKey), Some(groupIndex))
+    val lockup           = LockupScript.p2pk(PublicKeyType.SecP256K1(pubKey), groupIndex)
     val unlock           = UnlockScript.P2PK
     val fromPriKey       = genesisKeys(groupIndex.value)._1
     val block =

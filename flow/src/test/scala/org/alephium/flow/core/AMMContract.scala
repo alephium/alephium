@@ -16,7 +16,6 @@
 
 package org.alephium.flow.core
 
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.ralph.Compiler
 
 object AMMContract {
@@ -62,8 +61,7 @@ object AMMContract {
        |  }
        |}
        |""".stripMargin
-  def swapCode(implicit groupConfig: GroupConfig) =
-    Compiler.compileContract(swapContract).toOption.get
+  def swapCode = Compiler.compileContract(swapContract).toOption.get
 
   lazy val swapProxyContract: String =
     s"""
@@ -88,6 +86,5 @@ object AMMContract {
        |
        |$swapContract
        |""".stripMargin
-  def swapProxyCode(implicit groupConfig: GroupConfig) =
-    Compiler.compileContract(swapProxyContract).toOption.get
+  def swapProxyCode = Compiler.compileContract(swapProxyContract).toOption.get
 }

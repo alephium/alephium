@@ -3344,13 +3344,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     val gasPrice  = nonCoinbaseMinGasPrice
     val gasFee    = gasPrice * gasAmount
 
-    lazy val script =
+    val script =
       s"""
          |TxScript Foo {
          |  emit Debug(`Hey, I am Foo`)
          |}
          |""".stripMargin
-    lazy val scriptCode = Compiler.compileTxScript(script).toOption.get
+    val scriptCode = Compiler.compileTxScript(script).toOption.get
 
     def executeTxScript(
         buildExecuteScript: BuildExecuteScriptTx

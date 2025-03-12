@@ -20,10 +20,13 @@ import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json.{ReadWriter => RW, _}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.wallet.api.model._
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ModelCodecs extends ApiModelCodec {
+
+  implicit def groupConfig: GroupConfig
 
   implicit val addressesRW: RW[Addresses] = macroRW
 
