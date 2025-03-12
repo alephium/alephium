@@ -34,6 +34,7 @@ sealed trait LockupScript {
   def isAssetType: Boolean
 }
 
+// scalastyle:off number.of.methods
 object LockupScript {
   implicit val serde: Serde[LockupScript] = new Serde[LockupScript] {
     override def serialize(input: LockupScript): ByteString = {
@@ -67,24 +68,67 @@ object LockupScript {
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
   def fromBase58(input: String): Option[LockupScript] = {
+    decodeFromBase58(input).getLockupScript
+  }
+
+  trait DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript]
+  }
+  final case class ValidLockupScript(lockupScript: LockupScript) extends DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript] = Some(lockupScript)
+  }
+  case object InvalidLockupScript extends DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript] = None
+  }
+  final case class HalfDecodedP2PK(publicKeyType: PublicKeyType) extends DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript] = None
+  }
+
+  def decodeFromBase58(input: String): DecodeLockupScriptResult = {
     if (input.length > 2 && input(input.length - 2) == '@') {
-      input.takeRight(1).toByteOption match {
-        case Some(groupByte) =>
-          Base58.decode(input.dropRight(2)) match {
-            case Some(bytes) if bytes.startsWith(ByteString(4)) =>
-              P2PK.fromDecodedBase58(bytes.drop(1), groupByte)
-            case _ => None
-          }
-        case None => None
-      }
+      decodeP2PK(input)
     } else {
-      Base58.decode(input).flatMap { bytes =>
-        if (bytes.startsWith(ByteString(4))) {
-          None
-        } else {
-          deserialize[LockupScript](bytes).toOption
+      Base58
+        .decode(input)
+        .map { bytes =>
+          if (bytes.startsWith(ByteString(4))) {
+            halfDecodeP2PK(bytes)
+          } else {
+            decodeLockupScript(bytes)
+          }
         }
-      }
+        .getOrElse(InvalidLockupScript)
+    }
+  }
+
+  private def halfDecodeP2PK(bytes: ByteString): DecodeLockupScriptResult = {
+    P2PK.decodePublicKey(bytes.drop(1)) match {
+      case Some(publicKey) => HalfDecodedP2PK(publicKey)
+      case None            => InvalidLockupScript
+    }
+  }
+
+  private def decodeLockupScript(bytes: ByteString): DecodeLockupScriptResult = {
+    deserialize[LockupScript](bytes).toOption match {
+      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case None               => InvalidLockupScript
+    }
+  }
+
+  private def decodeP2PK(input: String): DecodeLockupScriptResult = {
+    val result = for {
+      groupByte <- input.takeRight(1).toByteOption
+      bytes     <- Base58.decode(input.dropRight(2))
+      lockupScriptOpt <-
+        if (bytes.startsWith(ByteString(4))) {
+          P2PK.fromDecodedBase58(bytes.drop(1), groupByte)
+        } else {
+          None
+        }
+    } yield lockupScriptOpt
+    result match {
+      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case None               => InvalidLockupScript
     }
   }
 
@@ -193,7 +237,7 @@ object LockupScript {
 
     def toBase58: String = {
       val bytes = serialize[LockupScript](this).dropRight(P2PK.groupByteLength)
-      Base58.encode(bytes)
+      s"${Base58.encode(bytes)}@$groupByte"
     }
   }
 
@@ -208,11 +252,12 @@ object LockupScript {
       P2PK(publicKey, groupByte)
     }
 
+    def decodePublicKey(bytes: ByteString): Option[PublicKeyType] = {
+      safePublicKeySerde.deserialize(bytes).toOption
+    }
+
     def fromDecodedBase58(bytes: ByteString, groupByte: Byte): Option[P2PK] = {
-      safePublicKeySerde._deserialize(bytes).toOption match {
-        case Some(key) if key.rest.isEmpty => Some(P2PK(key.value, groupByte))
-        case _                             => None
-      }
+      decodePublicKey(bytes).map(P2PK(_, groupByte))
     }
 
     private val safePublicKeySerde: Serde[PublicKeyType] = new Serde[PublicKeyType] {
@@ -245,3 +290,4 @@ object LockupScript {
     GroupIndex.unsafe(hash % config.groups)
   }
 }
+// scalastyle:on number.of.methods

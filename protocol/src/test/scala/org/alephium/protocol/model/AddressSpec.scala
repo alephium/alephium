@@ -162,11 +162,9 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "encode and decode between p2pk address and public key" in {
-    val address   = "3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L"
     val publicKey = "00e10a76a87b3211ca2f05be47b9ef8d2c9acedf3dfa9ee0268bf3a42ea3e29af1e1"
-
-    AddressVerifyP2PK(address).publicKey(publicKey).success()
     (0 until groupConfig.groups).foreach { index =>
+      val address = s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@${index}"
       AddressVerifyP2PK(address).publicKey(publicKey).group(index).success()
     }
   }
@@ -177,7 +175,7 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
     Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isDefined is true
     Address
       .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
-      .isDefined is true
+      .isDefined is false
     Address
       .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@0")
       .isDefined is true
@@ -192,7 +190,7 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
       .fromBase58(
         s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@${groupConfig.groups + 1}"
       )
-      .isDefined is false
+      .isDefined is true
   }
 
   sealed trait AddressVerify {
@@ -221,7 +219,6 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
 
     def group(index: Int) = copy(
-      groupedAddress = Some(s"$address@$index"),
       groupIndex = Some(GroupIndex.unsafe(index))
     )
 
