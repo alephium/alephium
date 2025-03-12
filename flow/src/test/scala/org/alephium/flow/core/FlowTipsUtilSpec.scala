@@ -240,6 +240,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
   }
 
   it should "calculate incoming blocks for a target group" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     val chainIndex0      = ChainIndex.unsafe(0, 0)
     val targetGroupIndex = GroupIndex.unsafe(1)
 

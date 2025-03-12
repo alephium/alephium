@@ -549,6 +549,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "calculate all the hashes for double spending check when there are genesis deps" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     val blockFlow1 = isolatedBlockFlow()
 
     val block1 = emptyBlock(blockFlow1, ChainIndex.unsafe(0, 0))
@@ -572,6 +573,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "calculate all the hashes for double spending check when there are no genesis deps" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     val blockFlow1 = isolatedBlockFlow()
     val mainGroup  = GroupIndex.unsafe(0)
     (0 until groups0).reverse.foreach { toGroup =>
