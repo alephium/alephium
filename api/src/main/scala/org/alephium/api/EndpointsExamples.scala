@@ -104,9 +104,9 @@ trait EndpointsExamples extends ErrorExamples {
   )
   private val lockedTokens = AVector(Token(TokenId.hash("token3"), alph(65).value))
 
-  val defaultDestinations = AVector(Destination(address, bigAmount, None, None))
+  val defaultDestinations = AVector(Destination(address, Some(bigAmount), None, None))
   val moreSettingsDestinations = AVector(
-    Destination(address, bigAmount, Some(tokens), Some(ts))
+    Destination(address, Some(bigAmount), Some(tokens), Some(ts))
   )
   private val outputRef = OutputRef(hint = 23412, key = hash)
 
@@ -273,6 +273,43 @@ trait EndpointsExamples extends ErrorExamples {
     Address.contract(contractId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
+  )
+
+  private val simulationResult = SimulationResult(
+    AVector(
+      AddressAssetState(
+        address,
+        model.dustUtxoAmount,
+        Some(AVector(Token(TokenId.hash("token1"), alph(1).value)))
+      ),
+      AddressAssetState(
+        contractAddress,
+        model.minimalAlphInContract,
+        Some(
+          AVector(
+            Token(TokenId.hash("token1"), alph(100).value),
+            Token(TokenId.hash("token2"), alph(100).value)
+          )
+        )
+      )
+    ),
+    AVector(
+      AddressAssetState(
+        address,
+        model.dustUtxoAmount,
+        Some(AVector(Token(TokenId.hash("token2"), alph(1).value)))
+      ),
+      AddressAssetState(
+        contractAddress,
+        model.minimalAlphInContract,
+        Some(
+          AVector(
+            Token(TokenId.hash("token1"), alph(99).value),
+            Token(TokenId.hash("token2"), alph(101).value)
+          )
+        )
+      )
+    )
   )
 
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
@@ -918,7 +955,7 @@ trait EndpointsExamples extends ErrorExamples {
         model.minimalGas,
         model.nonCoinbaseMinGasPrice,
         txId = txId,
-        simulatedOutputs = AVector(outputAsset.upCast())
+        simulationResult
       )
     )
 
@@ -933,7 +970,7 @@ trait EndpointsExamples extends ErrorExamples {
           model.minimalGas,
           model.nonCoinbaseMinGasPrice,
           txId = txId,
-          simulatedOutputs = AVector(outputAsset.upCast())
+          simulationResult
         )
       )
     )
@@ -960,7 +997,7 @@ trait EndpointsExamples extends ErrorExamples {
             model.minimalGas,
             model.nonCoinbaseMinGasPrice,
             txId = txId,
-            simulatedOutputs = AVector(outputAsset.upCast())
+            simulationResult
           )
         )
       )
@@ -968,6 +1005,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
+
+  implicit lazy val contractCodeExamples: List[Example[StatefulContract]] =
+    simpleExample(existingContract.bytecode)
 
   private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),

@@ -31,7 +31,7 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, U256}
 
 class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
-    val destinations = AVector(Destination(toAddress, value, None, None))
+    val destinations = AVector(Destination(toAddress, Some(value), None, None))
     val buildTransferTransactionIn =
       BuildTransferTx(publicKey.bytes, None, destinations, None, None)
     val request =

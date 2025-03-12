@@ -80,7 +80,7 @@ trait OutboundBrokerHandler extends BrokerHandler with EventStream.Publisher {
   override def handShakeDuration: Duration = networkSetting.handshakeTimeout
 
   override def handShakeMessage: Payload = {
-    Hello.unsafe(selfCliqueInfo.selfInterBrokerInfo, selfCliqueInfo.priKey)
+    Hello.unsafe(selfCliqueInfo.selfInterBrokerInfo, selfCliqueInfo.priKey, selfP2PVersion)
   }
 
   override def pingFrequency: Duration = networkSetting.pingFrequency

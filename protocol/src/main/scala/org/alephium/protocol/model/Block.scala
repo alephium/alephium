@@ -103,6 +103,11 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction])
     Block.getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
   }
 
+  def getTransaction(index: Int): Transaction = {
+    assume(index >= 0 && index < transactions.length)
+    transactions(index)
+  }
+
   def `type`: String = "Block"
 }
 

@@ -36,7 +36,6 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol._
-import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -2755,12 +2754,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "check gas amount: pre-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     blockFlow.checkProvidedGasAmount(None) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
@@ -2778,19 +2772,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "check gas amount: since-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+    setHardForkSince(HardFork.Rhone)
 
     blockFlow.checkProvidedGasAmount(None) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()

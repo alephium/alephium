@@ -52,7 +52,8 @@ trait BaseEndpoint extends ErrorExamples with TapirCodecs with TapirSchemasLike 
         error(InternalServerError, { case InternalServerError(_) => true }),
         error(NotFound, { case NotFound(_) => true }),
         error(ServiceUnavailable, { case ServiceUnavailable(_) => true }),
-        error(Unauthorized, { case Unauthorized(_) => true })
+        error(Unauthorized, { case Unauthorized(_) => true }),
+        error(GatewayTimeout, { case GatewayTimeout(_) => true })
       )
     )
 

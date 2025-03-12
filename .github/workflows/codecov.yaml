@@ -18,6 +18,8 @@ jobs:
           distribution: temurin
           java-version: 11
           cache: sbt
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
       - run: sbt clean coverage test coverageReport && sbt coverageAggregate
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2

@@ -20,13 +20,15 @@ import scala.annotation.tailrec
 
 sealed trait VariableScope {
   def include(childScope: VariableScope): Boolean
+  def getScopeRefPath: Seq[Ast.Positioned]
 }
 case object FunctionRoot extends VariableScope {
   def include(childScope: VariableScope): Boolean = true
+  def getScopeRefPath: Seq[Ast.Positioned]        = Seq.empty
 }
 final case class ChildScope(
     parent: VariableScope,
-    scopeRef: AnyRef,
+    scopeRef: Ast.Positioned,
     sourceIndex: Option[SourceIndex],
     depth: Int
 ) extends VariableScope {
@@ -44,6 +46,19 @@ final case class ChildScope(
         }
     }
   }
+
+  @tailrec
+  private def getScopeRefPath(
+      acc: Seq[Ast.Positioned],
+      current: VariableScope
+  ): Seq[Ast.Positioned] = {
+    current match {
+      case FunctionRoot      => acc
+      case child: ChildScope => getScopeRefPath(acc :+ child.scopeRef, child.parent)
+    }
+  }
+
+  def getScopeRefPath: Seq[Ast.Positioned] = getScopeRefPath(Seq.empty, this).reverse
 }
 
 trait VariableScoped {

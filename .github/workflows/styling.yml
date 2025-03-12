@@ -16,7 +16,11 @@ jobs:
           distribution: temurin
           java-version: 11
           cache: sbt
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
       - run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck it:scalafmtCheck scalastyle test:scalastyle it:scalastyle doc
       - run: make assembly
       - run: sbt app/docker
-      - run: sbt "tools/runMain org.alephium.tools.BuiltInFunctions" && test -z "$(git status --porcelain)"
+      - run: sbt "tools/runMain org.alephium.tools.BuiltInFunctions"
+      - run: sbt genSerde
+      - run: test -z "$(git status --porcelain)"

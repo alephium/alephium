@@ -375,6 +375,25 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.getIntraSyncInventories() isE blocks.map(_.hash).map(AVector(_))
   }
 
+  it should "get chain state" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+
+    val tips0 = blockFlow.getChainTipsUnsafe()
+    tips0 is brokerConfig.chainIndexes.map { chainIndex =>
+      val blockChain = blockFlow.getBlockChain(chainIndex)
+      ChainTip(blockChain.genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)
+    }
+
+    val tips1 = brokerConfig.chainIndexes.map { chainIndex =>
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block1)
+      val weight = blockFlow.getWeightUnsafe(block1.hash)
+      ChainTip(block1.hash, 2, weight)
+    }
+    blockFlow.getChainTipsUnsafe() is tips1
+  }
+
   behavior of "Mining"
 
   it should "sanity check rewards" in new FlowFixture {
@@ -678,12 +697,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "handle sequential txs: pre-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.broker-num", 1),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkBefore(HardFork.Rhone)
 
     val fromGroup = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
     val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
@@ -932,21 +947,18 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "not include new block as dependency when dependency gap time is large for pre-rhone hardfork" in new DependencyGapTimeFixture {
     override val configValues = Map(
       ("alephium.consensus.mainnet.uncle-dependency-gap-time", "5 seconds"),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis),
       ("alephium.broker.broker-num", 1)
     )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    setHardForkBefore(HardFork.Rhone)
     test()
   }
 
   it should "not include new block as dependency when dependency gap time is large for rhone hardfork" in new DependencyGapTimeFixture {
     override val configValues = Map(
       ("alephium.consensus.rhone.uncle-dependency-gap-time", "5 seconds"),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis),
       ("alephium.broker.broker-num", 1)
     )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    setHardFork(HardFork.Rhone)
     test()
   }
 
@@ -1028,10 +1040,12 @@ trait TxOutputRefIndexFixture extends FlowFixture {
     utxos.length is 1
     val txOutputRef = utxos.head.ref
     if (enableTxOutputRefIndex) {
-      blockFlow.getTxIdFromOutputRef(txOutputRef) isE Some(block.nonCoinbase.head.id)
+      blockFlow.getTxIdTxOutputLocatorsFromOutputRef(txOutputRef).map(_.map(_.txId)) isE Some(
+        block.nonCoinbase.head.id
+      )
     } else {
       blockFlow
-        .getTxIdFromOutputRef(txOutputRef)
+        .getTxIdTxOutputLocatorsFromOutputRef(txOutputRef)
         .leftValue
         .reason
         .getMessage is "Please set `alephium.node.indexes.tx-output-ref-index = true` to query transaction id from transaction output reference"

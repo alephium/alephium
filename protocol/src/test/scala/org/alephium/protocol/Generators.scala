@@ -169,6 +169,14 @@ trait Generators extends NumericHelpers {
 
   def bytesGen(size: Int): Gen[ByteString] =
     Gen.listOfN(size, arbitrary[Byte].sample.get).map(ByteString.apply)
+
+  def chainTipGen: Gen[ChainTip] = {
+    for {
+      blockHash <- blockHashGen
+      height    <- Gen.choose(0, Int.MaxValue - 1)
+      weight    <- Gen.choose(U256.One.v, U256.MaxValue.subOneUnsafe().v).map(v => Weight(v))
+    } yield ChainTip(blockHash, height, weight)
+  }
 }
 
 trait DefaultGenerators extends Generators {
