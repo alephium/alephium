@@ -180,15 +180,29 @@ object LockupScript {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)
   }
 
-  final case class P2PK private (publicKey: PublicKeyType, scriptHint: ScriptHint) extends Asset {
+  final case class P2PK private (publicKey: PublicKeyType, groupByte: Byte) extends Asset {
+    // We need to use `scriptHint` to calculate the group index in the `AssetOutputRef`,
+    // so we need to find a `scriptHint` that matches the group index.
+    override lazy val scriptHint: ScriptHint = {
+      val hintValue    = publicKey.scriptHint.value
+      val xorResult    = Bytes.xorByte(hintValue)
+      val byte0        = (hintValue >> 24).toByte
+      val newByte0     = byte0 ^ xorResult ^ groupByte
+      val newHintValue = (newByte0 << 24) | (hintValue & 0x00ffffff)
+      ScriptHint.fromHash(newHintValue)
+    }
+
+    override def groupIndex(implicit config: GroupConfig): GroupIndex =
+      GroupIndex.unsafe(groupByte % config.groups)
+
     def toBase58: String = {
-      val bytes = serialize[LockupScript](this).dropRight(P2PK.scriptHintLength)
+      val bytes = serialize[LockupScript](this).dropRight(P2PK.groupByteLength)
       Base58.encode(bytes)
     }
   }
 
   object P2PK {
-    private val scriptHintLength: Int = 4
+    private val groupByteLength: Int = 1
 
     def from(publicKey: PublicKeyType)(implicit groupConfig: GroupConfig): P2PK =
       from(publicKey, None)
@@ -197,19 +211,8 @@ object LockupScript {
         groupConfig: GroupConfig
     ): P2PK = {
       groupIndexOpt match {
-        case Some(groupIndex) => P2PK(publicKey, findScriptHint(publicKey.scriptHint, groupIndex))
-        case None             => P2PK(publicKey, publicKey.scriptHint)
-      }
-    }
-
-    @scala.annotation.tailrec
-    private def findScriptHint(hint: ScriptHint, group: GroupIndex)(implicit
-        config: GroupConfig
-    ): ScriptHint = {
-      if (hint.groupIndex == group) {
-        hint
-      } else {
-        findScriptHint(ScriptHint.fromHash(hint.value + 1), group)
+        case Some(groupIndex) => P2PK(publicKey, groupIndex.value.toByte)
+        case None             => P2PK(publicKey, publicKey.scriptHint.groupIndex.value.toByte)
       }
     }
 
@@ -219,9 +222,9 @@ object LockupScript {
       safePublicKeySerde._deserialize(bytes).toOption match {
         case Some(key) if key.rest.isEmpty => Some(from(key.value, groupIndexOpt))
         case Some(key) =>
-          scriptHintSerde.deserialize(key.rest).toOption match {
-            case Some(hint) if groupIndexOpt.forall(_ == hint.groupIndex) =>
-              Some(P2PK(key.value, hint))
+          serdeImpl[Byte].deserialize(key.rest).toOption match {
+            case Some(groupByte) if groupIndexOpt.forall(_.value.toByte == groupByte) =>
+              Some(P2PK(key.value, groupByte))
             case _ => None
           }
         case None => None
@@ -245,18 +248,10 @@ object LockupScript {
       }
     }
 
-    private val scriptHintSerde: Serde[ScriptHint] =
-      Serde
-        .bytesSerde(scriptHintLength)
-        .xmap(
-          (bs: ByteString) => new ScriptHint(Bytes.toIntUnsafe(bs)),
-          (hint: ScriptHint) => Bytes.from(hint.value)
-        )
-
     implicit val serde: Serde[P2PK] = {
-      Serde.forProduct2(P2PK.apply, (p: P2PK) => (p.publicKey, p.scriptHint))(
+      Serde.forProduct2(P2PK.apply, (p: P2PK) => (p.publicKey, p.groupByte))(
         safePublicKeySerde,
-        scriptHintSerde
+        serdeImpl[Byte]
       )
     }
   }

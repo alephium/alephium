@@ -16,10 +16,12 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
+
 import org.alephium.protocol.{Checksum, Hash}
 import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
@@ -78,12 +80,12 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "validate p2pk" in {
     val lockupScript = p2pkLockupGen(GroupIndex.unsafe(1)).sample.get
-    lockupScript.groupIndex is lockupScript.publicKey.scriptHint.groupIndex
+    lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
     val publicKeyBytes = serialize(lockupScript.publicKey)
     val checksum       = Checksum.calc(publicKeyBytes)
-    val hintBytes      = Bytes.from(lockupScript.scriptHint.value)
+    val groupByte      = ByteString(lockupScript.groupIndex.value.toByte)
     val bytes =
-      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum.bytes ++ hintBytes)}")
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum.bytes ++ groupByte)}")
     serialize[LockupScript](lockupScript) is bytes
     deserialize[LockupScript](bytes) isE lockupScript
 
@@ -95,8 +97,17 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val invalidChecksum = bytesGen(Checksum.checksumLength).sample.get
     val invalidBytes =
-      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ invalidChecksum ++ hintBytes)}")
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ invalidChecksum ++ groupByte)}")
     deserialize[LockupScript](invalidBytes).leftValue.getMessage
       .startsWith("Wrong checksum") is true
+  }
+
+  it should "calculate correct script hint for p2pk address" in {
+    forAll(groupIndexGen) { groupIndex =>
+      forAll(p2pkLockupGen(groupIndex)) { lockupScript =>
+        lockupScript.groupIndex is groupIndex
+        lockupScript.scriptHint.groupIndex is groupIndex
+      }
+    }
   }
 }
