@@ -61,7 +61,7 @@ object AMMContract {
        |  }
        |}
        |""".stripMargin
-  def swapCode = Compiler.compileContract(swapContract).toOption.get
+  lazy val swapCode = Compiler.compileContract(swapContract).toOption.get
 
   lazy val swapProxyContract: String =
     s"""
@@ -86,5 +86,5 @@ object AMMContract {
        |
        |$swapContract
        |""".stripMargin
-  def swapProxyCode = Compiler.compileContract(swapProxyContract).toOption.get
+  lazy val swapProxyCode = Compiler.compileContract(swapProxyContract).toOption.get
 }

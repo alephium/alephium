@@ -66,7 +66,7 @@ package object conf {
       )
   }
 
-  implicit def assetAddressValueReader: ValueReader[Address.Asset] = stringValueReader.map { str =>
+  implicit val assetAddressValueReader: ValueReader[Address.Asset] = stringValueReader.map { str =>
     Address.asset(str).getOrElse(throw new RuntimeException(s"Invalid address $str"))
   }
 
