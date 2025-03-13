@@ -31,7 +31,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.{BrokerState, SyncedResult}
 import org.alephium.flow.network.broker._
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{Message, NewBlock}
+import org.alephium.protocol.message.{Message, NewBlock, P2PV1}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, TransactionId}
 import org.alephium.util._
 
@@ -45,7 +45,8 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       brokerInfo: BrokerInfo,
       connectionType: ConnectionType = InboundConnection
   )(implicit system: ActorSystem): Unit = {
-    val event = InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo)
+    val event =
+      InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo, P2PV1)
     system.eventStream.publish(event)
   }
 

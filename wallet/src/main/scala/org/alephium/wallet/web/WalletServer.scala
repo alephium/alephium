@@ -36,13 +36,14 @@ import org.alephium.wallet.service.WalletService._
 class WalletServer(
     val walletService: WalletService,
     val blockflowFetchMaxAge: Duration,
+    val enableHttpMetrics: Boolean,
     override val apiKeys: AVector[ApiKey]
 )(implicit val groupConfig: GroupConfig, val executionContext: ExecutionContext)
     extends WalletEndpointsLogic
     with WalletDocumentation
     with VertxFutureServerInterpreter {
 
-  override val vertxFutureServerOptions = ServerOptions.serverOptions
+  override val vertxFutureServerOptions = ServerOptions.serverOptions(enableHttpMetrics)
 
   val routes: AVector[Router => Route] = AVector(
     createWalletLogic,

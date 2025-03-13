@@ -301,7 +301,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           )
         ),
         txEnv = Some(
-          TxEnv(
+          TxEnv.dryrun(
             tx,
             prevOutputs.map(_.referredOutput.copy(lockTime = txLockTime)),
             Stack.ofCapacity[Bytes64](0)
@@ -1530,7 +1530,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     override lazy val frame = prepareFrame(
       AVector.empty,
-      txEnv = Some(TxEnv(tx, AVector.empty, signatureStack))
+      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, signatureStack))
     )
   }
 
@@ -1721,7 +1721,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     override lazy val frame = prepareFrame(
       AVector.empty,
-      txEnv = Some(TxEnv(tx, AVector.empty, Stack.ofCapacity[Bytes64](0)))
+      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, Stack.ofCapacity[Bytes64](0)))
     )
 
     val initialGas = context.gasRemaining
@@ -1773,9 +1773,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val prevOutputs0  = prevOut.map(_.referredOutput)
     val prevOutputs1  = AVector.fill(3)(prevOutputs0.head)
 
-    val txEnvWithRandomAddresses = TxEnv(tx, prevOutputs0, Stack.ofCapacity(0))
-    val txEnvWithUniqueAddress   = TxEnv(tx, prevOutputs1, Stack.ofCapacity(0))
-    val uniqueAddress            = Val.Address(prevOutputs0.head.lockupScript)
+    val txEnvWithRandomAddresses =
+      TxEnv.dryrun(tx, prevOutputs0, Stack.ofCapacity(0))
+    val txEnvWithUniqueAddress =
+      TxEnv.dryrun(tx, prevOutputs1, Stack.ofCapacity(0))
+    val uniqueAddress = Val.Address(prevOutputs0.head.lockupScript)
   }
 
   it should "TxInputAddressAt" in new TxEnvFixture {
@@ -3239,7 +3241,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     override lazy val frame = prepareFrame(
       Some(balanceState),
       txEnvOpt = Some(
-        TxEnv(
+        TxEnv.dryrun(
           tx,
           prevOutputs.map(_.referredOutput),
           Stack.ofCapacity[Bytes64](0)
@@ -3336,7 +3338,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val preRhoneFrame = prepareFrame(
         Some(balanceState),
         txEnvOpt = Some(
-          TxEnv(
+          TxEnv.dryrun(
             tx,
             prevOutputs.map(_.referredOutput),
             Stack.ofCapacity[Bytes64](0)

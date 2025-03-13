@@ -38,7 +38,11 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
       tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> prevOutputs
     }
-    TxEnv(tx, prevOutputs.map(_.referredOutput), Stack.popOnly(signatures))
+    TxEnv.dryrun(
+      tx,
+      prevOutputs.map(_.referredOutput),
+      Stack.popOnly(signatures)
+    )
   }
 
   def genStatelessContext(
@@ -102,8 +106,9 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val cor = ContractOutputRef.from(TransactionId.generate, co, 0)
       (ci, co, cor)
     }
-    val halfDecoded    = contract.toHalfDecoded()
-    val transactionEnv = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
+    val halfDecoded       = contract.toHalfDecoded()
+    val transactionEnv    = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
+    val generatedBlockEnv = genBlockEnv()(_networkConfig)
 
     cachedWorldState.createContractUnsafe(
       contractId,
@@ -113,7 +118,8 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       contractOutputRef,
       contractOutput,
       _networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled(),
-      transactionEnv.txId
+      transactionEnv.txId,
+      None
     ) isE ()
 
     val obj          = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)
@@ -124,7 +130,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val groupConfig: GroupConfig                     = _groupConfig
       val outputBalances: MutBalances                  = MutBalances.empty
       def nextOutputIndex: Int                         = 0
-      val blockEnv: BlockEnv                           = genBlockEnv()
+      val blockEnv: BlockEnv                           = generatedBlockEnv
       val txEnv: TxEnv                                 = transactionEnv
       def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
       def logConfig: LogConfig                         = LogConfig.allEnabled()

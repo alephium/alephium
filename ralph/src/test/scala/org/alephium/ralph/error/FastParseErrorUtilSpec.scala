@@ -18,11 +18,10 @@ package org.alephium.ralph.error
 
 import fastparse._
 
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.ralph.Lexer
 import org.alephium.util.AlephiumSpec
 
-class FastParseErrorUtilSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class FastParseErrorUtilSpec extends AlephiumSpec {
 
   it should "drop only the head and tail quotes" in {
     FastParseErrorUtil.dropQuotes("\"test\"") is "test"

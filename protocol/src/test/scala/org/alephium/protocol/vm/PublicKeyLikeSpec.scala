@@ -19,15 +19,18 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.crypto.{SecP256K1PublicKey, SecP256R1PublicKey}
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.AlephiumSpec
 
-class PublicKeyLikeSpec extends AlephiumSpec {
+class PublicKeyLikeSpec extends AlephiumSpec with GroupConfigFixture.Default {
   it should "serde correctly" in {
     val publicKey0 = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
     val bytes0     = ByteString(0) ++ publicKey0.bytes
     serialize[PublicKeyLike](publicKey0) is bytes0
     deserialize[PublicKeyLike](bytes0) isE publicKey0
+    val lastByte = publicKey0.publicKey.bytes.last
+    publicKey0.defaultGroup.value is ((lastByte & 0xff) % groupConfig.groups)
 
     val publicKey1 = PublicKeyLike.Passkey(SecP256R1PublicKey.generate)
     val bytes1     = ByteString(1) ++ publicKey1.bytes

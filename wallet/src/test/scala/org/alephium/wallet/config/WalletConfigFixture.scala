@@ -43,13 +43,15 @@ trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
     override def groups: Int = config.blockflow.groups
   }
 
-  val apiKeys = AVector.empty[ApiKey]
+  val apiKeys           = AVector.empty[ApiKey]
+  val enableHttpMetrics = false
 
   lazy val config = WalletConfig(
     Some(walletPort),
     tempSecretDir,
     lockingTimeout,
     apiKeys,
+    enableHttpMetrics,
     WalletConfig.BlockFlow(
       host.getHostAddress,
       blockFlowPort,

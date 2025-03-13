@@ -78,9 +78,8 @@ trait LockupScriptGenerators extends Generators {
         } else {
           PublicKeyLike.Passkey(SecP256R1PublicKey.generate)
         }
-        LockupScript.p2pk(publicKey, None)
+        LockupScript.p2pk(publicKey, groupIndex)
       }
-      .retryUntil(_.groupIndex == groupIndex)
   }
 
   def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {

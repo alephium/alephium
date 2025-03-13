@@ -19,15 +19,19 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.crypto.{SecP256K1PublicKey, SecP256R1PublicKey}
-import org.alephium.protocol.model.ScriptHint
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.serde._
-import org.alephium.util.DjbHash
+import org.alephium.util.Bytes
 
 sealed trait PublicKeyLike {
   def bytes: ByteString
   def keyType: PublicKeyLike.KeyType
 
-  lazy val scriptHint: ScriptHint = ScriptHint.fromHash(DjbHash.intHash(bytes))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def defaultGroup(implicit groupConfig: GroupConfig): GroupIndex = {
+    GroupIndex.unsafe(Bytes.toPosInt(bytes.last) % groupConfig.groups)
+  }
 }
 
 object PublicKeyLike {

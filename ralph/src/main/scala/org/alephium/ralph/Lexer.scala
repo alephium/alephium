@@ -24,7 +24,6 @@ import fastparse._
 import fastparse.NoWhitespace._
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{LockupScript, StatelessContext, Val}
 import org.alephium.protocol.vm.Val.ByteVec
@@ -35,7 +34,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-class Lexer(fileURI: Option[java.net.URI])(implicit groupConfig: GroupConfig) {
+class Lexer(fileURI: Option[java.net.URI]) {
   def lowercase[Unknown: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[Unknown: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[Unknown: P]: P[Unit]     = P(CharIn("0-9"))
@@ -244,6 +243,15 @@ class Lexer(fileURI: Option[java.net.URI])(implicit groupConfig: GroupConfig) {
   def opOr[Unknown: P]: P[LogicalOperator]     = P("||").map(_ => Or)
   def opNot[Unknown: P]: P[LogicalOperator]    = P("!").map(_ => Not)
   def opNegate[Unknown: P]: P[LogicalOperator] = P("-").map(_ => Negate)
+
+  def opAddAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("+=").map(_ => CompoundAssignmentOperator.AddAssign)
+  def opSubAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("-=").map(_ => CompoundAssignmentOperator.SubAssign)
+  def opMulAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("*=").map(_ => CompoundAssignmentOperator.MulAssign)
+  def opDivAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("/=").map(_ => CompoundAssignmentOperator.DivAssign)
 
   sealed trait FuncModifier
 

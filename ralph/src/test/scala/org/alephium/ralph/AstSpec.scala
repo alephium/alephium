@@ -20,12 +20,11 @@ import scala.collection.mutable
 
 import akka.util.ByteString
 
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}
 
 //scalastyle:off file.size.limit
-class AstSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class AstSpec extends AlephiumSpec {
 
   behavior of "Check external caller"
 

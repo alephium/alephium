@@ -17,13 +17,14 @@
 package org.alephium.protocol.vm.nodeindexes
 
 import org.alephium.io.StagingKVStorage
-import org.alephium.protocol.model.{TransactionId, TxOutputRef}
+import org.alephium.protocol.model.TxOutputRef
 import org.alephium.protocol.vm.event.StagingLog
+import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.protocol.vm.subcontractindex.StagingSubContractIndex
 
 final case class StagingNodeIndexes(
     logState: StagingLog,
-    txOutputRefIndexState: Option[StagingKVStorage[TxOutputRef.Key, TransactionId]],
+    txOutputRefIndexState: Option[StagingKVStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
     subContractIndexState: Option[StagingSubContractIndex]
 ) {
   def rollback(): Unit = {

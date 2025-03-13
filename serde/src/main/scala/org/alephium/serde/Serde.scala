@@ -400,7 +400,7 @@ object Serde extends ProductSerde {
     }
 
   private[serde] object TimeStampSerde extends FixedSizeSerde[TimeStamp] {
-    override val serdeSize: Int = 8
+    override val serdeSize: Int = TimeStamp.byteLength
 
     override def serialize(input: TimeStamp): ByteString = {
       Bytes.from(input.millis)

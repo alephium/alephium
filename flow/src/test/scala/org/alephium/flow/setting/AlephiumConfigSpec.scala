@@ -31,7 +31,7 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{
   Address,
@@ -60,6 +60,9 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
     config.network.connectionBufferCapacityInByte is 100000000L
+    config.network.syncPeerSampleSizeV1 is 3
+    config.network.syncPeerSampleSizeV2 is 5
+    config.network.enableP2pV2 is true
   }
 
   it should "load mainnet config" in {
@@ -84,6 +87,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.genesisBlocks.flatMap(_.map(_.shortHex)).mkString("-") is
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
     config.network.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    config.network.enableP2pV2 is false
 
     config.node.assetTrieCacheMaxByteSize is 200_000_000
     config.node.contractTrieCacheMaxByteSize is 20_000_000
@@ -161,7 +165,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ) is ArraySeq.empty
   }
 
-  it should "load genesis config" in new GroupConfigFixture.Default {
+  it should "load genesis config" in {
     val amount = ALPH.oneAlph
     val addresses = AVector(
       "127TathFRczW5LXeNK2n2A6Qi2EpkamcmvwCrr3y18uHT",

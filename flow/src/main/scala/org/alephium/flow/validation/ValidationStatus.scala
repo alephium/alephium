@@ -204,5 +204,5 @@ final case object InvalidGeneratedOutputs                       extends InvalidT
 final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus
 final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus
 final case object UsingBreakingInstrs                           extends InvalidTxStatus
-case object InvalidLockupScriptPreDanue                         extends InvalidTxStatus
+case object InvalidLockupScriptPreDanube                        extends InvalidTxStatus
 final case class InvalidWebauthnPayload(error: SerdeError)      extends InvalidTxStatus

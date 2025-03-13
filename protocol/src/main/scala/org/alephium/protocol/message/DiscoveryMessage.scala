@@ -228,7 +228,7 @@ object DiscoveryMessage {
       case None    => Signature.zero.bytes
     }
     val data     = signature ++ header ++ payload
-    val checksum = serdeImpl[Checksum].serialize(Checksum.calc(data))
+    val checksum = Checksum.calcAndSerialize(data)
     val length   = MessageSerde.length(data)
 
     magic ++ checksum ++ length ++ data

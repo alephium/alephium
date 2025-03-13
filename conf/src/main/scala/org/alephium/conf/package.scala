@@ -32,14 +32,13 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import net.ceedubs.ficus.readers.CollectionReaders.traversableReader
 
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.Address
 import org.alephium.util.{AVector, Duration, U256}
 
 package object conf {
 
   implicit val nameMapper: NameMapper = new NameMapper {
-    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?<=[a-zA-Z])[0-9]|(?!^)[A-Z](?=[a-z]))".r
+    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))".r
 
     /** Maps from a camelCasedName to a hyphenated-name
       */
@@ -67,9 +66,7 @@ package object conf {
       )
   }
 
-  implicit def assetAddressValueReader(implicit
-      groupConfig: GroupConfig
-  ): ValueReader[Address.Asset] = stringValueReader.map { str =>
+  implicit val assetAddressValueReader: ValueReader[Address.Asset] = stringValueReader.map { str =>
     Address.asset(str).getOrElse(throw new RuntimeException(s"Invalid address $str"))
   }
 
@@ -126,8 +123,9 @@ package object conf {
 
   implicit val contractAddressValueReader: ValueReader[Address.Contract] = {
     ValueReader[String].map { str =>
-      Address.contract(str) match {
-        case Some(address) => address
+      Address.fromBase58(str) match {
+        case Some(address: Address.Contract) =>
+          address
         case _ =>
           throw new ConfigException.BadValue("ContractAddress", "oops")
       }
