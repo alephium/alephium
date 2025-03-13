@@ -1054,12 +1054,11 @@ trait FlowFixture
       unsignedTx: UnsignedTransaction,
       priKey: SecP256R1PrivateKey
   ): (WebAuthn, Transaction) = {
-    val clientData = WebAuthn.createClientData(WebAuthn.GET, unsignedTx.id.bytes)
-    val bytes      = bytesGen(WebAuthn.AuthenticatorDataMinLength).sample.get.toArray
+    val bytes = bytesGen(WebAuthn.AuthenticatorDataMinLength).sample.get.toArray
     bytes(WebAuthn.FlagIndex) = (bytes(WebAuthn.FlagIndex) | 0x01).toByte
     val authenticatorData = ByteString.fromArrayUnsafe(bytes)
-    val webauthn          = WebAuthn(authenticatorData, clientData)
-    val messageHash       = webauthn.messageHash
+    val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
+    val messageHash       = webauthn.messageHash(unsignedTx.id)
     val signature         = Bytes64.from(SecP256R1.sign(messageHash, priKey))
     (webauthn, Transaction.from(unsignedTx, encodeToBytes64(webauthn) :+ signature))
   }

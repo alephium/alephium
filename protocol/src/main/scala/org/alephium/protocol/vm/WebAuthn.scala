@@ -22,19 +22,44 @@ import java.util.Base64
 import akka.util.ByteString
 
 import org.alephium.crypto.{SecP256R1, SecP256R1PublicKey, SecP256R1Signature, Sha256}
+import org.alephium.protocol.model.TransactionId
 import org.alephium.serde.{bytestringSerde, Serde, SerdeError, SerdeResult}
 import org.alephium.util.Hex
 
-final case class WebAuthn(authenticatorData: ByteString, clientData: ByteString) {
-  def bytesLength: Int = authenticatorData.length + clientData.length
+final case class WebAuthn(
+    authenticatorData: ByteString,
+    clientDataPrefix: ByteString,
+    clientDataSuffix: ByteString
+) {
+  def bytesLength: Int =
+    authenticatorData.length + clientDataPrefix.length + clientDataSuffix.length
 
-  def messageHash: Sha256 = {
-    val clientDataHash = Sha256.hash(clientData)
+  def clientData(rawChallenge: ByteString): ByteString = {
+    val challengeBytes = WebAuthn.encodeChallenge(rawChallenge)
+    clientDataPrefix ++ challengeBytes ++ clientDataSuffix
+  }
+
+  def messageHash(rawChallenge: ByteString): Sha256 = {
+    val clientDataHash = Sha256.hash(clientData(rawChallenge))
     Sha256.hash(authenticatorData ++ clientDataHash.bytes)
   }
 
-  def verify(signature: SecP256R1Signature, publicKey: SecP256R1PublicKey): Boolean = {
-    SecP256R1.verify(messageHash.bytes, signature, publicKey)
+  def messageHash(txId: TransactionId): Sha256 = messageHash(txId.bytes)
+
+  def verify(
+      rawChallenge: ByteString,
+      signature: SecP256R1Signature,
+      publicKey: SecP256R1PublicKey
+  ): Boolean = {
+    SecP256R1.verify(messageHash(rawChallenge).bytes, signature, publicKey)
+  }
+
+  def verify(
+      txId: TransactionId,
+      signature: SecP256R1Signature,
+      publicKey: SecP256R1PublicKey
+  ): Boolean = {
+    SecP256R1.verify(messageHash(txId).bytes, signature, publicKey)
   }
 }
 
@@ -45,13 +70,16 @@ object WebAuthn {
   val FlagIndex: Int                  = 32
 
   implicit val serde: Serde[WebAuthn] =
-    Serde.forProduct2(WebAuthn.apply, v => (v.authenticatorData, v.clientData))
+    Serde.forProduct3(
+      WebAuthn.apply,
+      v => (v.authenticatorData, v.clientDataPrefix, v.clientDataSuffix)
+    )
 
   def tryDecode(
-      challenge: ByteString,
+      rawChallenge: ByteString,
       nextBytes: () => Option[ByteString]
   ): SerdeResult[WebAuthn] = {
-    val decoder = new Decoder(challenge)
+    val decoder = new Decoder(rawChallenge)
 
     @scala.annotation.tailrec
     def decode(): SerdeResult[WebAuthn] = {
@@ -71,6 +99,11 @@ object WebAuthn {
 
   @inline private[vm] def base64urlEncode(bs: ByteString): String = {
     Base64.getUrlEncoder.withoutPadding().encodeToString(bs.toArray)
+  }
+
+  def encodeChallenge(rawChallenge: ByteString): ByteString = {
+    val base64Encoded = WebAuthn.base64urlEncode(rawChallenge)
+    ByteString.fromArrayUnsafe(base64Encoded.getBytes(StandardCharsets.UTF_8))
   }
 
   private[vm] def extractValueFromClientData(
@@ -93,45 +126,34 @@ object WebAuthn {
     }
   }
 
-  private[vm] def validateClientData(
-      clientData: ByteString,
-      challengeBytes: ByteString
-  ): Either[String, Unit] = {
-    val clientDataStr = new String(clientData.toArray, StandardCharsets.UTF_8)
-    for {
-      tpe <- extractValueFromClientData(clientDataStr, "type")
-      _ <-
-        if (tpe == GET) {
-          Right(())
-        } else {
-          Left(s"Invalid type in client data, expected $GET, but got $tpe")
-        }
-      expectedChallenge <- extractValueFromClientData(clientDataStr, "challenge")
-      challenge = base64urlEncode(challengeBytes)
-      _ <-
-        if (challenge == expectedChallenge) {
-          Right(())
-        } else {
-          Left(
-            s"Invalid challenge in client data, expected $expectedChallenge, but got $challenge"
-          )
-        }
-    } yield ()
-  }
-
-  private[vm] def validate(value: WebAuthn, challengeBytes: ByteString): Either[String, Unit] = {
-    if (value.authenticatorData.length < AuthenticatorDataMinLength) {
-      Left("Invalid authenticator data length")
-    } else if (value.clientData.length < ClientDataMinLength) {
+  private[vm] def validateClientData(clientData: ByteString): Either[String, Unit] = {
+    if (clientData.length < ClientDataMinLength) {
       Left("Invalid client data length")
-    } else if ((value.authenticatorData(FlagIndex) & 0x01) != 0x01) {
-      Left("Invalid UP bit in authenticator data")
     } else {
-      validateClientData(value.clientData, challengeBytes)
+      val clientDataStr = new String(clientData.toArray, StandardCharsets.UTF_8)
+      for {
+        tpe <- extractValueFromClientData(clientDataStr, "type")
+        _ <-
+          if (tpe == GET) {
+            Right(())
+          } else {
+            Left(s"Invalid type in client data, expected $GET, but got $tpe")
+          }
+      } yield ()
     }
   }
 
-  private[vm] class Decoder(challengeBytes: ByteString) {
+  private[vm] def validate(webauthn: WebAuthn, rawChallenge: ByteString): Either[String, Unit] = {
+    if (webauthn.authenticatorData.length < AuthenticatorDataMinLength) {
+      Left("Invalid authenticator data length")
+    } else if ((webauthn.authenticatorData(FlagIndex) & 0x01) != 0x01) {
+      Left("Invalid UP bit in authenticator data")
+    } else {
+      validateClientData(webauthn.clientData(rawChallenge))
+    }
+  }
+
+  private[vm] class Decoder(rawChallenge: ByteString) {
     private var _bytes: ByteString = ByteString.empty
 
     def tryDecode(bytes: ByteString): SerdeResult[Option[WebAuthn]] = {
@@ -143,7 +165,7 @@ object WebAuthn {
               SerdeError.validation(s"Invalid webauthn postfix: ${Hex.toHexString(result.rest)}")
             )
           } else {
-            validate(result.value, challengeBytes)
+            validate(result.value, rawChallenge)
               .map(_ => Some(result.value))
               .left
               .map(SerdeError.validation)
@@ -154,9 +176,13 @@ object WebAuthn {
     }
   }
 
-  def createClientData(tpe: String, challenge: ByteString): ByteString = {
-    val challengeStr = WebAuthn.base64urlEncode(challenge)
-    val jsonStr      = s"""{"type":"$tpe","challenge":"$challengeStr"}"""
-    ByteString.fromArrayUnsafe(jsonStr.getBytes(StandardCharsets.UTF_8))
+  def createForTest(authenticatorData: ByteString, tpe: String): WebAuthn = {
+    val clientDataPrefixStr = s"""{"type":"$tpe","challenge":""""
+    val clientDataSuffixStr = s""""}"""
+    WebAuthn(
+      authenticatorData,
+      ByteString.fromArrayUnsafe(clientDataPrefixStr.getBytes(StandardCharsets.UTF_8)),
+      ByteString.fromArrayUnsafe(clientDataSuffixStr.getBytes(StandardCharsets.UTF_8))
+    )
   }
 }

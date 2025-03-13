@@ -929,7 +929,7 @@ object TxValidation {
         case Right(webauthn) =>
           txEnv.signatures.pop() match {
             case Right(signature) =>
-              if (!webauthn.verify(signature.toSecP256R1Signature, publicKey)) {
+              if (!webauthn.verify(txEnv.txId, signature.toSecP256R1Signature, publicKey)) {
                 invalidTx(InvalidSignature)
               } else {
                 fromOption(

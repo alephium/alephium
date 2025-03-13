@@ -46,22 +46,12 @@ class WebAuthnSpec extends AlephiumSpec {
   }
 
   it should "validate the client data" in {
-    val challenge   = Hash.generate.bytes
-    val clientData0 = WebAuthn.createClientData("webauthn.create", challenge)
-    WebAuthn.validateClientData(clientData0, challenge) is Left(
+    val challenge  = Hash.generate.bytes
+    val webauthn   = WebAuthn.createForTest(ByteString.empty, "webauthn.create")
+    val clientData = webauthn.clientData(challenge)
+    WebAuthn.validateClientData(clientData) is Left(
       "Invalid type in client data, expected webauthn.get, but got webauthn.create"
     )
-
-    val clientData1 = WebAuthn.createClientData("webauthn.get", challenge)
-    WebAuthn.validateClientData(clientData1, challenge) isE ()
-    val index                 = Random.nextInt(challenge.length)
-    val byte                  = (challenge(index).toInt + 1).toByte
-    val invalidChallengeBytes = challenge.toArray
-    invalidChallengeBytes.update(index, byte)
-    WebAuthn
-      .validateClientData(clientData1, ByteString.fromArrayUnsafe(invalidChallengeBytes))
-      .isLeft is true
-    WebAuthn.validateClientData(clientData1, Hash.generate.bytes).isLeft is true
   }
 
   def createAuthenticatorData(flag: Byte): ByteString = {
@@ -72,31 +62,25 @@ class WebAuthnSpec extends AlephiumSpec {
   }
 
   it should "validate the webauthn payload" in {
-    val challenge  = Hash.generate.bytes
-    val clientData = WebAuthn.createClientData("webauthn.get", challenge)
+    val challenge = Hash.generate.bytes
     val authenticatorData =
       createAuthenticatorData((Arbitrary.arbByte.arbitrary.sample.get | 0x01).toByte)
+    val webauthn = WebAuthn.createForTest(authenticatorData, "webauthn.get")
+    WebAuthn.validate(webauthn, challenge) isE ()
 
-    val webauthn0 = WebAuthn(
-      bytesGen(Random.nextInt(WebAuthn.AuthenticatorDataMinLength)).sample.get,
-      clientData
+    val webauthn0 = webauthn.copy(authenticatorData =
+      bytesGen(Random.nextInt(WebAuthn.AuthenticatorDataMinLength)).sample.get
     )
     WebAuthn.validate(webauthn0, challenge) is Left("Invalid authenticator data length")
 
-    val webauthn1 = WebAuthn(
-      authenticatorData,
-      bytesGen(Random.nextInt(WebAuthn.ClientDataMinLength)).sample.get
-    )
+    val webauthn1 = webauthn.copy(clientDataPrefix = bytesGen(Random.nextInt(10)).sample.get)
     WebAuthn.validate(webauthn1, challenge) is Left("Invalid client data length")
 
-    val webauthn2 = WebAuthn(
-      createAuthenticatorData((Arbitrary.arbByte.arbitrary.sample.get & 0xfe).toByte),
-      clientData
+    val webauthn2 = webauthn.copy(
+      authenticatorData =
+        createAuthenticatorData((Arbitrary.arbByte.arbitrary.sample.get & 0xfe).toByte)
     )
     WebAuthn.validate(webauthn2, challenge) is Left("Invalid UP bit in authenticator data")
-
-    val webauthn3 = WebAuthn(authenticatorData, clientData)
-    WebAuthn.validate(webauthn3, challenge) isE ()
   }
 
   it should "decode webauthn payload" in {
@@ -106,9 +90,8 @@ class WebAuthnSpec extends AlephiumSpec {
     }
 
     val challenge = Hash.generate.bytes
-    val webauthn =
-      WebAuthn(createAuthenticatorData(1), WebAuthn.createClientData("webauthn.get", challenge))
-    val bytes = WebAuthn.serde.serialize(webauthn)
+    val webauthn  = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
+    val bytes     = WebAuthn.serde.serialize(webauthn)
     WebAuthn.tryDecode(challenge, createIterator(bytes)) isE webauthn
     val validPostfix = ByteString.fromArrayUnsafe(Array.fill[Byte](10)(0))
     WebAuthn.tryDecode(challenge, createIterator(bytes ++ validPostfix)) isE webauthn
@@ -124,12 +107,12 @@ class WebAuthnSpec extends AlephiumSpec {
   }
 
   it should "verify the webauthn signature" in {
-    val challenge = Hash.generate.bytes
-    val webauthn =
-      WebAuthn(createAuthenticatorData(1), WebAuthn.createClientData("webauthn.get", challenge))
+    val challenge               = Hash.generate.bytes
+    val webauthn                = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
     val (privateKey, publicKey) = SecP256R1.generatePriPub()
-    val signature               = SecP256R1.sign(webauthn.messageHash, privateKey)
-    webauthn.verify(signature, publicKey) is true
-    webauthn.verify(SecP256R1Signature.generate, publicKey) is false
+    val signature               = SecP256R1.sign(webauthn.messageHash(challenge), privateKey)
+    webauthn.verify(challenge, signature, publicKey) is true
+    webauthn.verify(Hash.generate.bytes, signature, publicKey) is false
+    webauthn.verify(challenge, SecP256R1Signature.generate, publicKey) is false
   }
 }
