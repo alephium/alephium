@@ -1491,6 +1491,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     def lockup: LockupScript.P2PK
     def sign(unsignedTx: UnsignedTransaction): Transaction
+    def unlockGas: GasBox
 
     def prepare(): Unit = {
       val block =
@@ -1517,8 +1518,21 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       sign(unsignedTx)
     }
 
+    private def checkUnlockGas(tx: Transaction) = {
+      import GasSchedule._
+      val blockEnv =
+        BlockEnv(tx.chainIndex, networkConfig.networkId, TimeStamp.now(), Target.Max, None)
+      val worldState  = blockFlow.getBestPersistedWorldState(tx.chainIndex.from).rightValue
+      val prevOutputs = worldState.getPreOutputs(tx).rightValue
+      val initialGas  = tx.unsigned.gasAmount
+      val gasLeft     = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, 0).rightValue
+      val gasUsed     = initialGas.use(gasLeft).rightValue
+      gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas addUnsafe unlockGas)
+    }
+
     def checkValidTx(tx: Transaction) = {
       tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
+      checkUnlockGas(tx)
       tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
       tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
       tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
@@ -1536,6 +1550,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), groupIndex)
 
     def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+    def unlockGas: GasBox                                  = GasSchedule.p2pkUnlockGas
 
     prepare()
     checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
@@ -1547,7 +1562,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val (priKey, pubKey) = SecP256R1.generatePriPub()
     val lockup           = LockupScript.p2pk(PublicKeyLike.Passkey(pubKey), groupIndex)
 
-    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)
+    private var _webauthn: Option[WebAuthn] = None
+    def sign(unsignedTx: UnsignedTransaction): Transaction = {
+      val (webauthn, transaction) = signWithPasskey(unsignedTx, priKey)
+      _webauthn = Some(webauthn)
+      transaction
+    }
+    def unlockGas: GasBox = GasSchedule.passkeyUnlockGas(_webauthn.get.bytesLength)
 
     prepare()
     checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
@@ -1560,6 +1581,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val lockup           = LockupScript.p2pk(PublicKeyLike.ED25519(pubKey), groupIndex)
 
     def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+    def unlockGas: GasBox                                  = GasSchedule.ed25519UnlockGas
 
     prepare()
     checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))

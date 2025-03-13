@@ -2937,7 +2937,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val (priKey, pubKey)         = SecP256R1.generatePriPub()
     val publicKey: PublicKeyLike = PublicKeyLike.Passkey(pubKey)
 
-    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)
+    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)._2
 
     testTransfer()
   }

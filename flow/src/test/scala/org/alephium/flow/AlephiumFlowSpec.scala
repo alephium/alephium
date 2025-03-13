@@ -1050,7 +1050,10 @@ trait FlowFixture
     })
   }
 
-  def signWithPasskey(unsignedTx: UnsignedTransaction, priKey: SecP256R1PrivateKey): Transaction = {
+  def signWithPasskey(
+      unsignedTx: UnsignedTransaction,
+      priKey: SecP256R1PrivateKey
+  ): (WebAuthn, Transaction) = {
     val clientData = WebAuthn.createClientData(WebAuthn.GET, unsignedTx.id.bytes)
     val bytes      = bytesGen(WebAuthn.AuthenticatorDataMinLength).sample.get.toArray
     bytes(WebAuthn.FlagIndex) = (bytes(WebAuthn.FlagIndex) | 0x01).toByte
@@ -1058,7 +1061,7 @@ trait FlowFixture
     val webauthn          = WebAuthn(authenticatorData, clientData)
     val messageHash       = webauthn.messageHash
     val signature         = Bytes64.from(SecP256R1.sign(messageHash, priKey))
-    Transaction.from(unsignedTx, encodeToBytes64(webauthn) :+ signature)
+    (webauthn, Transaction.from(unsignedTx, encodeToBytes64(webauthn) :+ signature))
   }
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {
