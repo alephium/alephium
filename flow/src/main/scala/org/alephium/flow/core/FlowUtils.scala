@@ -138,7 +138,13 @@ trait FlowUtils
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
+  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
+
+  def getBestFlowSkeleton(): BlockFlowSkeleton
+
   def updateBestDeps(): IOResult[Unit]
+
+  def updateBestFlowSkeleton(): IOResult[Unit]
 
   def updateBestDepsUnsafe(): Unit
 
@@ -183,7 +189,12 @@ trait FlowUtils
       // some tx inputs might from bestDeps, but not loosenDeps
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
-      val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
+      val candidates3 = if (hardFork.isDanubeEnabled()) {
+        // For performance, conflicted TXs in parallel chains are fine since Danube upgrade
+        candidates2
+      } else {
+        filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
+      }
       FlowUtils.truncateTxs(
         candidates3,
         maximalTxsInOneBlock,
@@ -256,19 +267,28 @@ trait FlowUtils
     IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
+  def findBestDepsForNewBlock(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
+    if (hardfork.isDanubeEnabled()) {
+      calBestFlowPerChainIndex(chainIndex)
+    } else {
+      getBestDeps(chainIndex.from)
+    }
+  }
+
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
   ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
-    val bestDeps = getBestDeps(chainIndex.from)
+    val hardForkGuess = networkConfig.getHardFork(TimeStamp.now())
+    val bestDeps      = findBestDepsForNewBlock(chainIndex, hardForkGuess)
     for {
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       hardFork   = networkConfig.getHardFork(templateTs)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
       target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
-      groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
+      groupView    <- getMutableGroupView(chainIndex, loosenDeps, hardFork)
       uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps, hardFork)
       template <- prepareBlockFlow(

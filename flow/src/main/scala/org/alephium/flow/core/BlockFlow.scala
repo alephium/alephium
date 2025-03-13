@@ -258,7 +258,8 @@ object BlockFlow extends StrictLogging {
       assume(index.relateTo(brokerConfig))
 
       cacheBlock(block)
-      if (brokerConfig.contains(block.chainIndex.from)) {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      if (brokerConfig.contains(block.chainIndex.from) && !hardFork.isDanubeEnabled()) {
         cacheForConflicts(block)
       }
       for {
@@ -359,6 +360,45 @@ object BlockFlow extends StrictLogging {
         }
     }
 
+    def tryExtendBlockFlowSkeletonUnsafe(
+        flow: BlockFlowSkeleton,
+        group: GroupIndex,
+        toTry: AVector[BlockHash]
+    ): BlockFlowSkeleton = {
+      var updatedFlow: Option[BlockFlowSkeleton] = None
+      toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
+        if (updatedFlow.isEmpty) {
+          tryExtendBlockFlowSkeletonUnsafe(flow, group, tip).foreach { extendedFlow =>
+            updatedFlow = Some(extendedFlow)
+          }
+        }
+      }
+
+      updatedFlow.getOrElse(flow)
+    }
+
+    def extendFlowPerChainUnsafe(flowTips: FlowTips, chainIndex: ChainIndex): FlowTips = {
+      var updatedFlow: Option[FlowTips] = None
+      val currentChainTip               = flowTips.outTips(chainIndex.to.value)
+
+      val chain       = getHashChain(chainIndex)
+      val targetGroup = chainIndex.from
+      val toTry       = chain.getAllTips
+      toTry.sortBy(tip => getWeightUnsafe(tip)).view.reverse.foreach { tip =>
+        if (
+          updatedFlow.isEmpty && tip != currentChainTip && isExtendingUnsafe(tip, currentChainTip)
+        ) {
+          val header = getBlockHeaderUnsafe(tip)
+          tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(header, targetGroup)).foreach {
+            newFlow =>
+              updatedFlow = Some(newFlow)
+          }
+        }
+      }
+
+      updatedFlow.getOrElse(flowTips)
+    }
+
     def getBestIntraGroupTip(): BlockHash = {
       intraGroupHeaderChains.reduceBy(_.getBestTipUnsafe())(blockHashOrdering.max)
     }
@@ -389,6 +429,25 @@ object BlockFlow extends StrictLogging {
       flowTips2.toBlockDeps
     }
 
+    def calBestFlowSkeletonUnsafe(): BlockFlowSkeleton = {
+      val bestIntraGroupTip = getBestIntraGroupTip()
+      val bestIndex         = ChainIndex.from(bestIntraGroupTip)
+      val startFlow         = getBlockFlowSkeletonUnsafe(bestIntraGroupTip)
+
+      brokerConfig.cliqueGroups.filter(_ != bestIndex.from).fold(startFlow) { case (flow, g) =>
+        val toTry = getHashChain(g, g).getAllTips
+        tryExtendBlockFlowSkeletonUnsafe(flow, g, toTry)
+      }
+    }
+
+    def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps = {
+      val bestSkeleton     = getBestFlowSkeleton()
+      val initialDeps      = bestSkeleton.createBlockDeps(chainIndex.from)
+      val initialFlowTips  = FlowTips.from(initialDeps, chainIndex.from)
+      val extendedFlowTips = extendFlowPerChainUnsafe(initialFlowTips, chainIndex)
+      extendedFlowTips.toBlockDeps
+    }
+
     def updateBestDepsUnsafe(): Unit =
       brokerConfig.groupRange.foreach { mainGroup =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
@@ -406,6 +465,15 @@ object BlockFlow extends StrictLogging {
 
     def updateBestDeps(): IOResult[Unit] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
+    }
+
+    def updateBestFlowSkeleton(): IOResult[Unit] = {
+      IOUtils.tryExecute(updateBestFlowSkeletonUnsafe())
+    }
+
+    def updateBestFlowSkeletonUnsafe(): Unit = {
+      val bestFlowSkeleton = calBestFlowSkeletonUnsafe()
+      updateBestFlowSkeleton(bestFlowSkeleton)
     }
   }
 

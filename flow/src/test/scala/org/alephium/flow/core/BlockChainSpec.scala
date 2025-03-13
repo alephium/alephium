@@ -558,7 +558,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
   it should "test isBefore" in new ForkedFixture {
     chain0.foreach { block =>
+      chain.isBefore(genesis.hash, genesis.hash) isE true
       chain.isBefore(genesis.hash, block.hash) isE true
+      chain.isBefore(block.hash, block.hash) isE true
       chain.isBefore(block.hash, genesis.hash) isE false
       chain.isBefore(block.hash, chain1.last.hash) isE false
     }

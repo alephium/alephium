@@ -1181,7 +1181,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     implicit val validator: (Transaction) => TxValidationResult[Unit] = (tx: Transaction) => {
       val chainIndex = getChainIndex(tx).rightValue
       val bestDeps   = blockFlow.getBestDeps(chainIndex.from)
-      val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
+      val groupView  = blockFlow.getMutableGroupViewPreDanube(chainIndex.from, bestDeps).rightValue
       val hardFork   = networkConfig.getHardFork(TimeStamp.now())
       val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue.copy(hardFork = hardFork)
       validateTx(

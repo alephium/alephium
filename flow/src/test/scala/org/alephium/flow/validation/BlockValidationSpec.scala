@@ -356,7 +356,7 @@ class BlockValidationSpec extends AlephiumSpec {
     setHardForkBefore(HardFork.Rhone)
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
@@ -371,7 +371,7 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check gas reward cap for Genesis fork" in new GenesisForkFixture {
 
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Mainnet)
     }
 
@@ -398,7 +398,7 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check gas reward for Leman fork" in new Fixture {
     setHardFork(HardFork.Leman)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
@@ -506,7 +506,7 @@ class BlockValidationSpec extends AlephiumSpec {
         val block =
           mineWithTxs(blockFlow, ChainIndex.unsafe(from, to))((_, _) => block0.nonCoinbase)
         block.nonCoinbaseLength is 1
-        checkFlow(block, blockFlow) is Left(Right(InvalidFlowTxs))
+        checkFlow(block, blockFlow, HardFork.Rhone) is Left(Right(InvalidFlowTxs))
       }
     }
   }
@@ -543,7 +543,7 @@ class BlockValidationSpec extends AlephiumSpec {
       blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, newBlock.blockDeps).toSet is
         Set(block0.hash, block1.hash)
 
-      checkFlow(newBlock, blockFlow) is Left(Right(InvalidFlowTxs))
+      checkFlow(newBlock, blockFlow, HardFork.Rhone) is Left(Right(InvalidFlowTxs))
     }
   }
 
@@ -791,7 +791,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "check coinbase reward rhone" in new RhoneCoinbaseFixture {
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
       checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Rhone)
     }
 
@@ -1339,8 +1339,9 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "check PoLW coinbase tx" in new PoLWCoinbaseFixture {
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
-      val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val groupView =
+        blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 
@@ -1438,8 +1439,9 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "check PoLW coinbase tx pre-rhone" in new PoLWCoinbaseFixture {
     setHardForkBefore(HardFork.Rhone)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
-      val hardFork  = networkConfig.getHardFork(block.timestamp)
-      val groupView = blockFlow.getMutableGroupView(chainIndex.from, block.blockDeps).rightValue
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val groupView =
+        blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 

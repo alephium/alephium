@@ -106,7 +106,7 @@ class BlockFlowSpec extends AlephiumSpec {
     cache0.contains(newBlocks(3).hash) is false
 
     val block  = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    val cache1 = blockFlow.getBlocksForUpdates(block).rightValue.map(_.hash)
+    val cache1 = blockFlow.getInterGroupBlocksForUpdates(block).rightValue.map(_.hash)
     cache1.contains(block.hash) is true
     cache1.contains(newBlocks(1).hash) is true
     cache1.contains(newBlocks(2).hash) is false
@@ -290,7 +290,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val mainGroup = GroupIndex.unsafe(0)
     blockFlow.getHashesForUpdates(mainGroup) isE AVector.empty[BlockHash]
-    blockFlow.getBlocksForUpdates(block2) isE AVector(block1, block2)
+    blockFlow.getInterGroupBlocksForUpdates(block2) isE AVector(block1, block2)
     val bestDeps0 = blockFlow.getBestDeps(mainGroup)
     blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps0) isE AVector.empty[BlockCache]
 

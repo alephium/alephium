@@ -49,6 +49,7 @@ object RocksDBSource {
     case object ParentContract     extends ColumnFamily("parentcontract")
     case object SubContract        extends ColumnFamily("subcontract")
     case object SubContractCounter extends ColumnFamily("subcontractcounter")
+    case object ConflictedTxs      extends ColumnFamily("conflictedtx")
 
     val values: AVector[ColumnFamily] =
       AVector(
@@ -64,7 +65,8 @@ object RocksDBSource {
         SubContract,
         SubContractCounter,
         Trie,
-        TxOutputRefIndex
+        TxOutputRefIndex,
+        ConflictedTxs
       )
   }
 

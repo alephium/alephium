@@ -29,7 +29,7 @@ import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex}
+import org.alephium.protocol.model.{Address, ChainIndex, HardFork}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 import org.alephium.util.EventStream.{Publisher, Subscriber}
@@ -58,7 +58,8 @@ object ViewHandler {
       templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
   ) extends Event
       with EventStream.Event
-  final case class SubscribeResult(succeeded: Boolean) extends Event
+  final case class NewTemplate(template: BlockFlowTemplate) extends Event with EventStream.Event
+  final case class SubscribeResult(succeeded: Boolean)      extends Event
 
   def needUpdate(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from) || chainIndex.isIntraGroup
@@ -76,6 +77,16 @@ object ViewHandler {
         }
       }
     }
+
+  def prepareTemplate(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      minerAddresses: AVector[LockupScript.Asset]
+  ): IOResult[BlockFlowTemplate] = {
+    IOUtils.tryExecute {
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, minerAddresses(chainIndex.to.value))
+    }
+  }
 }
 
 class ViewHandler(
@@ -95,24 +106,34 @@ class ViewHandler(
 
   def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, _) =>
+      val hardFork = getHardForkNow()
       // We only update best deps for the following 2 cases:
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
       if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
-        updateBestDepsCount += 1
-        tryUpdateBestDeps()
+        updatingBestViewCount += 1
+        tryUpdateBestView(hardFork)
+      }
+      if (hardFork.isDanubeEnabled()) {
+        updateSubscribers(hardFork, Some(data.chainIndex))
       }
     case ViewHandler.BestDepsUpdated =>
       updatingBestDeps = false
-      if (isNodeSynced) { updateSubscribers() }
-      tryUpdateBestDeps()
+      val hardFork = getHardForkNow()
+      // If Danube is not enabled, we update the subscribers
+      // If Danube is enabled, we don't need to update the subscribers, as it's done when the data event is received
+      if (!hardFork.isDanubeEnabled()) { updateSubscribers(hardFork, None) }
+      if (isNodeSynced) {
+        tryUpdateBestView(hardFork)
+      }
     case ViewHandler.BestDepsUpdateFailed =>
       updatingBestDeps = false
       log.warning("Updating blockflow deps failed")
 
-    case ViewHandler.Subscribe         => subscribe()
-    case ViewHandler.Unsubscribe       => unsubscribe()
-    case ViewHandler.UpdateSubscribers => updateSubscribers()
+    case ViewHandler.Subscribe   => subscribe()
+    case ViewHandler.Unsubscribe => unsubscribe()
+    case ViewHandler.UpdateSubscribers =>
+      updateSubscribers(getHardForkNow(), None)
 
     case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
@@ -144,7 +165,7 @@ trait ViewHandlerState extends IOBaseActor {
       minerAddressesOpt match {
         case Some(_) =>
           subscribers.addOne(sender())
-          updateSubscribers()
+          updateSubscribers(getHardForkNow(), None)
           scheduleUpdate()
           sender() ! ViewHandler.SubscribeResult(true)
         case None =>
@@ -177,12 +198,20 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
-  def updateSubscribers(): Unit = {
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def updateSubscribers(hardFork: HardFork, chainIndex: Option[ChainIndex]): Unit = {
     if (isNodeSynced) {
       minerAddressesOpt.foreach { minerAddresses =>
         if (subscribers.nonEmpty) {
-          escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-            subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+          if (hardFork.isDanubeEnabled() && chainIndex.nonEmpty) {
+            escapeIOError(ViewHandler.prepareTemplate(blockFlow, chainIndex.get, minerAddresses)) {
+              template =>
+                subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+            }
+          } else {
+            escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+              subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+            }
           }
           scheduleUpdate()
         }
@@ -192,21 +221,40 @@ trait ViewHandlerState extends IOBaseActor {
       subscribers.foreach(_ ! ViewHandler.SubscribeResult(false))
     }
   }
+
+  def getHardForkNow(): HardFork = {
+    blockFlow.networkConfig.getHardFork(TimeStamp.now())
+  }
 }
 
 trait BlockFlowUpdaterState extends IOBaseActor {
   def blockFlow: BlockFlow
-  protected[handler] var updateBestDepsCount: Int  = 0
+  protected[handler] var updatingBestViewCount: Int  = 0
   protected[handler] var updatingBestDeps: Boolean = false
 
   implicit def executionContext: ExecutionContext = context.dispatcher
 
-  def tryUpdateBestDeps(): Unit = {
-    if (updateBestDepsCount > 0 && !updatingBestDeps) {
-      updateBestDepsCount = 0
+  def tryUpdateBestView(hardForkNow: HardFork): Unit = {
+    if (updatingBestViewCount > 0 && !updatingBestDeps) {
+      updatingBestViewCount = 0
       updatingBestDeps = true
       Future[ViewHandler.Command] {
-        blockFlow.updateBestDeps() match {
+        val now          = TimeStamp.now()
+        val hardForkSoon = blockFlow.networkConfig.getHardFork(now.plusSecondsUnsafe(10))
+        val updateResult = if (hardForkNow.isDanubeEnabled()) {
+          // If Danube is currently enabled
+          blockFlow.updateBestFlowSkeleton()
+        } else if (hardForkSoon.isDanubeEnabled()) {
+          // If Danube will be enabled within the next 10 seconds
+          for {
+            _ <- blockFlow.updateBestFlowSkeleton()
+            _ <- blockFlow.updateBestDeps()
+          } yield ()
+        } else {
+          // If Danube is not enabled and won't be soon
+          blockFlow.updateBestDeps()
+        }
+        updateResult match {
           case Left(_)  => ViewHandler.BestDepsUpdateFailed
           case Right(_) => ViewHandler.BestDepsUpdated
         }
