@@ -1926,7 +1926,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
     }
 
-    val defaultGroupIndex = publicKey.scriptHint.groupIndex
+    val defaultGroupIndex = publicKey.defaultGroup
     val address           = Address.Asset(LockupScript.p2pk(publicKey, defaultGroupIndex))
     read[Val](
       s"""{"type": "Address", "value": "${address.toBase58.dropRight(2)}"}"""

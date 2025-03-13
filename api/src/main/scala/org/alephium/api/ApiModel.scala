@@ -162,7 +162,7 @@ trait ApiModelCodec {
     LockupScript.decodeFromBase58(input) match {
       case LockupScript.ValidLockupScript(lockupScript) => Address.from(lockupScript)
       case LockupScript.HalfDecodedP2PK(publicKey) =>
-        val groupIndex = publicKey.scriptHint.groupIndex
+        val groupIndex = publicKey.defaultGroup
         Address.Asset(LockupScript.p2pk(publicKey, groupIndex))
       case LockupScript.InvalidLockupScript =>
         throw Abort(s"Unable to decode address from $input")

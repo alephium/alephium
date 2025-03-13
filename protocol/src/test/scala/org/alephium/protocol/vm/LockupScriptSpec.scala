@@ -20,9 +20,9 @@ import akka.util.ByteString
 
 import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol.{Checksum, Hash}
-import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators}
+import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
@@ -111,7 +111,7 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
         lockupScript0.scriptHint.groupIndex is groupIndex
         lockupScript0.scriptHint.groupIndex.value.toByte is lockupScript0.groupByte
 
-        val defaultGroupIndex = publicKey.scriptHint.groupIndex
+        val defaultGroupIndex = publicKey.defaultGroup
         val lockupScript1     = LockupScript.p2pk(publicKey, defaultGroupIndex)
         lockupScript1.scriptHint.groupIndex is defaultGroupIndex
         lockupScript1.scriptHint.groupIndex.value.toByte is lockupScript1.groupByte
@@ -120,12 +120,12 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "only modify the MSB of the public key's script hint" in {
-    val publicKey        = PublicKeyType.SecP256K1(SecP256K1PublicKey.generate)
-    val originScriptHint = publicKey.scriptHint
+    val publicKey   = PublicKeyType.SecP256K1(SecP256K1PublicKey.generate)
+    val initialHint = ScriptHint.fromHash(DjbHash.intHash(publicKey.bytes))
     (0 until groupConfig.groups).foreach { groupIndex =>
       val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
       lockupScript.scriptHint.groupIndex.value is groupIndex
-      (lockupScript.scriptHint.value & 0x00ffffff) is (originScriptHint.value & 0x00ffffff)
+      (lockupScript.scriptHint.value & 0x00ffffff) is (initialHint.value & 0x00ffffff)
     }
   }
 

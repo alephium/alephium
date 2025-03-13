@@ -22,7 +22,7 @@ import org.alephium.protocol.{Checksum, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{AVector, Base58, Bytes}
+import org.alephium.util.{AVector, Base58, Bytes, DjbHash}
 
 sealed trait LockupScript {
   def scriptHint: ScriptHint
@@ -226,11 +226,11 @@ object LockupScript {
     // Since the least significant byte is already used to distinguish the output type,
     // we use the most significant byte here to calculate the new `scriptHint`.
     override lazy val scriptHint: ScriptHint = {
-      val hintValue    = publicKey.scriptHint.value
-      val xorResult    = Bytes.xorByte(hintValue)
-      val byte0        = (hintValue >> 24).toByte
+      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(publicKey.bytes)).value
+      val xorResult    = Bytes.xorByte(initialHint)
+      val byte0        = (initialHint >> 24).toByte
       val newByte0     = byte0 ^ xorResult ^ groupByte
-      val newHintValue = (newByte0 << 24) | (hintValue & 0x00ffffff)
+      val newHintValue = (newByte0 << 24) | (initialHint & 0x00ffffff)
       ScriptHint.fromHash(newHintValue)
     }
 
