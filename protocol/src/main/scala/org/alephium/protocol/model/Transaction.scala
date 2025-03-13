@@ -30,7 +30,7 @@ import org.alephium.util.{AVector, Duration, Hex, Math, TimeStamp, U256}
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
   def inputSignatures: AVector[Bytes64]
-  def scriptSignatures: AVector[Signature]
+  def scriptSignatures: AVector[Bytes64]
 
   def id: TransactionId = unsigned.id
 
@@ -63,7 +63,7 @@ final case class Transaction(
     contractInputs: AVector[ContractOutputRef],
     generatedOutputs: AVector[TxOutput],
     inputSignatures: AVector[Bytes64],
-    scriptSignatures: AVector[Signature]
+    scriptSignatures: AVector[Bytes64]
 ) extends TransactionAbstract
     with MerkleHashable[Hash]
     with SerializationCache {
@@ -349,7 +349,7 @@ object Transaction {
       contractInputs: AVector[ContractOutputRef],
       generatedOutputs: AVector[TxOutput],
       inputSignatures: AVector[Bytes64],
-      scriptSignatures: AVector[Signature]
+      scriptSignatures: AVector[Bytes64]
   )
   object MerkelTx {
     implicit val serde: Serde[MerkelTx] = Serde.forProduct6(
@@ -370,7 +370,7 @@ object Transaction {
 final case class TransactionTemplate(
     unsigned: UnsignedTransaction,
     inputSignatures: AVector[Bytes64],
-    scriptSignatures: AVector[Signature]
+    scriptSignatures: AVector[Bytes64]
 ) extends TransactionAbstract
     with SerializationCache {
   override def outputsLength: Int = unsigned.fixedOutputs.length

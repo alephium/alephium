@@ -44,7 +44,7 @@ trait ApiModelFixture
   )
   val (priKey, pubKey) = keypairGen.sample.get
 
-  val sigature = SignatureSchema.sign(hashGen.sample.get.bytes, priKey)
+  val sigature = Bytes64.from(SignatureSchema.sign(hashGen.sample.get.bytes, priKey))
 
   val scriptPair = p2pkScriptGen(GroupIndex.unsafe(0)).sample.get
 
@@ -73,13 +73,13 @@ trait ApiModelFixture
     scriptExecutionOk = true,
     AVector(contractTxOutputRef),
     AVector(assetOutput, contractOutput),
-    AVector(Bytes64.from(sigature)),
+    AVector(sigature),
     AVector(sigature)
   )
 
   val transactionTemplate = TransactionTemplate(
     unsignedTransaction,
-    AVector(Bytes64.from(sigature)),
+    AVector(sigature),
     AVector(sigature)
   )
 }

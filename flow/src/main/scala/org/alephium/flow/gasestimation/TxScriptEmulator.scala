@@ -77,7 +77,7 @@ object TxScriptEmulator {
             fixedOutputs
           ),
           inputSignatures = AVector.fill(16)(Bytes64.from(Signature.generate)),
-          scriptSignatures = AVector.fill(16)(Signature.generate)
+          scriptSignatures = AVector.fill(16)(Bytes64.from(Signature.generate))
         )
 
         val result =

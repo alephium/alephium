@@ -133,6 +133,6 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       SignatureSchema.sign(tx.unsigned.id, privateKey)
     }
 
-    tx.copy(scriptSignatures = tx.scriptSignatures ++ signatures)
+    tx.copy(scriptSignatures = tx.scriptSignatures ++ signatures.map(Bytes64.from))
   }
 }

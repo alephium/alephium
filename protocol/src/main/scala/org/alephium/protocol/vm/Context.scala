@@ -583,7 +583,7 @@ object StatefulContext {
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): StatefulContext = {
-    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures.map(Bytes64.from)), txIndex)
+    val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures), txIndex)
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
   // scalastyle:on parameter.number

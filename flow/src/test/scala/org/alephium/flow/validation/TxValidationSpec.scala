@@ -416,7 +416,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "check the number of script signatures" in new Fixture {
     val tx        = transactionGen().sample.get
-    val signature = Signature.generate
+    val signature = Bytes64.from(Signature.generate)
     val modified0 = tx.copy(scriptSignatures = AVector.empty)
     val modified1 = tx.copy(scriptSignatures = AVector.fill(ALPH.MaxScriptSigNum)(signature))
     val modified2 = tx.copy(scriptSignatures = AVector.fill(ALPH.MaxScriptSigNum + 1)(signature))
