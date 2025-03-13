@@ -223,6 +223,8 @@ object LockupScript {
   final case class P2PK private (publicKey: PublicKeyType, groupByte: Byte) extends Asset {
     // We need to use `scriptHint` to calculate the group index in the `AssetOutputRef`,
     // so we need to find a `scriptHint` that matches the group index.
+    // Since the least significant byte is already used to distinguish the output type,
+    // we use the most significant byte here to calculate the new `scriptHint`.
     override lazy val scriptHint: ScriptHint = {
       val hintValue    = publicKey.scriptHint.value
       val xorResult    = Bytes.xorByte(hintValue)

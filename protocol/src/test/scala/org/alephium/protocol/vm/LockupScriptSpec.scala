@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
+import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol.{Checksum, Hash}
 import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators}
 import org.alephium.serde._
@@ -104,10 +105,27 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "calculate correct script hint for p2pk address" in {
     forAll(groupIndexGen) { groupIndex =>
-      forAll(p2pkLockupGen(groupIndex)) { lockupScript =>
-        lockupScript.groupIndex is groupIndex
-        lockupScript.scriptHint.groupIndex is groupIndex
+      forAll(p2pkLockupGen(groupIndex)) { lockupScript0 =>
+        val publicKey = lockupScript0.publicKey
+        lockupScript0.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex.value.toByte is lockupScript0.groupByte
+
+        val defaultGroupIndex = publicKey.scriptHint.groupIndex
+        val lockupScript1     = LockupScript.p2pk(publicKey, defaultGroupIndex)
+        lockupScript1.scriptHint.groupIndex is defaultGroupIndex
+        lockupScript1.scriptHint.groupIndex.value.toByte is lockupScript1.groupByte
       }
+    }
+  }
+
+  it should "only modify the MSB of the public key's script hint" in {
+    val publicKey        = PublicKeyType.SecP256K1(SecP256K1PublicKey.generate)
+    val originScriptHint = publicKey.scriptHint
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      lockupScript.scriptHint.groupIndex.value is groupIndex
+      (lockupScript.scriptHint.value & 0x00ffffff) is (originScriptHint.value & 0x00ffffff)
     }
   }
 

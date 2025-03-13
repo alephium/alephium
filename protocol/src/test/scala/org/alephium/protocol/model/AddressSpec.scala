@@ -210,7 +210,6 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   case class AddressVerifyP2PK(
       address: String,
-      groupedAddress: Option[String] = None,
       pubKey: Option[PublicKeyType] = None,
       groupIndex: Option[GroupIndex] = None
   ) extends AddressVerify {
@@ -226,12 +225,8 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
       groupIndex.foreach(g => script.groupIndex is g)
       val bytes = serialize[LockupScript](script)
       Base58.encode(bytes) isnot address
-
       Address.from(script).toBase58 is address
-      Address.fromBase58(address) is Some(
-        Address.Asset(LockupScript.p2pk(pubKey.get, groupIndex.get))
-      )
-      groupedAddress.foreach(Address.fromBase58(_) is Some(Address.Asset(script)))
+      Address.fromBase58(address) is Some(Address.from(script))
       Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(0, 5)).sample.get)) is None
     }
 
