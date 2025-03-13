@@ -265,7 +265,7 @@ object GasSchedule {
   val txInputBaseGas: GasBox  = GasBox.unsafe(2000)
   val txOutputBaseGas: GasBox = GasBox.unsafe(4500)
 
-  val p2pkUnlockGas: GasBox = {
+  val secp256K1UnlockGas: GasBox = {
     GasBox.unsafe(GasHash.gas(PublicKey.length).value + GasSignature.gas.value)
   }
 
@@ -279,5 +279,5 @@ object GasSchedule {
     )
   }
 
-  def p2mpkUnlockGas(m: Int): GasBox = p2pkUnlockGas.mulUnsafe(m)
+  def p2mpkUnlockGas(m: Int): GasBox = secp256K1UnlockGas.mulUnsafe(m)
 }

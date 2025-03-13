@@ -892,14 +892,17 @@ object TxValidation {
         invalidTx(InvalidUnlockScriptType)
       } else {
         lock.publicKey match {
-          case PublicKeyLike.SecP256K1(key) => checkSignature(txEnv, preImage, gasRemaining, key)
-          case PublicKeyLike.Passkey(key)   => checkPasskey(txEnv, preImage, gasRemaining, key)
-          case PublicKeyLike.ED25519(key)   => checkED25519(txEnv, preImage, gasRemaining, key)
+          case PublicKeyLike.SecP256K1(key) =>
+            checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
+          case PublicKeyLike.Passkey(key) =>
+            checkPasskeySignature(txEnv, preImage, gasRemaining, key)
+          case PublicKeyLike.ED25519(key) =>
+            checkED25519Signature(txEnv, preImage, gasRemaining, key)
         }
       }
     }
 
-    protected[validation] def checkED25519(
+    protected[validation] def checkED25519Signature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
@@ -916,7 +919,7 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkPasskey(
+    protected[validation] def checkPasskeySignature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
@@ -950,11 +953,11 @@ object TxValidation {
       if (Hash.hash(publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        checkSignature(txEnv, preImage, gasRemaining, publicKey)
+        checkSecP256K1Signature(txEnv, preImage, gasRemaining, publicKey)
       }
     }
 
-    private def checkSignature(
+    private def checkSecP256K1Signature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
@@ -965,7 +968,7 @@ object TxValidation {
           if (!SignatureSchema.verify(preImage, signature.toSecP256K1Signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
-            fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)
+            fromOption(gasRemaining.sub(GasSchedule.secp256K1UnlockGas), OutOfGas)
           }
         case Left(_) => invalidTx(NotEnoughSignature)
       }
@@ -989,7 +992,7 @@ object TxValidation {
                 if (Hash.hash(publicKey.bytes) != pkHash) {
                   invalidTx(InvalidPublicKeyHash)
                 } else {
-                  checkSignature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
+                  checkSecP256K1Signature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
                 }
               case None =>
                 invalidTx(InvalidP2mpkhUnlockScript)

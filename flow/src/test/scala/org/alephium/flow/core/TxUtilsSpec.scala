@@ -469,7 +469,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     def estimateWithDifferentP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
       val inputGas =
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas).mulUnsafe(numInputs)
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas).mulUnsafe(numInputs)
       GasEstimation.estimate(inputGas, numOutputs)
     }
   }

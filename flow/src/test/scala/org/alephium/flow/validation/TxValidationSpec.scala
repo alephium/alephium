@@ -965,7 +965,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       txBaseGas addUnsafe
         txInputBaseGas addUnsafe
         txOutputBaseGas.mulUnsafe(2) addUnsafe
-        GasSchedule.p2pkUnlockGas
+        GasSchedule.secp256K1UnlockGas
     )
     gasUsed is GasBox.unsafe(14060)
   }
@@ -1550,7 +1550,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), groupIndex)
 
     def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
-    def unlockGas: GasBox                                  = GasSchedule.p2pkUnlockGas
+    def unlockGas: GasBox                                  = GasSchedule.secp256K1UnlockGas
 
     prepare()
     checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))

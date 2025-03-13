@@ -21,7 +21,7 @@ import org.alephium.util.AlephiumSpec
 
 class GasScheduleSpec extends AlephiumSpec {
   it should "validate default gases" in {
-    (defaultGasPerInput >= GasSchedule.p2pkUnlockGas) is true
+    (defaultGasPerInput >= GasSchedule.secp256K1UnlockGas) is true
   }
 
   it should "charge gas for hash" in {
@@ -29,7 +29,7 @@ class GasScheduleSpec extends AlephiumSpec {
   }
 
   it should "charge gas for unlock" in {
-    GasSchedule.p2pkUnlockGas is GasBox.unsafe(60 + 2000)
+    GasSchedule.secp256K1UnlockGas is GasBox.unsafe(60 + 2000)
     GasSchedule.passkeyUnlockGas(100) is GasBox.unsafe(132 + 2000)
     GasSchedule.ed25519UnlockGas is GasBox.unsafe(54 + 2000)
   }

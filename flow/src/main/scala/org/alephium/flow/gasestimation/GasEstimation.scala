@@ -31,7 +31,7 @@ object GasEstimation extends StrictLogging {
 
   def gasForSameP2PKHInputs(numInputs: Int): GasBox = {
     assume(numInputs > 0)
-    val firstInputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
+    val firstInputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas)
     firstInputGas.addUnsafe(GasSchedule.txInputBaseGas.mulUnsafe(numInputs - 1))
   }
 
@@ -98,7 +98,7 @@ object GasEstimation extends StrictLogging {
   ): Either[String, GasBox] = {
     unlockScript match {
       case _: UnlockScript.P2PKH | _: UnlockScript.PoLW =>
-        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
+        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas))
       case p2mpkh: UnlockScript.P2MPKH =>
         Right(
           GasSchedule.txInputBaseGas.addUnsafe(
@@ -112,7 +112,7 @@ object GasEstimation extends StrictLogging {
       case UnlockScript.SameAsPrevious =>
         Right(GasSchedule.txInputBaseGas)
       case UnlockScript.P2PK(PublicKeyLike.SecP256K1) =>
-        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
+        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas))
       case UnlockScript.P2PK(PublicKeyLike.Passkey) =>
         // TODO: How to estimate the gas consumption more accurately when building the tx?
         // scalastyle:off magic.number
