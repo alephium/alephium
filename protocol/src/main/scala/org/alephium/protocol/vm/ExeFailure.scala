@@ -251,6 +251,10 @@ final case class NoAssetsApproved(address: Address.Asset) extends ExeFailure {
   override def toString: String = s"No assets approved from address ${address.toBase58}"
 }
 
+case object ChainCallerOutputsFailed extends ExeFailure {
+  override def toString: String = "Failed to chain output assets for transaction callers"
+}
+
 case object BalanceOverflow extends ExeFailure
 
 final case class NoAlphBalanceForTheAddress(address: Address) extends ExeFailure {

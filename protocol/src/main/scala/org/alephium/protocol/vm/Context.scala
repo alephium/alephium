@@ -256,6 +256,17 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
+  def getAllInputAddresses(): AVector[Address] = {
+    var addresses = AVector.ofCapacity[Address](1) // One input address in most cases
+    txEnv.prevOutputs.foreach { output =>
+      val address = Address.Asset(output.lockupScript)
+      if (!addresses.contains(address)) {
+        addresses = addresses :+ address
+      }
+    }
+    addresses
+  }
+
   def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
     if (getHardFork().isLemanEnabled()) {
       this.chargeGas(gasFormula.gas(size))
@@ -377,6 +388,23 @@ trait StatefulContext extends StatelessContext with ContractPool {
       }
     } else {
       okay
+    }
+  }
+
+  def chainCallerOutputs(frameBalanceStateOpt: Option[MutBalanceState]): ExeResult[Unit] = {
+    frameBalanceStateOpt match {
+      case Some(frameBalanceState) => chainCallerOutputs(frameBalanceState)
+      case None                    => okay
+    }
+  }
+
+  def chainCallerOutputs(frameBalanceState: MutBalanceState): ExeResult[Unit] = {
+    EitherF.foreachTry(getAllInputAddresses().toIterable) { caller =>
+      val success = outputBalances
+        .useAll(caller.lockupScript)
+        .forall(outputs => frameBalanceState.remaining.add(caller.lockupScript, outputs).nonEmpty)
+
+      if (success) okay else failed(ChainCallerOutputsFailed)
     }
   }
 
