@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.SecP256R1
+import org.alephium.crypto.{ED25519, SecP256R1}
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
@@ -1540,6 +1540,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     prepare()
     checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
     checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
+    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))
   }
 
   it should "validate p2pk(passkey) unlock script" in new P2PKUnlockScriptFixture {
@@ -1551,5 +1552,18 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     prepare()
     checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
     checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
+    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))
+  }
+
+  it should "validate p2pk(ed25519) unlock script" in new P2PKUnlockScriptFixture {
+    val (priKey, pubKey) = ED25519.generatePriPub()
+    val lockup           = LockupScript.p2pk(PublicKeyLike.ED25519(pubKey), groupIndex)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+
+    prepare()
+    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))
+    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
+    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
   }
 }

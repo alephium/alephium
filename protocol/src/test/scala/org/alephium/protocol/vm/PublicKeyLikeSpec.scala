@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{SecP256K1PublicKey, SecP256R1PublicKey}
+import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.AlephiumSpec
@@ -37,6 +37,11 @@ class PublicKeyLikeSpec extends AlephiumSpec with GroupConfigFixture.Default {
     serialize[PublicKeyLike](publicKey1) is bytes1
     deserialize[PublicKeyLike](bytes1) isE publicKey1
 
-    deserialize[PublicKeyLike](ByteString(2)).leftValue.getMessage is "Invalid public key type 2"
+    val publicKey2 = PublicKeyLike.ED25519(ED25519PublicKey.generate)
+    val bytes2     = ByteString(2) ++ publicKey2.bytes
+    serialize[PublicKeyLike](publicKey2) is bytes2
+    deserialize[PublicKeyLike](bytes2) isE publicKey2
+
+    deserialize[PublicKeyLike](ByteString(3)).leftValue.getMessage is "Invalid public key type 3"
   }
 }

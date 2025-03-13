@@ -67,6 +67,9 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     deserialize[UnlockScript](
       serialize[UnlockScript](UnlockScript.P2PK(PublicKeyLike.Passkey))
     ) isE UnlockScript.P2PK(PublicKeyLike.Passkey)
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2PK(PublicKeyLike.ED25519))
+    ) isE UnlockScript.P2PK(PublicKeyLike.ED25519)
   }
 
   it should "serialize examples" in {

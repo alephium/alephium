@@ -18,12 +18,13 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{SecP256K1Signature, SecP256R1Signature}
+import org.alephium.crypto.{ED25519Signature, SecP256K1Signature, SecP256R1Signature}
 import org.alephium.serde.Serde
 
 final case class Bytes64 private (bytes: ByteString) extends AnyVal {
   def toSecP256K1Signature: SecP256K1Signature = SecP256K1Signature.unsafe(bytes)
   def toSecP256R1Signature: SecP256R1Signature = SecP256R1Signature.unsafe(bytes)
+  def toED25519Signature: ED25519Signature     = ED25519Signature.unsafe(bytes)
 }
 
 object Bytes64 {
@@ -35,6 +36,7 @@ object Bytes64 {
 
   def from(signature: SecP256K1Signature): Bytes64 = Bytes64(signature.bytes)
   def from(signature: SecP256R1Signature): Bytes64 = Bytes64(signature.bytes)
+  def from(signature: ED25519Signature): Bytes64   = Bytes64(signature.bytes)
 
   implicit val serde: Serde[Bytes64] = Serde.bytesSerde(length).xmap(Bytes64.apply, _.bytes)
 }

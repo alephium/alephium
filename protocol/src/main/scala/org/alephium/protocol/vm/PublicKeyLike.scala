@@ -18,13 +18,13 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{SecP256K1PublicKey, SecP256R1PublicKey}
+import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.serde._
 import org.alephium.util.Bytes
 
-sealed trait PublicKeyLike {
+sealed trait PublicKeyLike extends Product with Serializable {
   def bytes: ByteString
   def keyType: PublicKeyLike.KeyType
 
@@ -41,12 +41,14 @@ object PublicKeyLike {
     def serialize(input: KeyType): ByteString = input match {
       case SecP256K1 => ByteString(0)
       case Passkey   => ByteString(1)
+      case ED25519   => ByteString(2)
     }
 
     def _deserialize(input: ByteString): SerdeResult[Staging[KeyType]] = {
       byteSerde._deserialize(input).flatMap {
         case Staging(0, rest) => Right(Staging(SecP256K1, rest))
         case Staging(1, rest) => Right(Staging(Passkey, rest))
+        case Staging(2, rest) => Right(Staging(ED25519, rest))
         case Staging(n, _)    => Left(SerdeError.wrongFormat(s"Invalid public key type $n"))
       }
     }
@@ -62,6 +64,8 @@ object PublicKeyLike {
           serdeImpl[SecP256K1PublicKey]._deserialize(rest).map(_.mapValue(SecP256K1.apply))
         case Staging(Passkey, rest) =>
           serdeImpl[SecP256R1PublicKey]._deserialize(rest).map(_.mapValue(Passkey.apply))
+        case Staging(ED25519, rest) =>
+          serdeImpl[ED25519PublicKey]._deserialize(rest).map(_.mapValue(ED25519.apply))
       }
     }
   }
@@ -77,4 +81,10 @@ object PublicKeyLike {
     def keyType: KeyType  = Passkey
   }
   object Passkey extends KeyType
+
+  final case class ED25519(publicKey: ED25519PublicKey) extends PublicKeyLike {
+    def bytes: ByteString = publicKey.bytes
+    def keyType: KeyType  = ED25519
+  }
+  object ED25519 extends KeyType
 }

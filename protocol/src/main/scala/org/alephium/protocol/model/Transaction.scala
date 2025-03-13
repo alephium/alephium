@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.crypto.MerkleHashable
+import org.alephium.crypto.{ED25519, ED25519PrivateKey, MerkleHashable}
 import org.alephium.protocol._
 import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
@@ -203,18 +203,31 @@ object Transaction {
     from(unsigned, AVector.empty[TxOutput], privateKey)
   }
 
+  def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
+    val signature = ED25519.sign(unsigned.id, privateKey)
+    from(unsigned, AVector.empty[TxOutput], Bytes64.from(signature))
+  }
+
   def from(
       unsigned: UnsignedTransaction,
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
     val signature = SignatureSchema.sign(unsigned.id, privateKey)
+    from(unsigned, generatedOutputs, Bytes64.from(signature))
+  }
+
+  private def from(
+      unsigned: UnsignedTransaction,
+      generatedOutputs: AVector[TxOutput],
+      rawSignature: Bytes64
+  ): Transaction = {
     Transaction(
       unsigned,
       scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs,
-      AVector(Bytes64.from(signature)),
+      AVector(rawSignature),
       scriptSignatures = AVector.empty
     )
   }

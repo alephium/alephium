@@ -25,7 +25,7 @@ import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{SecP256K1PublicKey, SecP256R1PublicKey}
+import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
@@ -70,16 +70,21 @@ trait LockupScriptGenerators extends Generators {
       .map(LockupScript.p2sh)
   }
 
+  private def publicKeyTypeGen: Gen[PublicKeyLike.KeyType] = {
+    Gen.oneOf(Seq(PublicKeyLike.SecP256K1, PublicKeyLike.Passkey, PublicKeyLike.ED25519))
+  }
+
   def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
-    arbBool.arbitrary
-      .map { b =>
-        val publicKey = if (b) {
+    publicKeyTypeGen
+      .map {
+        case PublicKeyLike.SecP256K1 =>
           PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
-        } else {
+        case PublicKeyLike.Passkey =>
           PublicKeyLike.Passkey(SecP256R1PublicKey.generate)
-        }
-        LockupScript.p2pk(publicKey, groupIndex)
+        case PublicKeyLike.ED25519 =>
+          PublicKeyLike.ED25519(ED25519PublicKey.generate)
       }
+      .map(LockupScript.p2pk(_, groupIndex))
   }
 
   def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
