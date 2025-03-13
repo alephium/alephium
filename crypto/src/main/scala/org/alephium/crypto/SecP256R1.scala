@@ -17,6 +17,7 @@
 package org.alephium.crypto
 
 import java.math.BigInteger
+import java.security.SecureRandom
 
 import scala.util.control.NonFatal
 
@@ -24,6 +25,7 @@ import akka.util.ByteString
 import org.bouncycastle.asn1.x9.X9ECParameters
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.ec.CustomNamedCurves
+import org.bouncycastle.crypto.generators.ECKeyPairGenerator
 import org.bouncycastle.crypto.params._
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.bouncycastle.math.ec.custom.sec.SecP256R1Curve
@@ -33,12 +35,6 @@ import org.alephium.serde.RandomBytes
 // TODO: Secp256R1 and Secp256K1 have a lot of duplicated code. We need to reduce the duplicate code once Secp256R1 is finalized.
 final class SecP256R1PrivateKey(val bytes: ByteString) extends PrivateKey {
   def length: Int = SecP256R1PrivateKey.length
-
-  def publicKey: SecP256R1PublicKey = {
-    val bigInt    = new BigInteger(1, bytes.toArray)
-    val publicKey = SecP256R1.params.getG.multiply(bigInt).getEncoded(true)
-    SecP256R1PublicKey.unsafe(ByteString.fromArrayUnsafe(publicKey))
-  }
 }
 
 object SecP256R1PrivateKey
@@ -117,29 +113,28 @@ trait SecP256R1CurveCommon {
 object SecP256R1
     extends SecP256R1CurveCommon
     with SignatureSchema[SecP256R1PrivateKey, SecP256R1PublicKey, SecP256R1Signature] {
-  private def isValidPrivateKey(key: SecP256R1PrivateKey): Boolean = {
-    val bigInt = new BigInteger(1, key.bytes.toArray)
-    bigInt.compareTo(params.getN) < 0
-  }
-
-  @scala.annotation.tailrec
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generatePriPub(): (SecP256R1PrivateKey, SecP256R1PublicKey) = {
-    val privateKey = SecP256R1PrivateKey.generate
-    if (isValidPrivateKey(privateKey)) {
-      (privateKey, privateKey.publicKey)
-    } else {
-      generatePriPub()
-    }
+    val keyGen       = new ECKeyPairGenerator()
+    val keyGenParams = new ECKeyGenerationParameters(domain, new SecureRandom)
+    keyGen.init(keyGenParams)
+
+    val keyPair            = keyGen.generateKeyPair()
+    val privateKeyParams   = keyPair.getPrivate.asInstanceOf[ECPrivateKeyParameters]
+    val privateKeyRawBytes = privateKeyParams.getD.toByteArray.takeRight(SecP256R1PrivateKey.length)
+    val padLength          = SecP256R1PrivateKey.length - privateKeyRawBytes.length
+    val privateKeyBytes    = Array.fill(padLength)(0.toByte) ++ privateKeyRawBytes
+    val publicKeyParams    = keyPair.getPublic.asInstanceOf[ECPublicKeyParameters]
+    val publicKeyBytes     = publicKeyParams.getQ.getEncoded(true)
+
+    (
+      SecP256R1PrivateKey.unsafe(ByteString.fromArrayUnsafe(privateKeyBytes)),
+      SecP256R1PublicKey.unsafe(ByteString.fromArrayUnsafe(publicKeyBytes))
+    )
   }
 
-  @scala.annotation.tailrec
   def secureGeneratePriPub(): (SecP256R1PrivateKey, SecP256R1PublicKey) = {
-    val privateKey = SecP256R1PrivateKey.secureGenerate
-    if (isValidPrivateKey(privateKey)) {
-      (privateKey, privateKey.publicKey)
-    } else {
-      secureGeneratePriPub()
-    }
+    generatePriPub()
   }
 
   def sign(message: Array[Byte], privateKey: Array[Byte]): SecP256R1Signature = {

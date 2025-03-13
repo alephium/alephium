@@ -92,13 +92,13 @@ class SecP256R1Spec extends AlephiumSpec {
     )
 
     cases.foreach { case (rawPrivateKey, rawPublicKey, rawMessage, rawSignature) =>
-      val privateKey = SecP256R1PrivateKey.unsafe(rawPrivateKey)
-      privateKey.publicKey is SecP256R1PublicKey.unsafe(rawPublicKey)
+      val privateKey  = SecP256R1PrivateKey.unsafe(rawPrivateKey)
+      val publicKey   = SecP256R1PublicKey.unsafe(rawPublicKey)
       val messageHash = Blake2b.hash(rawMessage)
       val signature   = SecP256R1.sign(messageHash, privateKey)
 
       signature.bytes is rawSignature
-      SecP256R1.verify(messageHash.bytes, signature, privateKey.publicKey) is true
+      SecP256R1.verify(messageHash.bytes, signature, publicKey) is true
     }
   }
 }

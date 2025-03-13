@@ -21,7 +21,7 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalacheck.Arbitrary
 
-import org.alephium.crypto.{SecP256R1, SecP256R1PrivateKey, SecP256R1Signature}
+import org.alephium.crypto.{SecP256R1, SecP256R1Signature}
 import org.alephium.protocol.Hash
 import org.alephium.serde.SerdeError
 import org.alephium.util.AlephiumSpec
@@ -127,9 +127,8 @@ class WebAuthnSpec extends AlephiumSpec {
     val challenge = Hash.generate.bytes
     val webauthn =
       WebAuthn(createAuthenticatorData(1), WebAuthn.createClientData("webauthn.get", challenge))
-    val privateKey = SecP256R1PrivateKey.generate
-    val publicKey  = privateKey.publicKey
-    val signature  = SecP256R1.sign(webauthn.messageHash, privateKey)
+    val (privateKey, publicKey) = SecP256R1.generatePriPub()
+    val signature               = SecP256R1.sign(webauthn.messageHash, privateKey)
     webauthn.verify(signature, publicKey) is true
     webauthn.verify(SecP256R1Signature.generate, publicKey) is false
   }
