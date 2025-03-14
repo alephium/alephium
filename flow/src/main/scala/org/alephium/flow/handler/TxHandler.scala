@@ -210,8 +210,11 @@ object TxHandler {
         blockFlow.add(block, worldStateOpt) match {
           case Left(error) => Left(s"Failed in add the mined block: $error")
           case Right(_) =>
-            blockFlow.updateBestDepsUnsafe()
-            Right(())
+            val result = for {
+              _ <- blockFlow.updateViewPerChainIndexDanube(block.chainIndex)
+              _ <- blockFlow.updateViewPreDanube()
+            } yield ()
+            result.left.map(_.getMessage)
         }
     }
   }

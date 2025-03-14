@@ -496,6 +496,7 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check double spending when UTXOs are directly spent again" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     forAll(chainIndexGenForBroker(brokerConfig)) { index =>
       val block0 = transfer(blockFlow, index)
       addAndCheck(blockFlow, block0)
@@ -1047,6 +1048,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.ghostUncleHashes.length is 1
+    blockTemplate.height is 5
     val ghostUncleHashes = blockTemplate.ghostUncleHashes ++ hashes.tail
     val block = mine(
       blockFlow,
@@ -1494,5 +1496,32 @@ class BlockValidationSpec extends AlephiumSpec {
 
     newBlock(whitelistedMiner).pass()
     newBlock(randomMiner).pass()
+  }
+
+  trait ConflictedTxsFixture extends Fixture {
+    lazy val fromGroup = brokerConfig.randomGroupIndex()
+    lazy val toGroup0  = GroupIndex.unsafe((fromGroup.value + 1) % brokerConfig.groups)
+    lazy val toGroup1  = GroupIndex.unsafe((toGroup0.value + 1) % brokerConfig.groups)
+    lazy val block0    = transfer(blockFlow, ChainIndex(fromGroup, toGroup0))
+    lazy val block1 = {
+      val block = transfer(blockFlow, ChainIndex(fromGroup, toGroup1))
+      addAndCheck(blockFlow, block0)
+      mineWithTxs(blockFlow, ChainIndex(fromGroup, toGroup1), block.nonCoinbase)
+    }
+  }
+
+  it should "disallow conflicted txs before danube" in new ConflictedTxsFixture {
+    setHardForkBefore(HardFork.Danube)
+    validate(block0, blockFlow).isRight is true
+    blockFlow.getCache(block0).blockCache.contains(block0.hash) is true
+    validate(block1, blockFlow).leftValue is Right(InvalidFlowTxs)
+  }
+
+  it should "allow conflicted txs since danube" in new ConflictedTxsFixture {
+    setHardForkSince(HardFork.Danube)
+    validate(block0, blockFlow).isRight is true
+    blockFlow.getCache(block0).blockCache.contains(block0.hash) is false
+    blockFlow.getCache(block0).add(block0)
+    validate(block1, blockFlow).isRight is true
   }
 }

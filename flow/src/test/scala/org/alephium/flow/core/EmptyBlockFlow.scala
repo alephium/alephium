@@ -44,13 +44,15 @@ trait EmptyBlockFlow extends BlockFlow {
   lazy val blockheaderChainBuilder: BlockHeader => BlockHeaderChain =
     BlockHeaderChain.fromGenesisUnsafe(storages)
 
-  def getAllTips: AVector[BlockHash]                                                           = ???
-  def getBestTipUnsafe(): BlockHash                                                            = ???
-  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps                              = ???
+  def getAllTips: AVector[BlockHash] = ???
+  def getBestTipUnsafe(): BlockHash  = ???
+  def calBestFlowPerChainIndexUnsafe(chainIndex: ChainIndex): BlockDeps = {
+    bestFlowSkeleton.createBlockDeps(chainIndex.from)
+  }
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
-  def updateBestDeps(): IOResult[Unit]                                                         = ???
   def updateBestFlowSkeleton(): IOResult[Unit]                                                 = ???
-  def updateBestDepsUnsafe(): Unit                                                             = ???
+  def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit]                    = ???
+  def updateViewPreDanube(): org.alephium.io.IOResult[Unit]                                    = ???
   def getBestIntraGroupTip(): BlockHash                                                        = ???
   def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]              = ???
   def add(header: BlockHeader): IOResult[Unit]                                                 = ???

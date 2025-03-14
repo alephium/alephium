@@ -98,7 +98,7 @@ trait ReplayState {
   private def updateTargetBlockFlowBestDeps(): IOResult[Unit] = {
     IOUtils.tryExecute(brokerConfig.groupRange.foreach { mainGroup =>
       val deps = targetBlockFlow.calBestDepsUnsafe(GroupIndex.unsafe(mainGroup)(brokerConfig))
-      targetBlockFlow.updateBestDeps(mainGroup, deps)
+      targetBlockFlow.updateBestDepsPreDanube(mainGroup, deps)
     })
   }
 

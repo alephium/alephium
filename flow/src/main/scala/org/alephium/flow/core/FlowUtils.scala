@@ -136,17 +136,11 @@ trait FlowUtils
     }
   }
 
-  def getBestDeps(groupIndex: GroupIndex): BlockDeps
+  def getBestDeps(chainIndex: ChainIndex, hardFork: HardFork): BlockDeps
 
-  def calBestFlowPerChainIndex(chainIndex: ChainIndex): BlockDeps
+  def calBestFlowPerChainIndexUnsafe(chainIndex: ChainIndex): BlockDeps
 
   def getBestFlowSkeleton(): BlockFlowSkeleton
-
-  def updateBestDeps(): IOResult[Unit]
-
-  def updateBestFlowSkeleton(): IOResult[Unit]
-
-  def updateBestDepsUnsafe(): Unit
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
@@ -267,28 +261,20 @@ trait FlowUtils
     IOUtils.tryExecute(getGhostUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
-  def findBestDepsForNewBlock(chainIndex: ChainIndex, hardfork: HardFork): BlockDeps = {
-    if (hardfork.isDanubeEnabled()) {
-      calBestFlowPerChainIndex(chainIndex)
-    } else {
-      getBestDeps(chainIndex.from)
-    }
-  }
-
   private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
   ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val hardForkGuess = networkConfig.getHardFork(TimeStamp.now())
-    val bestDeps      = findBestDepsForNewBlock(chainIndex, hardForkGuess)
+    val bestDeps      = getBestDeps(chainIndex, hardForkGuess)
     for {
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       hardFork   = networkConfig.getHardFork(templateTs)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
       target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
-      groupView    <- getMutableGroupView(chainIndex, loosenDeps, hardFork)
+      groupView    <- getMutableGroupView(chainIndex, loosenDeps, hardFork, None)
       uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps, hardFork)
       template <- prepareBlockFlow(

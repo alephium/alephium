@@ -272,10 +272,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
     if (brokerConfig.contains(chainIndex.from)) {
-      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val hardFork       = networkConfig.getHardFork(block.timestamp)
+      val checkpointHash = Option.when(chainIndex.isIntraGroup)(block.hash)
       for {
-        groupView <- from(flow.getMutableGroupView(chainIndex, block.blockDeps, hardFork))
-        _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
+        groupView <- from(
+          flow.getMutableGroupView(chainIndex, block.blockDeps, hardFork, checkpointHash)
+        )
+        _ <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
         _ <- checkCoinbase(
           flow,
           chainIndex,
@@ -712,17 +715,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     // Post-Danube upgrade, we skip this validation since conflicted transactions are allowed for parallel chains
     // Pre-Danube upgrade, we validate that transactions are not conflicted
     if (hardfork.isDanubeEnabled()) {
-      return validBlock(())
-    }
-
-    // If the block is not from the broker, we skip this validation
-    if (!brokerConfig.contains(block.chainIndex.from)) {
-      return validBlock(())
-    }
-
-    ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap {
-      case true  => validBlock(())
-      case false => invalidBlock(InvalidFlowTxs)
+      validBlock(())
+    } else if (!brokerConfig.contains(block.chainIndex.from)) {
+      // If the block is not from the broker, we skip this validation
+      validBlock(())
+    } else {
+      ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap {
+        case true  => validBlock(())
+        case false => invalidBlock(InvalidFlowTxs)
+      }
     }
   }
 }

@@ -105,22 +105,25 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
 object BlockFlowGroupView {
   def onlyBlocks[WS <: WorldState[_, _, _, _]](
       worldState: WS,
-      blockCaches: AVector[BlockCache]
+      blockCaches: AVector[BlockCache],
+      outputsInConflictedTxs: Set[TxOutputRef]
   ): BlockFlowGroupView[WS] = {
-    new Impl0[WS](worldState, blockCaches)
+    new Impl0[WS](worldState, blockCaches, outputsInConflictedTxs)
   }
 
   def includePool[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache],
+      outputsInConflictedTxs: Set[TxOutputRef],
       mempool: MemPool
   ): BlockFlowGroupView[WS] = {
-    new Impl1[WS](worldState, blockCaches, mempool)
+    new Impl1[WS](worldState, blockCaches, outputsInConflictedTxs, mempool)
   }
 
   private class Impl0[WS <: WorldState[_, _, _, _]](
       _worldState: WS,
-      blockCaches: AVector[BlockCache]
+      blockCaches: AVector[BlockCache],
+      outputsInConflictedTxs: Set[TxOutputRef]
   ) extends BlockFlowGroupView[WS] {
     def worldState: WS = _worldState
 
@@ -146,7 +149,9 @@ object BlockFlowGroupView {
     }
 
     def getPreAssetOutputInfo(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
-      if (TxUtils.isSpent(blockCaches, outputRef)) {
+      if (outputsInConflictedTxs.contains(outputRef)) {
+        Right(None)
+      } else if (TxUtils.isSpent(blockCaches, outputRef)) {
         Right(None)
       } else {
         worldState.getOutputOpt(outputRef).flatMap {
@@ -249,8 +254,9 @@ object BlockFlowGroupView {
   private class Impl1[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache],
+      outputsInConflictedTxs: Set[TxOutputRef],
       mempool: MemPool
-  ) extends Impl0[WS](worldState, blockCaches) {
+  ) extends Impl0[WS](worldState, blockCaches, outputsInConflictedTxs) {
 
     override def getPreAssetOutputInfo(
         outputRef: AssetOutputRef
