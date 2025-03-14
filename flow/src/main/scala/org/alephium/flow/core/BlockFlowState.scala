@@ -327,17 +327,8 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
-    val hardFork = networkConfig.getHardFork(TimeStamp.now())
-    getBestDeps(groupIndex, hardFork)
-  }
-
-  def getBestDeps(groupIndex: GroupIndex, hardFork: HardFork): BlockDeps = {
     val groupShift = brokerConfig.groupIndexOfBroker(groupIndex)
-    if (hardFork.isDanubeEnabled()) {
-      bestDepsDanube(groupShift)(groupIndex.value)
-    } else {
-      bestDeps(groupShift)
-    }
+    bestDeps(groupShift)
   }
 
   def getBestFlowSkeleton(): BlockFlowSkeleton = {
@@ -352,13 +343,15 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def getBestPersistedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(brokerConfig.contains(groupIndex))
-    val deps = getBestDeps(groupIndex)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    val deps     = getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
     getPersistedWorldState(deps, groupIndex)
   }
 
   def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(brokerConfig.contains(groupIndex))
-    val deps = getBestDeps(groupIndex)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    val deps     = getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
     getCachedWorldState(deps, groupIndex)
   }
 
@@ -370,7 +363,7 @@ trait BlockFlowState extends FlowTipsUtil {
     if (hardFork.isDanubeEnabled()) {
       getImmutableGroupViewDanube(mainGroup)
     } else {
-      val blockDeps = getBestDeps(mainGroup, hardFork)
+      val blockDeps = getBestDeps(mainGroup)
       getImmutableGroupViewPreDanube(mainGroup, blockDeps)
     }
   }
@@ -403,7 +396,7 @@ trait BlockFlowState extends FlowTipsUtil {
     if (hardFork.isDanubeEnabled()) {
       getMutableGroupViewDanube(mainGroup)
     } else {
-      val bestDeps = getBestDeps(mainGroup, hardFork)
+      val bestDeps = getBestDeps(mainGroup)
       getMutableGroupViewPreDanube(mainGroup, bestDeps)
     }
   }
@@ -428,7 +421,7 @@ trait BlockFlowState extends FlowTipsUtil {
     if (hardFork.isDanubeEnabled()) {
       getImmutableGroupViewIncludePoolDanube(mainGroup)
     } else {
-      val bestDeps = getBestDeps(mainGroup, hardFork)
+      val bestDeps = getBestDeps(mainGroup)
       getImmutableGroupViewIncludePoolPreDanube(mainGroup, bestDeps)
     }
   }
@@ -507,7 +500,7 @@ trait BlockFlowState extends FlowTipsUtil {
     if (hardFork.isDanubeEnabled()) {
       getMutableGroupViewIncludePoolDanube(mainGroup)
     } else {
-      val blockDeps = getBestDeps(mainGroup, hardFork)
+      val blockDeps = getBestDeps(mainGroup)
       getMutableGroupViewIncludePoolPreDanube(mainGroup, blockDeps)
     }
   }
@@ -537,11 +530,16 @@ trait BlockFlowState extends FlowTipsUtil {
     )
   }
 
+  // This should only be used for testing
   def getMutableGroupViewForTxHandling(
       mainGroup: GroupIndex,
-      blockDeps: BlockDeps
+      hardFork: HardFork
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
-    getMutableGroupViewPreDanube(mainGroup, blockDeps)
+    if (hardFork.isDanubeEnabled()) {
+      getMutableGroupViewDanube(mainGroup)
+    } else {
+      getMutableGroupViewPreDanube(mainGroup, getBestDeps(mainGroup))
+    }
   }
 
   def getMutableGroupViewPreDanube(
@@ -674,7 +672,7 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield blocks.sortBy(_.timestamp)
   }
 
-  def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
+  def getHashesForUpdatesPreDanube(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
     val bestDeps = getBestDeps(groupIndex)
     getHashesForUpdates(groupIndex, bestDeps)
   }

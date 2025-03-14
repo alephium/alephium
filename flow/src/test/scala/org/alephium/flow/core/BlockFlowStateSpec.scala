@@ -40,7 +40,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     val block1    = prepare(ChainIndex.unsafe(1, 0))
     prepare(ChainIndex.unsafe(1, 1))
     val block2 = prepare(ChainIndex.unsafe(0, 1))
-    blockFlow.getHashesForUpdates(mainGroup).rightValue.toSet is
+    blockFlow.getHashesForUpdatesPreDanube(mainGroup).rightValue.toSet is
       Set(block0.hash, block1.hash, block2.hash)
   }
 

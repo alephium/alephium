@@ -44,7 +44,7 @@ class BlockFlowSpec extends AlephiumSpec {
     checkBalance(blockFlow, brokerConfig.groupRange.head, genesisBalance)
   }
 
-  it should "work for at least 2 user group when adding blocks sequentially" in new FlowFixture {
+  it should "work for at least 2 user group when adding blocks sequentially" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     setHardForkSince(HardFork.Mainnet)
     val hardFork = networkConfig.getHardFork(TimeStamp.now())
@@ -53,16 +53,16 @@ class BlockFlowSpec extends AlephiumSpec {
       val chainIndex1 = ChainIndex.unsafe(0, 0)
       val block1      = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block1, 1)
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block1)
+      checkInBestDeps(chainIndex1, blockFlow, block1)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(1))
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
       val block2      = emptyBlock(blockFlow, chainIndex2)
       addAndCheck(blockFlow, block2, 2)
       if (hardFork.isDanubeEnabled()) {
-        checkInBestDeps(GroupIndex.unsafe(1), blockFlow, block2)
+        checkInBestDeps(chainIndex2, blockFlow, block2)
       } else {
-        checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block2)
+        checkInBestDeps(chainIndex1, blockFlow, block2)
       }
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(1))
 
@@ -70,20 +70,19 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 3)
       if (!hardFork.isDanubeEnabled()) {
-        checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
+        checkInBestDeps(chainIndex1, blockFlow, block3)
       }
+      checkInBestDeps(chainIndex3, blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(2))
 
-      val chainIndex4 = ChainIndex.unsafe(0, 0)
-      val block4      = emptyBlock(blockFlow, chainIndex4)
+      val block4 = emptyBlock(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block4, 4)
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block4)
+      checkInBestDeps(chainIndex1, blockFlow, block4)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(2))
 
-      val chainIndex5 = ChainIndex.unsafe(0, 0)
-      val block5      = transfer(blockFlow, chainIndex5)
+      val block5 = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block5, 5)
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block5)
+      checkInBestDeps(chainIndex1, blockFlow, block5)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(3))
     }
   }
@@ -98,8 +97,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
   it should "compute cached blocks" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
-    setHardForkSince(HardFork.Mainnet)
-    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    setHardForkBefore(HardFork.Danube)
 
     val newBlocks = for {
       i <- 0 to 1
@@ -109,16 +107,12 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block, 1)
     }
 
-    val cache0 = blockFlow.getHashesForUpdates(GroupIndex.unsafe(0)).rightValue
-    if (!hardFork.isDanubeEnabled()) {
-      cache0.length is 1
-      cache0.contains(newBlocks(0).hash) is false
-      cache0.contains(newBlocks(1).hash) is true
-      cache0.contains(newBlocks(2).hash) is false
-      cache0.contains(newBlocks(3).hash) is false
-    } else {
-      cache0.length is 0
-    }
+    val cache0 = blockFlow.getHashesForUpdatesPreDanube(GroupIndex.unsafe(0)).rightValue
+    cache0.length is 1
+    cache0.contains(newBlocks(0).hash) is false
+    cache0.contains(newBlocks(1).hash) is true
+    cache0.contains(newBlocks(2).hash) is false
+    cache0.contains(newBlocks(3).hash) is false
 
     val block  = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     val cache1 = blockFlow.getBlocksForUpdates(block).rightValue.map(_.hash)
@@ -130,7 +124,7 @@ class BlockFlowSpec extends AlephiumSpec {
     block.blockDeps.inDeps(0) is newBlocks(3).hash
   }
 
-  it should "work for at least 2 user group when adding blocks in parallel" in new FlowFixture {
+  it should "work for at least 2 user group when adding blocks in parallel" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
     if (brokerConfig.groups >= 2) {
@@ -145,7 +139,8 @@ class BlockFlowSpec extends AlephiumSpec {
         val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
         blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * 1
       }
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
+      val chainIndex = ChainIndex.unsafe(0, 0)
+      checkInBestDeps(chainIndex, blockFlow, newBlocks1)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(1))
       newBlocks1.map(_.hash).contains(blockFlow.getBestTipUnsafe()) is true
 
@@ -154,7 +149,7 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks2.foreach { block => addAndCheck(blockFlow, block, 4) }
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks2)
+      checkInBestDeps(chainIndex, blockFlow, newBlocks2)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(2))
       newBlocks2.map(_.hash).contains(blockFlow.getBestTipUnsafe()) is true
 
@@ -163,13 +158,13 @@ class BlockFlowSpec extends AlephiumSpec {
         j <- 0 to 1
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks3.foreach { block => addAndCheck(blockFlow, block, 8) }
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks3)
+      checkInBestDeps(chainIndex, blockFlow, newBlocks3)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(3))
       newBlocks3.map(_.hash).contains(blockFlow.getBestTipUnsafe()) is true
     }
   }
 
-  it should "work for 2 user group when there is a fork" in new FlowFixture {
+  it should "work for 2 user group when there is a fork" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     setHardForkSince(HardFork.Mainnet)
     val hardFork = networkConfig.getHardFork(TimeStamp.now())
@@ -180,7 +175,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val block12     = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
+      checkInBestDeps(chainIndex1, blockFlow, IndexedSeq(block11, block12))
       blockFlow.grandPool.cleanInvalidTxs(
         blockFlow,
         TimeStamp.now()
@@ -189,7 +184,7 @@ class BlockFlowSpec extends AlephiumSpec {
 
       val block13 = transfer(blockFlow, chainIndex1)
       addAndCheck(blockFlow, block13, 2)
-      checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block13)
+      checkInBestDeps(chainIndex1, blockFlow, block13)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(2))
 
       val chainIndex2 = ChainIndex.unsafe(1, 1)
@@ -198,9 +193,9 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block21, 3)
       addAndCheck(blockFlow, block22, 3)
       if (hardFork.isDanubeEnabled()) {
-        checkInBestDeps(GroupIndex.unsafe(1), blockFlow, IndexedSeq(block21, block22))
+        checkInBestDeps(chainIndex2, blockFlow, IndexedSeq(block21, block22))
       } else {
-        checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block21, block22))
+        checkInBestDeps(chainIndex1, blockFlow, IndexedSeq(block21, block22))
       }
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(2))
 
@@ -208,8 +203,9 @@ class BlockFlowSpec extends AlephiumSpec {
       val block3      = transfer(blockFlow, chainIndex3)
       addAndCheck(blockFlow, block3, 4)
       if (!hardFork.isDanubeEnabled()) {
-        checkInBestDeps(GroupIndex.unsafe(0), blockFlow, block3)
+        checkInBestDeps(chainIndex1, blockFlow, block3)
       }
+      checkInBestDeps(chainIndex3, blockFlow, block3)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(3))
     }
   }
@@ -321,7 +317,7 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  it should "reload blockflow properly from storage" in new FlowFixture {
+  it should "reload blockflow properly from storage" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     val blockFlow0                              = genesisBlockFlow()
 
@@ -340,14 +336,13 @@ class BlockFlowSpec extends AlephiumSpec {
       j <- 0 to 1
     } yield transferOnlyForIntraGroup(blockFlow1, ChainIndex.unsafe(i, j))
     newBlocks2.foreach { block => addAndCheck(blockFlow1, block, 4) }
-    checkInBestDeps(GroupIndex.unsafe(0), blockFlow1, newBlocks2)
+    checkInBestDeps(ChainIndex.unsafe(0, 0), blockFlow1, newBlocks2)
     checkBalance(blockFlow1, 0, genesisBalance - ALPH.alph(2))
     newBlocks2.map(_.hash).contains(blockFlow1.getBestTipUnsafe()) is true
   }
 
-  it should "calculate hashes and blocks for update" in new FlowFixture {
-    setHardForkSince(HardFork.Mainnet)
-    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+  it should "calculate hashes and blocks for update: pre-danube" in new FlowFixture {
+    setHardForkBefore(HardFork.Danube)
 
     val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     addAndCheck(blockFlow, block0)
@@ -357,7 +352,7 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block2)
 
     val mainGroup = GroupIndex.unsafe(0)
-    blockFlow.getHashesForUpdates(mainGroup) isE AVector.empty[BlockHash]
+    blockFlow.getHashesForUpdatesPreDanube(mainGroup) isE AVector.empty[BlockHash]
     blockFlow.getBlocksForUpdates(block2) isE AVector(block1, block2)
     val bestDeps0 = blockFlow.getBestDeps(mainGroup)
     blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps0) isE AVector.empty[BlockCache]
@@ -366,21 +361,40 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block3)
     val block4 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 2))
     addAndCheck(blockFlow, block4)
-    if (!hardFork.isDanubeEnabled()) {
-      blockFlow.getHashesForUpdates(mainGroup) isE AVector(block3.hash, block4.hash)
-      val bestDeps1 = blockFlow.getBestDeps(mainGroup)
-      blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps1) isE
-        AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
-    } else {
-      val block5 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
-      addAndCheck(blockFlow, block5)
-      blockFlow.getHashesForUpdates(mainGroup, block5.blockDeps) isE AVector(
-        block3.hash,
-        block4.hash
-      )
-      blockFlow.getBlockCachesForUpdates(mainGroup, block5.blockDeps) isE
-        AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
-    }
+    blockFlow.getHashesForUpdatesPreDanube(mainGroup) isE AVector(block3.hash, block4.hash)
+    val bestDeps1 = blockFlow.getBestDeps(mainGroup)
+    blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps1) isE
+      AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
+  }
+
+  it should "calculate hashes and blocks for update: danube" in new FlowFixture {
+    setHardForkSince(HardFork.Danube)
+
+    val block0 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block0)
+    val block1 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block1)
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block2)
+
+    val mainGroup = GroupIndex.unsafe(0)
+    blockFlow.getBlocksForUpdates(block2) isE AVector(block1, block2)
+    blockFlow.getHashesForUpdates(mainGroup, block2.blockDeps) isE AVector(block1.hash)
+    blockFlow.getBlockCachesForUpdates(mainGroup, block2.blockDeps) isE
+      AVector(block1).map(BlockFlowState.convertBlock(_, mainGroup))
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    addAndCheck(blockFlow, block3)
+    val block4 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 2))
+    addAndCheck(blockFlow, block4)
+
+    val block5 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block5)
+    blockFlow.getBlocksForUpdates(block5) isE AVector(block3, block4, block5)
+    blockFlow.getHashesForUpdates(mainGroup, block5.blockDeps) isE
+      AVector(block3.hash, block4.hash)
+    blockFlow.getBlockCachesForUpdates(mainGroup, block5.blockDeps) isE
+      AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
   }
 
   behavior of "Sync"
@@ -1295,19 +1309,21 @@ class BlockFlowSpec extends AlephiumSpec {
     accountView1.inBlocks.contains(block1) is false
   }
 
-  def checkInBestDeps(groupIndex: GroupIndex, blockFlow: BlockFlow, block: Block): Assertion = {
-    blockFlow.getBestDeps(groupIndex).deps.contains(block.hash) is true
-  }
+  trait Fixture extends FlowFixture {
+    def checkInBestDeps(chainIndex: ChainIndex, blockFlow: BlockFlow, block: Block): Assertion = {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      blockFlow.getBestDeps(chainIndex, hardFork).deps.contains(block.hash) is true
+    }
 
-  def checkInBestDeps(
-      groupIndex: GroupIndex,
-      blockFlow: BlockFlow,
-      blocks: IndexedSeq[Block]
-  ): Assertion = {
-    val bestDeps = blockFlow.getBestDeps(groupIndex).deps
-    blocks.exists { block =>
-      bestDeps.contains(block.hash)
-    } is true
+    def checkInBestDeps(
+        chainIndex: ChainIndex,
+        blockFlow: BlockFlow,
+        blocks: IndexedSeq[Block]
+    ): Assertion = {
+      val hardFork = networkConfig.getHardFork(blocks.head.timestamp)
+      val bestDeps = blockFlow.getBestDeps(chainIndex, hardFork).deps
+      blocks.exists(block => bestDeps.contains(block.hash)) is true
+    }
   }
 }
 
