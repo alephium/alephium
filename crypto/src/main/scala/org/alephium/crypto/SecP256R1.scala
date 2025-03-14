@@ -113,12 +113,12 @@ trait SecP256R1CurveCommon {
 object SecP256R1
     extends SecP256R1CurveCommon
     with SignatureSchema[SecP256R1PrivateKey, SecP256R1PublicKey, SecP256R1Signature] {
+  private val keyGen       = new ECKeyPairGenerator()
+  private val keyGenParams = new ECKeyGenerationParameters(domain, new SecureRandom)
+  keyGen.init(keyGenParams)
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generatePriPub(): (SecP256R1PrivateKey, SecP256R1PublicKey) = {
-    val keyGen       = new ECKeyPairGenerator()
-    val keyGenParams = new ECKeyGenerationParameters(domain, new SecureRandom)
-    keyGen.init(keyGenParams)
-
     val keyPair            = keyGen.generateKeyPair()
     val privateKeyParams   = keyPair.getPrivate.asInstanceOf[ECPrivateKeyParameters]
     val privateKeyRawBytes = privateKeyParams.getD.toByteArray.takeRight(SecP256R1PrivateKey.length)

@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.nio.charset.StandardCharsets
+
 import scala.util.Random
 
 import akka.util.ByteString
@@ -114,5 +116,14 @@ class WebAuthnSpec extends AlephiumSpec {
     webauthn.verify(challenge, signature, publicKey) is true
     webauthn.verify(Hash.generate.bytes, signature, publicKey) is false
     webauthn.verify(challenge, SecP256R1Signature.generate, publicKey) is false
+  }
+
+  it should "encode challenge as a base64 string" in {
+    val challenge       = Hash.generate.bytes
+    val webauthn        = WebAuthn.createForTest(ByteString.empty, WebAuthn.GET)
+    val clientDataBytes = webauthn.clientData(challenge)
+    val clientDataJSON  = new String(clientDataBytes.toArray, StandardCharsets.UTF_8)
+    clientDataJSON is
+      s"""{"type":"webauthn.get","challenge":"${WebAuthn.base64urlEncode(challenge)}"}"""
   }
 }
