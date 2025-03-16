@@ -70,29 +70,14 @@ trait LockupScriptGenerators extends Generators {
       .map(LockupScript.p2sh)
   }
 
-  private def publicKeyTypeGen: Gen[PublicKeyLike.KeyType] = {
-    Gen.oneOf(
-      Seq(
-        PublicKeyLike.SecP256K1,
-        PublicKeyLike.SecP256R1,
-        PublicKeyLike.ED25519,
-        PublicKeyLike.Passkey
-      )
-    )
-  }
-
   def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
-    publicKeyTypeGen
-      .map {
-        case PublicKeyLike.SecP256K1 =>
-          PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
-        case PublicKeyLike.SecP256R1 =>
-          PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)
-        case PublicKeyLike.ED25519 =>
-          PublicKeyLike.ED25519(ED25519PublicKey.generate)
-        case PublicKeyLike.Passkey =>
-          PublicKeyLike.Passkey(SecP256R1PublicKey.generate)
-      }
+    Gen
+      .oneOf(
+        Gen.const(()).map(_ => PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)),
+        Gen.const(()).map(_ => PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)),
+        Gen.const(()).map(_ => PublicKeyLike.ED25519(ED25519PublicKey.generate)),
+        Gen.const(()).map(_ => PublicKeyLike.Passkey(SecP256R1PublicKey.generate))
+      )
       .map(LockupScript.p2pk(_, groupIndex))
   }
 
