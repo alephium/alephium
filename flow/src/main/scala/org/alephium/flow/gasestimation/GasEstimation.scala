@@ -125,13 +125,15 @@ object GasEstimation extends StrictLogging {
     lockupScript.publicKey match {
       case _: PublicKeyLike.SecP256K1 =>
         GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas)
+      case _: PublicKeyLike.SecP256R1 =>
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256R1UnlockGas)
+      case _: PublicKeyLike.ED25519 =>
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.ed25519UnlockGas)
       case _: PublicKeyLike.Passkey =>
         // TODO: How to estimate the gas consumption more accurately when building the tx?
         // scalastyle:off magic.number
         GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.passkeyUnlockGas(300))
       // scalastyle:on magic.number
-      case _: PublicKeyLike.ED25519 =>
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.ed25519UnlockGas)
     }
   }
 }

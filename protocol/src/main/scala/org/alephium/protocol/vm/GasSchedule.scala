@@ -269,15 +269,17 @@ object GasSchedule {
     GasBox.unsafe(GasHash.gas(PublicKey.length).value + GasSignature.gas.value)
   }
 
-  val ed25519UnlockGas: GasBox = {
-    GasBox.unsafe(GasHash.gas(ED25519PublicKey.length).value + GasSignature.gas.value)
-  }
+  val secp256R1UnlockGas: GasBox =
+    GasBox.unsafe(GasHash.gas(SecP256R1PublicKey.length).value + GasSignature.gas.value)
 
   def passkeyUnlockGas(webauthnLength: Int): GasBox = {
     GasBox.unsafe(
       GasHash.gas(SecP256R1PublicKey.length + webauthnLength).value + GasSignature.gas.value
     )
   }
+
+  val ed25519UnlockGas: GasBox =
+    GasBox.unsafe(GasHash.gas(ED25519PublicKey.length).value + GasSignature.gas.value)
 
   def p2mpkUnlockGas(m: Int): GasBox = secp256K1UnlockGas.mulUnsafe(m)
 }

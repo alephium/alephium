@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{ED25519, ED25519PublicKey, SecP256R1PublicKey}
+import org.alephium.crypto.{ED25519, ED25519PublicKey, SecP256R1, SecP256R1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
@@ -890,10 +890,29 @@ object TxValidation {
       lock.publicKey match {
         case PublicKeyLike.SecP256K1(key) =>
           checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
-        case PublicKeyLike.Passkey(key) =>
-          checkPasskeySignature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.SecP256R1(key) =>
+          checkSecP256R1Signature(txEnv, preImage, gasRemaining, key)
         case PublicKeyLike.ED25519(key) =>
           checkED25519Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.Passkey(key) =>
+          checkPasskeySignature(txEnv, preImage, gasRemaining, key)
+      }
+    }
+
+    protected[validation] def checkSecP256R1Signature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: SecP256R1PublicKey
+    ): TxValidationResult[GasBox] = {
+      txEnv.signatures.pop() match {
+        case Right(signature) =>
+          if (!SecP256R1.verify(preImage, signature.toSecP256R1Signature, publicKey)) {
+            invalidTx(InvalidSignature)
+          } else {
+            fromOption(gasRemaining.sub(GasSchedule.secp256R1UnlockGas), OutOfGas)
+          }
+        case Left(_) => invalidTx(NotEnoughSignature)
       }
     }
 

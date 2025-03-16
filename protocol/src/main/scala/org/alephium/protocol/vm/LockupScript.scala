@@ -226,7 +226,7 @@ object LockupScript {
     // Since the least significant byte is already used to distinguish the output type,
     // we use the most significant byte here to calculate the new `scriptHint`.
     override lazy val scriptHint: ScriptHint = {
-      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(publicKey.bytes)).value
+      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes)).value
       val xorResult    = Bytes.xorByte(initialHint)
       val byte0        = (initialHint >> 24).toByte
       val newByte0     = byte0 ^ xorResult ^ groupByte

@@ -399,12 +399,15 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
     val publicKey0    = PublicKeyLike.SecP256K1(SecP256K1.generatePriPub()._2)
     val lockupScript0 = LockupScript.p2pk(publicKey0, groupIndex)
     GasEstimation.estimateInputGas(lockupScript0) is GasBox.unsafe(4060)
-    val publicKey1    = PublicKeyLike.Passkey(SecP256R1.generatePriPub()._2)
+    val publicKey1    = PublicKeyLike.SecP256R1(SecP256R1.generatePriPub()._2)
     val lockupScript1 = LockupScript.p2pk(publicKey1, groupIndex)
-    GasEstimation.estimateInputGas(lockupScript1) is GasBox.unsafe(4282)
+    GasEstimation.estimateInputGas(lockupScript1) is GasBox.unsafe(4060)
     val publicKey2    = PublicKeyLike.ED25519(ED25519.generatePriPub()._2)
     val lockupScript2 = LockupScript.p2pk(publicKey2, groupIndex)
     GasEstimation.estimateInputGas(lockupScript2) is GasBox.unsafe(4054)
+    val publicKey3    = PublicKeyLike.Passkey(SecP256R1.generatePriPub()._2)
+    val lockupScript3 = LockupScript.p2pk(publicKey3, groupIndex)
+    GasEstimation.estimateInputGas(lockupScript3) is GasBox.unsafe(4282)
 
     val invalidLockupScript = p2pkhLockupGen(groupIndex).sample.get
     GasEstimation
@@ -415,7 +418,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
       .leftValue is s"Invalid lockup script $invalidLockupScript, expected LockupScript.P2PK"
 
     val lockPair0: (LockupScript, UnlockScript) = (lockupScript0, UnlockScript.P2PK)
-    val lockPair1: (LockupScript, UnlockScript) = (lockupScript1, UnlockScript.P2PK)
+    val lockPair1: (LockupScript, UnlockScript) = (lockupScript3, UnlockScript.P2PK)
     GasEstimation.estimate(
       AVector.fill(1)(lockPair0),
       4,

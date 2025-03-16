@@ -1556,6 +1556,17 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     checkValidTx(createTx())
   }
 
+  it should "validate p2pk(secp256r1) unlock script" in new P2PKUnlockScriptFixture {
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256R1(pubKey), groupIndex)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+    def unlockGas: GasBox                                  = GasSchedule.secp256R1UnlockGas
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
   it should "validate p2pk(passkey) unlock script" in new P2PKUnlockScriptFixture {
     val (priKey, pubKey) = SecP256R1.generatePriPub()
     val lockup           = LockupScript.p2pk(PublicKeyLike.Passkey(pubKey), groupIndex)
