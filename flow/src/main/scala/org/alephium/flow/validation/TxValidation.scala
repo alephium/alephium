@@ -939,7 +939,7 @@ object TxValidation {
         gasRemaining: GasBox,
         publicKey: SecP256R1PublicKey
     ): TxValidationResult[GasBox] = {
-      WebAuthn.tryDecode(() => txEnv.signatures.pop().toOption.map(_.bytes)) match {
+      WebAuthn.tryDecode(() => txEnv.signatures.pop().toOption) match {
         case Right(webauthn) =>
           txEnv.signatures.pop() match {
             case Right(signature) =>

@@ -19,11 +19,21 @@ package org.alephium.protocol.vm
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
+import scala.annotation.tailrec
+
 import akka.util.ByteString
 
 import org.alephium.crypto.{SecP256R1, SecP256R1PublicKey, SecP256R1Signature, Sha256}
-import org.alephium.protocol.model.TransactionId
-import org.alephium.serde.{bytestringSerde, intSerde, serdeImpl, Serde, SerdeError, SerdeResult}
+import org.alephium.protocol.model.{Bytes64, TransactionId}
+import org.alephium.serde.{
+  bytestringSerde,
+  intSerde,
+  serdeImpl,
+  Serde,
+  SerdeError,
+  SerdeResult,
+  Staging
+}
 import org.alephium.util.Hex
 
 final case class WebAuthn(
@@ -80,23 +90,52 @@ object WebAuthn {
       v => (v.authenticatorData, v.clientDataPrefix, v.clientDataSuffix)
     )
 
-  def tryDecode(nextBytes: () => Option[ByteString]): SerdeResult[WebAuthn] = {
-    val decoder = new Decoder()
-
-    @scala.annotation.tailrec
-    def decode(): SerdeResult[WebAuthn] = {
-      nextBytes() match {
-        case Some(bytes) =>
-          decoder.tryDecode(bytes) match {
-            case Right(None)        => decode()
-            case Right(Some(value)) => Right(value)
-            case Left(error)        => Left(error)
-          }
-        case None => Left(SerdeError.WrongFormat("Incomplete webauthn payload"))
+  private def extractChunks(nextBytes: () => Option[Bytes64], checkSize: Int): SerdeResult[ByteString] = {
+    @tailrec
+    def iter(acc: ByteString, remaining: Int): SerdeResult[ByteString] = {
+      if (remaining == 0) {
+        Right(acc)
+      } else {
+        nextBytes() match {
+          case Some(bytes) =>
+            iter(acc ++ bytes.bytes, remaining - 1)
+          case None => Left(SerdeError.WrongFormat("Incomplete webauthn payload: missing chunks"))
+        }
       }
     }
+    iter(ByteString.empty, checkSize)
+  }
 
-    decode()
+  private def decode(payload: ByteString): SerdeResult[WebAuthn] = {
+    serde._deserialize(payload).flatMap { case Staging(webauthn, rest) =>
+      if (rest.exists(_ != 0)) {
+        Left(
+          SerdeError.validation(s"Invalid webauthn payload: unexpected trailing bytes ${Hex.toHexString(rest)}")
+        )
+      } else {
+        validate(webauthn)
+          .map(_ => webauthn)
+          .left
+          .map(SerdeError.validation)
+      }
+    }
+  }
+
+  def tryDecode(nextBytes: () => Option[Bytes64]): SerdeResult[WebAuthn] = {
+    for {
+      firstChunk <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
+      deserialized0 <- serdeImpl[Int]._deserialize(firstChunk.bytes).left.map(e => 
+        SerdeError.WrongFormat(s"Failed to deserialize payload length: ${e.getMessage}"))
+      Staging(payloadLength, payloadFirstChunk) = deserialized0
+      _ <- Either.cond(
+        payloadLength > 0,
+        (),
+        SerdeError.WrongFormat("Invalid payload length: must be positive")
+      )
+      chunkSize = (payloadLength - payloadFirstChunk.length + Bytes64.length - 1) / Bytes64.length
+      restPayload <- extractChunks(nextBytes, chunkSize)
+      webauthn <- decode(payloadFirstChunk ++ restPayload)
+    } yield webauthn
   }
 
   @inline private[vm] def base64urlEncode(bs: ByteString): String = {
@@ -126,47 +165,6 @@ object WebAuthn {
       validateClientData(webauthn)
     } else {
       Left("Invalid UP bit in authenticator data")
-    }
-  }
-
-  private[vm] class Decoder {
-    private var length: Option[Int] = None
-    private var _bytes: ByteString  = ByteString.empty
-
-    private def tryDecode(): SerdeResult[Option[WebAuthn]] = {
-      if (length.exists(_bytes.length >= _)) {
-        serde._deserialize(_bytes) match {
-          case Right(result) =>
-            if (result.rest.exists(_ != 0)) {
-              Left(
-                SerdeError.validation(s"Invalid webauthn postfix: ${Hex.toHexString(result.rest)}")
-              )
-            } else {
-              validate(result.value)
-                .map(_ => Some(result.value))
-                .left
-                .map(SerdeError.validation)
-            }
-          case Left(_: SerdeError.WrongFormat) => Right(None)
-          case Left(error)                     => Left(error)
-        }
-      } else {
-        Right(None)
-      }
-    }
-
-    def tryDecode(bytes: ByteString): SerdeResult[Option[WebAuthn]] = {
-      length match {
-        case Some(_) =>
-          _bytes = _bytes ++ bytes
-          tryDecode()
-        case None =>
-          serdeImpl[Int]._deserialize(bytes).flatMap { result =>
-            length = Some(result.value)
-            _bytes = result.rest
-            tryDecode()
-          }
-      }
     }
   }
 
