@@ -1355,6 +1355,7 @@ class ServerUtils(implicit
           )
           .select(
             AssetAmounts(totalSelectAmount, tokens),
+            fromLockupScript,
             fromUnlockScript,
             extraUtxosInfo.merge(utxos),
             txOutputsLength = estimatedTxOutputsLength,

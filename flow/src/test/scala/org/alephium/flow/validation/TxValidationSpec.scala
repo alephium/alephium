@@ -1499,12 +1499,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       addAndCheck(blockFlow, block)
     }
 
-    def createTx(unlock: UnlockScript.P2PK): Transaction = {
+    def createTx(): Transaction = {
       val utxos = blockFlow.getUsableUtxos(None, lockup, Int.MaxValue).rightValue
       utxos.length is 1
 
       val unsignedTx = UnsignedTransaction(
-        utxos.map(utxo => TxInput(utxo.ref, unlock)),
+        utxos.map(utxo => TxInput(utxo.ref, UnlockScript.P2PK)),
         AVector(
           AssetOutput(
             ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee),
@@ -1553,9 +1553,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def unlockGas: GasBox                                  = GasSchedule.secp256K1UnlockGas
 
     prepare()
-    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))
+    checkValidTx(createTx())
   }
 
   it should "validate p2pk(passkey) unlock script" in new P2PKUnlockScriptFixture {
@@ -1571,9 +1569,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def unlockGas: GasBox = GasSchedule.passkeyUnlockGas(_webauthn.get.bytesLength)
 
     prepare()
-    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))
+    checkValidTx(createTx())
   }
 
   it should "validate p2pk(ed25519) unlock script" in new P2PKUnlockScriptFixture {
@@ -1584,8 +1580,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def unlockGas: GasBox                                  = GasSchedule.ed25519UnlockGas
 
     prepare()
-    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.ED25519)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
+    checkValidTx(createTx())
   }
 }

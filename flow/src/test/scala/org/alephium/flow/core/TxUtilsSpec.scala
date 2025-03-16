@@ -927,7 +927,7 @@ class TxUtilsSpec extends AlephiumSpec {
       unsignedTx.fixedOutputs.foreach(_.lockupScript is toLockupScript)
       unsignedTx.gasAmount is GasEstimation
         .estimateWithInputScript(
-          fromUnlockScript,
+          (fromLockupScript, fromUnlockScript),
           unsignedTx.inputs.length,
           unsignedTx.fixedOutputs.length,
           AssetScriptGasEstimator.NotImplemented
@@ -1655,6 +1655,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val (alphRemainder, tokenRemainder) =
       blockFlow
         .getAssetRemainders(
+          genesisLockupScript,
           genesisUnlockScript,
           AVector(inputUtxoWithTokens),
           AVector(outputUtxoWithTokens),
@@ -1673,6 +1674,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector(genesisUtxos.head),
         AVector(outputOfAmount(genesisLockupScript, genesisBalance)),
@@ -1682,6 +1684,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector.empty,
         AVector(outputOfAmount(genesisLockupScript, genesisBalance)),
@@ -1691,6 +1694,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector.empty,
         AVector.empty,
@@ -1700,6 +1704,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector(genesisUtxos.head),
         AVector.empty,
@@ -1711,6 +1716,7 @@ class TxUtilsSpec extends AlephiumSpec {
       AVector.fill(2)(outputOfAmount(genesisLockupScript, U256.MaxValue))
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector(genesisUtxos.head),
         overflowValueOutputs,
@@ -1737,6 +1743,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         overflowValueInputs,
         AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4)),
@@ -1746,6 +1753,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         overflowValueInputs,
         overflowValueOutputs,
@@ -2881,7 +2889,6 @@ class TxUtilsSpec extends AlephiumSpec {
     def sign(unsignedTx: UnsignedTransaction): Transaction
 
     def lockupScript(group: GroupIndex): LockupScript.P2PK = LockupScript.p2pk(publicKey, group)
-    def unlockScript: UnlockScript.P2PK                    = UnlockScript.P2PK(publicKey.keyType)
     def testTransfer() = {
       (0 until groupConfig.groups).foreach { group =>
         val genesisKey     = genesisKeys(group)._1
@@ -2905,7 +2912,7 @@ class TxUtilsSpec extends AlephiumSpec {
           .transfer(
             None,
             fromLockupScript,
-            unlockScript,
+            UnlockScript.P2PK,
             outputInfos,
             Some(minimalGas),
             nonCoinbaseMinGasPrice,

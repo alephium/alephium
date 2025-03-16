@@ -873,9 +873,9 @@ object TxValidation {
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
-        case (lock: LockupScript.P2PK, unlock: UnlockScript.P2PK)
+        case (lock: LockupScript.P2PK, UnlockScript.P2PK)
             if blockEnv.getHardFork().isDanubeEnabled() =>
-          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock, unlock)
+          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -885,20 +885,15 @@ object TxValidation {
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
-        lock: LockupScript.P2PK,
-        unlock: UnlockScript.P2PK
+        lock: LockupScript.P2PK
     ): TxValidationResult[GasBox] = {
-      if (lock.publicKey.keyType != unlock.keyType) {
-        invalidTx(InvalidUnlockScriptType)
-      } else {
-        lock.publicKey match {
-          case PublicKeyLike.SecP256K1(key) =>
-            checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
-          case PublicKeyLike.Passkey(key) =>
-            checkPasskeySignature(txEnv, preImage, gasRemaining, key)
-          case PublicKeyLike.ED25519(key) =>
-            checkED25519Signature(txEnv, preImage, gasRemaining, key)
-        }
+      lock.publicKey match {
+        case PublicKeyLike.SecP256K1(key) =>
+          checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.Passkey(key) =>
+          checkPasskeySignature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.ED25519(key) =>
+          checkED25519Signature(txEnv, preImage, gasRemaining, key)
       }
     }
 

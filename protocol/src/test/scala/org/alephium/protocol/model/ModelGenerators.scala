@@ -109,6 +109,37 @@ trait LockupScriptGenerators extends Generators {
       }
   }
 
+  def p2pkLockPairGen(groupIndex: GroupIndex): Gen[(LockupScript, UnlockScript)] =
+    p2pkLockupGen(groupIndex).map((_, UnlockScript.P2PK))
+
+  def p2pkhUnlockGen(groupIndex: GroupIndex): Gen[UnlockScript] =
+    p2pkhLockPairGen(groupIndex).map(_._2)
+
+  def p2pkhLockPairGen(groupIndex: GroupIndex): Gen[(LockupScript, UnlockScript)] =
+    publicKeyGen(groupIndex).map { publicKey =>
+      (LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey))
+    }
+
+  def p2mpkhUnlockGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[UnlockScript] =
+    p2mpkhLockPairGen(n, m, groupIndex).map(_._2)
+
+  def p2mpkhLockPairGen(
+      n: Int,
+      m: Int,
+      groupIndex: GroupIndex
+  ): Gen[(LockupScript, UnlockScript)] = {
+    for {
+      publicKey0 <- publicKeyGen(groupIndex)
+      moreKeys   <- Gen.listOfN(n, publicKeyGen(groupIndex))
+      allKeys = publicKey0 +: moreKeys
+      indexedKey <- Gen.pick(m, allKeys.zipWithIndex).map(AVector.from)
+    } yield {
+      val lockupScript = LockupScript.p2mpkhUnsafe(AVector.from(allKeys), m)
+      val unlockScript = UnlockScript.p2mpkh(indexedKey.sortBy(_._2))
+      (lockupScript, unlockScript)
+    }
+  }
+
   def lockupGen(groupIndex: GroupIndex): Gen[LockupScript] = {
     Gen.oneOf(
       p2pkhLockupGen(groupIndex),
@@ -208,19 +239,6 @@ trait TxInputGenerators extends Generators {
       val outputRef = AssetOutputRef.from(scriptHint, TxOutputRef.unsafeKey(hash))
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
-
-  def p2pkhUnlockGen(groupIndex: GroupIndex): Gen[UnlockScript] =
-    publicKeyGen(groupIndex).map(UnlockScript.p2pkh)
-
-  def p2mpkhUnlockGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[UnlockScript] = {
-    for {
-      publicKey0 <- publicKeyGen(groupIndex)
-      moreKeys   <- Gen.listOfN(n, publicKeyGen(groupIndex))
-      indexedKey <- Gen.pick(m, (publicKey0 +: moreKeys).zipWithIndex).map(AVector.from)
-    } yield {
-      UnlockScript.p2mpkh(indexedKey.sortBy(_._2))
-    }
-  }
 }
 
 trait TokenGenerators extends Generators with NumericHelpers {
