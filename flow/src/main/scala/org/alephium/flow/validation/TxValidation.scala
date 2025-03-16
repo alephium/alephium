@@ -920,11 +920,11 @@ object TxValidation {
         gasRemaining: GasBox,
         publicKey: SecP256R1PublicKey
     ): TxValidationResult[GasBox] = {
-      WebAuthn.tryDecode(preImage, () => txEnv.signatures.pop().toOption.map(_.bytes)) match {
+      WebAuthn.tryDecode(() => txEnv.signatures.pop().toOption.map(_.bytes)) match {
         case Right(webauthn) =>
           txEnv.signatures.pop() match {
             case Right(signature) =>
-              if (!webauthn.verify(txEnv.txId, signature.toSecP256R1Signature, publicKey)) {
+              if (!webauthn.verify(preImage, signature.toSecP256R1Signature, publicKey)) {
                 invalidTx(InvalidSignature)
               } else {
                 fromOption(

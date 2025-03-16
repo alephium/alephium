@@ -23,7 +23,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.{SecP256R1, SecP256R1PublicKey, SecP256R1Signature, Sha256}
 import org.alephium.protocol.model.TransactionId
-import org.alephium.serde.{bytestringSerde, Serde, SerdeError, SerdeResult}
+import org.alephium.serde.{bytestringSerde, intSerde, serdeImpl, Serde, SerdeError, SerdeResult}
 import org.alephium.util.Hex
 
 final case class WebAuthn(
@@ -59,15 +59,20 @@ final case class WebAuthn(
       signature: SecP256R1Signature,
       publicKey: SecP256R1PublicKey
   ): Boolean = {
-    SecP256R1.verify(messageHash(txId).bytes, signature, publicKey)
+    verify(txId.bytes, signature, publicKey)
+  }
+
+  def getLengthPrefixedPayload(): ByteString = {
+    val payload = WebAuthn.serde.serialize(this)
+    val length  = serdeImpl[Int].serialize(payload.length)
+    length ++ payload
   }
 }
 
 object WebAuthn {
-  val AuthenticatorDataMinLength: Int = 37
-  val ClientDataMinLength: Int        = 81
-  val GET: String                     = "webauthn.get"
-  val FlagIndex: Int                  = 32
+  val GET: String       = "webauthn.get"
+  val TypeField: String = s""""type":"$GET""""
+  val FlagIndex: Int    = 32
 
   implicit val serde: Serde[WebAuthn] =
     Serde.forProduct3(
@@ -75,11 +80,8 @@ object WebAuthn {
       v => (v.authenticatorData, v.clientDataPrefix, v.clientDataSuffix)
     )
 
-  def tryDecode(
-      rawChallenge: ByteString,
-      nextBytes: () => Option[ByteString]
-  ): SerdeResult[WebAuthn] = {
-    val decoder = new Decoder(rawChallenge)
+  def tryDecode(nextBytes: () => Option[ByteString]): SerdeResult[WebAuthn] = {
+    val decoder = new Decoder()
 
     @scala.annotation.tailrec
     def decode(): SerdeResult[WebAuthn] = {
@@ -106,72 +108,64 @@ object WebAuthn {
     ByteString.fromArrayUnsafe(base64Encoded.getBytes(StandardCharsets.UTF_8))
   }
 
-  private[vm] def extractValueFromClientData(
-      jsonStr: String,
-      key: String
-  ): Either[String, String] = {
-    val keyIndex      = jsonStr.indexOf(key)
-    val valStartIndex = keyIndex + key.length + 3
-    if (keyIndex == -1) {
-      Left(s"The $key does not exist in client data")
-    } else if (valStartIndex >= jsonStr.length) {
-      Left(s"Invalid $key in client data")
+  private[vm] def validateClientData(webauthn: WebAuthn): Either[String, Unit] = {
+    val clientDataWithoutChallenge = webauthn.clientDataPrefix ++ webauthn.clientDataSuffix
+    val jsonStr = new String(clientDataWithoutChallenge.toArray, StandardCharsets.UTF_8)
+    if (jsonStr.contains(TypeField)) {
+      Right(())
     } else {
-      val valEndIndex = jsonStr.indexOf('"', valStartIndex)
-      if (valEndIndex == -1) {
-        Left(s"Invalid $key in client data")
+      Left(s"Invalid type in client data, expected $GET")
+    }
+  }
+
+  private[vm] def validate(webauthn: WebAuthn): Either[String, Unit] = {
+    if (
+      webauthn.authenticatorData.length > FlagIndex &&
+      (webauthn.authenticatorData(FlagIndex) & 0x01) == 0x01
+    ) {
+      validateClientData(webauthn)
+    } else {
+      Left("Invalid UP bit in authenticator data")
+    }
+  }
+
+  private[vm] class Decoder {
+    private var length: Option[Int] = None
+    private var _bytes: ByteString  = ByteString.empty
+
+    private def tryDecode(): SerdeResult[Option[WebAuthn]] = {
+      if (length.exists(_bytes.length >= _)) {
+        serde._deserialize(_bytes) match {
+          case Right(result) =>
+            if (result.rest.exists(_ != 0)) {
+              Left(
+                SerdeError.validation(s"Invalid webauthn postfix: ${Hex.toHexString(result.rest)}")
+              )
+            } else {
+              validate(result.value)
+                .map(_ => Some(result.value))
+                .left
+                .map(SerdeError.validation)
+            }
+          case Left(_: SerdeError.WrongFormat) => Right(None)
+          case Left(error)                     => Left(error)
+        }
       } else {
-        Right(jsonStr.slice(valStartIndex, valEndIndex))
+        Right(None)
       }
     }
-  }
-
-  private[vm] def validateClientData(clientData: ByteString): Either[String, Unit] = {
-    if (clientData.length < ClientDataMinLength) {
-      Left("Invalid client data length")
-    } else {
-      val clientDataStr = new String(clientData.toArray, StandardCharsets.UTF_8)
-      for {
-        tpe <- extractValueFromClientData(clientDataStr, "type")
-        _ <-
-          if (tpe == GET) {
-            Right(())
-          } else {
-            Left(s"Invalid type in client data, expected $GET, but got $tpe")
-          }
-      } yield ()
-    }
-  }
-
-  private[vm] def validate(webauthn: WebAuthn, rawChallenge: ByteString): Either[String, Unit] = {
-    if (webauthn.authenticatorData.length < AuthenticatorDataMinLength) {
-      Left("Invalid authenticator data length")
-    } else if ((webauthn.authenticatorData(FlagIndex) & 0x01) != 0x01) {
-      Left("Invalid UP bit in authenticator data")
-    } else {
-      validateClientData(webauthn.clientData(rawChallenge))
-    }
-  }
-
-  private[vm] class Decoder(rawChallenge: ByteString) {
-    private var _bytes: ByteString = ByteString.empty
 
     def tryDecode(bytes: ByteString): SerdeResult[Option[WebAuthn]] = {
-      _bytes = _bytes ++ bytes
-      serde._deserialize(_bytes) match {
-        case Right(result) =>
-          if (result.rest.exists(_ != 0)) {
-            Left(
-              SerdeError.validation(s"Invalid webauthn postfix: ${Hex.toHexString(result.rest)}")
-            )
-          } else {
-            validate(result.value, rawChallenge)
-              .map(_ => Some(result.value))
-              .left
-              .map(SerdeError.validation)
+      length match {
+        case Some(_) =>
+          _bytes = _bytes ++ bytes
+          tryDecode()
+        case None =>
+          serdeImpl[Int]._deserialize(bytes).flatMap { result =>
+            length = Some(result.value)
+            _bytes = result.rest
+            tryDecode()
           }
-        case Left(_: SerdeError.WrongFormat) => Right(None)
-        case Left(error)                     => Left(error)
       }
     }
   }

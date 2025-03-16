@@ -18,71 +18,44 @@ package org.alephium.protocol.vm
 
 import java.nio.charset.StandardCharsets
 
-import scala.util.Random
-
 import akka.util.ByteString
 import org.scalacheck.Arbitrary
 
 import org.alephium.crypto.{SecP256R1, SecP256R1Signature}
 import org.alephium.protocol.Hash
-import org.alephium.serde.SerdeError
-import org.alephium.util.AlephiumSpec
+import org.alephium.serde.{intSerde, SerdeError}
+import org.alephium.util.{AlephiumSpec, NumericHelpers}
 
-class WebAuthnSpec extends AlephiumSpec {
-  it should "extract value from client data" in {
-    val json0 = s"""{"type":"webauthn.get","challenge":"p5aV2uHXr0AO_qUk7HQitvi"}"""
-    WebAuthn.extractValueFromClientData(json0, "type") is Right("webauthn.get")
-    WebAuthn.extractValueFromClientData(json0, "challenge") is Right("p5aV2uHXr0AO_qUk7HQitvi")
-    WebAuthn.extractValueFromClientData(json0, "invalidKey") is Left(
-      "The invalidKey does not exist in client data"
-    )
-
-    val json1 = s"""{"type"}"""
-    WebAuthn.extractValueFromClientData(json1, "type") is Left("Invalid type in client data")
-
-    val json2 = s"""{"type":"webauthn.get}"""
-    WebAuthn.extractValueFromClientData(json2, "type") is Left("Invalid type in client data")
-
-    val json3 = s"""{"type":"webauth"n.get"}"""
-    WebAuthn.extractValueFromClientData(json3, "type") is Right("webauth")
-  }
-
+class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
   it should "validate the client data" in {
-    val challenge  = Hash.generate.bytes
-    val webauthn   = WebAuthn.createForTest(ByteString.empty, "webauthn.create")
-    val clientData = webauthn.clientData(challenge)
-    WebAuthn.validateClientData(clientData) is Left(
-      "Invalid type in client data, expected webauthn.get, but got webauthn.create"
+    val webauthn = WebAuthn.createForTest(ByteString.empty, "webauthn.create")
+    WebAuthn.validateClientData(webauthn) is Left(
+      "Invalid type in client data, expected webauthn.get"
     )
   }
 
   def createAuthenticatorData(flag: Byte): ByteString = {
     val rpIdHash  = Hash.generate.bytes
     val signCount = bytesGen(4).sample.get
-    val postfix   = bytesGen(Random.nextInt(100)).sample.get
+    val postfix   = bytesGen(nextInt(100)).sample.get
     rpIdHash ++ ByteString(flag) ++ signCount ++ postfix
   }
 
   it should "validate the webauthn payload" in {
-    val challenge = Hash.generate.bytes
     val authenticatorData =
       createAuthenticatorData((Arbitrary.arbByte.arbitrary.sample.get | 0x01).toByte)
-    val webauthn = WebAuthn.createForTest(authenticatorData, "webauthn.get")
-    WebAuthn.validate(webauthn, challenge) isE ()
+    val webauthn = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
+    WebAuthn.validate(webauthn) isE ()
 
-    val webauthn0 = webauthn.copy(authenticatorData =
-      bytesGen(Random.nextInt(WebAuthn.AuthenticatorDataMinLength)).sample.get
-    )
-    WebAuthn.validate(webauthn0, challenge) is Left("Invalid authenticator data length")
+    val webauthn0 =
+      webauthn.copy(authenticatorData = bytesGen(nextInt(WebAuthn.FlagIndex)).sample.get)
+    WebAuthn.validate(webauthn0) is Left("Invalid UP bit in authenticator data")
 
-    val webauthn1 = webauthn.copy(clientDataPrefix = bytesGen(Random.nextInt(10)).sample.get)
-    WebAuthn.validate(webauthn1, challenge) is Left("Invalid client data length")
-
-    val webauthn2 = webauthn.copy(
+    val webauthn1 = webauthn.copy(
       authenticatorData =
         createAuthenticatorData((Arbitrary.arbByte.arbitrary.sample.get & 0xfe).toByte)
     )
-    WebAuthn.validate(webauthn2, challenge) is Left("Invalid UP bit in authenticator data")
+    WebAuthn.validate(webauthn1) is Left("Invalid UP bit in authenticator data")
   }
 
   it should "decode webauthn payload" in {
@@ -91,20 +64,23 @@ class WebAuthnSpec extends AlephiumSpec {
       () => iterator.nextOption()
     }
 
-    val challenge = Hash.generate.bytes
-    val webauthn  = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
-    val bytes     = WebAuthn.serde.serialize(webauthn)
-    WebAuthn.tryDecode(challenge, createIterator(bytes)) isE webauthn
+    val webauthn = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
+    val bytes    = webauthn.getLengthPrefixedPayload()
+    val payload  = WebAuthn.serde.serialize(webauthn)
+    bytes is (intSerde.serialize(payload.length) ++ payload)
+
+    WebAuthn.tryDecode(() => Some(bytes)) isE webauthn
+    WebAuthn.tryDecode(createIterator(bytes)) isE webauthn
     val validPostfix = ByteString.fromArrayUnsafe(Array.fill[Byte](10)(0))
-    WebAuthn.tryDecode(challenge, createIterator(bytes ++ validPostfix)) isE webauthn
+    WebAuthn.tryDecode(createIterator(bytes ++ validPostfix)) isE webauthn
 
     val invalidPostfix = bytesGen(10).sample.get
     WebAuthn
-      .tryDecode(challenge, createIterator(bytes ++ invalidPostfix))
+      .tryDecode(createIterator(bytes ++ invalidPostfix))
       .leftValue
       .getMessage
       .startsWith("Invalid webauthn postfix") is true
-    WebAuthn.tryDecode(challenge, createIterator(bytes.dropRight(1))).leftValue is
+    WebAuthn.tryDecode(createIterator(bytes.dropRight(1))).leftValue is
       SerdeError.WrongFormat("Incomplete webauthn payload")
   }
 

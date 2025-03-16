@@ -1038,7 +1038,7 @@ trait FlowFixture
   }
 
   private def encodeToBytes64(webauthn: WebAuthn): AVector[Bytes64] = {
-    val bytes     = serialize(webauthn)
+    val bytes     = webauthn.getLengthPrefixedPayload()
     val chunkSize = Bytes64.length
     AVector.from(bytes.grouped(chunkSize).map { chunk =>
       val bs = if (chunk.length < chunkSize) {
@@ -1054,7 +1054,7 @@ trait FlowFixture
       unsignedTx: UnsignedTransaction,
       priKey: SecP256R1PrivateKey
   ): (WebAuthn, Transaction) = {
-    val bytes = bytesGen(WebAuthn.AuthenticatorDataMinLength).sample.get.toArray
+    val bytes = bytesGen(WebAuthn.FlagIndex + 1).sample.get.toArray
     bytes(WebAuthn.FlagIndex) = (bytes(WebAuthn.FlagIndex) | 0x01).toByte
     val authenticatorData = ByteString.fromArrayUnsafe(bytes)
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
