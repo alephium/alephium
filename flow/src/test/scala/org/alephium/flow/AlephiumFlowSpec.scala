@@ -1038,16 +1038,11 @@ trait FlowFixture
   }
 
   private def encodeToBytes64(webauthn: WebAuthn): AVector[Bytes64] = {
-    val bytes     = webauthn.getLengthPrefixedPayload()
-    val chunkSize = Bytes64.length
-    AVector.from(bytes.grouped(chunkSize).map { chunk =>
-      val bs = if (chunk.length < chunkSize) {
-        chunk ++ ByteString(Array.fill(chunkSize - chunk.length)(0.toByte))
-      } else {
-        chunk
-      }
-      Bytes64.from(bs).get
-    })
+    val bytes       = webauthn.getLengthPrefixedPayload()
+    val chunkSize   = (bytes.length + Bytes64.length - 1) / Bytes64.length
+    val paddingSize = chunkSize * Bytes64.length - bytes.length
+    val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
+    AVector.from(paddedBytes.grouped(Bytes64.length).map(Bytes64.from(_).get))
   }
 
   def signWithPasskey(

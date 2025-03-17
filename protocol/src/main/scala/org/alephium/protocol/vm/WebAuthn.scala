@@ -80,9 +80,10 @@ final case class WebAuthn(
 }
 
 object WebAuthn {
-  val GET: String       = "webauthn.get"
-  val TypeField: String = s""""type":"$GET""""
-  val FlagIndex: Int    = 32
+  val GET: String = "webauthn.get"
+  val TypeField: ByteString =
+    ByteString.fromArrayUnsafe(s""""type":"$GET"""".getBytes(StandardCharsets.UTF_8))
+  val FlagIndex: Int = 32
 
   implicit val serde: Serde[WebAuthn] =
     Serde.forProduct3(
@@ -90,7 +91,10 @@ object WebAuthn {
       v => (v.authenticatorData, v.clientDataPrefix, v.clientDataSuffix)
     )
 
-  private def extractChunks(nextBytes: () => Option[Bytes64], checkSize: Int): SerdeResult[ByteString] = {
+  private def extractChunks(
+      nextBytes: () => Option[Bytes64],
+      chunkSize: Int
+  ): SerdeResult[ByteString] = {
     @tailrec
     def iter(acc: ByteString, remaining: Int): SerdeResult[ByteString] = {
       if (remaining == 0) {
@@ -103,14 +107,16 @@ object WebAuthn {
         }
       }
     }
-    iter(ByteString.empty, checkSize)
+    iter(ByteString.empty, chunkSize)
   }
 
   private def decode(payload: ByteString): SerdeResult[WebAuthn] = {
     serde._deserialize(payload).flatMap { case Staging(webauthn, rest) =>
       if (rest.exists(_ != 0)) {
         Left(
-          SerdeError.validation(s"Invalid webauthn payload: unexpected trailing bytes ${Hex.toHexString(rest)}")
+          SerdeError.validation(
+            s"Invalid webauthn payload: unexpected trailing bytes ${Hex.toHexString(rest)}"
+          )
         )
       } else {
         validate(webauthn)
@@ -124,8 +130,10 @@ object WebAuthn {
   def tryDecode(nextBytes: () => Option[Bytes64]): SerdeResult[WebAuthn] = {
     for {
       firstChunk <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
-      deserialized0 <- serdeImpl[Int]._deserialize(firstChunk.bytes).left.map(e => 
-        SerdeError.WrongFormat(s"Failed to deserialize payload length: ${e.getMessage}"))
+      deserialized0 <- serdeImpl[Int]
+        ._deserialize(firstChunk.bytes)
+        .left
+        .map(e => SerdeError.WrongFormat(s"Failed to deserialize payload length: ${e.getMessage}"))
       Staging(payloadLength, payloadFirstChunk) = deserialized0
       _ <- Either.cond(
         payloadLength > 0,
@@ -134,7 +142,7 @@ object WebAuthn {
       )
       chunkSize = (payloadLength - payloadFirstChunk.length + Bytes64.length - 1) / Bytes64.length
       restPayload <- extractChunks(nextBytes, chunkSize)
-      webauthn <- decode(payloadFirstChunk ++ restPayload)
+      webauthn    <- decode(payloadFirstChunk ++ restPayload)
     } yield webauthn
   }
 
@@ -148,9 +156,10 @@ object WebAuthn {
   }
 
   private[vm] def validateClientData(webauthn: WebAuthn): Either[String, Unit] = {
-    val clientDataWithoutChallenge = webauthn.clientDataPrefix ++ webauthn.clientDataSuffix
-    val jsonStr = new String(clientDataWithoutChallenge.toArray, StandardCharsets.UTF_8)
-    if (jsonStr.contains(TypeField)) {
+    if (
+      webauthn.clientDataPrefix.containsSlice(TypeField) ||
+      webauthn.clientDataSuffix.containsSlice(TypeField)
+    ) {
       Right(())
     } else {
       Left(s"Invalid type in client data, expected $GET")

@@ -407,7 +407,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
     GasEstimation.estimateInputGas(lockupScript2) is GasBox.unsafe(4054)
     val publicKey3    = PublicKeyLike.Passkey(SecP256R1.generatePriPub()._2)
     val lockupScript3 = LockupScript.p2pk(publicKey3, groupIndex)
-    GasEstimation.estimateInputGas(lockupScript3) is GasBox.unsafe(4282)
+    GasEstimation.estimateInputGas(lockupScript3) is GasBox.unsafe(4432)
 
     val invalidLockupScript = p2pkhLockupGen(groupIndex).sample.get
     GasEstimation
@@ -435,7 +435,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
       AVector(lockPair0, lockPair1),
       4,
       AssetScriptGasEstimator.NotImplemented
-    ) isE GasBox.unsafe(27342)
+    ) isE GasBox.unsafe(27492)
   }
 
   private def transferFromP2sh(

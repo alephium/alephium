@@ -23,15 +23,20 @@ import org.scalacheck.Arbitrary
 
 import org.alephium.crypto.{SecP256R1, SecP256R1Signature}
 import org.alephium.protocol.Hash
+import org.alephium.protocol.model.Bytes64
 import org.alephium.serde.{intSerde, SerdeError}
 import org.alephium.util.{AlephiumSpec, NumericHelpers}
 
 class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
   it should "validate the client data" in {
-    val webauthn = WebAuthn.createForTest(ByteString.empty, "webauthn.create")
-    WebAuthn.validateClientData(webauthn) is Left(
+    val webauthn0 = WebAuthn.createForTest(ByteString.empty, "webauthn.get")
+    WebAuthn.validateClientData(webauthn0) isE ()
+    val webauthn1 = WebAuthn.createForTest(ByteString.empty, "webauthn.create")
+    WebAuthn.validateClientData(webauthn1) is Left(
       "Invalid type in client data, expected webauthn.get"
     )
+    val webauthn2 = webauthn1.copy(clientDataSuffix = WebAuthn.TypeField)
+    WebAuthn.validateClientData(webauthn2) isE ()
   }
 
   def createAuthenticatorData(flag: Byte): ByteString = {
@@ -59,9 +64,12 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "decode webauthn payload" in {
-    def createIterator(bs: ByteString): () => Option[ByteString] = {
-      val iterator = bs.grouped(64).iterator
-      () => iterator.nextOption()
+    def createIterator(bytes: ByteString): () => Option[Bytes64] = {
+      val chunkSize   = (bytes.length + Bytes64.length - 1) / Bytes64.length
+      val paddingSize = chunkSize * Bytes64.length - bytes.length
+      val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
+      val iterator    = paddedBytes.grouped(Bytes64.length).iterator
+      () => iterator.nextOption().flatMap(Bytes64.from)
     }
 
     val webauthn = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
@@ -69,7 +77,16 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
     val payload  = WebAuthn.serde.serialize(webauthn)
     bytes is (intSerde.serialize(payload.length) ++ payload)
 
-    WebAuthn.tryDecode(() => Some(bytes)) isE webauthn
+    WebAuthn.tryDecode(() => None).leftValue is SerdeError.WrongFormat("Empty webauthn payload")
+    WebAuthn.tryDecode(createIterator(ByteString(-1) ++ payload)).leftValue is SerdeError
+      .WrongFormat(
+        "Failed to deserialize payload length: Too few bytes: expected 68, got 64"
+      )
+    WebAuthn.tryDecode(createIterator(intSerde.serialize(-1) ++ payload)).leftValue is SerdeError
+      .WrongFormat(
+        "Invalid payload length: must be positive"
+      )
+
     WebAuthn.tryDecode(createIterator(bytes)) isE webauthn
     val validPostfix = ByteString.fromArrayUnsafe(Array.fill[Byte](10)(0))
     WebAuthn.tryDecode(createIterator(bytes ++ validPostfix)) isE webauthn
@@ -79,9 +96,9 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
       .tryDecode(createIterator(bytes ++ invalidPostfix))
       .leftValue
       .getMessage
-      .startsWith("Invalid webauthn postfix") is true
-    WebAuthn.tryDecode(createIterator(bytes.dropRight(1))).leftValue is
-      SerdeError.WrongFormat("Incomplete webauthn payload")
+      .startsWith("Invalid webauthn payload: unexpected trailing bytes") is true
+    WebAuthn.tryDecode(createIterator(bytes.dropRight(Bytes64.length))).leftValue is
+      SerdeError.WrongFormat("Incomplete webauthn payload: missing chunks")
   }
 
   it should "verify the webauthn signature" in {
