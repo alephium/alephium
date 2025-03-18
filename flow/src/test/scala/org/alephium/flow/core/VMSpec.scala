@@ -7499,6 +7499,204 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
   }
 
+  it should "use generated outputs for tokenRemaining/transferToken in TxScript after Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    val (_, randomPubKey)  = chainIndex.from.generateKey
+    val randomLockupScript = LockupScript.p2pkh(randomPubKey)
+    val randomAddress      = Address.p2pkh(randomPubKey)
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  let initialAlphBalance = tokenRemaining!(@$userAddress, ALPH)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 10, 0)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + dustAmount!(), 1)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 10 alph + dustAmount!(), 3)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).depositAlph{@$userAddress -> ALPH: 5 alph}(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 5 alph + dustAmount!(), 5)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 6)
+         |
+         |  transferToken!(@$userAddress, @$randomAddress, #${tokenId.toHexString}, 1)
+         |  transferToken!(@$userAddress, @$randomAddress, ALPH, 1 alph)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 9, 7)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 4 alph + dustAmount!(), 8)
+         |  assert!(tokenRemaining!(@$randomAddress, #${tokenId.toHexString}) == 0, 9)
+         |  assert!(tokenRemaining!(@$randomAddress, ALPH) == 0, 10)
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(995).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(9)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(14)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+    getTokenBalance(blockFlow, randomLockupScript, tokenId) is U256.unsafe(1)
+    getAlphBalance(blockFlow, randomLockupScript) is ALPH.alph(1)
+  }
+
+  it should "not use generated outputs for tokenRemaining in TxScript before Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  let initialAlphBalance = tokenRemaining!(@$userAddress, ALPH)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 0, 0)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance, 1)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance, 3)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(990).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(10)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(20)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+  }
+
+  it should "not use generated outputs for tokenRemaining in contracts after Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    val proxyContractCode =
+      s"""
+         |Contract Proxy() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn main() -> () {
+         |    TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |    assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 0, 0)
+         |    assert!(tokenRemaining!(@$userAddress, ALPH) == dustAmount!(), 1)
+         |    assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |    TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |    assert!(tokenRemaining!(@$userAddress, ALPH) == dustAmount!(), 3)
+         |    assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |  }
+         |}
+         |
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val proxyContractId = createContract(proxyContractCode)._1
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  Proxy(#${proxyContractId.toHexString}).main{@$userAddress -> ALPH: dustAmount!()}()
+         |}
+         |
+         |$proxyContractCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(990).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(10)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(20)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+  }
+
+  trait AssetRemainingFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
+    val userKeyPair      = chainIndex.from.generateKey
+    val userLockupScript = LockupScript.p2pkh(userKeyPair._2)
+    val userAddress      = Address.from(userLockupScript)
+
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val transferBlock = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      userLockupScript,
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(10)
+    )
+    addAndCheck(blockFlow, transferBlock)
+
+    val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000)))
+    val tokenFaucetCode =
+      s"""
+         |Contract TokenFaucet() {
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawToken(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, selfTokenId!(), 10)
+         |    transferTokenFromSelf!(caller, ALPH, dustAmount!())
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawAlph(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, ALPH, 10 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn depositAlph(caller: Address) -> () {
+         |    transferTokenToSelf!(caller, ALPH, 5 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenFaucetId = createContract(
+      tokenFaucetCode,
+      initialAttoAlphAmount = ALPH.alph(1000),
+      tokenIssuanceInfo = tokenIssuanceInfo
+    )._1
+    val tokenFaucetAddress = Address.contract(tokenFaucetId)
+    val tokenId            = TokenId.from(tokenFaucetId)
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(1000),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(1000)))
+    )
+    getAlphBalance(blockFlow, userLockupScript) is ALPH.alph(10)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
