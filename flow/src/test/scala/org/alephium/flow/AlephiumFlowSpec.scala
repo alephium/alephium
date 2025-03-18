@@ -23,7 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{SecP256R1, SecP256R1PrivateKey}
+import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1PrivateKey}
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.io.StoragesFixture
@@ -1037,12 +1037,12 @@ trait FlowFixture
     AVector.fill(n)(createTx())
   }
 
-  private def encodeToBytes64(webauthn: WebAuthn): AVector[Bytes64] = {
+  private def encodeToByte64(webauthn: WebAuthn): AVector[Byte64] = {
     val bytes       = webauthn.getLengthPrefixedPayload()
-    val chunkSize   = (bytes.length + Bytes64.length - 1) / Bytes64.length
-    val paddingSize = chunkSize * Bytes64.length - bytes.length
+    val chunkSize   = (bytes.length + Byte64.length - 1) / Byte64.length
+    val paddingSize = chunkSize * Byte64.length - bytes.length
     val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
-    AVector.from(paddedBytes.grouped(Bytes64.length).map(Bytes64.from(_).get))
+    AVector.from(paddedBytes.grouped(Byte64.length).map(Byte64.from(_).get))
   }
 
   def signWithPasskey(
@@ -1054,8 +1054,8 @@ trait FlowFixture
     val authenticatorData = ByteString.fromArrayUnsafe(bytes)
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val messageHash       = webauthn.messageHash(unsignedTx.id)
-    val signature         = Bytes64.from(SecP256R1.sign(messageHash, priKey))
-    (webauthn, Transaction.from(unsignedTx, encodeToBytes64(webauthn) :+ signature))
+    val signature         = Byte64.from(SecP256R1.sign(messageHash, priKey))
+    (webauthn, Transaction.from(unsignedTx, encodeToByte64(webauthn) :+ signature))
   }
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {

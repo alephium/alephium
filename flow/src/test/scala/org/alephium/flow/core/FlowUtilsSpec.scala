@@ -21,6 +21,7 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalacheck.Gen
 
+import org.alephium.crypto.Byte64
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.mempool.{Normal, Reorg}
@@ -46,7 +47,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       val unsignedTx = UnsignedTransaction(txScriptOpt = Some(script), inputs, AVector.empty)
       val tx = TransactionTemplate(
         unsignedTx,
-        assets.map(asset => Bytes64.from(SignatureSchema.sign(unsignedTx.id, asset.privateKey))),
+        assets.map(asset => Byte64.from(SignatureSchema.sign(unsignedTx.id, asset.privateKey))),
         AVector.empty
       )
       val blockEnv = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue

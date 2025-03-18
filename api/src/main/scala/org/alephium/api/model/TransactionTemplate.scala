@@ -18,6 +18,7 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{model => protocol}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde._
@@ -35,8 +36,8 @@ final case class TransactionTemplate(
   ): Either[String, protocol.TransactionTemplate] = {
     for {
       unsignedTx <- unsigned.toProtocol()
-      inputSig   <- inputSignatures.mapE(deserialize[protocol.Bytes64]).left.map(_.getMessage())
-      scriptSig  <- scriptSignatures.mapE(deserialize[protocol.Bytes64]).left.map(_.getMessage())
+      inputSig   <- inputSignatures.mapE(deserialize[Byte64]).left.map(_.getMessage())
+      scriptSig  <- scriptSignatures.mapE(deserialize[Byte64]).left.map(_.getMessage())
     } yield {
       protocol.TransactionTemplate(
         unsignedTx,

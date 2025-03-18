@@ -21,9 +21,8 @@ import java.nio.charset.StandardCharsets
 import akka.util.ByteString
 import org.scalacheck.Arbitrary
 
-import org.alephium.crypto.{SecP256R1, SecP256R1Signature}
+import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1Signature}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.Bytes64
 import org.alephium.serde.{intSerde, SerdeError}
 import org.alephium.util.{AlephiumSpec, NumericHelpers}
 
@@ -64,12 +63,12 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "decode webauthn payload" in {
-    def createIterator(bytes: ByteString): () => Option[Bytes64] = {
-      val chunkSize   = (bytes.length + Bytes64.length - 1) / Bytes64.length
-      val paddingSize = chunkSize * Bytes64.length - bytes.length
+    def createIterator(bytes: ByteString): () => Option[Byte64] = {
+      val chunkSize   = (bytes.length + Byte64.length - 1) / Byte64.length
+      val paddingSize = chunkSize * Byte64.length - bytes.length
       val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
-      val iterator    = paddedBytes.grouped(Bytes64.length).iterator
-      () => iterator.nextOption().flatMap(Bytes64.from)
+      val iterator    = paddedBytes.grouped(Byte64.length).iterator
+      () => iterator.nextOption().flatMap(Byte64.from)
     }
 
     val webauthn = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
@@ -97,7 +96,7 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
       .leftValue
       .getMessage
       .startsWith("Invalid webauthn payload: unexpected trailing bytes") is true
-    WebAuthn.tryDecode(createIterator(bytes.dropRight(Bytes64.length))).leftValue is
+    WebAuthn.tryDecode(createIterator(bytes.dropRight(Byte64.length))).leftValue is
       SerdeError.WrongFormat("Incomplete webauthn payload: missing chunks")
   }
 

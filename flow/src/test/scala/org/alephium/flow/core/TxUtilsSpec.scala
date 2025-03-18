@@ -22,7 +22,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Succeeded}
 
-import org.alephium.crypto.{BIP340Schnorr, SecP256K1, SecP256R1}
+import org.alephium.crypto.{BIP340Schnorr, Byte64, SecP256K1, SecP256R1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.{
   AssetOutputInfo,
@@ -395,7 +395,7 @@ class TxUtilsSpec extends AlephiumSpec {
     def validateSubmit(utx: UnsignedTransaction, privateKeys: AVector[PrivateKey]) = {
 
       val signatures = privateKeys.map { privateKey =>
-        Bytes64.from(SignatureSchema.sign(utx.id.bytes, privateKey))
+        Byte64.from(SignatureSchema.sign(utx.id.bytes, privateKey))
       }
 
       val template = TransactionTemplate(
@@ -1127,7 +1127,7 @@ class TxUtilsSpec extends AlephiumSpec {
           )
         }
       }
-      val tx = Transaction.from(AVector.empty[TxInput], tokenOutputs, AVector.empty[Bytes64])
+      val tx         = Transaction.from(AVector.empty[TxInput], tokenOutputs, AVector.empty[Byte64])
       val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val block      = emptyBlock(blockFlow, chainIndex)
       blockFlow.addAndUpdateView(
@@ -2205,7 +2205,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val signature = BIP340Schnorr.sign(unsignedTx.id.bytes, priKey)
     val tx = TransactionTemplate(
       unsignedTx,
-      AVector(Bytes64.from(signature.bytes).value),
+      AVector(Byte64.from(signature.bytes).value),
       scriptSignatures = AVector.empty
     )
     TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()

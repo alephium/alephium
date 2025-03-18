@@ -18,6 +18,7 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
@@ -115,7 +116,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
 
   def inputSign(unsignedTx: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
     val signatures = AVector.from(privateKeys).map { privateKey =>
-      Bytes64.from(SignatureSchema.sign(unsignedTx.id, privateKey))
+      Byte64.from(SignatureSchema.sign(unsignedTx.id, privateKey))
     }
 
     Transaction(
@@ -133,6 +134,6 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       SignatureSchema.sign(tx.unsigned.id, privateKey)
     }
 
-    tx.copy(scriptSignatures = tx.scriptSignatures ++ signatures.map(Bytes64.from))
+    tx.copy(scriptSignatures = tx.scriptSignatures ++ signatures.map(Byte64.from))
   }
 }

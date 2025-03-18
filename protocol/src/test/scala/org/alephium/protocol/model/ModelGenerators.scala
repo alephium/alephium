@@ -25,7 +25,7 @@ import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
+import org.alephium.crypto.{Byte64, ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
@@ -459,7 +459,7 @@ trait TxGenerators
       signatures =
         assetInfos.map(info => SignatureSchema.sign(unsignedTx.id, info.privateKey))
     } yield {
-      val tx = Transaction.from(unsignedTx, signatures.map(Bytes64.from))
+      val tx = Transaction.from(unsignedTx, signatures.map(Byte64.from))
       tx -> assetInfos
     }
 
@@ -497,7 +497,7 @@ trait TxGenerators
     } yield {
       val signatures =
         AVector.from(scriptPairs.map(pair => SignatureSchema.sign(unsignedTx.id, pair.privateKey)))
-      val tx = Transaction.from(unsignedTx, signatures.map(Bytes64.from))
+      val tx = Transaction.from(unsignedTx, signatures.map(Byte64.from))
       tx -> assetInfos
     }
   }

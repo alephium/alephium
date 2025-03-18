@@ -23,8 +23,8 @@ import scala.annotation.tailrec
 
 import akka.util.ByteString
 
-import org.alephium.crypto.{SecP256R1, SecP256R1PublicKey, SecP256R1Signature, Sha256}
-import org.alephium.protocol.model.{Bytes64, TransactionId}
+import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1PublicKey, SecP256R1Signature, Sha256}
+import org.alephium.protocol.model.TransactionId
 import org.alephium.serde.{
   bytestringSerde,
   intSerde,
@@ -92,7 +92,7 @@ object WebAuthn {
     )
 
   private def extractChunks(
-      nextBytes: () => Option[Bytes64],
+      nextBytes: () => Option[Byte64],
       chunkSize: Int
   ): SerdeResult[ByteString] = {
     @tailrec
@@ -127,7 +127,7 @@ object WebAuthn {
     }
   }
 
-  def tryDecode(nextBytes: () => Option[Bytes64]): SerdeResult[WebAuthn] = {
+  def tryDecode(nextBytes: () => Option[Byte64]): SerdeResult[WebAuthn] = {
     for {
       firstChunk <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
       deserialized0 <- serdeImpl[Int]
@@ -140,7 +140,7 @@ object WebAuthn {
         (),
         SerdeError.WrongFormat("Invalid payload length: must be positive")
       )
-      chunkSize = (payloadLength - payloadFirstChunk.length + Bytes64.length - 1) / Bytes64.length
+      chunkSize = (payloadLength - payloadFirstChunk.length + Byte64.length - 1) / Byte64.length
       restPayload <- extractChunks(nextBytes, chunkSize)
       webauthn    <- decode(payloadFirstChunk ++ restPayload)
     } yield webauthn

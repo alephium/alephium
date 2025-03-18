@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.crypto.Byte64
 import org.alephium.io.IOError
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -78,7 +79,7 @@ object BlockEnv {
 
 sealed trait TxEnv {
   def txId: TransactionId
-  def signatures: Stack[Bytes64]
+  def signatures: Stack[Byte64]
   def prevOutputs: AVector[AssetOutput]
   def fixedOutputs: AVector[AssetOutput]
   def gasPrice: GasPrice
@@ -94,19 +95,19 @@ object TxEnv {
   def apply(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Bytes64],
+      signatures: Stack[Byte64],
       txIndex: Int
   ): TxEnv = Default(tx, prevOutputs, signatures, txIndex)
 
   def dryrun(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Bytes64]
+      signatures: Stack[Byte64]
   ): TxEnv = apply(tx, prevOutputs, signatures, 0)
 
   def mockup(
       txId: TransactionId,
-      signatures: Stack[Bytes64],
+      signatures: Stack[Byte64],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
       gasPrice: GasPrice,
@@ -128,7 +129,7 @@ object TxEnv {
   final case class Default(
       tx: TransactionAbstract,
       prevOutputs: AVector[AssetOutput],
-      signatures: Stack[Bytes64],
+      signatures: Stack[Byte64],
       txIndex: Int
   ) extends TxEnv {
     def txId: TransactionId                = tx.id
@@ -141,7 +142,7 @@ object TxEnv {
 
   final case class Mockup(
       txId: TransactionId,
-      signatures: Stack[Bytes64],
+      signatures: Stack[Byte64],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
       gasPrice: GasPrice,
@@ -217,8 +218,8 @@ trait StatelessContext extends CostStrategy {
       systemEvent: Boolean
   ): ExeResult[Unit]
 
-  def txId: TransactionId        = txEnv.txId
-  def signatures: Stack[Bytes64] = txEnv.signatures
+  def txId: TransactionId       = txEnv.txId
+  def signatures: Stack[Byte64] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
     indexRaw.v.toInt
