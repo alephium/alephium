@@ -1080,6 +1080,21 @@ object BuiltIn {
     def doc: String         = "Get the length of an array"
   }
 
+  val verifySignature: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptography(
+      "verifySignature",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      VerifySignature,
+      argsName = Seq(
+        "data"      -> "the data that was supposed to have been signed",
+        "publicKey" -> "the public key of the signer",
+        "signature" -> "the signature value"
+      ),
+      retComment = "",
+      doc = s"Verifies the signature of the input and public key."
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1139,7 +1154,8 @@ object BuiltIn {
     i256Max,
     i256Min,
     groupOfAddress,
-    len
+    len,
+    verifySignature
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

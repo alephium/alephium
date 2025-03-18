@@ -110,6 +110,14 @@ object WebAuthn {
     iter(ByteString.empty, chunkSize)
   }
 
+  def decodeWithoutPadding(payload: ByteString): SerdeResult[(WebAuthn, SecP256R1Signature)] = {
+    for {
+      webauthn  <- serde._deserialize(payload)
+      _         <- validate(webauthn.value).left.map(SerdeError.validation)
+      signature <- serdeImpl[SecP256R1Signature].deserialize(webauthn.rest)
+    } yield (webauthn.value, signature)
+  }
+
   private def decode(payload: ByteString): SerdeResult[WebAuthn] = {
     serde._deserialize(payload).flatMap { case Staging(webauthn, rest) =>
       if (rest.exists(_ != 0)) {

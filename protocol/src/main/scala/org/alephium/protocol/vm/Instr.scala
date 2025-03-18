@@ -74,6 +74,17 @@ sealed trait RhoneInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   def runWithRhone[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
+sealed trait DanubeInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkDanubeHardFork(this)
+      _ <- runWithDanube(frame)
+    } yield ()
+  }
+
+  def runWithDanube[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -112,6 +123,20 @@ sealed trait RhoneInstrWithSimpleGas[-Ctx <: StatelessContext]
       _ <- frame.ctx.checkRhoneHardFork(this)
       _ <- frame.ctx.chargeGas(this)
       _ <- runWithRhone(frame)
+    } yield ()
+  }
+}
+
+sealed trait DanubeInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends DanubeInstr[Ctx]
+    with GasSimple {
+  def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
+
+  override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkDanubeHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithDanube(frame)
     } yield ()
   }
 }
@@ -189,7 +214,9 @@ object Instr {
     I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
     U256ToString, I256ToString, BoolToString,
     /* Below are instructions for Rhone hard fork */
-    GroupOfAddress
+    GroupOfAddress,
+    /* Below are instructions for Danube hard fork */
+    VerifySignature
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -238,6 +265,14 @@ object Instr {
     AVector(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
 
   val mockupCode: Byte = 0xff.toByte
+
+  @inline def checkSignedData(rawData: ByteString): ExeResult[Unit] = {
+    if (rawData.length == 32) {
+      okay
+    } else {
+      failed(SignedDataIsNot32Bytes(rawData.length))
+    }
+  }
 }
 
 sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
@@ -1504,12 +1539,7 @@ sealed trait GenericVerifySignature[PubKey, Sig]
       rawPublicKey <- frame.popOpStackByteVec()
       publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
       rawData      <- frame.popOpStackByteVec()
-      _ <-
-        if (rawData.bytes.length == 32) {
-          okay
-        } else {
-          failed(SignedDataIsNot32Bytes(rawData.bytes.length))
-        }
+      _            <- Instr.checkSignedData(rawData.bytes)
       _ <-
         if (verify(rawData.bytes, signature, publicKey)) {
           okay
@@ -1593,6 +1623,73 @@ case object VerifyBIP340Schnorr
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
     super[LemanInstrWithSimpleGas].runWith(frame)
+}
+
+case object VerifySignature
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature
+    with DanubeInstrWithSimpleGas[StatelessContext] {
+  private def decodeSignature[Sig](
+      rawSignature: ByteString,
+      sig: RandomBytes.Companion[Sig]
+  ): ExeResult[Sig] = {
+    sig.from(rawSignature).toRight(Right(InvalidSignatureFormat(rawSignature)))
+  }
+  private def verify[C <: StatelessContext](
+      frame: Frame[C],
+      publicKey: PublicKeyLike,
+      rawSignature: ByteString,
+      rawData: ByteString
+  ): ExeResult[Boolean] = {
+    publicKey match {
+      case PublicKeyLike.SecP256K1(publicKey) =>
+        decodeSignature(rawSignature, crypto.SecP256K1Signature).map(
+          crypto.SecP256K1.verify(rawData, _, publicKey)
+        )
+      case PublicKeyLike.SecP256R1(publicKey) =>
+        decodeSignature(rawSignature, crypto.SecP256R1Signature).map(
+          crypto.SecP256R1.verify(rawData, _, publicKey)
+        )
+      case PublicKeyLike.ED25519(publicKey) =>
+        decodeSignature(rawSignature, crypto.ED25519Signature).map(
+          crypto.ED25519.verify(rawData, _, publicKey)
+        )
+      case PublicKeyLike.Passkey(publicKey) =>
+        for {
+          result <- WebAuthn
+            .decodeWithoutPadding(rawSignature)
+            .left
+            .map(_ => Right(InvalidSignatureFormat(rawSignature)))
+          (webauthn, signature) = result
+          _ <- frame.ctx.chargeGas(GasHash.gas(webauthn.bytesLength))
+        } yield webauthn.verify(rawData, signature, publicKey)
+    }
+  }
+
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      rawSignature <- frame.popOpStackByteVec()
+      rawPublicKey <- frame.popOpStackByteVec()
+      publicKey <- decode[PublicKeyLike](rawPublicKey.bytes).left.map(_ =>
+        Right(InvalidPublicKey(rawPublicKey.bytes))
+      )
+      rawData <- frame.popOpStackByteVec()
+      _       <- Instr.checkSignedData(rawData.bytes)
+      isValid <- verify(frame, publicKey, rawSignature.bytes, rawData.bytes)
+      _ <-
+        if (isValid) {
+          okay
+        } else {
+          failed(InvalidSignature(rawPublicKey.bytes, rawData.bytes, rawSignature.bytes))
+        }
+    } yield ()
+  }
+
+  override def mockup(): Instr[StatelessContext] = {
+    assume(this.gas() == VerifySignatureMockup.gas())
+    VerifySignatureMockup
+  }
 }
 
 case object GetSegregatedSignature

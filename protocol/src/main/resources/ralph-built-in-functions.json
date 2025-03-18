@@ -1043,5 +1043,17 @@
       "@param signature the signature value"
     ],
     "returns": "@returns the ETH account that signed the data"
+  },
+  {
+    "name": "verifySignature",
+    "category": "Cryptography",
+    "signature": "fn verifySignature!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
+    "doc": "Verifies the signature of the input and public key.",
+    "params": [
+      "@param data the data that was supposed to have been signed",
+      "@param publicKey the public key of the signer",
+      "@param signature the signature value"
+    ],
+    "returns": "@returns "
   }
 ]

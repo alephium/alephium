@@ -118,4 +118,11 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
     clientDataJSON is
       s"""{"type":"webauthn.get","challenge":"${WebAuthn.base64urlEncode(challenge)}"}"""
   }
+
+  it should "test decodeWithoutPadding" in {
+    val webauthn  = WebAuthn.createForTest(createAuthenticatorData(1), WebAuthn.GET)
+    val signature = SecP256R1Signature.generate
+    val payload   = WebAuthn.serde.serialize(webauthn) ++ signature.bytes
+    WebAuthn.decodeWithoutPadding(payload) isE (webauthn, signature)
+  }
 }

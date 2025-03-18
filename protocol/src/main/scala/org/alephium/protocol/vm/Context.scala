@@ -209,6 +209,14 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
+  def checkDanubeHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    if (getHardFork().isDanubeEnabled()) {
+      okay
+    } else {
+      failed(InactiveInstr(instr))
+    }
+  }
+
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[MutBalances]
 
