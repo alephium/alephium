@@ -89,5 +89,5 @@ object UnlockScript {
       Hash.hash(prefix ++ serialize(from) ++ serialize(to)).bytes
     }
   }
-  final case object P2PK extends UnlockScript
+  case object P2PK extends UnlockScript
 }

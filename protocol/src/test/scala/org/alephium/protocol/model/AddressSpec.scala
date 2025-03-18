@@ -210,11 +210,11 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   case class AddressVerifyP2PK(
       address: String,
-      pubKey: Option[PublicKeyType] = None,
+      pubKey: Option[PublicKeyLike] = None,
       groupIndex: Option[GroupIndex] = None
   ) extends AddressVerify {
     def publicKey(key: String) = {
-      copy(pubKey = Some(deserialize[PublicKeyType](Hex.unsafe(key)).rightValue))
+      copy(pubKey = Some(deserialize[PublicKeyLike](Hex.unsafe(key)).rightValue))
     }
 
     def group(index: Int) = copy(

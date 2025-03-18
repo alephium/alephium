@@ -1457,7 +1457,7 @@ case object VerifyTxSignature
         .toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
       signature <- signatures.pop()
       _ <- {
-        if (SignatureSchema.verify(rawData, signature, publicKey)) {
+        if (SignatureSchema.verify(rawData, signature.toSecP256K1Signature, publicKey)) {
           okay
         } else {
           failed(InvalidSignature(rawPublicKey.bytes, rawData, signature.bytes))

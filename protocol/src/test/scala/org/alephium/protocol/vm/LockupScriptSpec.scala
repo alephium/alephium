@@ -120,8 +120,8 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "only modify the MSB of the public key's script hint" in {
-    val publicKey   = PublicKeyType.SecP256K1(SecP256K1PublicKey.generate)
-    val initialHint = ScriptHint.fromHash(DjbHash.intHash(publicKey.bytes))
+    val publicKey   = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
+    val initialHint = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes))
     (0 until groupConfig.groups).foreach { groupIndex =>
       val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
       lockupScript.scriptHint.groupIndex.value is groupIndex

@@ -25,11 +25,11 @@ import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.crypto.SecP256K1PublicKey
+import org.alephium.crypto.{Byte64, ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
-import org.alephium.protocol.vm.{LockupScript, PublicKeyType, StatefulContract, UnlockScript, Val}
+import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, StatefulContract, UnlockScript, Val}
 import org.alephium.util._
 
 trait LockupScriptGenerators extends Generators {
@@ -72,8 +72,13 @@ trait LockupScriptGenerators extends Generators {
 
   def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
     Gen
-      .const(())
-      .map(_ => LockupScript.p2pk(PublicKeyType.SecP256K1(SecP256K1PublicKey.generate), groupIndex))
+      .oneOf(
+        Gen.const(()).map(_ => PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)),
+        Gen.const(()).map(_ => PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)),
+        Gen.const(()).map(_ => PublicKeyLike.ED25519(ED25519PublicKey.generate)),
+        Gen.const(()).map(_ => PublicKeyLike.Passkey(SecP256R1PublicKey.generate))
+      )
+      .map(LockupScript.p2pk(_, groupIndex))
   }
 
   def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
@@ -96,6 +101,37 @@ trait LockupScriptGenerators extends Generators {
       .map { hash =>
         LockupScript.p2c(ContractId.unsafe(hash))
       }
+  }
+
+  def p2pkLockPairGen(groupIndex: GroupIndex): Gen[(LockupScript, UnlockScript)] =
+    p2pkLockupGen(groupIndex).map((_, UnlockScript.P2PK))
+
+  def p2pkhUnlockGen(groupIndex: GroupIndex): Gen[UnlockScript] =
+    p2pkhLockPairGen(groupIndex).map(_._2)
+
+  def p2pkhLockPairGen(groupIndex: GroupIndex): Gen[(LockupScript, UnlockScript)] =
+    publicKeyGen(groupIndex).map { publicKey =>
+      (LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey))
+    }
+
+  def p2mpkhUnlockGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[UnlockScript] =
+    p2mpkhLockPairGen(n, m, groupIndex).map(_._2)
+
+  def p2mpkhLockPairGen(
+      n: Int,
+      m: Int,
+      groupIndex: GroupIndex
+  ): Gen[(LockupScript, UnlockScript)] = {
+    for {
+      publicKey0 <- publicKeyGen(groupIndex)
+      moreKeys   <- Gen.listOfN(n, publicKeyGen(groupIndex))
+      allKeys = publicKey0 +: moreKeys
+      indexedKey <- Gen.pick(m, allKeys.zipWithIndex).map(AVector.from)
+    } yield {
+      val lockupScript = LockupScript.p2mpkhUnsafe(AVector.from(allKeys), m)
+      val unlockScript = UnlockScript.p2mpkh(indexedKey.sortBy(_._2))
+      (lockupScript, unlockScript)
+    }
   }
 
   def lockupGen(groupIndex: GroupIndex): Gen[LockupScript] = {
@@ -197,19 +233,6 @@ trait TxInputGenerators extends Generators {
       val outputRef = AssetOutputRef.from(scriptHint, TxOutputRef.unsafeKey(hash))
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
-
-  def p2pkhUnlockGen(groupIndex: GroupIndex): Gen[UnlockScript] =
-    publicKeyGen(groupIndex).map(UnlockScript.p2pkh)
-
-  def p2mpkhUnlockGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[UnlockScript] = {
-    for {
-      publicKey0 <- publicKeyGen(groupIndex)
-      moreKeys   <- Gen.listOfN(n, publicKeyGen(groupIndex))
-      indexedKey <- Gen.pick(m, (publicKey0 +: moreKeys).zipWithIndex).map(AVector.from)
-    } yield {
-      UnlockScript.p2mpkh(indexedKey.sortBy(_._2))
-    }
-  }
 }
 
 trait TokenGenerators extends Generators with NumericHelpers {
@@ -436,7 +459,7 @@ trait TxGenerators
       signatures =
         assetInfos.map(info => SignatureSchema.sign(unsignedTx.id, info.privateKey))
     } yield {
-      val tx = Transaction.from(unsignedTx, signatures)
+      val tx = Transaction.from(unsignedTx, signatures.map(Byte64.from))
       tx -> assetInfos
     }
 
@@ -474,7 +497,7 @@ trait TxGenerators
     } yield {
       val signatures =
         AVector.from(scriptPairs.map(pair => SignatureSchema.sign(unsignedTx.id, pair.privateKey)))
-      val tx = Transaction.from(unsignedTx, signatures)
+      val tx = Transaction.from(unsignedTx, signatures.map(Byte64.from))
       tx -> assetInfos
     }
   }

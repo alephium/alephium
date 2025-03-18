@@ -19,6 +19,7 @@ package org.alephium.flow.validation
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.model.{BlockHash, Transaction}
 import org.alephium.protocol.vm._
+import org.alephium.serde.SerdeError
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.types
@@ -204,3 +205,4 @@ final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidT
 final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus
 final case object UsingBreakingInstrs                           extends InvalidTxStatus
 case object InvalidLockupScriptPreDanube                        extends InvalidTxStatus
+final case class InvalidWebauthnPayload(error: SerdeError)      extends InvalidTxStatus
