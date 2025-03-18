@@ -969,18 +969,25 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val blocks1 = chainGenOf(3, genesis).sample.get
     val blocks2 = chainGenOf(3, blocks1.head).sample.get
     val blocks3 = chainGenOf(1, genesis).sample.get
+    val blocks4 = chainGenOf(3, blocks1(1)).sample.get
 
     addBlocks(chain, blocks0)
+    chain.tryGetBlocksFromUnsafe(blocks0.head) is blocks0.tail.reverse
+
     addBlocks(chain, blocks1)
     addBlocks(chain, blocks2)
     addBlocks(chain, blocks3)
+    addBlocks(chain, blocks4)
 
     chain.getAllTips.toSet is Set(
       blocks0.last.hash,
       blocks1.last.hash,
       blocks2.last.hash,
-      blocks3.last.hash
+      blocks3.last.hash,
+      blocks4.last.hash
     )
-    chain.tryGetBlocksFromUnsafe(blocks1.head).toSet is Set.from(blocks1.tail ++ blocks2)
+    val blocks = chain.tryGetBlocksFromUnsafe(blocks1.head)
+    blocks.length is (blocks1.tail.length + blocks2.length + blocks4.length)
+    blocks.toSet is Set.from(blocks1.tail ++ blocks2 ++ blocks4)
   }
 }

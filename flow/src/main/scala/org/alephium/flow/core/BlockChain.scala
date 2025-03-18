@@ -411,7 +411,20 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def tryGetBlocksFromUnsafe(from: Block): AVector[Block] = {
-    getAllTips.flatMap(tryGetBlocksBetweenUnsafe(from, _))
+    val allTips = getAllTips
+    if (allTips.length == 1) {
+      tryGetBlocksBetweenUnsafe(from, allTips.head)
+    } else {
+      val allBlocks = mutable.ArrayBuffer.empty[Block]
+      getAllTips.foreach { tip =>
+        tryGetBlocksBetweenUnsafe(from, tip).foreach { block =>
+          if (!allBlocks.exists(_.hash == block.hash)) {
+            allBlocks.addOne(block)
+          }
+        }
+      }
+      AVector.from(allBlocks)
+    }
   }
 
   private def tryGetBlocksBetweenUnsafe(from: Block, tip: BlockHash): AVector[Block] = {
