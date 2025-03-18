@@ -27,6 +27,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 import org.alephium.crypto
+import org.alephium.crypto.Byte64
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
@@ -304,7 +305,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           TxEnv.dryrun(
             tx,
             prevOutputs.map(_.referredOutput.copy(lockTime = txLockTime)),
-            Stack.ofCapacity[Signature](0)
+            Stack.ofCapacity[Byte64](0)
           )
         )
       )
@@ -1524,8 +1525,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val tx               = transactionGen().sample.get
     val (pubKey, priKey) = keysGen.sample.get
 
-    val signature      = SignatureSchema.sign(tx.id.bytes, priKey)
-    val signatureStack = Stack.ofCapacity[Signature](1)
+    val signature      = Byte64.from(SignatureSchema.sign(tx.id.bytes, priKey))
+    val signatureStack = Stack.ofCapacity[Byte64](1)
     signatureStack.push(signature)
 
     override lazy val frame = prepareFrame(
@@ -1721,7 +1722,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     override lazy val frame = prepareFrame(
       AVector.empty,
-      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, Stack.ofCapacity[Signature](0)))
+      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, Stack.ofCapacity[Byte64](0)))
     )
 
     val initialGas = context.gasRemaining
@@ -3244,7 +3245,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         TxEnv.dryrun(
           tx,
           prevOutputs.map(_.referredOutput),
-          Stack.ofCapacity[Signature](0)
+          Stack.ofCapacity[Byte64](0)
         )
       ),
       callerFrameOpt = Some(callerFrame)
@@ -3341,7 +3342,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           TxEnv.dryrun(
             tx,
             prevOutputs.map(_.referredOutput),
-            Stack.ofCapacity[Signature](0)
+            Stack.ofCapacity[Byte64](0)
           )
         ),
         callerFrameOpt = Some(callerFrame)

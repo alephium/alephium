@@ -24,6 +24,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
+import org.alephium.crypto.Byte64
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{BlockFlow, FlowUtils}
 import org.alephium.flow.gasestimation.GasEstimation
@@ -134,9 +135,9 @@ class BlockValidationSpec extends AlephiumSpec {
   trait CoinbaseFormatFixture extends Fixture {
     val output0         = assetOutputGen.sample.get
     val emptyOutputs    = AVector.empty[AssetOutput]
-    val emptySignatures = AVector.empty[Signature]
+    val emptySignatures = AVector.empty[Byte64]
     val script          = StatefulScript.alwaysFail
-    val testSignatures  = AVector(Signature.generate)
+    val testSignatures  = AVector(Byte64.from(Signature.generate))
     val block           = emptyBlock(blockFlow, chainIndex)
 
     def commonTest(block: Block = block)(implicit
@@ -1304,7 +1305,7 @@ class BlockValidationSpec extends AlephiumSpec {
           .polwCoinbase(lockupScript, unlockScript, rewardOutputs, reward.burntAmount, utxos, gas)
           .rightValue
       val preImage  = UnlockScript.PoLW.buildPreImage(lockupScript, minerLockupScript)
-      val signature = SignatureSchema.sign(preImage, privateKey)
+      val signature = Byte64.from(SignatureSchema.sign(preImage, privateKey))
       Transaction.from(unsignedTx, AVector(signature))
     }
 
@@ -1458,7 +1459,7 @@ class BlockValidationSpec extends AlephiumSpec {
         .filter(_.groupIndex == chainIndex.to)
         .head
         .asInstanceOf[LockupScript.Asset]
-    lazy val randomMiner = assetLockupGen(chainIndex.from).sample.get
+    lazy val randomMiner = preDanubeLockupGen(chainIndex.from).sample.get
 
     def newBlock(miner: LockupScript.Asset): Block = {
       val template   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)

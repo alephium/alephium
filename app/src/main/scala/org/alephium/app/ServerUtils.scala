@@ -27,7 +27,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.Byte32
+import org.alephium.crypto.{Byte32, Byte64}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
@@ -468,7 +468,7 @@ class ServerUtils(implicit
   ): TransactionTemplate = {
     TransactionTemplate(
       unsignedTx,
-      signatures,
+      signatures.map(Byte64.from),
       scriptSignatures = AVector.empty
     )
   }
@@ -1355,6 +1355,7 @@ class ServerUtils(implicit
           )
           .select(
             AssetAmounts(totalSelectAmount, tokens),
+            fromLockupScript,
             fromUnlockScript,
             extraUtxosInfo.merge(utxos),
             txOutputsLength = estimatedTxOutputsLength,
@@ -1808,7 +1809,7 @@ class ServerUtils(implicit
   @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
     TxEnv.mockup(
       txId = txId,
-      signatures = Stack.popOnly(AVector.empty[Signature]),
+      signatures = Stack.popOnly(AVector.empty[Byte64]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
       gasPrice = nonCoinbaseMinGasPrice,

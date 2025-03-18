@@ -1914,4 +1914,23 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
     ) isE (None, AVector(tokenId2 -> U256.One))
   }
+
+  it should "encode/decode groupless address" in {
+    val publicKey = p2pkLockupGen(GroupIndex.unsafe(0)).sample.get.publicKey
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      val address      = Address.Asset(lockupScript)
+      checkData[Val](
+        ValAddress(address),
+        s"""{"type": "Address", "value": "${address.toBase58}"}"""
+      )
+    }
+
+    val defaultGroupIndex = publicKey.defaultGroup
+    val address           = Address.Asset(LockupScript.p2pk(publicKey, defaultGroupIndex))
+    read[Val](
+      s"""{"type": "Address", "value": "${address.toBase58.dropRight(2)}"}"""
+    ) is ValAddress(address)
+    write(ValAddress(address)) is s"""{"type":"Address","value":"${address.toBase58}"}"""
+  }
 }

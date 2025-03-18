@@ -14,24 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium.protocol
 
-import org.alephium.protocol.model.defaultGasPerInput
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, Bytes, DjbHash}
 
-class GasScheduleSpec extends AlephiumSpec {
-  it should "validate default gases" in {
-    (defaultGasPerInput >= GasSchedule.secp256K1UnlockGas) is true
+class ChecksumSpec extends AlephiumSpec with Generators {
+  it should "calculate checksum" in {
+    forAll(hashGen) { hash =>
+      val checksum = Checksum.calc(hash.bytes)
+      checksum.bytes is Bytes.from(DjbHash.intHash(hash.bytes))
+      checksum.check(hash.bytes) isE ()
+      checksum.check(Hash.generate.bytes).isLeft is true
+      Checksum.calcAndSerialize(hash.bytes) is checksum.bytes
+    }
   }
 
-  it should "charge gas for hash" in {
-    GasHash.gas(33) is GasBox.unsafe(60)
-  }
-
-  it should "charge gas for unlock" in {
-    GasSchedule.secp256K1UnlockGas is GasBox.unsafe(60 + 2000)
-    GasSchedule.secp256R1UnlockGas is GasBox.unsafe(60 + 2000)
-    GasSchedule.ed25519UnlockGas is GasBox.unsafe(54 + 2000)
-    GasSchedule.passkeyUnlockGas(100) is GasBox.unsafe(132 + 2000)
+  it should "serde checksum" in {
+    forAll(bytesGen(4)) { bytes =>
+      val checksum = Checksum.unsafe(bytes)
+      Checksum.serde.serialize(checksum) is bytes
+      Checksum.serde.deserialize(bytes) isE checksum
+    }
   }
 }
