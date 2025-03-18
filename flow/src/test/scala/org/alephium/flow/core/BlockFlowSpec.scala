@@ -301,7 +301,7 @@ class BlockFlowSpec extends AlephiumSpec {
         blockFlow.grandPool.mempools.foreach(_.size is 0)
         addAndCheck(blockFlow, block12, 1)
 
-        val blockAdded = blockFlow.getBestDeps(chainIndex.from).getOutDep(chainIndex.to)
+        val blockAdded = blockFlow.getBestDepsPreDanube(chainIndex.from).getOutDep(chainIndex.to)
         if (blockAdded equals block12.hash) {
           val conflictedTx = block11.nonCoinbase.head
           blockFlow.getMemPool(chainIndex).size is 1 // the conflicted tx is kept
@@ -354,7 +354,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val mainGroup = GroupIndex.unsafe(0)
     blockFlow.getHashesForUpdatesPreDanube(mainGroup) isE AVector.empty[BlockHash]
     blockFlow.getBlocksForUpdates(block2) isE AVector(block1, block2)
-    val bestDeps0 = blockFlow.getBestDeps(mainGroup)
+    val bestDeps0 = blockFlow.getBestDepsPreDanube(mainGroup)
     blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps0) isE AVector.empty[BlockCache]
 
     val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
@@ -362,7 +362,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val block4 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 2))
     addAndCheck(blockFlow, block4)
     blockFlow.getHashesForUpdatesPreDanube(mainGroup) isE AVector(block3.hash, block4.hash)
-    val bestDeps1 = blockFlow.getBestDeps(mainGroup)
+    val bestDeps1 = blockFlow.getBestDepsPreDanube(mainGroup)
     blockFlow.getBlockCachesForUpdates(mainGroup, bestDeps1) isE
       AVector(block3, block4).map(BlockFlowState.convertBlock(_, mainGroup))
   }
@@ -895,7 +895,7 @@ class BlockFlowSpec extends AlephiumSpec {
     theMemPool.contains(tx2.id) is true
     theMemPool.isReady(tx1.id) is true
     theMemPool.isReady(tx2.id) is false
-    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block0.hash) is true
+    blockFlow.getBestDepsPreDanube(fromLockup.groupIndex).deps.contains(block0.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue, true).rightValue is fromBalance
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
@@ -903,13 +903,13 @@ class BlockFlowSpec extends AlephiumSpec {
     theMemPool.contains(tx1.id) is false
     theMemPool.contains(tx2.id) is true
     theMemPool.isReady(tx2.id) is true
-    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block1.hash) is true
+    blockFlow.getBestDepsPreDanube(fromLockup.groupIndex).deps.contains(block1.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue, true).rightValue is fromBalance
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
     theMemPool.contains(tx2.id) is false
-    blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block2.hash) is true
+    blockFlow.getBestDepsPreDanube(fromLockup.groupIndex).deps.contains(block2.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue, true).rightValue is fromBalance
   }
 

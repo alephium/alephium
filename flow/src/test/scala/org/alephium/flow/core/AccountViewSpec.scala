@@ -47,46 +47,67 @@ class AccountViewSpec extends AlephiumSpec {
 
   it should "create account view from genesis blocks" in new Fixture {
     brokerConfig.groupRange.foreach { index =>
+      val mainGroup    = GroupIndex.unsafe(index)
       val genesisBlock = blockFlow.genesisBlocks(index)(index)
+      val inTips = brokerConfig.cliqueGroups.filter(_ != mainGroup).map { from =>
+        blockFlow.genesisHashes(from.value)(mainGroup.value)
+      }
       AccountView.from(blockFlow, genesisBlock).rightValue is
-        AccountView(genesisBlock, AVector.empty, AVector.empty)
+        AccountView(genesisBlock, inTips, AVector.empty, AVector.empty)
     }
   }
 
   it should "create account view from non-genesis blocks" in new Fixture {
     def mineInterBlocks(chainIndex: ChainIndex): AVector[Block] = {
-      if (chainIndex.isIntraGroup) {
-        AVector.empty[Block]
-      } else {
-        val block0 = emptyBlock(blockFlow, chainIndex)
-        val block1 = emptyBlock(blockFlow, chainIndex)
-        addAndCheck(blockFlow, block0, block1)
-        val block2 = emptyBlock(blockFlow, chainIndex)
-        addAndCheck(blockFlow, block2)
-        AVector(block0, block1, block2)
-      }
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block0, block1)
+      val block2 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block2)
+      AVector(block0, block1, block2)
     }
 
-    val block = emptyBlock(blockFlow, ChainIndex(mainGroup, mainGroup))
-    addAndCheck(blockFlow, block)
-    AccountView.from(blockFlow, block).rightValue is
-      AccountView(block, AVector.empty, AVector.empty)
+    val block0 = emptyBlock(blockFlow, ChainIndex(mainGroup, mainGroup))
+    addAndCheck(blockFlow, block0)
+    val inTips0 = brokerConfig.cliqueGroups.filter(_ != mainGroup).map { from =>
+      blockFlow.genesisHashes(from.value)(mainGroup.value)
+    }
+    AccountView.from(blockFlow, block0).rightValue is
+      AccountView(block0, inTips0, AVector.empty, AVector.empty)
 
-    val inBlocks = brokerConfig.groupRange.flatMap { index =>
+    val inBlocksPerChain = otherGroups.map { index =>
       mineInterBlocks(ChainIndex.unsafe(index, mainGroup.value))
     }
-    val accountView0 = AccountView.from(blockFlow, block).rightValue
-    accountView0.checkpoint is block
+    val inBlocks     = inBlocksPerChain.flatten
+    val accountView0 = AccountView.from(blockFlow, block0).rightValue
+    accountView0.checkpoint is block0
+    accountView0.inTips is inTips0
     accountView0.inBlocks.toSet is inBlocks.toSet
     accountView0.outBlocks.isEmpty is true
 
-    val outBlocks = brokerConfig.groupRange.flatMap { index =>
+    val outBlocks = otherGroups.flatMap { index =>
       mineInterBlocks(ChainIndex.unsafe(mainGroup.value, index))
     }
-    val accountView1 = AccountView.from(blockFlow, block).rightValue
-    accountView1.checkpoint is block
+    val accountView1 = AccountView.from(blockFlow, block0).rightValue
+    accountView1.checkpoint is block0
+    accountView1.inTips is inTips0
     accountView1.inBlocks.toSet is inBlocks.toSet
     accountView1.outBlocks.toSet is outBlocks.toSet
+
+    otherGroups.foreach { groupIndex =>
+      val chainIndex = ChainIndex.unsafe(groupIndex, groupIndex)
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    }
+
+    val block1 = emptyBlock(blockFlow, ChainIndex(mainGroup, mainGroup))
+    addAndCheck(blockFlow, block1)
+    val accountView2 = AccountView.from(blockFlow, block1).rightValue
+    val inTips1      = AVector.from(inBlocksPerChain.map(_.last.hash))
+    accountView2.checkpoint is block1
+    accountView2.inTips is inTips1
+    accountView2.inTips isnot inTips0
+    accountView2.inBlocks.isEmpty is true
+    accountView2.outBlocks.isEmpty is true
   }
 
   it should "add incoming blocks to account view" in new Fixture {

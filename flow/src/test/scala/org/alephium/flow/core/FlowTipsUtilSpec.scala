@@ -246,7 +246,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
 
     val block0 = transfer(blockFlow, chainIndex0)
     addAndCheck(blockFlow, block0)
-    val bestDeps0 = blockFlow.getBestDeps(targetGroupIndex)
+    val bestDeps0 = blockFlow.getBestDepsPreDanube(targetGroupIndex)
     bestDeps0.deps.contains(block0.hash) is true
     blockFlow.getIncomingBlockDeps(targetGroupIndex, bestDeps0).rightValue.isEmpty is true
 
@@ -256,7 +256,7 @@ class FlowTipsUtilSpec extends AlephiumSpec {
       val block      = transfer(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
       newBlocks = newBlocks :+ block.hash
-      val bestDeps = blockFlow.getBestDeps(targetGroupIndex)
+      val bestDeps = blockFlow.getBestDepsPreDanube(targetGroupIndex)
       bestDeps.deps.contains(block.hash) is false
       blockFlow.getIncomingBlockDeps(targetGroupIndex, bestDeps0) isE newBlocks
     }

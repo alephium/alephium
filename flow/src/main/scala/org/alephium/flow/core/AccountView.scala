@@ -21,11 +21,13 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlowState.BlockCache
 import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 final case class AccountView(
     checkpoint: Block,
+    inTips: AVector[BlockHash],
     inBlocks: AVector[Block],
     outBlocks: AVector[Block]
 ) {
@@ -97,11 +99,18 @@ final case class AccountView(
     }
   }
 
+  private def getInTip(fromGroup: GroupIndex): BlockHash = {
+    if (fromGroup.value < mainGroup.value) {
+      inTips(fromGroup.value)
+    } else {
+      inTips(fromGroup.value - 1)
+    }
+  }
+
   private def tryAddInBlockUnsafe(blockFlow: BlockFlow, block: Block): Option[AccountView] = {
     val inChainIndex = block.chainIndex
     assume(!inChainIndex.isIntraGroup && inChainIndex.to == mainGroup)
-    val groupTip = blockFlow.getGroupTip(checkpoint.header, inChainIndex.from)
-    val inTip    = blockFlow.getInTipUnsafe(groupTip, inChainIndex.to)
+    val inTip = getInTip(inChainIndex.from)
     if (blockFlow.isExtendingUnsafe(block.hash, inTip)) {
       Some(copy(inBlocks = inBlocks :+ block))
     } else {
@@ -133,15 +142,19 @@ object AccountView {
   private def getInBlocksUnsafe(
       blockFlow: BlockFlow,
       checkpointBlock: Block
-  ): AVector[Block] = {
+  ): (AVector[BlockHash], AVector[Block]) = {
     val mainGroup = checkpointBlock.chainIndex.from
-    checkpointBlock.blockDeps.inDeps.flatMap { inDep =>
-      val inTip        = blockFlow.getInTipUnsafe(inDep, mainGroup)
+    val inDeps    = checkpointBlock.blockDeps.inDeps
+    var inTips    = AVector.ofCapacity[BlockHash](inDeps.length)
+    val inBlocks = inDeps.flatMap { inDep =>
+      val inTip = blockFlow.getInTipUnsafe(inDep, mainGroup)
+      inTips = inTips :+ inTip
       val inChainIndex = ChainIndex.from(inTip)(blockFlow.brokerConfig)
       val blockchain   = blockFlow.getBlockChain(inChainIndex)
       val fromBlock    = blockchain.getBlockUnsafe(inTip)
       blockchain.tryGetBlocksFromUnsafe(fromBlock)
     }
+    (inTips, inBlocks)
   }
 
   private def getOutBlocksUnsafe(
@@ -160,15 +173,32 @@ object AccountView {
     }
   }
 
+  private[core] def genesis(
+      checkpoint: Block,
+      genesisHashes: AVector[AVector[BlockHash]]
+  )(implicit brokerConfig: BrokerConfig): AccountView = {
+    assume(checkpoint.isGenesis)
+    val groups    = brokerConfig.cliqueGroups
+    var inTips    = AVector.ofCapacity[BlockHash](groups.length - 1)
+    val mainGroup = checkpoint.chainIndex.from
+    groups.foreach { fromGroup =>
+      if (fromGroup != mainGroup) {
+        val inTip = genesisHashes(fromGroup.value)(mainGroup.value)
+        inTips = inTips :+ inTip
+      }
+    }
+    AccountView(checkpoint, inTips, AVector.empty, AVector.empty)
+  }
+
   def unsafe(blockFlow: BlockFlow, checkpointBlock: Block): AccountView = {
     val chainIndex = checkpointBlock.chainIndex
     assume(chainIndex.isIntraGroup && blockFlow.brokerConfig.contains(chainIndex.from))
     if (checkpointBlock.isGenesis) {
-      AccountView(checkpointBlock, AVector.empty, AVector.empty)
+      genesis(checkpointBlock, blockFlow.genesisHashes)(blockFlow.brokerConfig)
     } else {
-      val inBlocks  = getInBlocksUnsafe(blockFlow, checkpointBlock)
-      val outBlocks = getOutBlocksUnsafe(blockFlow, checkpointBlock)
-      AccountView(checkpointBlock, inBlocks, outBlocks)
+      val (inTips, inBlocks) = getInBlocksUnsafe(blockFlow, checkpointBlock)
+      val outBlocks          = getOutBlocksUnsafe(blockFlow, checkpointBlock)
+      AccountView(checkpointBlock, inTips, inBlocks, outBlocks)
     }
   }
 

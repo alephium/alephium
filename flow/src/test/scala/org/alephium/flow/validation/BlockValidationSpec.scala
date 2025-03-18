@@ -563,11 +563,11 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, block1, block2, block3)
 
     val mainGroup = GroupIndex.unsafe(0)
-    val bestDeps  = blockFlow.getBestDeps(mainGroup)
+    val bestDeps  = blockFlow.getBestDepsPreDanube(mainGroup)
     blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, bestDeps).toSet is
       Set(block0.hash, block1.hash, block2.hash, block3.hash)
 
-    val bestDeps1 = blockFlow1.getBestDeps(mainGroup)
+    val bestDeps1 = blockFlow1.getBestDepsPreDanube(mainGroup)
     blockFlow1.getHashesForDoubleSpendingCheckUnsafe(mainGroup, bestDeps1).toSet is
       Set(block1.hash, block2.hash, block3.hash)
   }
@@ -589,7 +589,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     addAndCheck(blockFlow, block0, block1, block2)
 
-    val bestDeps = blockFlow.getBestDeps(mainGroup)
+    val bestDeps = blockFlow.getBestDepsPreDanube(mainGroup)
 
     blockFlow.getHashesForDoubleSpendingCheckUnsafe(mainGroup, bestDeps).toSet is
       Set(block0.hash, block1.hash, block2.hash)

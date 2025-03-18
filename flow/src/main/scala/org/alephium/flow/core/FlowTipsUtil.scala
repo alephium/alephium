@@ -31,7 +31,7 @@ trait FlowTipsUtil {
   def groups: Int
   def initialGenesisHashes: AVector[BlockHash]
   def genesisHashes: AVector[AVector[BlockHash]]
-  def getBestDeps(groupIndex: GroupIndex): BlockDeps
+  def getBestDepsPreDanube(groupIndex: GroupIndex): BlockDeps
 
   def getHeightUnsafe(hash: BlockHash): Int
   def getBlockUnsafe(hash: BlockHash): Block
@@ -241,7 +241,7 @@ trait FlowTipsUtil {
       val chainIndex = ChainIndex.from(inDep)
       assume(ChainIndex.from(inDep).isIntraGroup)
       if (brokerConfig.contains(chainIndex.from)) {
-        val bestInDep = getBestDeps(chainIndex.from).getOutDep(targetGroupIndex)
+        val bestInDep = getBestDepsPreDanube(chainIndex.from).getOutDep(targetGroupIndex)
         getInTip(inDep, targetGroupIndex).flatMap { bestTargetDep =>
           getTipsDiff(bestInDep, bestTargetDep).map(acc ++ _)
         }

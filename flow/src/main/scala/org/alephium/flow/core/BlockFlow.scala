@@ -454,7 +454,7 @@ object BlockFlow extends StrictLogging {
     def updateViewPreDanubeUnsafe(): Unit =
       brokerConfig.groupRange.foreach { mainGroup =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
-        val oldDeps        = getBestDeps(mainGroupIndex)
+        val oldDeps        = getBestDepsPreDanube(mainGroupIndex)
         val newDeps        = calBestDepsUnsafe(mainGroupIndex)
         updateGrandPoolUnsafe(mainGroupIndex, newDeps, oldDeps)
         updateBestDepsPreDanube(mainGroup, newDeps)

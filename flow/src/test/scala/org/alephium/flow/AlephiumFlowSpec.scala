@@ -791,7 +791,7 @@ trait FlowFixture
       .mkString("", "\n", "\n")
     val bestDeps = brokerConfig.groupRange
       .map { group =>
-        val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
+        val bestDeps    = blockFlow.getBestDepsPreDanube(GroupIndex.unsafe(group))
         val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")
         s"group $group, bestDeps: $bestDepsStr"
       }
