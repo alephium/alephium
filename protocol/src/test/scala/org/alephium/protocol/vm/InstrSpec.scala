@@ -1743,15 +1743,25 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(VerifySignature, crypto.ED25519.generatePriPub(), crypto.ED25519.sign, Some(ByteString(2)))
   }
 
-  it should "VerifySignature:Passkey" in new GenericSignatureFixture {
+  it should "VerifySignature:WebAuthn" in new GenericSignatureFixture {
     val authenticatorData = Hash.generate.bytes ++ ByteString(1)
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val sign = (challenge: ByteString, pk: crypto.SecP256R1PrivateKey) => {
       val messageHash = webauthn.messageHash(challenge)
       val signature   = crypto.SecP256R1.sign(messageHash, pk).bytes
-      WebAuthn.serde.serialize(webauthn) ++ signature
+      val byte64Array = webauthn.encodeForTest()
+      byte64Array.map(_.bytes).reduce(_ ++ _) ++ signature
     }
     test0(VerifySignature, crypto.SecP256R1.generatePriPub(), sign, Some(ByteString(3)))
+
+    val (priKey, pubKey) = crypto.SecP256R1.generatePriPub()
+    val challenge        = Hash.generate.bytes
+    stack.push(Val.ByteVec(challenge))
+    stack.push(Val.ByteVec(pubKey.bytes))
+    val payload = sign(challenge, priKey)
+    stack.push(Val.ByteVec(payload.drop(1)))
+    stack.push(Val.ByteVec(ByteString(3)))
+    VerifySignature.runWith(frame).leftValue isE InvalidSignatureFormat(payload.drop(1))
   }
 
   it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture

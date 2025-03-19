@@ -24,7 +24,7 @@ import scala.annotation.switch
 import akka.util.ByteString
 
 import org.alephium.crypto
-import org.alephium.crypto.SecP256K1
+import org.alephium.crypto.{Byte64, SecP256K1}
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
@@ -1657,11 +1657,16 @@ case object VerifySignature
         )
       case PublicKeyLike.Passkey(publicKey) =>
         for {
-          result <- WebAuthn
-            .decodeWithoutPadding(rawSignature)
+          signature <-
+            if (rawSignature.length < Byte64.length) {
+              failed(InvalidSignatureFormat(rawSignature))
+            } else {
+              Right(crypto.SecP256R1Signature.unsafe(rawSignature.takeRight(Byte64.length)))
+            }
+          webauthn <- WebAuthn
+            .tryDecode(rawSignature.dropRight(Byte64.length))
             .left
             .map(_ => Right(InvalidSignatureFormat(rawSignature)))
-          (webauthn, signature) = result
           _ <- frame.ctx.chargeGas(GasHash.gas(webauthn.bytesLength))
         } yield webauthn.verify(rawData, signature, publicKey)
     }

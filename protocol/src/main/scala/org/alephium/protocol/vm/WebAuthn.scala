@@ -34,7 +34,7 @@ import org.alephium.serde.{
   SerdeResult,
   Staging
 }
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
 final case class WebAuthn(
     authenticatorData: ByteString,
@@ -77,6 +77,15 @@ final case class WebAuthn(
     val length  = serdeImpl[Int].serialize(payload.length)
     length ++ payload
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def encodeForTest(): AVector[Byte64] = {
+    val bytes       = getLengthPrefixedPayload()
+    val chunkSize   = (bytes.length + Byte64.length - 1) / Byte64.length
+    val paddingSize = chunkSize * Byte64.length - bytes.length
+    val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
+    AVector.from(paddedBytes.grouped(Byte64.length).map(Byte64.from(_).get))
+  }
 }
 
 object WebAuthn {
@@ -110,14 +119,6 @@ object WebAuthn {
     iter(ByteString.empty, chunkSize)
   }
 
-  def decodeWithoutPadding(payload: ByteString): SerdeResult[(WebAuthn, SecP256R1Signature)] = {
-    for {
-      webauthn  <- serde._deserialize(payload)
-      _         <- validate(webauthn.value).left.map(SerdeError.validation)
-      signature <- serdeImpl[SecP256R1Signature].deserialize(webauthn.rest)
-    } yield (webauthn.value, signature)
-  }
-
   private def decode(payload: ByteString): SerdeResult[WebAuthn] = {
     serde._deserialize(payload).flatMap { case Staging(webauthn, rest) =>
       if (rest.exists(_ != 0)) {
@@ -135,19 +136,29 @@ object WebAuthn {
     }
   }
 
-  def tryDecode(nextBytes: () => Option[Byte64]): SerdeResult[WebAuthn] = {
+  @inline private def decodePayloadLength(bytes: ByteString) = {
     for {
-      firstChunk <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
-      deserialized0 <- serdeImpl[Int]
-        ._deserialize(firstChunk.bytes)
+      payloadLength <- serdeImpl[Int]
+        ._deserialize(bytes)
         .left
         .map(e => SerdeError.WrongFormat(s"Failed to deserialize payload length: ${e.getMessage}"))
-      Staging(payloadLength, payloadFirstChunk) = deserialized0
       _ <- Either.cond(
-        payloadLength > 0,
+        payloadLength.value > 0,
         (),
         SerdeError.WrongFormat("Invalid payload length: must be positive")
       )
+    } yield payloadLength
+  }
+
+  def tryDecode(bytes: ByteString): SerdeResult[WebAuthn] = {
+    decodePayloadLength(bytes).flatMap(deserialized => decode(deserialized.rest))
+  }
+
+  def tryDecode(nextBytes: () => Option[Byte64]): SerdeResult[WebAuthn] = {
+    for {
+      firstChunk    <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
+      deserialized0 <- decodePayloadLength(firstChunk.bytes)
+      Staging(payloadLength, payloadFirstChunk) = deserialized0
       chunkSize = (payloadLength - payloadFirstChunk.length + Byte64.length - 1) / Byte64.length
       restPayload <- extractChunks(nextBytes, chunkSize)
       webauthn    <- decode(payloadFirstChunk ++ restPayload)
