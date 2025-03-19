@@ -107,7 +107,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait DanubeForkFixture extends AllInstrsFixture {
     val danubeStatelessInstrs =
       AVector[DanubeInstr[StatelessContext]](VerifySignature, GetSegregatedWebAuthnSignature)
-    val danubeStatefulInstrs = AVector.empty[DanubeInstr[StatefulContext]]
+    val danubeStatefulInstrs = AVector[DanubeInstr[StatefulContext]](
+      ExternalCallerId,
+      ExternalCallerAddress
+    )
   }
 
   it should "check all LemanInstr" in new LemanForkFixture {

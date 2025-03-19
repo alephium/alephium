@@ -355,6 +355,16 @@ case object NoCaller extends ExeFailure {
   override def toString: String = "The current method does not have a caller"
 }
 
+case object ExternalCallerNotAvailable extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: no external contract caller found in the call chain"
+}
+
+case object CurrentFrameIsNotContract extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: current frame is not a contract frame"
+}
+
 final case class NegativeTimeStamp(millis: Long) extends ExeFailure {
   override def toString: String = s"Negative timestamp $millis"
 }

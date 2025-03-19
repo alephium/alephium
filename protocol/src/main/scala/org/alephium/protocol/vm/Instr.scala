@@ -232,7 +232,9 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Rhone hard fork */
-    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
+    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector,
+    /* Below are instructions for Danube hard fork */
+    ExternalCallerId, ExternalCallerAddress
   )
   // format: on
 
@@ -2743,6 +2745,30 @@ object CallerAddress extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.getCallerAddress()
+      _       <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
+
+object ExternalCallerId
+    extends ContractInstr
+    with GasLow
+    with DanubeInstrWithSimpleGas[StatefulContext] {
+  def runWithDanube[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerContractId <- frame.getExternalCallerContractId()
+      _                <- frame.pushOpStack(callerContractId)
+    } yield ()
+  }
+}
+
+object ExternalCallerAddress
+    extends ContractInstr
+    with GasLow
+    with DanubeInstrWithSimpleGas[StatefulContext] {
+  def runWithDanube[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.getExternalCallerAddress()
       _       <- frame.pushOpStack(address)
     } yield ()
   }

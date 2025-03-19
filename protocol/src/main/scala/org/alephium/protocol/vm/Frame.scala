@@ -39,6 +39,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def getCallerFrame(): ExeResult[Frame[Ctx]]
   def getCallerAddress(): ExeResult[Val.Address]
   def getCallAddress(): ExeResult[Val.Address]
+  def getExternalCallerContractId(): ExeResult[Val.ByteVec]
+  def getExternalCallerAddress(): ExeResult[Val.Address]
 
   def balanceStateOpt: Option[MutBalanceState]
 
@@ -247,9 +249,11 @@ final class StatelessFrame(
       newImmFieldsOpt: Option[AVector[Val]],
       newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = StatelessFrame.notAllowed
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
-  def getCallerAddress(): ExeResult[Val.Address]           = StatelessFrame.notAllowed
-  def getCallAddress(): ExeResult[Val.Address]             = StatelessFrame.notAllowed
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]  = StatelessFrame.notAllowed
+  def getCallerAddress(): ExeResult[Val.Address]            = StatelessFrame.notAllowed
+  def getCallAddress(): ExeResult[Val.Address]              = StatelessFrame.notAllowed
+  def getExternalCallerContractId(): ExeResult[Val.ByteVec] = StatelessFrame.notAllowed
+  def getExternalCallerAddress(): ExeResult[Val.Address]    = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
   def callExternalBySelector(
@@ -290,6 +294,43 @@ final case class StatefulFrame(
         Right(Val.Address(LockupScript.p2c(contractId)))
       case None => // frame for script
         ctx.getUniqueTxInputAddress()
+    }
+  }
+
+  def getExternalCallerContractId(): ExeResult[Val.ByteVec] = {
+    getExternalCallerAddress().flatMap {
+      case Val.Address(LockupScript.P2C(contractId)) => Right(Val.ByteVec(contractId.bytes))
+      case _                                         => failed(ExternalCallerNotAvailable)
+    }
+  }
+
+  def getExternalCallerAddress(): ExeResult[Val.Address] = {
+    this.obj.contractIdOpt match {
+      case Some(contractId) => this.getExternalCallerAddress(contractId)
+      case None             => failed(CurrentFrameIsNotContract)
+    }
+  }
+
+  @tailrec
+  private def getExternalCallerAddress(currentContractId: ContractId): ExeResult[Val.Address] = {
+    callerFrameOpt match {
+      case Some(callerFrame) =>
+        callerFrame.obj.contractIdOpt match {
+          case Some(contractId) =>
+            if (contractId == currentContractId) {
+              // Skip frames from the same contract to find the external caller
+              callerFrame.getExternalCallerAddress(currentContractId)
+            } else {
+              // Found the first external contract caller
+              Right(Val.Address(LockupScript.p2c(contractId)))
+            }
+          case None =>
+            // Reached a script frame, return the transaction input address
+            ctx.getUniqueTxInputAddress()
+        }
+      case None =>
+        // Dead branch, no caller frame exists, which should not happen for contract frames
+        failed(ExternalCallerNotAvailable)
     }
   }
 
