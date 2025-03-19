@@ -1669,10 +1669,12 @@ case object VerifySignature
 
   def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      rawSignature <- frame.popOpStackByteVec()
-      rawPublicKey <- frame.popOpStackByteVec()
-      publicKey <- decode[PublicKeyLike](rawPublicKey.bytes).left.map(_ =>
-        Right(InvalidPublicKey(rawPublicKey.bytes))
+      publicKeyType <- frame.popOpStackByteVec()
+      rawSignature  <- frame.popOpStackByteVec()
+      rawPublicKey  <- frame.popOpStackByteVec()
+      publicKeyBytes = publicKeyType.bytes ++ rawPublicKey.bytes
+      publicKey <- decode[PublicKeyLike](publicKeyBytes).left.map(_ =>
+        Right(InvalidPublicKey(publicKeyBytes))
       )
       rawData <- frame.popOpStackByteVec()
       _       <- Instr.checkSignedData(rawData.bytes)
@@ -1681,15 +1683,30 @@ case object VerifySignature
         if (isValid) {
           okay
         } else {
-          failed(InvalidSignature(rawPublicKey.bytes, rawData.bytes, rawSignature.bytes))
+          failed(InvalidSignature(publicKeyBytes, rawData.bytes, rawSignature.bytes))
         }
     } yield ()
   }
 
   override def mockup(): Instr[StatelessContext] = {
-    assume(this.gas() == VerifySignatureMockup.gas())
-    VerifySignatureMockup
+    assume(this.gas() == VerifySignatureMockup1.gas())
+    VerifySignatureMockup1
   }
+}
+
+case object VerifySignatureMockup1
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.popOpStackByteVec() // publicKeyType
+      _ <- frame.popOpStackByteVec() // rawSignature
+      _ <- frame.popOpStackByteVec() // rawPublicKey
+      _ <- frame.popOpStackByteVec() // rawData
+    } yield ()
+  }
+  override lazy val code: Byte = Instr.mockupCode
 }
 
 case object GetSegregatedSignature

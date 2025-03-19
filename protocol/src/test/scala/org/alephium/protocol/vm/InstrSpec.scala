@@ -1602,12 +1602,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       bytes <- Gen.listOfN(32, arbitrary[Byte])
     } yield ByteString(bytes)
 
+    private def pushPublicKeyType(tpe: Option[ByteString]) = {
+      tpe.foreach(v => stack.push(Val.ByteVec(v)))
+    }
+
     // scalastyle:off method.length
     def test0[PriKey <: RandomBytes, PubKey <: RandomBytes](
         instr: SignatureInstr,
         generatePriPub: => (PriKey, PubKey),
         sign: (ByteString, PriKey) => ByteString,
-        pubKeyPrefix: ByteString = ByteString.empty
+        publicKeyType: Option[ByteString] = None
     ) = {
       val keysGen = for {
         (pri, pub) <- Gen.const(()).map(_ => generatePriPub)
@@ -1616,16 +1620,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val (priKey, pubKey) = keysGen.sample.get
       val data             = data32Gen.sample.get
 
-      val signature       = sign(data, priKey)
-      val fullPubKeyBytes = pubKeyPrefix ++ pubKey.bytes
+      val signature = sign(data, priKey)
 
       stack.push(Val.ByteVec(data))
-      stack.push(Val.ByteVec(fullPubKeyBytes))
+      stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(signature))
+      pushPublicKeyType(publicKeyType)
 
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
-      val extraGas = if (pubKeyPrefix == ByteString(3)) { // passkey
+      val extraGas = if (publicKeyType == Some(ByteString(3))) { // passkey
         GasBox.unsafe(84)
       } else {
         GasBox.zero
@@ -1634,25 +1638,42 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       initialGas.subUnsafe(context.gasRemaining) is usedGas
 
       stack.push(Val.ByteVec(data))
-      stack.push(Val.ByteVec(fullPubKeyBytes))
+      stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(ByteString("zzz")))
+      pushPublicKeyType(publicKeyType)
       instr.runWith(frame).leftValue isE InvalidSignatureFormat(ByteString("zzz"))
-      if (pubKeyPrefix.isEmpty) stack.pop(2)
+      if (publicKeyType.isEmpty) stack.pop(2)
       stack.isEmpty is true
 
       val wrongData = dataGen.sample.get
       stack.push(Val.ByteVec(wrongData))
       stack.push(Val.ByteVec(signature))
+      pushPublicKeyType(publicKeyType)
+      val invalidPublicKeyBytes = publicKeyType.getOrElse(ByteString.empty) ++ wrongData
       instr
         .runWith(frame)
         .leftValue
         .rightValue
-        .toString is s"Invalid public key: ${Hex.toHexString(wrongData)}"
+        .toString is s"Invalid public key: ${Hex.toHexString(invalidPublicKeyBytes)}"
+      stack.isEmpty is true
+
+      if (publicKeyType.isDefined) {
+        val invalidPublicKeyType = ByteString(nextInt(4, 255).toByte) ++ dataGen.sample.get
+        stack.push(Val.ByteVec(pubKey.bytes))
+        stack.push(Val.ByteVec(signature))
+        stack.push(Val.ByteVec(invalidPublicKeyType))
+        instr
+          .runWith(frame)
+          .leftValue
+          .rightValue
+          .toString is s"Invalid public key: ${Hex.toHexString(invalidPublicKeyType ++ pubKey.bytes)}"
+      }
 
       val signedData = dataGen.sample.get
       stack.push(Val.ByteVec(signedData))
-      stack.push(Val.ByteVec(fullPubKeyBytes))
+      stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(signature))
+      pushPublicKeyType(publicKeyType)
       instr
         .runWith(frame)
         .leftValue
@@ -1660,14 +1681,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .toString is s"Signed data bytes should have 32 bytes, get ${signedData.length} instead"
 
       stack.push(Val.ByteVec(data))
-      stack.push(Val.ByteVec(fullPubKeyBytes))
+      stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey)))
+      pushPublicKeyType(publicKeyType)
       instr.runWith(frame).leftValue isE a[InvalidSignature]
       stack.isEmpty is true
 
       stack.push(Val.ByteVec(data))
-      stack.push(Val.ByteVec(fullPubKeyBytes))
+      stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey)))
+      pushPublicKeyType(publicKeyType)
       instr.mockup().runWith(frame) isE ()
       stack.isEmpty is true
     }
@@ -1678,10 +1701,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         instr: SignatureInstr,
         generatePriPub: => (PriKey, PubKey),
         sign: (ByteString, PriKey) => Sig,
-        pubKeyPrefix: ByteString = ByteString.empty
+        publicKeyType: Option[ByteString] = None
     ) = {
       val signFunc = (data: ByteString, pk: PriKey) => sign(data, pk).bytes
-      test0(instr, generatePriPub, signFunc, pubKeyPrefix)
+      test0(instr, generatePriPub, signFunc, publicKeyType)
     }
     // scalastyle:on method.length
   }
@@ -1699,15 +1722,25 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "VerifySignature:SecP256K1" in new GenericSignatureFixture {
-    test(VerifySignature, crypto.SecP256K1.generatePriPub(), crypto.SecP256K1.sign, ByteString(0))
+    test(
+      VerifySignature,
+      crypto.SecP256K1.generatePriPub(),
+      crypto.SecP256K1.sign,
+      Some(ByteString(0))
+    )
   }
 
   it should "VerifySignature:SecP256R1" in new GenericSignatureFixture {
-    test(VerifySignature, crypto.SecP256R1.generatePriPub(), crypto.SecP256R1.sign, ByteString(1))
+    test(
+      VerifySignature,
+      crypto.SecP256R1.generatePriPub(),
+      crypto.SecP256R1.sign,
+      Some(ByteString(1))
+    )
   }
 
   it should "VerifySignature:ED25519" in new GenericSignatureFixture {
-    test(VerifySignature, crypto.ED25519.generatePriPub(), crypto.ED25519.sign, ByteString(2))
+    test(VerifySignature, crypto.ED25519.generatePriPub(), crypto.ED25519.sign, Some(ByteString(2)))
   }
 
   it should "VerifySignature:Passkey" in new GenericSignatureFixture {
@@ -1718,7 +1751,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val signature   = crypto.SecP256R1.sign(messageHash, pk).bytes
       WebAuthn.serde.serialize(webauthn) ++ signature
     }
-    test0(VerifySignature, crypto.SecP256R1.generatePriPub(), sign, ByteString(3))
+    test0(VerifySignature, crypto.SecP256R1.generatePriPub(), sign, Some(ByteString(3)))
   }
 
   it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture

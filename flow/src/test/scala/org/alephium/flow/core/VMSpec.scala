@@ -1911,10 +1911,10 @@ class VMSpec extends AlephiumSpec with Generators {
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
          |  verifyBIP340Schnorr!(#$zero, #${bip340Pub.toHexString}, #$bip340Sig)
          |
-         |  verifySignature!(#$zero, #00${p256k1Pub.toHexString}, #$p256k1Sig)
-         |  verifySignature!(#$zero, #01${p256r1Pub.toHexString}, #$p256r1Sig)
-         |  verifySignature!(#$zero, #02${ed25519Pub.toHexString}, #$ed25519Sig)
-         |  verifySignature!(#$zero, #03${p256r1Pub.toHexString}, #$passkeySig)
+         |  verifySignature!(#$zero, #${p256k1Pub.toHexString}, #$p256k1Sig, #00)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig, #01)
+         |  verifySignature!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig, #02)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$passkeySig, #03)
          |}
          |""".stripMargin
     testSimpleScript(main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, passkeySig))

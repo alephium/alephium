@@ -1083,13 +1083,14 @@ object BuiltIn {
   val verifySignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifySignature",
-      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq.empty,
       VerifySignature,
       argsName = Seq(
-        "data"      -> "the data that was supposed to have been signed",
-        "publicKey" -> "the public key of the signer",
-        "signature" -> "the signature value"
+        "data"          -> "the data that was supposed to have been signed",
+        "publicKey"     -> "the public key of the signer",
+        "signature"     -> "the signature value",
+        "publicKeyType" -> "the type of the public key"
       ),
       retComment = "",
       doc = s"Verifies the signature of the input and public key."
