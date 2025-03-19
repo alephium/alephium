@@ -1968,6 +1968,58 @@ class VMSpec extends AlephiumSpec with Generators {
     )
   }
 
+  it should "test getSegregatedWebAuthnSignature" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val main =
+      s"""
+         |AssetScript Main {
+         |  pub fn main() -> () {
+         |    verifyWebAuthn!(txId!(), #${pubKey.toHexString}, getSegregatedWebAuthnSignature!())
+         |  }
+         |}
+         |""".stripMargin
+
+    val script           = Compiler.compileAssetScript(main).rightValue._1
+    val fromLockupScript = LockupScript.p2sh(script)
+    val groupIndex       = fromLockupScript.groupIndex
+    val genesisKey       = genesisKeys(groupIndex.value)._1
+    val block =
+      transfer(
+        blockFlow,
+        genesisKey,
+        fromLockupScript,
+        AVector.empty[(TokenId, U256)],
+        ALPH.alph(4)
+      )
+    addAndCheck(blockFlow, block)
+
+    val toLockupScript = LockupScript.p2pkh(groupIndex.generateKey._2)
+    checkBalance(blockFlow, toLockupScript, U256.Zero)
+
+    val outputInfo =
+      UnsignedTransaction.TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None)
+    val unsignedTx = blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        UnlockScript.P2SH(script, AVector.empty),
+        AVector(outputInfo),
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .rightValue
+    val tx     = signWithPasskey(unsignedTx, priKey)._2
+    val block0 = mineWithTxs(blockFlow, ChainIndex(groupIndex, groupIndex), AVector(tx))
+    block0.nonCoinbase.head.id is tx.id
+    addAndCheck(blockFlow, block0)
+    checkBalance(blockFlow, toLockupScript, ALPH.oneAlph)
+  }
+
   it should "test convert pubkey to address" in new ContractFixture {
     val (_, publicKey, _) = genesisKeys(chainIndex.from.value)
     def main() =

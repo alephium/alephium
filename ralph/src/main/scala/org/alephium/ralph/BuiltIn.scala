@@ -1156,6 +1156,17 @@ object BuiltIn {
       doc = s"Verifies the webauthn of the input and public key."
     )
 
+  val getSegregatedWebAuthnSignature: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptography(
+      "getSegregatedWebAuthnSignature",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      GetSegregatedWebAuthnSignature,
+      argsName = Seq.empty,
+      retComment = "the segregated webauthn signature of the transaction",
+      doc = "The segregated webauthn signature of the transaction"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1218,7 +1229,8 @@ object BuiltIn {
     len,
     verifySignature,
     verifySecP256R1,
-    verifyWebAuthn
+    verifyWebAuthn,
+    getSegregatedWebAuthnSignature
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

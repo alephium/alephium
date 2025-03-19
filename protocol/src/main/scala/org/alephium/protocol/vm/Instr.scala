@@ -216,7 +216,7 @@ object Instr {
     /* Below are instructions for Rhone hard fork */
     GroupOfAddress,
     /* Below are instructions for Danube hard fork */
-    VerifySignature
+    VerifySignature, GetSegregatedWebAuthnSignature
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -1696,6 +1696,24 @@ case object VerifySignature
   override def mockup(): Instr[StatelessContext] = {
     assume(this.gas() == VerifySignatureMockup1.gas())
     VerifySignatureMockup1
+  }
+}
+
+case object GetSegregatedWebAuthnSignature
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasVeryLow
+    with DanubeInstrWithSimpleGas[StatelessContext] {
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val size = frame.ctx.signatures.size
+    frame.ctx.signatures.pop(size).flatMap { signatures =>
+      if (signatures.isEmpty) {
+        failed(StackUnderflow)
+      } else {
+        val bytes = signatures.view.reverse.map(_.bytes).foldLeft(ByteString.empty)(_ ++ _)
+        frame.pushOpStack(Val.ByteVec(bytes))
+      }
+    }
   }
 }
 

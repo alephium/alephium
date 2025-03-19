@@ -1080,5 +1080,13 @@
       "@param payload the webauthn payload and signature"
     ],
     "returns": "@returns "
+  },
+  {
+    "name": "getSegregatedWebAuthnSignature",
+    "category": "Cryptography",
+    "signature": "fn getSegregatedWebAuthnSignature!() -> (ByteVec)",
+    "doc": "The segregated webauthn signature of the transaction",
+    "params": [],
+    "returns": "@returns the segregated webauthn signature of the transaction"
   }
 ]

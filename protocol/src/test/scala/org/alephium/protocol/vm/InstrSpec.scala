@@ -105,8 +105,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait DanubeForkFixture extends AllInstrsFixture {
-    val danubeStatelessInstrs = AVector[DanubeInstr[StatelessContext]](VerifySignature)
-    val danubeStatefulInstrs  = AVector.empty[DanubeInstr[StatefulContext]]
+    val danubeStatelessInstrs =
+      AVector[DanubeInstr[StatelessContext]](VerifySignature, GetSegregatedWebAuthnSignature)
+    val danubeStatefulInstrs = AVector.empty[DanubeInstr[StatefulContext]]
   }
 
   it should "check all LemanInstr" in new LemanForkFixture {
@@ -1743,15 +1744,22 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(VerifySignature, crypto.ED25519.generatePriPub(), crypto.ED25519.sign, Some(ByteString(2)))
   }
 
-  it should "VerifySignature:WebAuthn" in new GenericSignatureFixture {
+  trait WebAuthnFixture {
     val authenticatorData = Hash.generate.bytes ++ ByteString(1)
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
-    val sign = (challenge: ByteString, pk: crypto.SecP256R1PrivateKey) => {
+
+    def signRaw(challenge: ByteString, pk: crypto.SecP256R1PrivateKey) = {
       val messageHash = webauthn.messageHash(challenge)
-      val signature   = crypto.SecP256R1.sign(messageHash, pk).bytes
-      val byte64Array = webauthn.encodeForTest()
-      byte64Array.map(_.bytes).reduce(_ ++ _) ++ signature
+      val signature   = Byte64.from(crypto.SecP256R1.sign(messageHash, pk))
+      webauthn.encodeForTest() :+ signature
     }
+
+    def sign(challenge: ByteString, pk: crypto.SecP256R1PrivateKey) = {
+      signRaw(challenge, pk).map(_.bytes).reduce(_ ++ _)
+    }
+  }
+
+  it should "VerifySignature:WebAuthn" in new GenericSignatureFixture with WebAuthnFixture {
     test0(VerifySignature, crypto.SecP256R1.generatePriPub(), sign, Some(ByteString(3)))
 
     val (priKey, pubKey) = crypto.SecP256R1.generatePriPub()
@@ -1762,6 +1770,27 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(payload.drop(1)))
     stack.push(Val.ByteVec(ByteString(3)))
     VerifySignature.runWith(frame).leftValue isE InvalidSignatureFormat(payload.drop(1))
+  }
+
+  it should "GetSegregatedWebAuthnSignature" in new StatelessInstrFixture with WebAuthnFixture {
+    val priKey     = crypto.SecP256R1.generatePriPub()._1
+    val tx         = transactionGen().sample.get
+    val signatures = signRaw(tx.id.bytes, priKey)
+
+    val signatureStack = Stack.ofCapacity[Byte64](signatures.length)
+    signatureStack.push(signatures.reverse)
+
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, signatureStack))
+    )
+
+    val initialGas = context.gasRemaining
+    GetSegregatedWebAuthnSignature.runWith(frame) isE ()
+    initialGas.subUnsafe(context.gasRemaining) is GasVeryLow.gas
+    stack.size is 1
+    stack.top.get is Val.ByteVec(signatures.map(_.bytes).reduce(_ ++ _))
+    GetSegregatedWebAuthnSignature.runWith(frame).leftValue isE StackUnderflow
   }
 
   it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture
@@ -4578,7 +4607,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 5,
       /* Below are instructions for Danube hard fork */
-      VerifySignature -> 2000
+      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 3
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -4714,7 +4743,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 140,
       /* Below are instructions for Danube hard fork */
-      VerifySignature -> 141,
+      VerifySignature -> 141, GetSegregatedWebAuthnSignature -> 142,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -4790,7 +4819,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress,
       /* Below are instructions for Danube hard fork */
-      VerifySignature
+      VerifySignature, GetSegregatedWebAuthnSignature
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),
