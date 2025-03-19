@@ -41,7 +41,7 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
   def createAuthenticatorData(flag: Byte): ByteString = {
     val rpIdHash  = Hash.generate.bytes
     val signCount = bytesGen(4).sample.get
-    val postfix   = bytesGen(nextInt(100)).sample.get
+    val postfix   = bytesGen(nextInt(40)).sample.get
     rpIdHash ++ ByteString(flag) ++ signCount ++ postfix
   }
 
