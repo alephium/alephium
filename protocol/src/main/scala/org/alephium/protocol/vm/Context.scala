@@ -404,7 +404,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         .useAll(caller.lockupScript)
         .forall(outputs => frameBalanceState.remaining.add(caller.lockupScript, outputs).nonEmpty)
 
-      if (success) okay else failed(ChainCallerOutputsFailed)
+      if (success) okay else failed(ChainCallerOutputsFailed(caller))
     }
   }
 

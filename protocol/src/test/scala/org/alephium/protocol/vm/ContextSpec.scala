@@ -457,7 +457,9 @@ class ContextSpec
     balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.MaxValue)
 
     addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
-    ctx.chainCallerOutputs(Some(balanceState)).leftValue isE ChainCallerOutputsFailed
+    ctx.chainCallerOutputs(Some(balanceState)).leftValue isE ChainCallerOutputsFailed(
+      Address.from(inputLockupScript)
+    )
   }
 
   it should "call chainCallerOutputs and ensure non-input address balances remain unchanged" in new ChainCallerOutputsFixture {
