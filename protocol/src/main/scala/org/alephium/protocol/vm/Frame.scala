@@ -20,13 +20,13 @@ import scala.annotation.{switch, tailrec}
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.{Address, ContractId, TokenId}
+import org.alephium.protocol.model.{minimalContractStorageDeposit, Address, ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.serde.{avectorSerde, deserialize}
-import org.alephium.util.{AVector, Bytes}
+import org.alephium.util.{AVector, Bytes, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 abstract class Frame[Ctx <: StatelessContext] {
   var pc: Int
   def obj: ContractObj[Ctx]
@@ -456,9 +456,8 @@ final case class StatefulFrame(
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     for {
-      _            <- checkContractId(contractId)
-      balanceState <- getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      _        <- checkContractId(contractId)
+      balances <- getInitialBalancesForNewContract()
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId(ctx.blockEnv.chainIndex.from.value)),
@@ -467,6 +466,71 @@ final case class StatefulFrame(
       )
       _ <- ctx.writeSubContractIndexes(parentContractId, contractId)
     } yield contractId
+  }
+
+  def getInitialBalancesForNewContract(): ExeResult[MutBalancesPerLockup] = {
+    if (ctx.getHardFork().isDanubeEnabled()) {
+      getInitialBalancesForNewContractSinceDanube()
+    } else {
+      getInitialBalancesForNewContractPreDanube()
+    }
+  }
+
+  def getInitialBalancesForNewContractPreDanube(): ExeResult[MutBalancesPerLockup] = {
+    for {
+      balanceState <- getBalanceState()
+      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+    } yield balances
+  }
+
+  def getInitialBalancesForNewContractSinceDanube(): ExeResult[MutBalancesPerLockup] = {
+    val minimalDeposit = minimalContractStorageDeposit(ctx.getHardFork())
+
+    for {
+      // Start with approved balances if available, otherwise empty balance
+      initialBalance <- getInitialContractBalance()
+
+      // Check if we need to add more deposit
+      _ <- ensureMinimalDeposit(initialBalance, minimalDeposit)
+    } yield initialBalance
+  }
+
+  private def getInitialContractBalance(): ExeResult[MutBalancesPerLockup] = {
+    if (balanceStateOpt.exists(_.approved.all.nonEmpty)) {
+      getInitialBalancesForNewContractPreDanube()
+    } else {
+      Right(MutBalancesPerLockup.empty)
+    }
+  }
+
+  private def ensureMinimalDeposit(
+      contractBalance: MutBalancesPerLockup,
+      minimalDeposit: U256
+  ): ExeResult[Unit] = {
+    minimalDeposit.sub(contractBalance.attoAlphAmount) match {
+      case Some(alphToCover) if alphToCover > U256.Zero =>
+        // Need to cover additional deposit
+        coverMinimalContractStorageDeposit(contractBalance, alphToCover)
+      case _ =>
+        // Contract already has sufficient deposit
+        Right(())
+    }
+  }
+
+  private def coverMinimalContractStorageDeposit(
+      contractBalance: MutBalancesPerLockup,
+      alphToCover: U256
+  ): ExeResult[Unit] = {
+    for {
+      // Get tx caller balance to potentially pay deposit
+      txCallerBalance <- ctx.getTxCallerBalance()
+      callerAddress   <- ctx.getUniqueTxInputAddress()
+
+      // Try to move required ALPH from caller to contract
+      _ <- txCallerBalance.remaining
+        .moveAlph(callerAddress.lockupScript, alphToCover, contractBalance)
+        .toRight(Right(InsufficientDepositForContractCreation))
+    } yield ()
   }
 
   def contractCreationEventFields(
