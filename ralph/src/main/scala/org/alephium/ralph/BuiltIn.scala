@@ -18,6 +18,8 @@ package org.alephium.ralph
 
 import scala.language.reflectiveCalls
 
+import akka.util.ByteString
+
 import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler.{Error, FuncInfo, UseContractAssetsInfo}
@@ -171,6 +173,32 @@ object BuiltIn {
         )
     }
 
+    private def multipleInstr[Ctx <: StatelessContext](category: Category) = new {
+      def apply(
+          name: String,
+          argsType: Seq[Type],
+          returnType: Seq[Type],
+          instrs: Seq[Instr[Ctx]],
+          argsName: Seq[(String, String)],
+          retComment: String,
+          doc: String,
+          usePreapprovedAssets: Boolean = false,
+          useAssetsInContract: Ast.ContractAssetsAnnotation = Ast.NotUseContractAssets
+      ): SimpleBuiltIn[Ctx] =
+        SimpleBuiltIn(
+          name,
+          argsType,
+          returnType,
+          instrs,
+          usePreapprovedAssets,
+          UseContractAssetsInfo(useAssetsInContract, usePayToContractOnly = false),
+          category,
+          argsName,
+          retComment,
+          doc
+        )
+    }
+
     private def multipleInstrReturn[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
@@ -197,12 +225,14 @@ object BuiltIn {
     }
 
     private[ralph] val cryptography = tag[StatelessContext](Category.Cryptography)
-    private[ralph] val chain        = tag[StatelessContext](Category.Chain)
-    private[ralph] val conversion   = tag[StatelessContext](Category.Conversion)
-    private[ralph] val byteVec      = tag[StatelessContext](Category.ByteVec)
-    private[ralph] val asset        = tag[StatefulContext](Category.Asset)
-    private[ralph] val contract     = tag[StatefulContext](Category.Contract)
-    private[ralph] val subContract  = tag[StatefulContext](Category.SubContract)
+    private[ralph] val cryptographyMultipleInstr =
+      multipleInstr[StatelessContext](Category.Cryptography)
+    private[ralph] val chain       = tag[StatelessContext](Category.Chain)
+    private[ralph] val conversion  = tag[StatelessContext](Category.Conversion)
+    private[ralph] val byteVec     = tag[StatelessContext](Category.ByteVec)
+    private[ralph] val asset       = tag[StatefulContext](Category.Asset)
+    private[ralph] val contract    = tag[StatefulContext](Category.Contract)
+    private[ralph] val subContract = tag[StatefulContext](Category.SubContract)
 
     private[ralph] val chainSimple    = simpleReturn[StatelessContext](Category.Chain)
     private[ralph] val byteVecSimple  = simpleReturn[StatelessContext](Category.ByteVec)
@@ -1096,6 +1126,36 @@ object BuiltIn {
       doc = s"Verifies the signature of the input and public key."
     )
 
+  val verifySecP256R1: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptographyMultipleInstr(
+      "verifySecP256R1",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      Seq[Instr[StatelessContext]](BytesConst(Val.ByteVec(ByteString(1))), VerifySignature),
+      argsName = Seq(
+        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "publicKey" -> "the public key (33 bytes) of the signer",
+        "signature" -> "the signature value (64 bytes)"
+      ),
+      retComment = "",
+      doc = s"Verifies the SecP256R1 signature of the input and public key."
+    )
+
+  val verifyWebAuthn: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptographyMultipleInstr(
+      "verifyWebAuthn",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      Seq[Instr[StatelessContext]](BytesConst(Val.ByteVec(ByteString(3))), VerifySignature),
+      argsName = Seq(
+        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "publicKey" -> "the public key (33 bytes) of the signer",
+        "payload"   -> "the webauthn payload and signature"
+      ),
+      retComment = "",
+      doc = s"Verifies the webauthn of the input and public key."
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1156,7 +1216,9 @@ object BuiltIn {
     i256Min,
     groupOfAddress,
     len,
-    verifySignature
+    verifySignature,
+    verifySecP256R1,
+    verifyWebAuthn
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

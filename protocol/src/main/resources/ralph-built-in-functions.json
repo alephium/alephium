@@ -1056,5 +1056,29 @@
       "@param publicKeyType the type of the public key"
     ],
     "returns": "@returns "
+  },
+  {
+    "name": "verifySecP256R1",
+    "category": "Cryptography",
+    "signature": "fn verifySecP256R1!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
+    "doc": "Verifies the SecP256R1 signature of the input and public key.",
+    "params": [
+      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param publicKey the public key (33 bytes) of the signer",
+      "@param signature the signature value (64 bytes)"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "verifyWebAuthn",
+    "category": "Cryptography",
+    "signature": "fn verifyWebAuthn!(data:ByteVec, publicKey:ByteVec, payload:ByteVec) -> ()",
+    "doc": "Verifies the webauthn of the input and public key.",
+    "params": [
+      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param publicKey the public key (33 bytes) of the signer",
+      "@param payload the webauthn payload and signature"
+    ],
+    "returns": "@returns "
   }
 ]
