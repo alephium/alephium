@@ -180,7 +180,7 @@ object StaticAnalysis {
       case _: vm.StoreMutField | _: vm.StoreMutFieldByIndex.type | _: vm.MigrateWithFields.type =>
         true
       case _ => false
-    }
+    } || func.updatesMap(state)
 
     if (updateFields && !func.useUpdateFields) {
       state.warnNoUpdateFieldsCheck(state.typeId, func.id)
