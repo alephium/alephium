@@ -272,7 +272,7 @@ object GasSchedule {
   val secp256R1UnlockGas: GasBox =
     GasBox.unsafe(GasHash.gas(SecP256R1PublicKey.length).value + GasSignature.gas.value)
 
-  def passkeyUnlockGas(webauthnLength: Int): GasBox = {
+  def webauthnUnlockGas(webauthnLength: Int): GasBox = {
     GasBox.unsafe(
       GasHash.gas(SecP256R1PublicKey.length + webauthnLength).value + GasSignature.gas.value
     )

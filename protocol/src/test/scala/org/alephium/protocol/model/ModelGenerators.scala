@@ -76,7 +76,7 @@ trait LockupScriptGenerators extends Generators {
         Gen.const(()).map(_ => PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)),
         Gen.const(()).map(_ => PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)),
         Gen.const(()).map(_ => PublicKeyLike.ED25519(ED25519PublicKey.generate)),
-        Gen.const(()).map(_ => PublicKeyLike.Passkey(SecP256R1PublicKey.generate))
+        Gen.const(()).map(_ => PublicKeyLike.WebAuthn(SecP256R1PublicKey.generate))
       )
       .map(LockupScript.p2pk(_, groupIndex))
   }

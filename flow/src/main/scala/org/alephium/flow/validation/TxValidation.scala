@@ -894,8 +894,8 @@ object TxValidation {
           checkSecP256R1Signature(txEnv, preImage, gasRemaining, key)
         case PublicKeyLike.ED25519(key) =>
           checkED25519Signature(txEnv, preImage, gasRemaining, key)
-        case PublicKeyLike.Passkey(key) =>
-          checkPasskeySignature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.WebAuthn(key) =>
+          checkWebAuthnSignature(txEnv, preImage, gasRemaining, key)
       }
     }
 
@@ -933,7 +933,7 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkPasskeySignature(
+    protected[validation] def checkWebAuthnSignature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
@@ -947,7 +947,7 @@ object TxValidation {
                 invalidTx(InvalidSignature)
               } else {
                 fromOption(
-                  gasRemaining.sub(GasSchedule.passkeyUnlockGas(webauthn.bytesLength)),
+                  gasRemaining.sub(GasSchedule.webauthnUnlockGas(webauthn.bytesLength)),
                   OutOfGas
                 )
               }

@@ -1037,7 +1037,7 @@ trait FlowFixture
     AVector.fill(n)(createTx())
   }
 
-  def signWithPasskey(
+  def signWithWebAuthn(
       unsignedTx: UnsignedTransaction,
       priKey: SecP256R1PrivateKey
   ): (WebAuthn, Transaction) = {

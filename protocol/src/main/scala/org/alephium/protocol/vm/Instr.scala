@@ -1655,7 +1655,7 @@ case object VerifySignature
         decodeSignature(rawSignature, crypto.ED25519Signature).map(
           crypto.ED25519.verify(rawData, _, publicKey)
         )
-      case PublicKeyLike.Passkey(publicKey) =>
+      case PublicKeyLike.WebAuthn(publicKey) =>
         for {
           signature <-
             if (rawSignature.length < Byte64.length) {

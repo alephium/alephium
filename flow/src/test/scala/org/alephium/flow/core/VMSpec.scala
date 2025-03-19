@@ -1894,15 +1894,15 @@ class VMSpec extends AlephiumSpec with Generators {
     val authenticatorData        = Hash.generate.bytes ++ ByteString(1)
     val webauthn                 = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val messageHash              = webauthn.messageHash(Hash.zero.bytes)
-    val passkeySig0              = SecP256R1.sign(messageHash.bytes, p256r1Pri).bytes
+    val webauthnSig0             = SecP256R1.sign(messageHash.bytes, p256r1Pri).bytes
     val webauthnPayload          = webauthn.encodeForTest().map(_.bytes).reduce(_ ++ _).drop(2)
-    val passkeySig               = Hex.toHexString(webauthnPayload ++ passkeySig0)
+    val webauthnSig              = Hex.toHexString(webauthnPayload ++ webauthnSig0)
     def main(
         p256k1Sig: String,
         ed25519Sig: String,
         bip340Sig: String,
         p256r1Sig: String,
-        passkeySig: String
+        webauthnSig: String
     ) =
       s"""
          |@using(preapprovedAssets = false)
@@ -1914,16 +1914,16 @@ class VMSpec extends AlephiumSpec with Generators {
          |  verifySignature!(#$zero, #${p256k1Pub.toHexString}, #$p256k1Sig, #00)
          |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig, #01)
          |  verifySignature!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig, #02)
-         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$passkeySig, #03)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$webauthnSig, #03)
          |
          |  verifySecP256R1!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig)
-         |  verifyWebAuthn!(#$zero, #${p256r1Pub.toHexString}, #$passkeySig)
+         |  verifyWebAuthn!(#$zero, #${p256r1Pub.toHexString}, #$webauthnSig)
          |}
          |""".stripMargin
-    testSimpleScript(main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, passkeySig))
+    testSimpleScript(main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, webauthnSig))
     val randomSecP256K1Signature = SecP256K1Signature.generate
     failSimpleScript(
-      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig, p256r1Sig, passkeySig),
+      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig, p256r1Sig, webauthnSig),
       InvalidSignature(
         p256k1Pub.bytes,
         Hash.zero.bytes,
@@ -1932,7 +1932,7 @@ class VMSpec extends AlephiumSpec with Generators {
     )
     val randomEd25519Signature = ED25519Signature.generate
     failSimpleScript(
-      main(p256k1Sig, randomEd25519Signature.toHexString, bip340Sig, p256r1Sig, passkeySig),
+      main(p256k1Sig, randomEd25519Signature.toHexString, bip340Sig, p256r1Sig, webauthnSig),
       InvalidSignature(
         ed25519Pub.bytes,
         Hash.zero.bytes,
@@ -1941,7 +1941,7 @@ class VMSpec extends AlephiumSpec with Generators {
     )
     val randomBIP340SchnorrSignature = BIP340SchnorrSignature.generate
     failSimpleScript(
-      main(p256k1Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString, p256r1Sig, passkeySig),
+      main(p256k1Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString, p256r1Sig, webauthnSig),
       InvalidSignature(
         bip340Pub.bytes,
         Hash.zero.bytes,
@@ -1950,20 +1950,20 @@ class VMSpec extends AlephiumSpec with Generators {
     )
     val randomSecP256R1Signature = SecP256R1Signature.generate
     failSimpleScript(
-      main(p256k1Sig, ed25519Sig, bip340Sig, randomSecP256R1Signature.toHexString, passkeySig),
+      main(p256k1Sig, ed25519Sig, bip340Sig, randomSecP256R1Signature.toHexString, webauthnSig),
       InvalidSignature(
         ByteString(1) ++ p256r1Pub.bytes,
         Hash.zero.bytes,
         randomSecP256R1Signature.bytes
       )
     )
-    val randomPasskeySig = webauthnPayload ++ SecP256R1Signature.generate.bytes
+    val randomWebAuthnSig = webauthnPayload ++ SecP256R1Signature.generate.bytes
     failSimpleScript(
-      main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, Hex.toHexString(randomPasskeySig)),
+      main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, Hex.toHexString(randomWebAuthnSig)),
       InvalidSignature(
         ByteString(3) ++ p256r1Pub.bytes,
         Hash.zero.bytes,
-        randomPasskeySig
+        randomWebAuthnSig
       )
     )
   }
@@ -2013,7 +2013,7 @@ class VMSpec extends AlephiumSpec with Generators {
       )
       .rightValue
       .rightValue
-    val tx     = signWithPasskey(unsignedTx, priKey)._2
+    val tx     = signWithWebAuthn(unsignedTx, priKey)._2
     val block0 = mineWithTxs(blockFlow, ChainIndex(groupIndex, groupIndex), AVector(tx))
     block0.nonCoinbase.head.id is tx.id
     addAndCheck(blockFlow, block0)

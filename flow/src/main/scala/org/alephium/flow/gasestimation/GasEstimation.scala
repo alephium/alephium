@@ -129,9 +129,9 @@ object GasEstimation extends StrictLogging {
         GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256R1UnlockGas)
       case _: PublicKeyLike.ED25519 =>
         GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.ed25519UnlockGas)
-      case _: PublicKeyLike.Passkey =>
+      case _: PublicKeyLike.WebAuthn =>
         // scalastyle:off magic.number
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.passkeyUnlockGas(500))
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.webauthnUnlockGas(500))
       // scalastyle:on magic.number
     }
   }

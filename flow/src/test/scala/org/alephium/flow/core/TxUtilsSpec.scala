@@ -2940,11 +2940,11 @@ class TxUtilsSpec extends AlephiumSpec {
     testTransfer()
   }
 
-  it should "test p2pk(passkey) lockup script" in new P2PKLockupScriptFixture {
+  it should "test p2pk(webauthn) lockup script" in new P2PKLockupScriptFixture {
     val (priKey, pubKey)         = SecP256R1.generatePriPub()
-    val publicKey: PublicKeyLike = PublicKeyLike.Passkey(pubKey)
+    val publicKey: PublicKeyLike = PublicKeyLike.WebAuthn(pubKey)
 
-    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)._2
+    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithWebAuthn(unsignedTx, priKey)._2
 
     testTransfer()
   }

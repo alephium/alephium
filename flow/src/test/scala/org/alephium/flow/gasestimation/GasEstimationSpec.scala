@@ -405,7 +405,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
     val publicKey2    = PublicKeyLike.ED25519(ED25519.generatePriPub()._2)
     val lockupScript2 = LockupScript.p2pk(publicKey2, groupIndex)
     GasEstimation.estimateInputGas(lockupScript2) is GasBox.unsafe(4054)
-    val publicKey3    = PublicKeyLike.Passkey(SecP256R1.generatePriPub()._2)
+    val publicKey3    = PublicKeyLike.WebAuthn(SecP256R1.generatePriPub()._2)
     val lockupScript3 = LockupScript.p2pk(publicKey3, groupIndex)
     GasEstimation.estimateInputGas(lockupScript3) is GasBox.unsafe(4432)
 

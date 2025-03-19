@@ -1630,7 +1630,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
-      val extraGas = if (publicKeyType == Some(ByteString(3))) { // passkey
+      val extraGas = if (publicKeyType == Some(ByteString(3))) { // webauthn
         GasBox.unsafe(84)
       } else {
         GasBox.zero
