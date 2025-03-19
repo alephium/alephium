@@ -81,38 +81,21 @@ class WebAuthnSpec extends AlephiumSpec with NumericHelpers {
       .WrongFormat(
         "Failed to deserialize payload length: Too few bytes: expected 68, got 64"
       )
-    WebAuthn
-      .tryDecode(ByteString(-1) ++ payload)
-      .leftValue
-      .getMessage
-      .startsWith("Failed to deserialize payload length") is true
     WebAuthn.tryDecode(createIterator(intSerde.serialize(-1) ++ payload)).leftValue is SerdeError
-      .WrongFormat(
-        "Invalid payload length: must be positive"
-      )
-    WebAuthn.tryDecode(intSerde.serialize(-1) ++ payload).leftValue is SerdeError
       .WrongFormat(
         "Invalid payload length: must be positive"
       )
 
     WebAuthn.tryDecode(createIterator(bytes)) isE webauthn
-    WebAuthn.tryDecode(bytes) isE webauthn
-
     val byte64Array = webauthn.encodeForTest().iterator
     WebAuthn.tryDecode(() => byte64Array.nextOption()) isE webauthn
 
     val validPostfix = ByteString.fromArrayUnsafe(Array.fill[Byte](10)(0))
     WebAuthn.tryDecode(createIterator(bytes ++ validPostfix)) isE webauthn
-    WebAuthn.tryDecode(bytes ++ validPostfix) isE webauthn
 
     val invalidPostfix = bytesGen(10).sample.get
     WebAuthn
       .tryDecode(createIterator(bytes ++ invalidPostfix))
-      .leftValue
-      .getMessage
-      .startsWith("Invalid webauthn payload: unexpected trailing bytes") is true
-    WebAuthn
-      .tryDecode(bytes ++ invalidPostfix)
       .leftValue
       .getMessage
       .startsWith("Invalid webauthn payload: unexpected trailing bytes") is true

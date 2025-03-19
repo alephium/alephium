@@ -119,7 +119,7 @@ object WebAuthn {
     iter(ByteString.empty, chunkSize)
   }
 
-  private def decode(payload: ByteString): SerdeResult[WebAuthn] = {
+  def decode(payload: ByteString): SerdeResult[WebAuthn] = {
     serde._deserialize(payload).flatMap { case Staging(webauthn, rest) =>
       if (rest.exists(_ != 0)) {
         Left(
@@ -136,33 +136,26 @@ object WebAuthn {
     }
   }
 
-  @inline private def decodePayloadLength(bytes: ByteString) = {
+  def tryDecodePayload(nextBytes: () => Option[Byte64]): SerdeResult[ByteString] = {
     for {
-      payloadLength <- serdeImpl[Int]
-        ._deserialize(bytes)
+      firstChunk <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
+      deserialized0 <- serdeImpl[Int]
+        ._deserialize(firstChunk.bytes)
         .left
         .map(e => SerdeError.WrongFormat(s"Failed to deserialize payload length: ${e.getMessage}"))
+      Staging(payloadLength, payloadFirstChunk) = deserialized0
       _ <- Either.cond(
-        payloadLength.value > 0,
+        payloadLength > 0,
         (),
         SerdeError.WrongFormat("Invalid payload length: must be positive")
       )
-    } yield payloadLength
-  }
-
-  def tryDecode(bytes: ByteString): SerdeResult[WebAuthn] = {
-    decodePayloadLength(bytes).flatMap(deserialized => decode(deserialized.rest))
+      chunkSize = (payloadLength - payloadFirstChunk.length + Byte64.length - 1) / Byte64.length
+      restPayload <- extractChunks(nextBytes, chunkSize)
+    } yield payloadFirstChunk ++ restPayload
   }
 
   def tryDecode(nextBytes: () => Option[Byte64]): SerdeResult[WebAuthn] = {
-    for {
-      firstChunk    <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
-      deserialized0 <- decodePayloadLength(firstChunk.bytes)
-      Staging(payloadLength, payloadFirstChunk) = deserialized0
-      chunkSize = (payloadLength - payloadFirstChunk.length + Byte64.length - 1) / Byte64.length
-      restPayload <- extractChunks(nextBytes, chunkSize)
-      webauthn    <- decode(payloadFirstChunk ++ restPayload)
-    } yield webauthn
+    tryDecodePayload(nextBytes).flatMap(decode)
   }
 
   @inline private[vm] def base64urlEncode(bs: ByteString): String = {

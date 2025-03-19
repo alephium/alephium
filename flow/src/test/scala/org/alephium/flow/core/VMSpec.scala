@@ -1895,7 +1895,7 @@ class VMSpec extends AlephiumSpec with Generators {
     val webauthn                 = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val messageHash              = webauthn.messageHash(Hash.zero.bytes)
     val passkeySig0              = SecP256R1.sign(messageHash.bytes, p256r1Pri).bytes
-    val webauthnPayload          = webauthn.encodeForTest().map(_.bytes).reduce(_ ++ _)
+    val webauthnPayload          = webauthn.encodeForTest().map(_.bytes).reduce(_ ++ _).drop(2)
     val passkeySig               = Hex.toHexString(webauthnPayload ++ passkeySig0)
     def main(
         p256k1Sig: String,

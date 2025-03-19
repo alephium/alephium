@@ -1755,7 +1755,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
 
     def sign(challenge: ByteString, pk: crypto.SecP256R1PrivateKey) = {
-      signRaw(challenge, pk).map(_.bytes).reduce(_ ++ _)
+      signRaw(challenge, pk).map(_.bytes).reduce(_ ++ _).drop(2)
     }
   }
 
@@ -1769,7 +1769,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val payload = sign(challenge, priKey)
     stack.push(Val.ByteVec(payload.drop(1)))
     stack.push(Val.ByteVec(ByteString(3)))
-    VerifySignature.runWith(frame).leftValue isE InvalidSignatureFormat(payload.drop(1))
+    VerifySignature.runWith(frame).leftValue isE a[InvalidWebAuthnPayload]
   }
 
   it should "GetSegregatedWebAuthnSignature" in new StatelessInstrFixture with WebAuthnFixture {
@@ -1777,7 +1777,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val tx         = transactionGen().sample.get
     val signatures = signRaw(tx.id.bytes, priKey)
 
-    val signatureStack = Stack.ofCapacity[Byte64](signatures.length)
+    val signatureStack = Stack.ofCapacity[Byte64](signatures.length + 1)
+    val signature0     = Byte64.from(bytesGen(64).sample.get).get
+    signatureStack.push(signature0)
     signatureStack.push(signatures.reverse)
 
     override lazy val frame = prepareFrame(
@@ -1787,10 +1789,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val initialGas = context.gasRemaining
     GetSegregatedWebAuthnSignature.runWith(frame) isE ()
-    initialGas.subUnsafe(context.gasRemaining) is GasVeryLow.gas
+    initialGas.subUnsafe(context.gasRemaining) is GasMid.gas
     stack.size is 1
-    stack.top.get is Val.ByteVec(signatures.map(_.bytes).reduce(_ ++ _))
-    GetSegregatedWebAuthnSignature.runWith(frame).leftValue isE StackUnderflow
+    stack.top.get is Val.ByteVec(signatures.map(_.bytes).reduce(_ ++ _).drop(2))
+    frame.ctx.signatures.size is 1
+    frame.ctx.signatures.top.get is signature0
+    GetSegregatedWebAuthnSignature.runWith(frame).leftValue isE a[InvalidWebAuthnPayload]
+
+    signatureStack.push(signature0)
+    GetSegregatedWebAuthnSignatureMockup.runWith(frame) isE ()
+    stack.size is 2
+    stack.top.get is Val.ByteVec(signature0.bytes)
+    frame.ctx.signatures.isEmpty is true
   }
 
   it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture
@@ -4607,7 +4617,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 5,
       /* Below are instructions for Danube hard fork */
-      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 3
+      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 8
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */

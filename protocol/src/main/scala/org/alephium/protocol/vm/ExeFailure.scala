@@ -427,6 +427,8 @@ final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId],
   }
 }
 
+final case class InvalidWebAuthnPayload(error: SerdeError) extends ExeFailure
+
 sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix

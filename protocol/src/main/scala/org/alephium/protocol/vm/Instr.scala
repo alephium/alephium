@@ -1550,12 +1550,12 @@ sealed trait GenericVerifySignature[PubKey, Sig]
   }
 
   override def mockup(): Instr[StatelessContext] = {
-    assume(this.gas() == VerifySignatureMockup.gas())
-    VerifySignatureMockup
+    assume(this.gas() == GenericVerifySignatureMockup.gas())
+    GenericVerifySignatureMockup
   }
 }
 
-sealed trait GenericVerifySignatureMockup[PubKey, Sig]
+sealed trait GenericVerifySignatureMockupBase[PubKey, Sig]
     extends SignatureInstr
     with StatelessInstrCompanion0
     with GasSignature {
@@ -1568,8 +1568,8 @@ sealed trait GenericVerifySignatureMockup[PubKey, Sig]
   }
 }
 
-case object VerifySignatureMockup
-    extends GenericVerifySignatureMockup[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
+case object GenericVerifySignatureMockup
+    extends GenericVerifySignatureMockupBase[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
   override lazy val code: Byte = Instr.mockupCode
 }
 
@@ -1664,9 +1664,9 @@ case object VerifySignature
               Right(crypto.SecP256R1Signature.unsafe(rawSignature.takeRight(Byte64.length)))
             }
           webauthn <- WebAuthn
-            .tryDecode(rawSignature.dropRight(Byte64.length))
+            .decode(rawSignature.dropRight(Byte64.length))
             .left
-            .map(_ => Right(InvalidSignatureFormat(rawSignature)))
+            .map(error => Right(InvalidWebAuthnPayload(error)))
           _ <- frame.ctx.chargeGas(GasHash.gas(webauthn.bytesLength))
         } yield webauthn.verify(rawData, signature, publicKey)
     }
@@ -1694,30 +1694,48 @@ case object VerifySignature
   }
 
   override def mockup(): Instr[StatelessContext] = {
-    assume(this.gas() == VerifySignatureMockup1.gas())
-    VerifySignatureMockup1
+    assume(this.gas() == VerifySignatureMockup.gas())
+    VerifySignatureMockup
   }
 }
 
 case object GetSegregatedWebAuthnSignature
     extends SignatureInstr
     with StatelessInstrCompanion0
-    with GasVeryLow
+    with GasMid
     with DanubeInstrWithSimpleGas[StatelessContext] {
   def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    val size = frame.ctx.signatures.size
-    frame.ctx.signatures.pop(size).flatMap { signatures =>
-      if (signatures.isEmpty) {
-        failed(StackUnderflow)
-      } else {
-        val bytes = signatures.view.reverse.map(_.bytes).foldLeft(ByteString.empty)(_ ++ _)
-        frame.pushOpStack(Val.ByteVec(bytes))
-      }
-    }
+    val nextBytes = () => frame.ctx.signatures.pop().toOption
+    for {
+      payload <- WebAuthn
+        .tryDecodePayload(nextBytes)
+        .left
+        .map(error => Right(InvalidWebAuthnPayload(error)))
+      signature <- frame.ctx.signatures.pop()
+      _         <- frame.pushOpStack(Val.ByteVec(payload ++ signature.bytes))
+    } yield ()
+  }
+
+  override def mockup(): Instr[StatelessContext] = {
+    assume(this.gas() == GetSegregatedWebAuthnSignatureMockup.gas())
+    GetSegregatedWebAuthnSignatureMockup
   }
 }
 
-case object VerifySignatureMockup1
+case object GetSegregatedWebAuthnSignatureMockup
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasMid {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      payload <- frame.ctx.signatures.pop()
+      _       <- frame.pushOpStack(Val.ByteVec(payload.bytes))
+    } yield ()
+  }
+  override lazy val code: Byte = Instr.mockupCode
+}
+
+case object VerifySignatureMockup
     extends SignatureInstr
     with StatelessInstrCompanion0
     with GasSignature {

@@ -1123,7 +1123,8 @@ object BuiltIn {
         "publicKeyType" -> "the type of the public key"
       ),
       retComment = "",
-      doc = s"Verifies the signature of the input and public key."
+      doc =
+        "(Deprecated) Verifies the signature of the input and public key. This function is deprecated, please use the other specific verify functions instead."
     )
 
   val verifySecP256R1: SimpleBuiltIn[StatelessContext] =
@@ -1138,7 +1139,7 @@ object BuiltIn {
         "signature" -> "the signature value (64 bytes)"
       ),
       retComment = "",
-      doc = s"Verifies the SecP256R1 signature of the input and public key."
+      doc = "Verifies the SecP256R1 signature of the input data using the provided public key."
     )
 
   val verifyWebAuthn: SimpleBuiltIn[StatelessContext] =
@@ -1148,12 +1149,12 @@ object BuiltIn {
       Seq.empty,
       Seq[Instr[StatelessContext]](BytesConst(Val.ByteVec(ByteString(3))), VerifySignature),
       argsName = Seq(
-        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "challenge" -> "The challenge (32 bytes) in the webauthn client data that was supposed to have been signed",
         "publicKey" -> "the public key (33 bytes) of the signer",
-        "payload"   -> "the webauthn payload and signature"
+        "payload"   -> "the WebAuthn payload containing the signature and authenticator data"
       ),
       retComment = "",
-      doc = s"Verifies the webauthn of the input and public key."
+      doc = "Verifies a WebAuthn signature for the input data using the provided public key."
     )
 
   val getSegregatedWebAuthnSignature: SimpleBuiltIn[StatelessContext] =
@@ -1163,8 +1164,9 @@ object BuiltIn {
       Seq(Type.ByteVec),
       GetSegregatedWebAuthnSignature,
       argsName = Seq.empty,
-      retComment = "the segregated webauthn signature of the transaction",
-      doc = "The segregated webauthn signature of the transaction"
+      retComment =
+        "the segregated WebAuthn payload containing the signature and authenticator data",
+      doc = "Retrieves the segregated WebAuthn signature payload from the current transaction"
     )
 
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(

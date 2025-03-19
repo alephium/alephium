@@ -1048,7 +1048,7 @@
     "name": "verifySignature",
     "category": "Cryptography",
     "signature": "fn verifySignature!(data:ByteVec, publicKey:ByteVec, signature:ByteVec, publicKeyType:ByteVec) -> ()",
-    "doc": "Verifies the signature of the input and public key.",
+    "doc": "(Deprecated) Verifies the signature of the input and public key. This function is deprecated, please use the other specific verify functions instead.",
     "params": [
       "@param data the data that was supposed to have been signed",
       "@param publicKey the public key of the signer",
@@ -1061,7 +1061,7 @@
     "name": "verifySecP256R1",
     "category": "Cryptography",
     "signature": "fn verifySecP256R1!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
-    "doc": "Verifies the SecP256R1 signature of the input and public key.",
+    "doc": "Verifies the SecP256R1 signature of the input data using the provided public key.",
     "params": [
       "@param data the data (32 bytes) that was supposed to have been signed",
       "@param publicKey the public key (33 bytes) of the signer",
@@ -1072,12 +1072,12 @@
   {
     "name": "verifyWebAuthn",
     "category": "Cryptography",
-    "signature": "fn verifyWebAuthn!(data:ByteVec, publicKey:ByteVec, payload:ByteVec) -> ()",
-    "doc": "Verifies the webauthn of the input and public key.",
+    "signature": "fn verifyWebAuthn!(challenge:ByteVec, publicKey:ByteVec, payload:ByteVec) -> ()",
+    "doc": "Verifies a WebAuthn signature for the input data using the provided public key.",
     "params": [
-      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param challenge The challenge (32 bytes) in the webauthn client data that was supposed to have been signed",
       "@param publicKey the public key (33 bytes) of the signer",
-      "@param payload the webauthn payload and signature"
+      "@param payload the WebAuthn payload containing the signature and authenticator data"
     ],
     "returns": "@returns "
   },
@@ -1085,8 +1085,8 @@
     "name": "getSegregatedWebAuthnSignature",
     "category": "Cryptography",
     "signature": "fn getSegregatedWebAuthnSignature!() -> (ByteVec)",
-    "doc": "The segregated webauthn signature of the transaction",
+    "doc": "Retrieves the segregated WebAuthn signature payload from the current transaction",
     "params": [],
-    "returns": "@returns the segregated webauthn signature of the transaction"
+    "returns": "@returns the segregated WebAuthn payload containing the signature and authenticator data"
   }
 ]
