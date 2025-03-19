@@ -1154,7 +1154,7 @@ object BuiltIn {
         "payload"   -> "the WebAuthn payload containing the signature and authenticator data"
       ),
       retComment = "",
-      doc = "Verifies a WebAuthn signature for the input data using the provided public key."
+      doc = "Verifies a WebAuthn signature for the input challenge using the provided public key."
     )
 
   val getSegregatedWebAuthnSignature: SimpleBuiltIn[StatelessContext] =

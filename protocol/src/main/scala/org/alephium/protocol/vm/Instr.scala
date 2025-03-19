@@ -1675,8 +1675,14 @@ case object VerifySignature
   def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       publicKeyType <- frame.popOpStackByteVec()
-      rawSignature  <- frame.popOpStackByteVec()
-      rawPublicKey  <- frame.popOpStackByteVec()
+      _ <-
+        if (publicKeyType.bytes.length != 1) {
+          failed(InvalidPublicKeyType(publicKeyType.bytes))
+        } else {
+          okay
+        }
+      rawSignature <- frame.popOpStackByteVec()
+      rawPublicKey <- frame.popOpStackByteVec()
       publicKeyBytes = publicKeyType.bytes ++ rawPublicKey.bytes
       publicKey <- decode[PublicKeyLike](publicKeyBytes).left.map(_ =>
         Right(InvalidPublicKey(publicKeyBytes))

@@ -1073,7 +1073,7 @@
     "name": "verifyWebAuthn",
     "category": "Cryptography",
     "signature": "fn verifyWebAuthn!(challenge:ByteVec, publicKey:ByteVec, payload:ByteVec) -> ()",
-    "doc": "Verifies a WebAuthn signature for the input data using the provided public key.",
+    "doc": "Verifies a WebAuthn signature for the input challenge using the provided public key.",
     "params": [
       "@param challenge The challenge (32 bytes) in the webauthn client data that was supposed to have been signed",
       "@param publicKey the public key (33 bytes) of the signer",

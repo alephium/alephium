@@ -1659,15 +1659,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.isEmpty is true
 
       if (publicKeyType.isDefined) {
-        val invalidPublicKeyType = ByteString(nextInt(4, 255).toByte) ++ dataGen.sample.get
+        val invalidPublicKeyType0 = ByteString(nextInt(4, 255).toByte)
         stack.push(Val.ByteVec(pubKey.bytes))
         stack.push(Val.ByteVec(signature))
-        stack.push(Val.ByteVec(invalidPublicKeyType))
+        stack.push(Val.ByteVec(invalidPublicKeyType0))
         instr
           .runWith(frame)
           .leftValue
           .rightValue
-          .toString is s"Invalid public key: ${Hex.toHexString(invalidPublicKeyType ++ pubKey.bytes)}"
+          .toString is s"Invalid public key: ${Hex.toHexString(invalidPublicKeyType0 ++ pubKey.bytes)}"
+
+        val invalidPublicKeyType1 =
+          ByteString(nextInt(4, 255).toByte) ++ bytesGen(nextInt(1, 5)).sample.get
+        stack.push(Val.ByteVec(invalidPublicKeyType1))
+        instr.runWith(frame).leftValue isE InvalidPublicKeyType(invalidPublicKeyType1)
       }
 
       val signedData = dataGen.sample.get
