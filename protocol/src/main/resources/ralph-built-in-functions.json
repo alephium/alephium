@@ -606,9 +606,9 @@
     "name": "blockTimeStamp",
     "category": "Chain",
     "signature": "fn blockTimeStamp!() -> (U256)",
-    "doc": "Returns the block timestamp in milliseconds.",
+    "doc": "Returns the timestamp of the current block in milliseconds since the Unix epoch.",
     "params": [],
-    "returns": "@returns the block timestamp in milliseconds"
+    "returns": "@returns the timestamp of the current block in milliseconds since the Unix epoch"
   },
   {
     "name": "blockTarget",
