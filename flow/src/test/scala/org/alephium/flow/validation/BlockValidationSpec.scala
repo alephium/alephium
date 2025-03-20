@@ -1069,12 +1069,20 @@ class BlockValidationSpec extends AlephiumSpec {
     val miner                      = getGenesisLockupScript(chainIndex.to)
     val uncleHeight                = nextInt(1, ALPH.MaxGhostUncleAge - 1)
     val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight)
-    val template                   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    template.ghostUncleHashes.contains(ghostUncle0.hash) is true
-    template.ghostUncleHashes.contains(ghostUncle1.hash) is true
-    val block = mine(blockFlow, template)
-    checkBlock(block, blockFlow).isRight is true
-    addAndCheck(blockFlow, block)
+    val template0                  = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.ghostUncleHashes.contains(ghostUncle0.hash) is true
+    template0.ghostUncleHashes.contains(ghostUncle1.hash) is true
+    val block0 = mine(blockFlow, template0)
+    checkBlock(block0, blockFlow).isRight is true
+
+    val ghostUncle2 = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight)
+    BlockHeader.fromSameTemplate(ghostUncle0.header, ghostUncle2.header) is true
+    val uncleHashes = sortGhostUncleHashes(AVector(ghostUncle0.hash, ghostUncle2.hash))
+    val template1   = template0.setGhostUncles(blockFlow, uncleHashes)
+    val block1      = mine(blockFlow, template1)
+    checkBlock(block0, blockFlow).isRight is true
+
+    addAndCheck(blockFlow, block0, block1)
   }
 
   it should "invalidate block if there are duplicate ghost uncles since danube" in new Fixture
@@ -1100,13 +1108,23 @@ class BlockValidationSpec extends AlephiumSpec {
     val block2            = mine(blockFlow, blockTemplate2)
     checkBlock(block2, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(ghostUncle0.hash)
 
-    val uncleHeight1 = ALPH.MaxGhostUncleAge
-    val ghostUncle2  = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight1)
-    addAndCheck(blockFlow, ghostUncle2)
+    val ghostUncle2 = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle1)
+    BlockHeader.fromSameTemplate(ghostUncle1.header, ghostUncle2.header) is true
     val ghostUncleHashes2 = sortGhostUncleHashes(AVector(ghostUncle1.hash, ghostUncle2.hash))
     val blockTemplate3    = blockTemplate0.setGhostUncles(blockFlow, ghostUncleHashes2)
     val block3            = mine(blockFlow, blockTemplate3)
-    checkBlock(block3, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(ghostUncle2.hash)
+    checkBlock(block3, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(
+      ghostUncleHashes2.last
+    )
+
+    val uncleHeight1      = ALPH.MaxGhostUncleAge
+    val ghostUncle3       = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight1)
+    val ghostUncleHashes3 = sortGhostUncleHashes(AVector(ghostUncle1.hash, ghostUncle3.hash))
+    val blockTemplate4    = blockTemplate0.setGhostUncles(blockFlow, ghostUncleHashes3)
+    val block4            = mine(blockFlow, blockTemplate4)
+    checkBlock(block4, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(ghostUncle3.hash)
+
+    addAndCheck(blockFlow, block0, block1)
   }
 
   it should "invalidate block with invalid uncle intra deps: since-rhone" in new Fixture {

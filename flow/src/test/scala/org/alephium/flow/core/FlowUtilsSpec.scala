@@ -752,12 +752,20 @@ class FlowUtilsSpec extends AlephiumSpec {
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
 
-    val uncleHeight                = nextInt(1, ALPH.MaxGhostUncleAge - 1)
-    val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight)
+    val uncleHeight0               = nextInt(1, ALPH.MaxGhostUncleAge - 2)
+    val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
     val miner                      = getGenesisLockupScript(chainIndex.to)
-    val blockTemplate              = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    blockTemplate.ghostUncleHashes.contains(ghostUncle0.hash) is true
-    blockTemplate.ghostUncleHashes.contains(ghostUncle1.hash) is true
+    val blockTemplate0             = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle0.hash) is true
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle1.hash) is true
+
+    val uncleHeight1 = uncleHeight0 + 1
+    val ghostUncle3  = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight1)
+    val ghostUncle4  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle3)
+    BlockHeader.fromSameTemplate(ghostUncle3.header, ghostUncle4.header) is true
+    val blockTemplate1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle3.hash) is true
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle4.hash) is true
   }
 
   it should "not select duplicate ghost uncles since danube" in new GhostUncleFixture
@@ -766,20 +774,33 @@ class FlowUtilsSpec extends AlephiumSpec {
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
 
-    val uncleHeight0                 = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val uncleHeight0                 = nextInt(1, ALPH.MaxGhostUncleAge - 2)
     val (ghostUncle00, ghostUncle01) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
     val miner                        = getGenesisLockupScript(chainIndex.to)
     val blockTemplate0               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate0.ghostUncleHashes.contains(ghostUncle00.hash) is false
     blockTemplate0.ghostUncleHashes.contains(ghostUncle01.hash) is true
 
-    val uncleHeight1                 = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val uncleHeight1                 = nextInt(1, ALPH.MaxGhostUncleAge - 2)
     val (ghostUncle10, ghostUncle11) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight1)
     val blockTemplate1               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate1.ghostUncleHashes.contains(ghostUncle00.hash) is false
     blockTemplate1.ghostUncleHashes.contains(ghostUncle01.hash) is true
     blockTemplate1.ghostUncleHashes.contains(ghostUncle10.hash) is false
     blockTemplate1.ghostUncleHashes.contains(ghostUncle11.hash) is true
+
+    val uncleHeight2 = math.max(uncleHeight0, uncleHeight1) + 1
+    val ghostUncle2  = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight2)
+    val ghostUncle3  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle2)
+    val ghostUncle4  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle2)
+    BlockHeader.fromSameTemplate(ghostUncle2.header, ghostUncle3.header) is true
+    BlockHeader.fromSameTemplate(ghostUncle2.header, ghostUncle4.header) is true
+    val uncleHashes = blockFlow.getHashes(chainIndex, uncleHeight2).rightValue.tail
+    uncleHashes.toSet is Set(ghostUncle2.hash, ghostUncle3.hash, ghostUncle4.hash)
+    val blockTemplate2 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate2.ghostUncleHashes.length is 2
+    blockTemplate2.ghostUncleHashes.contains(uncleHashes.head) is true
+    uncleHashes.tail.foreach(blockTemplate2.ghostUncleHashes.contains(_) is false)
 
     val block0 = mine(blockFlow, blockTemplate0)
     val block1 = mine(blockFlow, blockTemplate1)

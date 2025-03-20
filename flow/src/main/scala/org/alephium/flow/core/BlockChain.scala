@@ -125,16 +125,27 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     IOUtils.tryExecute(getUsedGhostUnclesAndAncestorsUnsafe(parentHeader))
   }
 
-  @inline private def isDuplicateGhostUncle(
+  private def selectGhostUncles(
       hardFork: HardFork,
+      requiredSize: Int,
       mainChainHeader: BlockHeader,
-      uncleHeader: BlockHeader
-  ): Boolean = {
-    if (hardFork.isDanubeEnabled()) {
-      BlockHeader.fromSameTemplate(mainChainHeader, uncleHeader)
-    } else {
-      false
+      uncleBlocks: AVector[Block],
+      isValidGhostUncle: BlockHeader => Boolean
+  ): AVector[Block] = {
+    var selected = AVector.ofCapacity[Block](uncleBlocks.length)
+    uncleBlocks.foreach { uncle =>
+      if ((selected.length < requiredSize) && isValidGhostUncle(uncle.header)) {
+        if (!hardFork.isDanubeEnabled()) {
+          selected = selected :+ uncle
+        } else if (
+          !BlockHeader.fromSameTemplate(mainChainHeader, uncle.header) &&
+          !selected.exists(b => BlockHeader.fromSameTemplate(b.header, uncle.header))
+        ) {
+          selected = selected :+ uncle
+        }
+      }
     }
+    AVector.from(selected)
   }
 
   def selectGhostUnclesUnsafe(
@@ -158,16 +169,19 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         val uncleHeight = getHeightUnsafe(fromHeader.hash)
         val uncleHashes = getHashesUnsafe(uncleHeight).filter(_ != fromHeader.hash)
         val uncleBlocks = uncleHashes.map(getBlockUnsafe)
-        val selected = uncleBlocks
-          .filter(uncle =>
+        val selected = selectGhostUncles(
+          hardFork,
+          ALPH.MaxGhostUncleSize - unclesAcc.length,
+          fromHeader,
+          uncleBlocks,
+          uncle => {
             !usedUncles.contains(uncle.hash) &&
-              ancestors.exists(_ == uncle.parentHash) &&
-              validator(uncle.header) &&
-              !isDuplicateGhostUncle(hardFork, fromHeader, uncle.header)
-          )
-          .map(block =>
-            SelectedGhostUncle(block.hash, block.minerLockupScript, blockHeight - uncleHeight)
-          )
+            ancestors.exists(_ == uncle.parentHash) &&
+            validator(uncle)
+          }
+        ).map(block =>
+          SelectedGhostUncle(block.hash, block.minerLockupScript, blockHeight - uncleHeight)
+        )
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
         iter(parentHeader, num - 1, unclesAcc ++ selected)
       }

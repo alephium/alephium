@@ -223,7 +223,26 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           validBlock(())
         }
       }
+      _ <-
+        if (hardFork.isDanubeEnabled()) {
+          checkDuplicateGhostUnclesSinceDanube(uncles)
+        } else {
+          validBlock(())
+        }
     } yield ()
+  }
+
+  private def checkDuplicateGhostUnclesSinceDanube(
+      uncleBlocks: AVector[Block]
+  ): BlockValidationResult[Unit] = {
+    if (
+      uncleBlocks.length == ALPH.MaxGhostUncleSize &&
+      BlockHeader.fromSameTemplate(uncleBlocks(0).header, uncleBlocks(1).header)
+    ) {
+      invalidBlock(DuplicateGhostUncleSinceDanube(uncleBlocks(1).hash))
+    } else {
+      validBlock(())
+    }
   }
 
   private def checkDuplicateGhostUnclesSinceDanube(

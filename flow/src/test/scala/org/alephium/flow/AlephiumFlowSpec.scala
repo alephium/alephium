@@ -1130,6 +1130,13 @@ trait GhostUncleFixture extends FlowFixture {
     BlockFlowTemplate.from(mainChainBlock, height)
   }
 
+  private def mineDuplicateGhostUncle(blockFlow: BlockFlow, template: BlockFlowTemplate) = {
+    val block = mine(blockFlow, template)
+    block.header.copy(nonce = Nonce.zero) is template.dummyHeader()
+    addAndCheck(blockFlow, block)
+    block
+  }
+
   def mineBlocks(blockFlow: BlockFlow, chainIndex: ChainIndex, size: Int): Unit = {
     (0 until size).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
   }
@@ -1140,9 +1147,13 @@ trait GhostUncleFixture extends FlowFixture {
       height: Int
   ): Block = {
     val template = getBlockTemplate(blockFlow, chainIndex, height)
-    val block    = mine(blockFlow, template)
-    block.header.copy(nonce = Nonce.zero) is template.dummyHeader()
-    block
+    mineDuplicateGhostUncle(blockFlow, template)
+  }
+
+  def mineDuplicateGhostUncleBlock(blockFlow: BlockFlow, templateBlock: Block): Block = {
+    val height   = blockFlow.getHeightUnsafe(templateBlock.hash)
+    val template = BlockFlowTemplate.from(templateBlock, height)
+    mineDuplicateGhostUncle(blockFlow, template)
   }
 
   def mineValidGhostUncleBlockAt(
@@ -1154,6 +1165,7 @@ trait GhostUncleFixture extends FlowFixture {
     val newMiner = LockupScript.p2pkh(chainIndex.to.generateKey._2)
     val block = mine(blockFlow, chainIndex, BlockDeps(template.deps), AVector.empty, newMiner, None)
     block.header.copy(nonce = Nonce.zero) isnot template.dummyHeader()
+    addAndCheck(blockFlow, block)
     block
   }
 
@@ -1164,7 +1176,6 @@ trait GhostUncleFixture extends FlowFixture {
   ): (Block, Block) = {
     val duplicateGhostUncle = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, height)
     val validGhostUncle     = mineValidGhostUncleBlockAt(blockFlow, chainIndex, height)
-    addAndCheck(blockFlow, duplicateGhostUncle, validGhostUncle)
     (duplicateGhostUncle, validGhostUncle)
   }
 }
