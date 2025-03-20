@@ -422,11 +422,15 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       allHandlerProbes.txHandler.expectMsg(SyncedResult(synced))
       allHandlerProbes.blockHandlers.foreach(_._2.expectMsg(SyncedResult(synced)))
       allHandlerProbes.viewHandler.expectMsg(SyncedResult(synced))
+      allHandlerProbes.accountViewHandler.expectMsg(SyncedResult(synced))
     }
 
     def noPublish() = {
+      blockFlowSynchronizer.expectNoMessage()
+      allHandlerProbes.txHandler.expectNoMessage()
       allHandlerProbes.blockHandlers.foreach(_._2.expectNoMessage())
       allHandlerProbes.viewHandler.expectNoMessage()
+      allHandlerProbes.accountViewHandler.expectNoMessage()
     }
 
     override lazy val numBootstrapNodes: Int = 1

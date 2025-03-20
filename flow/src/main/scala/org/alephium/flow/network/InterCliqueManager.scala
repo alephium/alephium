@@ -342,6 +342,7 @@ class InterCliqueManager(
     allHandlers.viewHandler.ref ! result
     allHandlers.txHandler.ref ! result
     allHandlers.blockHandlers.foreach(_._2.ref ! result)
+    allHandlers.accountViewHandler.ref ! result
   }
 
   def connect(broker: BrokerInfo): Unit = {
