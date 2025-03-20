@@ -30,7 +30,7 @@ import org.alephium.crypto
 import org.alephium.crypto.Byte64
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
+import org.alephium.protocol.config.NetworkConfigFixture.{Danube, Genesis, Leman}
 import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde._
@@ -2216,7 +2216,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         txEnvOpt: Option[TxEnv] = None,
         callerFrameOpt: Option[StatefulFrame] = None,
         immFields: AVector[Val] = AVector(Val.False),
-        mutFields: AVector[Val] = AVector(Val.True)
+        mutFields: AVector[Val] = AVector(Val.True),
+        contractIdOpt: Option[ContractId] = None
     )(implicit networkConfig: NetworkConfig) = {
       val (obj, ctx) =
         prepareContract(
@@ -2224,7 +2225,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           immFields,
           mutFields,
           contractOutputOpt = contractOutputOpt,
-          txEnvOpt = txEnvOpt
+          txEnvOpt = txEnvOpt,
+          contractIdOpt = contractIdOpt
         )
       Frame
         .stateful(
@@ -2238,6 +2240,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           _ => okay
         )
         .rightValue
+    }
+
+    def preparePreDanubeFrame(
+        balanceState: Option[MutBalanceState] = None,
+        contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
+        txEnvOpt: Option[TxEnv] = None,
+        callerFrameOpt: Option[StatefulFrame] = None
+    ) = {
+      val config = NetworkConfigFixture.PreDanube
+      if (config.getHardFork(TimeStamp.now()).isLemanEnabled()) {
+        prepareFrame(balanceState, contractOutputOpt, txEnvOpt, callerFrameOpt)(config)
+      } else {
+        preparePreLemanFrame(balanceState, contractOutputOpt, txEnvOpt, callerFrameOpt)
+      }
     }
 
     def preparePreRhoneFrame(
@@ -4447,6 +4463,124 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  trait ExternalCallerFixture extends ContractInstrFixture with TxEnvFixture {
+    def prepareScriptFrame(config: NetworkConfig = Danube) = {
+      prepareFrame(txEnvOpt = Some(txEnvWithUniqueAddress))(config)
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+    }
+
+    def prepareContractFrame(
+        callerFrameOpt: Option[StatefulFrame] = None,
+        contractIdOpt: Option[ContractId] = None,
+        config: NetworkConfig = Danube
+    ) = {
+      prepareFrame(
+        txEnvOpt = callerFrameOpt.map(_.ctx.txEnv),
+        callerFrameOpt = callerFrameOpt,
+        contractIdOpt = contractIdOpt
+      )(config)
+        .asInstanceOf[StatefulFrame]
+    }
+  }
+
+  it should "ExternalCallerAddress" in new ExternalCallerFixture {
+    {
+      info("Not activated in PreDanube")
+      ExternalCallerAddress.runWith(preparePreDanubeFrame()).leftValue isE
+        InactiveInstr(ExternalCallerAddress)
+    }
+
+    {
+      info("Current frame is a script frame")
+      val frame = prepareScriptFrame()
+      ExternalCallerAddress.runWith(frame).leftValue isE CurrentFrameIsNotContract
+    }
+
+    {
+      info("Current frame is a contract but has no caller frame")
+      val frame = prepareContractFrame()
+      ExternalCallerAddress.runWith(frame).leftValue isE ExternalCallerNotAvailable
+    }
+
+    {
+      info("Current frame is a contract with caller script frame")
+      val scriptFrame = prepareScriptFrame()
+      val frame       = prepareContractFrame(callerFrameOpt = Some(scriptFrame))
+      test(
+        ExternalCallerAddress,
+        uniqueAddress,
+        frame,
+        GasUniqueAddress.gas(txEnvWithUniqueAddress.prevOutputs.length)
+      )
+    }
+
+    {
+      info("Current frame caller is a contract from the same contract")
+      val contractId  = ContractId.random
+      val scriptFrame = prepareScriptFrame()
+      val callerFrame =
+        prepareContractFrame(callerFrameOpt = Some(scriptFrame), contractIdOpt = Some(contractId))
+
+      val frame =
+        prepareContractFrame(callerFrameOpt = Some(callerFrame), contractIdOpt = Some(contractId))
+
+      test(ExternalCallerAddress, uniqueAddress, frame)
+    }
+
+    {
+      info("Current frame caller is a contract from a different contract")
+      val callerContractId = ContractId.random
+      val callerFrame = prepareContractFrame(
+        callerFrameOpt = Some(prepareScriptFrame()),
+        contractIdOpt = Some(callerContractId)
+      )
+      val frame = prepareContractFrame(callerFrameOpt = Some(callerFrame))
+      test(ExternalCallerAddress, Val.Address(LockupScript.p2c(callerContractId)), frame)
+    }
+
+    {
+      info("The external caller of current frame is a contract from a different contract")
+      val contractId       = ContractId.random
+      val callerContractId = ContractId.random
+      val callerFrame0 = prepareContractFrame(
+        callerFrameOpt = Some(prepareScriptFrame()),
+        contractIdOpt = Some(callerContractId)
+      )
+      val callerFrame1 =
+        prepareContractFrame(callerFrameOpt = Some(callerFrame0), contractIdOpt = Some(contractId))
+      val frame =
+        prepareContractFrame(callerFrameOpt = Some(callerFrame1), contractIdOpt = Some(contractId))
+      test(ExternalCallerAddress, Val.Address(LockupScript.p2c(callerContractId)), frame)
+    }
+  }
+
+  it should "ExternalCallerId" in new ExternalCallerFixture {
+    {
+      info("Not activated in PreDanube")
+      ExternalCallerId.runWith(preparePreDanubeFrame()).leftValue isE
+        InactiveInstr(ExternalCallerId)
+    }
+
+    {
+      info("Current frame is a script frame")
+      val scriptFrame = prepareScriptFrame()
+      ExternalCallerId.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
+      ExternalCallerAddress.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
+    }
+
+    {
+      info("Current frame caller is a contract from a different contract")
+      val callerContractId = ContractId.random
+      val callerFrame = prepareContractFrame(
+        callerFrameOpt = Some(prepareScriptFrame()),
+        contractIdOpt = Some(callerContractId)
+      )
+      val frame = prepareContractFrame(callerFrameOpt = Some(callerFrame))
+      test(ExternalCallerId, Val.ByteVec(callerContractId.bytes), frame)
+    }
+  }
+
   it should "IsCalledFromTxScript" in new CallerFrameFixture {
     test(IsCalledFromTxScript, Val.Bool(false))
   }
@@ -4641,7 +4775,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
       LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000,
-      MethodSelector(Method.Selector(0)) -> 10 /* CallExternalBySelector(selector) -> ??? */
+      MethodSelector(Method.Selector(0)) -> 10, /* CallExternalBySelector(selector) -> ??? */
+      /* Below are instructions for Danube hard fork */
+      ExternalCallerId -> 5, ExternalCallerAddress -> 5
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -4775,8 +4911,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
+      /* Below are instructions for Rhone hard fork */
       LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(0, 0) -> 210,
-      MethodSelector(Method.Selector(0)) -> 211, CallExternalBySelector(Method.Selector(0)) -> 212
+      MethodSelector(Method.Selector(0)) -> 211, CallExternalBySelector(Method.Selector(0)) -> 212,
+      /* Below are instructions for Danube hard fork */
+      ExternalCallerId -> 213, ExternalCallerAddress -> 214
     )
     // format: on
 
@@ -4851,8 +4990,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes),
-      MethodSelector(Method.Selector(0)), CallExternalBySelector(Method.Selector(0))
+      LoadImmField(0.toByte), LoadImmFieldByIndex,
+      /* Below are instructions for Rhone hard fork */
+      PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes),
+      MethodSelector(Method.Selector(0)), CallExternalBySelector(Method.Selector(0)),
+      /* Below are instructions for Danube hard fork */
+      ExternalCallerId, ExternalCallerAddress
     )
     // format: on
   }
