@@ -609,6 +609,16 @@ trait FlowFixture
       blockFlow.rebuild(template, txs, uncles, miner)
     }
 
+    def setGhostUncles(blockFlow: BlockFlow, uncleHashes: AVector[BlockHash]): BlockFlowTemplate = {
+      val height = template.height
+      val ghostUncles = uncleHashes.map { hash =>
+        val uncleBlock  = blockFlow.getBlockUnsafe(hash)
+        val uncleHeight = blockFlow.getHeightUnsafe(hash)
+        SelectedGhostUncle(hash, uncleBlock.minerLockupScript, height - uncleHeight)
+      }
+      setGhostUncles(ghostUncles)
+    }
+
     lazy val ghostUncleHashes: AVector[BlockHash] = {
       val coinbase = template.transactions.last
       deserialize[CoinbaseData](
@@ -1110,6 +1120,52 @@ trait FlowFixture
     val hashes = blockFlow.getHashes(chainIndex, height).rightValue
     hashes.length is 2
     (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
+  }
+}
+
+trait GhostUncleFixture extends FlowFixture {
+  private def getBlockTemplate(blockFlow: BlockFlow, chainIndex: ChainIndex, height: Int) = {
+    val hash           = blockFlow.getHashes(chainIndex, height).rightValue.head
+    val mainChainBlock = blockFlow.getBlockUnsafe(hash)
+    BlockFlowTemplate.from(mainChainBlock, height)
+  }
+
+  def mineBlocks(blockFlow: BlockFlow, chainIndex: ChainIndex, size: Int): Unit = {
+    (0 until size).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+  }
+
+  def mineDuplicateGhostUncleBlockAt(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      height: Int
+  ): Block = {
+    val template = getBlockTemplate(blockFlow, chainIndex, height)
+    val block    = mine(blockFlow, template)
+    block.header.copy(nonce = Nonce.zero) is template.dummyHeader()
+    block
+  }
+
+  def mineValidGhostUncleBlockAt(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      height: Int
+  ): Block = {
+    val template = getBlockTemplate(blockFlow, chainIndex, height)
+    val newMiner = LockupScript.p2pkh(chainIndex.to.generateKey._2)
+    val block = mine(blockFlow, chainIndex, BlockDeps(template.deps), AVector.empty, newMiner, None)
+    block.header.copy(nonce = Nonce.zero) isnot template.dummyHeader()
+    block
+  }
+
+  def mineTwoGhostUnclesAt(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      height: Int
+  ): (Block, Block) = {
+    val duplicateGhostUncle = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, height)
+    val validGhostUncle     = mineValidGhostUncleBlockAt(blockFlow, chainIndex, height)
+    addAndCheck(blockFlow, duplicateGhostUncle, validGhostUncle)
+    (duplicateGhostUncle, validGhostUncle)
   }
 }
 

@@ -21,7 +21,7 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalacheck.Gen
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.model.BlockFlowTemplate
@@ -745,6 +745,45 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     val block2 = mineBlockTemplate(blockFlow, chainIndex)
     block2.ghostUncleHashes.rightValue is AVector(uncle1.hash)
+  }
+
+  it should "select duplicate ghost uncles before danube" in new GhostUncleFixture with Generators {
+    setHardFork(HardFork.Rhone)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight                = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight)
+    val miner                      = getGenesisLockupScript(chainIndex.to)
+    val blockTemplate              = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.ghostUncleHashes.contains(ghostUncle0.hash) is true
+    blockTemplate.ghostUncleHashes.contains(ghostUncle1.hash) is true
+  }
+
+  it should "not select duplicate ghost uncles since danube" in new GhostUncleFixture
+    with Generators {
+    setHardForkSince(HardFork.Danube)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight0                 = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val (ghostUncle00, ghostUncle01) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
+    val miner                        = getGenesisLockupScript(chainIndex.to)
+    val blockTemplate0               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle00.hash) is false
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle01.hash) is true
+
+    val uncleHeight1                 = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val (ghostUncle10, ghostUncle11) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight1)
+    val blockTemplate1               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle00.hash) is false
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle01.hash) is true
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle10.hash) is false
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle11.hash) is true
+
+    val block0 = mine(blockFlow, blockTemplate0)
+    val block1 = mine(blockFlow, blockTemplate1)
+    addAndCheck(blockFlow, block0, block1)
   }
 
   it should "rebuild block template if there are invalid txs" in new FlowFixture {

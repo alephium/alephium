@@ -125,7 +125,20 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     IOUtils.tryExecute(getUsedGhostUnclesAndAncestorsUnsafe(parentHeader))
   }
 
+  @inline private def isDuplicateGhostUncle(
+      hardFork: HardFork,
+      mainChainHeader: BlockHeader,
+      uncleHeader: BlockHeader
+  ): Boolean = {
+    if (hardFork.isDanubeEnabled()) {
+      BlockHeader.fromSameTemplate(mainChainHeader, uncleHeader)
+    } else {
+      false
+    }
+  }
+
   def selectGhostUnclesUnsafe(
+      hardFork: HardFork,
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): AVector[SelectedGhostUncle] = {
@@ -149,7 +162,8 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
           .filter(uncle =>
             !usedUncles.contains(uncle.hash) &&
               ancestors.exists(_ == uncle.parentHash) &&
-              validator(uncle.header)
+              validator(uncle.header) &&
+              !isDuplicateGhostUncle(hardFork, fromHeader, uncle.header)
           )
           .map(block =>
             SelectedGhostUncle(block.hash, block.minerLockupScript, blockHeight - uncleHeight)
@@ -164,10 +178,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def selectGhostUncles(
+      hardFork: HardFork,
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): IOResult[AVector[SelectedGhostUncle]] = {
-    IOUtils.tryExecute(selectGhostUnclesUnsafe(parentHeader, validator))
+    IOUtils.tryExecute(selectGhostUnclesUnsafe(hardFork, parentHeader, validator))
   }
 
   def getMainChainBlockByHeight(height: Int): IOResult[Option[Block]] = {

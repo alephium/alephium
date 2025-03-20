@@ -24,7 +24,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{BlockFlow, FlowUtils}
 import org.alephium.flow.gasestimation.GasEstimation
 import org.alephium.flow.io.StoragesFixture
@@ -876,8 +876,12 @@ class BlockValidationSpec extends AlephiumSpec {
     setHardForkSince(HardFork.Rhone)
     lazy val miner = getGenesisLockupScript(chainIndex.to)
 
+    private def randomMiner = LockupScript.p2pkh(chainIndex.to.generateKey._2)
+
+    def minerOf(hash: BlockHash) = blockFlow.getBlockUnsafe(hash).minerLockupScript
+
     def mineBlocks(size: Int): AVector[BlockHash] = {
-      val blocks = (0 to size).map(_ => emptyBlockWithMiner(blockFlow, chainIndex, miner))
+      val blocks = (0 to size).map(_ => emptyBlockWithMiner(blockFlow, chainIndex, randomMiner))
       addAndCheck(blockFlow, blocks: _*)
       val hashes = blockFlow.getHashes(chainIndex, 1).rightValue
       hashes.length is size + 1
@@ -887,7 +891,7 @@ class BlockValidationSpec extends AlephiumSpec {
     def mineChain(size: Int): AVector[Block] = {
       val blockFlow = isolatedBlockFlow()
       val blocks = (0 until size).map(_ => {
-        val block = emptyBlockWithMiner(blockFlow, chainIndex, miner)
+        val block = emptyBlockWithMiner(blockFlow, chainIndex, randomMiner)
         addAndCheck(blockFlow, block)
         block
       })
@@ -982,10 +986,11 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val block1Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     block1Template.ghostUncleHashes.isEmpty is true
+    val usedGhostUncleHash = block0.ghostUncleHashes.rightValue.head
     val block1 = mine(
       blockFlow,
       block1Template.setGhostUncles(
-        AVector(SelectedGhostUncle(block0.ghostUncleHashes.rightValue.head, miner, 1))
+        AVector(SelectedGhostUncle(usedGhostUncleHash, minerOf(usedGhostUncleHash), 1))
       )
     )
     checkBlock(block1, blockFlow).left.value isE GhostUnclesAlreadyUsed
@@ -1052,11 +1057,56 @@ class BlockValidationSpec extends AlephiumSpec {
     blockTemplate.ghostUncleHashes.length is 1
     blockTemplate.height is 5
     val ghostUncleHashes = blockTemplate.ghostUncleHashes ++ hashes.tail
-    val block = mine(
-      blockFlow,
-      blockTemplate.setGhostUncles(ghostUncleHashes.map(hash => SelectedGhostUncle(hash, miner, 1)))
-    )
+    val ghostUncles      = ghostUncleHashes.map(hash => SelectedGhostUncle(hash, minerOf(hash), 1))
+    val block            = mine(blockFlow, blockTemplate.setGhostUncles(ghostUncles))
     checkBlock(block, blockFlow).left.value isE GhostUncleHashConflictWithParentHash
+  }
+
+  it should "allow duplicate ghost uncles before danube" in new Fixture with GhostUncleFixture {
+    setHardFork(HardFork.Rhone)
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val miner                      = getGenesisLockupScript(chainIndex.to)
+    val uncleHeight                = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight)
+    val template                   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template.ghostUncleHashes.contains(ghostUncle0.hash) is true
+    template.ghostUncleHashes.contains(ghostUncle1.hash) is true
+    val block = mine(blockFlow, template)
+    checkBlock(block, blockFlow).isRight is true
+    addAndCheck(blockFlow, block)
+  }
+
+  it should "invalidate block if there are duplicate ghost uncles since danube" in new Fixture
+    with GhostUncleFixture {
+    setHardForkSince(HardFork.Danube)
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight0               = nextInt(1, ALPH.MaxGhostUncleAge - 1)
+    val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
+    val miner                      = getGenesisLockupScript(chainIndex.to)
+    val blockTemplate0             = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle0.hash) is false
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle1.hash) is true
+    val block0 = mine(blockFlow, blockTemplate0)
+    checkBlock(block0, blockFlow).isRight is true
+
+    val blockTemplate1 = blockTemplate0.setGhostUncles(blockFlow, AVector(ghostUncle1.hash))
+    val block1         = mine(blockFlow, blockTemplate1)
+    checkBlock(block1, blockFlow).isRight is true
+
+    val ghostUncleHashes1 = sortGhostUncleHashes(AVector(ghostUncle0.hash, ghostUncle1.hash))
+    val blockTemplate2    = blockTemplate0.setGhostUncles(blockFlow, ghostUncleHashes1)
+    val block2            = mine(blockFlow, blockTemplate2)
+    checkBlock(block2, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(ghostUncle0.hash)
+
+    val uncleHeight1 = ALPH.MaxGhostUncleAge
+    val ghostUncle2  = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight1)
+    addAndCheck(blockFlow, ghostUncle2)
+    val ghostUncleHashes2 = sortGhostUncleHashes(AVector(ghostUncle1.hash, ghostUncle2.hash))
+    val blockTemplate3    = blockTemplate0.setGhostUncles(blockFlow, ghostUncleHashes2)
+    val block3            = mine(blockFlow, blockTemplate3)
+    checkBlock(block3, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(ghostUncle2.hash)
   }
 
   it should "invalidate block with invalid uncle intra deps: since-rhone" in new Fixture {
