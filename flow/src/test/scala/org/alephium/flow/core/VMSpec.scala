@@ -1209,11 +1209,17 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
          |    assert!(callerContractId!() == barId, 0)
          |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |    assert!(callerInitialStateHash!() == barHash, 0)
          |    assert!(callerCodeHash!() == barCodeHash, 0)
          |    assert!(isCalledFromTxScript!() == false, 0)
          |    assert!(isAssetAddress!(barAddress) == false, 0)
          |    assert!(isContractAddress!(barAddress) == true, 0)
+         |  }
+         |
+         |  fn foofoo(barAddress: Address) -> () {
+         |    assert!(callerAddress!() == selfAddress!(), 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |  }
          |}
          |""".stripMargin

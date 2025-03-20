@@ -1655,7 +1655,26 @@ object BuiltIn {
       argsName = Seq(),
       retComment = "the address of the caller",
       doc =
-        "<ol><li>When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same. If not all input addresses are the same, `callAddress!()` function fails.</li><li>When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)</li><li>When used in a contract function called from another contract, returns the address of the calling contract.</li></ol>"
+        s"""<ol>
+           |<li>When used in a TxScript, returns the transaction caller's address. The transaction must have identical input addresses, otherwise the call fails.</li>
+           |<li>When used in a contract function called from a TxScript, returns the transaction caller's address.</li>
+           |<li>When used in a contract function called from another contract, returns the address of the calling contract.</li>
+           |</ol>""".stripMargin
+    )
+  val externalCallerAddress: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.contract(
+      "externalCallerAddress",
+      Seq.empty,
+      Seq(Type.Address),
+      ExternalCallerAddress,
+      argsName = Seq(),
+      retComment = "the address of the external caller",
+      doc =
+        s"""<ol>
+           |<li>When used in a TxScript, fails with 'CurrentFrameIsNotContract' error.</li>
+           |<li>When used in a contract function called from a TxScript, returns the transaction caller's address.</li>
+           |<li>When used in a contract function called from another contract, returns the address of the external calling contract. If multiple calls come from the same contract, it skips intermediate frames to find the first external contract caller.</li>
+           |</ol>""".stripMargin
     )
   // scalastyle:on line.size.limit
 
@@ -1979,6 +1998,7 @@ object BuiltIn {
       contractAddress,
       callerContractId,
       callerAddress,
+      externalCallerAddress,
       contractInitialStateHash,
       contractCodeHash,
       callerInitialStateHash,
