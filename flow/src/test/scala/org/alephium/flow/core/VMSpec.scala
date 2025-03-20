@@ -5027,6 +5027,56 @@ class VMSpec extends AlephiumSpec with Generators {
     test(minimalAlphInContract + 1)
   }
 
+  it should "use tx caller assets if not enough deposit for new contract" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () { return }
+         |}
+         |""".stripMargin
+    val fooCompiled = Compiler.compileContract(foo).rightValue
+    val fooBytecode = Hex.toHexString(serialize(fooCompiled))
+
+    val create =
+      s"""
+         |Contract Create() {
+         |  pub fn noDeposit() -> () {
+         |    createContract!(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withEnoughDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withInsufficientDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withZeroDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: 0}(#$fooBytecode, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val (createContractId, _, _) = createContract(create)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let create = Create(#${createContractId.toHexString})
+         |  create.noDeposit()
+         |  create.withEnoughDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |  create.withInsufficientDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}()
+         |  create.withZeroDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |}
+         |$create
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   it should "call the correct contract method based on the interface method index" in new ContractFixture {
     val fooV0 =
       s"""

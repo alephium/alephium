@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import java.util.Locale
+
 import scala.language.reflectiveCalls
 
 import akka.util.ByteString
@@ -2019,6 +2021,12 @@ object BuiltIn {
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
+  val contractCreationFuncs: Seq[String] = statefulFuncs.keys.filter { name =>
+    val lowerCaseName = name.toLowerCase(Locale.US)
+    lowerCaseName.contains("createcontract") || lowerCaseName.contains("createsubcontract")
+  }.toSeq
+
+  def isContractCreationFunc(funcName: String): Boolean = contractCreationFuncs.contains(funcName)
 
   trait ContractBuiltIn[Ctx <: StatelessContext] extends Compiler.ContractFunc[Ctx] {
     val isPublic: Boolean             = true

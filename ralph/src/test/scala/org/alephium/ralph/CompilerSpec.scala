@@ -9744,4 +9744,44 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.methods(1).usePayToContractOnly is false
     }
   }
+
+  it should "skip preapproved assets check for contract creation" in {
+    val noAnnotation   = ""
+    val withAnnotation = ", preapprovedAssets = true"
+
+    {
+      info("Test createContract without deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  @using(checkExternalCaller = false$annotation)
+           |  pub fn noDeposit() -> () {
+           |    createContract!(#00, #00, #00)
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code(noAnnotation)).isRight is true
+      compileContract(code(withAnnotation)).isRight is true
+    }
+
+    {
+      info("Test createContract with deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  $$@using(checkExternalCaller = false$annotation)
+           |  pub fn withDeposit() -> () {
+           |    createContract!{callerAddress!() -> ALPH: 1}(#00, #00, #00)
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code(noAnnotation),
+        """Function "Create.withDeposit" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"""
+      )
+      compileContract(replace(code(withAnnotation))).isRight is true
+    }
+  }
 }
