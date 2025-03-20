@@ -3416,7 +3416,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val immState = Val.ByteVec(serialize(immFields))
     val mutState = Val.ByteVec(serialize(mutFields))
 
-    def balanceState: MutBalanceState
+    val balanceState = MutBalanceState(
+      MutBalances.empty,
+      alphBalance(from, ALPH.oneAlph)
+    )
 
     val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]
     override lazy val frame = prepareFrame(
@@ -3534,9 +3537,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateContract" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
-
     val values: AVector[Val] = AVector(Val.ByteVec(contractBytes), immState, mutState)
     values.foreach(stack.push)
     test(CreateContract, ALPH.oneAlph, AVector.empty, None)
@@ -3545,19 +3545,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateContractWithToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     val values: AVector[Val] =
       AVector(Val.ByteVec(contractBytes), immState, mutState, Val.U256(ALPH.oneNanoAlph))
     values.foreach(stack.push)
     test(
       CreateContractWithToken,
-      U256.Zero,
-      AVector((tokenId, ALPH.oneAlph)),
+      ALPH.oneAlph,
+      AVector.empty,
       Some(ALPH.oneNanoAlph)
     )
 
@@ -3568,12 +3562,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateContractAndTransferToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     {
       info("create contract and transfer token")
 
@@ -3587,8 +3575,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       values.foreach(stack.push)
       test(
         CreateContractAndTransferToken,
-        U256.Zero,
-        AVector((tokenId, ALPH.oneAlph)),
+        ALPH.oneAlph,
+        AVector.empty,
         tokenAmount = None
       )
 
@@ -3612,9 +3600,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateSubContract" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
-
     val values: AVector[Val] =
       AVector(Val.ByteVec(serialize("nft-01")), Val.ByteVec(contractBytes), immState, mutState)
     values.foreach(stack.push)
@@ -3625,12 +3610,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateSubContractWithToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     val values: AVector[Val] = AVector(
       Val.ByteVec(serialize("nft-01")),
       Val.ByteVec(contractBytes),
@@ -3642,8 +3621,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val subContractId = getSubContractId("nft-01")
     test(
       CreateSubContractWithToken,
-      U256.Zero,
-      AVector((tokenId, ALPH.oneAlph)),
+      ALPH.oneAlph,
+      AVector.empty,
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
     )
@@ -3655,12 +3634,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateSubContractAndTransferToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     {
       info("create sub contract and transfer token")
 
@@ -3676,8 +3649,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val subContractId = getSubContractId("nft-01")
       test(
         CreateSubContractAndTransferToken,
-        U256.Zero,
-        AVector((tokenId, ALPH.oneAlph)),
+        ALPH.oneAlph,
+        AVector.empty,
         tokenAmount = None,
         Some(subContractId)
       )
@@ -3703,9 +3676,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CreateMapEntry" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
-
     override lazy val contract = CreateMapEntry.genContract(immFields.length, mutFields.length)
 
     stack.push(Val.ByteVec(serialize("entity")))
@@ -3922,9 +3892,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
-
     stack.push(Val.ByteVec(serialize(Hash.generate)))
     stack.push(immState)
     stack.push(mutState)
@@ -3937,12 +3904,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CopyCreateContractWithToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     stack.push(Val.ByteVec(serialize(Hash.generate)))
     stack.push(immState)
     stack.push(mutState)
@@ -3955,19 +3916,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
     test(
       CopyCreateContractWithToken,
-      U256.Zero,
-      AVector((tokenId, ALPH.oneAlph)),
+      ALPH.oneAlph,
+      AVector.empty,
       Some(ALPH.oneNanoAlph)
     )
   }
 
   it should "CopyCreateContractAndTransferToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     val assetAddress = Val.Address(assetLockupScriptGen.sample.get)
 
     {
@@ -3980,8 +3935,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(assetAddress)
       test(
         CopyCreateContractAndTransferToken,
-        U256.Zero,
-        AVector((tokenId, ALPH.oneAlph)),
+        ALPH.oneAlph,
+        AVector.empty,
         tokenAmount = None
       )
     }
@@ -4010,9 +3965,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CopyCreateSubContract" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
-
     stack.push(Val.ByteVec(serialize(Hash.generate)))
     stack.push(immState)
     stack.push(mutState)
@@ -4028,12 +3980,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CopyCreateSubContractWithToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     stack.push(Val.ByteVec(serialize(Hash.generate)))
     stack.push(immState)
     stack.push(mutState)
@@ -4049,20 +3995,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val subContractId = getSubContractId("nft-01")
     test(
       CopyCreateSubContractWithToken,
-      U256.Zero,
-      AVector((tokenId, ALPH.oneAlph)),
+      ALPH.oneAlph,
+      AVector.empty,
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
     )
   }
 
   it should "CopyCreateSubContractAndTransferToken" in new CreateContractAbstractFixture {
-    val balanceState =
-      MutBalanceState(
-        MutBalances.empty,
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
-
     val assetAddress = Val.Address(assetLockupScriptGen.sample.get)
 
     {
@@ -4078,8 +4018,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val subContractId = getSubContractId("nft-01")
       test(
         CopyCreateSubContractAndTransferToken,
-        U256.Zero,
-        AVector((tokenId, ALPH.oneAlph)),
+        ALPH.oneAlph,
+        AVector.empty,
         tokenAmount = None,
         Some(subContractId)
       )
