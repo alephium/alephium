@@ -6817,15 +6817,15 @@ class VMSpec extends AlephiumSpec with Generators {
     blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
-  // Inactive instrs check will be enabled in future upgrades
-  ignore should "check inactive instrs when creating contract" in new ContractFixture {
+  // Inactive instrs check should be enabled for new network upgrades
+  it should "check inactive instrs when creating contract" in new ContractFixture {
     setHardFork(HardFork.Leman)
 
     val code =
       s"""
          |Contract Foo() implements IFoo {
          |  pub fn foo() -> () {
-         |    let _ = groupOfAddress!(@$genesisAddress)
+         |    let _ = externalCallerAddress!()
          |  }
          |}
          |@using(methodSelector = false)
@@ -6835,7 +6835,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     intercept[AssertionError](createContract(code)).getMessage is
-      "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
+      s"Right(TxScriptExeFailed(InactiveInstr($ExternalCallerAddress)))"
   }
 
   it should "test chained contract calls" in new ContractFixture {
