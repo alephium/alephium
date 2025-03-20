@@ -183,6 +183,96 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     assumptionFail(test(rhoneFrame, contract7, emptyOutput = true))
   }
 
+  it should "get the initial balances for new contract: PreDanube" in new FrameFixture {
+    val frameWithoutBalance = genStatefulFrame()(NetworkConfigFixture.PreDanube)
+    frameWithoutBalance.getInitialBalancesForNewContract().leftValue isE NoBalanceAvailable
+
+    val from = lockupScriptGen.sample.get
+    val frameWithBalance = genStatefulFrame(
+      Option(
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+        )
+      )
+    )(NetworkConfigFixture.PreDanube)
+    frameWithBalance.getInitialBalancesForNewContract() isE
+      MutBalancesPerLockup.alph(ALPH.oneNanoAlph)
+  }
+
+  it should "get the initial balances for new contract: Danube" in new FrameFixture {
+    {
+      info("Frame without balance")
+
+      val frameWithoutBalance = genStatefulFrame()(NetworkConfigFixture.Danube)
+      frameWithoutBalance
+        .getInitialBalancesForNewContract()
+        .leftValue isE TxCallerBalanceNotAvailable
+
+      val txCaller = frameWithoutBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
+
+      frameWithoutBalance.ctx.setTxCallerBalance(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph))),
+          MutBalances.empty
+        )
+      )
+      frameWithoutBalance
+        .getInitialBalancesForNewContract()
+        .leftValue isE InsufficientDepositForContractCreation
+
+      frameWithoutBalance.ctx.setTxCallerBalance(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneAlph))),
+          MutBalances.empty
+        )
+      )
+      frameWithoutBalance.getInitialBalancesForNewContract() isE
+        MutBalancesPerLockup.alph(minimalAlphInContract)
+    }
+
+    {
+      info("Frame with limited balance")
+
+      val from = lockupScriptGen.sample.get
+      val frameWithBalance = genStatefulFrame(
+        Option(
+          MutBalanceState(
+            MutBalances.empty,
+            MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+          )
+        )
+      )(NetworkConfigFixture.Danube)
+      frameWithBalance.getInitialBalancesForNewContract().leftValue isE TxCallerBalanceNotAvailable
+
+      val txCaller = frameWithBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
+      frameWithBalance.ctx.setTxCallerBalance(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneAlph))),
+          MutBalances.empty
+        )
+      )
+      frameWithBalance.getInitialBalancesForNewContract() isE
+        MutBalancesPerLockup.alph(minimalAlphInContract)
+    }
+
+    {
+      info("Frame with enough balance")
+
+      val from = lockupScriptGen.sample.get
+      val frameWithBalance = genStatefulFrame(
+        Option(
+          MutBalanceState(
+            MutBalances.empty,
+            MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneAlph)))
+          )
+        )
+      )(NetworkConfigFixture.Danube)
+      frameWithBalance.getInitialBalancesForNewContract() isE
+        MutBalancesPerLockup.alph(ALPH.oneAlph)
+    }
+  }
+
   it should "check contract id" in {
     val genesisFrame    = genStatefulFrame()(NetworkConfigFixture.Genesis)
     val sinceLemanFrame = genStatefulFrame()(NetworkConfigFixture.SinceLeman)

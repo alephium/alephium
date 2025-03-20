@@ -41,7 +41,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     }
     TxEnv.dryrun(
       tx,
-      prevOutputs.map(_.referredOutput),
+      prevOutputs.map(_ => prevOutputs.head.referredOutput),
       Stack.popOnly(signatures)
     )
   }
