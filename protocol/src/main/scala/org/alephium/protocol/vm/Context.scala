@@ -256,7 +256,7 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
-  def getAllInputAddresses(): AVector[Address] = {
+  lazy val allInputAddresses: AVector[Address] = {
     var addresses = AVector.ofCapacity[Address](1) // One input address in most cases
     txEnv.prevOutputs.foreach { output =>
       val address = Address.Asset(output.lockupScript)
@@ -399,7 +399,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def chainCallerOutputs(frameBalanceState: MutBalanceState): ExeResult[Unit] = {
-    EitherF.foreachTry(getAllInputAddresses().toIterable) { caller =>
+    EitherF.foreachTry(allInputAddresses.toIterable) { caller =>
       val success = outputBalances
         .useAll(caller.lockupScript)
         .forall(outputs => frameBalanceState.remaining.add(caller.lockupScript, outputs).nonEmpty)

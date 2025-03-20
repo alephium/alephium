@@ -386,7 +386,7 @@ class ContextSpec
 
   it should "get all input addresses" in new Fixture {
     forAll(genStatefulContext()) { context =>
-      val addresses  = context.getAllInputAddresses()
+      val addresses  = context.allInputAddresses
       val expected   = context.txEnv.prevOutputs.map(o => Address.from(o.lockupScript)).toSet
       val addressSet = addresses.toSet
       addresses.length is addressSet.size
