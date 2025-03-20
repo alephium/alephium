@@ -69,7 +69,7 @@ class FlowUtilsSpec extends AlephiumSpec {
         amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe),
         additionalData = ByteString.empty
       )
-      val bestDeps = blockFlow.getBestDeps(groupIndex)
+      val bestDeps = blockFlow.getBestDepsPreDanube(groupIndex)
       val groupView =
         blockFlow.getMutableGroupViewPreDanube(groupIndex, bestDeps, worldState).rightValue
       blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script, 0).rightValue is
@@ -366,7 +366,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     def test(hardFork: HardFork, expected: AVector[TransactionTemplate]) = {
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      val bestDeps  = blockFlow.getBestDeps(chainIndex.from)
+      val bestDeps  = blockFlow.getBestDepsPreDanube(chainIndex.from)
       blockFlow.collectTransactions(chainIndex, groupView, bestDeps, hardFork) isE expected
     }
 
@@ -530,14 +530,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     setHardForkBefore(HardFork.Danube)
 
     val mainGroup = GroupIndex.unsafe(0)
-    val deps0     = blockFlow.getBestDeps(mainGroup)
+    val deps0     = blockFlow.getBestDepsPreDanube(mainGroup)
     val block0    = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     addAndCheck(blockFlow, block0)
     val block1 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
     addAndCheck(blockFlow, block1)
     val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
     addAndCheck(blockFlow, block2)
-    val deps1 = blockFlow.getBestDeps(mainGroup)
+    val deps1 = blockFlow.getBestDepsPreDanube(mainGroup)
 
     val blockFlow1 = isolatedBlockFlow()
 
@@ -563,7 +563,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block7)
     addAndCheck(blockFlow, block8)
     addAndCheck(blockFlow, block9)
-    val deps2 = blockFlow.getBestDeps(mainGroup)
+    val deps2 = blockFlow.getBestDepsPreDanube(mainGroup)
 
     blockFlow.calMemPoolChangesUnsafe(mainGroup, deps0, deps1) is
       Normal(
@@ -628,7 +628,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       mempool.isReady(tx0.id) is true
       mempool.isReady(tx1.id) is false
 
-      val oldDeps = blockFlow.getBestDeps(chainIndex.from)
+      val oldDeps = blockFlow.getBestDepsPreDanube(chainIndex.from)
       addWithoutViewUpdate(blockFlow, block0)
       val newDeps = blockFlow.calBestDepsUnsafe(chainIndex.from)
       blockFlow.updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps, heightGap)
@@ -845,7 +845,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     def collectTxs() = {
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      val bestDeps  = blockFlow.getBestDeps(chainIndex.from)
+      val bestDeps  = blockFlow.getBestDepsPreDanube(chainIndex.from)
       blockFlow.collectTransactions(chainIndex, groupView, bestDeps, HardFork.Rhone).rightValue
     }
   }

@@ -463,7 +463,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.fromGroupConfirmations is 1
     confirmed.toGroupConfirmations is 1
     val blockHash = confirmed.index.hash
-    blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
+    blockFlow.getBestDepsPreDanube(chainIndex.from).deps.contains(blockHash) is true
   }
 
   it should "report validation error when auto-mine is enabled" in new Fixture {
@@ -541,7 +541,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.fromGroupConfirmations is 1
     confirmed.toGroupConfirmations is 0
     val blockHash = confirmed.index.hash
-    blockFlow.getBestDeps(index.from).deps.contains(blockHash) is true
+    blockFlow.getBestDepsPreDanube(index.from).deps.contains(blockHash) is true
 
     val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
     val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1

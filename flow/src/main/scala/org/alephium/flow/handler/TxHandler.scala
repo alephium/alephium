@@ -125,8 +125,13 @@ object TxHandler {
           _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
           addToMemPoolResult <-
             if (!chainIndex.isIntraGroup) {
-              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from), publishBlock)
-                .map(_ => MemPool.AddedToMemPool)
+              val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
+              for {
+                _ <- blockFlow.updateViewPerChainIndexDanube(intraChain).left.map(_.toString)
+                result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
+                  MemPool.AddedToMemPool
+                )
+              } yield result
             } else {
               Right(MemPool.AddedToMemPool)
             }
@@ -212,6 +217,7 @@ object TxHandler {
           case Right(_) =>
             val result = for {
               _ <- blockFlow.updateViewPerChainIndexDanube(block.chainIndex)
+              _ <- blockFlow.updateAccountView(block)
               _ <- blockFlow.updateViewPreDanube()
             } yield ()
             result.left.map(_.getMessage)

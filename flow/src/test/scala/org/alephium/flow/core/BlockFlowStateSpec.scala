@@ -28,6 +28,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
   }
 
   it should "calculate all the hashes for state update" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     def prepare(chainIndex: ChainIndex): Block = {
       val block = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
@@ -39,7 +40,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     val block1    = prepare(ChainIndex.unsafe(1, 0))
     prepare(ChainIndex.unsafe(1, 1))
     val block2 = prepare(ChainIndex.unsafe(0, 1))
-    blockFlow.getHashesForUpdates(mainGroup).rightValue.toSet is
+    blockFlow.getHashesForUpdatesPreDanube(mainGroup).rightValue.toSet is
       Set(block0.hash, block1.hash, block2.hash)
   }
 
@@ -231,11 +232,16 @@ class BlockFlowStateSpec extends AlephiumSpec {
       .rightValue
       .isEmpty is true
 
+    val lockupScript = getGenesisLockupScript(GroupIndex.unsafe(0))
+    val utxos        = groupView0.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue
+    utxos.exists(_.ref == block3.nonCoinbase.head.fixedOutputRefs.last) is true
+    utxos.exists(_.ref == block4.nonCoinbase.head.fixedOutputRefs.last) is false
+
     val groupView1 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(2)).rightValue
     groupView1
       .getPreAssetOutputInfo(block1.nonCoinbase.head.fixedOutputRefs.head)
       .rightValue
-      .isEmpty is true
+      .nonEmpty is true
 
     val block5 = transfer(blockFlow, ChainIndex.unsafe(1, 0), nextBlockTs)
     addAndCheck(blockFlow, block5)
@@ -243,11 +249,44 @@ class BlockFlowStateSpec extends AlephiumSpec {
     groupView2
       .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
       .rightValue
-      .isEmpty is true
+      .nonEmpty is true
     val groupView3 = blockFlow.getImmutableGroupViewIncludePool(GroupIndex.unsafe(0)).rightValue
     groupView3
       .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
       .rightValue
       .nonEmpty is true
+  }
+
+  it should "sort blocks properly" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 1)
+    )
+    setHardForkSince(HardFork.Danube)
+
+    val now = TimeStamp.now()
+    val blocks = (1 to 3).map { toGroup =>
+      val chainIndex = ChainIndex.unsafe(0, toGroup)
+      transfer(blockFlow, chainIndex, now)
+    }
+    addAndCheck(blockFlow, blocks: _*)
+
+    (1 to 3).foreach { toGroup =>
+      val chainIndex = ChainIndex.unsafe(0, toGroup)
+      (1 to 10).foreach { _ =>
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      }
+    }
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block3)
+
+    val worldState = blockFlow.getBestPersistedWorldState(GroupIndex.unsafe(0)).rightValue
+    val output0    = blocks(0).nonCoinbase.head.fixedOutputRefs.last
+    val output1    = blocks(1).nonCoinbase.head.fixedOutputRefs.last
+    val output2    = blocks(2).nonCoinbase.head.fixedOutputRefs.last
+    worldState.existOutput(output0) isE true
+    worldState.existOutput(output1) isE false
+    worldState.existOutput(output2) isE false
   }
 }

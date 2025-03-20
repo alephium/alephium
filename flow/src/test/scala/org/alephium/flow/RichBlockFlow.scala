@@ -29,7 +29,9 @@ trait RichBlockFlowT {
         _ <- blockFlow.add(block, worldStateOpt)
         _ <-
           if (hardFork.isDanubeEnabled()) {
-            blockFlow.updateViewPerChainIndexDanube(block.chainIndex)
+            blockFlow.updateViewPerChainIndexDanube(block.chainIndex).flatMap { _ =>
+              blockFlow.updateAccountView(block)
+            }
           } else {
             blockFlow.updateViewPreDanube()
           }

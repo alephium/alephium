@@ -183,6 +183,9 @@ class TxUtilsSpec extends AlephiumSpec {
       val from = LockupScript.p2pkh(genesisKeys(fromGroup.value)._2)
       val tx   = transferTx(blockFlow, chainIndex, from, ALPH.oneAlph, None)
       blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+      if (hardFork.isDanubeEnabled()) {
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      }
       val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
 
@@ -192,7 +195,7 @@ class TxUtilsSpec extends AlephiumSpec {
       tx.fixedOutputRefs.foreachWithIndex { case (outputRef, index) =>
         val output = tx.unsigned.fixedOutputs(index)
         if (output.toGroup equals chainIndex.from) {
-          if (chainIndex.isIntraGroup || hardFork.isDanubeEnabled()) {
+          if (chainIndex.isIntraGroup) {
             // the block is persisted and the lockTime of each output is updated as block timestamp
             groupView.getPreAssetOutputInfo(outputRef) isE Some(
               AssetOutputInfo(

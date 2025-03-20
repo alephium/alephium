@@ -137,6 +137,9 @@ class ServerUtilsSpec extends AlephiumSpec {
               chainIndex,
               fromPrivateKey
             )
+          if (hardFork.isDanubeEnabled()) {
+            addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+          }
           val block = mineFromMemPool(blockFlow, chainIndex)
           addAndCheck(blockFlow, block)
           if (!chainIndex.isIntraGroup) {
@@ -1623,6 +1626,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       )(serverUtils, blockFlow)
 
       confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      if (hardFork.isDanubeEnabled()) {
+        confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+      }
       confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
       serverUtils.getTransaction(blockFlow, deployContractTxResult.txId, None, None).rightValue
 
@@ -4304,11 +4310,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction1.value, groupInfo1.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction0.value, groupInfo0.privateKey)
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)))
+    }
     val block0 = confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    block0.nonCoinbaseLength is 1
+
     addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0)))
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
+    }
     val block1 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
     val block2 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
-    block0.nonCoinbaseLength is 1
     block1.nonCoinbaseLength is 1
     block2.nonCoinbaseLength is 1
 
@@ -5321,12 +5334,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue is richTransaction
 
+    val height = if (hardFork.isDanubeEnabled()) 4 else 3
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
         .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
-        RichBlockEntry.from(scriptBlock, 3, richTxs).rightValue,
+        RichBlockEntry.from(scriptBlock, height, richTxs).rightValue,
         AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
       )
     }

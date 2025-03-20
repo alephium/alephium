@@ -844,4 +844,10 @@ class SpecialAVectorSpec extends AlephiumSpec {
     converted(1).asInstanceOf[Bar] is Bar(2)
     converted(2).asInstanceOf[Bar] is Bar(3)
   }
+
+  it should "stableSortBy" in {
+    val avector = AVector.from((0 until 30).map((_, 1)))
+    avector.stableSortBy(_._2) is avector
+    avector.sortBy(_._2) isnot avector
+  }
 }

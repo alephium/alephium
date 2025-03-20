@@ -52,7 +52,8 @@ trait EmptyBlockFlow extends BlockFlow {
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
   def updateBestFlowSkeleton(): IOResult[Unit]                                                 = ???
   def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit]                    = ???
-  def updateViewPreDanube(): org.alephium.io.IOResult[Unit]                                    = ???
+  def updateViewPreDanube(): IOResult[Unit]                                                    = ???
+  def updateAccountView(block: Block): IOResult[Unit]                                          = ???
   def getBestIntraGroupTip(): BlockHash                                                        = ???
   def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]              = ???
   def add(header: BlockHeader): IOResult[Unit]                                                 = ???

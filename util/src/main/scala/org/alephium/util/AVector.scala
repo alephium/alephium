@@ -598,6 +598,12 @@ final class AVector[@sp A](
     AVector.unsafe(arr)
   }
 
+  def stableSortBy[B](f: A => B)(implicit ord: Ordering[B]): AVector[A] = {
+    val arr = toArray
+    scala.util.Sorting.stableSort(arr)(ord.on(f))
+    AVector.unsafe(arr)
+  }
+
   def sum(implicit num: Numeric[A]): A = fold(num.zero)(num.plus)
 
   def sumBy[B](f: A => B)(implicit num: Numeric[B]): B = {

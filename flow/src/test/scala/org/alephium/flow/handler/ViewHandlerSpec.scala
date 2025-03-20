@@ -244,13 +244,13 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     addWithoutViewUpdate(blockFlow, block)
 
     blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
-    blockFlow.getBestDeps(block.chainIndex.from, HardFork.Rhone).deps.contains(block.hash) is false
+    blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is false
 
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
       blockFlow
-        .getBestDeps(block.chainIndex.from, HardFork.Rhone)
+        .getBestDepsPreDanube(block.chainIndex.from)
         .deps
         .contains(block.hash) is false
     }
@@ -268,12 +268,12 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     addWithoutViewUpdate(blockFlow, block)
 
     blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
-    blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+    blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is false
 
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
-      blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is true
+      blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is true
     }
   }
 
@@ -289,12 +289,12 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     addWithoutViewUpdate(blockFlow, block)
 
     blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
-    blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is false
+    blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is false
 
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
-      blockFlow.getBestDeps(block.chainIndex.from).deps.contains(block.hash) is true
+      blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is true
     }
   }
 
@@ -419,7 +419,7 @@ class PreDanubeUpdateBestViewSpec extends UpdateBestViewSpec {
     def setHardFork(): Unit     = setHardForkBefore(HardFork.Danube)
     def state: AsyncUpdateState = viewHandler.underlyingActor.preDanubeUpdateState
     override def containBlockHashInBestDeps(blockHash: BlockHash): Boolean =
-      blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash)
+      blockFlow.getBestDepsPreDanube(chainIndex.from).deps.contains(blockHash)
     def bestDepsUpdatedMsg: ViewHandler.Command      = ViewHandler.BestDepsUpdatedPreDanube
     def bestDepsUpdateFailedMsg: ViewHandler.Command = ViewHandler.BestDepsUpdateFailedPreDanube
   }

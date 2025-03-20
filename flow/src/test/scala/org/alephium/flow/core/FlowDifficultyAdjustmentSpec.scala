@@ -28,7 +28,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   it should "calculate weighted target" in new PreLemanDifficultyFixture {
     prepareBlocks(2)
 
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+    val bestDeps = blockFlow.getBestDepsPreDanube(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
       .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
@@ -43,7 +43,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   it should "clip target" in new PreLemanDifficultyFixture {
     prepareBlocks(8 * groups0)
 
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+    val bestDeps = blockFlow.getBestDepsPreDanube(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
       .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
@@ -96,7 +96,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       }
     }
     brokerConfig.cliqueGroupIndexes.foreach { index =>
-      val blockDeps = blockFlow.getBestDeps(index)
+      val blockDeps = blockFlow.getBestDepsPreDanube(index)
       val intraDeps = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, index)
       intraDeps is brokerConfig.cliqueGroupIndexes
         .map(group => blockFlow.genesisHashes(group.value)(group.value))
@@ -194,7 +194,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       earliestDepTs is getEarliestDepTs(height)
     }
     brokerConfig.cliqueGroupIndexes.foreach { groupIndex =>
-      val blockDeps = blockFlow.getBestDeps(groupIndex)
+      val blockDeps = blockFlow.getBestDepsPreDanube(groupIndex)
       val intraDeps = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, groupIndex)
       val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(intraDeps)
       diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum * 2)
@@ -253,7 +253,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock), None)
         } else {
           addAndCheck(blockFlow, block)
-          val bestDep = blockFlow.getBestDeps(chainIndex.from)
+          val bestDep = blockFlow.getBestDepsPreDanube(chainIndex.from)
           blockFlow.getNextHashTarget(
             chainIndex,
             bestDep,
