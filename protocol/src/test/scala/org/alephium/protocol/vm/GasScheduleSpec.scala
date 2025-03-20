@@ -32,6 +32,6 @@ class GasScheduleSpec extends AlephiumSpec {
     GasSchedule.secp256K1UnlockGas is GasBox.unsafe(60 + 2000)
     GasSchedule.secp256R1UnlockGas is GasBox.unsafe(60 + 2000)
     GasSchedule.ed25519UnlockGas is GasBox.unsafe(54 + 2000)
-    GasSchedule.passkeyUnlockGas(100) is GasBox.unsafe(132 + 2000)
+    GasSchedule.webauthnUnlockGas(100) is GasBox.unsafe(132 + 2000)
   }
 }

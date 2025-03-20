@@ -34,7 +34,7 @@ import org.alephium.serde.{
   SerdeResult,
   Staging
 }
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
 final case class WebAuthn(
     authenticatorData: ByteString,
@@ -77,6 +77,15 @@ final case class WebAuthn(
     val length  = serdeImpl[Int].serialize(payload.length)
     length ++ payload
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def encodeForTest(): AVector[Byte64] = {
+    val bytes       = getLengthPrefixedPayload()
+    val chunkSize   = (bytes.length + Byte64.length - 1) / Byte64.length
+    val paddingSize = chunkSize * Byte64.length - bytes.length
+    val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
+    AVector.from(paddedBytes.grouped(Byte64.length).map(Byte64.from(_).get))
+  }
 }
 
 object WebAuthn {
@@ -110,7 +119,7 @@ object WebAuthn {
     iter(ByteString.empty, chunkSize)
   }
 
-  private def decode(payload: ByteString): SerdeResult[WebAuthn] = {
+  def decode(payload: ByteString): SerdeResult[WebAuthn] = {
     serde._deserialize(payload).flatMap { case Staging(webauthn, rest) =>
       if (rest.exists(_ != 0)) {
         Left(
@@ -127,7 +136,7 @@ object WebAuthn {
     }
   }
 
-  def tryDecode(nextBytes: () => Option[Byte64]): SerdeResult[WebAuthn] = {
+  def tryDecodePayload(nextBytes: () => Option[Byte64]): SerdeResult[ByteString] = {
     for {
       firstChunk <- nextBytes().toRight(SerdeError.WrongFormat("Empty webauthn payload"))
       deserialized0 <- serdeImpl[Int]
@@ -142,8 +151,11 @@ object WebAuthn {
       )
       chunkSize = (payloadLength - payloadFirstChunk.length + Byte64.length - 1) / Byte64.length
       restPayload <- extractChunks(nextBytes, chunkSize)
-      webauthn    <- decode(payloadFirstChunk ++ restPayload)
-    } yield webauthn
+    } yield payloadFirstChunk ++ restPayload
+  }
+
+  def tryDecode(nextBytes: () => Option[Byte64]): SerdeResult[WebAuthn] = {
+    tryDecodePayload(nextBytes).flatMap(decode)
   }
 
   @inline private[vm] def base64urlEncode(bs: ByteString): String = {

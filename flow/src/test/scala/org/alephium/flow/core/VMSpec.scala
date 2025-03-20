@@ -1883,34 +1883,56 @@ class VMSpec extends AlephiumSpec with Generators {
   // scalastyle:off no.equal
   it should "test signature built-ins" in new ContractFixture {
     val zero                     = Hash.zero.toHexString
-    val (p256Pri, p256Pub)       = SecP256K1.generatePriPub()
-    val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
+    val (p256k1Pri, p256k1Pub)   = SecP256K1.generatePriPub()
+    val p256k1Sig                = SecP256K1.sign(Hash.zero.bytes, p256k1Pri).toHexString
     val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
     val (bip340Pri, bip340Pub)   = BIP340Schnorr.generatePriPub()
     val bip340Sig                = BIP340Schnorr.sign(Hash.zero.bytes, bip340Pri).toHexString
-    def main(p256Sig: String, ed25519Sig: String, bip340Sig: String) =
+    val (p256r1Pri, p256r1Pub)   = SecP256R1.generatePriPub()
+    val p256r1Sig                = SecP256R1.sign(Hash.zero.bytes, p256r1Pri).toHexString
+    val authenticatorData        = Hash.generate.bytes ++ ByteString(1)
+    val webauthn                 = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
+    val messageHash              = webauthn.messageHash(Hash.zero.bytes)
+    val webauthnSig0             = SecP256R1.sign(messageHash.bytes, p256r1Pri).bytes
+    val webauthnPayload          = webauthn.encodeForTest().map(_.bytes).reduce(_ ++ _).drop(2)
+    val webauthnSig              = Hex.toHexString(webauthnPayload ++ webauthnSig0)
+    def main(
+        p256k1Sig: String,
+        ed25519Sig: String,
+        bip340Sig: String,
+        p256r1Sig: String,
+        webauthnSig: String
+    ) =
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
+         |  verifySecP256K1!(#$zero, #${p256k1Pub.toHexString}, #$p256k1Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
          |  verifyBIP340Schnorr!(#$zero, #${bip340Pub.toHexString}, #$bip340Sig)
+         |
+         |  verifySignature!(#$zero, #${p256k1Pub.toHexString}, #$p256k1Sig, #00)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig, #01)
+         |  verifySignature!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig, #02)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$webauthnSig, #03)
+         |
+         |  verifySecP256R1!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig)
+         |  verifyWebAuthn!(#$zero, #${p256r1Pub.toHexString}, #$webauthnSig)
          |}
          |""".stripMargin
-    testSimpleScript(main(p256Sig, ed25519Sig, bip340Sig))
+    testSimpleScript(main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, webauthnSig))
     val randomSecP256K1Signature = SecP256K1Signature.generate
     failSimpleScript(
-      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig),
+      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig, p256r1Sig, webauthnSig),
       InvalidSignature(
-        p256Pub.bytes,
+        p256k1Pub.bytes,
         Hash.zero.bytes,
         randomSecP256K1Signature.bytes
       )
     )
     val randomEd25519Signature = ED25519Signature.generate
     failSimpleScript(
-      main(p256Sig, randomEd25519Signature.toHexString, bip340Sig),
+      main(p256k1Sig, randomEd25519Signature.toHexString, bip340Sig, p256r1Sig, webauthnSig),
       InvalidSignature(
         ed25519Pub.bytes,
         Hash.zero.bytes,
@@ -1919,13 +1941,83 @@ class VMSpec extends AlephiumSpec with Generators {
     )
     val randomBIP340SchnorrSignature = BIP340SchnorrSignature.generate
     failSimpleScript(
-      main(p256Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString),
+      main(p256k1Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString, p256r1Sig, webauthnSig),
       InvalidSignature(
         bip340Pub.bytes,
         Hash.zero.bytes,
         randomBIP340SchnorrSignature.bytes
       )
     )
+    val randomSecP256R1Signature = SecP256R1Signature.generate
+    failSimpleScript(
+      main(p256k1Sig, ed25519Sig, bip340Sig, randomSecP256R1Signature.toHexString, webauthnSig),
+      InvalidSignature(
+        ByteString(1) ++ p256r1Pub.bytes,
+        Hash.zero.bytes,
+        randomSecP256R1Signature.bytes
+      )
+    )
+    val randomWebAuthnSig = webauthnPayload ++ SecP256R1Signature.generate.bytes
+    failSimpleScript(
+      main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, Hex.toHexString(randomWebAuthnSig)),
+      InvalidSignature(
+        ByteString(3) ++ p256r1Pub.bytes,
+        Hash.zero.bytes,
+        randomWebAuthnSig
+      )
+    )
+  }
+
+  it should "test getSegregatedWebAuthnSignature" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val main =
+      s"""
+         |AssetScript Main {
+         |  pub fn main() -> () {
+         |    verifyWebAuthn!(txId!(), #${pubKey.toHexString}, getSegregatedWebAuthnSignature!())
+         |  }
+         |}
+         |""".stripMargin
+
+    val script           = Compiler.compileAssetScript(main).rightValue._1
+    val fromLockupScript = LockupScript.p2sh(script)
+    val groupIndex       = fromLockupScript.groupIndex
+    val genesisKey       = genesisKeys(groupIndex.value)._1
+    val block =
+      transfer(
+        blockFlow,
+        genesisKey,
+        fromLockupScript,
+        AVector.empty[(TokenId, U256)],
+        ALPH.alph(4)
+      )
+    addAndCheck(blockFlow, block)
+
+    val toLockupScript = LockupScript.p2pkh(groupIndex.generateKey._2)
+    checkBalance(blockFlow, toLockupScript, U256.Zero)
+
+    val outputInfo =
+      UnsignedTransaction.TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None)
+    val unsignedTx = blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        UnlockScript.P2SH(script, AVector.empty),
+        AVector(outputInfo),
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .rightValue
+    val tx     = signWithWebAuthn(unsignedTx, priKey)._2
+    val block0 = mineWithTxs(blockFlow, ChainIndex(groupIndex, groupIndex), AVector(tx))
+    block0.nonCoinbase.head.id is tx.id
+    addAndCheck(blockFlow, block0)
+    checkBalance(blockFlow, toLockupScript, ALPH.oneAlph)
   }
 
   it should "test convert pubkey to address" in new ContractFixture {

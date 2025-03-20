@@ -1057,15 +1057,7 @@ trait FlowFixture
     AVector.fill(n)(createTx())
   }
 
-  private def encodeToByte64(webauthn: WebAuthn): AVector[Byte64] = {
-    val bytes       = webauthn.getLengthPrefixedPayload()
-    val chunkSize   = (bytes.length + Byte64.length - 1) / Byte64.length
-    val paddingSize = chunkSize * Byte64.length - bytes.length
-    val paddedBytes = bytes ++ ByteString(Array.fill(paddingSize)(0.toByte))
-    AVector.from(paddedBytes.grouped(Byte64.length).map(Byte64.from(_).get))
-  }
-
-  def signWithPasskey(
+  def signWithWebAuthn(
       unsignedTx: UnsignedTransaction,
       priKey: SecP256R1PrivateKey
   ): (WebAuthn, Transaction) = {
@@ -1075,7 +1067,7 @@ trait FlowFixture
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val messageHash       = webauthn.messageHash(unsignedTx.id)
     val signature         = Byte64.from(SecP256R1.sign(messageHash, priKey))
-    (webauthn, Transaction.from(unsignedTx, encodeToByte64(webauthn) :+ signature))
+    (webauthn, Transaction.from(unsignedTx, webauthn.encodeForTest() :+ signature))
   }
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {

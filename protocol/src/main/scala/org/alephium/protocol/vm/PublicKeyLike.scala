@@ -45,7 +45,7 @@ object PublicKeyLike {
           ByteString(1) ++ serdeImpl[SecP256R1PublicKey].serialize(publicKey)
         case ED25519(publicKey) =>
           ByteString(2) ++ serdeImpl[ED25519PublicKey].serialize(publicKey)
-        case Passkey(publicKey) =>
+        case WebAuthn(publicKey) =>
           ByteString(3) ++ serdeImpl[SecP256R1PublicKey].serialize(publicKey)
       }
     }
@@ -59,7 +59,7 @@ object PublicKeyLike {
         case Staging(2, rest) =>
           serdeImpl[ED25519PublicKey]._deserialize(rest).map(_.mapValue(ED25519.apply))
         case Staging(3, rest) =>
-          serdeImpl[SecP256R1PublicKey]._deserialize(rest).map(_.mapValue(Passkey.apply))
+          serdeImpl[SecP256R1PublicKey]._deserialize(rest).map(_.mapValue(WebAuthn.apply))
         case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid public key type $n"))
       }
     }
@@ -68,5 +68,5 @@ object PublicKeyLike {
   final case class SecP256K1(publicKey: SecP256K1PublicKey) extends PublicKeyLike
   final case class SecP256R1(publicKey: SecP256R1PublicKey) extends PublicKeyLike
   final case class ED25519(publicKey: ED25519PublicKey)     extends PublicKeyLike
-  final case class Passkey(publicKey: SecP256R1PublicKey)   extends PublicKeyLike
+  final case class WebAuthn(publicKey: SecP256R1PublicKey)  extends PublicKeyLike
 }

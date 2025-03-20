@@ -40,7 +40,7 @@ class PublicKeyLikeSpec extends AlephiumSpec with GroupConfigFixture.Default {
     serialize[PublicKeyLike](publicKey2) is bytes2
     deserialize[PublicKeyLike](bytes2) isE publicKey2
 
-    val publicKey3 = PublicKeyLike.Passkey(SecP256R1PublicKey.generate)
+    val publicKey3 = PublicKeyLike.WebAuthn(SecP256R1PublicKey.generate)
     val bytes3     = ByteString(3) ++ publicKey3.rawBytes
     serialize[PublicKeyLike](publicKey3) is bytes3
     deserialize[PublicKeyLike](bytes3) isE publicKey3
