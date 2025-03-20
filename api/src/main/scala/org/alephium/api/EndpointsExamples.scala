@@ -354,7 +354,8 @@ trait EndpointsExamples extends ErrorExamples {
           "47c01136d52cdf29062f6a3598a36ebc1e4dc57e"
         ),
         true,
-        Some(inetSocketAddress)
+        Some(inetSocketAddress), 
+        Some("Hello Alephium ! ")
       )
     )
 
