@@ -415,7 +415,31 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   it should "publish node synced status" in new SyncFixture {
     override val configValues: Map[String, Any] =
       Map(("alephium.network.update-synced-frequency", "1 minute"))
+
+    subscribe()
     interCliqueManagerActor.lastNodeSyncedStatus is Some(false)
+
+    def subscribe() = {
+      system.eventStream.subscribe(
+        blockFlowSynchronizer.ref,
+        classOf[InterCliqueManager.SyncedResult]
+      )
+      system.eventStream.subscribe(
+        allHandlerProbes.txHandler.ref,
+        classOf[InterCliqueManager.SyncedResult]
+      )
+      allHandlerProbes.blockHandlers.foreach(h =>
+        system.eventStream.subscribe(h._2.ref, classOf[InterCliqueManager.SyncedResult])
+      )
+      system.eventStream.subscribe(
+        allHandlerProbes.viewHandler.ref,
+        classOf[InterCliqueManager.SyncedResult]
+      )
+      system.eventStream.subscribe(
+        allHandlerProbes.accountViewHandler.ref,
+        classOf[InterCliqueManager.SyncedResult]
+      )
+    }
 
     def checkPublish(synced: Boolean) = {
       blockFlowSynchronizer.expectMsg(SyncedResult(synced))

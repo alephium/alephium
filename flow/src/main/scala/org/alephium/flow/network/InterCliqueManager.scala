@@ -128,11 +128,16 @@ object InterCliqueManager {
     .build("alephium_peers_total", "Number of connected peers")
     .register()
 
-  trait NodeSyncStatus extends BaseActor {
+  trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
     private var nodeSynced: Boolean      = false
     private var firstTimeSynced: Boolean = true
 
     protected def onFirstTimeSynced(): Unit = {}
+
+    override def preStart(): Unit = {
+      super.preStart()
+      subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
+    }
 
     def updateNodeSyncStatus: Receive = {
       case InterCliqueManager.SyncedResult(isSynced) =>
@@ -337,12 +342,8 @@ class InterCliqueManager(
     }
   }
 
-  def publishNodeStatus(result: SyncedResult): Unit = {
-    blockFlowSynchronizer.ref ! result
-    allHandlers.viewHandler.ref ! result
-    allHandlers.txHandler.ref ! result
-    allHandlers.blockHandlers.foreach(_._2.ref ! result)
-    allHandlers.accountViewHandler.ref ! result
+  @inline def publishNodeStatus(result: SyncedResult): Unit = {
+    publishEvent(result)
   }
 
   def connect(broker: BrokerInfo): Unit = {
