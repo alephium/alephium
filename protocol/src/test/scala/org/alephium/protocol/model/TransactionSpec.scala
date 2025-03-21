@@ -196,6 +196,19 @@ class TransactionSpec
     }
 
     {
+      info("danube coinbase transaction")
+      implicit val networkConfig = NetworkConfigFixture.Danube
+      val blockHash = model.BlockHash.unsafe(
+        hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7"
+      )
+      val lockupScript = LockupScript.P2PKH(
+        Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
+      )
+      val tx = coinbaseTransaction(AVector(SelectedGhostUncle(blockHash, lockupScript, 1)))
+      tx.verify("danube-coinbase")
+    }
+
+    {
       info("multiple fixed inputs and outputs")
 
       val unsignedTx = UnsignedTransaction(

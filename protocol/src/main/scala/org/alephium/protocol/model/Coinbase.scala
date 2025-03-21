@@ -74,7 +74,7 @@ object Coinbase {
       miningReward: U256,
       lockupScript: LockupScript.Asset,
       lockTime: TimeStamp
-  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
+  ): AVector[AssetOutput] = {
     AVector(
       AssetOutput(miningReward, lockupScript, lockTime, AVector.empty, serialize(coinbaseData))
     )
@@ -87,7 +87,7 @@ object Coinbase {
       lockupScript: LockupScript.Asset,
       lockTime: TimeStamp,
       uncles: AVector[SelectedGhostUncle]
-  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
+  ): AVector[AssetOutput] = {
     val mainChainReward    = calcMainChainRewardSinceRhone(hardFork, miningReward)
     val uncleRewardOutputs = uncles.map(_.toAssetOutput(mainChainReward, lockTime))
     val blockRewardOutput = AssetOutput(

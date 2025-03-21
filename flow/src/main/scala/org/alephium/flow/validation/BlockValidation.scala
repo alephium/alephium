@@ -24,7 +24,6 @@ import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConf
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{NetworkId => _, _}
-import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes, EitherF, U256}
 
 // scalastyle:off number.of.methods file.size.limit
@@ -531,7 +530,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       isPoLW: Boolean
   ): BlockValidationResult[Unit] = {
     for {
-      ghostUncleData <- checkCoinbaseData(chainIndex, block)
+      ghostUncleData <- checkCoinbaseData(chainIndex, block, hardFork)
       _              <- checkCoinbaseEasy(block, ghostUncleData.length, isPoLW)
       uncles         <- checkGhostUncles(flow, chainIndex, block, ghostUncleData)
       _ <- if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncles.length) else validBlock(())
@@ -639,22 +638,29 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
 
   private[validation] def checkCoinbaseData(
       chainIndex: ChainIndex,
-      block: Block
+      block: Block,
+      hardFork: HardFork
   ): BlockValidationResult[AVector[GhostUncleData]] = {
     val coinbase = block.coinbase
     if (coinbase.unsigned.fixedOutputs.isEmpty) {
       invalidBlock(InvalidCoinbaseFormat)
     } else {
       val data = coinbase.unsigned.fixedOutputs.head.additionalData
-      deserialize[CoinbaseData](data) match {
+      CoinbaseData.deserialize(data, hardFork) match {
         case Right(CoinbaseDataV1(prefix, _)) =>
-          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+          if (prefix == CoinbaseDataPrefixV1.from(chainIndex, block.timestamp)) {
             validBlock(AVector.empty)
           } else {
             invalidBlock(InvalidCoinbaseData)
           }
         case Right(CoinbaseDataV2(prefix, ghostUncleData, _)) =>
-          if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+          if (prefix == CoinbaseDataPrefixV1.from(chainIndex, block.timestamp)) {
+            validBlock(ghostUncleData)
+          } else {
+            invalidBlock(InvalidCoinbaseData)
+          }
+        case Right(CoinbaseDataV3(prefix, ghostUncleData, _)) =>
+          if (prefix == CoinbaseDataPrefixV2.from(chainIndex)) {
             validBlock(ghostUncleData)
           } else {
             invalidBlock(InvalidCoinbaseData)

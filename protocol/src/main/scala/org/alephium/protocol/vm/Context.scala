@@ -219,6 +219,8 @@ trait StatelessContext extends CostStrategy {
 
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[MutBalances]
+  def setTxCallerBalance(callerBalance: MutBalanceState): Unit
+  def getTxCallerBalance(): ExeResult[MutBalanceState]
 
   def writeLog(
       contractIdOpt: Option[ContractId],
@@ -264,6 +266,17 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
+  lazy val allInputAddresses: AVector[Address] = {
+    var addresses = AVector.ofCapacity[Address](1) // One input address in most cases
+    txEnv.prevOutputs.foreach { output =>
+      val address = Address.Asset(output.lockupScript)
+      if (!addresses.contains(address)) {
+        addresses = addresses :+ address
+      }
+    }
+    addresses
+  }
+
   def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
     if (getHardFork().isLemanEnabled()) {
       this.chargeGas(gasFormula.gas(size))
@@ -287,8 +300,9 @@ object StatelessContext {
       var gasRemaining: GasBox
   )(implicit val networkConfig: NetworkConfig, val groupConfig: GroupConfig)
       extends StatelessContext {
-    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
-
+    def getInitialBalances(): ExeResult[MutBalances]             = failed(ExpectNonPayableMethod)
+    def setTxCallerBalance(callerBalance: MutBalanceState): Unit = ???
+    def getTxCallerBalance(): ExeResult[MutBalanceState]         = failed(ExpectNonPayableMethod)
     def writeLog(
         contractIdOpt: Option[ContractId],
         fields: AVector[Val],
@@ -300,9 +314,22 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
-  def outputBalances: MutBalances
-
   def logConfig: LogConfig
+
+  var txCallerBalance: Option[MutBalanceState] = None
+
+  def setTxCallerBalance(callerBalance: MutBalanceState): Unit = {
+    this.txCallerBalance = Some(callerBalance)
+  }
+
+  def getTxCallerBalance(): ExeResult[MutBalanceState] = {
+    txCallerBalance match {
+      case Some(balance) => Right(balance)
+      case None          => failed(TxCallerBalanceNotAvailable)
+    }
+  }
+
+  def outputBalances: MutBalances
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 
@@ -385,6 +412,23 @@ trait StatefulContext extends StatelessContext with ContractPool {
       }
     } else {
       okay
+    }
+  }
+
+  def chainCallerOutputs(frameBalanceStateOpt: Option[MutBalanceState]): ExeResult[Unit] = {
+    frameBalanceStateOpt match {
+      case Some(frameBalanceState) => chainCallerOutputs(frameBalanceState)
+      case None                    => okay
+    }
+  }
+
+  def chainCallerOutputs(frameBalanceState: MutBalanceState): ExeResult[Unit] = {
+    EitherF.foreachTry(allInputAddresses.toIterable) { caller =>
+      val success = outputBalances
+        .useAll(caller.lockupScript)
+        .forall(outputs => frameBalanceState.remaining.add(caller.lockupScript, outputs).nonEmpty)
+
+      if (success) okay else failed(ChainCallerOutputsFailed(caller))
     }
   }
 

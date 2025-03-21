@@ -1209,11 +1209,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
          |    assert!(callerContractId!() == barId, 0)
          |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(externalCallerContractId!() == barId, 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |    assert!(callerInitialStateHash!() == barHash, 0)
          |    assert!(callerCodeHash!() == barCodeHash, 0)
          |    assert!(isCalledFromTxScript!() == false, 0)
          |    assert!(isAssetAddress!(barAddress) == false, 0)
          |    assert!(isContractAddress!(barAddress) == true, 0)
+         |
+         |    foofoo(barAddress)
+         |  }
+         |
+         |  fn foofoo(barAddress: Address) -> () {
+         |    assert!(callerAddress!() == selfAddress!(), 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |  }
          |}
          |""".stripMargin
@@ -5021,6 +5030,56 @@ class VMSpec extends AlephiumSpec with Generators {
     test(minimalAlphInContract + 1)
   }
 
+  it should "use tx caller assets if not enough deposit for new contract" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () { return }
+         |}
+         |""".stripMargin
+    val fooCompiled = Compiler.compileContract(foo).rightValue
+    val fooBytecode = Hex.toHexString(serialize(fooCompiled))
+
+    val create =
+      s"""
+         |Contract Create() {
+         |  pub fn noDeposit() -> () {
+         |    createContract!(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withEnoughDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withInsufficientDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withZeroDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: 0}(#$fooBytecode, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val (createContractId, _, _) = createContract(create)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let create = Create(#${createContractId.toHexString})
+         |  create.noDeposit()
+         |  create.withEnoughDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |  create.withInsufficientDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}()
+         |  create.withZeroDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |}
+         |$create
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   it should "call the correct contract method based on the interface method index" in new ContractFixture {
     val fooV0 =
       s"""
@@ -6761,15 +6820,15 @@ class VMSpec extends AlephiumSpec with Generators {
     blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
-  // Inactive instrs check will be enabled in future upgrades
-  ignore should "check inactive instrs when creating contract" in new ContractFixture {
+  // Inactive instrs check should be enabled for new network upgrades
+  it should "check inactive instrs when creating contract" in new ContractFixture {
     setHardFork(HardFork.Leman)
 
     val code =
       s"""
          |Contract Foo() implements IFoo {
          |  pub fn foo() -> () {
-         |    let _ = groupOfAddress!(@$genesisAddress)
+         |    let _ = externalCallerAddress!()
          |  }
          |}
          |@using(methodSelector = false)
@@ -6779,7 +6838,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     intercept[AssertionError](createContract(code)).getMessage is
-      "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
+      s"Right(TxScriptExeFailed(InactiveInstr($ExternalCallerAddress)))"
   }
 
   it should "test chained contract calls" in new ContractFixture {
@@ -7337,6 +7396,456 @@ class VMSpec extends AlephiumSpec with Generators {
     callTxScript(script)
     val balance = getContractAsset(fooId).amount
     balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
+  }
+
+  it should "support chained contract calls in TxScript after danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+    val chainedSwapBlock = payableCall(
+      blockFlow,
+      chainIndex,
+      Compiler.compileTxScript(chainedSwapScript).rightValue,
+      keyPairOpt = Some(userKeyPair)
+    )
+    addAndCheck(blockFlow, chainedSwapBlock)
+    getContractAsset(swapToken1Token2).tokens.toSet is Set(
+      (token1Id, U256.unsafe(105)),
+      (token2Id, U256.unsafe(95))
+    )
+    getContractAsset(swapToken2Token3).tokens.toSet is Set(
+      (token2Id, U256.unsafe(105)),
+      (token3Id, U256.unsafe(95))
+    )
+
+    getTokenBalance(blockFlow, userLockupScript, token1Id) is U256.unsafe(5)
+    getTokenBalance(blockFlow, userLockupScript, token2Id) is U256.unsafe(0)
+    getTokenBalance(blockFlow, userLockupScript, token3Id) is U256.unsafe(5)
+  }
+
+  it should "not support chained contract calls in TxScript before danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(chainedSwapScript).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  it should "not support chained contract calls in contracts after danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(swapThroughProxyScriptCode).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  it should "not support chained contract calls in contracts before danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(swapThroughProxyScriptCode).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  trait ChainedContractCallsFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+    val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000), Some(genesisLockup)))
+    val token1Code =
+      s"""
+         |Contract Token1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract1 = createContract(token1Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token1Id  = TokenId.from(contract1)
+
+    val token2Code =
+      s"""
+         |Contract Token2() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract2 = createContract(token2Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token2Id  = TokenId.from(contract2)
+
+    val token3Code =
+      s"""
+         |Contract Token3() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract3 = createContract(token3Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token3Id  = TokenId.from(contract3)
+
+    val swapContractCode =
+      s"""
+         |Contract Swap(tokenId1: ByteVec, tokenId2: ByteVec, mut token1Reserve: U256, mut token2Reserve: U256) {
+         |  event AddLiquidity(lp: Address, token1Amount: U256, token2Amount: U256)
+         |  event SwapToken(buyer: Address, tokenId: ByteVec, tokenAmount: U256)
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn addLiquidity(lp: Address, token1Amount: U256, token2Amount: U256) -> () {
+         |    emit AddLiquidity(lp, token1Amount, token2Amount)
+         |
+         |    transferTokenToSelf!(lp, tokenId1, token1Amount)
+         |    transferTokenToSelf!(lp, tokenId2, token2Amount)
+         |    token1Reserve = token1Reserve + token1Amount
+         |    token2Reserve = token2Reserve + token2Amount
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn swap(buyer: Address, tokenId: ByteVec, tokenAmount: U256) -> () {
+         |    assert!(tokenId == tokenId1 || tokenId == tokenId2, 0)
+         |    emit SwapToken(buyer, tokenId, tokenAmount)
+         |
+         |    if (tokenId == tokenId1) {
+         |      let token1Amount = tokenAmount
+         |      let token2Amount = token2Reserve - token1Reserve * token2Reserve / (token1Reserve + token1Amount)
+         |      transferTokenToSelf!(buyer, tokenId1, token1Amount)
+         |      transferTokenFromSelf!(buyer, tokenId2, token2Amount)
+         |      token1Reserve = token1Reserve + token1Amount
+         |      token2Reserve = token2Reserve - token2Amount
+         |    } else {
+         |      let token2Amount = tokenAmount
+         |      let token1Amount = token1Reserve - token1Reserve * token2Reserve / (token2Reserve + token2Amount)
+         |      transferTokenToSelf!(buyer, tokenId2, token2Amount)
+         |      transferTokenFromSelf!(buyer, tokenId1, token1Amount)
+         |      token1Reserve = token1Reserve + token1Amount
+         |      token2Reserve = token2Reserve - token2Amount
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val swapToken1Token2 = createContract(
+      swapContractCode,
+      initialImmState = AVector(Val.ByteVec(token1Id.bytes), Val.ByteVec(token2Id.bytes)),
+      initialMutState = AVector(Val.U256(0), Val.U256(0))
+    )._1
+
+    val swapToken2Token3 = createContract(
+      swapContractCode,
+      initialImmState = AVector(Val.ByteVec(token2Id.bytes), Val.ByteVec(token3Id.bytes)),
+      initialMutState = AVector(Val.U256(0), Val.U256(0))
+    )._1
+
+    val swapContract = Compiler.compileContract(swapContractCode).rightValue
+
+    def addLiquidityScript(
+        swap: ContractId,
+        lp: Address,
+        tokenId1: TokenId,
+        tokenId2: TokenId,
+        token1Amount: Int,
+        token2Amount: Int
+    ): String =
+      s"""
+         |TxScript AddLiquidity() {
+         |  Swap(#${swap.toHexString}).addLiquidity{
+         |    @$lp -> #${tokenId1.toHexString}: ${token1Amount}, #${tokenId2.toHexString}: ${token2Amount}
+         |  }(@$lp, ${token1Amount}, ${token2Amount})
+         |}
+         |
+         |$swapContractCode
+         |""".stripMargin
+
+    def addLiquidity(
+        swap: ContractId,
+        tokenId1: TokenId,
+        tokenId2: TokenId,
+        token1Amount: Int,
+        token2Amount: Int
+    ): Unit = {
+      val code =
+        addLiquidityScript(swap, genesisAddress, tokenId1, tokenId2, token1Amount, token2Amount)
+      val block = payableCall(blockFlow, chainIndex, Compiler.compileTxScript(code).rightValue)
+      addAndCheck(blockFlow, block)
+    }
+    addLiquidity(swapToken1Token2, token1Id, token2Id, 100, 100)
+    addLiquidity(swapToken2Token3, token2Id, token3Id, 100, 100)
+
+    getContractAsset(swapToken1Token2).tokens.toSet is Set(
+      (token1Id, U256.unsafe(100)),
+      (token2Id, U256.unsafe(100))
+    )
+    getContractAsset(swapToken2Token3).tokens.toSet is Set(
+      (token2Id, U256.unsafe(100)),
+      (token3Id, U256.unsafe(100))
+    )
+
+    val userKeyPair               = chainIndex.from.generateKey
+    val userLockupScript          = LockupScript.p2pkh(userKeyPair._2)
+    val userAddress               = Address.from(userLockupScript)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val block3 = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      userLockupScript,
+      AVector(token1Id -> U256.unsafe(10)),
+      ALPH.alph(10)
+    )
+    addAndCheck(blockFlow, block3)
+
+    getTokenBalance(blockFlow, userLockupScript, token1Id) is U256.unsafe(10)
+    getTokenBalance(blockFlow, userLockupScript, token2Id) is U256.unsafe(0)
+    getTokenBalance(blockFlow, userLockupScript, token3Id) is U256.unsafe(0)
+
+    val chainedSwapScript: String =
+      s"""
+         |TxScript ChainedSwapToken() {
+         |  Swap(#${swapToken1Token2.toHexString}).swap{
+         |    @$userAddress -> #${token1Id.toHexString}: 5
+         |  }(@$userAddress, #${token1Id.toHexString}, 5)
+         |
+         |  Swap(#${swapToken2Token3.toHexString}).swap{
+         |    @$userAddress -> #${token2Id.toHexString}: 5
+         |  }(@$userAddress, #${token2Id.toHexString}, 5)
+         |}
+         |$swapContractCode
+         |""".stripMargin
+
+    val swapProxyContractCode: String =
+      s"""
+         |Contract SwapProxy() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn swap() -> () {
+         |    Swap(#${swapToken1Token2.toHexString}).swap{
+         |      @$userAddress -> #${token1Id.toHexString}: 5
+         |    }(@$userAddress, #${token1Id.toHexString}, 5)
+         |
+         |    Swap(#${swapToken2Token3.toHexString}).swap{
+         |      @$userAddress -> #${token2Id.toHexString}: 5
+         |    }(@$userAddress, #${token2Id.toHexString}, 5)
+         |  }
+         |}
+         |$swapContractCode
+         |""".stripMargin
+
+    val swapProxyContract = createContract(swapProxyContractCode)._1
+
+    val swapThroughProxyScriptCode =
+      s"""
+         |TxScript Main {
+         |  SwapProxy(#${swapProxyContract.toHexString}).swap{
+         |    @$userAddress -> #${token1Id.toHexString}: 5
+         |  }()
+         |}
+         |
+         |$swapProxyContractCode
+         |""".stripMargin
+  }
+
+  it should "use generated outputs for tokenRemaining/transferToken in TxScript after Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    val (_, randomPubKey)  = chainIndex.from.generateKey
+    val randomLockupScript = LockupScript.p2pkh(randomPubKey)
+    val randomAddress      = Address.p2pkh(randomPubKey)
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  let initialAlphBalance = tokenRemaining!(@$userAddress, ALPH)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 10, 0)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + dustAmount!(), 1)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 10 alph + dustAmount!(), 3)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).depositAlph{@$userAddress -> ALPH: 5 alph}(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 5 alph + dustAmount!(), 5)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 6)
+         |
+         |  transferToken!(@$userAddress, @$randomAddress, #${tokenId.toHexString}, 1)
+         |  transferToken!(@$userAddress, @$randomAddress, ALPH, 1 alph)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 9, 7)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 4 alph + dustAmount!(), 8)
+         |  assert!(tokenRemaining!(@$randomAddress, #${tokenId.toHexString}) == 0, 9)
+         |  assert!(tokenRemaining!(@$randomAddress, ALPH) == 0, 10)
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(995).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(9)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(14)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+    getTokenBalance(blockFlow, randomLockupScript, tokenId) is U256.unsafe(1)
+    getAlphBalance(blockFlow, randomLockupScript) is ALPH.alph(1)
+  }
+
+  it should "not use generated outputs for tokenRemaining in TxScript before Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  let initialAlphBalance = tokenRemaining!(@$userAddress, ALPH)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 0, 0)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance, 1)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance, 3)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(990).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(10)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(20)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+  }
+
+  it should "not use generated outputs for tokenRemaining in contracts after Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    val proxyContractCode =
+      s"""
+         |Contract Proxy() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn main() -> () {
+         |    TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |    assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 0, 0)
+         |    assert!(tokenRemaining!(@$userAddress, ALPH) == dustAmount!(), 1)
+         |    assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |    TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |    assert!(tokenRemaining!(@$userAddress, ALPH) == dustAmount!(), 3)
+         |    assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |  }
+         |}
+         |
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val proxyContractId = createContract(proxyContractCode)._1
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  Proxy(#${proxyContractId.toHexString}).main{@$userAddress -> ALPH: dustAmount!()}()
+         |}
+         |
+         |$proxyContractCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(990).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(10)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(20)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+  }
+
+  trait AssetRemainingFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
+    val userKeyPair      = chainIndex.from.generateKey
+    val userLockupScript = LockupScript.p2pkh(userKeyPair._2)
+    val userAddress      = Address.from(userLockupScript)
+
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val transferBlock = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      userLockupScript,
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(10)
+    )
+    addAndCheck(blockFlow, transferBlock)
+
+    val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000)))
+    val tokenFaucetCode =
+      s"""
+         |Contract TokenFaucet() {
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawToken(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, selfTokenId!(), 10)
+         |    transferTokenFromSelf!(caller, ALPH, dustAmount!())
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawAlph(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, ALPH, 10 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn depositAlph(caller: Address) -> () {
+         |    transferTokenToSelf!(caller, ALPH, 5 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenFaucetId = createContract(
+      tokenFaucetCode,
+      initialAttoAlphAmount = ALPH.alph(1000),
+      tokenIssuanceInfo = tokenIssuanceInfo
+    )._1
+    val tokenFaucetAddress = Address.contract(tokenFaucetId)
+    val tokenId            = TokenId.from(tokenFaucetId)
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(1000),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(1000)))
+    )
+    getAlphBalance(blockFlow, userLockupScript) is ALPH.alph(10)
   }
 
   private def getEvents(

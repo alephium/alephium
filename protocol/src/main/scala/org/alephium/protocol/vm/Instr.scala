@@ -232,7 +232,9 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Rhone hard fork */
-    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
+    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector,
+    /* Below are instructions for Danube hard fork */
+    ExternalCallerContractId, ExternalCallerAddress
   )
   // format: on
 
@@ -2270,7 +2272,7 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
       contractCode      <- prepareContractCode(frame)
       // Enable the check below for new network upgrades
-//      _                 <- checkInactiveInstructions(frame, contractCode)
+      _ <- checkInactiveInstructions(frame, contractCode)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
@@ -2297,10 +2299,10 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       frame: Frame[C],
       contractCode: StatefulContract.HalfDecoded
   ): ExeResult[Unit] = {
-    if (!frame.ctx.getHardFork().isRhoneEnabled()) {
+    if (!frame.ctx.getHardFork().isDanubeEnabled()) {
       EitherF.foreachTry(0 until contractCode.methodsLength)(methodIndex => {
         contractCode.getMethod(methodIndex).flatMap { method =>
-          method.instrs.find(_.isInstanceOf[RhoneInstr[_]]) match {
+          method.instrs.find(_.isInstanceOf[DanubeInstr[_]]) match {
             case Some(inactiveInstr) => failed(InactiveInstr(inactiveInstr))
             case None                => okay
           }
@@ -2743,6 +2745,30 @@ object CallerAddress extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.getCallerAddress()
+      _       <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
+
+object ExternalCallerContractId
+    extends ContractInstr
+    with GasLow
+    with DanubeInstrWithSimpleGas[StatefulContext] {
+  def runWithDanube[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerContractId <- frame.getExternalCallerContractId()
+      _                <- frame.pushOpStack(callerContractId)
+    } yield ()
+  }
+}
+
+object ExternalCallerAddress
+    extends ContractInstr
+    with GasLow
+    with DanubeInstrWithSimpleGas[StatefulContext] {
+  def runWithDanube[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.getExternalCallerAddress()
       _       <- frame.pushOpStack(address)
     } yield ()
   }
