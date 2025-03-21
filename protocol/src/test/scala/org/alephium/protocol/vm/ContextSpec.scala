@@ -383,4 +383,101 @@ class ContextSpec
     context.outputRemainingContractAssetsForRhone() isE ()
     context.outputBalances.all.length is 0
   }
+
+  it should "get all input addresses" in new Fixture {
+    forAll(genStatefulContext()) { context =>
+      val addresses  = context.allInputAddresses
+      val expected   = context.txEnv.prevOutputs.map(o => Address.from(o.lockupScript)).toSet
+      val addressSet = addresses.toSet
+      addresses.length is addressSet.size
+      expected is addressSet
+    }
+  }
+
+  trait ChainCallerOutputsFixture extends Fixture {
+    val ctx           = genStatefulContext()
+    val randomTokenId = TokenId.random
+
+    def txOutput(
+        lockupScript: LockupScript.Asset,
+        alphAmount: U256,
+        tokens: AVector[(TokenId, U256)]
+    ) = {
+      AssetOutput(alphAmount, lockupScript, TimeStamp.zero, tokens, ByteString.empty)
+    }
+
+    def addOutputBalance(
+        lockupScript: LockupScript.Asset,
+        alphAmount: U256,
+        tokens: AVector[(TokenId, U256)]
+    ) = {
+      ctx.outputBalances.add(
+        lockupScript,
+        MutBalancesPerLockup.from(txOutput(lockupScript, alphAmount, tokens))
+      ) is Some(())
+    }
+
+    def getMutBalanceState(txOutputs: AVector[AssetOutput]): MutBalanceState = {
+      MutBalanceState.from(MutBalances.from(txOutputs, AVector.empty).get)
+    }
+  }
+
+  it should "call chainCallerOutputs with no balance state" in new ChainCallerOutputsFixture {
+    ctx.chainCallerOutputs(None) isE ()
+  }
+
+  it should "call chainCallerOutputs and update input address balance from output balances" in new ChainCallerOutputsFixture {
+    val inputLockupScript    = ctx.txEnv.prevOutputs.head.lockupScript
+    val balanceState         = getMutBalanceState(ctx.txEnv.prevOutputs)
+    val initialAlphRemaining = balanceState.alphRemaining(inputLockupScript)
+
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(inputLockupScript) is initialAlphRemaining
+    balanceState.tokenRemaining(inputLockupScript, randomTokenId) is None
+
+    addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(inputLockupScript) is initialAlphRemaining.value.add(ALPH.oneAlph)
+    balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.One)
+  }
+
+  it should "call chainCallerOutputs and fail when the amount overflows" in new ChainCallerOutputsFixture {
+    val inputLockupScript = ctx.txEnv.prevOutputs.head.lockupScript
+    val updatedPrevOutputs = ctx.txEnv.prevOutputs.replace(
+      0,
+      txOutput(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> U256.MaxValue))
+    )
+    val balanceState = getMutBalanceState(updatedPrevOutputs)
+
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(inputLockupScript).value is ALPH.oneAlph
+    balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.MaxValue)
+
+    addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
+    ctx.chainCallerOutputs(Some(balanceState)).leftValue isE ChainCallerOutputsFailed(
+      Address.from(inputLockupScript)
+    )
+  }
+
+  it should "call chainCallerOutputs and ensure non-input address balances remain unchanged" in new ChainCallerOutputsFixture {
+    val lockupScript         = assetLockupGen(GroupIndex.unsafe(0)).sample.value
+    val randomTxOutput       = txOutput(lockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
+    val balanceState         = getMutBalanceState(ctx.txEnv.prevOutputs :+ randomTxOutput)
+    val initialAlphRemaining = balanceState.alphRemaining(lockupScript)
+    balanceState.tokenRemaining(lockupScript, randomTokenId) is Some(U256.One)
+
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(lockupScript) is initialAlphRemaining
+    balanceState.tokenRemaining(lockupScript, randomTokenId) is Some(U256.One)
+
+    addOutputBalance(lockupScript, ALPH.oneAlph.mulUnsafe(2), AVector(randomTokenId -> 10))
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(lockupScript) is initialAlphRemaining
+    balanceState.tokenRemaining(lockupScript, randomTokenId) is Some(U256.One)
+  }
 }
