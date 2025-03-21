@@ -64,10 +64,12 @@ final case class CoinbaseDataV1(
     prefix: CoinbaseDataPrefixV1,
     minerData: ByteString
 ) extends CoinbaseData {
-  val ghostUncleData: AVector[GhostUncleData] = AVector.empty[GhostUncleData]
+  def ghostUncleData: AVector[GhostUncleData] = CoinbaseDataV1.ghostUncleData
 }
 
 object CoinbaseDataV1 {
+  val ghostUncleData: AVector[GhostUncleData] = AVector.empty[GhostUncleData]
+
   implicit val serde: Serde[CoinbaseDataV1] = new Serde[CoinbaseDataV1] {
     def serialize(input: CoinbaseDataV1): ByteString = encode(input.prefix) ++ input.minerData
 
