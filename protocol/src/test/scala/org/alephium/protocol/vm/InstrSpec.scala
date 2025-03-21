@@ -108,7 +108,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val danubeStatelessInstrs =
       AVector[DanubeInstr[StatelessContext]](VerifySignature, GetSegregatedWebAuthnSignature)
     val danubeStatefulInstrs = AVector[DanubeInstr[StatefulContext]](
-      ExternalCallerId,
+      ExternalCallerContractId,
       ExternalCallerAddress
     )
   }
@@ -4498,14 +4498,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "ExternalCallerId" in new ExternalCallerFixture {
     {
       info("Not activated in PreDanube")
-      ExternalCallerId.runWith(preparePreDanubeFrame()).leftValue isE
-        InactiveInstr(ExternalCallerId)
+      ExternalCallerContractId.runWith(preparePreDanubeFrame()).leftValue isE
+        InactiveInstr(ExternalCallerContractId)
     }
 
     {
       info("Current frame is a script frame")
       val scriptFrame = prepareScriptFrame()
-      ExternalCallerId.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
+      ExternalCallerContractId.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
       ExternalCallerAddress.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
     }
 
@@ -4517,7 +4517,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         contractIdOpt = Some(callerContractId)
       )
       val frame = prepareContractFrame(callerFrameOpt = Some(callerFrame))
-      test(ExternalCallerId, Val.ByteVec(callerContractId.bytes), frame)
+      test(ExternalCallerContractId, Val.ByteVec(callerContractId.bytes), frame)
     }
   }
 
@@ -4717,7 +4717,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30, MinimalContractDeposit -> 2, CreateMapEntry(byte, byte) -> 32000,
       MethodSelector(Method.Selector(0)) -> 10, /* CallExternalBySelector(selector) -> ??? */
       /* Below are instructions for Danube hard fork */
-      ExternalCallerId -> 5, ExternalCallerAddress -> 5
+      ExternalCallerContractId -> 5, ExternalCallerAddress -> 5
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -4855,7 +4855,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208, MinimalContractDeposit -> 209, CreateMapEntry(0, 0) -> 210,
       MethodSelector(Method.Selector(0)) -> 211, CallExternalBySelector(Method.Selector(0)) -> 212,
       /* Below are instructions for Danube hard fork */
-      ExternalCallerId -> 213, ExternalCallerAddress -> 214
+      ExternalCallerContractId -> 213, ExternalCallerAddress -> 214
     )
     // format: on
 
@@ -4935,7 +4935,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       PayGasFee, MinimalContractDeposit, CreateMapEntry(twoBytes),
       MethodSelector(Method.Selector(0)), CallExternalBySelector(Method.Selector(0)),
       /* Below are instructions for Danube hard fork */
-      ExternalCallerId, ExternalCallerAddress
+      ExternalCallerContractId, ExternalCallerAddress
     )
     // format: on
   }

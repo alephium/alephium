@@ -1644,16 +1644,18 @@ object BuiltIn {
       Seq(Type.ByteVec),
       CallerContractId,
       argsName = Seq(),
-      retComment = "the contract id of the immediate caller, which could be the current contract in case of recursive calls"
+      retComment =
+        "the contract id of the immediate caller, which could be the current contract in case of recursive calls"
     )
   val externalCallerContractId: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contractSimple(
       "externalCallerContractId",
       Seq.empty,
       Seq(Type.ByteVec),
-      ExternalCallerId,
+      ExternalCallerContractId,
       argsName = Seq(),
-      retComment = "the contract id of the first external contract in the call stack (different from the current contract)",
+      retComment =
+        "the contract id of the first external contract in the call stack (different from the current contract)"
     )
 
   // scalastyle:off line.size.limit

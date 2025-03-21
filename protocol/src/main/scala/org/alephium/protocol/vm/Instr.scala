@@ -234,7 +234,7 @@ object Instr {
     /* Below are instructions for Rhone hard fork */
     PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector,
     /* Below are instructions for Danube hard fork */
-    ExternalCallerId, ExternalCallerAddress
+    ExternalCallerContractId, ExternalCallerAddress
   )
   // format: on
 
@@ -2750,7 +2750,7 @@ object CallerAddress extends ContractInstr with GasLow {
   }
 }
 
-object ExternalCallerId
+object ExternalCallerContractId
     extends ContractInstr
     with GasLow
     with DanubeInstrWithSimpleGas[StatefulContext] {
