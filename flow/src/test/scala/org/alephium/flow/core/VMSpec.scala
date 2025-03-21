@@ -1209,6 +1209,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
          |    assert!(callerContractId!() == barId, 0)
          |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(externalCallerContractId!() == barId, 0)
          |    assert!(externalCallerAddress!() == barAddress, 0)
          |    assert!(callerInitialStateHash!() == barHash, 0)
          |    assert!(callerCodeHash!() == barCodeHash, 0)
