@@ -23,7 +23,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.{Block, ChainIndex, TransactionTemplate}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{ActorRefT, EventBus}
 
@@ -33,7 +33,8 @@ final case class AllHandlers(
     dependencyHandler: ActorRefT[DependencyHandler.Command],
     viewHandler: ActorRefT[ViewHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]],
+    accountViewHandler: ActorRefT[Unit]
 )(implicit brokerConfig: BrokerConfig) {
   def orderedHandlers: Seq[ActorRefT[_]] = {
     (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
@@ -131,13 +132,18 @@ object AllHandlers {
     val viewHandlerProps = ViewHandler.props(blockFlow).withDispatcher(MiningDispatcher)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
+    val accountViewHandlerProps = AccountViewHandler.props(blockFlow)
+    val accountViewHandler =
+      ActorRefT.build[Unit](system, accountViewHandlerProps, s"AccountViewHandler$namePostfix")
+
     AllHandlers(
       flowHandler,
       txHandler,
       dependencyHandler,
       viewHandler,
       blockHandlers,
-      headerHandlers
+      headerHandlers,
+      accountViewHandler
     )
   }
 
@@ -195,4 +201,5 @@ object AllHandlers {
   }
 
   final case class BlockNotify(block: Block, height: Int) extends EventBus.Event
+  final case class TxNotify(tx: TransactionTemplate)      extends EventBus.Event
 }

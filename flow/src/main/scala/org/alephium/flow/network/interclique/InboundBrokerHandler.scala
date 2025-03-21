@@ -65,5 +65,5 @@ class InboundBrokerHandler(
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
-    extends BaseInboundBrokerHandler
-    with BrokerHandler
+    extends BrokerHandler
+    with BaseInboundBrokerHandler

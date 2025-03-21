@@ -20,6 +20,7 @@ import scala.collection.mutable
 
 import akka.util.ByteString
 
+import org.alephium.crypto.{ED25519, ED25519PublicKey, SecP256R1, SecP256R1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
@@ -58,6 +59,7 @@ trait TxValidation {
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv
   ): TxValidationResult[Unit] = {
+    val txIndex = 0 // Always 0 for tx template validation
     for {
       preOutputs <- fromGetPreOutputs(groupView.getPreAssetOutputs(tx.unsigned.inputs))
       // the tx might fail afterwards
@@ -71,7 +73,7 @@ trait TxValidation {
         blockEnv.getHardFork(),
         isCoinbase = false
       )
-      _ <- checkStatefulExceptTxScript(failedTx, blockEnv, preOutputs.as[TxOutput], None)
+      _ <- checkStatefulExceptTxScript(failedTx, blockEnv, preOutputs.as[TxOutput], None, txIndex)
       // the tx should succeed
       _ <- validateSuccessfulScriptTxTemplate(
         tx,
@@ -79,7 +81,8 @@ trait TxValidation {
         chainIndex,
         groupView,
         blockEnv,
-        preOutputs
+        preOutputs,
+        txIndex
       )
     } yield ()
   }
@@ -90,7 +93,8 @@ trait TxValidation {
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
-      preOutputs: AVector[AssetOutput]
+      preOutputs: AVector[AssetOutput],
+      txIndex: Int
   ): TxValidationResult[Transaction] = {
     val stagingWorldState = groupView.worldState.staging()
     val scriptBaseGas     = GasCall.scriptBaseGas(script.bytes.length)
@@ -103,7 +107,8 @@ trait TxValidation {
           tx,
           preOutputs,
           script,
-          gasRemaining0
+          gasRemaining0,
+          txIndex
         ),
         TxScriptExeFailed.apply
       )
@@ -120,7 +125,8 @@ trait TxValidation {
         successfulTx,
         blockEnv,
         preOutputs.as[TxOutput] ++ exeResult.contractPrevOutputs,
-        None
+        None,
+        txIndex
       )
       gasRemaining2 <- fromOption(gasRemaining1.sub(scriptBaseGas), OutOfGas)
       _             <- fromOption(gasRemaining2.sub(exeGas), TxScriptExeFailed(VMOutOfGas))
@@ -153,7 +159,8 @@ trait TxValidation {
         groupView.worldState,
         preOutputs.as[TxOutput],
         None,
-        blockEnv
+        blockEnv,
+        0 // Always 0 for tx template validation
       )
     } yield ()
   }
@@ -166,7 +173,12 @@ trait TxValidation {
       chainIndex <- getChainIndex(tx)
       blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
       groupView  <- from(flow.getMutableGroupViewIncludePool(chainIndex.from))
-      _          <- validateTxTemplate(tx, chainIndex, groupView, blockEnv)
+      _ <- validateTxTemplate(
+        tx,
+        chainIndex,
+        groupView,
+        blockEnv
+      )
     } yield ()
   }
 
@@ -177,16 +189,17 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       chainIndex <- getChainIndex(tx)
-      bestDeps = flow.getBestDeps(chainIndex.from)
-      groupView <- from(flow.getMutableGroupView(chainIndex.from, bestDeps))
-      blockEnv  <- from(flow.getDryrunBlockEnv(chainIndex))
+      blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
+      hardFork = hardForkOpt.getOrElse(blockEnv.hardFork)
+      groupView <- from(flow.getMutableGroupViewForTxHandling(chainIndex.from, hardFork))
       _ <- validateTx(
         tx,
         chainIndex,
         groupView,
         hardForkOpt.map(hardFork => blockEnv.copy(hardFork = hardFork)).getOrElse(blockEnv),
         None,
-        checkDoubleSpending = true
+        checkDoubleSpending = true,
+        0 // Always 0 for tx template validation
       )
     } yield ()
   }
@@ -197,7 +210,8 @@ trait TxValidation {
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
       coinbaseNetReward: Option[U256],
-      checkDoubleSpending: Boolean // for block txs, this has been checked in block validation
+      checkDoubleSpending: Boolean, // for block txs, this has been checked in block validation
+      txIndex: Int
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkStateless(
@@ -214,7 +228,8 @@ trait TxValidation {
         groupView.worldState,
         preOutputs,
         coinbaseNetReward,
-        blockEnv
+        blockEnv,
+        txIndex
       )
     } yield ()
   }
@@ -234,7 +249,8 @@ trait TxValidation {
       tx: Transaction,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv,
-      coinbaseNetReward: Option[U256]
+      coinbaseNetReward: Option[U256],
+      txIndex: Int
   ): TxValidationResult[Unit] = {
     for {
       _ <- validateTx(
@@ -244,7 +260,8 @@ trait TxValidation {
         blockEnv,
         coinbaseNetReward,
         // checkDoubleSpending is false as it has been checked in block validation
-        checkDoubleSpending = false
+        checkDoubleSpending = false,
+        txIndex
       )
     } yield ()
   }
@@ -274,25 +291,47 @@ trait TxValidation {
       worldState: WorldState.Cached,
       preOutputs: AVector[TxOutput],
       coinbaseNetReward: Option[U256],
-      blockEnv: BlockEnv
+      blockEnv: BlockEnv,
+      txIndex: Int
   ): TxValidationResult[Unit] = {
     for {
-      gasRemaining <- checkStatefulExceptTxScript(tx, blockEnv, preOutputs, coinbaseNetReward)
+      gasRemaining <- checkStatefulExceptTxScript(
+        tx,
+        blockEnv,
+        preOutputs,
+        coinbaseNetReward,
+        txIndex
+      )
       preAssetOutputs = getPrevAssetOutputs(preOutputs, tx)
-      _ <- checkTxScript(chainIndex, tx, gasRemaining, worldState, preAssetOutputs, blockEnv)
+      _ <- checkTxScript(
+        chainIndex,
+        tx,
+        gasRemaining,
+        worldState,
+        preAssetOutputs,
+        blockEnv,
+        txIndex
+      )
     } yield ()
   }
   protected[validation] def checkStatefulExceptTxScript(
       tx: Transaction,
       blockEnv: BlockEnv,
       preOutputs: AVector[TxOutput],
-      coinbaseNetReward: Option[U256]
+      coinbaseNetReward: Option[U256],
+      txIndex: Int
   ): TxValidationResult[GasBox] = {
     for {
-      _            <- checkLockTime(preOutputs, blockEnv.timeStamp)
-      _            <- checkAlphBalance(tx, preOutputs, coinbaseNetReward)
-      _            <- checkTokenBalance(tx, preOutputs)
-      gasRemaining <- checkGasAndWitnesses(tx, preOutputs, blockEnv, coinbaseNetReward.isDefined)
+      _ <- checkLockTime(preOutputs, blockEnv.timeStamp)
+      _ <- checkAlphBalance(tx, preOutputs, coinbaseNetReward)
+      _ <- checkTokenBalance(tx, preOutputs)
+      gasRemaining <- checkGasAndWitnesses(
+        tx,
+        preOutputs,
+        blockEnv,
+        coinbaseNetReward.isDefined,
+        txIndex
+      )
     } yield gasRemaining
   }
 
@@ -319,14 +358,22 @@ trait TxValidation {
   protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlphBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
   protected[validation] def checkTokenBalance(tx: Transaction, preOutputs: AVector[TxOutput]): TxValidationResult[Unit]
-  def checkGasAndWitnesses(tx: Transaction, preOutputs: AVector[TxOutput], blockEnv: BlockEnv, isCoinbase: Boolean): TxValidationResult[GasBox]
+  def checkGasAndWitnesses(
+    tx: Transaction,
+    preOutputs: AVector[TxOutput],
+    blockEnv: BlockEnv,
+    isCoinbase: Boolean,
+    txIndex: Int
+  ): TxValidationResult[GasBox]
   protected[validation] def checkTxScript(
       chainIndex: ChainIndex,
       tx: Transaction,
       gasRemaining: GasBox,
       worldState: WorldState.Cached,
       preOutputs: AVector[AssetOutput],
-      blockEnv: BlockEnv): TxValidationResult[GasBox]
+      blockEnv: BlockEnv,
+      txIndex: Int
+    ): TxValidationResult[GasBox]
   // format: on
 }
 
@@ -486,6 +533,7 @@ object TxValidation {
       for {
         _ <- checkOutputAmount(output, hardFork)
         _ <- checkP2MPKStat(output, hardFork)
+        _ <- checkP2PKStat(output, hardFork)
         _ <- checkOutputDataState(output)
       } yield ()
     }
@@ -521,6 +569,20 @@ object TxValidation {
         output.tokens.length <= deprecatedMaxTokenPerUtxo &&
         output.tokens.forall(_._2.nonZero)
       if (validated) Right(()) else invalidTx(InvalidOutputStats)
+    }
+
+    @inline private def checkP2PKStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      if (hardFork.isDanubeEnabled()) {
+        Right(())
+      } else {
+        output.lockupScript match {
+          case _: LockupScript.P2PK => invalidTx(InvalidLockupScriptPreDanube)
+          case _                    => Right(())
+        }
+      }
     }
 
     @inline private def checkP2MPKStat(
@@ -712,11 +774,19 @@ object TxValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv,
-        isCoinbase: Boolean
+        isCoinbase: Boolean,
+        txIndex: Int
     ): TxValidationResult[GasBox] = {
       for {
         gasRemaining0 <- checkBasicGas(tx, tx.unsigned.gasAmount)
-        gasRemaining1 <- checkWitnesses(tx, preOutputs, blockEnv, gasRemaining0, isCoinbase)
+        gasRemaining1 <- checkWitnesses(
+          tx,
+          preOutputs,
+          blockEnv,
+          gasRemaining0,
+          isCoinbase,
+          txIndex
+        )
       } yield gasRemaining1
     }
 
@@ -748,11 +818,12 @@ object TxValidation {
         preOutputs: AVector[TxOutput],
         blockEnv: BlockEnv,
         gasRemaining: GasBox,
-        isCoinbase: Boolean
+        isCoinbase: Boolean,
+        txIndex: Int
     ): TxValidationResult[GasBox] = {
       assume(tx.unsigned.inputs.length <= preOutputs.length)
       val signatures = Stack.popOnly(tx.inputSignatures.reverse)
-      val txEnv      = TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures)
+      val txEnv      = TxEnv(tx, getPrevAssetOutputs(preOutputs, tx), signatures, txIndex)
       val inputs     = tx.unsigned.inputs
       for {
         remaining <- EitherF.foldTry(inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
@@ -802,8 +873,87 @@ object TxValidation {
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
+        case (lock: LockupScript.P2PK, UnlockScript.P2PK)
+            if blockEnv.getHardFork().isDanubeEnabled() =>
+          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
+      }
+    }
+
+    protected[validation] def checkP2pk(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2PK
+    ): TxValidationResult[GasBox] = {
+      lock.publicKey match {
+        case PublicKeyLike.SecP256K1(key) =>
+          checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.SecP256R1(key) =>
+          checkSecP256R1Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.ED25519(key) =>
+          checkED25519Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.WebAuthn(key) =>
+          checkWebAuthnSignature(txEnv, preImage, gasRemaining, key)
+      }
+    }
+
+    protected[validation] def checkSecP256R1Signature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: SecP256R1PublicKey
+    ): TxValidationResult[GasBox] = {
+      txEnv.signatures.pop() match {
+        case Right(signature) =>
+          if (!SecP256R1.verify(preImage, signature.toSecP256R1Signature, publicKey)) {
+            invalidTx(InvalidSignature)
+          } else {
+            fromOption(gasRemaining.sub(GasSchedule.secp256R1UnlockGas), OutOfGas)
+          }
+        case Left(_) => invalidTx(NotEnoughSignature)
+      }
+    }
+
+    protected[validation] def checkED25519Signature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: ED25519PublicKey
+    ): TxValidationResult[GasBox] = {
+      txEnv.signatures.pop() match {
+        case Right(signature) =>
+          if (!ED25519.verify(preImage, signature.toED25519Signature, publicKey)) {
+            invalidTx(InvalidSignature)
+          } else {
+            fromOption(gasRemaining.sub(GasSchedule.ed25519UnlockGas), OutOfGas)
+          }
+        case Left(_) => invalidTx(NotEnoughSignature)
+      }
+    }
+
+    protected[validation] def checkWebAuthnSignature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: SecP256R1PublicKey
+    ): TxValidationResult[GasBox] = {
+      WebAuthn.tryDecode(() => txEnv.signatures.pop().toOption) match {
+        case Right(webauthn) =>
+          txEnv.signatures.pop() match {
+            case Right(signature) =>
+              if (!webauthn.verify(preImage, signature.toSecP256R1Signature, publicKey)) {
+                invalidTx(InvalidSignature)
+              } else {
+                fromOption(
+                  gasRemaining.sub(GasSchedule.webauthnUnlockGas(webauthn.bytesLength)),
+                  OutOfGas
+                )
+              }
+            case Left(_) => invalidTx(NotEnoughSignature)
+          }
+        case Left(error) => invalidTx(InvalidWebauthnPayload(error))
       }
     }
 
@@ -817,11 +967,11 @@ object TxValidation {
       if (Hash.hash(publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        checkSignature(txEnv, preImage, gasRemaining, publicKey)
+        checkSecP256K1Signature(txEnv, preImage, gasRemaining, publicKey)
       }
     }
 
-    private def checkSignature(
+    private def checkSecP256K1Signature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
@@ -829,10 +979,10 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(preImage, signature, publicKey)) {
+          if (!SignatureSchema.verify(preImage, signature.toSecP256K1Signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
-            fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)
+            fromOption(gasRemaining.sub(GasSchedule.secp256K1UnlockGas), OutOfGas)
           }
         case Left(_) => invalidTx(NotEnoughSignature)
       }
@@ -856,7 +1006,7 @@ object TxValidation {
                 if (Hash.hash(publicKey.bytes) != pkHash) {
                   invalidTx(InvalidPublicKeyHash)
                 } else {
-                  checkSignature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
+                  checkSecP256K1Signature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
                 }
               case None =>
                 invalidTx(InvalidP2mpkhUnlockScript)
@@ -910,7 +1060,8 @@ object TxValidation {
         gasRemaining: GasBox,
         worldState: WorldState.Cached,
         preAssetOutputs: AVector[AssetOutput],
-        blockEnv: BlockEnv
+        blockEnv: BlockEnv,
+        txIndex: Int
     ): TxValidationResult[GasBox] = {
       if (chainIndex.isIntraGroup) {
         tx.unsigned.scriptOpt match {
@@ -922,7 +1073,8 @@ object TxValidation {
               gasRemaining,
               stagingWorldState,
               preAssetOutputs,
-              blockEnv
+              blockEnv,
+              txIndex
             ) match {
               case Right(TxScriptExecution(remaining, contractInputs, _, generatedOutputs)) =>
                 if (contractInputs != tx.contractInputs) {
@@ -969,7 +1121,8 @@ object TxValidation {
         gasRemaining: GasBox,
         worldState: WorldState.Staging,
         preAssetOutputs: AVector[AssetOutput],
-        blockEnv: BlockEnv
+        blockEnv: BlockEnv,
+        txIndex: Int
     ): ExeResult[StatefulVM.TxScriptExecution] = {
       for {
         remaining <- VM.checkCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())
@@ -980,7 +1133,8 @@ object TxValidation {
             tx,
             preAssetOutputs,
             script,
-            remaining
+            remaining,
+            txIndex
           )
       } yield result
     }

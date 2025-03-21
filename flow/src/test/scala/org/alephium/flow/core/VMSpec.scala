@@ -32,12 +32,12 @@ import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
-import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
-import org.alephium.ralph.Compiler
+import org.alephium.ralph.{Compiler, CompoundAssignmentOperator}
 import org.alephium.serde._
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 
 // scalastyle:off file.size.limit method.length number.of.methods
 class VMSpec extends AlephiumSpec with Generators {
@@ -1209,11 +1209,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
          |    assert!(callerContractId!() == barId, 0)
          |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(externalCallerContractId!() == barId, 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |    assert!(callerInitialStateHash!() == barHash, 0)
          |    assert!(callerCodeHash!() == barCodeHash, 0)
          |    assert!(isCalledFromTxScript!() == false, 0)
          |    assert!(isAssetAddress!(barAddress) == false, 0)
          |    assert!(isContractAddress!(barAddress) == true, 0)
+         |
+         |    foofoo(barAddress)
+         |  }
+         |
+         |  fn foofoo(barAddress: Address) -> () {
+         |    assert!(callerAddress!() == selfAddress!(), 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |  }
          |}
          |""".stripMargin
@@ -1883,34 +1892,56 @@ class VMSpec extends AlephiumSpec with Generators {
   // scalastyle:off no.equal
   it should "test signature built-ins" in new ContractFixture {
     val zero                     = Hash.zero.toHexString
-    val (p256Pri, p256Pub)       = SecP256K1.generatePriPub()
-    val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
+    val (p256k1Pri, p256k1Pub)   = SecP256K1.generatePriPub()
+    val p256k1Sig                = SecP256K1.sign(Hash.zero.bytes, p256k1Pri).toHexString
     val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
     val (bip340Pri, bip340Pub)   = BIP340Schnorr.generatePriPub()
     val bip340Sig                = BIP340Schnorr.sign(Hash.zero.bytes, bip340Pri).toHexString
-    def main(p256Sig: String, ed25519Sig: String, bip340Sig: String) =
+    val (p256r1Pri, p256r1Pub)   = SecP256R1.generatePriPub()
+    val p256r1Sig                = SecP256R1.sign(Hash.zero.bytes, p256r1Pri).toHexString
+    val authenticatorData        = Hash.generate.bytes ++ ByteString(1)
+    val webauthn                 = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
+    val messageHash              = webauthn.messageHash(Hash.zero.bytes)
+    val webauthnSig0             = SecP256R1.sign(messageHash.bytes, p256r1Pri).bytes
+    val webauthnPayload          = webauthn.encodeForTest().map(_.bytes).reduce(_ ++ _).drop(2)
+    val webauthnSig              = Hex.toHexString(webauthnPayload ++ webauthnSig0)
+    def main(
+        p256k1Sig: String,
+        ed25519Sig: String,
+        bip340Sig: String,
+        p256r1Sig: String,
+        webauthnSig: String
+    ) =
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
+         |  verifySecP256K1!(#$zero, #${p256k1Pub.toHexString}, #$p256k1Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
          |  verifyBIP340Schnorr!(#$zero, #${bip340Pub.toHexString}, #$bip340Sig)
+         |
+         |  verifySignature!(#$zero, #${p256k1Pub.toHexString}, #$p256k1Sig, #00)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig, #01)
+         |  verifySignature!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig, #02)
+         |  verifySignature!(#$zero, #${p256r1Pub.toHexString}, #$webauthnSig, #03)
+         |
+         |  verifySecP256R1!(#$zero, #${p256r1Pub.toHexString}, #$p256r1Sig)
+         |  verifyWebAuthn!(#$zero, #${p256r1Pub.toHexString}, #$webauthnSig)
          |}
          |""".stripMargin
-    testSimpleScript(main(p256Sig, ed25519Sig, bip340Sig))
+    testSimpleScript(main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, webauthnSig))
     val randomSecP256K1Signature = SecP256K1Signature.generate
     failSimpleScript(
-      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig),
+      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig, p256r1Sig, webauthnSig),
       InvalidSignature(
-        p256Pub.bytes,
+        p256k1Pub.bytes,
         Hash.zero.bytes,
         randomSecP256K1Signature.bytes
       )
     )
     val randomEd25519Signature = ED25519Signature.generate
     failSimpleScript(
-      main(p256Sig, randomEd25519Signature.toHexString, bip340Sig),
+      main(p256k1Sig, randomEd25519Signature.toHexString, bip340Sig, p256r1Sig, webauthnSig),
       InvalidSignature(
         ed25519Pub.bytes,
         Hash.zero.bytes,
@@ -1919,13 +1950,83 @@ class VMSpec extends AlephiumSpec with Generators {
     )
     val randomBIP340SchnorrSignature = BIP340SchnorrSignature.generate
     failSimpleScript(
-      main(p256Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString),
+      main(p256k1Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString, p256r1Sig, webauthnSig),
       InvalidSignature(
         bip340Pub.bytes,
         Hash.zero.bytes,
         randomBIP340SchnorrSignature.bytes
       )
     )
+    val randomSecP256R1Signature = SecP256R1Signature.generate
+    failSimpleScript(
+      main(p256k1Sig, ed25519Sig, bip340Sig, randomSecP256R1Signature.toHexString, webauthnSig),
+      InvalidSignature(
+        ByteString(1) ++ p256r1Pub.bytes,
+        Hash.zero.bytes,
+        randomSecP256R1Signature.bytes
+      )
+    )
+    val randomWebAuthnSig = webauthnPayload ++ SecP256R1Signature.generate.bytes
+    failSimpleScript(
+      main(p256k1Sig, ed25519Sig, bip340Sig, p256r1Sig, Hex.toHexString(randomWebAuthnSig)),
+      InvalidSignature(
+        ByteString(3) ++ p256r1Pub.bytes,
+        Hash.zero.bytes,
+        randomWebAuthnSig
+      )
+    )
+  }
+
+  it should "test getSegregatedWebAuthnSignature" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val main =
+      s"""
+         |AssetScript Main {
+         |  pub fn main() -> () {
+         |    verifyWebAuthn!(txId!(), #${pubKey.toHexString}, getSegregatedWebAuthnSignature!())
+         |  }
+         |}
+         |""".stripMargin
+
+    val script           = Compiler.compileAssetScript(main).rightValue._1
+    val fromLockupScript = LockupScript.p2sh(script)
+    val groupIndex       = fromLockupScript.groupIndex
+    val genesisKey       = genesisKeys(groupIndex.value)._1
+    val block =
+      transfer(
+        blockFlow,
+        genesisKey,
+        fromLockupScript,
+        AVector.empty[(TokenId, U256)],
+        ALPH.alph(4)
+      )
+    addAndCheck(blockFlow, block)
+
+    val toLockupScript = LockupScript.p2pkh(groupIndex.generateKey._2)
+    checkBalance(blockFlow, toLockupScript, U256.Zero)
+
+    val outputInfo =
+      UnsignedTransaction.TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None)
+    val unsignedTx = blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        UnlockScript.P2SH(script, AVector.empty),
+        AVector(outputInfo),
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .rightValue
+    val tx     = signWithWebAuthn(unsignedTx, priKey)._2
+    val block0 = mineWithTxs(blockFlow, ChainIndex(groupIndex, groupIndex), AVector(tx))
+    block0.nonCoinbase.head.id is tx.id
+    addAndCheck(blockFlow, block0)
+    checkBalance(blockFlow, toLockupScript, ALPH.oneAlph)
   }
 
   it should "test convert pubkey to address" in new ContractFixture {
@@ -2303,12 +2404,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in random order" in new TxExecutionOrderFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
+    setHardFork(HardFork.Mainnet)
 
     def contractCreationPreLeman(
         code: StatefulContract,
@@ -2386,13 +2482,9 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in sequential order" in new TxExecutionOrderFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
+    setHardForkSince(HardFork.Leman)
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
     val block      = callScript(contractId, identity)
-    networkConfig.getHardFork(block.timestamp) is HardFork.Leman
 
     val expected = (0L until block.nonCoinbaseLength.toLong).fold(0L)(_ * 10 + _)
     checkState(expected, contractId)
@@ -3810,54 +3902,28 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
+    setHardForkBefore(HardFork.Rhone)
+    val hardFork                            = networkConfig.getHardFork(TimeStamp.now())
     override def useMethodSelector: Boolean = false
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
-
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-    errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+    if (hardFork == HardFork.Mainnet) {
+      errorMessage.contains(s"Right(TxScriptExeFailed(Deserialization error") is true
+    } else {
+      errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+    }
   }
 
   it should "not load contract assets just after creation from Rhone upgrade" in new CreateContractFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
-
+    setHardForkSince(HardFork.Rhone)
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetAlreadyFlushed)") is true
   }
 
   it should "load contract fields just after creation from Rhone upgrade" in new CreateContractFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
+    setHardForkSince(HardFork.Rhone)
     override def useAssets: Boolean = false
-
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
 
     val block = payableCall(blockFlow, chainIndex, script)
     addAndCheck(blockFlow, block)
@@ -3916,10 +3982,41 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "encode values" in new ContractFixture {
     val foo: String =
       s"""
+         |struct Struct1 {
+         |  a: Bool,
+         |  b: U256,
+         |  c: Bool
+         |}
+         |
+         |struct Struct2 {
+         |  a: Bool,
+         |  b: [U256; 2]
+         |}
+         |
+         |struct Struct3 {
+         |  a: Bool,
+         |  b: Struct2
+         |}
+         |
          |Contract Foo() {
          |  pub fn foo() -> () {
-         |    let bytes = encodeToByteVec!(true, 1, false)
-         |    assert!(bytes == #03000102010000, 0)
+         |    let struct1 = Struct1 { a: true, b: 1, c: false }
+         |    let struct1Bytes = encodeToByteVec!(struct1)
+         |    assert!(struct1Bytes == #03000102010000, 0)
+         |
+         |    let struct2 = Struct2 { a: true, b: [1, 2] }
+         |    let struct2Bytes = encodeToByteVec!(struct2)
+         |    assert!(struct2Bytes == #03000102010202, 1)
+         |
+         |    let struct3 = Struct3 { a: true, b: struct2 }
+         |    let struct3Bytes = encodeToByteVec!(struct3)
+         |    assert!(struct3Bytes == #040001000102010202, 3)
+         |
+         |    let allStructs = encodeToByteVec!(struct1, struct2, struct3)
+         |    assert!(allStructs == #0a0001020100000001020102020001000102010202, 4)
+         |
+         |    let bytes = encodeToByteVec!(true, 1, false, [1, 2], struct3)
+         |    assert!(bytes == #09000102010000020102020001000102010202, 5)
          |  }
          |}
          |""".stripMargin
@@ -3934,6 +4031,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |$foo
          |""".stripMargin
     testSimpleScript(main)
+  }
+
+  it should "return compilation error when encoding nothing" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes = encodeToByteVec!()
+         |    assert!(bytes == #00, 0)
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(foo).leftValue.getMessage is
+      "Builtin func encodeToByteVec expects at least one argument"
   }
 
   it should "test Contract.encodeFields" in new ContractFixture {
@@ -4917,6 +5028,56 @@ class VMSpec extends AlephiumSpec with Generators {
     test(minimalAlphInContract - 1)
     test(minimalAlphInContract)
     test(minimalAlphInContract + 1)
+  }
+
+  it should "use tx caller assets if not enough deposit for new contract" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () { return }
+         |}
+         |""".stripMargin
+    val fooCompiled = Compiler.compileContract(foo).rightValue
+    val fooBytecode = Hex.toHexString(serialize(fooCompiled))
+
+    val create =
+      s"""
+         |Contract Create() {
+         |  pub fn noDeposit() -> () {
+         |    createContract!(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withEnoughDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withInsufficientDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withZeroDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: 0}(#$fooBytecode, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val (createContractId, _, _) = createContract(create)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let create = Create(#${createContractId.toHexString})
+         |  create.noDeposit()
+         |  create.withEnoughDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |  create.withInsufficientDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}()
+         |  create.withZeroDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |}
+         |$create
+         |""".stripMargin
+    callTxScript(script)
   }
 
   it should "call the correct contract method based on the interface method index" in new ContractFixture {
@@ -6120,19 +6281,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "call multiple asset functions in the same contract: since-rhone" in new ReentrancyFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+    setHardForkSince(HardFork.Rhone)
     callTxScript(script(s"""
                            |  foo.withdraw0(callerAddress!())
                            |  foo.withdraw2(callerAddress!())
@@ -6157,12 +6306,8 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "not call multiple asset functions in the same contract: Leman" in new ReentrancyFixture {
+    setHardFork(HardFork.Leman)
     override def useMethodSelector: Boolean = false
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     failCallTxScript(
       script(s"""
                 |  foo.withdraw0(callerAddress!())
@@ -6229,32 +6374,14 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "call the same deposit function multiple times in the same contract: since-rhone" in new PayToContractOnlyFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
-
+    setHardForkSince(HardFork.Rhone)
     getContractAsset(fooId).amount is ALPH.alph(100)
     callTxScript(script)
     getContractAsset(fooId).amount is ALPH.alph(100 + 20 + 10 * 6 - 1)
   }
 
   it should "not call the same deposit function multiple times in the same contract: Leman" in new PayToContractOnlyFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardFork(HardFork.Leman)
     intercept[AssertionError](callTxScript(script)).getMessage is
       s"Right(TxScriptExeFailed($InvalidMethodModifierBeforeRhone))"
   }
@@ -6684,27 +6811,24 @@ class VMSpec extends AlephiumSpec with Generators {
     subContracts678.foreach { blockFlow.getParentContractId(_) isE Some(parentContractId) }
     blockFlow.getSubContractsCurrentCount(parentContractId) isE Some(4)
     blockFlow.getSubContractIds(parentContractId, 0, 4) isE (4, AVector.from(subContracts))
-
-    blockFlow
-      .getSubContractIds(parentContractId, 0, 5)
-      .leftValue
-      .reason
-      .getMessage is s"Can not find sub-contracts for ${parentContractId.toHexString} at count 4"
+    blockFlow.getSubContractIds(parentContractId, 0, 5) isE (4, AVector.from(subContracts))
+    blockFlow.getSubContractIds(parentContractId, 2, 5) isE (4, AVector.from(
+      subContractId5 +: subContracts678
+    ))
+    blockFlow.getSubContractIds(parentContractId, 3, 10) isE (4, AVector.from(subContracts678))
+    blockFlow.getSubContractIds(parentContractId, 4, 10) isE (4, AVector.empty)
+    blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
-  // Inactive instrs check will be enabled in future upgrades
-  ignore should "check inactive instrs when creating contract" in new ContractFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+  // Inactive instrs check should be enabled for new network upgrades
+  it should "check inactive instrs when creating contract" in new ContractFixture {
+    setHardFork(HardFork.Leman)
 
     val code =
       s"""
          |Contract Foo() implements IFoo {
          |  pub fn foo() -> () {
-         |    let _ = groupOfAddress!(@$genesisAddress)
+         |    let _ = externalCallerAddress!()
          |  }
          |}
          |@using(methodSelector = false)
@@ -6714,7 +6838,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     intercept[AssertionError](createContract(code)).getMessage is
-      "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
+      s"Right(TxScriptExeFailed(InactiveInstr($ExternalCallerAddress)))"
   }
 
   it should "test chained contract calls" in new ContractFixture {
@@ -6778,6 +6902,950 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     testSimpleScript(script)
+  }
+
+  trait CompoundAssignmentFixture extends ContractFixture {
+    def verify(contract: String) = {
+      val contractId = createContract(contract)._1
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  TestContract(#${contractId.toHexString}).compoundAssign()
+           |}
+           |
+           |$contract
+           |""".stripMargin
+      )
+    }
+
+    def getValueType(value: String): String = {
+      value.last match {
+        case 'u' => "U256"
+        case 'i' => "I256"
+        case _   => fail(s"Invalid value type: $value")
+      }
+    }
+
+    def verifySimpleNumber(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let $mutKeyword x = $initValue
+           |    x $op $operationValue
+           |    assert!(x == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable variable x."
+    }
+
+    def verifyArray(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let $mutKeyword x = [$initValue; 2]
+           |    x[0] $op $operationValue
+           |    assert!(x[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable variable x."
+    }
+
+    def verifySimpleStruct(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |struct TestStruct {
+           |  $mutKeyword x: $valueType,
+           |  y: $valueType
+           |}
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let mut testStruct = TestStruct{x: $initValue, y: $initValue}
+           |    testStruct.x $op $operationValue
+           |    assert!(testStruct.x == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable field x in struct TestStruct."
+    }
+
+    def verifyNestedStruct(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      def code(mut: Boolean) = {
+        val mutKeyword = if (mut) "mut" else ""
+        s"""
+           |struct TestStruct0 {
+           |  $mutKeyword x: [$valueType; 2],
+           |  y: $valueType
+           |}
+           |struct TestStruct1 {
+           |  $mutKeyword testStruct0: TestStruct0
+           |}
+           |Contract TestContract() {
+           |  @using(updateFields = true)
+           |  pub fn compoundAssign() -> () {
+           |    let mut testStruct1 = TestStruct1{testStruct0: TestStruct0{x: [$initValue, $initValue], y: $initValue}}
+           |    testStruct1.testStruct0.x[0] $op $operationValue
+           |    assert!(testStruct1.testStruct0.x[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      }
+      verify(code(true))
+      intercept[AssertionError] {
+        verify(code(false))
+      }.getCause.getMessage is "Cannot assign to immutable field testStruct0 in struct TestStruct1."
+    }
+
+    def verifyMapping(
+        op: String,
+        initValue: String,
+        operationValue: String,
+        assertValue: String
+    ) = {
+      val valueType = getValueType(initValue)
+      val contractCode =
+        s"""
+           |Contract TestContract() {
+           |  mapping[U256, $valueType] map
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn compoundAssign() -> () {
+           |    map.insert!(@$genesisAddress, 0, $initValue)
+           |    map[0] $op $operationValue
+           |    assert!(map[0] == $assertValue, 0)
+           |  }
+           |}
+           |""".stripMargin
+      val contractId = createContract(contractCode)._1
+      val scriptCode =
+        s"""
+           |@using(preapprovedAssets = true)
+           |TxScript Main {
+           |  TestContract(#${contractId.toHexString}).compoundAssign{
+           |    @$genesisAddress -> ALPH: minimalContractDeposit!()
+           |}()
+           |}
+           |
+           |$contractCode
+           |""".stripMargin
+      val script = Compiler.compileTxScript(scriptCode).rightValue
+      payableCall(blockFlow, chainIndex, script)
+    }
+
+    def verifySingleTarget(op: String, initValue: String) = {
+      val valueType = getValueType(initValue)
+      verify(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssign() -> () {
+           |    let mut x = $initValue
+           |    x $op getValues()
+           |  }
+           |
+           |  fn getValues() -> ($valueType, $valueType) {
+           |    return $initValue, $initValue
+           |  }
+           |}
+           |""".stripMargin
+      )
+    }
+  }
+
+  it should "work for compound assignment" in new CompoundAssignmentFixture {
+    val testCases = Seq(
+      ("+=", "0u", "1u", "1u"),
+      ("-=", "10u", "1u", "9u"),
+      ("*=", "2u", "2u", "4u"),
+      ("/=", "10u", "1u", "10u"),
+      ("+=", "0i", "1i", "1i"),
+      ("-=", "10i", "1i + 2i", "7i"),
+      ("-=", "1i", "10i", "-9i"),
+      ("*=", "2i", "2i * 3i", "12i"),
+      ("/=", "10i", "1i", "10i")
+    )
+
+    testCases.foreach(verifySimpleNumber.tupled)
+    testCases.foreach(verifyArray.tupled)
+    testCases.foreach(verifyMapping.tupled)
+    testCases.foreach(verifySimpleStruct.tupled)
+    testCases.foreach(verifyNestedStruct.tupled)
+
+    CompoundAssignmentOperator.values.foreach { op =>
+      intercept[AssertionError] {
+        verifySingleTarget(op.operatorName, "1u")
+      }.getCause.getMessage is s"""Compound assignment "${op.operatorName}" requires single value on both sides"""
+    }
+
+    intercept[AssertionError] {
+      CompoundAssignmentOperator.values.foreach { op =>
+        verifySimpleNumber(op.operatorName, "1u", "1i", "1i")
+      }
+    }.getCause.getMessage is """Cannot assign "I256" to "U256""""
+  }
+
+  it should "work when compound assignment selectors have side effect" in new CompoundAssignmentFixture {
+    val contract =
+      s"""
+         |Contract TestContract(
+         |  mut arrayIndex: U256,
+         |  mut map1Key: ByteVec,
+         |  mut map2Key: U256
+         |) {  // set init value to 0, #01 and 0
+         |
+         |  mapping[ByteVec, U256] map1
+         |  mapping[U256, [U256; 2]] map2
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn initMaps() -> () {
+         |    map1.insert!(@$genesisAddress, #01, 1)
+         |    map1.insert!(@$genesisAddress, #02, 2)
+         |    map2.insert!(@$genesisAddress, 0, [1, 2])
+         |    map2.insert!(@$genesisAddress, 1, [3, 4])
+         |  }
+         |
+         |  @using(updateFields = true)
+         |  pub fn compoundAssign() -> () {
+         |    let mut array = [0; 2]
+         |    array[1] = 1
+         |    assert!(arrayIndex == 0, 0)
+         |    array[updateAndGetArrayIndex()] += 1
+         |    assert!(array[0] == 1, 1)
+         |    assert!(array[1] == 1, 2)
+         |    assert!(arrayIndex == 1, 3)
+         |    array[updateAndGetArrayIndex()] += 1
+         |    assert!(array[0] == 1, 4)
+         |    assert!(array[1] == 2, 5)
+         |
+         |    assert!(map1Key == #01, 6)
+         |    assert!(map1[#01] == 1, 7)
+         |    map1[updateAndGetMap1Key()] += 10
+         |    assert!(map1[#01] == 11, 8)
+         |    assert!(map1Key == #02, 9)
+         |    assert!(map1[map1Key] == 2, 10)
+         |    map1[map1Key] += 2
+         |    assert!(map1[map1Key] == 4, 12)
+         |
+         |    arrayIndex = 0
+         |    assert!(map2[0][0] == 1, 13)
+         |    map2[updateAndGetMap2Key()][updateAndGetArrayIndex()] += 1
+         |    assert!(map2[0][0] == 2, 14)
+         |    assert!(arrayIndex == 1, 15)
+         |    assert!(map2Key == 1, 16)
+         |    assert!(map2[1][1] == 4, 17)
+         |    map2[updateAndGetMap2Key()][updateAndGetArrayIndex()] += 2
+         |    assert!(map2[1][1] == 6, 18)
+         |  }
+         |
+         |  pub fn updateAndGetArrayIndex() -> U256 {
+         |    let originIndex = arrayIndex
+         |    arrayIndex = arrayIndex + 1
+         |    return originIndex
+         |  }
+         |
+         |  pub fn updateAndGetMap1Key() -> ByteVec {
+         |    let originMapKey = map1Key
+         |    map1Key = #02
+         |    return originMapKey
+         |  }
+         |
+         |  pub fn updateAndGetMap2Key() -> U256 {
+         |    let originMapKey = map2Key
+         |    map2Key = map2Key + 1
+         |    return originMapKey
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(
+      contract,
+      initialMutState = AVector(Val.U256(U256.Zero), Val.ByteVec(hex"01"), Val.U256(U256.Zero))
+    )._1
+
+    callTxScript(
+      s"""
+         |TxScript Main {
+         |  TestContract(#${contractId.toHexString}).initMaps{@$genesisAddress -> ALPH: minimalContractDeposit!() * 4}()
+         |}
+         |$contract
+         |""".stripMargin
+    )
+
+    testSimpleScript(
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  TestContract(#${contractId.toHexString}).compoundAssign()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    )
+  }
+
+  it should "report compilation error when map key and array index do not have the right type" in new CompoundAssignmentFixture {
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssignArray() -> () {
+           |    let mut array = [0; 2]
+           |    array[arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> ByteVec {
+           |    return #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "ByteVec", expected "U256""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  pub fn compoundAssignArray() -> () {
+           |    let mut array = [0; 2]
+           |    array[arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> (U256, ByteVec) {
+           |    return 0, #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "List(U256, ByteVec)", expected "U256""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, U256] map
+           |
+           |  pub fn compoundAssignMap() -> () {
+           |    map[mapKey()] += 1
+           |  }
+           |
+           |  pub fn mapKey() -> U256 {
+           |    return 0
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid map key type "U256", expected "ByteVec""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, U256] map
+           |
+           |  pub fn compoundAssignMap() -> () {
+           |    map[mapKey()] += 1
+           |  }
+           |
+           |  pub fn mapKey() -> (U256, ByteVec) {
+           |    return 0, #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid map key type "List(U256, ByteVec)", expected "ByteVec""""
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract TestContract() {
+           |  mapping[ByteVec, [U256; 2]] map
+           |
+           |  pub fn compoundAssignMapArray() -> () {
+           |    map[#00][arrayIndex()] += 1
+           |  }
+           |
+           |  pub fn arrayIndex() -> ByteVec {
+           |    return #01
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .leftValue
+      .message is """Invalid array index type "ByteVec", expected "U256""""
+  }
+
+  it should "be able to use assets in the inline function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @inline fn transfer() -> () {
+         |    let caller = callerAddress!()
+         |    assert!(caller == @$genesisAddress, 0)
+         |    transferTokenToSelf!(caller, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> () {
+         |    checkCaller!(callerAddress!() == @$genesisAddress, 0)
+         |    transfer{callerAddress!() -> ALPH: 1 alph}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val fooId = createCompiledContract(compiled.code)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo{@$genesisAddress -> ALPH: 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is ALPH.oneAlph.addUnsafe(minimalAlphInContract)
+  }
+
+  it should "call multiple inline functions that use contract assets" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(checkExternalCaller = false, preapprovedAssets = true)
+         |  pub fn f0() -> () {
+         |    f1{callerAddress!() -> ALPH: 2 alph}()
+         |    f2()
+         |  }
+         |
+         |  @using(payToContractOnly = true, preapprovedAssets = true)
+         |  @inline fn f1() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 2 alph)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  @inline fn f2() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val compiled = Compiler.compileContractFull(foo).rightValue
+    compiled.warnings.isEmpty is true
+    compiled.code.methods.length is 1
+    val initialAlphAmount = ALPH.alph(2)
+    val fooId = createCompiledContract(compiled.code, initialAttoAlphAmount = initialAlphAmount)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.f0{@$genesisAddress -> ALPH: 2 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+    val balance = getContractAsset(fooId).amount
+    balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
+  }
+
+  it should "support chained contract calls in TxScript after danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+    val chainedSwapBlock = payableCall(
+      blockFlow,
+      chainIndex,
+      Compiler.compileTxScript(chainedSwapScript).rightValue,
+      keyPairOpt = Some(userKeyPair)
+    )
+    addAndCheck(blockFlow, chainedSwapBlock)
+    getContractAsset(swapToken1Token2).tokens.toSet is Set(
+      (token1Id, U256.unsafe(105)),
+      (token2Id, U256.unsafe(95))
+    )
+    getContractAsset(swapToken2Token3).tokens.toSet is Set(
+      (token2Id, U256.unsafe(105)),
+      (token3Id, U256.unsafe(95))
+    )
+
+    getTokenBalance(blockFlow, userLockupScript, token1Id) is U256.unsafe(5)
+    getTokenBalance(blockFlow, userLockupScript, token2Id) is U256.unsafe(0)
+    getTokenBalance(blockFlow, userLockupScript, token3Id) is U256.unsafe(5)
+  }
+
+  it should "not support chained contract calls in TxScript before danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(chainedSwapScript).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  it should "not support chained contract calls in contracts after danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(swapThroughProxyScriptCode).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  it should "not support chained contract calls in contracts before danube hard fork" in new ChainedContractCallsFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    intercept[AssertionError](
+      payableCall(
+        blockFlow,
+        chainIndex,
+        Compiler.compileTxScript(swapThroughProxyScriptCode).rightValue,
+        keyPairOpt = Some(userKeyPair)
+      )
+    ).getMessage is s"Right(TxScriptExeFailed(Not enough approved balance for address $userAddress, tokenId: ${token2Id.toHexString}, expected: 5, got: 0))"
+  }
+
+  trait ChainedContractCallsFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+    val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000), Some(genesisLockup)))
+    val token1Code =
+      s"""
+         |Contract Token1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract1 = createContract(token1Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token1Id  = TokenId.from(contract1)
+
+    val token2Code =
+      s"""
+         |Contract Token2() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract2 = createContract(token2Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token2Id  = TokenId.from(contract2)
+
+    val token3Code =
+      s"""
+         |Contract Token3() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract3 = createContract(token3Code, tokenIssuanceInfo = tokenIssuanceInfo)._1
+    val token3Id  = TokenId.from(contract3)
+
+    val swapContractCode =
+      s"""
+         |Contract Swap(tokenId1: ByteVec, tokenId2: ByteVec, mut token1Reserve: U256, mut token2Reserve: U256) {
+         |  event AddLiquidity(lp: Address, token1Amount: U256, token2Amount: U256)
+         |  event SwapToken(buyer: Address, tokenId: ByteVec, tokenAmount: U256)
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn addLiquidity(lp: Address, token1Amount: U256, token2Amount: U256) -> () {
+         |    emit AddLiquidity(lp, token1Amount, token2Amount)
+         |
+         |    transferTokenToSelf!(lp, tokenId1, token1Amount)
+         |    transferTokenToSelf!(lp, tokenId2, token2Amount)
+         |    token1Reserve = token1Reserve + token1Amount
+         |    token2Reserve = token2Reserve + token2Amount
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn swap(buyer: Address, tokenId: ByteVec, tokenAmount: U256) -> () {
+         |    assert!(tokenId == tokenId1 || tokenId == tokenId2, 0)
+         |    emit SwapToken(buyer, tokenId, tokenAmount)
+         |
+         |    if (tokenId == tokenId1) {
+         |      let token1Amount = tokenAmount
+         |      let token2Amount = token2Reserve - token1Reserve * token2Reserve / (token1Reserve + token1Amount)
+         |      transferTokenToSelf!(buyer, tokenId1, token1Amount)
+         |      transferTokenFromSelf!(buyer, tokenId2, token2Amount)
+         |      token1Reserve = token1Reserve + token1Amount
+         |      token2Reserve = token2Reserve - token2Amount
+         |    } else {
+         |      let token2Amount = tokenAmount
+         |      let token1Amount = token1Reserve - token1Reserve * token2Reserve / (token2Reserve + token2Amount)
+         |      transferTokenToSelf!(buyer, tokenId2, token2Amount)
+         |      transferTokenFromSelf!(buyer, tokenId1, token1Amount)
+         |      token1Reserve = token1Reserve + token1Amount
+         |      token2Reserve = token2Reserve - token2Amount
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val swapToken1Token2 = createContract(
+      swapContractCode,
+      initialImmState = AVector(Val.ByteVec(token1Id.bytes), Val.ByteVec(token2Id.bytes)),
+      initialMutState = AVector(Val.U256(0), Val.U256(0))
+    )._1
+
+    val swapToken2Token3 = createContract(
+      swapContractCode,
+      initialImmState = AVector(Val.ByteVec(token2Id.bytes), Val.ByteVec(token3Id.bytes)),
+      initialMutState = AVector(Val.U256(0), Val.U256(0))
+    )._1
+
+    val swapContract = Compiler.compileContract(swapContractCode).rightValue
+
+    def addLiquidityScript(
+        swap: ContractId,
+        lp: Address,
+        tokenId1: TokenId,
+        tokenId2: TokenId,
+        token1Amount: Int,
+        token2Amount: Int
+    ): String =
+      s"""
+         |TxScript AddLiquidity() {
+         |  Swap(#${swap.toHexString}).addLiquidity{
+         |    @$lp -> #${tokenId1.toHexString}: ${token1Amount}, #${tokenId2.toHexString}: ${token2Amount}
+         |  }(@$lp, ${token1Amount}, ${token2Amount})
+         |}
+         |
+         |$swapContractCode
+         |""".stripMargin
+
+    def addLiquidity(
+        swap: ContractId,
+        tokenId1: TokenId,
+        tokenId2: TokenId,
+        token1Amount: Int,
+        token2Amount: Int
+    ): Unit = {
+      val code =
+        addLiquidityScript(swap, genesisAddress, tokenId1, tokenId2, token1Amount, token2Amount)
+      val block = payableCall(blockFlow, chainIndex, Compiler.compileTxScript(code).rightValue)
+      addAndCheck(blockFlow, block)
+    }
+    addLiquidity(swapToken1Token2, token1Id, token2Id, 100, 100)
+    addLiquidity(swapToken2Token3, token2Id, token3Id, 100, 100)
+
+    getContractAsset(swapToken1Token2).tokens.toSet is Set(
+      (token1Id, U256.unsafe(100)),
+      (token2Id, U256.unsafe(100))
+    )
+    getContractAsset(swapToken2Token3).tokens.toSet is Set(
+      (token2Id, U256.unsafe(100)),
+      (token3Id, U256.unsafe(100))
+    )
+
+    val userKeyPair               = chainIndex.from.generateKey
+    val userLockupScript          = LockupScript.p2pkh(userKeyPair._2)
+    val userAddress               = Address.from(userLockupScript)
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val block3 = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      userLockupScript,
+      AVector(token1Id -> U256.unsafe(10)),
+      ALPH.alph(10)
+    )
+    addAndCheck(blockFlow, block3)
+
+    getTokenBalance(blockFlow, userLockupScript, token1Id) is U256.unsafe(10)
+    getTokenBalance(blockFlow, userLockupScript, token2Id) is U256.unsafe(0)
+    getTokenBalance(blockFlow, userLockupScript, token3Id) is U256.unsafe(0)
+
+    val chainedSwapScript: String =
+      s"""
+         |TxScript ChainedSwapToken() {
+         |  Swap(#${swapToken1Token2.toHexString}).swap{
+         |    @$userAddress -> #${token1Id.toHexString}: 5
+         |  }(@$userAddress, #${token1Id.toHexString}, 5)
+         |
+         |  Swap(#${swapToken2Token3.toHexString}).swap{
+         |    @$userAddress -> #${token2Id.toHexString}: 5
+         |  }(@$userAddress, #${token2Id.toHexString}, 5)
+         |}
+         |$swapContractCode
+         |""".stripMargin
+
+    val swapProxyContractCode: String =
+      s"""
+         |Contract SwapProxy() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn swap() -> () {
+         |    Swap(#${swapToken1Token2.toHexString}).swap{
+         |      @$userAddress -> #${token1Id.toHexString}: 5
+         |    }(@$userAddress, #${token1Id.toHexString}, 5)
+         |
+         |    Swap(#${swapToken2Token3.toHexString}).swap{
+         |      @$userAddress -> #${token2Id.toHexString}: 5
+         |    }(@$userAddress, #${token2Id.toHexString}, 5)
+         |  }
+         |}
+         |$swapContractCode
+         |""".stripMargin
+
+    val swapProxyContract = createContract(swapProxyContractCode)._1
+
+    val swapThroughProxyScriptCode =
+      s"""
+         |TxScript Main {
+         |  SwapProxy(#${swapProxyContract.toHexString}).swap{
+         |    @$userAddress -> #${token1Id.toHexString}: 5
+         |  }()
+         |}
+         |
+         |$swapProxyContractCode
+         |""".stripMargin
+  }
+
+  it should "use generated outputs for tokenRemaining/transferToken in TxScript after Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    val (_, randomPubKey)  = chainIndex.from.generateKey
+    val randomLockupScript = LockupScript.p2pkh(randomPubKey)
+    val randomAddress      = Address.p2pkh(randomPubKey)
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  let initialAlphBalance = tokenRemaining!(@$userAddress, ALPH)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 10, 0)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + dustAmount!(), 1)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 10 alph + dustAmount!(), 3)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).depositAlph{@$userAddress -> ALPH: 5 alph}(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 5 alph + dustAmount!(), 5)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 6)
+         |
+         |  transferToken!(@$userAddress, @$randomAddress, #${tokenId.toHexString}, 1)
+         |  transferToken!(@$userAddress, @$randomAddress, ALPH, 1 alph)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 9, 7)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance + 4 alph + dustAmount!(), 8)
+         |  assert!(tokenRemaining!(@$randomAddress, #${tokenId.toHexString}) == 0, 9)
+         |  assert!(tokenRemaining!(@$randomAddress, ALPH) == 0, 10)
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(995).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(9)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(14)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+    getTokenBalance(blockFlow, randomLockupScript, tokenId) is U256.unsafe(1)
+    getAlphBalance(blockFlow, randomLockupScript) is ALPH.alph(1)
+  }
+
+  it should "not use generated outputs for tokenRemaining in TxScript before Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  let initialAlphBalance = tokenRemaining!(@$userAddress, ALPH)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 0, 0)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance, 1)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |  TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |  assert!(tokenRemaining!(@$userAddress, ALPH) == initialAlphBalance, 3)
+         |  assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(990).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(10)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(20)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+  }
+
+  it should "not use generated outputs for tokenRemaining in contracts after Danube hard fork" in new AssetRemainingFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    val proxyContractCode =
+      s"""
+         |Contract Proxy() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn main() -> () {
+         |    TokenFaucet(#${tokenFaucetId.toHexString}).withDrawToken(@$userAddress)
+         |    assert!(tokenRemaining!(@$userAddress, #${tokenId.toHexString}) == 0, 0)
+         |    assert!(tokenRemaining!(@$userAddress, ALPH) == dustAmount!(), 1)
+         |    assert!(tokenRemaining!(@$tokenFaucetAddress, #${tokenId.toHexString}) == 0, 2)
+         |
+         |    TokenFaucet(#${tokenFaucetId.toHexString}).withDrawAlph(@$userAddress)
+         |    assert!(tokenRemaining!(@$userAddress, ALPH) == dustAmount!(), 3)
+         |    assert!(tokenRemaining!(@$tokenFaucetAddress, ALPH) == 0, 4)
+         |  }
+         |}
+         |
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val proxyContractId = createContract(proxyContractCode)._1
+
+    val interactWithFaucetCode =
+      s"""
+         |TxScript Main {
+         |  Proxy(#${proxyContractId.toHexString}).main{@$userAddress -> ALPH: dustAmount!()}()
+         |}
+         |
+         |$proxyContractCode
+         |""".stripMargin
+
+    val script = Compiler.compileTxScript(interactWithFaucetCode).rightValue
+    val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = Some(userKeyPair))
+    val gasFee = block.nonCoinbase.head.gasFeeUnsafe
+    addAndCheck(blockFlow, block)
+
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(990).subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(990)))
+    )
+    getTokenBalance(blockFlow, userLockupScript, tokenId) is U256.unsafe(10)
+    getAlphBalance(blockFlow, userLockupScript) is ALPH
+      .alph(20)
+      .addUnsafe(dustUtxoAmount)
+      .subUnsafe(gasFee)
+  }
+
+  trait AssetRemainingFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
+    val userKeyPair      = chainIndex.from.generateKey
+    val userLockupScript = LockupScript.p2pkh(userKeyPair._2)
+    val userAddress      = Address.from(userLockupScript)
+
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val transferBlock = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      userLockupScript,
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(10)
+    )
+    addAndCheck(blockFlow, transferBlock)
+
+    val tokenIssuanceInfo = Some(TokenIssuance.Info(Val.U256(1000)))
+    val tokenFaucetCode =
+      s"""
+         |Contract TokenFaucet() {
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawToken(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, selfTokenId!(), 10)
+         |    transferTokenFromSelf!(caller, ALPH, dustAmount!())
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawAlph(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, ALPH, 10 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn depositAlph(caller: Address) -> () {
+         |    transferTokenToSelf!(caller, ALPH, 5 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenFaucetId = createContract(
+      tokenFaucetCode,
+      initialAttoAlphAmount = ALPH.alph(1000),
+      tokenIssuanceInfo = tokenIssuanceInfo
+    )._1
+    val tokenFaucetAddress = Address.contract(tokenFaucetId)
+    val tokenId            = TokenId.from(tokenFaucetId)
+    getContractAsset(tokenFaucetId) is ContractOutput(
+      ALPH.alph(1000),
+      LockupScript.P2C(tokenFaucetId),
+      AVector((tokenId, U256.unsafe(1000)))
+    )
+    getAlphBalance(blockFlow, userLockupScript) is ALPH.alph(10)
   }
 
   private def getEvents(

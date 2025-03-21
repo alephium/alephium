@@ -27,10 +27,16 @@ import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{BlockHash, ContractId, TxOutputRef}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
+import org.alephium.protocol.vm.nodeindexes.{
+  ConflictedTxsPerBlock,
+  ConflictedTxsSource,
+  ConflictedTxsStorage,
+  NodeIndexesStorage,
+  TxIdTxOutputLocators
+}
 import org.alephium.protocol.vm.subcontractindex.{
   SubContractIndexState,
   SubContractIndexStateId,
@@ -70,9 +76,13 @@ object Storages {
     val trieImmutableStateStorage =
       RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
 
-    val txOutputRefIndexStorageOpt = if (nodeSetting.indexesConfig.txOutputRefIndex) {
+    val txOutputRefIndexStorage = if (nodeSetting.indexesConfig.txOutputRefIndex) {
       Some(
-        RocksDBKeyValueStorage[TxOutputRef.Key, TransactionId](db, TxOutputRefIndex, writeOptions)
+        RocksDBKeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators](
+          db,
+          TxOutputRefIndex,
+          writeOptions
+        )
       )
     } else {
       None
@@ -100,9 +110,15 @@ object Storages {
     } else {
       None
     }
+    val conflictedTxsStorage = createConflictedTxsStorage(db, writeOptions)
 
     val nodeIndexesStorage =
-      NodeIndexesStorage(logStorage, txOutputRefIndexStorageOpt, subContractIndexStorageOpt)
+      NodeIndexesStorage(
+        logStorage,
+        txOutputRefIndexStorage,
+        subContractIndexStorageOpt,
+        conflictedTxsStorage
+      )
 
     val worldStateStorage =
       WorldStateRockDBStorage(
@@ -142,6 +158,23 @@ object Storages {
   def createRocksDBUnsafe(rootPath: Path, dbFolder: String): RocksDBSource = {
     val dbPath = rootPath.resolve(dbFolder)
     RocksDBSource.openUnsafe(dbPath)
+  }
+
+  def createConflictedTxsStorage(
+      db: RocksDBSource,
+      writeOptions: WriteOptions
+  ): ConflictedTxsStorage = {
+    val index = RocksDBKeyValueStorage[BlockHash, AVector[ConflictedTxsPerBlock]](
+      db,
+      ConflictedTxs,
+      writeOptions
+    )
+    val reversedIndex = RocksDBKeyValueStorage[BlockHash, AVector[ConflictedTxsSource]](
+      db,
+      ConflictedTxs,
+      writeOptions
+    )
+    ConflictedTxsStorage(index, reversedIndex)
   }
 }
 

@@ -41,8 +41,6 @@ class WalletConfigSpec() extends AlephiumSpec {
     override val configValues: Map[String, Any] =
       Map(("wallet.api-key", walletApiKey), ("wallet.blockflow.api-key", blockflowApiKey))
 
-    val config = typesafeConfig.as[WalletConfig]("wallet")
-
     config.apiKey.headOption.value is ApiKey.unsafe(walletApiKey)
     config.blockflow.apiKey.headOption.value is ApiKey.unsafe(blockflowApiKey)
   }
@@ -54,8 +52,6 @@ class WalletConfigSpec() extends AlephiumSpec {
     override val configValues: Map[String, Any] =
       Map(("wallet.api-key", walletApiKeys), ("wallet.blockflow.api-key", blockflowApiKey))
 
-    val config = typesafeConfig.as[WalletConfig]("wallet")
-
     config.apiKey is walletApiKeys.map(ApiKey.unsafe(_))
     config.blockflow.apiKey.headOption.value is ApiKey.unsafe(blockflowApiKey)
   }
@@ -65,8 +61,6 @@ class WalletConfigSpec() extends AlephiumSpec {
     override val configValues: Map[String, Any] =
       Map(("wallet.api-key", null), ("wallet.blockflow.api-key", null))
     // scalastyle:on null
-
-    val config = typesafeConfig.as[WalletConfig]("wallet")
 
     config.apiKey.headOption is None
     config.blockflow.apiKey.headOption is None
@@ -78,6 +72,25 @@ class WalletConfigSpec() extends AlephiumSpec {
     Try(
       typesafeConfig.as[WalletConfig]("wallet")
     ).toEither.leftValue.getMessage is "Invalid value at 'ApiKey': Api key must have at least 32 characters"
+  }
+
+  it should "work with enable-http-metrics" in {
+    new Fixture {
+      override val configValues: Map[String, Any] = Map(("wallet.enable-http-metrics", true))
+      config.enableHttpMetrics is true
+    }
+
+    new Fixture {
+      override val configValues: Map[String, Any] = Map(("wallet.enable-http-metrics", false))
+      config.enableHttpMetrics is false
+    }
+
+    new Fixture {
+      // scalastyle:off null
+      override val configValues: Map[String, Any] = Map(("wallet.enable-http-metrics", null))
+      // scalastyle:on null
+      config.enableHttpMetrics is false
+    }
   }
 
   trait Fixture {
@@ -97,5 +110,7 @@ class WalletConfigSpec() extends AlephiumSpec {
           .asJava
       )
       .withFallback(ConfigFactory.load)
+
+    lazy val config = typesafeConfig.as[WalletConfig]("wallet")
   }
 }

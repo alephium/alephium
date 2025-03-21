@@ -26,7 +26,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{NetworkId => _, _}
 import org.alephium.util.{AVector, Bytes, EitherF, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[WorldState.Cached]] {
   import ValidationStatus._
@@ -123,14 +123,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
+    val hardFork = networkConfig.getHardFork(block.timestamp)
     for {
       _          <- checkGroup(block)
       _          <- checkNonEmptyTransactions(block)
       _          <- checkTxNumber(block)
       _          <- checkGasPriceDecreasing(block)
-      _          <- checkTotalGas(block, networkConfig.getHardFork(block.timestamp))
+      _          <- checkTotalGas(block, hardFork)
       _          <- checkMerkleRoot(block)
-      _          <- checkFlow(block, flow)
+      _          <- checkFlow(block, flow, hardFork)
       sideResult <- checkTxs(block.chainIndex, block, flow)
     } yield sideResult
   }
@@ -151,7 +152,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           _            <- checkGhostUncleOrder(ghostUncleHashes)
           uncleBlocks  <- getGhostUncleBlocks(blockchain, ghostUncleHashes)
           _            <- checkGhostUncleMiners(ghostUncleData.map(_.lockupScript), uncleBlocks)
-          _            <- checkGhostUncleBlocks(flow, chainIndex, block, uncleBlocks)
+          _            <- checkGhostUncleBlocks(hardFork, flow, chainIndex, block, uncleBlocks)
           _            <- checkGhostUncleDeps(block, flow, uncleBlocks)
           parentHeight <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)))
           uncleHeights <- from(ghostUncleHashes.mapE(blockchain.getHeight))
@@ -193,6 +194,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   private def checkGhostUncleBlocks(
+      hardFork: HardFork,
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
@@ -205,17 +207,56 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       usedUnclesAndAncestors <- from(blockchain.getUsedGhostUnclesAndAncestors(parentHeader))
       (usedUncles, ancestors) = usedUnclesAndAncestors
       _ <- uncles.foreachE { uncle =>
+        val ancestorIndex = ancestors.indexWhere(_ == uncle.parentHash)
         if (uncle.hash == parentHeader.hash || ancestors.exists(_ == uncle.hash)) {
           invalidBlock(NotGhostUnclesForTheBlock)
-        } else if (!ancestors.exists(_ == uncle.parentHash)) {
+        } else if (ancestorIndex == -1) {
           invalidBlock(GhostUncleHashConflictWithParentHash)
         } else if (usedUncles.contains(uncle.hash)) {
           invalidBlock(GhostUnclesAlreadyUsed)
+        } else if (hardFork.isDanubeEnabled()) {
+          val mainChainHash =
+            if (ancestorIndex == 0) block.parentHash else ancestors(ancestorIndex - 1)
+          val disallowedHashes = usedUncles :+ mainChainHash
+          checkDuplicateGhostUnclesSinceDanube(flow, disallowedHashes, uncle)
         } else {
           validBlock(())
         }
       }
+      _ <-
+        if (hardFork.isDanubeEnabled()) {
+          checkDuplicateGhostUnclesSinceDanube(uncles)
+        } else {
+          validBlock(())
+        }
     } yield ()
+  }
+
+  private def checkDuplicateGhostUnclesSinceDanube(
+      uncleBlocks: AVector[Block]
+  ): BlockValidationResult[Unit] = {
+    if (
+      uncleBlocks.length == ALPH.MaxGhostUncleSize &&
+      BlockHeader.fromSameTemplate(uncleBlocks(0).header, uncleBlocks(1).header)
+    ) {
+      invalidBlock(DuplicateGhostUncleSinceDanube(uncleBlocks(1).hash))
+    } else {
+      validBlock(())
+    }
+  }
+
+  private def checkDuplicateGhostUnclesSinceDanube(
+      flow: BlockFlow,
+      disallowedHashes: AVector[BlockHash],
+      uncleBlock: Block
+  ): BlockValidationResult[Unit] = {
+    from(disallowedHashes.mapE(flow.getBlockHeader)).flatMap { disallowedHeaders =>
+      if (disallowedHeaders.exists(BlockHeader.fromSameTemplate(_, uncleBlock.header))) {
+        invalidBlock(DuplicateGhostUncleSinceDanube(uncleBlock.hash))
+      } else {
+        validBlock(())
+      }
+    }
   }
 
   @inline private def checkGhostUncleSize(
@@ -270,10 +311,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
     if (brokerConfig.contains(chainIndex.from)) {
-      val hardFork = networkConfig.getHardFork(block.timestamp)
+      val hardFork       = networkConfig.getHardFork(block.timestamp)
+      val checkpointHash = Option.when(chainIndex.isIntraGroup)(block.hash)
       for {
-        groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
-        _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
+        groupView <- from(
+          flow.getMutableGroupView(chainIndex, block.blockDeps, hardFork, checkpointHash)
+        )
+        _ <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
         _ <- checkCoinbase(
           flow,
           chainIndex,
@@ -513,7 +557,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           block.coinbase,
           groupView,
           blockEnv,
-          Some(netReward)
+          Some(netReward),
+          block.transactions.length - 1
         )
       )
     } else {
@@ -676,7 +721,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         tx,
         groupView,
         blockEnv,
-        None
+        None,
+        index
       )
       if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
         blockEnv.addOutputRefFromTx(tx.unsigned)
@@ -709,15 +755,21 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow)(implicit
+  private[validation] def checkFlow(block: Block, blockFlow: BlockFlow, hardfork: HardFork)(implicit
       brokerConfig: BrokerConfig
   ): BlockValidationResult[Unit] = {
-    if (brokerConfig.contains(block.chainIndex.from)) {
-      ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap { ok =>
-        if (ok) validBlock(()) else invalidBlock(InvalidFlowTxs)
-      }
-    } else {
+    // Post-Danube upgrade, we skip this validation since conflicted transactions are allowed for parallel chains
+    // Pre-Danube upgrade, we validate that transactions are not conflicted
+    if (hardfork.isDanubeEnabled()) {
       validBlock(())
+    } else if (!brokerConfig.contains(block.chainIndex.from)) {
+      // If the block is not from the broker, we skip this validation
+      validBlock(())
+    } else {
+      ValidationStatus.from(blockFlow.checkFlowTxs(block)).flatMap {
+        case true  => validBlock(())
+        case false => invalidBlock(InvalidFlowTxs)
+      }
     }
   }
 }

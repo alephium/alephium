@@ -25,6 +25,7 @@ import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
+// scalastyle:off file.size.limit
 abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Ordering[A])
     extends AlephiumSpec {
 
@@ -250,6 +251,19 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "reverseForeach" in new Fixture {
+    val empty  = AVector.empty[A]
+    val buffer = ArrayBuffer.empty[A]
+    empty.foreachReversed(buffer.append)
+    buffer.isEmpty is true
+
+    forAll(vectorGen) { vc =>
+      val buffer = ArrayBuffer.empty[A]
+      vc.foreachReversed(buffer.append)
+      checkEq(vc.reverse, buffer)
+    }
+  }
+
   it should "map" in new Fixture {
     forAll(vectorGen) { vc =>
       val vc0 = vc.map(identity)
@@ -383,6 +397,47 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "findE" in new Fixture {
+    forAll(vectorGen) { vc =>
+      val arr = vc.toArray
+      arr.foreach { elem =>
+        vc.findE(e => Right(e == elem)) isE arr.find(_ == elem)
+        vc.findE(_ => Right(false)) isE arr.find(_ => false)
+        vc.findE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
+  it should "findReversedE" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversedE(_ => Right(false)) isE None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversedE(e => Right(e._1 == elem)) isE Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversedE(_ => Right(false)) isE None
+        vector.findReversedE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
+  it should "findReversed" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversed(_ => false) is None
+    empty.findReversed(_ => true) is None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversed(e => e._1 == elem) is Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversed(_ => false) is None
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
@@ -428,6 +483,15 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val vc1 = vc ++ AVector.empty[A]
       vc1.toSeq is vc.toSeq
       (vc1.elems eq vc.elems) is true
+    }
+  }
+
+  it should "remove" in new Fixture {
+    forAll(vectorGen.filter(_.nonEmpty)) { vector =>
+      vector.remove(0) is vector.tail
+      vector.remove(vector.length - 1) is vector.init
+      val index = Random.nextInt(vector.length)
+      vector.remove(index) is vector.slice(0, index) ++ vector.slice(index + 1, vector.length)
     }
   }
 }
@@ -736,6 +800,36 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     test(Gen.negNum[Int])
     test(Gen.chooseNum[Int](-100000, 100000))
   }
+
+  it should "partitionE" in new Fixture {
+    AVector.empty[Int].partitionE[String](x => Right(x % 2 == 0)) isE (AVector.empty, AVector.empty)
+    AVector(0, 1, 2, 3, 4, 5)
+      .partitionE[String](x => Right(x % 2 == 0)) isE (AVector(0, 2, 4), AVector(1, 3, 5))
+
+    def test(intGen: Gen[Int]) = {
+      forAll(Gen.listOf(intGen)) { nums =>
+        val numsAVector = AVector.from(nums)
+        val result = numsAVector.partitionE[String] { x =>
+          if (x == 0) {
+            Left("zero")
+          } else {
+            Right(x % 2 == 0)
+          }
+        }
+        if (nums.contains(0)) {
+          result is Left("zero")
+        } else {
+          val even = numsAVector.filter(_ % 2 == 0)
+          val odd  = numsAVector.filterNot(_ % 2 == 0)
+          result is Right((even, odd))
+        }
+      }
+    }
+
+    test(Gen.posNum[Int])
+    test(Gen.negNum[Int])
+    test(Gen.chooseNum[Int](-100000, 100000))
+  }
 }
 
 class SpecialAVectorSpec extends AlephiumSpec {
@@ -749,5 +843,11 @@ class SpecialAVectorSpec extends AlephiumSpec {
     converted(0).asInstanceOf[Bar] is Bar(1)
     converted(1).asInstanceOf[Bar] is Bar(2)
     converted(2).asInstanceOf[Bar] is Bar(3)
+  }
+
+  it should "stableSortBy" in {
+    val avector = AVector.from((0 until 30).map((_, 1)))
+    avector.stableSortBy(_._2) is avector
+    avector.sortBy(_._2) isnot avector
   }
 }

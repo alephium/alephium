@@ -21,10 +21,17 @@ import sttp.tapir.server.vertx.VertxFutureServerOptions
 import org.alephium.api.DecodeFailureHandler
 
 object ServerOptions extends DecodeFailureHandler {
-  val serverOptions: VertxFutureServerOptions =
-    VertxFutureServerOptions.customiseInterceptors
+  def serverOptions(enableMetrics: Boolean): VertxFutureServerOptions = {
+    val customiseInterceptors = VertxFutureServerOptions.customiseInterceptors
       .decodeFailureHandler(
         myDecodeFailureHandler
       )
-      .options
+    if (enableMetrics) {
+      customiseInterceptors
+        .metricsInterceptor(Metrics.prometheus.metricsInterceptor())
+        .options
+    } else {
+      customiseInterceptors.options
+    }
+  }
 }

@@ -21,10 +21,10 @@ import akka.actor.Props
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.serde.serialize
 import org.alephium.util.ActorRefT
 
 object CpuMiner {
@@ -56,7 +56,9 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
   }
 
   def publishNewBlock(block: Block): Unit = {
-    val handlerMessage = BlockChainHandler.Validate(block, ActorRefT(self), Local)
+    val blockBytes = serialize(block)
+    val handlerMessage =
+      BlockChainHandler.ValidateMinedBlock(block.hash, blockBytes, ActorRefT(self))
     allHandlers.getBlockHandlerUnsafe(block.chainIndex) ! handlerMessage
   }
 
@@ -64,6 +66,10 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
     case ViewHandler.NewTemplates(templates) =>
       if (miningStarted) {
         updateAndStartTasks(templates)
+      }
+    case ViewHandler.NewTemplate(template) =>
+      if (miningStarted) {
+        updateAndStartTask(template)
       }
     case BlockChainHandler.BlockAdded(hash) =>
       setIdle(ChainIndex.from(hash))
@@ -87,6 +93,14 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
       val job = Job.from(templates(fromShift)(to))
       pendingTasks(fromShift)(to) = Some(job)
     }
+    startNewTasks()
+  }
+
+  def updateAndStartTask(template: BlockFlowTemplate): Unit = {
+    val fromShift = template.index.from.value / brokerConfig.brokerNum
+    val to        = template.index.to.value
+    val job       = Job.from(template)
+    pendingTasks(fromShift)(to) = Some(job)
     startNewTasks()
   }
 }

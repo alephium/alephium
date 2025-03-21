@@ -33,9 +33,11 @@ object TestUtils {
       dependencyHandler: TestProbe,
       viewHandler: TestProbe,
       blockHandlers: Map[ChainIndex, TestProbe],
-      headerHandlers: Map[ChainIndex, TestProbe]
+      headerHandlers: Map[ChainIndex, TestProbe],
+      accountViewHandler: TestProbe
   )
 
+  // scalastyle:off method.length
   def createAllHandlersProbe(implicit
       brokerConfig: BrokerConfig,
       system: ActorSystem
@@ -62,17 +64,20 @@ object TestUtils {
       val probe = TestProbe()
       chainIndex -> (ActorRefT[HeaderChainHandler.Command](probe.ref) -> probe)
     }).toMap
-    val dependencyProbe   = TestProbe()
-    val dependencyHandler = ActorRefT[DependencyHandler.Command](dependencyProbe.ref)
-    val viewProbe         = TestProbe()
-    val viewHandler       = ActorRefT[ViewHandler.Command](viewProbe.ref)
+    val dependencyProbe    = TestProbe()
+    val dependencyHandler  = ActorRefT[DependencyHandler.Command](dependencyProbe.ref)
+    val viewProbe          = TestProbe()
+    val viewHandler        = ActorRefT[ViewHandler.Command](viewProbe.ref)
+    val accountViewProbe   = TestProbe()
+    val accountViewHandler = ActorRefT[Unit](accountViewProbe.ref)
     val allHandlers = AllHandlers(
       flowHandler,
       txHandler,
       dependencyHandler,
       viewHandler,
       blockHandlers.view.mapValues(_._1).toMap,
-      headerHandlers.view.mapValues(_._1).toMap
+      headerHandlers.view.mapValues(_._1).toMap,
+      accountViewHandler
     )
     val allProbes = AllHandlerProbs(
       flowProbe,
@@ -80,10 +85,12 @@ object TestUtils {
       dependencyProbe,
       viewProbe,
       blockHandlers.view.mapValues(_._2).toMap,
-      headerHandlers.view.mapValues(_._2).toMap
+      headerHandlers.view.mapValues(_._2).toMap,
+      accountViewProbe
     )
     allHandlers -> allProbes
   }
+  // scalastyle:on method.length
 
   // remove all the content under the path; the path itself would be kept
   def clear(path: Path): Unit = {

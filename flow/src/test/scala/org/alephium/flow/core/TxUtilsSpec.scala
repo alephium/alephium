@@ -22,7 +22,7 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Succeeded}
 
-import org.alephium.crypto.BIP340Schnorr
+import org.alephium.crypto.{BIP340Schnorr, Byte64, SecP256K1, SecP256R1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.{
   AssetOutputInfo,
@@ -36,7 +36,6 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol._
-import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -175,14 +174,21 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "calculate getPreAssetOutputInfo for txs in new blocks" in new FlowFixture
     with Generators {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Mainnet)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
 
-      val block = transfer(blockFlow, chainIndex)
+      val from = LockupScript.p2pkh(genesisKeys(fromGroup.value)._2)
+      val tx   = transferTx(blockFlow, chainIndex, from, ALPH.oneAlph, None)
+      blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+      if (hardFork.isDanubeEnabled()) {
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      }
+      val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
 
-      val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
       // return None when output is spent
       groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
@@ -209,12 +215,22 @@ class TxUtilsSpec extends AlephiumSpec {
           groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
+
+      if (hardFork.isDanubeEnabled() && !chainIndex.isIntraGroup) {
+        // Suppose the `chainIndex` is `1 -> 0`, and the next chain index is `1 -> 2`.
+        // Since the Danube upgrade, the new block in chain index `1 -> 2` won't take the
+        // block from `1 -> 0` as a dependency. Therefore, we need to insert a new block
+        // in chain index `1 -> 1` to make it possible to use the change output from
+        // chain index `1 -> 0` in chain index `1 -> 2`.
+        addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex(fromGroup, fromGroup)))
+      }
     }
   }
 
   it should "calculate getPreAssetOutputInfo for txs in mempool" in new FlowFixture
     with Generators {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Mainnet)
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
@@ -247,6 +263,34 @@ class TxUtilsSpec extends AlephiumSpec {
         }
       }
     }
+  }
+
+  it should "be able to use the change outputs from other inter chains since danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Danube)
+
+    val chainIndex0 = ChainIndex.unsafe(1, 0)
+    val chainIndex1 = ChainIndex.unsafe(1, 2)
+    val tx0         = transfer(blockFlow, chainIndex0).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex0, tx0.toTemplate, TimeStamp.now())
+    val tx1 = transfer(blockFlow, chainIndex1).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex1, tx1.toTemplate, TimeStamp.now())
+    tx1.allInputRefs.head is tx0.fixedOutputRefs.last
+
+    val block0 = mineFromMemPool(blockFlow, chainIndex0)
+    block0.nonCoinbase.head is tx0
+    addAndCheck(blockFlow, block0)
+    val block1 = mineFromMemPool(blockFlow, chainIndex1)
+    block1.nonCoinbaseLength is 0
+    addAndCheck(blockFlow, block1)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
+    val block2 = mineFromMemPool(blockFlow, chainIndex1)
+    block2.nonCoinbaseLength is 0
+    addAndCheck(blockFlow, block2)
+    val block3 = mineFromMemPool(blockFlow, chainIndex1)
+    block3.nonCoinbase.head is tx1
+    addAndCheck(blockFlow, block3)
   }
 
   it should "calculate getPreContractOutput" in new FlowFixture {
@@ -396,7 +440,7 @@ class TxUtilsSpec extends AlephiumSpec {
     def validateSubmit(utx: UnsignedTransaction, privateKeys: AVector[PrivateKey]) = {
 
       val signatures = privateKeys.map { privateKey =>
-        SignatureSchema.sign(utx.id.bytes, privateKey)
+        Byte64.from(SignatureSchema.sign(utx.id.bytes, privateKey))
       }
 
       val template = TransactionTemplate(
@@ -470,7 +514,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     def estimateWithDifferentP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
       val inputGas =
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas).mulUnsafe(numInputs)
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas).mulUnsafe(numInputs)
       GasEstimation.estimate(inputGas, numOutputs)
     }
   }
@@ -928,7 +972,7 @@ class TxUtilsSpec extends AlephiumSpec {
       unsignedTx.fixedOutputs.foreach(_.lockupScript is toLockupScript)
       unsignedTx.gasAmount is GasEstimation
         .estimateWithInputScript(
-          fromUnlockScript,
+          (fromLockupScript, fromUnlockScript),
           unsignedTx.inputs.length,
           unsignedTx.fixedOutputs.length,
           AssetScriptGasEstimator.NotImplemented
@@ -1128,7 +1172,7 @@ class TxUtilsSpec extends AlephiumSpec {
           )
         }
       }
-      val tx = Transaction.from(AVector.empty[TxInput], tokenOutputs, AVector.empty[Signature])
+      val tx         = Transaction.from(AVector.empty[TxInput], tokenOutputs, AVector.empty[Byte64])
       val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val block      = emptyBlock(blockFlow, chainIndex)
       blockFlow.addAndUpdateView(
@@ -1656,6 +1700,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val (alphRemainder, tokenRemainder) =
       blockFlow
         .getAssetRemainders(
+          genesisLockupScript,
           genesisUnlockScript,
           AVector(inputUtxoWithTokens),
           AVector(outputUtxoWithTokens),
@@ -1674,6 +1719,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector(genesisUtxos.head),
         AVector(outputOfAmount(genesisLockupScript, genesisBalance)),
@@ -1683,6 +1729,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector.empty,
         AVector(outputOfAmount(genesisLockupScript, genesisBalance)),
@@ -1692,6 +1739,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector.empty,
         AVector.empty,
@@ -1701,6 +1749,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector(genesisUtxos.head),
         AVector.empty,
@@ -1712,6 +1761,7 @@ class TxUtilsSpec extends AlephiumSpec {
       AVector.fill(2)(outputOfAmount(genesisLockupScript, U256.MaxValue))
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         AVector(genesisUtxos.head),
         overflowValueOutputs,
@@ -1738,6 +1788,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         overflowValueInputs,
         AVector(outputOfAmount(genesisLockupScript, genesisBalance / 4)),
@@ -1747,6 +1798,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     blockFlow
       .getAssetRemainders(
+        genesisLockupScript,
         genesisUnlockScript,
         overflowValueInputs,
         overflowValueOutputs,
@@ -2198,7 +2250,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val signature = BIP340Schnorr.sign(unsignedTx.id.bytes, priKey)
     val tx = TransactionTemplate(
       unsignedTx,
-      AVector(Signature.unsafe(signature.bytes)),
+      AVector(Byte64.from(signature.bytes).value),
       scriptSignatures = AVector.empty
     )
     TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
@@ -2755,12 +2807,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "check gas amount: pre-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     blockFlow.checkProvidedGasAmount(None) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas.subUnsafe(GasBox.unsafe(1)))).leftValue is
@@ -2778,19 +2825,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "check gas amount: since-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+    setHardForkSince(HardFork.Rhone)
 
     blockFlow.checkProvidedGasAmount(None) isE ()
     blockFlow.checkProvidedGasAmount(Some(minimalGas)) isE ()
@@ -2889,6 +2924,74 @@ class TxUtilsSpec extends AlephiumSpec {
       .calcMainChainReward(polwReward.netRewardUnsafe())
       .addUnsafe(polwReward.burntAmount)
     tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy)
+  }
+
+  trait P2PKLockupScriptFixture extends FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Danube
+
+    def publicKey: PublicKeyLike
+    def sign(unsignedTx: UnsignedTransaction): Transaction
+
+    def lockupScript(group: GroupIndex): LockupScript.P2PK = LockupScript.p2pk(publicKey, group)
+    def testTransfer() = {
+      (0 until groupConfig.groups).foreach { group =>
+        val genesisKey     = genesisKeys(group)._1
+        val toLockupScript = lockupScript(GroupIndex.unsafe(group))
+        val block = transfer(
+          blockFlow,
+          genesisKey,
+          toLockupScript,
+          AVector.empty[(TokenId, U256)],
+          ALPH.alph(2)
+        )
+        addAndCheck(blockFlow, block)
+        blockFlow.getBalance(toLockupScript, Int.MaxValue, true).rightValue._1 is ALPH.alph(2)
+      }
+
+      (0 until groupConfig.groups).foreach { group =>
+        val fromLockupScript = lockupScript(GroupIndex.unsafe(group))
+        val toLockupScript   = LockupScript.p2pkh(genesisKeys(group)._2)
+        val outputInfos = AVector(TxOutputInfo(toLockupScript, ALPH.oneAlph, AVector.empty, None))
+        val unsignedTx = blockFlow
+          .transfer(
+            None,
+            fromLockupScript,
+            UnlockScript.P2PK,
+            outputInfos,
+            Some(minimalGas),
+            nonCoinbaseMinGasPrice,
+            Int.MaxValue,
+            ExtraUtxosInfo.empty
+          )
+          .rightValue
+          .rightValue
+        val tx    = sign(unsignedTx)
+        val block = mineWithTxs(blockFlow, ChainIndex.unsafe(group, group))((_, _) => AVector(tx))
+        addAndCheck(blockFlow, block)
+
+        val balance = ALPH.alph(2).subUnsafe(ALPH.oneAlph).subUnsafe(tx.gasFeeUnsafe)
+        blockFlow.getBalance(fromLockupScript, Int.MaxValue, true).rightValue._1 is balance
+      }
+    }
+  }
+
+  it should "test p2pk(secp256k1) lockup script" in new P2PKLockupScriptFixture {
+    val (priKey, pubKey)         = SecP256K1.generatePriPub()
+    val publicKey: PublicKeyLike = PublicKeyLike.SecP256K1(pubKey)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+
+    testTransfer()
+  }
+
+  it should "test p2pk(webauthn) lockup script" in new P2PKLockupScriptFixture {
+    val (priKey, pubKey)         = SecP256R1.generatePriPub()
+    val publicKey: PublicKeyLike = PublicKeyLike.WebAuthn(pubKey)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithWebAuthn(unsignedTx, priKey)._2
+
+    testTransfer()
   }
 
   private def input(

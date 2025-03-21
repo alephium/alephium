@@ -82,6 +82,8 @@ final case class UnsignedTransaction(
     case (output, outputIndex) =>
       AssetOutputRef.from(output, TxOutputRef.key(id, outputIndex))
   }
+
+  lazy val gasFee: U256 = gasPrice * gasAmount
 }
 
 object UnsignedTransaction {

@@ -244,6 +244,15 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def opNot[Unknown: P]: P[LogicalOperator]    = P("!").map(_ => Not)
   def opNegate[Unknown: P]: P[LogicalOperator] = P("-").map(_ => Negate)
 
+  def opAddAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("+=").map(_ => CompoundAssignmentOperator.AddAssign)
+  def opSubAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("-=").map(_ => CompoundAssignmentOperator.SubAssign)
+  def opMulAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("*=").map(_ => CompoundAssignmentOperator.MulAssign)
+  def opDivAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("/=").map(_ => CompoundAssignmentOperator.DivAssign)
+
   sealed trait FuncModifier
 
   object FuncModifier {

@@ -138,17 +138,16 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader =
     getHeaderChain(hash).getBlockHeaderUnsafe(hash)
 
-  def getGhostUncles(
-      parentHeader: BlockHeader,
-      validator: BlockHeader => Boolean
-  ): IOResult[AVector[SelectedGhostUncle]] =
-    getBlockChain(parentHeader.chainIndex).selectGhostUncles(parentHeader, validator)
-
   def getGhostUnclesUnsafe(
+      hardFork: HardFork,
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): AVector[SelectedGhostUncle] =
-    getBlockChain(parentHeader.chainIndex).selectGhostUnclesUnsafe(parentHeader, validator)
+    getBlockChain(parentHeader.chainIndex).selectGhostUnclesUnsafe(
+      hardFork,
+      parentHeader,
+      validator
+    )
 
   def add(header: BlockHeader): IOResult[Unit]
 
@@ -185,6 +184,13 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
 
   def getBlockBytes(hash: BlockHash): IOResult[ByteString] = {
     getBlockChain(hash).getBlockBytes(hash)
+  }
+
+  def isBlockInMainChain(blockHash: BlockHash): IOResult[Boolean] = {
+    for {
+      height <- getHeight(blockHash)
+      hashes <- getHashes(ChainIndex.from(blockHash), height)
+    } yield hashes.headOption.contains(blockHash)
   }
 
   private def getMainChainBlockByGhostUncleUnsafe(

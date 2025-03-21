@@ -71,10 +71,14 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     ctx.getInitialBalances().flatMap { balances =>
+      // Store the transaction caller's balance to use later if needed to cover contract creation deposits
+      val txCallerBalance = MutBalanceState.from(balances)
+      ctx.setTxCallerBalance(txCallerBalance)
+
       startPayableFrame(
         obj,
         ctx,
-        MutBalanceState.from(balances),
+        txCallerBalance,
         method,
         args,
         operandStack,
@@ -484,13 +488,14 @@ object StatefulVM {
       tx: TransactionAbstract,
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
-      gasRemaining: GasBox
+      gasRemaining: GasBox,
+      txIndex: Int
   )(implicit
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
+    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs, txIndex)
     runTxScript(context, script)
   }
   // scalastyle:on parameter.number
@@ -518,7 +523,7 @@ object StatefulVM {
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): ExeResult[TxScriptExecution] = {
-    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
+    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs, 0)
     runTxScriptMockup(context, script)
   }
   // scalastyle:on parameter.number

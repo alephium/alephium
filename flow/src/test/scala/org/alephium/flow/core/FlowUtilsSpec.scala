@@ -21,12 +21,13 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalacheck.Gen
 
-import org.alephium.flow.FlowFixture
+import org.alephium.crypto.Byte64
+import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.mempool.{Normal, Reorg}
+import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, Generators, PrivateKey, PublicKey, SignatureSchema}
-import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
@@ -47,14 +48,20 @@ class FlowUtilsSpec extends AlephiumSpec {
       val unsignedTx = UnsignedTransaction(txScriptOpt = Some(script), inputs, AVector.empty)
       val tx = TransactionTemplate(
         unsignedTx,
-        assets.map(asset => SignatureSchema.sign(unsignedTx.id, asset.privateKey)),
+        assets.map(asset => Byte64.from(SignatureSchema.sign(unsignedTx.id, asset.privateKey))),
         AVector.empty
       )
+      val blockEnv = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
 
       val worldState = blockFlow.getBestCachedWorldState(groupIndex).rightValue
       assets.foreach { asset =>
         worldState
-          .addAsset(asset.txInput.outputRef, asset.referredOutput, tx.id)
+          .addAsset(
+            asset.txInput.outputRef,
+            asset.referredOutput,
+            tx.id,
+            None
+          )
           .isRight is true
       }
       val firstInput = assets.head.referredOutput
@@ -62,10 +69,10 @@ class FlowUtilsSpec extends AlephiumSpec {
         amount = firstInput.amount.subUnsafe(tx.gasFeeUnsafe),
         additionalData = ByteString.empty
       )
-      val bestDeps  = blockFlow.getBestDeps(groupIndex)
-      val groupView = blockFlow.getMutableGroupView(groupIndex, bestDeps, worldState).rightValue
-      val blockEnv  = blockFlow.getDryrunBlockEnv(unsignedTx.chainIndex).rightValue
-      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script).rightValue is
+      val bestDeps = blockFlow.getBestDepsPreDanube(groupIndex)
+      val groupView =
+        blockFlow.getMutableGroupViewPreDanube(groupIndex, bestDeps, worldState).rightValue
+      blockFlow.generateFullTx(chainIndex, groupView, blockEnv, tx, script, 0).rightValue is
         Transaction(
           unsignedTx,
           scriptExecutionOk = false,
@@ -115,7 +122,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   trait TxConflictsFixture extends FlowFixture {
-    def test() = {
+    def testPrepareBlockFlow(allowConflictedTxs: Boolean) = {
       val fromGroup      = Random.nextInt(groups0)
       val chainIndex0    = ChainIndex.unsafe(fromGroup, Random.nextInt(groups0))
       val anotherToGroup = (chainIndex0.to.value + 1 + Random.nextInt(groups0 - 1)) % groups0
@@ -126,44 +133,196 @@ class FlowUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block0)
       val groupIndex = GroupIndex.unsafe(fromGroup)
       val tx1        = block1.nonCoinbase.head.toTemplate
-      blockFlow.isTxConflicted(groupIndex, tx1) is true
+      blockFlow.isTxConflicted(groupIndex, tx1) is !allowConflictedTxs
       blockFlow.getGrandPool().add(chainIndex1, tx1, TimeStamp.now())
 
       val miner    = getGenesisLockupScript(chainIndex1.to)
       val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
       template.deps.contains(block0.hash) is false
-      template.transactions.init.isEmpty is true
+      template.transactions.init.isEmpty is !allowConflictedTxs
     }
   }
 
   it should "detect tx conflicts using bestDeps for pre-rhone hardfork" in new TxConflictsFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.consensus.mainnet.uncle-dependency-gap-time", "10 seconds"),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis),
       ("alephium.broker.broker-num", 1)
     )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-    test()
+    setHardForkBefore(HardFork.Rhone)
+    testPrepareBlockFlow(false)
   }
 
-  it should "detect tx conflicts using bestDeps for since-rhone hardfork" in new TxConflictsFixture {
+  it should "detect tx conflicts using bestDeps for rhone hardfork" in new TxConflictsFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.consensus.rhone.uncle-dependency-gap-time", "10 seconds"),
-      ("alephium.broker.broker-num", 1),
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
+      ("alephium.broker.broker-num", 1)
     )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
-    test()
+    setHardFork(HardFork.Rhone)
+    testPrepareBlockFlow(false)
+  }
+
+  it should "allow conflicted txs when preparing block template since danube" in new TxConflictsFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.consensus.rhone.uncle-dependency-gap-time", "10 seconds"),
+      ("alephium.broker.broker-num", 1)
+    )
+    setHardForkSince(HardFork.Danube)
+    testPrepareBlockFlow(true)
+  }
+
+  trait DanubeConflictedTxsFixture extends FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Danube)
+
+    val fromGroup   = GroupIndex.random
+    val toGroup0    = GroupIndex.unsafe((fromGroup.value + 1) % groups0)
+    val toGroup1    = GroupIndex.unsafe((fromGroup.value + 2) % groups0)
+    val chainIndex0 = ChainIndex(fromGroup, toGroup0)
+    val chainIndex1 = ChainIndex(fromGroup, toGroup1)
+    val now         = TimeStamp.now()
+    val block0      = transfer(blockFlow, chainIndex0, now)
+    val block1      = transfer(blockFlow, chainIndex1, now.plusMillisUnsafe(1))
+    addAndCheck(blockFlow, block0, block1)
+
+    val block2 = emptyBlock(blockFlow, ChainIndex(fromGroup, fromGroup))
+    block2.blockDeps.deps.contains(block0.hash) is true
+    block2.blockDeps.deps.contains(block1.hash) is true
+    addAndCheck(blockFlow, block2)
+  }
+
+  it should "add conflicted txs to storage since danube" in new DanubeConflictedTxsFixture {
+    val storage      = blockFlow.conflictedTxsStorage
+    val conflictedTx = block1.nonCoinbase.head
+    storage.conflictedTxsReversedIndex.existsUnsafe(block0.hash) is false
+    storage.conflictedTxsReversedIndex.getUnsafe(block1.hash) is AVector(
+      nodeindexes.ConflictedTxsSource(block2.hash, AVector(conflictedTx.id))
+    )
+    storage.conflictedTxsPerIntraBlock.getUnsafe(block2.hash) is AVector(
+      nodeindexes.ConflictedTxsPerBlock(block1.hash, AVector(conflictedTx.id))
+    )
+  }
+
+  it should "ignore conflicted txs when updating state since danube" in new DanubeConflictedTxsFixture {
+    val block3 = emptyBlock(blockFlow, ChainIndex(toGroup0, toGroup0))
+    addAndCheck(blockFlow, block3)
+    val worldState0 = blockFlow.getBestPersistedWorldState(toGroup0).rightValue
+    val tx0         = block0.nonCoinbase.head
+    worldState0.existOutput(tx0.outputRefs.head) isE true
+
+    val block4 = emptyBlock(blockFlow, ChainIndex(toGroup1, toGroup1))
+    addAndCheck(blockFlow, block4)
+    val worldState1 = blockFlow.getBestPersistedWorldState(toGroup1).rightValue
+    val tx1         = block1.nonCoinbase.head
+    worldState1.existOutput(tx1.outputRefs.head) isE false
+  }
+
+  it should "update state if the conflicted tx from fork chain since danube" in new DanubeConflictedTxsFixture {
+    val tx      = block1.nonCoinbase.head
+    val sources = AVector(nodeindexes.ConflictedTxsSource(block2.hash, AVector(tx.id)))
+    blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex.getUnsafe(block1.hash) is sources
+
+    val template0 = BlockFlowTemplate.from(block2, 1)
+    val index     = groups0 - 1 + toGroup0.value
+    val newDeps =
+      template0.deps.replace(index, blockFlow.genesisHashes(fromGroup.value)(toGroup0.value))
+    val template1 = template0.copy(deps = newDeps)
+    val block3    = mine(blockFlow, template1)
+    block3.blockDeps.deps.contains(block0.hash) is false
+    block3.blockDeps.deps.contains(block1.hash) is true
+    addAndCheck(blockFlow, block3)
+    blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex.getUnsafe(block1.hash) is sources
+
+    val block4 = mineBlockWithDep(ChainIndex(toGroup1, toGroup1), block3.hash)
+    addAndCheck(blockFlow, block4)
+    val worldState = blockFlow.getPersistedWorldState(block4.hash).rightValue
+    worldState.existOutput(tx.outputRefs.head) isE true
+  }
+
+  it should "support transfers using incoming block outputs in danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    val genesisKey                = genesisKeys(0)._1
+    val (privateKey0, publicKey0) = GroupIndex.unsafe(0).generateKey
+    val block0                    = transfer(blockFlow, genesisKey, publicKey0, ALPH.alph(10))
+    addAndCheck(blockFlow, block0)
+
+    val (privateKey1, publicKey1) = GroupIndex.unsafe(1).generateKey
+    val block1                    = transfer(blockFlow, privateKey0, publicKey1, ALPH.alph(5))
+    addAndCheck(blockFlow, block1)
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    block2.blockDeps.deps.contains(block1.hash) is true
+    addAndCheck(blockFlow, block2)
+
+    val block3 = transfer(blockFlow, privateKey1, publicKey1, ALPH.alph(1))
+    block3.nonCoinbase.head.allInputRefs.head is block1.nonCoinbase.head.outputRefs.head
+    addAndCheck(blockFlow, block3)
+  }
+
+  it should "update mempool properly in normal case: danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    val chainIndex = ChainIndex.unsafe(0, 1)
+    val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is true
+
+    val miner     = getGenesisLockupScript(chainIndex.to)
+    val template0 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.transactions.head.id is tx.id
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is true
+
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.transactions.head.id is tx.id
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is true
+
+    val block = mine(blockFlow, template1)
+    addAndCheck(blockFlow, block)
+    val template2 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template2.transactions.length is 1 // coinbase tx
+    blockFlow.getMemPool(chainIndex).contains(tx.id) is false
+  }
+
+  it should "update mempool properly in reorg: danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    val chainIndex  = ChainIndex.unsafe(0, 1)
+    val miner       = getGenesisLockupScript(chainIndex.to)
+    val genesisKey  = genesisKeys(0)._1
+    val toPublicKey = chainIndex.to.generateKey._2
+
+    val (privateKey0, publicKey0) = chainIndex.from.generateKey
+    addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey0, ALPH.alph(2)))
+    val (privateKey1, publicKey1) = chainIndex.from.generateKey
+    addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey1, ALPH.alph(2)))
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    val blocks = {
+      val block0 = transfer(blockFlow, privateKey0, toPublicKey, ALPH.oneAlph)
+      val block1 = transfer(blockFlow, privateKey1, toPublicKey, ALPH.oneAlph)
+      AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+    }
+    val block0 = blocks.head
+    val tx0    = block0.nonCoinbase.head
+    val block1 = blocks.last
+    val tx1    = block1.nonCoinbase.head
+
+    blockFlow.grandPool.add(chainIndex, tx0.toTemplate, TimeStamp.now())
+    blockFlow.prepareBlockFlowUnsafe(chainIndex, miner).transactions.head.id is tx0.id
+    addAndCheck(blockFlow, block0)
+    val template0 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.transactions.length is 1 // coinbase tx
+    blockFlow.getMemPool(chainIndex).contains(tx0.id) is false
+
+    blockFlow.grandPool.add(chainIndex, tx1.toTemplate, TimeStamp.now())
+    blockFlow.prepareBlockFlowUnsafe(chainIndex, miner).transactions.head.id is tx1.id
+    addAndCheck(blockFlow, block1)
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.transactions.head.id is tx0.id
+    blockFlow.getMemPool(chainIndex).contains(tx0.id) is true
+    blockFlow.getMemPool(chainIndex).contains(tx1.id) is false
   }
 
   it should "truncate txs w.r.t. tx number and gas" in new FlowFixture {
@@ -207,7 +366,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     def test(hardFork: HardFork, expected: AVector[TransactionTemplate]) = {
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      val bestDeps  = blockFlow.getBestDeps(chainIndex.from)
+      val bestDeps  = blockFlow.getBestDepsPreDanube(chainIndex.from)
       blockFlow.collectTransactions(chainIndex, groupView, bestDeps, hardFork) isE expected
     }
 
@@ -245,12 +404,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "prepare block with correct coinbase reward for pre-rhone hardfork" in new CoinbaseRewardFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+  it should "prepare block with correct coinbase reward for mainnet hardfork" in new CoinbaseRewardFixture {
+    setHardFork(HardFork.Mainnet)
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
     emptyBlock.coinbaseReward is consensusConfigs.mainnet.emission
       .reward(emptyBlock.header)
@@ -263,28 +418,27 @@ class FlowUtilsSpec extends AlephiumSpec {
     transferBlock.coinbaseReward is consensusConfigs.mainnet.emission
       .reward(transferBlock.header)
       .miningReward
+      .addUnsafe(transferBlock.nonCoinbase.head.gasFeeUnsafe.divUnsafe(2))
+    addAndCheck(blockFlow, transferBlock)
+  }
+
+  it should "prepare block with correct coinbase reward for leman hardfork" in new CoinbaseRewardFixture {
+    setHardFork(HardFork.Leman)
+    val transferBlock = newTransferBlock()
+    transferBlock.coinbaseReward is consensusConfigs.mainnet.emission
+      .reward(transferBlock.header)
+      .miningReward
     addAndCheck(blockFlow, transferBlock)
   }
 
   it should "prepare block with correct coinbase reward for since-rhone hardfork" in new CoinbaseRewardFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+    setHardForkSince(HardFork.Rhone)
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
-    val miningReward = consensusConfigs.rhone.emission
+    val emission   = consensusConfigs.rhone.emission
+    val miningReward = emission
       .reward(emptyBlock.header)
       .miningReward
-    miningReward is (ALPH.alph(30) / 9 / 4)
+    miningReward is emission.rewardWrtTime(emptyBlock.header.timestamp, ALPH.LaunchTimestamp)
     emptyBlock.coinbase.unsigned.fixedOutputs.length is 1
     val mainChainReward = Coinbase.calcMainChainReward(miningReward)
     emptyBlock.coinbaseReward is mainChainReward
@@ -342,12 +496,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "prepare block template when txs are inter-dependent: pre-rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
-
+    setHardForkBefore(HardFork.Rhone)
     val blockFlow1 = isolatedBlockFlow()
     val index      = ChainIndex.unsafe(0, 0)
     val block0     = transfer(blockFlow1, index)
@@ -378,16 +527,17 @@ class FlowUtilsSpec extends AlephiumSpec {
 
   it should "reorg" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkBefore(HardFork.Danube)
 
     val mainGroup = GroupIndex.unsafe(0)
-    val deps0     = blockFlow.getBestDeps(mainGroup)
+    val deps0     = blockFlow.getBestDepsPreDanube(mainGroup)
     val block0    = transfer(blockFlow, ChainIndex.unsafe(0, 0))
     addAndCheck(blockFlow, block0)
     val block1 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
     addAndCheck(blockFlow, block1)
     val block2 = transfer(blockFlow, ChainIndex.unsafe(0, 1))
     addAndCheck(blockFlow, block2)
-    val deps1 = blockFlow.getBestDeps(mainGroup)
+    val deps1 = blockFlow.getBestDepsPreDanube(mainGroup)
 
     val blockFlow1 = isolatedBlockFlow()
 
@@ -413,7 +563,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block7)
     addAndCheck(blockFlow, block8)
     addAndCheck(blockFlow, block9)
-    val deps2 = blockFlow.getBestDeps(mainGroup)
+    val deps2 = blockFlow.getBestDepsPreDanube(mainGroup)
 
     blockFlow.calMemPoolChangesUnsafe(mainGroup, deps0, deps1) is
       Normal(
@@ -478,7 +628,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       mempool.isReady(tx0.id) is true
       mempool.isReady(tx1.id) is false
 
-      val oldDeps = blockFlow.getBestDeps(chainIndex.from)
+      val oldDeps = blockFlow.getBestDepsPreDanube(chainIndex.from)
       addWithoutViewUpdate(blockFlow, block0)
       val newDeps = blockFlow.calBestDepsUnsafe(chainIndex.from)
       blockFlow.updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps, heightGap)
@@ -532,25 +682,20 @@ class FlowUtilsSpec extends AlephiumSpec {
 
       blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
       val blockHashes = blockFlow.getHashes(chainIndex, 1).rightValue
-      blockHashes.length is 2
       blockHashes.toSet is Set(block0.hash, block1.hash)
       blockHashes.last
     }
   }
 
   trait PreRhonePrepareBlockFlowFixture extends PrepareBlockFlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.broker-num", 1),
-      ("alephium.network.rhone-hard-fork-timestamp", TimeStamp.Max.millis),
-      ("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis)
-    )
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkBefore(HardFork.Rhone)
   }
 
   it should "prepare block without uncles before rhone hardfork" in new PreRhonePrepareBlockFlowFixture {
     prepare()
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
-    networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Leman
 
     val block = mine(blockFlow, blockTemplate)
     block.header.version is DefaultBlockVersion
@@ -559,27 +704,14 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   trait SinceRhonePrepareBlockFlowFixture extends PrepareBlockFlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.broker-num", 1),
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
   }
 
   it should "prepare block with uncles since rhone hardfork" in new SinceRhonePrepareBlockFlowFixture {
     val ghostUncleHash = prepare()
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(blockTemplate.templateTs)
-    ) is true
-
     val block = mine(blockFlow, blockTemplate)
     block.header.version is DefaultBlockVersion
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
@@ -614,6 +746,86 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     val block2 = mineBlockTemplate(blockFlow, chainIndex)
     block2.ghostUncleHashes.rightValue is AVector(uncle1.hash)
+  }
+
+  it should "select duplicate ghost uncles before danube" in new GhostUncleFixture with Generators {
+    setHardFork(HardFork.Rhone)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight0               = nextInt(1, ALPH.MaxGhostUncleAge - 2)
+    val (ghostUncle0, ghostUncle1) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
+    val miner                      = getGenesisLockupScript(chainIndex.to)
+    val blockTemplate0             = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle0.hash) is true
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle1.hash) is true
+
+    val uncleHeight1 = uncleHeight0 + 1
+    val ghostUncle3  = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight1)
+    val ghostUncle4  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle3)
+    BlockHeader.fromSameTemplate(ghostUncle3.header, ghostUncle4.header) is true
+    val blockTemplate1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle3.hash) is true
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle4.hash) is true
+  }
+
+  it should "not select duplicate ghost uncles since danube" in new GhostUncleFixture
+    with Generators {
+    setHardForkSince(HardFork.Danube)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight0                 = nextInt(1, ALPH.MaxGhostUncleAge - 2)
+    val (ghostUncle00, ghostUncle01) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
+    val miner                        = getGenesisLockupScript(chainIndex.to)
+    val blockTemplate0               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle00.hash) is false
+    blockTemplate0.ghostUncleHashes.contains(ghostUncle01.hash) is true
+
+    val uncleHeight1                 = nextInt(1, ALPH.MaxGhostUncleAge - 2)
+    val (ghostUncle10, ghostUncle11) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight1)
+    val blockTemplate1               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle00.hash) is false
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle01.hash) is true
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle10.hash) is false
+    blockTemplate1.ghostUncleHashes.contains(ghostUncle11.hash) is true
+
+    val uncleHeight2 = math.max(uncleHeight0, uncleHeight1) + 1
+    val ghostUncle2  = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight2)
+    val ghostUncle3  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle2)
+    val ghostUncle4  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle2)
+    BlockHeader.fromSameTemplate(ghostUncle2.header, ghostUncle3.header) is true
+    BlockHeader.fromSameTemplate(ghostUncle2.header, ghostUncle4.header) is true
+    val uncleHashes = blockFlow.getHashes(chainIndex, uncleHeight2).rightValue.tail
+    uncleHashes.toSet is Set(ghostUncle2.hash, ghostUncle3.hash, ghostUncle4.hash)
+    val blockTemplate2 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate2.ghostUncleHashes.length is 2
+    blockTemplate2.ghostUncleHashes.contains(uncleHashes.head) is true
+    uncleHashes.tail.foreach(blockTemplate2.ghostUncleHashes.contains(_) is false)
+
+    val block0 = mine(blockFlow, blockTemplate0)
+    val block1 = mine(blockFlow, blockTemplate1)
+    addAndCheck(blockFlow, block0, block1)
+  }
+
+  it should "not select the ghost uncle if it is a duplicates of used uncles" in new GhostUncleFixture
+    with Generators {
+    setHardForkSince(HardFork.Danube)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight = nextInt(2, ALPH.MaxGhostUncleAge - 1)
+    val ghostUncle0 = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight)
+    val miner       = getGenesisLockupScript(chainIndex.to)
+    val template0   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.ghostUncleHashes is AVector(ghostUncle0.hash)
+    val block0 = mine(blockFlow, template0)
+    addAndCheck(blockFlow, block0)
+
+    val ghostUncle1 = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle0)
+    BlockHeader.fromSameTemplate(ghostUncle0.header, ghostUncle1.header) is true
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.ghostUncleHashes.isEmpty is true
   }
 
   it should "rebuild block template if there are invalid txs" in new FlowFixture {
@@ -672,10 +884,8 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   trait SequentialTxsFixture extends FlowFixture with Generators {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.danube-hard-fork-timestamp", TimeStamp.Max.millis))
+    setHardFork(HardFork.Rhone)
     lazy val chainIndex = chainIndexGenForBroker(brokerConfig).retryUntil(_.isIntraGroup).sample.get
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
     lazy val keys = (0 until 2).map { _ =>
       val (privateKey, publicKey) = chainIndex.from.generateKey
@@ -715,7 +925,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     def collectTxs() = {
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
-      val bestDeps  = blockFlow.getBestDeps(chainIndex.from)
+      val bestDeps  = blockFlow.getBestDepsPreDanube(chainIndex.from)
       blockFlow.collectTransactions(chainIndex, groupView, bestDeps, HardFork.Rhone).rightValue
     }
   }
@@ -877,6 +1087,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
   it should "not collect sequential txs if the input of the source tx from other chains" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex0               = ChainIndex.unsafe(0, 0)
     val (privateKey0, publicKey0) = chainIndex0.from.generateKey
@@ -908,7 +1119,18 @@ class FlowUtilsSpec extends AlephiumSpec {
       blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue
     template0.transactions.length is 1 // coinbase tx
 
-    addAndCheck(blockFlow, mineFromMemPool(blockFlow, chainIndex1))
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex1))
+    }
+
+    val block1 = mineFromMemPool(blockFlow, chainIndex1)
+    block1.nonCoinbase.head.id is tx0.id
+    addAndCheck(blockFlow, block1)
+
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex0))
+    }
 
     val template1 =
       blockFlow.prepareBlockFlow(chainIndex0, LockupScript.p2pkh(publicKey2)).rightValue
@@ -917,19 +1139,7 @@ class FlowUtilsSpec extends AlephiumSpec {
   }
 
   it should "support sequential script txs in rhone" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      (
-        "alephium.network.rhone-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.rhoneHardForkTimestamp.millis
-      ),
-      (
-        "alephium.network.danube-hard-fork-timestamp",
-        NetworkConfigFixture.SinceRhone.danubeHardForkTimestamp.millis
-      )
-    )
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+    setHardForkSince(HardFork.Rhone)
     val chainIndex              = ChainIndex.unsafe(0, 0)
     val (privateKey, publicKey) = chainIndex.from.generateKey
     val lockupScript            = LockupScript.p2pkh(publicKey)

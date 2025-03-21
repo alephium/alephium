@@ -35,6 +35,7 @@ import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrok
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model._
 import org.alephium.util._
 
@@ -65,7 +66,8 @@ object InterCliqueManager {
       broker: ActorRefT[BrokerHandler.Command],
       brokerInfo: BrokerInfo,
       connectionType: ConnectionType,
-      clientInfo: String
+      clientInfo: String,
+      p2pVersion: P2PVersion
   ) extends Command
       with EventStream.Event
   final case object GetSyncStatuses        extends Command
@@ -126,11 +128,16 @@ object InterCliqueManager {
     .build("alephium_peers_total", "Number of connected peers")
     .register()
 
-  trait NodeSyncStatus extends BaseActor {
+  trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
     private var nodeSynced: Boolean      = false
     private var firstTimeSynced: Boolean = true
 
     protected def onFirstTimeSynced(): Unit = {}
+
+    override def preStart(): Unit = {
+      super.preStart()
+      subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
+    }
 
     def updateNodeSyncStatus: Receive = {
       case InterCliqueManager.SyncedResult(isSynced) =>
@@ -202,7 +209,7 @@ class InterCliqueManager(
       } else {
         sender() ! Tcp.Close
       }
-    case InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo) =>
+    case InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo, _) =>
       connecting.remove(brokerInfo.address)
       val brokerState =
         BrokerState(brokerInfo, connectionType, broker, isSynced = false, clientInfo)
@@ -335,11 +342,8 @@ class InterCliqueManager(
     }
   }
 
-  def publishNodeStatus(result: SyncedResult): Unit = {
-    blockFlowSynchronizer.ref ! result
-    allHandlers.viewHandler.ref ! result
-    allHandlers.txHandler.ref ! result
-    allHandlers.blockHandlers.foreach(_._2.ref ! result)
+  @inline def publishNodeStatus(result: SyncedResult): Unit = {
+    publishEvent(result)
   }
 
   def connect(broker: BrokerInfo): Unit = {

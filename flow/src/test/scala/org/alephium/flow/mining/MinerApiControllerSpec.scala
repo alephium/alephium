@@ -21,11 +21,14 @@ import scala.util.Random
 import akka.actor.ActorRef
 import akka.io.{IO, Tcp}
 import akka.testkit.{TestActor, TestProbe}
+import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
+import org.alephium.protocol.Generators
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex, Target}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util.{AVector, SocketUtil}
@@ -111,22 +114,37 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       blockHeight
     )
     val headerBlob = Job.from(blockFlowTemplate).headerBlob
+
+    def blockRejected(block: Block, blockBlob: ByteString, errorMessage: String) = {
+      expectErrorMsg(errorMessage) {
+        connection0 ! Tcp.Write(
+          ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob)))
+        )
+      }
+
+      probe0.expectMsgPF() { case Tcp.Received(data) =>
+        val chainIndex = block.chainIndex
+        ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
+          SubmitResult(chainIndex.from.value, chainIndex.to.value, block.hash, false)
+        )
+      }
+    }
+
+    def blockAccepted(block: Block, blockBlob: ByteString) = {
+      connection0 ! Tcp.Write(
+        ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob)))
+      )
+
+      eventually(minerApiController.underlyingActor.submittingBlocks.contains(block.hash))
+      allHandlerProbes.blockHandlers(chainIndex).expectMsgType[BlockChainHandler.ValidateMinedBlock]
+    }
   }
 
   it should "error when the job is not in the cache" in new SubmissionFixture {
     val newBlock  = block.copy(transactions = AVector.empty)
     val blockBlob = serialize(newBlock)
 
-    expectErrorMsg("The job for the block is expired") {
-      connection0 ! Tcp.Write(ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob))))
-    }
-
-    probe0.expectMsgPF() { case Tcp.Received(data) =>
-      val chainIndex = newBlock.chainIndex
-      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
-        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
-      )
-    }
+    blockRejected(newBlock, blockBlob, "The job for the block is expired")
   }
   it should "error when the mined block has invalid chain index" in new SubmissionFixture {
     val newBlock      = block.copy(header = block.header.copy(target = Target.Zero))
@@ -137,21 +155,11 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val newTemplate =
       BlockFlowTemplate.from(newBlock, blockHeight).copy(index = invalidChainIndex)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
+    val cacheKey      = MinerApiController.getCacheKey(newHeaderBlob)
     minerApiController.underlyingActor.jobCache
-      .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
+      .put(cacheKey, newTemplate -> serialize(newTemplate.transactions))
 
-    expectErrorMsg("The mined block has invalid chainindex:") {
-      connection0 ! Tcp.Write(
-        ClientMessage.serialize(ClientMessage.from(SubmitBlock(newBlockBlob)))
-      )
-    }
-
-    probe0.expectMsgPF() { case Tcp.Received(data) =>
-      val chainIndex = newBlock.chainIndex
-      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
-        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
-      )
-    }
+    blockRejected(newBlock, newBlockBlob, "The mined block has invalid chainindex:")
   }
 
   it should "error when the mined block has invalid work" in new SubmissionFixture {
@@ -159,21 +167,11 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
     val newTemplate   = BlockFlowTemplate.from(newBlock, blockHeight)
     val newHeaderBlob = Job.fromWithoutTxs(newTemplate).headerBlob
+    val cacheKey      = MinerApiController.getCacheKey(newHeaderBlob)
     minerApiController.underlyingActor.jobCache
-      .put(newHeaderBlob, newTemplate -> serialize(newTemplate.transactions))
+      .put(cacheKey, newTemplate -> serialize(newTemplate.transactions))
 
-    expectErrorMsg("The mined block has invalid work:") {
-      connection0 ! Tcp.Write(
-        ClientMessage.serialize(ClientMessage.from(SubmitBlock(newBlockBlob)))
-      )
-    }
-
-    probe0.expectMsgPF() { case Tcp.Received(data) =>
-      val chainIndex = newBlock.chainIndex
-      ServerMessage.deserialize(data).rightValue.value is ServerMessage.from(
-        SubmitResult(chainIndex.from.value, chainIndex.to.value, newBlock.hash, false)
-      )
-    }
+    blockRejected(newBlock, newBlockBlob, "The mined block has invalid work:")
   }
 
   it should "error when the protocol version is invalid" in new SubmissionFixture {
@@ -186,16 +184,12 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   }
 
   it should "submit block when the job is cached" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
     minerApiController.underlyingActor.jobCache
-      .put(headerBlob, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+      .put(cacheKey, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
 
     val blockBlob = serialize(block.copy(transactions = AVector.empty))
-    connection0 ! Tcp.Write(
-      ClientMessage.serialize(ClientMessage.from(SubmitBlock(blockBlob)))
-    )
-
-    eventually(minerApiController.underlyingActor.submittingBlocks.contains(block.hash))
-    allHandlerProbes.blockHandlers(chainIndex).expectMsgType[BlockChainHandler.ValidateMinedBlock]
+    blockAccepted(block, blockBlob)
 
     val succeeded = Random.nextBoolean()
     val feedback = if (succeeded) {
@@ -209,6 +203,31 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
         SubmitResult(0, 0, block.hash, succeeded)
       )
     }
+  }
+
+  it should "get cache key from header blob" in new SubmissionFixture {
+    import org.alephium.serde.byteSerde
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    cacheKey isnot headerBlob
+
+    val header = blockFlowTemplate.dummyHeader()
+    serialize(header.version) ++
+      serialize(header.blockDeps) ++
+      serialize(header.depStateHash) ++
+      serialize(header.txsHash) ++
+      serialize(header.target) is cacheKey
+  }
+
+  it should "accept the block if the timestamp is changed" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    minerApiController.underlyingActor.jobCache
+      .put(cacheKey, blockFlowTemplate -> serialize(blockFlowTemplate.transactions))
+
+    val newHeader    = block.header.copy(timestamp = block.header.timestamp.plusMillisUnsafe(1))
+    val newBlock     = block.copy(header = newHeader)
+    val reMinedBlock = reMine(blockFlow, chainIndex, newBlock)
+    val blockBlob    = serialize(reMinedBlock.copy(transactions = AVector.empty))
+    blockAccepted(reMinedBlock, blockBlob)
   }
 
   trait ConnectionFixture extends Fixture {
@@ -235,5 +254,48 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     minerApiController ! ViewHandler.SubscribeResult(false)
     probe.expectMsgType[Tcp.ErrorClosed]
     eventually(minerApiController.underlyingActor.connections.length is 0)
+  }
+
+  it should "calculate job index" in {
+    Seq((0, 2, 4), (1, 2, 4), (0, 4, 4), (0, 1, 4)).foreach {
+      case (_brokerId, _brokerNum, _groups) =>
+        val config = new BrokerConfig {
+          def brokerId: Int  = _brokerId
+          def brokerNum: Int = _brokerNum
+          def groups: Int    = _groups
+        }
+        config.chainIndexes.zipWithIndex.foreach { case (chainIndex, index) =>
+          MinerApiController.calcJobIndex(chainIndex)(config) is index
+        }
+    }
+  }
+
+  it should "publish jobs once the new template is received" in new SyncedFixture with Generators {
+    val minerApiControllerActor = minerApiController.underlyingActor
+    minerApiControllerActor.latestJobs.isEmpty is true
+    val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
+    minerApiController ! ViewHandler.NewTemplates(templates)
+    val templates0 = AVector.from(templates.flatten)
+    eventually {
+      minerApiControllerActor.latestJobs.isEmpty is false
+      minerApiControllerActor.latestJobs.value.map(_._2) is templates0
+    }
+
+    val probe = TestProbe()
+    connectToServer(probe)
+
+    val chainIndex  = chainIndexGenForBroker(brokerConfig).sample.get
+    val block       = emptyBlock(blockFlow, chainIndex)
+    val newTemplate = BlockFlowTemplate.from(block, 1)
+    minerApiController ! ViewHandler.NewTemplate(newTemplate)
+    probe.expectMsgPF() { case Tcp.Received(data) =>
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
+    }
+    eventually {
+      val index        = MinerApiController.calcJobIndex(chainIndex)
+      val newTemplates = templates0.replace(index, newTemplate)
+      minerApiControllerActor.latestJobs.isEmpty is false
+      minerApiControllerActor.latestJobs.value.map(_._2) is newTemplates
+    }
   }
 }
