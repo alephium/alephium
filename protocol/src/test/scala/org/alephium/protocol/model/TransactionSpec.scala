@@ -197,7 +197,9 @@ class TransactionSpec
 
     {
       info("danube coinbase transaction")
-      implicit val networkConfig = NetworkConfigFixture.Danube
+      implicit val networkConfig = new NetworkConfigFixture.Default {
+        override def danubeHardForkTimestamp: TimeStamp = TimeStamp.zero
+      }.networkConfig
       val blockHash = model.BlockHash.unsafe(
         hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7"
       )
