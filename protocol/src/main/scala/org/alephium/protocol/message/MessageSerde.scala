@@ -18,43 +18,27 @@ package org.alephium.protocol.message
 
 import akka.util.ByteString
 
+import org.alephium.protocol.Checksum
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.serde._
-import org.alephium.util.{Bytes, DjbHash, Hex}
+import org.alephium.util.Bytes
 
 object MessageSerde {
-  private val checksumLength: Int = 4
-
-  def checksum(data: ByteString): ByteString =
-    Bytes.from(DjbHash.intHash(data))
-
   def length(data: ByteString): ByteString =
     Bytes.from(data.length)
 
   def unwrap(
       input: ByteString
-  )(implicit networkConfig: NetworkConfig): SerdeResult[(ByteString, Int, ByteString)] = {
+  )(implicit networkConfig: NetworkConfig): SerdeResult[(Checksum, Int, ByteString)] = {
     for {
       rest         <- checkMagicBytes(input)
-      checksumRest <- extractChecksum(rest)
+      checksumRest <- serdeImpl[Checksum]._deserialize(rest)
       lengthRest <- extractLength(
         checksumRest.rest
       ) // don't use intSerde due to potential notEnoughBytes
     } yield {
       (checksumRest.value, lengthRest.value, lengthRest.rest)
     }
-  }
-
-  def extractBytes(bytes: ByteString, length: Int): SerdeResult[Staging[ByteString]] = {
-    Either.cond(
-      bytes.length >= length,
-      bytes.splitAt(length) match { case (data, rest) => Staging(data, rest) },
-      SerdeError.notEnoughBytes(length, bytes.length)
-    )
-  }
-
-  def extractChecksum(bytes: ByteString): SerdeResult[Staging[ByteString]] = {
-    extractBytes(bytes, checksumLength)
   }
 
   def extractLength(bytes: ByteString): SerdeResult[Staging[Int]] = {
@@ -82,16 +66,5 @@ object MessageSerde {
         SerdeError.wrongFormat(s"Wrong magic bytes")
       )
     }
-  }
-
-  def checkChecksum(toCheck: ByteString, data: ByteString): SerdeResult[Unit] = {
-    val digest = checksum(data)
-    Either.cond(
-      digest == toCheck,
-      (),
-      SerdeError.wrongFormat(
-        s"Wrong checksum: expected ${Hex.toHexString(digest)}, got ${Hex.toHexString(toCheck)}"
-      )
-    )
   }
 }

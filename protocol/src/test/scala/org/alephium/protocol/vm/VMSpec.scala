@@ -22,6 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
@@ -593,7 +594,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val context0 = genStatefulContext(None)
     StatefulVM.checkRemainingSignatures(context0) isE ()
 
-    val signature = Signature.generate
+    val signature = Byte64.from(Signature.generate)
     val context1  = genStatefulContext(None, signatures = AVector(signature))
     StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures(1)
   }

@@ -27,6 +27,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
 import org.alephium.crypto
+import org.alephium.crypto.Byte64
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.config.NetworkConfigFixture.{Genesis, Leman}
@@ -103,6 +104,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
   }
 
+  trait DanubeForkFixture extends AllInstrsFixture {
+    val danubeStatelessInstrs =
+      AVector[DanubeInstr[StatelessContext]](VerifySignature, GetSegregatedWebAuthnSignature)
+    val danubeStatefulInstrs = AVector.empty[DanubeInstr[StatefulContext]]
+  }
+
   it should "check all LemanInstr" in new LemanForkFixture {
     lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
     lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
@@ -119,6 +126,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       .map(_.isInstanceOf[RhoneInstr[_]] is false)
     (statefulInstrs.toSet -- rhoneStatefulInstrs.toSet)
       .map(_.isInstanceOf[RhoneInstr[_]] is false)
+  }
+
+  it should "check all DanubeInstr" in new DanubeForkFixture {
+    danubeStatelessInstrs.foreach(_.isInstanceOf[DanubeInstr[_]] is true)
+    danubeStatefulInstrs.foreach(_.isInstanceOf[DanubeInstr[_]] is true)
+    (statelessInstrs.toSet -- danubeStatelessInstrs.toSet)
+      .map(_.isInstanceOf[DanubeInstr[_]] is false)
+    (statefulInstrs.toSet -- danubeStatefulInstrs.toSet)
+      .map(_.isInstanceOf[DanubeInstr[_]] is false)
   }
 
   it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
@@ -161,6 +177,19 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     rhoneStatefulInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
     val frame2 = preparePreLemanFrame()
     rhoneStatefulInstrs.foreach(instr => instr.runWith(frame2).leftValue isE InactiveInstr(instr))
+  }
+
+  it should "fail if the danube hardfork is not activated yet for stateless instrs" in new DanubeForkFixture
+    with StatelessFixture {
+    val frame0 = prepareFrame(AVector.empty)(NetworkConfigFixture.Danube) // Danube is activated
+    danubeStatelessInstrs.foreach { instr =>
+      val result = instr.runWith(frame0)
+      if (result.isLeft) {
+        result.leftValue isnotE InactiveInstr(instr)
+      }
+    }
+    val frame1 = prepareFrame(AVector.empty)(NetworkConfigFixture.PreDanube)
+    danubeStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
   }
 
   trait GenFixture extends ContextGenerators {
@@ -304,7 +333,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           TxEnv.dryrun(
             tx,
             prevOutputs.map(_.referredOutput.copy(lockTime = txLockTime)),
-            Stack.ofCapacity[Signature](0)
+            Stack.ofCapacity[Byte64](0)
           )
         )
       )
@@ -1524,8 +1553,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val tx               = transactionGen().sample.get
     val (pubKey, priKey) = keysGen.sample.get
 
-    val signature      = SignatureSchema.sign(tx.id.bytes, priKey)
-    val signatureStack = Stack.ofCapacity[Signature](1)
+    val signature      = Byte64.from(SignatureSchema.sign(tx.id.bytes, priKey))
+    val signatureStack = Stack.ofCapacity[Byte64](1)
     signatureStack.push(signature)
 
     override lazy val frame = prepareFrame(
@@ -1574,14 +1603,19 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       bytes <- Gen.listOfN(32, arbitrary[Byte])
     } yield ByteString(bytes)
 
+    private def pushPublicKeyType(tpe: Option[ByteString]) = {
+      tpe.foreach(v => stack.push(Val.ByteVec(v)))
+    }
+
     // scalastyle:off method.length
-    def test[PriKey <: RandomBytes, PubKey <: RandomBytes, Sig <: RandomBytes](
-        instr: GenericVerifySignature[PubKey, Sig],
-        genratePriPub: => (PriKey, PubKey),
-        sign: (ByteString, PriKey) => Sig
+    def test0[PriKey <: RandomBytes, PubKey <: RandomBytes](
+        instr: SignatureInstr,
+        generatePriPub: => (PriKey, PubKey),
+        sign: (ByteString, PriKey) => ByteString,
+        publicKeyType: Option[ByteString] = None
     ) = {
       val keysGen = for {
-        (pri, pub) <- Gen.const(()).map(_ => genratePriPub)
+        (pri, pub) <- Gen.const(()).map(_ => generatePriPub)
       } yield ((pri, pub))
 
       val (priKey, pubKey) = keysGen.sample.get
@@ -1591,28 +1625,61 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       stack.push(Val.ByteVec(data))
       stack.push(Val.ByteVec(pubKey.bytes))
-      stack.push(Val.ByteVec(signature.bytes))
+      stack.push(Val.ByteVec(signature))
+      pushPublicKeyType(publicKeyType)
 
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
-      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+      val extraGas = if (publicKeyType == Some(ByteString(3))) { // webauthn
+        GasBox.unsafe(84)
+      } else {
+        GasBox.zero
+      }
+      val usedGas = GasBox.unsafe(instr.gas().value + extraGas.value)
+      initialGas.subUnsafe(context.gasRemaining) is usedGas
 
+      stack.push(Val.ByteVec(data))
+      stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(ByteString("zzz")))
+      pushPublicKeyType(publicKeyType)
       instr.runWith(frame).leftValue isE InvalidSignatureFormat(ByteString("zzz"))
+      if (publicKeyType.isEmpty) stack.pop(2)
+      stack.isEmpty is true
 
       val wrongData = dataGen.sample.get
       stack.push(Val.ByteVec(wrongData))
-      stack.push(Val.ByteVec(signature.bytes))
+      stack.push(Val.ByteVec(signature))
+      pushPublicKeyType(publicKeyType)
+      val invalidPublicKeyBytes = publicKeyType.getOrElse(ByteString.empty) ++ wrongData
       instr
         .runWith(frame)
         .leftValue
         .rightValue
-        .toString is s"Invalid public key: ${Hex.toHexString(wrongData)}"
+        .toString is s"Invalid public key: ${Hex.toHexString(invalidPublicKeyBytes)}"
+      stack.isEmpty is true
+
+      if (publicKeyType.isDefined) {
+        val invalidPublicKeyType0 = ByteString(nextInt(4, 255).toByte)
+        stack.push(Val.ByteVec(pubKey.bytes))
+        stack.push(Val.ByteVec(signature))
+        stack.push(Val.ByteVec(invalidPublicKeyType0))
+        instr
+          .runWith(frame)
+          .leftValue
+          .rightValue
+          .toString is s"Invalid public key: ${Hex.toHexString(invalidPublicKeyType0 ++ pubKey.bytes)}"
+
+        val invalidPublicKeyType1 =
+          ByteString(nextInt(4, 255).toByte) ++ bytesGen(nextInt(1, 5)).sample.get
+        stack.push(Val.ByteVec(invalidPublicKeyType1))
+        instr.runWith(frame).leftValue isE InvalidPublicKeyType(invalidPublicKeyType1)
+      }
 
       val signedData = dataGen.sample.get
       stack.push(Val.ByteVec(signedData))
       stack.push(Val.ByteVec(pubKey.bytes))
-      stack.push(Val.ByteVec(signature.bytes))
+      stack.push(Val.ByteVec(signature))
+      pushPublicKeyType(publicKeyType)
       instr
         .runWith(frame)
         .leftValue
@@ -1621,15 +1688,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       stack.push(Val.ByteVec(data))
       stack.push(Val.ByteVec(pubKey.bytes))
-      stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey).bytes))
+      stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey)))
+      pushPublicKeyType(publicKeyType)
       instr.runWith(frame).leftValue isE a[InvalidSignature]
       stack.isEmpty is true
 
       stack.push(Val.ByteVec(data))
       stack.push(Val.ByteVec(pubKey.bytes))
-      stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey).bytes))
+      stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey)))
+      pushPublicKeyType(publicKeyType)
       instr.mockup().runWith(frame) isE ()
       stack.isEmpty is true
+    }
+    // scalastyle:on method.length
+
+    // scalastyle:off method.length
+    def test[PriKey <: RandomBytes, PubKey <: RandomBytes, Sig <: RandomBytes](
+        instr: SignatureInstr,
+        generatePriPub: => (PriKey, PubKey),
+        sign: (ByteString, PriKey) => Sig,
+        publicKeyType: Option[ByteString] = None
+    ) = {
+      val signFunc = (data: ByteString, pk: PriKey) => sign(data, pk).bytes
+      test0(instr, generatePriPub, signFunc, publicKeyType)
     }
     // scalastyle:on method.length
   }
@@ -1644,6 +1725,87 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "VerifyBIP340Schnorr" in new GenericSignatureFixture {
     test(VerifyBIP340Schnorr, crypto.BIP340Schnorr.generatePriPub(), crypto.BIP340Schnorr.sign)
+  }
+
+  it should "VerifySignature:SecP256K1" in new GenericSignatureFixture {
+    test(
+      VerifySignature,
+      crypto.SecP256K1.generatePriPub(),
+      crypto.SecP256K1.sign,
+      Some(ByteString(0))
+    )
+  }
+
+  it should "VerifySignature:SecP256R1" in new GenericSignatureFixture {
+    test(
+      VerifySignature,
+      crypto.SecP256R1.generatePriPub(),
+      crypto.SecP256R1.sign,
+      Some(ByteString(1))
+    )
+  }
+
+  it should "VerifySignature:ED25519" in new GenericSignatureFixture {
+    test(VerifySignature, crypto.ED25519.generatePriPub(), crypto.ED25519.sign, Some(ByteString(2)))
+  }
+
+  trait WebAuthnFixture {
+    val authenticatorData = Hash.generate.bytes ++ ByteString(1)
+    val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
+
+    def signRaw(challenge: ByteString, pk: crypto.SecP256R1PrivateKey) = {
+      val messageHash = webauthn.messageHash(challenge)
+      val signature   = Byte64.from(crypto.SecP256R1.sign(messageHash, pk))
+      webauthn.encodeForTest() :+ signature
+    }
+
+    def sign(challenge: ByteString, pk: crypto.SecP256R1PrivateKey) = {
+      signRaw(challenge, pk).map(_.bytes).reduce(_ ++ _).drop(2)
+    }
+  }
+
+  it should "VerifySignature:WebAuthn" in new GenericSignatureFixture with WebAuthnFixture {
+    test0(VerifySignature, crypto.SecP256R1.generatePriPub(), sign, Some(ByteString(3)))
+
+    val (priKey, pubKey) = crypto.SecP256R1.generatePriPub()
+    val challenge        = Hash.generate.bytes
+    stack.push(Val.ByteVec(challenge))
+    stack.push(Val.ByteVec(pubKey.bytes))
+    val payload = sign(challenge, priKey)
+    stack.push(Val.ByteVec(payload.drop(1)))
+    stack.push(Val.ByteVec(ByteString(3)))
+    VerifySignature.runWith(frame).leftValue isE a[InvalidWebAuthnPayload]
+  }
+
+  it should "GetSegregatedWebAuthnSignature" in new StatelessInstrFixture with WebAuthnFixture {
+    val priKey     = crypto.SecP256R1.generatePriPub()._1
+    val tx         = transactionGen().sample.get
+    val signatures = signRaw(tx.id.bytes, priKey)
+
+    val signatureStack = Stack.ofCapacity[Byte64](signatures.length + 1)
+    val signature0     = Byte64.from(bytesGen(64).sample.get).get
+    signatureStack.push(signature0)
+    signatureStack.push(signatures.reverse)
+
+    override lazy val frame = prepareFrame(
+      AVector.empty,
+      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, signatureStack))
+    )
+
+    val initialGas = context.gasRemaining
+    GetSegregatedWebAuthnSignature.runWith(frame) isE ()
+    initialGas.subUnsafe(context.gasRemaining) is GasMid.gas
+    stack.size is 1
+    stack.top.get is Val.ByteVec(signatures.map(_.bytes).reduce(_ ++ _).drop(2))
+    frame.ctx.signatures.size is 1
+    frame.ctx.signatures.top.get is signature0
+    GetSegregatedWebAuthnSignature.runWith(frame).leftValue isE a[InvalidWebAuthnPayload]
+
+    signatureStack.push(signature0)
+    GetSegregatedWebAuthnSignatureMockup.runWith(frame) isE ()
+    stack.size is 2
+    stack.top.get is Val.ByteVec(signature0.bytes)
+    frame.ctx.signatures.isEmpty is true
   }
 
   it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture
@@ -1721,7 +1883,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     override lazy val frame = prepareFrame(
       AVector.empty,
-      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, Stack.ofCapacity[Signature](0)))
+      txEnv = Some(TxEnv.dryrun(tx, AVector.empty, Stack.ofCapacity[Byte64](0)))
     )
 
     val initialGas = context.gasRemaining
@@ -3244,7 +3406,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         TxEnv.dryrun(
           tx,
           prevOutputs.map(_.referredOutput),
-          Stack.ofCapacity[Signature](0)
+          Stack.ofCapacity[Byte64](0)
         )
       ),
       callerFrameOpt = Some(callerFrame)
@@ -3341,7 +3503,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           TxEnv.dryrun(
             tx,
             prevOutputs.map(_.referredOutput),
-            Stack.ofCapacity[Signature](0)
+            Stack.ofCapacity[Byte64](0)
           )
         ),
         callerFrameOpt = Some(callerFrame)
@@ -4458,7 +4620,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3, MulModN -> 13, AddModN -> 8,
       U256ToString -> 4, I256ToString -> 4, BoolToString -> 4,
       /* Below are instructions for Rhone hard fork */
-      GroupOfAddress -> 5
+      GroupOfAddress -> 5,
+      /* Below are instructions for Danube hard fork */
+      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 8
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -4593,6 +4757,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256ToString -> 137, I256ToString -> 138, BoolToString -> 139,
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 140,
+      /* Below are instructions for Danube hard fork */
+      VerifySignature -> 141, GetSegregatedWebAuthnSignature -> 142,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -4666,7 +4832,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
       U256ToString, I256ToString, BoolToString,
       /* Below are instructions for Rhone hard fork */
-      GroupOfAddress
+      GroupOfAddress,
+      /* Below are instructions for Danube hard fork */
+      VerifySignature, GetSegregatedWebAuthnSignature
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),

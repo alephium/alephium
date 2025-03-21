@@ -16,6 +16,7 @@
 
 package org.alephium.flow.gasestimation
 
+import org.alephium.crypto.Byte64
 import org.alephium.flow.core._
 import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.Signature
@@ -76,8 +77,8 @@ object TxScriptEmulator {
             inputWithAssets.map(_.input),
             fixedOutputs
           ),
-          inputSignatures = AVector.fill(16)(Signature.generate),
-          scriptSignatures = AVector.fill(16)(Signature.generate)
+          inputSignatures = AVector.fill(16)(Byte64.from(Signature.generate)),
+          scriptSignatures = AVector.fill(16)(Byte64.from(Signature.generate))
         )
 
         val result =

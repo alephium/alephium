@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Signature
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -34,7 +34,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     )
   }
 
-  def genTxEnv(scriptOpt: Option[StatefulScript] = None, signatures: AVector[Signature]): TxEnv = {
+  def genTxEnv(scriptOpt: Option[StatefulScript] = None, signatures: AVector[Byte64]): TxEnv = {
     val (tx, prevOutputs) = {
       val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
       tx.copy(unsigned = tx.unsigned.copy(scriptOpt = scriptOpt)) -> prevOutputs
@@ -48,7 +48,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
   def genStatelessContext(
       gasLimit: GasBox = minimalGas,
-      signatures: AVector[Signature] = AVector.empty,
+      signatures: AVector[Byte64] = AVector.empty,
       blockEnv: Option[BlockEnv] = None,
       txEnv: Option[TxEnv] = None
   )(implicit networkConfig: NetworkConfig): StatelessContext = {
@@ -62,7 +62,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareStatelessScript(
       script: StatelessScript,
       gasLimit: GasBox = minimalGas,
-      signatures: AVector[Signature] = AVector.empty
+      signatures: AVector[Byte64] = AVector.empty
   ): (ScriptObj[StatelessContext], StatelessContext) = {
     val obj     = script.toObject
     val context = genStatelessContext(gasLimit, signatures)
@@ -72,7 +72,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def genStatefulContext(
       scriptOpt: Option[StatefulScript] = None,
       gasLimit: GasBox = minimalGas,
-      signatures: AVector[Signature] = AVector.empty
+      signatures: AVector[Byte64] = AVector.empty
   )(implicit networkConfig: NetworkConfig): StatefulContext = {
     val txEnv = genTxEnv(scriptOpt, signatures)
     StatefulContext(
