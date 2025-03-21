@@ -219,6 +219,8 @@ trait StatelessContext extends CostStrategy {
 
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[MutBalances]
+  def setTxCallerBalance(callerBalance: MutBalanceState): Unit
+  def getTxCallerBalance(): ExeResult[MutBalanceState]
 
   def writeLog(
       contractIdOpt: Option[ContractId],
@@ -298,8 +300,9 @@ object StatelessContext {
       var gasRemaining: GasBox
   )(implicit val networkConfig: NetworkConfig, val groupConfig: GroupConfig)
       extends StatelessContext {
-    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
-
+    def getInitialBalances(): ExeResult[MutBalances]             = failed(ExpectNonPayableMethod)
+    def setTxCallerBalance(callerBalance: MutBalanceState): Unit = ???
+    def getTxCallerBalance(): ExeResult[MutBalanceState]         = failed(ExpectNonPayableMethod)
     def writeLog(
         contractIdOpt: Option[ContractId],
         fields: AVector[Val],
@@ -311,9 +314,22 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
-  def outputBalances: MutBalances
-
   def logConfig: LogConfig
+
+  var txCallerBalance: Option[MutBalanceState] = None
+
+  def setTxCallerBalance(callerBalance: MutBalanceState): Unit = {
+    this.txCallerBalance = Some(callerBalance)
+  }
+
+  def getTxCallerBalance(): ExeResult[MutBalanceState] = {
+    txCallerBalance match {
+      case Some(balance) => Right(balance)
+      case None          => failed(TxCallerBalanceNotAvailable)
+    }
+  }
+
+  def outputBalances: MutBalances
 
   lazy val generatedOutputs: ArrayBuffer[TxOutput] = ArrayBuffer.empty
 

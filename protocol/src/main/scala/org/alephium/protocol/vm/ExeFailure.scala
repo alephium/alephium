@@ -235,6 +235,16 @@ case object NoBalanceAvailable extends ExeFailure {
   }
 }
 
+case object TxCallerBalanceNotAvailable extends ExeFailure {
+  override def toString: String = "Transaction caller balance is not available"
+}
+
+case object InsufficientDepositForContractCreation extends ExeFailure {
+  override def toString: String =
+    "Insufficient funds to cover minimal contract deposit requirement (0.1 ALPH). " +
+      "Please ensure transaction caller has enough ALPH to pay for contract creation."
+}
+
 final case class NotEnoughApprovedBalance(
     lockupScript: LockupScript,
     tokenId: TokenId,
@@ -358,6 +368,16 @@ final case class EmptyContractAsset(address: Address.Contract) extends ExeFailur
 
 case object NoCaller extends ExeFailure {
   override def toString: String = "The current method does not have a caller"
+}
+
+case object ExternalCallerNotAvailable extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: no external contract caller found in the call chain"
+}
+
+case object CurrentFrameIsNotContract extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: current frame is not a contract frame"
 }
 
 final case class NegativeTimeStamp(millis: Long) extends ExeFailure {

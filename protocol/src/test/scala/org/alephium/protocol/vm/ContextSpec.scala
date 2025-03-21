@@ -384,6 +384,14 @@ class ContextSpec
     context.outputBalances.all.length is 0
   }
 
+  it should "set and get tx caller balance" in new Fixture {
+    context.getTxCallerBalance().leftValue isE TxCallerBalanceNotAvailable
+
+    val callerBalance = MutBalanceState.empty
+    context.setTxCallerBalance(callerBalance)
+    context.getTxCallerBalance() isE callerBalance
+  }
+
   it should "get all input addresses" in new Fixture {
     forAll(genStatefulContext()) { context =>
       val addresses  = context.allInputAddresses

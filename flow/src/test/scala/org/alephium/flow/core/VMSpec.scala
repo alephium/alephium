@@ -1209,11 +1209,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
          |    assert!(callerContractId!() == barId, 0)
          |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(externalCallerContractId!() == barId, 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |    assert!(callerInitialStateHash!() == barHash, 0)
          |    assert!(callerCodeHash!() == barCodeHash, 0)
          |    assert!(isCalledFromTxScript!() == false, 0)
          |    assert!(isAssetAddress!(barAddress) == false, 0)
          |    assert!(isContractAddress!(barAddress) == true, 0)
+         |
+         |    foofoo(barAddress)
+         |  }
+         |
+         |  fn foofoo(barAddress: Address) -> () {
+         |    assert!(callerAddress!() == selfAddress!(), 0)
+         |    assert!(externalCallerAddress!() == barAddress, 0)
          |  }
          |}
          |""".stripMargin
@@ -5021,6 +5030,56 @@ class VMSpec extends AlephiumSpec with Generators {
     test(minimalAlphInContract + 1)
   }
 
+  it should "use tx caller assets if not enough deposit for new contract" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () { return }
+         |}
+         |""".stripMargin
+    val fooCompiled = Compiler.compileContract(foo).rightValue
+    val fooBytecode = Hex.toHexString(serialize(fooCompiled))
+
+    val create =
+      s"""
+         |Contract Create() {
+         |  pub fn noDeposit() -> () {
+         |    createContract!(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withEnoughDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withInsufficientDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}(#$fooBytecode, #00, #00)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn withZeroDeposit() -> () {
+         |    createContract!{@$genesisAddress -> ALPH: 0}(#$fooBytecode, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    val (createContractId, _, _) = createContract(create)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let create = Create(#${createContractId.toHexString})
+         |  create.noDeposit()
+         |  create.withEnoughDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |  create.withInsufficientDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!() - 1}()
+         |  create.withZeroDeposit{@$genesisAddress -> ALPH: minimalContractDeposit!()}()
+         |}
+         |$create
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   it should "call the correct contract method based on the interface method index" in new ContractFixture {
     val fooV0 =
       s"""
@@ -6761,15 +6820,15 @@ class VMSpec extends AlephiumSpec with Generators {
     blockFlow.getSubContractIds(parentContractId, 100, 110) isE (100, AVector.empty)
   }
 
-  // Inactive instrs check will be enabled in future upgrades
-  ignore should "check inactive instrs when creating contract" in new ContractFixture {
+  // Inactive instrs check should be enabled for new network upgrades
+  it should "check inactive instrs when creating contract" in new ContractFixture {
     setHardFork(HardFork.Leman)
 
     val code =
       s"""
          |Contract Foo() implements IFoo {
          |  pub fn foo() -> () {
-         |    let _ = groupOfAddress!(@$genesisAddress)
+         |    let _ = externalCallerAddress!()
          |  }
          |}
          |@using(methodSelector = false)
@@ -6779,7 +6838,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     intercept[AssertionError](createContract(code)).getMessage is
-      "Right(TxScriptExeFailed(InactiveInstr(GroupOfAddress)))"
+      s"Right(TxScriptExeFailed(InactiveInstr($ExternalCallerAddress)))"
   }
 
   it should "test chained contract calls" in new ContractFixture {

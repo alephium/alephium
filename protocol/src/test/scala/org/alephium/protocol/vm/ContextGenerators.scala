@@ -41,7 +41,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     }
     TxEnv.dryrun(
       tx,
-      prevOutputs.map(_.referredOutput),
+      prevOutputs.map(_ => prevOutputs.head.referredOutput),
       Stack.popOnly(signatures)
     )
   }
@@ -98,11 +98,12 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       mutFields: AVector[Val],
       gasLimit: GasBox = GasBox.unsafe(100000),
       contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
-      txEnvOpt: Option[TxEnv] = None
+      txEnvOpt: Option[TxEnv] = None,
+      contractIdOpt: Option[ContractId] = None
   )(implicit _networkConfig: NetworkConfig): (StatefulContractObject, StatefulContext) = {
     val groupIndex = GroupIndex.unsafe(0)
     val (contractId, contractOutput, contractOutputRef) = contractOutputOpt.getOrElse {
-      val ci  = ContractId.random
+      val ci  = contractIdOpt.getOrElse(ContractId.random)
       val co  = contractOutputGen(scriptGen = p2cLockupGen(groupIndex)).sample.get
       val cor = ContractOutputRef.from(TransactionId.generate, co, 0)
       (ci, co, cor)
