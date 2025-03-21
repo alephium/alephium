@@ -64,7 +64,7 @@ final case class CoinbaseDataV1(
     prefix: CoinbaseDataPrefixV1,
     minerData: ByteString
 ) extends CoinbaseData {
-  def ghostUncleData: AVector[GhostUncleData] = AVector.empty[GhostUncleData]
+  val ghostUncleData: AVector[GhostUncleData] = AVector.empty[GhostUncleData]
 }
 
 object CoinbaseDataV1 {
