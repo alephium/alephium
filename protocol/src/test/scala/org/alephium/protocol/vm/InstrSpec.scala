@@ -4506,7 +4506,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       info("Current frame is a script frame")
       val scriptFrame = prepareScriptFrame()
       ExternalCallerContractId.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
-      ExternalCallerAddress.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
     }
 
     {

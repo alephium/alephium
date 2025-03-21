@@ -1216,6 +1216,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(isCalledFromTxScript!() == false, 0)
          |    assert!(isAssetAddress!(barAddress) == false, 0)
          |    assert!(isContractAddress!(barAddress) == true, 0)
+         |
+         |    foofoo(barAddress)
          |  }
          |
          |  fn foofoo(barAddress: Address) -> () {

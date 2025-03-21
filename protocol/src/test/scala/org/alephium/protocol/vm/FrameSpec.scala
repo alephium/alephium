@@ -201,6 +201,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   }
 
   it should "get the initial balances for new contract: Danube" in new FrameFixture {
+    val from = lockupScriptGen.sample.get
+
     {
       info("Frame without balance")
 
@@ -232,9 +234,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     }
 
     {
-      info("Frame with limited balance")
+      info("Frame with limited balance: no Tx caller balance")
 
-      val from = lockupScriptGen.sample.get
       val frameWithBalance = genStatefulFrame(
         Option(
           MutBalanceState(
@@ -244,22 +245,58 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
         )
       )(NetworkConfigFixture.Danube)
       frameWithBalance.getInitialBalancesForNewContract().leftValue isE TxCallerBalanceNotAvailable
+    }
 
-      val txCaller = frameWithBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
-      frameWithBalance.ctx.setTxCallerBalance(
-        MutBalanceState(
-          MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneAlph))),
-          MutBalances.empty
+    {
+      info("Frame with limited balance: not enough Tx caller balance")
+
+      val frameWithBalance = genStatefulFrame(
+        Option(
+          MutBalanceState(
+            MutBalances.empty,
+            MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+          )
         )
+      )(NetworkConfigFixture.Danube)
+      val txCaller = frameWithBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
+      val txCallerBalance = MutBalanceState(
+        MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph))),
+        MutBalances.empty
       )
+      frameWithBalance.ctx.setTxCallerBalance(txCallerBalance)
+      frameWithBalance
+        .getInitialBalancesForNewContract()
+        .leftValue isE InsufficientDepositForContractCreation
+    }
+
+    {
+      info("Frame with limited balance: enough Tx caller balance")
+
+      val frameWithBalance = genStatefulFrame(
+        Option(
+          MutBalanceState(
+            MutBalances.empty,
+            MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+          )
+        )
+      )(NetworkConfigFixture.Danube)
+      val txCaller = frameWithBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
+      val txCallerBalance = MutBalanceState(
+        MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneAlph))),
+        MutBalances.empty
+      )
+      frameWithBalance.ctx.setTxCallerBalance(txCallerBalance)
       frameWithBalance.getInitialBalancesForNewContract() isE
         MutBalancesPerLockup.alph(minimalAlphInContract)
+      val txCallerRemainingAlph = txCallerBalance.remaining.all.head._2.attoAlphAmount
+      txCallerRemainingAlph is ALPH.oneAlph
+        .subUnsafe(minimalAlphInContract)
+        .addUnsafe(ALPH.oneNanoAlph)
     }
 
     {
       info("Frame with enough balance")
 
-      val from = lockupScriptGen.sample.get
       val frameWithBalance = genStatefulFrame(
         Option(
           MutBalanceState(
