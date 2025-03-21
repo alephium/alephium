@@ -153,7 +153,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           _            <- checkGhostUncleOrder(ghostUncleHashes)
           uncleBlocks  <- getGhostUncleBlocks(blockchain, ghostUncleHashes)
           _            <- checkGhostUncleMiners(ghostUncleData.map(_.lockupScript), uncleBlocks)
-          _            <- checkGhostUncleBlocks(flow, chainIndex, block, uncleBlocks)
+          _            <- checkGhostUncleBlocks(hardFork, flow, chainIndex, block, uncleBlocks)
           _            <- checkGhostUncleDeps(block, flow, uncleBlocks)
           parentHeight <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)))
           uncleHeights <- from(ghostUncleHashes.mapE(blockchain.getHeight))
@@ -195,6 +195,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   private def checkGhostUncleBlocks(
+      hardFork: HardFork,
       flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
@@ -207,17 +208,56 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       usedUnclesAndAncestors <- from(blockchain.getUsedGhostUnclesAndAncestors(parentHeader))
       (usedUncles, ancestors) = usedUnclesAndAncestors
       _ <- uncles.foreachE { uncle =>
+        val ancestorIndex = ancestors.indexWhere(_ == uncle.parentHash)
         if (uncle.hash == parentHeader.hash || ancestors.exists(_ == uncle.hash)) {
           invalidBlock(NotGhostUnclesForTheBlock)
-        } else if (!ancestors.exists(_ == uncle.parentHash)) {
+        } else if (ancestorIndex == -1) {
           invalidBlock(GhostUncleHashConflictWithParentHash)
         } else if (usedUncles.contains(uncle.hash)) {
           invalidBlock(GhostUnclesAlreadyUsed)
+        } else if (hardFork.isDanubeEnabled()) {
+          val mainChainHash =
+            if (ancestorIndex == 0) block.parentHash else ancestors(ancestorIndex - 1)
+          val disallowedHashes = usedUncles :+ mainChainHash
+          checkDuplicateGhostUnclesSinceDanube(flow, disallowedHashes, uncle)
         } else {
           validBlock(())
         }
       }
+      _ <-
+        if (hardFork.isDanubeEnabled()) {
+          checkDuplicateGhostUnclesSinceDanube(uncles)
+        } else {
+          validBlock(())
+        }
     } yield ()
+  }
+
+  private def checkDuplicateGhostUnclesSinceDanube(
+      uncleBlocks: AVector[Block]
+  ): BlockValidationResult[Unit] = {
+    if (
+      uncleBlocks.length == ALPH.MaxGhostUncleSize &&
+      BlockHeader.fromSameTemplate(uncleBlocks(0).header, uncleBlocks(1).header)
+    ) {
+      invalidBlock(DuplicateGhostUncleSinceDanube(uncleBlocks(1).hash))
+    } else {
+      validBlock(())
+    }
+  }
+
+  private def checkDuplicateGhostUnclesSinceDanube(
+      flow: BlockFlow,
+      disallowedHashes: AVector[BlockHash],
+      uncleBlock: Block
+  ): BlockValidationResult[Unit] = {
+    from(disallowedHashes.mapE(flow.getBlockHeader)).flatMap { disallowedHeaders =>
+      if (disallowedHeaders.exists(BlockHeader.fromSameTemplate(_, uncleBlock.header))) {
+        invalidBlock(DuplicateGhostUncleSinceDanube(uncleBlock.hash))
+      } else {
+        validBlock(())
+      }
+    }
   }
 
   @inline private def checkGhostUncleSize(

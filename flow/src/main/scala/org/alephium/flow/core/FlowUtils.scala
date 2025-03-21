@@ -249,7 +249,11 @@ trait FlowUtils
       parentHeader: BlockHeader
   ): AVector[SelectedGhostUncle] = {
     if (hardFork.isRhoneEnabled()) {
-      getGhostUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
+      getGhostUnclesUnsafe(
+        hardFork,
+        parentHeader,
+        uncle => isExtendingUnsafe(deps, uncle.blockDeps)
+      )
     } else {
       AVector.empty
     }
