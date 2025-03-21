@@ -218,7 +218,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else if (hardFork.isDanubeEnabled()) {
           val mainChainHash =
             if (ancestorIndex == 0) block.parentHash else ancestors(ancestorIndex - 1)
-          checkDuplicateGhostUnclesSinceDanube(flow, mainChainHash, uncle)
+          val disallowedHashes = usedUncles :+ mainChainHash
+          checkDuplicateGhostUnclesSinceDanube(flow, disallowedHashes, uncle)
         } else {
           validBlock(())
         }
@@ -247,11 +248,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
 
   private def checkDuplicateGhostUnclesSinceDanube(
       flow: BlockFlow,
-      mainChainHash: BlockHash,
+      disallowedHashes: AVector[BlockHash],
       uncleBlock: Block
   ): BlockValidationResult[Unit] = {
-    from(flow.getBlockHeader(mainChainHash)).flatMap { mainChainHeader =>
-      if (BlockHeader.fromSameTemplate(mainChainHeader, uncleBlock.header)) {
+    from(disallowedHashes.mapE(flow.getBlockHeader)).flatMap { disallowedHeaders =>
+      if (disallowedHeaders.exists(BlockHeader.fromSameTemplate(_, uncleBlock.header))) {
         invalidBlock(DuplicateGhostUncleSinceDanube(uncleBlock.hash))
       } else {
         validBlock(())

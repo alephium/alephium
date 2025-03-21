@@ -1127,6 +1127,29 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, block1)
   }
 
+  it should "invalidate block if a ghost uncle is a duplicate of used uncles" in new Fixture
+    with GhostUncleFixture {
+    setHardForkSince(HardFork.Danube)
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight = nextInt(2, ALPH.MaxGhostUncleAge - 1)
+    val ghostUncle0 = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight)
+    val miner       = getGenesisLockupScript(chainIndex.to)
+    val template0   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.ghostUncleHashes is AVector(ghostUncle0.hash)
+    val block0 = mine(blockFlow, template0)
+    checkBlock(block0, blockFlow).isRight is true
+    addAndCheck(blockFlow, block0)
+
+    val ghostUncle1 = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle0)
+    BlockHeader.fromSameTemplate(ghostUncle0.header, ghostUncle1.header) is true
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.ghostUncleHashes.isEmpty is true
+    val template2 = template1.setGhostUncles(blockFlow, AVector(ghostUncle1.hash))
+    val block1    = mine(blockFlow, template2)
+    checkBlock(block1, blockFlow).leftValue isE DuplicateGhostUncleSinceDanube(ghostUncle1.hash)
+  }
+
   it should "invalidate block with invalid uncle intra deps: since-rhone" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
     setHardForkSince(HardFork.Rhone)

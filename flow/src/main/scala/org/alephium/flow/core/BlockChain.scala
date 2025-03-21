@@ -128,7 +128,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   private def selectGhostUncles(
       hardFork: HardFork,
       requiredSize: Int,
-      mainChainHeader: BlockHeader,
+      disallowedHeaders: AVector[BlockHeader],
       uncleBlocks: AVector[Block],
       isValidGhostUncle: BlockHeader => Boolean
   ): AVector[Block] = {
@@ -138,8 +138,8 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         if (!hardFork.isDanubeEnabled()) {
           selected = selected :+ uncle
         } else if (
-          !BlockHeader.fromSameTemplate(mainChainHeader, uncle.header) &&
-          !selected.exists(b => BlockHeader.fromSameTemplate(b.header, uncle.header))
+          !selected.exists(b => BlockHeader.fromSameTemplate(b.header, uncle.header)) &&
+          !disallowedHeaders.exists(b => BlockHeader.fromSameTemplate(b, uncle.header))
         ) {
           selected = selected :+ uncle
         }
@@ -166,13 +166,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxGhostUncleSize) {
         unclesAcc
       } else {
-        val uncleHeight = getHeightUnsafe(fromHeader.hash)
-        val uncleHashes = getHashesUnsafe(uncleHeight).filter(_ != fromHeader.hash)
-        val uncleBlocks = uncleHashes.map(getBlockUnsafe)
+        val uncleHeight       = getHeightUnsafe(fromHeader.hash)
+        val uncleHashes       = getHashesUnsafe(uncleHeight).filter(_ != fromHeader.hash)
+        val uncleBlocks       = uncleHashes.map(getBlockUnsafe)
+        val disallowedHeaders = usedUncles.map(getBlockHeaderUnsafe) :+ fromHeader
         val selected = selectGhostUncles(
           hardFork,
           ALPH.MaxGhostUncleSize - unclesAcc.length,
-          fromHeader,
+          disallowedHeaders,
           uncleBlocks,
           uncle => {
             !usedUncles.contains(uncle.hash) &&

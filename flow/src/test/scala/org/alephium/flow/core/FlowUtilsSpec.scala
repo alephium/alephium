@@ -807,6 +807,26 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, block1)
   }
 
+  it should "not select the ghost uncle if it is a duplicates of used uncles" in new GhostUncleFixture
+    with Generators {
+    setHardForkSince(HardFork.Danube)
+    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+
+    val uncleHeight = nextInt(2, ALPH.MaxGhostUncleAge - 1)
+    val ghostUncle0 = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight)
+    val miner       = getGenesisLockupScript(chainIndex.to)
+    val template0   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template0.ghostUncleHashes is AVector(ghostUncle0.hash)
+    val block0 = mine(blockFlow, template0)
+    addAndCheck(blockFlow, block0)
+
+    val ghostUncle1 = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle0)
+    BlockHeader.fromSameTemplate(ghostUncle0.header, ghostUncle1.header) is true
+    val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template1.ghostUncleHashes.isEmpty is true
+  }
+
   it should "rebuild block template if there are invalid txs" in new FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)
