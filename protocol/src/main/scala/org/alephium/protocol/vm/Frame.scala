@@ -730,7 +730,19 @@ final case class StatefulFrame(
           contractObj,
           method,
           opStack,
-          opStack.push
+          returnVals =>
+            for {
+              _ <- opStack.push(returnVals)
+              _ <-
+                if (
+                  ctx.getHardFork().isDanubeEnabled() &&
+                  this.obj.isScript() && !contractObj.isScript()
+                ) {
+                  ctx.chainCallerOutputs(balanceStateOpt)
+                } else {
+                  okay
+                }
+            } yield ()
         )
     } yield frame
   }

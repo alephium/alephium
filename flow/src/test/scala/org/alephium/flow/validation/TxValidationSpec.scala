@@ -1024,16 +1024,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction
 
     val preLemanValidator = validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
-    val lemanValidator    = validateTxOnlyForTest(_, blockFlow, None)
+    val lemanValidator    = validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman))
+    val danubeValidator   = validateTxOnlyForTest(_, blockFlow, None)
 
     def validate() = {
       val unsignedTx0 = prepareOutputs(lockup, unlock, 2)
+      // The block generated in `prepareOutputs` is post-danube upgrade, so we only update the danube best deps.
+      // This causes the leman/mainnet validator to be unable to get the correct best deps.
+      // So we need to call `updateViewPreDanube` to update the pre-danube best deps.
+      blockFlow.updateViewPreDanube() isE ()
       unsignedTx0.inputs.length is 3
       unsignedTx0.inputs.head.unlockScript is unlock
       unsignedTx0.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
       val tx0 = toSignedTx(unsignedTx0)
       tx0.pass()(lemanValidator)
       tx0.fail(InvalidUnlockScriptType)(preLemanValidator)
+      tx0.pass()(danubeValidator)
 
       val newInputs = unsignedTx0.inputs.head +: unsignedTx0.inputs.tail.map(
         _.copy(unlockScript = unlock)
@@ -1042,6 +1048,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val tx1         = toSignedTx(unsignedTx1)
       tx1.pass()(lemanValidator)
       tx1.pass()(preLemanValidator)
+      tx1.pass()(danubeValidator)
     }
   }
 
@@ -1200,10 +1207,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "validate polw" in new Fixture {
     implicit val validator: (Transaction) => TxValidationResult[Unit] = (tx: Transaction) => {
       val chainIndex = getChainIndex(tx).rightValue
-      val bestDeps   = blockFlow.getBestDeps(chainIndex.from)
-      val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
-      val hardFork   = networkConfig.getHardFork(TimeStamp.now())
-      val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue.copy(hardFork = hardFork)
+      val groupView  = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue
       validateTx(
         tx,
         chainIndex,

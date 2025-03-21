@@ -174,14 +174,21 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "calculate getPreAssetOutputInfo for txs in new blocks" in new FlowFixture
     with Generators {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Mainnet)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
 
-      val block = transfer(blockFlow, chainIndex)
+      val from = LockupScript.p2pkh(genesisKeys(fromGroup.value)._2)
+      val tx   = transferTx(blockFlow, chainIndex, from, ALPH.oneAlph, None)
+      blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+      if (hardFork.isDanubeEnabled()) {
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      }
+      val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
 
-      val tx        = block.nonCoinbase.head
       val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
       // return None when output is spent
       groupView.getPreAssetOutputInfo(tx.unsigned.inputs.head.outputRef) isE None
@@ -208,12 +215,22 @@ class TxUtilsSpec extends AlephiumSpec {
           groupView.getPreAssetOutputInfo(outputRef) isE None
         }
       }
+
+      if (hardFork.isDanubeEnabled() && !chainIndex.isIntraGroup) {
+        // Suppose the `chainIndex` is `1 -> 0`, and the next chain index is `1 -> 2`.
+        // Since the Danube upgrade, the new block in chain index `1 -> 2` won't take the
+        // block from `1 -> 0` as a dependency. Therefore, we need to insert a new block
+        // in chain index `1 -> 1` to make it possible to use the change output from
+        // chain index `1 -> 0` in chain index `1 -> 2`.
+        addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex(fromGroup, fromGroup)))
+      }
     }
   }
 
   it should "calculate getPreAssetOutputInfo for txs in mempool" in new FlowFixture
     with Generators {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Mainnet)
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
       val chainIndex = ChainIndex(fromGroup, toGroup)
@@ -246,6 +263,34 @@ class TxUtilsSpec extends AlephiumSpec {
         }
       }
     }
+  }
+
+  it should "be able to use the change outputs from other inter chains since danube" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Danube)
+
+    val chainIndex0 = ChainIndex.unsafe(1, 0)
+    val chainIndex1 = ChainIndex.unsafe(1, 2)
+    val tx0         = transfer(blockFlow, chainIndex0).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex0, tx0.toTemplate, TimeStamp.now())
+    val tx1 = transfer(blockFlow, chainIndex1).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex1, tx1.toTemplate, TimeStamp.now())
+    tx1.allInputRefs.head is tx0.fixedOutputRefs.last
+
+    val block0 = mineFromMemPool(blockFlow, chainIndex0)
+    block0.nonCoinbase.head is tx0
+    addAndCheck(blockFlow, block0)
+    val block1 = mineFromMemPool(blockFlow, chainIndex1)
+    block1.nonCoinbaseLength is 0
+    addAndCheck(blockFlow, block1)
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
+    val block2 = mineFromMemPool(blockFlow, chainIndex1)
+    block2.nonCoinbaseLength is 0
+    addAndCheck(blockFlow, block2)
+    val block3 = mineFromMemPool(blockFlow, chainIndex1)
+    block3.nonCoinbase.head is tx1
+    addAndCheck(blockFlow, block3)
   }
 
   it should "calculate getPreContractOutput" in new FlowFixture {

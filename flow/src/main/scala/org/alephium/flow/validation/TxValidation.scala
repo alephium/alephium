@@ -189,9 +189,9 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       chainIndex <- getChainIndex(tx)
-      bestDeps = flow.getBestDeps(chainIndex.from)
-      groupView <- from(flow.getMutableGroupView(chainIndex.from, bestDeps))
-      blockEnv  <- from(flow.getDryrunBlockEnv(chainIndex))
+      blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
+      hardFork = hardForkOpt.getOrElse(blockEnv.hardFork)
+      groupView <- from(flow.getMutableGroupViewForTxHandling(chainIndex.from, hardFork))
       _ <- validateTx(
         tx,
         chainIndex,

@@ -42,6 +42,7 @@ import org.alephium.util._
 // scalastyle:off number.of.methods file.size.limit
 trait FlowFixture
     extends AlephiumSpec
+    with RichBlockFlowT
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NumericHelpers {
@@ -95,6 +96,12 @@ trait FlowFixture
 
   def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
+  }
+
+  def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex, timestamp: TimeStamp): Block = {
+    val publicKey = chainIndex.to.generateKey._2
+    val miner     = LockupScript.p2pkh(publicKey)
+    mine(blockFlow, chainIndex, AVector.empty[Transaction], miner, Some(timestamp))
   }
 
   def emptyBlockWithMiner(
@@ -516,6 +523,19 @@ trait FlowFixture
     mine(blockFlow, chainIndex, txs, miner, None)
   }
 
+  private def calcBlockDeps(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      timestamp: Option[TimeStamp]
+  ): BlockDeps = {
+    val hardFork = networkConfig.getHardFork(timestamp.getOrElse(TimeStamp.now()))
+    if (hardFork.isDanubeEnabled()) {
+      blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex)
+    } else {
+      blockFlow.calBestDepsUnsafe(chainIndex.from)
+    }
+  }
+
   def mine(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -523,7 +543,27 @@ trait FlowFixture
       miner: LockupScript.Asset,
       timestamp: Option[TimeStamp]
   ): Block = {
-    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val deps = calcBlockDeps(blockFlow, chainIndex, timestamp)
+    mine(blockFlow, chainIndex, deps, txs, miner, timestamp)
+  }
+
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): Block = {
+    val miner = getGenesisLockupScript(chainIndex.to)
+    mine(blockFlow, chainIndex, deps, AVector.empty, miner, None)
+  }
+
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      txs: AVector[Transaction],
+      miner: LockupScript.Asset,
+      timestamp: Option[TimeStamp]
+  ): Block = {
     val blockTs = timestamp.getOrElse {
       val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
       FlowUtils.nextTimeStamp(parentTs)
@@ -541,7 +581,7 @@ trait FlowFixture
       blockTs: TimeStamp,
       uncles: AVector[SelectedGhostUncle] = AVector.empty
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val deps             = calcBlockDeps(blockFlow, chainIndex, Some(blockTs))
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val consensusConfig  = consensusConfigs.getConsensusConfig(blockTs)
@@ -752,7 +792,7 @@ trait FlowFixture
       .mkString("", "\n", "\n")
     val bestDeps = brokerConfig.groupRange
       .map { group =>
-        val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
+        val bestDeps    = blockFlow.getBestDepsPreDanube(GroupIndex.unsafe(group))
         val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")
         s"group $group, bestDeps: $bestDepsStr"
       }
@@ -1064,6 +1104,26 @@ trait FlowFixture
           blockFlow.getDepStateHash(BlockDeps.unsafe(newDeps), chainIndex.from).rightValue
       )
     mine(blockFlow, template1)
+  }
+
+  def mineBlockWithDep(chainIndex: ChainIndex, depHash: BlockHash): Block = {
+    assume(blockFlow.containsUnsafe(depHash))
+    val height        = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
+    val block         = emptyBlock(blockFlow, chainIndex)
+    val template0     = BlockFlowTemplate.from(block, height)
+    val depChainIndex = ChainIndex.from(depHash)
+    val index         = template0.deps.indexWhere(ChainIndex.from(_) == depChainIndex)
+    val template1     = template0.copy(deps = template0.deps.replace(index, depHash))
+    mine(blockFlow, template1)
+  }
+
+  def mineTwoBlocksAndAdd(chainIndex: ChainIndex): (Block, Block) = {
+    val blocks = Seq.fill(2)(emptyBlock(blockFlow, chainIndex))
+    blocks.foreach(addAndCheck(blockFlow, _))
+    val height = blockFlow.getBlockChain(chainIndex).maxHeightUnsafe
+    val hashes = blockFlow.getHashes(chainIndex, height).rightValue
+    hashes.length is 2
+    (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
   }
 }
 
