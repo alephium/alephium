@@ -94,10 +94,17 @@ final case class ConsensusSetting(
 final case class ConsensusSettings(
     mainnet: ConsensusSetting,
     rhone: ConsensusSetting,
+    danube: ConsensusSetting,
     blockCacheCapacityPerChain: Int
 ) extends ConsensusConfigs {
   override def getConsensusConfig(hardFork: HardFork): ConsensusSetting = {
-    if (hardFork.isRhoneEnabled()) rhone else mainnet
+    if (hardFork.isDanubeEnabled()) {
+      danube
+    } else if (hardFork.isRhoneEnabled()) {
+      rhone
+    } else {
+      mainnet
+    }
   }
   override def getConsensusConfig(
       ts: TimeStamp
@@ -107,10 +114,10 @@ final case class ConsensusSettings(
 
   val conflictCacheKeepDuration: Duration =
     Math.max(
-      mainnet.expectedTimeSpan,
-      rhone.expectedTimeSpan
+      rhone.expectedTimeSpan,
+      danube.expectedTimeSpan
     ) timesUnsafe blockCacheCapacityPerChain.toLong
-  val tipsPruneDuration: Duration = Math.max(mainnet.tipsPruneDuration, rhone.tipsPruneDuration)
+  val tipsPruneDuration: Duration = Math.max(rhone.tipsPruneDuration, danube.tipsPruneDuration)
 
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
@@ -260,6 +267,7 @@ object AlephiumConfig {
   final private case class TempConsensusSettings(
       mainnet: TempConsensusSetting,
       rhone: TempConsensusSetting,
+      danube: TempConsensusSetting,
       blockCacheCapacityPerChain: Int,
       numZerosAtLeastInHash: Int
   ) {
@@ -267,9 +275,12 @@ object AlephiumConfig {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
       val rhoneEmission =
         Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
+      val danubeEmission =
+        Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
       ConsensusSettings(
         mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
         rhone.toConsensusSetting(rhoneEmission, numZerosAtLeastInHash),
+        danube.toConsensusSetting(danubeEmission, numZerosAtLeastInHash),
         blockCacheCapacityPerChain
       )
     }

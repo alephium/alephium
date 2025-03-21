@@ -50,7 +50,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
       ("alephium.consensus.mainnet.block-target-time", "11 seconds"),
-      ("alephium.consensus.rhone.block-target-time", "4 seconds")
+      ("alephium.consensus.rhone.block-target-time", "4 seconds"),
+      ("alephium.consensus.danube.block-target-time", "3 seconds")
     )
 
     config.broker.groups is 12
@@ -59,6 +60,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.networkId is NetworkId(2)
     config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
+    config.consensus.danube.blockTargetTime is Duration.ofSecondsUnsafe(3)
     config.network.connectionBufferCapacityInByte is 100000000L
     config.network.syncPeerSampleSizeV1 is 3
     config.network.syncPeerSampleSizeV2 is 5
@@ -111,6 +113,26 @@ class AlephiumConfigSpec extends AlephiumSpec {
     initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
     config.network.networkId is NetworkId.AlephiumMainNet
     config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1718186400000L)
+  }
+
+  it should "load danube config" in {
+    val rootPath = Files.tmpDir
+    val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.danube.numZerosAtLeastInHash is 37
+    config.consensus.danube.blockTargetTime is Duration.ofSecondsUnsafe(8)
+    config.consensus.danube.uncleDependencyGapTime is Duration.ofSecondsUnsafe(4)
+    val initialHashRate =
+      HashRate.from(
+        config.consensus.danube.maxMiningTarget,
+        config.consensus.danube.blockTargetTime
+      )(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("4398054899712"))
+    config.network.networkId is NetworkId.AlephiumMainNet
+    config.network.danubeHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
