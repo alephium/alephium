@@ -270,7 +270,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     }
 
     {
-      info("Frame with limited balance: enough Tx caller balance")
+      info("Frame with limited balance: enough Tx caller balance in remaining assets")
 
       val frameWithBalance = genStatefulFrame(
         Option(
@@ -292,6 +292,62 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       txCallerRemainingAlph is ALPH.oneAlph
         .subUnsafe(minimalAlphInContract)
         .addUnsafe(ALPH.oneNanoAlph)
+    }
+
+    {
+      info("Frame with limited balance: enough Tx caller balance in approved assets")
+
+      val frameWithBalance = genStatefulFrame(
+        Option(
+          MutBalanceState(
+            MutBalances.empty,
+            MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+          )
+        )
+      )(NetworkConfigFixture.Danube)
+      val txCaller = frameWithBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
+      val txCallerBalance = MutBalanceState(
+        MutBalances.empty,
+        MutBalances(ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(ALPH.oneAlph)))
+      )
+      frameWithBalance.ctx.setTxCallerBalance(txCallerBalance)
+      frameWithBalance.getInitialBalancesForNewContract() isE
+        MutBalancesPerLockup.alph(minimalAlphInContract)
+      val txCallerRemainingAlph = txCallerBalance.approved.all.head._2.attoAlphAmount
+      txCallerRemainingAlph is ALPH.oneAlph
+        .subUnsafe(minimalAlphInContract)
+        .addUnsafe(ALPH.oneNanoAlph)
+    }
+
+    {
+      info(
+        "Frame with limited balance: enough Tx caller balance by combining both remaing and approved assets"
+      )
+
+      val frameWithBalance = genStatefulFrame(
+        Option(
+          MutBalanceState(
+            MutBalances.empty,
+            MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+          )
+        )
+      )(NetworkConfigFixture.Danube)
+      val txCaller = frameWithBalance.ctx.getUniqueTxInputAddress().rightValue.lockupScript
+      val txCallerBalance = MutBalanceState(
+        MutBalances(
+          ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(minimalAlphInContract.divUnsafe(2)))
+        ),
+        MutBalances(
+          ArrayBuffer(txCaller -> MutBalancesPerLockup.alph(minimalAlphInContract.divUnsafe(2)))
+        )
+      )
+      frameWithBalance.ctx.setTxCallerBalance(txCallerBalance)
+      frameWithBalance.getInitialBalancesForNewContract() isE
+        MutBalancesPerLockup.alph(minimalAlphInContract)
+      val txCallerRemainingAlphInRemaining = txCallerBalance.remaining.all.head._2.attoAlphAmount
+      txCallerRemainingAlphInRemaining is ALPH.alph(0)
+      val txCallerRemainingAlphInApproved = txCallerBalance.approved.all.head._2.attoAlphAmount
+      txCallerRemainingAlphInApproved is ALPH.oneNanoAlph
     }
 
     {
