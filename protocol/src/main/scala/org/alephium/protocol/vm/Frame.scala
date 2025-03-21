@@ -562,6 +562,7 @@ final case class StatefulFrame(
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def transferAvailableDeposit(
       contractBalance: MutBalancesPerLockup,
       caller: LockupScript,
