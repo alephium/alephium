@@ -33,8 +33,23 @@ object Coinbase {
     Transaction.totalReward(gasFee, reward.miningReward, hardFork)
   }
 
+  @inline def calcMainChainRewardSinceRhone(hardFork: HardFork, miningReward: U256): U256 = {
+    if (hardFork.isDanubeEnabled()) {
+      calcMainChainRewardDanube(miningReward)
+    } else {
+      calcMainChainRewardRhone(miningReward)
+    }
+  }
+
   @inline
-  def calcMainChainReward(miningReward: U256): U256 = {
+  private[model] def calcMainChainRewardDanube(miningReward: U256): U256 = {
+    val numerator   = U256.unsafe(100 * 8 * 32)
+    val denominator = U256.unsafe(10 * 7 * 33 + 100 * 8 * 32)
+    miningReward.mulUnsafe(numerator).divUnsafe(denominator)
+  }
+
+  @inline
+  private[model] def calcMainChainRewardRhone(miningReward: U256): U256 = {
     val numerator   = U256.unsafe(100 * 8 * 32)
     val denominator = U256.unsafe(5 * 7 * 33 + 100 * 8 * 32)
     miningReward.mulUnsafe(numerator).divUnsafe(denominator)
@@ -65,14 +80,15 @@ object Coinbase {
     )
   }
 
-  def coinbaseOutputsRhone(
+  def coinbaseOutputsSinceRhone(
+      hardFork: HardFork,
       coinbaseData: CoinbaseData,
       miningReward: U256,
       lockupScript: LockupScript.Asset,
       lockTime: TimeStamp,
       uncles: AVector[SelectedGhostUncle]
   )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
-    val mainChainReward    = calcMainChainReward(miningReward)
+    val mainChainReward    = calcMainChainRewardSinceRhone(hardFork, miningReward)
     val uncleRewardOutputs = uncles.map(_.toAssetOutput(mainChainReward, lockTime))
     val blockRewardOutput = AssetOutput(
       calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount)),
@@ -95,7 +111,14 @@ object Coinbase {
     val hardFork = networkConfig.getHardFork(blockTs)
     val outputs = if (hardFork.isRhoneEnabled()) {
       assume(coinbaseData.isGhostEnabled)
-      coinbaseOutputsRhone(coinbaseData, miningReward, lockupScript, lockTime, uncles)
+      coinbaseOutputsSinceRhone(
+        hardFork,
+        coinbaseData,
+        miningReward,
+        lockupScript,
+        lockTime,
+        uncles
+      )
     } else {
       assume(!coinbaseData.isGhostEnabled)
       coinbaseOutputsPreRhone(coinbaseData, miningReward, lockupScript, lockTime)
@@ -135,7 +158,7 @@ object Coinbase {
     val hardFork           = networkConfig.getHardFork(blockTs)
     val lockedReward       = Transaction.totalReward(gasFee, reward.miningReward, hardFork)
     val netReward          = lockedReward.subUnsafe(reward.burntAmount)
-    val mainChainReward    = Coinbase.calcMainChainReward(netReward)
+    val mainChainReward    = Coinbase.calcMainChainRewardSinceRhone(hardFork, netReward)
     val lockTime           = blockTs + networkConfig.coinbaseLockupPeriod
     val sortedUncles       = uncles.sortBy(_.blockHash.bytes)(Bytes.byteStringOrdering)
     val uncleRewardOutputs = sortedUncles.map(_.toAssetOutput(mainChainReward, lockTime))

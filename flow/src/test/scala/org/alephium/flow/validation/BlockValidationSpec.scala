@@ -650,7 +650,10 @@ class BlockValidationSpec extends AlephiumSpec {
     validatorLeman.validate(block, blockflowLeman).isRight is true
   }
 
-  trait RhoneCoinbaseFixture extends Fixture {
+  trait SinceRhoneCoinbaseFixture extends Fixture {
+    setHardForkSince(HardFork.Rhone)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+
     def randomLockupScript: LockupScript.Asset = {
       val (_, toPublicKey) = chainIndex.to.generateKey
       LockupScript.p2pkh(toPublicKey)
@@ -711,12 +714,12 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "check coinbase locked amount rhone" in new RhoneCoinbaseFixture {
+  it should "check coinbase locked amount since rhone" in new SinceRhoneCoinbaseFixture {
     {
       info("block has no uncle")
       val block           = emptyBlock(blockFlow, chainIndex)
       val miningReward    = getMiningReward(block)
-      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val mainChainReward = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
       val lockedReward    = mainChainReward
       implicit val validator: (Block) => BlockValidationResult[Unit] =
         (blk: Block) => checkLockedReward(blk, AVector(lockedReward))
@@ -737,7 +740,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val heightDiff      = Random.between(1, ALPH.MaxGhostUncleAge)
       val block           = mineBlockWith1Uncle(heightDiff)
       val miningReward    = getMiningReward(block)
-      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val mainChainReward = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
       val uncleReward     = Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
       val blockReward     = mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
       implicit val validator: (Block) => BlockValidationResult[Unit] =
@@ -764,7 +767,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val diffs = (0 until 2).map(_ => Random.between(1, ALPH.MaxGhostUncleAge)).sorted
       val (block, diff0, diff1) = mineBlockWith2Uncle(diffs(0), diffs(1))
       val miningReward          = getMiningReward(block)
-      val mainChainReward       = Coinbase.calcMainChainReward(miningReward)
+      val mainChainReward       = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
       val uncleReward0          = Coinbase.calcGhostUncleReward(mainChainReward, diff0)
       val uncleReward1          = Coinbase.calcGhostUncleReward(mainChainReward, diff1)
       val blockReward =
@@ -793,10 +796,10 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "check coinbase reward rhone" in new RhoneCoinbaseFixture {
+  it should "check coinbase reward since rhone" in new SinceRhoneCoinbaseFixture {
     implicit val validator: (Block) => BlockValidationResult[Unit] = (blk: Block) => {
-      val groupView = blockFlow.getMutableGroupViewPreDanube(blk).rightValue
-      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Rhone)
+      val groupView = blockFlow.getMutableGroupView(blk.chainIndex.from).rightValue
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, hardFork)
     }
 
     {
@@ -807,7 +810,7 @@ class BlockValidationSpec extends AlephiumSpec {
       block.pass()
 
       val miningReward    = getMiningReward(block)
-      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val mainChainReward = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
 
       info("invalid block reward")
       block.Coinbase.output(_.copy(amount = miningReward)).fail(InvalidCoinbaseReward)
@@ -821,7 +824,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val heightDiff      = Random.between(1, ALPH.MaxGhostUncleAge)
       val block           = mineBlockWith1Uncle(heightDiff)
       val miningReward    = getMiningReward(block)
-      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val mainChainReward = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
       val uncleReward     = Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
 
       info("valid")
@@ -845,7 +848,7 @@ class BlockValidationSpec extends AlephiumSpec {
       val diffs = (0 until 2).map(_ => Random.between(1, ALPH.MaxGhostUncleAge)).sorted
       val (block, diff0, diff1) = mineBlockWith2Uncle(diffs(0), diffs(1))
       val miningReward          = getMiningReward(block)
-      val mainChainReward       = Coinbase.calcMainChainReward(miningReward)
+      val mainChainReward       = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
       val uncleReward0          = Coinbase.calcGhostUncleReward(mainChainReward, diff0)
       val uncleReward1          = Coinbase.calcGhostUncleReward(mainChainReward, diff1)
 
@@ -1433,11 +1436,11 @@ class BlockValidationSpec extends AlephiumSpec {
     }
   }
 
-  it should "check PoLW coinbase tx" in new PoLWCoinbaseFixture {
+  it should "check PoLW coinbase tx since rhone" in new PoLWCoinbaseFixture {
+    setHardForkSince(HardFork.Rhone)
     implicit val validator: (Block) => BlockValidationResult[Unit] = (block: Block) => {
-      val hardFork = networkConfig.getHardFork(block.timestamp)
-      val groupView =
-        blockFlow.getMutableGroupViewPreDanube(chainIndex.from, block.blockDeps).rightValue
+      val hardFork  = networkConfig.getHardFork(block.timestamp)
+      val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
       checkCoinbase(blockFlow, chainIndex, block, groupView, hardFork)
     }
 
