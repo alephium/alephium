@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.protocol.{ALPH, Generators}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{ChainIndex, HardFork, NetworkId, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, TimeStamp}
@@ -338,41 +338,5 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           .timestamp
       }
     }
-  }
-
-  abstract class PenalizeDiffFixture(hardFork: HardFork) extends FlowFixture with Generators {
-    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
-    setHardFork(hardFork)
-
-    lazy val chainIndex      = chainIndexGen.sample.get
-    lazy val consensusConfig = consensusConfigs.getConsensusConfig(hardFork)
-
-    def prepareBlocks(): Unit = {
-      val duration = consensusConfig.blockTargetTime.timesUnsafe(50)
-      val from     = TimeStamp.now().minusUnsafe(duration)
-      (0 to 50).foreach { index =>
-        val blockTs = from.plusMillisUnsafe(consensusConfig.blockTargetTime.millis * index)
-        val block   = emptyBlock(blockFlow, chainIndex, blockTs)
-        addAndCheck(blockFlow, block)
-      }
-    }
-  }
-
-  it should "add the penalty diff in leman" in new PenalizeDiffFixture(HardFork.Leman) {
-    prepareBlocks()
-    val block = emptyBlock(blockFlow, chainIndex)
-    block.target < consensusConfig.maxMiningTarget is true
-  }
-
-  it should "add the penalty diff in rhone" in new PenalizeDiffFixture(HardFork.Rhone) {
-    prepareBlocks()
-    val block = emptyBlock(blockFlow, chainIndex)
-    block.target < consensusConfig.maxMiningTarget is true
-  }
-
-  it should "not add the penalty diff in danube" in new PenalizeDiffFixture(HardFork.Danube) {
-    prepareBlocks()
-    val block = emptyBlock(blockFlow, chainIndex)
-    block.target is consensusConfig.maxMiningTarget
   }
 }

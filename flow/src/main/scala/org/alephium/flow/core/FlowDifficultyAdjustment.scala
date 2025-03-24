@@ -83,13 +83,9 @@ trait FlowDifficultyAdjustment {
     val diffAverage                      = diffSum.divide(brokerConfig.chainNum)
     val timeSpanAverage                  = timeSpanSum.divUnsafe(brokerConfig.chainNum.toLong)
 
-    val targetDiff = if (hardFork.isDanubeEnabled()) {
-      diffAverage
-    } else {
-      val chainDep  = deps.getOutDep(chainIndex.to)
-      val heightGap = calHeightDiffUnsafe(chainDep, oldestTs)
-      consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap, hardFork)
-    }
+    val chainDep   = deps.getOutDep(chainIndex.to)
+    val heightGap  = calHeightDiffUnsafe(chainDep, oldestTs)
+    val targetDiff = consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap, hardFork)
     ChainDifficultyAdjustment.calNextHashTargetRaw(targetDiff.getTarget(), timeSpanAverage)
   }
 
