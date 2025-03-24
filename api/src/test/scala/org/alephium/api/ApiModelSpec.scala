@@ -252,12 +252,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildGrouplessExecuteScriptTx" in {
-    val fromPublicKey    = PublicKey.generate
-    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
-    val fromAddress      = Address.Asset(fromLockupScript)
-    val fromAddressRaw   = fromAddress.toBase58
-    val attoAlphAmount   = Amount(U256.unsafe(1))
-    val bytecode         = ByteString(0, 0)
+    val fromPublicKey = PublicKey.generate
+    val fromLockupScript =
+      LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), GroupIndex.unsafe(0))
+    val fromAddress    = Address.Asset(fromLockupScript)
+    val fromAddressRaw = fromAddress.toBase58
+    val attoAlphAmount = Amount(U256.unsafe(1))
+    val bytecode       = ByteString(0, 0)
     val request = BuildGrouplessExecuteScriptTx(fromAddressRaw, bytecode, Some(attoAlphAmount))
     val jsonRaw =
       s"""{
@@ -1960,31 +1961,33 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "get groupIndex for BuildGrouplessDeployContractTx" in {
-    val fromPublicKey    = PublicKey.generate
-    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
-    val fromAddress      = Address.Asset(fromLockupScript)
-    val bytecode         = ByteString(0, 0)
+    val fromPublicKey = PublicKey.generate
+    val fromLockupScript =
+      LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), GroupIndex.unsafe(0))
+    val fromAddress = Address.Asset(fromLockupScript)
+    val bytecode    = ByteString(0, 0)
 
     {
-      val fromAddressRaw = fromAddress.toBase58
-      val request        = BuildGrouplessDeployContractTx(fromAddressRaw, bytecode)
+      val fromAddressWithoutGroup = fromLockupScript.toBase58WithoutGroup
+      val request = BuildGrouplessDeployContractTx(fromAddressWithoutGroup, bytecode)
       request
         .groupIndex()
-        .leftValue is s"Contract deployment requires groupless address `$fromAddressRaw` with explicit group information"
+        .leftValue is s"Contract deployment requires groupless address `$fromAddressWithoutGroup` with explicit group information"
     }
 
     {
       val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}:${groupIndex.value}"
+      val fromAddressRaw = fromAddress.toBase58
       val request        = BuildGrouplessDeployContractTx(fromAddressRaw, bytecode)
       request.groupIndex().rightValue is groupIndex
     }
   }
 
   it should "get groupIndex for BuildGrouplessExecuteScriptTx" in {
-    val fromPublicKey    = PublicKey.generate
-    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
-    val fromAddress      = Address.Asset(fromLockupScript)
+    val fromPublicKey = PublicKey.generate
+    val fromLockupScript =
+      LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), GroupIndex.unsafe(0))
+    val fromAddress = Address.Asset(fromLockupScript)
 
     {
       val script =
@@ -1995,7 +1998,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       """.stripMargin
       val compiled       = Compiler.compileTxScript(script).rightValue
       val bytecode       = serialize(compiled)
-      val fromAddressRaw = fromAddress.toBase58
+      val fromAddressRaw = fromLockupScript.toBase58WithoutGroup
       val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, bytecode)
       request
         .groupIndex()
@@ -2004,7 +2007,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}:${groupIndex.value}"
+      val fromAddressRaw = fromAddress.toBase58
       val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, ByteString(0, 0))
       request.groupIndex().rightValue is groupIndex
     }
@@ -2025,38 +2028,38 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     """.stripMargin
       val compiled       = Compiler.compileTxScript(script).rightValue
       val bytecode       = serialize(compiled)
-      val fromAddressRaw = fromAddress.toBase58
+      val fromAddressRaw = fromLockupScript.toBase58WithoutGroup
       val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, bytecode)
       request.groupIndex().rightValue is contractAddress.groupIndex
     }
   }
 
   it should "get lockPair for BuildGrouplessDeployContractTx" in {
-    val fromPublicKey    = PublicKey.generate
-    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
-    val fromAddress      = Address.Asset(fromLockupScript)
+    val fromPublicKey = PublicKey.generate
+    val fromLockupScript =
+      LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), GroupIndex.unsafe(0))
+    val fromAddress = Address.Asset(fromLockupScript)
 
     {
-      val request = BuildGrouplessDeployContractTx(fromAddress.toBase58, ByteString(0, 0))
+      val fromAddressWithoutGroup = fromLockupScript.toBase58WithoutGroup
+      val request = BuildGrouplessDeployContractTx(fromAddressWithoutGroup, ByteString(0, 0))
       request
         .getLockPair()
-        .leftValue is s"Contract deployment requires groupless address `${fromAddress.toBase58}` with explicit group information"
+        .leftValue is s"Contract deployment requires groupless address `${fromAddressWithoutGroup}` with explicit group information"
     }
 
     {
-      val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}:${groupIndex.value}"
+      val fromAddressRaw = fromAddress.toBase58
       val request        = BuildGrouplessDeployContractTx(fromAddressRaw, ByteString(0, 0))
-      request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK(
-        PublicKeyLike.SecP256K1
-      ))
+      request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK)
     }
   }
 
   it should "get lockPair for BuildGrouplessExecuteScriptTx" in {
-    val fromPublicKey    = PublicKey.generate
-    val fromLockupScript = LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), None)
-    val fromAddress      = Address.Asset(fromLockupScript)
+    val fromPublicKey = PublicKey.generate
+    val fromLockupScript =
+      LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), GroupIndex.unsafe(0))
+    val fromAddress = Address.Asset(fromLockupScript)
 
     {
       val script =
@@ -2065,13 +2068,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
            |  assert!(1 == 1, 0)
            |}
       """.stripMargin
-      val compiled = Compiler.compileTxScript(script).rightValue
-      val bytecode = serialize(compiled)
-
-      val request = BuildGrouplessExecuteScriptTx(fromAddress.toBase58, bytecode)
+      val compiled                = Compiler.compileTxScript(script).rightValue
+      val bytecode                = serialize(compiled)
+      val fromAddressWithoutGroup = fromLockupScript.toBase58WithoutGroup
+      val request                 = BuildGrouplessExecuteScriptTx(fromAddressWithoutGroup, bytecode)
       request
         .getLockPair()
-        .leftValue is s"Can not determine group: `${fromAddress.toBase58}` has no explicit group and no contract address can be derived from TxScript"
+        .leftValue is s"Can not determine group: `${fromAddressWithoutGroup}` has no explicit group and no contract address can be derived from TxScript"
     }
 
     {
@@ -2088,22 +2091,39 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
            |  pub fn bar() -> () {}
            |}
     """.stripMargin
-      val compiled = Compiler.compileTxScript(script).rightValue
-      val bytecode = serialize(compiled)
-      val request  = BuildGrouplessExecuteScriptTx(fromAddress.toBase58, bytecode)
+      val compiled                = Compiler.compileTxScript(script).rightValue
+      val bytecode                = serialize(compiled)
+      val fromAddressWithoutGroup = fromLockupScript.toBase58WithoutGroup
+      val request                 = BuildGrouplessExecuteScriptTx(fromAddressWithoutGroup, bytecode)
       request.getLockPair().rightValue is (
-        LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), Some(contractAddress.groupIndex)),
-        UnlockScript.P2PK(PublicKeyLike.SecP256K1)
+        LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), contractAddress.groupIndex),
+        UnlockScript.P2PK
       )
     }
 
     {
-      val groupIndex     = fromLockupScript.groupIndex
-      val fromAddressRaw = s"${fromAddress.toBase58}:${groupIndex.value}"
+      val fromAddressRaw = fromAddress.toBase58
       val request        = BuildGrouplessExecuteScriptTx(fromAddressRaw, ByteString(0, 0))
-      request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK(
-        PublicKeyLike.SecP256K1
-      ))
+      request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK)
     }
+  }
+
+  it should "encode/decode groupless address" in {
+    val publicKey = p2pkLockupGen(GroupIndex.unsafe(0)).sample.get.publicKey
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      val address      = Address.Asset(lockupScript)
+      checkData[Val](
+        ValAddress(address),
+        s"""{"type": "Address", "value": "${address.toBase58}"}"""
+      )
+    }
+
+    val defaultGroupIndex = publicKey.defaultGroup
+    val address           = Address.Asset(LockupScript.p2pk(publicKey, defaultGroupIndex))
+    read[Val](
+      s"""{"type": "Address", "value": "${address.toBase58.dropRight(2)}"}"""
+    ) is ValAddress(address)
+    write(ValAddress(address)) is s"""{"type":"Address","value":"${address.toBase58}"}"""
   }
 }

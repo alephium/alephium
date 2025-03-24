@@ -40,12 +40,16 @@ final case class BuildGrouplessDeployContractTx(
   private val explicitGroupInfoError = {
     s"Contract deployment requires groupless address `${fromAddress}` with explicit group information"
   }
-
   override def getLockPair()(implicit
       config: GroupConfig
   ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
     if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
-      super.getLockPair()
+      getFromAddress().flatMap { address =>
+        address.lockupScript match {
+          case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK))
+          case _ => Left(s"Invalid from address: $address, expected a groupless address")
+        }
+      }
     } else {
       Left(explicitGroupInfoError)
     }

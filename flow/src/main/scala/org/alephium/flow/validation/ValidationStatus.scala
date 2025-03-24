@@ -95,6 +95,8 @@ case object GhostUncleHashConflictWithParentHash  extends InvalidGhostUncleStatu
 case object GhostUnclesAlreadyUsed                extends InvalidGhostUncleStatus
 case object GhostUncleDoesNotExist                extends InvalidGhostUncleStatus
 case object InvalidGhostUncleMiner                extends InvalidGhostUncleStatus
+final case class DuplicateGhostUncleSinceDanube(uncleHash: BlockHash)
+    extends InvalidGhostUncleStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

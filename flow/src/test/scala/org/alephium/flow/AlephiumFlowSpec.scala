@@ -23,7 +23,7 @@ import scala.language.implicitConversions
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.crypto.{SecP256R1, SecP256R1PrivateKey}
+import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1PrivateKey}
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.io.StoragesFixture
@@ -42,6 +42,7 @@ import org.alephium.util._
 // scalastyle:off number.of.methods file.size.limit
 trait FlowFixture
     extends AlephiumSpec
+    with RichBlockFlowT
     with AlephiumConfigFixture
     with StoragesFixture.Default
     with NumericHelpers {
@@ -95,6 +96,12 @@ trait FlowFixture
 
   def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
+  }
+
+  def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex, timestamp: TimeStamp): Block = {
+    val publicKey = chainIndex.to.generateKey._2
+    val miner     = LockupScript.p2pkh(publicKey)
+    mine(blockFlow, chainIndex, AVector.empty[Transaction], miner, Some(timestamp))
   }
 
   def emptyBlockWithMiner(
@@ -521,6 +528,19 @@ trait FlowFixture
     mine(blockFlow, chainIndex, txs, miner, None)
   }
 
+  private def calcBlockDeps(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      timestamp: Option[TimeStamp]
+  ): BlockDeps = {
+    val hardFork = networkConfig.getHardFork(timestamp.getOrElse(TimeStamp.now()))
+    if (hardFork.isDanubeEnabled()) {
+      blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex)
+    } else {
+      blockFlow.calBestDepsUnsafe(chainIndex.from)
+    }
+  }
+
   def mine(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -528,7 +548,27 @@ trait FlowFixture
       miner: LockupScript.Asset,
       timestamp: Option[TimeStamp]
   ): Block = {
-    val deps = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val deps = calcBlockDeps(blockFlow, chainIndex, timestamp)
+    mine(blockFlow, chainIndex, deps, txs, miner, timestamp)
+  }
+
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): Block = {
+    val miner = getGenesisLockupScript(chainIndex.to)
+    mine(blockFlow, chainIndex, deps, AVector.empty, miner, None)
+  }
+
+  def mine(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      txs: AVector[Transaction],
+      miner: LockupScript.Asset,
+      timestamp: Option[TimeStamp]
+  ): Block = {
     val blockTs = timestamp.getOrElse {
       val parentTs = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
       FlowUtils.nextTimeStamp(parentTs)
@@ -546,7 +586,7 @@ trait FlowFixture
       blockTs: TimeStamp,
       uncles: AVector[SelectedGhostUncle] = AVector.empty
   ): Block = {
-    val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
+    val deps             = calcBlockDeps(blockFlow, chainIndex, Some(blockTs))
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val consensusConfig  = consensusConfigs.getConsensusConfig(blockTs)
@@ -575,15 +615,24 @@ trait FlowFixture
       blockFlow.rebuild(template, txs, uncles, miner)
     }
 
+    def setGhostUncles(blockFlow: BlockFlow, uncleHashes: AVector[BlockHash]): BlockFlowTemplate = {
+      val height = template.height
+      val ghostUncles = uncleHashes.map { hash =>
+        val uncleBlock  = blockFlow.getBlockUnsafe(hash)
+        val uncleHeight = blockFlow.getHeightUnsafe(hash)
+        SelectedGhostUncle(hash, uncleBlock.minerLockupScript, height - uncleHeight)
+      }
+      setGhostUncles(ghostUncles)
+    }
+
     lazy val ghostUncleHashes: AVector[BlockHash] = {
       val coinbase = template.transactions.last
-      deserialize[CoinbaseData](
-        coinbase.unsigned.fixedOutputs.head.additionalData
-      ).rightValue match {
-        case v2: CoinbaseDataV2 => v2.ghostUncleData.map(_.blockHash)
-        case _: CoinbaseDataV1  => AVector.empty
-      }
-
+      val hardFork = networkConfig.getHardFork(template.templateTs)
+      CoinbaseData
+        .deserialize(coinbase.unsigned.fixedOutputs.head.additionalData, hardFork)
+        .rightValue
+        .ghostUncleData
+        .map(_.blockHash)
     }
   }
 
@@ -757,7 +806,7 @@ trait FlowFixture
       .mkString("", "\n", "\n")
     val bestDeps = brokerConfig.groupRange
       .map { group =>
-        val bestDeps    = blockFlow.getBestDeps(GroupIndex.unsafe(group))
+        val bestDeps    = blockFlow.getBestDepsPreDanube(GroupIndex.unsafe(group))
         val bestDepsStr = bestDeps.deps.map(_.shortHex).mkString("-")
         s"group $group, bestDeps: $bestDepsStr"
       }
@@ -1042,43 +1091,17 @@ trait FlowFixture
     AVector.fill(n)(createTx())
   }
 
-  private def encodeToBytes64(webauthn: WebAuthn): AVector[Bytes64] = {
-    val bytes     = serialize(webauthn)
-    val chunkSize = Bytes64.length
-    AVector.from(bytes.grouped(chunkSize).map { chunk =>
-      val bs = if (chunk.length < chunkSize) {
-        chunk ++ ByteString(Array.fill(chunkSize - chunk.length)(0.toByte))
-      } else {
-        chunk
-      }
-      Bytes64.from(bs).get
-    })
-  }
-
-  def signWithPasskey(unsignedTx: UnsignedTransaction, priKey: SecP256R1PrivateKey): Transaction = {
-    val clientData = WebAuthn.createClientData(WebAuthn.GET, unsignedTx.id.bytes)
-    val bytes      = bytesGen(WebAuthn.AuthenticatorDataMinLength).sample.get.toArray
+  def signWithWebAuthn(
+      unsignedTx: UnsignedTransaction,
+      priKey: SecP256R1PrivateKey
+  ): (WebAuthn, Transaction) = {
+    val bytes = bytesGen(WebAuthn.FlagIndex + 1).sample.get.toArray
     bytes(WebAuthn.FlagIndex) = (bytes(WebAuthn.FlagIndex) | 0x01).toByte
     val authenticatorData = ByteString.fromArrayUnsafe(bytes)
-    val webauthn          = WebAuthn(authenticatorData, clientData)
-    val messageHash       = webauthn.messageHash
-    val signature         = Bytes64.from(SecP256R1.sign(messageHash, priKey))
-    val inputSignatures   = encodeToBytes64(webauthn) :+ signature
-    unsignedTx.scriptOpt match {
-      case None => Transaction.from(unsignedTx, inputSignatures)
-      case Some(script) =>
-        val txTemplate = TransactionTemplate(unsignedTx, inputSignatures, AVector.empty)
-        val (contractInputs, generatedOutputs) =
-          genInputsOutputs(blockFlow, unsignedTx.fromGroup, txTemplate, script)
-        Transaction(
-          unsignedTx,
-          true,
-          contractInputs,
-          generatedOutputs,
-          inputSignatures,
-          AVector.empty
-        )
-    }
+    val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
+    val messageHash       = webauthn.messageHash(unsignedTx.id)
+    val signature         = Byte64.from(SecP256R1.sign(messageHash, priKey))
+    (webauthn, Transaction.from(unsignedTx, webauthn.encodeForTest() :+ signature))
   }
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {
@@ -1095,6 +1118,83 @@ trait FlowFixture
           blockFlow.getDepStateHash(BlockDeps.unsafe(newDeps), chainIndex.from).rightValue
       )
     mine(blockFlow, template1)
+  }
+
+  def mineBlockWithDep(chainIndex: ChainIndex, depHash: BlockHash): Block = {
+    assume(blockFlow.containsUnsafe(depHash))
+    val height        = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
+    val block         = emptyBlock(blockFlow, chainIndex)
+    val template0     = BlockFlowTemplate.from(block, height)
+    val depChainIndex = ChainIndex.from(depHash)
+    val index         = template0.deps.indexWhere(ChainIndex.from(_) == depChainIndex)
+    val template1     = template0.copy(deps = template0.deps.replace(index, depHash))
+    mine(blockFlow, template1)
+  }
+
+  def mineTwoBlocksAndAdd(chainIndex: ChainIndex): (Block, Block) = {
+    val blocks = Seq.fill(2)(emptyBlock(blockFlow, chainIndex))
+    blocks.foreach(addAndCheck(blockFlow, _))
+    val height = blockFlow.getBlockChain(chainIndex).maxHeightUnsafe
+    val hashes = blockFlow.getHashes(chainIndex, height).rightValue
+    hashes.length is 2
+    (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
+  }
+}
+
+trait GhostUncleFixture extends FlowFixture {
+  private def getBlockTemplate(blockFlow: BlockFlow, chainIndex: ChainIndex, height: Int) = {
+    val hash           = blockFlow.getHashes(chainIndex, height).rightValue.head
+    val mainChainBlock = blockFlow.getBlockUnsafe(hash)
+    BlockFlowTemplate.from(mainChainBlock, height)
+  }
+
+  private def mineDuplicateGhostUncle(blockFlow: BlockFlow, template: BlockFlowTemplate) = {
+    val block = mine(blockFlow, template)
+    block.header.copy(nonce = Nonce.zero) is template.dummyHeader()
+    addAndCheck(blockFlow, block)
+    block
+  }
+
+  def mineBlocks(blockFlow: BlockFlow, chainIndex: ChainIndex, size: Int): Unit = {
+    (0 until size).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+  }
+
+  def mineDuplicateGhostUncleBlockAt(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      height: Int
+  ): Block = {
+    val template = getBlockTemplate(blockFlow, chainIndex, height)
+    mineDuplicateGhostUncle(blockFlow, template)
+  }
+
+  def mineDuplicateGhostUncleBlock(blockFlow: BlockFlow, templateBlock: Block): Block = {
+    val height   = blockFlow.getHeightUnsafe(templateBlock.hash)
+    val template = BlockFlowTemplate.from(templateBlock, height)
+    mineDuplicateGhostUncle(blockFlow, template)
+  }
+
+  def mineValidGhostUncleBlockAt(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      height: Int
+  ): Block = {
+    val template = getBlockTemplate(blockFlow, chainIndex, height)
+    val newMiner = LockupScript.p2pkh(chainIndex.to.generateKey._2)
+    val block = mine(blockFlow, chainIndex, BlockDeps(template.deps), AVector.empty, newMiner, None)
+    block.header.copy(nonce = Nonce.zero) isnot template.dummyHeader()
+    addAndCheck(blockFlow, block)
+    block
+  }
+
+  def mineTwoGhostUnclesAt(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      height: Int
+  ): (Block, Block) = {
+    val duplicateGhostUncle = mineDuplicateGhostUncleBlockAt(blockFlow, chainIndex, height)
+    val validGhostUncle     = mineValidGhostUncleBlockAt(blockFlow, chainIndex, height)
+    (duplicateGhostUncle, validGhostUncle)
   }
 }
 

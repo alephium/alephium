@@ -27,7 +27,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.Byte32
+import org.alephium.crypto.{Byte32, Byte64}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
@@ -483,7 +483,7 @@ class ServerUtils(implicit
   ): TransactionTemplate = {
     TransactionTemplate(
       unsignedTx,
-      signatures.map(Bytes64.from),
+      signatures.map(Byte64.from),
       scriptSignatures = AVector.empty
     )
   }
@@ -1261,6 +1261,7 @@ class ServerUtils(implicit
         blockFlow,
         script,
         amounts,
+        fromLockupScript,
         fromUnlockScript,
         gas,
         gasPrice,
@@ -1291,6 +1292,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       script: StatefulScript,
       amounts: BuildTxCommon.ScriptTxAmounts,
+      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
@@ -1301,6 +1303,7 @@ class ServerUtils(implicit
       blockFlow,
       script,
       amounts,
+      fromLockupScript,
       fromUnlockScript,
       gas,
       gasPrice,
@@ -1318,6 +1321,7 @@ class ServerUtils(implicit
             blockFlow,
             script,
             amounts.copy(estimatedAlph = amounts.estimatedAlph.addUnsafe(dustUtxoAmount)),
+            fromLockupScript,
             fromUnlockScript,
             Some(res.gas),
             gasPrice,
@@ -1335,6 +1339,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       script: StatefulScript,
       amounts: BuildTxCommon.ScriptTxAmounts,
+      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
@@ -1343,6 +1348,7 @@ class ServerUtils(implicit
   ): Try[Selected] = {
     wrapError(
       blockFlow.selectUtxos(
+        fromLockupScript,
         fromUnlockScript,
         utxos,
         (amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1),
@@ -1750,9 +1756,11 @@ class ServerUtils(implicit
     for {
       groupIndex <- params.validate()
       _          <- checkGroup(groupIndex)
-      blockHash = params.worldStateBlockHash.getOrElse(
-        blockFlow.getBestDeps(groupIndex).uncleHash(groupIndex)
-      )
+      blockHash = params.worldStateBlockHash.getOrElse {
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        val bestDeps = blockFlow.getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
+        bestDeps.uncleHash(groupIndex)
+      }
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
       )
@@ -1822,7 +1830,7 @@ class ServerUtils(implicit
   @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
     TxEnv.mockup(
       txId = txId,
-      signatures = Stack.popOnly(AVector.empty[Bytes64]),
+      signatures = Stack.popOnly(AVector.empty[Byte64]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
       gasPrice = nonCoinbaseMinGasPrice,
@@ -1891,9 +1899,10 @@ class ServerUtils(implicit
         failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
       )
     } else {
-      val bestDepss = blockFlow.brokerConfig.groupRange.map(group =>
-        blockFlow.getBestDeps(GroupIndex.unsafe(group))
-      )
+      val bestDepss = blockFlow.brokerConfig.groupRange.map { group =>
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        blockFlow.getBestDeps(ChainIndex.unsafe(group, group), hardFork)
+      }
       params.calls
         .mapE { call =>
           call.validate().map { groupIndex =>
@@ -2349,7 +2358,7 @@ object ServerUtils {
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
-  )(implicit groupConfig: GroupConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
@@ -2411,10 +2420,10 @@ object ServerUtils {
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
-  )(implicit groupConfig: GroupConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
-      address.toBase58Extended,
+      address.toBase58,
       initialImmFields,
       initialMutFields,
       initialAttoAlphAmount,

@@ -21,7 +21,6 @@ import fastparse._
 import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.ArithOperator._
@@ -31,9 +30,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit
-class ParserSpec(fileURI: Option[java.net.URI])
-    extends AlephiumSpec
-    with GroupConfigFixture.Default {
+class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   import Ast._
 
   val StatelessParser = new StatelessParser(fileURI)

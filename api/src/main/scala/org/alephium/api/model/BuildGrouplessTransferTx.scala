@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHash, GroupIndex}
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -30,5 +30,15 @@ final case class BuildGrouplessTransferTx(
 ) extends BuildGrouplessTx {
   def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex] = {
     getFromAddress().map(_.groupIndex)
+  }
+  def getLockPair()(implicit
+      config: GroupConfig
+  ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
+    getFromAddress().flatMap { address =>
+      address.lockupScript match {
+        case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK))
+        case _ => Left(s"Invalid from address: $address, expected a groupless address")
+      }
+    }
   }
 }

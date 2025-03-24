@@ -36,13 +36,6 @@ sealed trait Address {
     }
   }
 
-  def toBase58Extended(implicit config: GroupConfig): String = {
-    lockupScript match {
-      case script: LockupScript.P2PK => script.toBase58 + s":${script.groupIndex.value}"
-      case _                         => Base58.encode(serialize(lockupScript))
-    }
-  }
-
   override def toString: String = toBase58
 }
 
@@ -70,22 +63,20 @@ object Address {
     }
   }
 
-  def fromBase58(input: String)(implicit groupConfig: GroupConfig): Option[Address] = {
+  def fromBase58(input: String): Option[Address] = {
     for {
       lockupScript <- LockupScript.fromBase58(input)
     } yield from(lockupScript)
   }
 
-  def asset(input: String)(implicit groupConfig: GroupConfig): Option[Address.Asset] = {
+  def asset(input: String): Option[Address.Asset] = {
     fromBase58(input) match {
       case Some(address: Asset) => Some(address)
       case _                    => None
     }
   }
 
-  def extractLockupScript(
-      address: String
-  )(implicit groupConfig: GroupConfig): Option[LockupScript] = {
+  def extractLockupScript(address: String): Option[LockupScript] = {
     for {
       lockupScript <- LockupScript.fromBase58(address)
     } yield lockupScript

@@ -19,6 +19,11 @@ package org.alephium.protocol.model
 import scala.collection.immutable.ArraySeq
 import scala.util.Random
 
+// Checklist for introducing a new upgrade:
+// 1. Activation timestamp in network config files.
+// 2. `checkUpgrade` function in `ReleaseVersion.scala`.
+// 3. Enable `checkInactiveInstructions` in `Instr.scala`.
+// 4. `sanityCheck` function in `AlephiumConfig.scala`.
 sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
 
@@ -35,6 +40,6 @@ object HardFork {
   val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman, Rhone, Danube)
 
   // TestOnly
-  def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(3))
+  def SinceLemanForTest: HardFork = All.drop(1).apply(Random.nextInt(All.length - 1))
   def PreRhoneForTest: HardFork   = All.take(2).apply(Random.nextInt(2))
 }

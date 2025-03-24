@@ -14,34 +14,37 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.model
+package org.alephium.crypto
 
-import org.alephium.protocol.Signature
 import org.alephium.serde
 import org.alephium.util.AlephiumSpec
 
-class Bytes64Spec extends AlephiumSpec {
-  it should "test Bytes64" in {
+class Byte64Spec extends AlephiumSpec {
+  it should "test Byte64" in {
     {
       info("from bytes")
-      Bytes64.from(bytesGen(63).sample.get) is None
-      Bytes64.from(bytesGen(65).sample.get) is None
+      Byte64.from(bytesGen(63).sample.get) is None
+      Byte64.from(bytesGen(65).sample.get) is None
       val bytes = bytesGen(64).sample.get
-      Bytes64.from(bytes).value.bytes is bytes
+      Byte64.from(bytes).value.bytes is bytes
     }
 
     {
       info("from signature")
-      val signature = Signature.generate
-      Bytes64.from(signature).bytes is signature.bytes
+      val signature0 = SecP256K1Signature.generate
+      Byte64.from(signature0).bytes is signature0.bytes
+      val signature1 = SecP256R1Signature.generate
+      Byte64.from(signature1).bytes is signature1.bytes
+      val signature2 = ED25519Signature.generate
+      Byte64.from(signature2).bytes is signature2.bytes
     }
 
     {
       info("serde")
       forAll(bytesGen(64)) { bytes =>
-        val bytes64 = Bytes64.from(bytes).get
-        serde.serialize(bytes64) is bytes
-        serde.deserialize[Bytes64](bytes) isE bytes64
+        val byte64 = Byte64.from(bytes).get
+        serde.serialize(byte64) is bytes
+        serde.deserialize[Byte64](bytes) isE byte64
       }
     }
   }

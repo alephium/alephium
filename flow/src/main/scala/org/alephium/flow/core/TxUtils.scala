@@ -102,6 +102,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
         selectUtxos(
+          fromLockupScript,
           fromUnlockScript,
           extraUtxosInfo.merge(utxos),
           totalAmount,
@@ -131,7 +132,7 @@ trait TxUtils { Self: FlowUtils =>
             case None =>
               for {
                 estimatedGas <- GasEstimation.estimateWithInputScript(
-                  fromUnlockScript,
+                  (fromLockupScript, fromUnlockScript),
                   utxoRefs.length,
                   outputScripts.length,
                   AssetScriptGasEstimator.NotImplemented // Not P2SH
@@ -258,6 +259,7 @@ trait TxUtils { Self: FlowUtils =>
     getUsableUtxos(None, fromLockupScript, Int.MaxValue)
       .map { utxos =>
         selectUtxos(
+          fromLockupScript,
           fromUnlockScript,
           utxos,
           (totalAmount, AVector.empty, rewardOutputs.length + 1),
@@ -353,6 +355,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def selectUtxos(
+      fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       utxos: AVector[FlowUtils.AssetOutputInfo],
       totalAmount: UnsignedTransaction.TotalAmountNeeded,
@@ -365,6 +368,7 @@ trait TxUtils { Self: FlowUtils =>
       .Build(ProvidedGas(gasOpt, gasPrice, gasEstimationMultiplier))
       .select(
         AssetAmounts(totalAmount._1, totalAmount._2),
+        fromLockupScript,
         fromUnlockScript,
         utxos,
         totalAmount._3,
@@ -384,8 +388,17 @@ trait TxUtils { Self: FlowUtils =>
       gasPrice: GasPrice
   ): Either[String, UnsignedTransaction] = {
     for {
-      selected <- selectUtxos(fromUnlockScript, utxos, totalAmount, None, None, gasOpt, gasPrice)
-      _        <- checkEstimatedGasAmount(selected.gas)
+      selected <- selectUtxos(
+        fromLockupScript,
+        fromUnlockScript,
+        utxos,
+        totalAmount,
+        None,
+        None,
+        gasOpt,
+        gasPrice
+      )
+      _ <- checkEstimatedGasAmount(selected.gas)
       unsignedTx <- UnsignedTransaction
         .buildTransferTx(
           fromLockupScript,
@@ -521,6 +534,7 @@ trait TxUtils { Self: FlowUtils =>
         )
       _ <- blockFlow
         .sanityCheckBalance(
+          fromLockupScript,
           fromUnlockScript,
           inputSelection,
           outputInfos,
@@ -568,6 +582,7 @@ trait TxUtils { Self: FlowUtils =>
         _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
         amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
         selected <- selectUtxos(
+          fromLockupScript,
           fromUnlockScript,
           inputs,
           amountTokensOutputCount,
@@ -631,14 +646,16 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def sanityCheckBalance(
+      fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
       gasPrice: GasPrice
   ): Either[String, Unit] =
-    getAssetRemainders(fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
+    getAssetRemainders(fromLockupScript, fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
 
   def getAssetRemainders(
+      fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
@@ -649,7 +666,7 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       for {
         gasBox <- GasEstimation.estimateWithInputScript(
-          fromUnlockScript,
+          (fromLockupScript, fromUnlockScript),
           inputs.length,
           countResultingTxOutputs(outputs),
           AssetScriptGasEstimator.Default(blockFlow)
@@ -1097,6 +1114,7 @@ trait TxUtils { Self: FlowUtils =>
       selected <- UtxoSelectionAlgo
         .SelectionWithGasEstimation(gasPrice)
         .select(
+          fromLockupScript,
           fromUnlockScript,
           totalNumOfOutputs,
           UtxoSelectionAlgo.SelectedSoFar(totalAlphAmount, tokenUtxos, alphUtxos),
@@ -1143,7 +1161,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, UnsignedTransaction] = {
     for {
       estimatedGas <- GasEstimation.estimateWithInputScript(
-        fromUnlockScript,
+        (fromLockupScript, fromUnlockScript),
         alphUtxos.length,
         1,
         AssetScriptGasEstimator.Default(blockFlow)

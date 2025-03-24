@@ -31,7 +31,7 @@ object GasEstimation extends StrictLogging {
 
   def gasForSameP2PKHInputs(numInputs: Int): GasBox = {
     assume(numInputs > 0)
-    val firstInputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
+    val firstInputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas)
     firstInputGas.addUnsafe(GasSchedule.txInputBaseGas.mulUnsafe(numInputs - 1))
   }
 
@@ -41,27 +41,27 @@ object GasEstimation extends StrictLogging {
   }
 
   def estimateWithInputScript(
-      unlockScript: UnlockScript,
+      lockPair: (LockupScript, UnlockScript),
       numInputs: Int,
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
-    val inputs = AVector.fill(numInputs)(unlockScript)
+    val inputs = AVector.fill(numInputs)(lockPair)
     estimate(inputs, numOutputs, assetScriptGasEstimator)
   }
 
   def estimate(
-      unlockScripts: AVector[UnlockScript],
+      lockPairs: AVector[(LockupScript, UnlockScript)],
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
     val inputGas: Either[String, GasBox] =
-      unlockScripts.foldWithIndexE(GasBox.zero) { case (sum, unlock, index) =>
-        val sameAsPrevious = index > 0 && unlockScripts(index - 1) == unlock
+      lockPairs.foldWithIndexE(GasBox.zero) { case (sum, lockPair, index) =>
+        val sameAsPrevious = index > 0 && lockPairs(index - 1) == lockPair
         if (sameAsPrevious) {
           Right(sum.addUnsafe(GasSchedule.txInputBaseGas))
         } else {
-          estimateInputGas(unlock, assetScriptGasEstimator).map(_.addUnsafe(sum))
+          estimateInputGas(lockPair, assetScriptGasEstimator).map(_.addUnsafe(sum))
         }
       }
 
@@ -93,12 +93,12 @@ object GasEstimation extends StrictLogging {
   }
 
   private[gasestimation] def estimateInputGas(
-      unlockScript: UnlockScript,
+      lockPair: (LockupScript, UnlockScript),
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
-    unlockScript match {
+    lockPair._2 match {
       case _: UnlockScript.P2PKH | _: UnlockScript.PoLW =>
-        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
+        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas))
       case p2mpkh: UnlockScript.P2MPKH =>
         Right(
           GasSchedule.txInputBaseGas.addUnsafe(
@@ -111,12 +111,27 @@ object GasEstimation extends StrictLogging {
           .map(GasSchedule.txInputBaseGas.addUnsafe(_))
       case UnlockScript.SameAsPrevious =>
         Right(GasSchedule.txInputBaseGas)
-      case UnlockScript.P2PK(PublicKeyLike.SecP256K1) =>
-        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas))
-      case UnlockScript.P2PK(PublicKeyLike.Passkey) =>
-        // TODO: How to estimate the gas consumption more accurately when building the tx?
+      case UnlockScript.P2PK =>
+        lockPair._1 match {
+          case lockupScript: LockupScript.P2PK =>
+            Right(estimateInputGas(lockupScript))
+          case lockupScript =>
+            Left(s"Invalid lockup script $lockupScript, expected LockupScript.P2PK")
+        }
+    }
+  }
+
+  private[gasestimation] def estimateInputGas(lockupScript: LockupScript.P2PK): GasBox = {
+    lockupScript.publicKey match {
+      case _: PublicKeyLike.SecP256K1 =>
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas)
+      case _: PublicKeyLike.SecP256R1 =>
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256R1UnlockGas)
+      case _: PublicKeyLike.ED25519 =>
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.ed25519UnlockGas)
+      case _: PublicKeyLike.WebAuthn =>
         // scalastyle:off magic.number
-        Right(GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.passkeyUnlockGas(300)))
+        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.webauthnUnlockGas(500))
       // scalastyle:on magic.number
     }
   }

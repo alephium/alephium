@@ -21,7 +21,7 @@ import scala.util.Random
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.NetworkId
+import org.alephium.protocol.model.{HardFork, NetworkId}
 import org.alephium.util.TimeStamp
 
 trait NetworkConfigFixture { self =>
@@ -42,6 +42,43 @@ trait NetworkConfigFixture { self =>
 
 object NetworkConfigFixture {
   lazy val All = ArraySeq(Genesis, Leman, Rhone, Danube)
+
+  def getNetworkConfig(hardFork: HardFork): NetworkConfig = {
+    val config = hardFork match {
+      case HardFork.Mainnet => Genesis
+      case HardFork.Leman   => Leman
+      case HardFork.Rhone   => Rhone
+      case HardFork.Danube  => Danube
+      case _                => ???
+    }
+    assume(config.getHardFork(TimeStamp.now()) == hardFork)
+    config
+  }
+
+  def getNetworkConfigSince(hardFork: HardFork): NetworkConfig = {
+    val config = hardFork match {
+      case HardFork.Mainnet => SinceGenesis
+      case HardFork.Leman   => SinceLeman
+      case HardFork.Rhone   => SinceRhone
+      case HardFork.Danube  => SinceDanube
+      case _                => ???
+    }
+    val hardForks = HardFork.All.drop(HardFork.All.indexOf(hardFork))
+    assume(hardForks.contains(config.getHardFork(TimeStamp.now())))
+    config
+  }
+
+  def getNetworkConfigBefore(hardFork: HardFork): NetworkConfig = {
+    assume(hardFork != HardFork.Mainnet && hardFork != HardFork.Leman)
+    val config = hardFork match {
+      case HardFork.Rhone  => PreRhone
+      case HardFork.Danube => PreDanube
+      case _               => ???
+    }
+    val hardForks = HardFork.All.take(HardFork.All.indexOf(hardFork))
+    assume(hardForks.contains(config.getHardFork(TimeStamp.now())))
+    config
+  }
 
   trait Default extends NetworkConfigFixture {
     def networkId: NetworkId               = NetworkId.AlephiumDevNet
@@ -81,6 +118,16 @@ object NetworkConfigFixture {
     override def danubeHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
   }
   val Danube = new DanubeT {}.networkConfig
+
+  lazy val sinceGenesisForks = All
+  trait SinceGenesisT extends NetworkConfigFixture {
+    override def networkId: NetworkId = NetworkId.AlephiumMainNet
+    private lazy val fork             = sinceGenesisForks(Random.nextInt(sinceGenesisForks.length))
+    override def lemanHardForkTimestamp: TimeStamp  = fork.lemanHardForkTimestamp
+    override def rhoneHardForkTimestamp: TimeStamp  = fork.rhoneHardForkTimestamp
+    override def danubeHardForkTimestamp: TimeStamp = fork.danubeHardForkTimestamp
+  }
+  val SinceGenesis = new SinceGenesisT {}.networkConfig
 
   lazy val sinceLemanForks = All.drop(1)
   trait SinceLemanT extends NetworkConfigFixture {

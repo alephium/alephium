@@ -71,10 +71,14 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     ctx.getInitialBalances().flatMap { balances =>
+      // Store the transaction caller's balance to use later if needed to cover contract creation deposits
+      val txCallerBalance = MutBalanceState.from(balances)
+      ctx.setTxCallerBalance(txCallerBalance)
+
       startPayableFrame(
         obj,
         ctx,
-        MutBalanceState.from(balances),
+        txCallerBalance,
         method,
         args,
         operandStack,

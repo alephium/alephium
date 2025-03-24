@@ -36,18 +36,18 @@ final case class BuildGrouplessExecuteScriptTx(
     with BuildTxCommon.ExecuteScriptTx {
   def gasAmount: Option[GasBox] = None
 
-  override def getLockPair()(implicit
+  def getLockPair()(implicit
       config: GroupConfig
   ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
     getFromAddress().flatMap { address =>
       address.lockupScript match {
         case lock: LockupScript.P2PK => {
-          val unlockScript = UnlockScript.P2PK(lock.publicKey.keyType)
+          val unlockScript = UnlockScript.P2PK
           if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
             Right((lock, unlockScript))
           } else {
             groupIndex().map { groupIndex =>
-              (LockupScript.P2PK.from(lock.publicKey, Some(groupIndex)), unlockScript)
+              (LockupScript.P2PK(lock.publicKey, groupIndex), unlockScript)
             }
           }
         }

@@ -38,6 +38,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
+import org.alephium.flow.RichBlockFlowT
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -65,7 +66,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with NumericHelpers
     with ApiModelCodec
     with wallet.json.ModelCodecs
-    with HttpFixture { Fixture =>
+    with HttpFixture
+    with RichBlockFlowT { Fixture =>
   implicit val system: ActorSystem = spec.system
 
   private val vertx           = Vertx.vertx()
@@ -273,6 +275,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     new ItConfigFixture with StoragesFixture {
       override val configValues = Map[String, Any](
         ("alephium.network.leman-hard-fork-timestamp", "1643500800000"),
+        ("alephium.network.rhone-hard-fork-timestamp", "1643500800000"),
+        ("alephium.network.danube-hard-fork-timestamp", "1643500800000"),
         ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),

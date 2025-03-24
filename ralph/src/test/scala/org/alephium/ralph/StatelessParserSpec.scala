@@ -17,13 +17,12 @@ package org.alephium.ralph
 
 import fastparse.{EagerOps, Parsed}
 
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter, FastParseErrorUtil}
 import org.alephium.ralph.util.OperatingSystem
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
-class StatelessParserSpec extends AlephiumSpec with GroupConfigFixture.Default {
+class StatelessParserSpec extends AlephiumSpec {
   val StatelessParser = new StatelessParser(None)
 
   it should "disallow mutable template params" in {

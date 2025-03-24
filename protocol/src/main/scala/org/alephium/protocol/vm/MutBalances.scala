@@ -77,6 +77,18 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     getBalances(lockupScript).flatMap(_.sub(balancesPerLockup))
   }
 
+  def moveAlph(
+      lockupScript: LockupScript,
+      amount: U256,
+      targetBalance: MutBalancesPerLockup
+  ): Option[Unit] = {
+    assume(amount > U256.Zero)
+    for {
+      _ <- subAlph(lockupScript, amount)
+      _ <- targetBalance.addAlph(amount)
+    } yield ()
+  }
+
   def use(): MutBalances = {
     val newAll = all.map { case (lockupScript, balancesPerLockup) =>
       lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)

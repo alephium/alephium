@@ -50,6 +50,10 @@ object Checksum {
     unsafe(Bytes.from(DjbHash.intHash(bytes)))
   }
 
+  def calcAndSerialize(bytes: ByteString): ByteString = {
+    serde.serialize(calc(bytes))
+  }
+
   def unsafe(bytes: ByteString): Checksum = {
     assume(bytes.length == checksumLength)
     Checksum(bytes)

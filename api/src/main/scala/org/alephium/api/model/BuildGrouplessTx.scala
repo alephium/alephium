@@ -27,7 +27,7 @@ trait BuildGrouplessTx {
 
   var decodedAddress: Option[Address.Asset] = None
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def getFromAddress()(implicit config: GroupConfig): Either[String, Address.Asset] = {
+  def getFromAddress(): Either[String, Address.Asset] = {
     if (decodedAddress.isDefined) {
       Right(decodedAddress.get)
     } else {
@@ -43,14 +43,5 @@ trait BuildGrouplessTx {
     }
   }
 
-  def getLockPair()(implicit
-      config: GroupConfig
-  ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
-    getFromAddress().flatMap { address =>
-      address.lockupScript match {
-        case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK(lock.publicKey.keyType)))
-        case _ => Left(s"Invalid from address: $address, expected a groupless address")
-      }
-    }
-  }
+  def getLockPair()(implicit config: GroupConfig): Either[String, (LockupScript.P2PK, UnlockScript)]
 }

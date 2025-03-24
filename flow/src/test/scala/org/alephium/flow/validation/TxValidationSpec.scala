@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.SecP256R1
+import org.alephium.crypto.{Byte64, ED25519, SecP256R1}
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
@@ -142,7 +142,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
 
     def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
-      val signatures = privateKeys.map(key => Bytes64.from(SignatureSchema.sign(unsigned.id, key)))
+      val signatures = privateKeys.map(key => Byte64.from(SignatureSchema.sign(unsigned.id, key)))
       Transaction.from(unsigned, AVector.from(signatures))
     }
 
@@ -416,7 +416,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "check the number of script signatures" in new Fixture {
     val tx        = transactionGen().sample.get
-    val signature = Signature.generate
+    val signature = Byte64.from(Signature.generate)
     val modified0 = tx.copy(scriptSignatures = AVector.empty)
     val modified1 = tx.copy(scriptSignatures = AVector.fill(ALPH.MaxScriptSigNum)(signature))
     val modified2 = tx.copy(scriptSignatures = AVector.fill(ALPH.MaxScriptSigNum + 1)(signature))
@@ -965,7 +965,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       txBaseGas addUnsafe
         txInputBaseGas addUnsafe
         txOutputBaseGas.mulUnsafe(2) addUnsafe
-        GasSchedule.p2pkUnlockGas
+        GasSchedule.secp256K1UnlockGas
     )
     gasUsed is GasBox.unsafe(14060)
   }
@@ -981,7 +981,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       tx.updateInput(0, _.copy(unlockScript = unlock)).fail(InvalidPublicKeyHash)
 
       val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
-      val signaturesNew = tx.inputSignatures.replace(sampleIndex, Bytes64.from(Signature.generate))
+      val signaturesNew = tx.inputSignatures.replace(sampleIndex, Byte64.from(Signature.generate))
       tx.copy(inputSignatures = signaturesNew).fail(InvalidSignature)
       tx.copy(inputSignatures = tx.inputSignatures ++ tx.inputSignatures)
         .fail(TooManyInputSignatures)
@@ -1024,16 +1024,22 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction
 
     val preLemanValidator = validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
-    val lemanValidator    = validateTxOnlyForTest(_, blockFlow, None)
+    val lemanValidator    = validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman))
+    val danubeValidator   = validateTxOnlyForTest(_, blockFlow, None)
 
     def validate() = {
       val unsignedTx0 = prepareOutputs(lockup, unlock, 2)
+      // The block generated in `prepareOutputs` is post-danube upgrade, so we only update the danube best deps.
+      // This causes the leman/mainnet validator to be unable to get the correct best deps.
+      // So we need to call `updateViewPreDanube` to update the pre-danube best deps.
+      blockFlow.updateViewPreDanube() isE ()
       unsignedTx0.inputs.length is 3
       unsignedTx0.inputs.head.unlockScript is unlock
       unsignedTx0.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
       val tx0 = toSignedTx(unsignedTx0)
       tx0.pass()(lemanValidator)
       tx0.fail(InvalidUnlockScriptType)(preLemanValidator)
+      tx0.pass()(danubeValidator)
 
       val newInputs = unsignedTx0.inputs.head +: unsignedTx0.inputs.tail.map(
         _.copy(unlockScript = unlock)
@@ -1042,6 +1048,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val tx1         = toSignedTx(unsignedTx1)
       tx1.pass()(lemanValidator)
       tx1.pass()(preLemanValidator)
+      tx1.pass()(danubeValidator)
     }
   }
 
@@ -1085,7 +1092,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unlock: UnlockScript       = UnlockScript.p2sh(script, AVector.empty)
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
-      Transaction.from(unsignedTx, AVector.empty[Bytes64])
+      Transaction.from(unsignedTx, AVector.empty[Byte64])
     }
 
     validate()
@@ -1135,7 +1142,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
       tx.pass()
       tx.replaceUnlock(UnlockScript.p2pkh(PublicKey.generate)).fail(InvalidPublicKeyHash)
-      tx.copy(inputSignatures = AVector(Bytes64.from(Signature.generate))).fail(InvalidSignature)
+      tx.copy(inputSignatures = AVector(Byte64.from(Signature.generate))).fail(InvalidSignature)
     }
   }
 
@@ -1186,7 +1193,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     implicit val validator: (Transaction) => TxValidationResult[Unit] =
       validateTxOnlyForTest(_, blockFlow, None)
 
-    val tx0 = Transaction.from(unsigned, AVector.empty[Bytes64])
+    val tx0 = Transaction.from(unsigned, AVector.empty[Byte64])
     tx0.pass()
 
     val tx1 = tx0.replaceUnlock(UnlockScript.p2sh(script, AVector(Val.U256(50))))
@@ -1200,10 +1207,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "validate polw" in new Fixture {
     implicit val validator: (Transaction) => TxValidationResult[Unit] = (tx: Transaction) => {
       val chainIndex = getChainIndex(tx).rightValue
-      val bestDeps   = blockFlow.getBestDeps(chainIndex.from)
-      val groupView  = blockFlow.getMutableGroupView(chainIndex.from, bestDeps).rightValue
-      val hardFork   = networkConfig.getHardFork(TimeStamp.now())
-      val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue.copy(hardFork = hardFork)
+      val groupView  = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+      val blockEnv   = blockFlow.getDryrunBlockEnv(chainIndex).rightValue
       validateTx(
         tx,
         chainIndex,
@@ -1222,11 +1227,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val inputs0   = unsignedTx.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(pubKey)))
     val unsigned0 = unsignedTx.copy(inputs = inputs0)
     val preImage  = UnlockScript.PoLW.buildPreImage(lockup, lockup)
-    val signature = Bytes64.from(SignatureSchema.sign(preImage, priKey))
+    val signature = Byte64.from(SignatureSchema.sign(preImage, priKey))
     val tx0       = Transaction.from(unsigned0, AVector(signature))
     tx0.pass()
 
-    val tx1 = Transaction.from(unsigned0, AVector(Bytes64.from(Signature.generate)))
+    val tx1 = Transaction.from(unsigned0, AVector(Byte64.from(Signature.generate)))
     tx1.fail(InvalidSignature)
 
     val invalidPubKey = keypairGen.sample.value._2
@@ -1257,7 +1262,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val inputs    = unsigned0.inputs.map(i => i.copy(unlockScript = UnlockScript.polw(pubKey)))
     val unsigned1 = unsigned0.copy(inputs = inputs)
     val preImage  = UnlockScript.PoLW.buildPreImage(lockup, lockup)
-    val signature = Bytes64.from(SignatureSchema.sign(preImage, priKey))
+    val signature = Byte64.from(SignatureSchema.sign(preImage, priKey))
     val tx1       = Transaction.from(unsigned1, AVector(signature))
     tx1.fail(InvalidUnlockScriptType)
   }
@@ -1282,7 +1287,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       .getPreOutputs(tx)
       .rightValue
       .asUnsafe[AssetOutput]
-    lazy val txEnv = TxEnv.dryrun(tx, prevOutputs, Stack.ofCapacity[Bytes64](0))
+    lazy val txEnv = TxEnv.dryrun(tx, prevOutputs, Stack.ofCapacity[Byte64](0))
   }
 
   it should "charge gas for asset script size" in new GasFixture {
@@ -1299,7 +1304,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val lockup   = LockupScript.p2sh(script)
     val unlock   = UnlockScript.p2sh(script, AVector.empty)
     val unsigned = prepareOutput(lockup, unlock)
-    val tx       = Transaction.from(unsigned, AVector.empty[Bytes64])
+    val tx       = Transaction.from(unsigned, AVector.empty[Byte64])
 
     val groupIndex = lockup.groupIndex
     val gasRemaining =
@@ -1491,6 +1496,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     def lockup: LockupScript.P2PK
     def sign(unsignedTx: UnsignedTransaction): Transaction
+    def unlockGas: GasBox
 
     def prepare(): Unit = {
       val block =
@@ -1498,12 +1504,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       addAndCheck(blockFlow, block)
     }
 
-    def createTx(unlock: UnlockScript.P2PK): Transaction = {
+    def createTx(): Transaction = {
       val utxos = blockFlow.getUsableUtxos(None, lockup, Int.MaxValue).rightValue
       utxos.length is 1
 
       val unsignedTx = UnsignedTransaction(
-        utxos.map(utxo => TxInput(utxo.ref, unlock)),
+        utxos.map(utxo => TxInput(utxo.ref, UnlockScript.P2PK)),
         AVector(
           AssetOutput(
             ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee),
@@ -1517,11 +1523,24 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       sign(unsignedTx)
     }
 
+    private def checkUnlockGas(tx: Transaction) = {
+      import GasSchedule._
+      val blockEnv =
+        BlockEnv(tx.chainIndex, networkConfig.networkId, TimeStamp.now(), Target.Max, None)
+      val worldState  = blockFlow.getBestPersistedWorldState(tx.chainIndex.from).rightValue
+      val prevOutputs = worldState.getPreOutputs(tx).rightValue
+      val initialGas  = tx.unsigned.gasAmount
+      val gasLeft     = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, 0).rightValue
+      val gasUsed     = initialGas.use(gasLeft).rightValue
+      gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas addUnsafe unlockGas)
+    }
+
     def checkValidTx(tx: Transaction) = {
       tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
-      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
+      checkUnlockGas(tx)
+      tx.fail(NonExistInput)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
+      tx.fail(NonExistInput)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
+      tx.fail(NonExistInput)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
     }
 
     def checkInvalidTx(invalidTx: Transaction) = {
@@ -1533,23 +1552,50 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "validate p2pk(secp256k1) unlock script" in new P2PKUnlockScriptFixture {
     val (priKey, pubKey) = keypairGen.sample.value
-    val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), Some(groupIndex))
+    val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256K1(pubKey), groupIndex)
 
     def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+    def unlockGas: GasBox                                  = GasSchedule.secp256K1UnlockGas
 
     prepare()
-    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
+    checkValidTx(createTx())
   }
 
-  it should "validate p2pk(passkey) unlock script" in new P2PKUnlockScriptFixture {
+  it should "validate p2pk(secp256r1) unlock script" in new P2PKUnlockScriptFixture {
     val (priKey, pubKey) = SecP256R1.generatePriPub()
-    val lockup           = LockupScript.p2pk(PublicKeyLike.Passkey(pubKey), Some(groupIndex))
+    val lockup           = LockupScript.p2pk(PublicKeyLike.SecP256R1(pubKey), groupIndex)
 
-    def sign(unsignedTx: UnsignedTransaction): Transaction = signWithPasskey(unsignedTx, priKey)
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+    def unlockGas: GasBox                                  = GasSchedule.secp256R1UnlockGas
 
     prepare()
-    checkValidTx(createTx(UnlockScript.P2PK(PublicKeyLike.Passkey)))
-    checkInvalidTx(createTx(UnlockScript.P2PK(PublicKeyLike.SecP256K1)))
+    checkValidTx(createTx())
+  }
+
+  it should "validate p2pk(webauthn) unlock script" in new P2PKUnlockScriptFixture {
+    val (priKey, pubKey) = SecP256R1.generatePriPub()
+    val lockup           = LockupScript.p2pk(PublicKeyLike.WebAuthn(pubKey), groupIndex)
+
+    private var _webauthn: Option[WebAuthn] = None
+    def sign(unsignedTx: UnsignedTransaction): Transaction = {
+      val (webauthn, transaction) = signWithWebAuthn(unsignedTx, priKey)
+      _webauthn = Some(webauthn)
+      transaction
+    }
+    def unlockGas: GasBox = GasSchedule.webauthnUnlockGas(_webauthn.get.bytesLength)
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
+  it should "validate p2pk(ed25519) unlock script" in new P2PKUnlockScriptFixture {
+    val (priKey, pubKey) = ED25519.generatePriPub()
+    val lockup           = LockupScript.p2pk(PublicKeyLike.ED25519(pubKey), groupIndex)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
+    def unlockGas: GasBox                                  = GasSchedule.ed25519UnlockGas
+
+    prepare()
+    checkValidTx(createTx())
   }
 }

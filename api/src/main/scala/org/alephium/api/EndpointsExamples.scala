@@ -29,6 +29,7 @@ import org.alephium.protocol.model.{
   BlockHash,
   CliqueId,
   ContractId,
+  GroupIndex,
   NetworkId,
   TokenId,
   TransactionId
@@ -43,9 +44,8 @@ import org.alephium.util.Hex.HexStringSyntax
 trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
-  private val lockupScript = LockupScript.p2pkh(
-    Hash.unsafe(Hex.unsafe("933bced74566a994aa03b73f8d0471772afcbc825b6a09a385ef6f399a741b8d"))
-  )
+  private val lockupScript =
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
@@ -311,6 +311,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
   )
+
+  private val groupIndex = new GroupIndex(0)
 
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
@@ -1158,7 +1160,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(transaction.unsigned.txId)
 
   private val grouplessAddress =
-    Address.Asset(LockupScript.P2PK.from(PublicKeyLike.SecP256K1(publicKey)))
+    Address.Asset(LockupScript.P2PK(PublicKeyLike.SecP256K1(publicKey), groupIndex))
   private val grouplessAddressRaw = grouplessAddress.toBase58
   implicit val buildGrouplessTransferExamples: List[Example[BuildGrouplessTransferTx]] = List(
     defaultExample(

@@ -18,7 +18,14 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.crypto.MerkleHashable
+import org.alephium.crypto.{
+  Byte64,
+  ED25519,
+  ED25519PrivateKey,
+  MerkleHashable,
+  SecP256R1,
+  SecP256R1PrivateKey
+}
 import org.alephium.protocol._
 import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.mining.Emission
@@ -29,8 +36,8 @@ import org.alephium.util.{AVector, Duration, Hex, Math, TimeStamp, U256}
 
 sealed trait TransactionAbstract {
   def unsigned: UnsignedTransaction
-  def inputSignatures: AVector[Bytes64]
-  def scriptSignatures: AVector[Signature]
+  def inputSignatures: AVector[Byte64]
+  def scriptSignatures: AVector[Byte64]
 
   def id: TransactionId = unsigned.id
 
@@ -62,8 +69,8 @@ final case class Transaction(
     scriptExecutionOk: Boolean,
     contractInputs: AVector[ContractOutputRef],
     generatedOutputs: AVector[TxOutput],
-    inputSignatures: AVector[Bytes64],
-    scriptSignatures: AVector[Signature]
+    inputSignatures: AVector[Byte64],
+    scriptSignatures: AVector[Byte64]
 ) extends TransactionAbstract
     with MerkleHashable[Hash]
     with SerializationCache {
@@ -171,7 +178,7 @@ object Transaction {
   def from(
       inputs: AVector[TxInput],
       outputs: AVector[AssetOutput],
-      inputSignatures: AVector[Bytes64]
+      inputSignatures: AVector[Byte64]
   )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
@@ -187,7 +194,7 @@ object Transaction {
       inputs: AVector[TxInput],
       outputs: AVector[AssetOutput],
       generatedOutputs: AVector[TxOutput],
-      inputSignatures: AVector[Bytes64]
+      inputSignatures: AVector[Byte64]
   )(implicit networkConfig: NetworkConfig): Transaction = {
     Transaction(
       UnsignedTransaction(inputs, outputs),
@@ -203,18 +210,36 @@ object Transaction {
     from(unsigned, AVector.empty[TxOutput], privateKey)
   }
 
+  def from(unsigned: UnsignedTransaction, privateKey: SecP256R1PrivateKey): Transaction = {
+    val signature = SecP256R1.sign(unsigned.id, privateKey)
+    from(unsigned, AVector.empty[TxOutput], Byte64.from(signature))
+  }
+
+  def from(unsigned: UnsignedTransaction, privateKey: ED25519PrivateKey): Transaction = {
+    val signature = ED25519.sign(unsigned.id, privateKey)
+    from(unsigned, AVector.empty[TxOutput], Byte64.from(signature))
+  }
+
   def from(
       unsigned: UnsignedTransaction,
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
     val signature = SignatureSchema.sign(unsigned.id, privateKey)
+    from(unsigned, generatedOutputs, Byte64.from(signature))
+  }
+
+  private def from(
+      unsigned: UnsignedTransaction,
+      generatedOutputs: AVector[TxOutput],
+      rawSignature: Byte64
+  ): Transaction = {
     Transaction(
       unsigned,
       scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs,
-      AVector(Bytes64.from(signature)),
+      AVector(rawSignature),
       scriptSignatures = AVector.empty
     )
   }
@@ -231,12 +256,12 @@ object Transaction {
       scriptExecutionOk = true,
       contractInputs,
       generatedOutputs,
-      AVector(Bytes64.from(signature)),
+      AVector(Byte64.from(signature)),
       scriptSignatures = AVector.empty
     )
   }
 
-  def from(unsigned: UnsignedTransaction, inputSignatures: AVector[Bytes64]): Transaction = {
+  def from(unsigned: UnsignedTransaction, inputSignatures: AVector[Byte64]): Transaction = {
     Transaction(
       unsigned,
       scriptExecutionOk = true,
@@ -335,8 +360,8 @@ object Transaction {
       scriptExecutionOk: Boolean,
       contractInputs: AVector[ContractOutputRef],
       generatedOutputs: AVector[TxOutput],
-      inputSignatures: AVector[Bytes64],
-      scriptSignatures: AVector[Signature]
+      inputSignatures: AVector[Byte64],
+      scriptSignatures: AVector[Byte64]
   )
   object MerkelTx {
     implicit val serde: Serde[MerkelTx] = Serde.forProduct6(
@@ -356,8 +381,8 @@ object Transaction {
 
 final case class TransactionTemplate(
     unsigned: UnsignedTransaction,
-    inputSignatures: AVector[Bytes64],
-    scriptSignatures: AVector[Signature]
+    inputSignatures: AVector[Byte64],
+    scriptSignatures: AVector[Byte64]
 ) extends TransactionAbstract
     with SerializationCache {
   override def outputsLength: Int = unsigned.fixedOutputs.length
@@ -378,7 +403,7 @@ object TransactionTemplate {
     val signature = SignatureSchema.sign(unsigned.id, privateKey)
     TransactionTemplate(
       unsigned,
-      AVector(Bytes64.from(signature)),
+      AVector(Byte64.from(signature)),
       scriptSignatures = AVector.empty
     )
   }
