@@ -1137,6 +1137,8 @@ trait FlowFixture
 }
 
 trait GhostUncleFixture extends FlowFixture {
+  override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
   private def getBlockTemplate(blockFlow: BlockFlow, chainIndex: ChainIndex, height: Int) = {
     val hash           = blockFlow.getHashes(chainIndex, height).rightValue.head
     val mainChainBlock = blockFlow.getBlockUnsafe(hash)
@@ -1145,13 +1147,18 @@ trait GhostUncleFixture extends FlowFixture {
 
   private def mineDuplicateGhostUncle(blockFlow: BlockFlow, template: BlockFlowTemplate) = {
     val block = mine(blockFlow, template)
-    block.header.copy(nonce = Nonce.zero) is template.dummyHeader()
+    BlockHeader.fromSameTemplate(block.header, template.dummyHeader()) is true
     addAndCheck(blockFlow, block)
     block
   }
 
   def mineBlocks(blockFlow: BlockFlow, chainIndex: ChainIndex, size: Int): Unit = {
-    (0 until size).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+    val depGroupIndex = (chainIndex.from.value + 1) % blockFlow.brokerConfig.groups
+    val depChainIndex = ChainIndex.unsafe(depGroupIndex, depGroupIndex)
+    (0 until size).foreach { _ =>
+      addAndCheck(blockFlow, emptyBlock(blockFlow, depChainIndex))
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    }
   }
 
   def mineDuplicateGhostUncleBlockAt(
@@ -1174,10 +1181,13 @@ trait GhostUncleFixture extends FlowFixture {
       chainIndex: ChainIndex,
       height: Int
   ): Block = {
-    val template = getBlockTemplate(blockFlow, chainIndex, height)
-    val newMiner = LockupScript.p2pkh(chainIndex.to.generateKey._2)
-    val block = mine(blockFlow, chainIndex, BlockDeps(template.deps), AVector.empty, newMiner, None)
-    block.header.copy(nonce = Nonce.zero) isnot template.dummyHeader()
+    val template      = getBlockTemplate(blockFlow, chainIndex, height)
+    val depGroupIndex = (chainIndex.from.value + 1) % blockFlow.brokerConfig.groups
+    val depIndex = if (depGroupIndex < chainIndex.from.value) depGroupIndex else depGroupIndex - 1
+    val oldDep   = blockFlow.getBlockHeaderUnsafe(template.deps(depIndex))
+    val newDeps  = BlockDeps.unsafe(template.deps.replace(depIndex, oldDep.parentHash))
+    val block    = mine(blockFlow, chainIndex, newDeps)
+    BlockHeader.fromSameTemplate(block.header, template.dummyHeader()) is false
     addAndCheck(blockFlow, block)
     block
   }

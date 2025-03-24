@@ -775,14 +775,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
     mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
 
-    val uncleHeight0                 = nextInt(1, ALPH.MaxGhostUncleAge - 2)
+    val uncleHeight0                 = nextInt(1, ALPH.MaxGhostUncleAge - 3)
     val (ghostUncle00, ghostUncle01) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight0)
     val miner                        = getGenesisLockupScript(chainIndex.to)
     val blockTemplate0               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate0.ghostUncleHashes.contains(ghostUncle00.hash) is false
     blockTemplate0.ghostUncleHashes.contains(ghostUncle01.hash) is true
 
-    val uncleHeight1                 = nextInt(1, ALPH.MaxGhostUncleAge - 2)
+    val uncleHeight1                 = uncleHeight0 + 1
     val (ghostUncle10, ghostUncle11) = mineTwoGhostUnclesAt(blockFlow, chainIndex, uncleHeight1)
     val blockTemplate1               = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate1.ghostUncleHashes.contains(ghostUncle00.hash) is false
@@ -790,7 +790,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockTemplate1.ghostUncleHashes.contains(ghostUncle10.hash) is false
     blockTemplate1.ghostUncleHashes.contains(ghostUncle11.hash) is true
 
-    val uncleHeight2 = math.max(uncleHeight0, uncleHeight1) + 1
+    val uncleHeight2 = uncleHeight1 + 1
     val ghostUncle2  = mineValidGhostUncleBlockAt(blockFlow, chainIndex, uncleHeight2)
     val ghostUncle3  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle2)
     val ghostUncle4  = mineDuplicateGhostUncleBlock(blockFlow, ghostUncle2)
