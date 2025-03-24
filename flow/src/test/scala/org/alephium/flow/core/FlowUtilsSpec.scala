@@ -431,10 +431,12 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, transferBlock)
   }
 
-  it should "prepare block with correct coinbase reward for since-rhone hardfork" in new CoinbaseRewardFixture {
+  it should "prepare block with correct coinbase reward for since-rhone hardfork" in new CoinbaseRewardFixture
+    with SinceRhoneGhostUncleFixture {
     setHardForkSince(HardFork.Rhone)
-    val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
-    val emission   = consensusConfigs.rhone.emission
+    override lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    val emptyBlock               = mineFromMemPool(blockFlow, chainIndex)
+    val emission                 = consensusConfigs.rhone.emission
     val miningReward = emission
       .reward(emptyBlock.header)
       .miningReward
@@ -450,48 +452,36 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, transferBlock)
 
     {
-      val block0 = emptyBlock(blockFlow, chainIndex)
-      val block1 = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block0, block1)
-      blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 3
-      val block2          = mineBlockTemplate(blockFlow, chainIndex)
-      val hashesAtHeight3 = blockFlow.getHashes(chainIndex, 3).rightValue
-      block2.ghostUncleHashes.rightValue is hashesAtHeight3.tail
-      block2.coinbase.unsigned.fixedOutputs.length is 2
-      val uncleReward = block2.coinbase.unsigned.fixedOutputs(1).amount
-      uncleReward is Coinbase.calcGhostUncleReward(mainChainReward, 1)
-      block2.coinbaseReward is mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
-      addAndCheck(blockFlow, block2)
+      mineUncleBlocks(blockFlow, chainIndex, 1)
+      val block = mineBlockTemplate(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      val ghostUncleHashes = block.ghostUncleHashes.rightValue
+      ghostUncleHashes.length is 1
+      block.coinbase.unsigned.fixedOutputs.length is 2
+      val uncleReward = block.coinbase.unsigned.fixedOutputs(1).amount
+      val heightDiff =
+        blockFlow.getHeightUnsafe(block.hash) - blockFlow.getHeightUnsafe(ghostUncleHashes.head)
+      uncleReward is Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
+      block.coinbaseReward is mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
     }
 
     {
-      val block0 = emptyBlock(blockFlow, chainIndex)
-      val block1 = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block0, block1)
-      val block2 = emptyBlock(blockFlow, chainIndex)
-      val block3 = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block2, block3)
-      val block4 = mineBlockTemplate(blockFlow, chainIndex)
-      blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 6
-      val hashesAtHeight5  = blockFlow.getHashes(chainIndex, 5).rightValue
-      val hashesAtHeight6  = blockFlow.getHashes(chainIndex, 6).rightValue
-      val ghostUncleHashes = block4.ghostUncleHashes.rightValue
-      ghostUncleHashes is
-        AVector(hashesAtHeight6(1), hashesAtHeight5(1)).sortBy(_.bytes)(Bytes.byteStringOrdering)
-      block4.coinbase.unsigned.fixedOutputs.length is 3
-      val uncle0Reward = block4.coinbase.unsigned.fixedOutputs(1).amount
-      val uncle1Reward = block4.coinbase.unsigned.fixedOutputs(2).amount
-      if (ghostUncleHashes == AVector(hashesAtHeight6(1), hashesAtHeight5(1))) {
-        uncle0Reward is Coinbase.calcGhostUncleReward(mainChainReward, 1)
-        uncle1Reward is Coinbase.calcGhostUncleReward(mainChainReward, 2)
-      } else {
-        uncle0Reward is Coinbase.calcGhostUncleReward(mainChainReward, 2)
-        uncle1Reward is Coinbase.calcGhostUncleReward(mainChainReward, 1)
+      mineUncleBlocks(blockFlow, chainIndex, 2)
+      val block = mineBlockTemplate(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      val ghostUncleHashes = block.ghostUncleHashes.rightValue
+      ghostUncleHashes.length is 2
+      block.coinbase.unsigned.fixedOutputs.length is 3
+      val uncleRewards = ghostUncleHashes.mapWithIndex { case (ghostUncleHash, index) =>
+        val uncleReward = block.coinbase.unsigned.fixedOutputs(index + 1).amount
+        val heightDiff =
+          blockFlow.getHeightUnsafe(block.hash) - blockFlow.getHeightUnsafe(ghostUncleHash)
+        uncleReward is Coinbase.calcGhostUncleReward(mainChainReward, heightDiff)
+        uncleReward
       }
-      block4.coinbaseReward is mainChainReward.addUnsafe(
-        uncle0Reward.addUnsafe(uncle1Reward).divUnsafe(32)
+      block.coinbaseReward is mainChainReward.addUnsafe(
+        uncleRewards.fold(U256.Zero)(_ addUnsafe _).divUnsafe(32)
       )
-      addAndCheck(blockFlow, block4)
     }
   }
 
@@ -703,13 +693,15 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
   }
 
-  trait SinceRhonePrepareBlockFlowFixture extends PrepareBlockFlowFixture {
-    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+  trait SinceRhoneGhostUncleFixture extends GhostUncleFixture with NoIndexModelGeneratorsLike {
     setHardForkSince(HardFork.Rhone)
+
+    lazy val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    lazy val miner      = getGenesisLockupScript(chainIndex.to)
   }
 
-  it should "prepare block with uncles since rhone hardfork" in new SinceRhonePrepareBlockFlowFixture {
-    val ghostUncleHash = prepare()
+  it should "prepare block with uncles since rhone hardfork" in new SinceRhoneGhostUncleFixture {
+    val ghostUncleHash = mineUncleBlocks(blockFlow, chainIndex, 1).head
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
     val block = mine(blockFlow, blockTemplate)
@@ -718,34 +710,38 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
   }
 
-  it should "select uncles that deps are from mainchain" in new SinceRhonePrepareBlockFlowFixture {
-    val chain00 = ChainIndex.unsafe(0, 0)
-    chainIndex isnot chain00
-
-    val depBlock0 = emptyBlock(blockFlow, chain00)
-    val depBlock1 = emptyBlock(blockFlow, chain00)
+  it should "select uncles that deps are from mainchain" in new SinceRhoneGhostUncleFixture {
+    val depGroupIndex = GroupIndex.unsafe((chainIndex.from.value + 1) % brokerConfig.groups)
+    val depChainIndex = ChainIndex(depGroupIndex, depGroupIndex)
+    val depBlock0     = emptyBlock(blockFlow, depChainIndex)
+    val depBlock1     = emptyBlock(blockFlow, depChainIndex)
     addAndCheck(blockFlow, depBlock0, depBlock1)
 
-    val depHashes = blockFlow.getHashes(chain00, 1).rightValue
-    depHashes.toSet is Set(depBlock0.hash, depBlock1.hash)
+    val uncleBlockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
 
-    val uncle0Template =
-      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
-    val uncle1Template =
-      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
-    val block0 = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0)
-    val block1 = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block1)
-
-    val uncleDepHash = depHashes.filter(_ != block1.blockDeps.inDeps(0)).head
-    val uncle0 =
-      mine(blockFlow, uncle0Template.copy(deps = uncle0Template.deps.replace(0, uncleDepHash)))
-    val uncle1 = mine(blockFlow, uncle1Template)
-    addAndCheck(blockFlow, uncle0, uncle1)
-
-    val block2 = mineBlockTemplate(blockFlow, chainIndex)
-    block2.ghostUncleHashes.rightValue is AVector(uncle1.hash)
+    val depIndex = if (depGroupIndex.value > chainIndex.from.value) {
+      depGroupIndex.value - 1
+    } else {
+      depGroupIndex.value
+    }
+    val depChainHashes = blockFlow.getHashes(depChainIndex, 1).rightValue
+    val invalidDepHash =
+      if (depChainHashes.head == depBlock0.hash) depBlock1.hash else depBlock0.hash
+    val invalidUncle = mine(
+      blockFlow,
+      uncleBlockTemplate.copy(deps = uncleBlockTemplate.deps.replace(depIndex, invalidDepHash))
+    )
+    val validDepHash = blockFlow.getHashes(depChainIndex, 0).rightValue.head
+    val validUncle = mine(
+      blockFlow,
+      uncleBlockTemplate.copy(deps = uncleBlockTemplate.deps.replace(depIndex, validDepHash))
+    )
+    addAndCheck(blockFlow, invalidUncle, validUncle)
+    val block = mineBlockTemplate(blockFlow, chainIndex)
+    block.ghostUncleHashes.rightValue is AVector(validUncle.hash)
+    addAndCheck(blockFlow, block)
   }
 
   it should "select duplicate ghost uncles before danube" in new GhostUncleFixture with Generators {
@@ -845,9 +841,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     template2 is blockFlow.rebuild(template1, AVector.empty, AVector.empty, miner)
   }
 
-  it should "rebuild block template if there are invalid uncles" in new SinceRhonePrepareBlockFlowFixture {
-    val miner               = getGenesisLockupScript(chainIndex.to)
-    val ghostUncleHash      = prepare()
+  it should "rebuild block template if there are invalid uncles" in new SinceRhoneGhostUncleFixture {
+    val ghostUncleHash      = mineUncleBlocks(blockFlow, chainIndex, 1).head
     val (template0, uncles) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
     uncles.map(_.blockHash) is AVector(ghostUncleHash)
     blockFlow.validateTemplate(chainIndex, template0, uncles, miner).rightValue is template0
@@ -862,9 +857,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     template3 is blockFlow.rebuild(template2, template2.transactions.init, AVector.empty, miner)
   }
 
-  it should "rebuild block template if there are invalid txs and uncles" in new SinceRhonePrepareBlockFlowFixture {
-    prepare()
-    val miner               = getGenesisLockupScript(chainIndex.to)
+  it should "rebuild block template if there are invalid txs and uncles" in new SinceRhoneGhostUncleFixture {
+    mineUncleBlocks(blockFlow, chainIndex, 1)
     val (template0, uncles) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
     val block0              = mine(blockFlow, template0)
     addAndCheck(blockFlow, block0)

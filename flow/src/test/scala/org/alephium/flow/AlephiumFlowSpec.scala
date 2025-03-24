@@ -1161,6 +1161,18 @@ trait GhostUncleFixture extends FlowFixture {
     }
   }
 
+  def mineUncleBlocks(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      uncleSize: Int
+  ): AVector[BlockHash] = {
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+    val height = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
+    AVector.from(0 until uncleSize).map { index =>
+      mineValidGhostUncleBlockAt(blockFlow, chainIndex, height - 1 - index).hash
+    }
+  }
+
   def mineDuplicateGhostUncleBlockAt(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
