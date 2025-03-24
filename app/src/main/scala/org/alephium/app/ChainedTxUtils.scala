@@ -17,7 +17,6 @@ package org.alephium.app
 
 import scala.collection.mutable
 
-import akka.util.ByteString
 import sttp.model.StatusCode
 
 import org.alephium.api.{badRequest, failedInIO, ApiError, Try}
@@ -30,7 +29,6 @@ import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Math, TimeStamp, U256}
 
 trait ChainedTxUtils { self: ServerUtils =>
@@ -77,7 +75,7 @@ trait ChainedTxUtils { self: ServerUtils =>
       blockFlow: BlockFlow,
       lockPair: (LockupScript.Asset, UnlockScript),
       otherLockPairs: AVector[(LockupScript.Asset, UnlockScript)],
-      bytecode: ByteString,
+      script: StatefulScript,
       amounts: ScriptTxAmounts,
       gasEstimationMultiplier: Option[Double],
       gasAmount: Option[GasBox],
@@ -86,9 +84,6 @@ trait ChainedTxUtils { self: ServerUtils =>
   ): Try[BuildGrouplessExecuteScriptTxResult] = {
     for {
       multiplier <- GasEstimationMultiplier.from(gasEstimationMultiplier).left.map(badRequest)
-      script <- deserialize[StatefulScript](bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
       utxos <- blockFlow
         .getUsableUtxos(lockPair._1, apiConfig.defaultUtxosLimit)
         .left
@@ -410,7 +405,9 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  private def getAvailableBalances(utxos: AVector[FlowUtils.AssetOutputInfo]): (U256, AVector[(TokenId, U256)]) = {
+  private def getAvailableBalances(
+      utxos: AVector[FlowUtils.AssetOutputInfo]
+  ): (U256, AVector[(TokenId, U256)]) = {
     var alphBalance   = U256.Zero
     val tokenBalances = new TxUtils.TokenBalances(mutable.Map.empty)
     val currentTs     = TimeStamp.now()
@@ -436,7 +433,10 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  private def getExtraUtxos(lockup: LockupScript.Asset, txs: AVector[UnsignedTransaction]): AVector[FlowUtils.AssetOutputInfo] = {
+  private def getExtraUtxos(
+      lockup: LockupScript.Asset,
+      txs: AVector[UnsignedTransaction]
+  ): AVector[FlowUtils.AssetOutputInfo] = {
     val extraUtxos = mutable.ArrayBuffer.empty[FlowUtils.AssetOutputInfo]
     txs.foreach(tx =>
       tx.fixedOutputs.mapWithIndex { case (output, index) =>

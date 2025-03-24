@@ -1159,13 +1159,14 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val grouplessAddress =
     Address.Asset(LockupScript.P2PK.from(PublicKeyLike.SecP256K1(publicKey)))
+  private val grouplessAddressRaw = grouplessAddress.toBase58
   implicit val buildGrouplessTransferExamples: List[Example[BuildGrouplessTransferTx]] = List(
     defaultExample(
-      BuildGrouplessTransferTx(grouplessAddress, defaultDestinations)
+      BuildGrouplessTransferTx(grouplessAddressRaw, defaultDestinations)
     ),
     moreSettingsExample(
       BuildGrouplessTransferTx(
-        grouplessAddress,
+        grouplessAddressRaw,
         moreSettingsDestinations,
         Some(model.nonCoinbaseMinGasPrice)
       )
@@ -1174,10 +1175,10 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildGrouplessExecuteScriptTxExamples: List[Example[BuildGrouplessExecuteScriptTx]] =
     List(
-      defaultExample(BuildGrouplessExecuteScriptTx(grouplessAddress, bytecode = byteString)),
+      defaultExample(BuildGrouplessExecuteScriptTx(grouplessAddressRaw, bytecode = byteString)),
       moreSettingsExample(
         BuildGrouplessExecuteScriptTx(
-          grouplessAddress,
+          grouplessAddressRaw,
           byteString,
           Some(Amount(model.dustUtxoAmount)),
           Some(tokens),
@@ -1214,10 +1215,10 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildGrouplessDeployContractTxExamples
       : List[Example[BuildGrouplessDeployContractTx]] = List(
-    defaultExample(BuildGrouplessDeployContractTx(grouplessAddress, bytecode = byteString)),
+    defaultExample(BuildGrouplessDeployContractTx(grouplessAddressRaw, bytecode = byteString)),
     moreSettingsExample(
       BuildGrouplessDeployContractTx(
-        grouplessAddress,
+        grouplessAddressRaw,
         byteString,
         Some(bigAmount),
         Some(tokens),

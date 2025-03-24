@@ -171,12 +171,14 @@ class Lexer(fileURI: Option[java.net.URI])(implicit groupConfig: GroupConfig) {
     }
 
   def addressInternal[Unknown: P]: P[(Val.Address, Int, Int)] =
-    P(Index ~ CharsWhileIn("0-9a-zA-Z").!).map { case (index, input) =>
-      val lockupScriptOpt = Address.extractLockupScript(input)
-      lockupScriptOpt match {
-        case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
-        case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
-      }
+    P(Index ~ CharsWhileIn("0-9a-zA-Z").! ~ (":" ~ digit.rep(1).!).?).map {
+      case (index, input0, groupIndexOpt) =>
+        val input = groupIndexOpt.map(groupIndex => s"$input0:${groupIndex}").getOrElse(input0)
+        val lockupScriptOpt = Address.extractLockupScript(input)
+        lockupScriptOpt match {
+          case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
+          case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
+        }
     }
   def address[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
     P(Index ~ "@" ~ addressInternal).map { case (index, (address, _, addressWidth)) =>

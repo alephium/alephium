@@ -155,20 +155,34 @@ class ServerUtils(implicit
     }
   }
 
-  def getBalance(blockFlow: BlockFlow, address: Address, getMempoolUtxos: Boolean): Try[Balance] = {
+  def getBalance(
+      blockFlow: BlockFlow,
+      addressRaw: String,
+      getMempoolUtxos: Boolean
+  ): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
-    for {
-      _ <- checkGroup(address.lockupScript)
-      balance <- blockFlow
-        .getBalance(
-          address.lockupScript,
-          utxosLimit,
-          getMempoolUtxos
-        )
-        .map(Balance.from)
-        .left
-        .flatMap(tooManyUtxos)
-    } yield balance
+    Address.fromBase58(addressRaw) match {
+      case Some(address) =>
+        address.lockupScript match {
+          case _: LockupScript.P2PK if !LockupScript.P2PK.hasExplicitGroupIndex(addressRaw) =>
+            getGrouplessBalance(blockFlow, address, getMempoolUtxos)
+          case _ =>
+            for {
+              _ <- checkGroup(address.lockupScript)
+              balance <- blockFlow
+                .getBalance(
+                  address.lockupScript,
+                  utxosLimit,
+                  getMempoolUtxos
+                )
+                .map(Balance.from)
+                .left
+                .flatMap(tooManyUtxos)
+            } yield balance
+        }
+      case None =>
+        Left(ApiError.BadRequest(s"Unable to decode address from $addressRaw"))
+    }
   }
 
   def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address): Try[UTXOs] = {
@@ -1577,10 +1591,8 @@ class ServerUtils(implicit
       multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
       amounts    <- query.getAmounts.left.map(badRequest)
       lockPair   <- query.getLockPair()
-      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-      utxos <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
+      script     <- query.decodeStatefulScript().left.map(badRequest)
+      utxos      <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
       result <- buildExecuteScriptTx(
         blockFlow,
         amounts,
@@ -2351,7 +2363,7 @@ object ServerUtils {
 
   def buildDeployContractScriptRawWithParsedState(
       codeRaw: String,
-      address: Address,
+      address: String,
       initialImmFields: AVector[vm.Val],
       initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
@@ -2402,7 +2414,7 @@ object ServerUtils {
   )(implicit groupConfig: GroupConfig): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
-      address,
+      address.toBase58Extended,
       initialImmFields,
       initialMutFields,
       initialAttoAlphAmount,

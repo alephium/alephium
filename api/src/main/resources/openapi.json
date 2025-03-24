@@ -5704,8 +5704,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "address"
+              "type": "string"
             }
           },
           {
@@ -13575,12 +13574,12 @@
       }
     },
     "/groupless/transfer": {
-      "get": {
+      "post": {
         "tags": [
           "Groupless"
         ],
         "summary": "Build unsigned transfer transactions from a groupless address",
-        "operationId": "getGrouplessTransfer",
+        "operationId": "postGrouplessTransfer",
         "requestBody": {
           "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
           "content": {
@@ -13719,6 +13718,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -13794,27 +13806,60 @@
                     "gasAmount": 20000,
                     "gasPrice": "100000000000",
                     "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                    "simulatedOutputs": [
-                      {
-                        "type": "AssetOutput",
-                        "hint": 1,
-                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                        "attoAlphAmount": "2000000000000000000",
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "42000000000000000000"
-                          },
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "1000000000000000000000"
-                          }
-                        ],
-                        "lockTime": 1611041396892,
-                        "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                      }
-                    ]
+                    "simulationResult": {
+                      "contractInputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "100000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "100000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "generatedOutputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "99000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "101000000000000000000"
+                            }
+                          ]
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -13882,6 +13927,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -14033,163 +14091,16 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/groupless/{address}/balance": {
-      "get": {
-        "tags": [
-          "Groupless"
-        ],
-        "summary": "Get the balance of a groupless address",
-        "operationId": "getGrouplessAddressBalance",
-        "parameters": [
-          {
-            "name": "address",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "address"
-            }
           },
-          {
-            "name": "mempool",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
+          "504": {
+            "description": "GatewayTimeout",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Balance"
-                },
-                "examples": {
-                  "Example0": {
-                    "summary": "Default",
-                    "value": {
-                      "balance": "10000000000000000000",
-                      "balanceHint": "10 ALPH",
-                      "lockedBalance": "5000000000000000000",
-                      "lockedBalanceHint": "5 ALPH",
-                      "tokenBalances": [
-                        {
-                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                          "amount": "42000000000000000000"
-                        },
-                        {
-                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                          "amount": "1000000000000000000000"
-                        }
-                      ],
-                      "lockedTokenBalances": [
-                        {
-                          "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
-                          "amount": "65000000000000000000"
-                        }
-                      ],
-                      "utxoNum": 3
-                    }
-                  },
-                  "Example1": {
-                    "summary": "More settings",
-                    "value": {
-                      "balance": "10000000000000000000",
-                      "balanceHint": "10 ALPH",
-                      "lockedBalance": "5000000000000000000",
-                      "lockedBalanceHint": "5 ALPH",
-                      "tokenBalances": [
-                        {
-                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                          "amount": "42000000000000000000"
-                        },
-                        {
-                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                          "amount": "1000000000000000000000"
-                        }
-                      ],
-                      "lockedTokenBalances": [
-                        {
-                          "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
-                          "amount": "65000000000000000000"
-                        }
-                      ],
-                      "utxoNum": 3
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
+                  "$ref": "#/components/schemas/GatewayTimeout"
                 },
                 "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -15056,8 +14967,7 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           },
           "bytecode": {
             "type": "string",
@@ -15119,8 +15029,7 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           },
           "bytecode": {
             "type": "string",
@@ -15178,8 +15087,7 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           },
           "destinations": {
             "type": "array",

@@ -578,7 +578,7 @@ object WalletService {
         address: Address.Asset
     ): Future[Either[WalletError, (Address.Asset, Amount, Amount)]] = {
       blockFlowClient
-        .fetchBalance(address)
+        .fetchBalance(address.toBase58)
         .map(
           _.map { case (amount, lockedAmount) =>
             (address, amount, lockedAmount)

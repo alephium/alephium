@@ -40,6 +40,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     val fromLockupScript = LockupScript.p2pk(PublicKeyLike.Passkey(fromPublicKey), None)
     val fromAddress      = Address.Asset(fromLockupScript)
+    val fromAddressRaw   = fromAddress.toBase58
     val chainIndex       = ChainIndex(fromLockupScript.groupIndex, fromLockupScript.groupIndex)
     val allLockupScripts = brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.Asset]) {
       case (acc, group) =>
@@ -157,7 +158,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           Some(AVector(Token(tokenId, tokenTransferAmount)))
         )
       }
-      val query = BuildGrouplessTransferTx(fromAddress, destinations)
+      val query = BuildGrouplessTransferTx(fromAddressRaw, destinations)
 
       val txs = buildGrouplessTransferTx(query)
       txs.length is expectedTxSize
@@ -220,7 +221,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.alph(2))),
         Some(AVector(Token(tokenId, ALPH.alph(2))))
       )
-    val query0 = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
+    val query0 = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination0))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query0)
       .leftValue
@@ -232,7 +233,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.oneAlph)),
         Some(AVector(Token(tokenId, ALPH.alph(3))))
       )
-    val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
+    val query1 = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
       .leftValue
@@ -245,7 +246,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
     val destination0 = Destination(toAddress, Some(Amount(ALPH.oneAlph)), None)
-    val query0       = BuildGrouplessTransferTx(fromAddress, AVector(destination0))
+    val query0       = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination0))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query0)
       .leftValue
@@ -258,7 +259,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.oneAlph)),
         Some(AVector(Token(tokenId, ALPH.alph(2))))
       )
-    val query1 = BuildGrouplessTransferTx(fromAddress, AVector(destination1))
+    val query1 = BuildGrouplessTransferTx(fromAddressRaw, AVector(destination1))
     serverUtils
       .buildGrouplessTransferTx(blockFlow, query1)
       .leftValue
@@ -300,7 +301,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       val compiledScript = Compiler.compileTxScript(script).rightValue
       BuildGrouplessExecuteScriptTx(
-        fromAddress,
+        fromAddressRaw,
         serialize(compiledScript),
         attoAlphAmount = Some(alphAmount),
         tokens = Some(AVector(Token(tokenId, tokenAmount)))
@@ -362,6 +363,8 @@ class GrouplessUtilsSpec extends AlephiumSpec {
   }
 
   trait BuildDeployContractTxFixture extends BuildExecuteScriptTxFixture {
+    val fromAddressWithGroupIndex =
+      s"${fromAddressRaw}:${fromAddress.lockupScript.groupIndex.value}"
     def buildDeployContractQuery(
         alphAmount: U256,
         tokenAmount: U256
@@ -372,7 +375,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         AVector.empty
       )
       BuildGrouplessDeployContractTx(
-        fromAddress,
+        fromAddressWithGroupIndex,
         serialize(code),
         initialAttoAlphAmount = Some(alphAmount),
         initialTokenAmounts = Some(AVector(Token(tokenId, tokenAmount)))
@@ -445,8 +448,10 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     serverUtils.getGrouplessBalance(blockFlow, invalidAddress, false).leftValue.detail is
       s"""Invalid groupless address: $invalidAddress"""
 
-    val lockTime = TimeStamp.now().plusHoursUnsafe(1)
-    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.head, Some(lockTime))
+    val lockTime      = TimeStamp.now().plusHoursUnsafe(1)
+    val lockupScript1 = allLockupScripts.head
+    val addressRaw1   = Address.from(lockupScript1).toBase58Extended
+    prepare(ALPH.alph(2), ALPH.alph(2), lockupScript1, Some(lockTime))
     val balance0 = serverUtils.getGrouplessBalance(blockFlow, fromAddress, true).rightValue
     balance0.balance.value is ALPH.alph(2)
     balance0.lockedBalance.value is ALPH.alph(2)
@@ -454,7 +459,9 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance0.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
     balance0.utxoNum is 2
 
-    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+    val lockupScript2 = allLockupScripts(1)
+    val addressRaw2   = Address.from(lockupScript2).toBase58Extended
+    prepare(ALPH.alph(2), ALPH.alph(2), lockupScript2)
     val balance1 = serverUtils.getGrouplessBalance(blockFlow, fromAddress, true).rightValue
     balance1.balance.value is ALPH.alph(4)
     balance1.lockedBalance.value is ALPH.alph(2)
@@ -462,12 +469,43 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance1.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
     balance1.utxoNum is 4
 
-    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.last)
+    val lockupScript3 = allLockupScripts.last
+    val addressRaw3   = Address.from(lockupScript3).toBase58Extended
+    prepare(ALPH.alph(2), ALPH.alph(2), lockupScript3)
     val balance2 = serverUtils.getGrouplessBalance(blockFlow, fromAddress, true).rightValue
     balance2.balance.value is ALPH.alph(6)
     balance2.lockedBalance.value is ALPH.alph(2)
     balance2.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(6))))
     balance2.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
     balance2.utxoNum is 6
+
+    val grouplessAddressRaw = fromAddress.toBase58
+    val balance3 = serverUtils.getBalance(blockFlow, grouplessAddressRaw, true).rightValue
+    balance3.balance.value is ALPH.alph(6)
+    balance3.lockedBalance.value is ALPH.alph(2)
+    balance3.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(6))))
+    balance3.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance3.utxoNum is 6
+
+    val balance4 = serverUtils.getBalance(blockFlow, addressRaw1, true).rightValue
+    balance4.balance.value is ALPH.alph(2)
+    balance4.lockedBalance.value is ALPH.alph(2)
+    balance4.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance4.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance4.utxoNum is 2
+
+    val balance5 = serverUtils.getBalance(blockFlow, addressRaw2, true).rightValue
+    balance5.balance.value is ALPH.alph(2)
+    balance5.lockedBalance.value is ALPH.alph(0)
+    balance5.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance5.lockedTokenBalances is None
+    balance5.utxoNum is 2
+
+    val balance6 = serverUtils.getBalance(blockFlow, addressRaw3, true).rightValue
+    balance6.balance.value is ALPH.alph(2)
+    balance6.lockedBalance.value is ALPH.alph(0)
+    balance6.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
+    balance6.lockedTokenBalances is None
+    balance6.utxoNum is 2
   }
 }

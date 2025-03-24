@@ -26,7 +26,7 @@ import akka.util.ByteString
 import org.alephium.io.IOError
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, HardFork}
+import org.alephium.protocol.model.{Address, ContractId, HardFork}
 import org.alephium.serde
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes, EitherF, Hex}
@@ -334,6 +334,26 @@ object StatefulScript {
         )
       )
     )
+
+  def deriveContractAddress(script: StatefulScript): Option[Address.Contract] = {
+    var prevInstr: Option[Instr[StatefulContext]] = None
+    script.methods.flatMap(_.instrs).collectFirst { instr =>
+      val isCallingExternal = instr match {
+        case CallExternalBySelector(_) | CallExternal(_) => true
+        case _                                           => false
+      }
+      if (isCallingExternal) {
+        prevInstr match {
+          case Some(BytesConst(Val.ByteVec(bytes))) =>
+            ContractId.from(bytes).map(Address.contract(_))
+          case _ => None
+        }
+      } else {
+        prevInstr = Some(instr)
+        None
+      }
+    }
+  }
 }
 
 @HashSerde

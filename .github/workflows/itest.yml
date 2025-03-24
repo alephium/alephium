@@ -22,5 +22,5 @@ jobs:
           cache: sbt
       - name: Setup SBT
         uses: sbt/setup-sbt@v1
-      - run: sbt it:test
+      - run: sbt integration/test
         shell: bash

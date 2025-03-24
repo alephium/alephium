@@ -18,14 +18,14 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{BlockHash, GroupIndex}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessExecuteScriptTx(
-    fromAddress: Address.Asset,
+    fromAddress: String,
     bytecode: ByteString,
     attoAlphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
@@ -36,6 +36,40 @@ final case class BuildGrouplessExecuteScriptTx(
     with BuildTxCommon.ExecuteScriptTx {
   def gasAmount: Option[GasBox] = None
 
-  def getLockPair(): Try[(LockupScript.P2PK, UnlockScript)] =
-    lockPair.left.map(badRequest)
+  override def getLockPair()(implicit
+      config: GroupConfig
+  ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
+    getFromAddress().flatMap { address =>
+      address.lockupScript match {
+        case lock: LockupScript.P2PK => {
+          val unlockScript = UnlockScript.P2PK(lock.publicKey.keyType)
+          if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
+            Right((lock, unlockScript))
+          } else {
+            groupIndex().map { groupIndex =>
+              (LockupScript.P2PK.from(lock.publicKey, Some(groupIndex)), unlockScript)
+            }
+          }
+        }
+        case _ => Left(s"Invalid from address: $address, expected a groupless address")
+      }
+    }
+  }
+
+  def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex] = {
+    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
+      getFromAddress().map(_.groupIndex)
+    } else {
+      decodeStatefulScript().flatMap { script =>
+        StatefulScript.deriveContractAddress(script) match {
+          case Some(contractAddress) =>
+            Right(contractAddress.groupIndex)
+          case None =>
+            Left(
+              s"Can not determine group: `${fromAddress}` has no explicit group and no contract address can be derived from TxScript"
+            )
+        }
+      }
+    }
+  }
 }

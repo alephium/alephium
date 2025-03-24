@@ -67,7 +67,7 @@ object LockupScript {
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
   def fromBase58(input: String)(implicit groupConfig: GroupConfig): Option[LockupScript] = {
-    if (input.length > 2 && input(input.length - 2) == '@') {
+    if (P2PK.hasExplicitGroupIndex(input)) {
       input.takeRight(1).toIntOption.flatMap(GroupIndex.from) match {
         case Some(groupIndex) =>
           Base58.decode(input.dropRight(2)) match {
@@ -212,6 +212,10 @@ object LockupScript {
       }
     }
 
+    def hasExplicitGroupIndex(input: String): Boolean = {
+      input.length > 2 && input(input.length - 2) == ':'
+    }
+
     def fromDecodedBase58(bytes: ByteString, groupIndexOpt: Option[GroupIndex])(implicit
         groupConfig: GroupConfig
     ): Option[P2PK] = {
@@ -258,10 +262,5 @@ object LockupScript {
         scriptHintSerde
       )
     }
-  }
-
-  def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
-    val hash = Bytes.toPosInt(Bytes.xorByte(shortKey))
-    GroupIndex.unsafe(hash % config.groups)
   }
 }

@@ -18,14 +18,14 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.model.{Address, BlockHash}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessDeployContractTx(
-    fromAddress: Address.Asset,
+    fromAddress: String,
     bytecode: ByteString,
     initialAttoAlphAmount: Option[Amount] = None,
     initialTokenAmounts: Option[AVector[Token]] = None,
@@ -37,6 +37,25 @@ final case class BuildGrouplessDeployContractTx(
     with BuildTxCommon.DeployContractTx {
   def gasAmount: Option[GasBox] = None
 
-  def getLockPair(): Try[(LockupScript.P2PK, UnlockScript)] =
-    lockPair.left.map(badRequest)
+  private val explicitGroupInfoError = {
+    s"Contract deployment requires groupless address `${fromAddress}` with explicit group information"
+  }
+
+  override def getLockPair()(implicit
+      config: GroupConfig
+  ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
+    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
+      super.getLockPair()
+    } else {
+      Left(explicitGroupInfoError)
+    }
+  }
+
+  def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex] = {
+    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
+      getFromAddress().map(_.groupIndex)
+    } else {
+      Left(explicitGroupInfoError)
+    }
+  }
 }

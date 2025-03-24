@@ -16,16 +16,41 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 
 trait BuildGrouplessTx {
-  def fromAddress: Address.Asset
+  val fromAddress: String
 
-  def lockPair: Either[String, (LockupScript.P2PK, UnlockScript)] = {
-    fromAddress.lockupScript match {
-      case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK(lock.publicKey.keyType)))
-      case _ => Left(s"Invalid from address: $fromAddress, expected a groupless address")
+  def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex]
+
+  var decodedAddress: Option[Address.Asset] = None
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def getFromAddress()(implicit config: GroupConfig): Either[String, Address.Asset] = {
+    if (decodedAddress.isDefined) {
+      Right(decodedAddress.get)
+    } else {
+      Address.fromBase58(fromAddress) match {
+        case Some(address: Address.Asset) =>
+          decodedAddress = Some(address)
+          Right(address)
+        case Some(_: Address.Contract) =>
+          Left(s"Expect asset address, but was contract address: $fromAddress")
+        case None =>
+          Left(s"Unable to decode address from $fromAddress")
+      }
+    }
+  }
+
+  def getLockPair()(implicit
+      config: GroupConfig
+  ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
+    getFromAddress().flatMap { address =>
+      address.lockupScript match {
+        case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK(lock.publicKey.keyType)))
+        case _ => Left(s"Invalid from address: $address, expected a groupless address")
+      }
     }
   }
 }

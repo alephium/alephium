@@ -31,7 +31,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait BlockFlowClient {
   def fetchBalance(
-      address: Address.Asset
+      addressRaw: String
   ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
@@ -107,11 +107,22 @@ object BlockFlowClient {
     }
 
     def fetchBalance(
-        address: Address.Asset
+        addressRaw: String
     ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] =
-      requestFromGroup(address.groupIndex, getBalance, (address, Some(true))).map(
-        _.map(res => (res.balance, res.lockedBalance))
-      )
+      Address.fromBase58(addressRaw) match {
+        case Some(address: Address.Asset) =>
+          requestFromGroup(address.groupIndex, getBalance, (addressRaw, Some(true))).map(
+            _.map(res => (res.balance, res.lockedBalance))
+          )
+        case Some(_: Address.Contract) =>
+          Future.successful(
+            Left(
+              ApiError.BadRequest(s"Expect asset address, but was contract address: $addressRaw")
+            )
+          )
+        case None =>
+          Future.successful(Left(ApiError.BadRequest(s"Unable to decode address from $addressRaw")))
+      }
 
     def prepareTransaction(
         fromPublicKey: PublicKey,
