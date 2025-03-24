@@ -425,5 +425,18 @@ class AlephiumConfigSpec extends AlephiumSpec {
       consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Rhone) is
         Difficulty.unsafe(N * (100 + 3 * (gap - 8)) / 100)
     }
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18, HardFork.Danube) is
+      Difficulty.unsafe(N * 103 / 100)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19, HardFork.Danube) is
+      Difficulty.unsafe(N * 106 / 100)
+    (20 until 18 * 3).foreach { gap =>
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Danube) is
+        Difficulty.unsafe(N * (100 + 3 * (gap - 17)) / 100)
+    }
   }
 }

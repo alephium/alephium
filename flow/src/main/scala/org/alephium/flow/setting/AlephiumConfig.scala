@@ -62,12 +62,15 @@ final case class ConsensusSetting(
   val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
   private val crossShardHeightGapThresholdPreRhone: Int = powAveragingWindow
-  private val crossShardHeightGapThreshold: Int         = powAveragingWindow / 2
+  private val crossShardHeightGapThresholdRhone: Int    = powAveragingWindow / 2
+  private val crossShardHeightGapThresholdDanube: Int   = powAveragingWindow
 
   def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int, hardFork: HardFork): Difficulty = {
     assume(hardFork.isLemanEnabled())
-    val (threshold, factor) = if (hardFork.isRhoneEnabled()) {
-      crossShardHeightGapThreshold -> 3
+    val (threshold, factor) = if (hardFork.isDanubeEnabled()) {
+      crossShardHeightGapThresholdDanube -> 3
+    } else if (hardFork.isRhoneEnabled()) {
+      crossShardHeightGapThresholdRhone -> 3
     } else {
       crossShardHeightGapThresholdPreRhone -> 5
     }
