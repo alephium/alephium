@@ -499,12 +499,12 @@ class FlowUtilsSpec extends AlephiumSpec {
   "the rhone block reward" should "be roughly twice the danube block reward" in new FlowFixture {
     val now = TimeStamp.now()
     override val configValues: Map[String, Any] = Map(
-      ("alephium.network.danube-hard-fork-timestamp", now.plusMillisUnsafe(10).millis)
+      ("alephium.network.danube-hard-fork-timestamp", now.plusSecondsUnsafe(1).millis)
     )
     val chainIndex = ChainIndex.unsafe(0, 0)
     val rhoneBlock = emptyBlock(blockFlow, chainIndex, now)
     networkConfig.getHardFork(rhoneBlock.timestamp) is HardFork.Rhone
-    val danubeBlock = emptyBlock(blockFlow, chainIndex, now.plusMillisUnsafe(20))
+    val danubeBlock = emptyBlock(blockFlow, chainIndex, now.plusSecondsUnsafe(1))
     networkConfig.getHardFork(danubeBlock.timestamp) is HardFork.Danube
 
     val rhoneReward        = rhoneBlock.coinbaseReward
