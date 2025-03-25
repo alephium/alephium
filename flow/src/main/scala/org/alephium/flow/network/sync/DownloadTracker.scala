@@ -38,7 +38,7 @@ trait DownloadTracker {
     toDownload
   }
 
-  def finalized(hash: BlockHash): Unit = {
+  def onBlockProcessedV1(hash: BlockHash): Unit = {
     syncing -= hash
   }
 

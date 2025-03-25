@@ -50,10 +50,10 @@ class DownloadTrackerSpec extends AlephiumFlowActorSpec {
       .empty[BlockHash]
     downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
-    hashes.foreach(downloadTrack.finalized)
+    hashes.foreach(downloadTrack.onBlockProcessedV1)
     downloadTrack.syncing.keys.toSet is randomHashes.toSet
 
-    (hashes ++ randomHashes).foreach(downloadTrack.finalized)
+    (hashes ++ randomHashes).foreach(downloadTrack.onBlockProcessedV1)
     downloadTrack.syncing.isEmpty is true
   }
 

@@ -215,6 +215,19 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     addBroker()
     blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
     allProbes.flowHandler.expectMsg(FlowHandler.GetChainState)
+    allProbes.flowHandler.expectMsg(FlowHandler.GetSyncLocators)
+  }
+
+  it should "be able to sync using v1" in new BlockFlowSynchronizerV2Fixture {
+    val (brokerActor, _, probe) = addBroker(P2PV1)
+    val syncLocators = brokerConfig.cliqueChainIndexes.map { chainIndex =>
+      (chainIndex, AVector(BlockHash.generate))
+    }
+    val hashes = syncLocators.map(_._2)
+    blockFlowSynchronizer ! FlowHandler.SyncLocators(syncLocators)
+    eventually(probe.expectMsg(BrokerHandler.SyncLocators(hashes)))
+    blockFlowSynchronizer.tell(BlockFlowSynchronizer.SyncInventories(hashes), brokerActor.ref)
+    eventually(probe.expectMsg(BrokerHandler.DownloadBlocks(hashes.flatMap(identity))))
   }
 
   it should "handle self chain state" in new BlockFlowSynchronizerV2Fixture {
