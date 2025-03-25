@@ -1101,7 +1101,26 @@ trait FlowFixture
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val messageHash       = webauthn.messageHash(unsignedTx.id)
     val signature         = Byte64.from(SecP256R1.sign(messageHash, priKey))
-    (webauthn, Transaction.from(unsignedTx, webauthn.encodeForTest() :+ signature))
+    val inputSignatures   = webauthn.encodeForTest() :+ signature
+    unsignedTx.scriptOpt match {
+      case None =>
+        (webauthn, Transaction.from(unsignedTx, inputSignatures))
+      case Some(script) =>
+        val txTemplate = TransactionTemplate(unsignedTx, inputSignatures, AVector.empty)
+        val (contractInputs, generatedOutputs) =
+          genInputsOutputs(blockFlow, unsignedTx.fromGroup, txTemplate, script)
+        (
+          webauthn,
+          Transaction(
+            unsignedTx,
+            true,
+            contractInputs,
+            generatedOutputs,
+            inputSignatures,
+            AVector.empty
+          )
+        )
+    }
   }
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {

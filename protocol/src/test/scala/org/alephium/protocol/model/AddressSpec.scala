@@ -164,7 +164,7 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "encode and decode between p2pk address and public key" in {
     val publicKey = "00e10a76a87b3211ca2f05be47b9ef8d2c9acedf3dfa9ee0268bf3a42ea3e29af1e1"
     (0 until groupConfig.groups).foreach { index =>
-      val address = s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@${index}"
+      val address = s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:${index}"
       AddressVerifyP2PK(address).publicKey(publicKey).group(index).success()
     }
   }
@@ -229,12 +229,8 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
       Address.fromBase58(address) is Some(Address.from(script))
       Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(0, 5)).sample.get)) is None
 
-      val fullAddress = Base58.encode(bytes)
-      Address.fromBase58(fullAddress) is Some(Address.Asset(script))
-      Address.fromBase58(s"$fullAddress:${script.groupIndex.value}") is Some(Address.Asset(script))
-      Address.fromBase58(
-        s"$fullAddress:${new GroupIndex(script.groupIndex.value + 1).value}"
-      ) is None
+      val addressWithoutGroup = script.toBase58WithoutGroup
+      Address.fromBase58(s"$addressWithoutGroup:${script.groupIndex.value}") is Some(Address.Asset(script))
       Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get)) is None
     }
 

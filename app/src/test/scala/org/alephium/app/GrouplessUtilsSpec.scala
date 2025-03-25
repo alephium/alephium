@@ -38,11 +38,12 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val serverUtils                     = new ServerUtils
     val (fromPrivateKey, fromPublicKey) = SecP256R1.generatePriPub()
 
-    val chainIndex            = ChainIndex(GroupIndex.unsafe(0), GroupIndex.unsafe(0))
-    val publicKeyLike         = PublicKeyLike.SecP256R1(fromPublicKey)
-    lazy val fromLockupScript = LockupScript.p2pk(publicKeyLike, chainIndex.from)
-    val fromAddress           = Address.Asset(fromLockupScript)
-    val fromAddressRaw        = fromAddress.toBase58
+    val chainIndex              = ChainIndex(GroupIndex.unsafe(0), GroupIndex.unsafe(0))
+    val publicKeyLike           = PublicKeyLike.WebAuthn(fromPublicKey)
+    lazy val fromLockupScript   = LockupScript.p2pk(publicKeyLike, chainIndex.from)
+    val fromAddress             = Address.Asset(fromLockupScript)
+    val fromAddressWithoutGroup = fromLockupScript.toBase58WithoutGroup
+    val fromAddressRaw          = fromAddress.toBase58
 
     def allLockupScripts: AVector[LockupScript.Asset] = {
       brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.Asset]) { case (acc, group) =>
@@ -480,7 +481,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance2.lockedTokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
     balance2.utxoNum is 6
 
-    val grouplessAddressRaw = fromAddress.toBase58
+    val grouplessAddressRaw = fromAddressWithoutGroup
     val balance3 = serverUtils.getBalance(blockFlow, grouplessAddressRaw, true).rightValue
     balance3.balance.value is ALPH.alph(6)
     balance3.lockedBalance.value is ALPH.alph(2)
