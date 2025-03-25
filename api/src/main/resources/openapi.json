@@ -13591,7 +13591,7 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd",
+                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd:0",
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
@@ -13603,7 +13603,7 @@
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd",
+                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd:0",
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
@@ -13752,14 +13752,14 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd",
+                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd:0",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd",
+                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd:0",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "attoAlphAmount": "1000000000000000",
                     "tokens": [
@@ -13964,14 +13964,14 @@
                 "Example0": {
                   "summary": "Default",
                   "value": {
-                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd",
+                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd:0",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
-                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd",
+                    "fromAddress": "3cbnLfvqckScEZE9av6d3fuaJ4sKdhoEnZYcMbnvQheTBXTsG8VUd:0",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "initialAttoAlphAmount": "2000000000000000000",
                     "initialTokenAmounts": [
