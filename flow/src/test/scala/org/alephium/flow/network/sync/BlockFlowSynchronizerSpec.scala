@@ -256,9 +256,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       )
     )
 
-    blockFlowSynchronizerActor.isSyncingUsingV2 = false
+    blockFlowSynchronizerActor.isSyncingUsingV2 = true
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
-    eventually(allProbes.dependencyHandler.expectNoMessage())
+    allProbes.dependencyHandler.expectNoMessage()
   }
 
   it should "sample v1 peers from v1 brokers" in new BlockFlowSynchronizerV2Fixture {
