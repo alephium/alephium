@@ -129,7 +129,7 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     scheduleOnce(self, Sync, frequency)
   }
 
-  protected def sampleV1Peers(): AVector[(BrokerActor, BrokerStatus)] = {
+  private[sync] def sampleV1Peers(): AVector[(BrokerActor, BrokerStatus)] = {
     if (networkSetting.enableP2pV2) {
       samplePeers(P2PV1)
     } else {
@@ -154,7 +154,7 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
   }
 
   protected def handleSyncCommandV1(): Unit = {
-    log.debug(s"Send sync requests to the network")
+    log.debug("Sync V1: Send chain state to the network")
     allHandlers.flowHandler ! FlowHandler.GetSyncLocators
   }
 
@@ -175,7 +175,7 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
 trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
   _: BlockFlowSynchronizer =>
   protected def handleSyncCommandV2(): Unit = {
-    log.debug(s"Send chain state to the network")
+    log.debug("Sync V2: Send chain state to the network")
     allHandlers.flowHandler ! FlowHandler.GetChainState
   }
 

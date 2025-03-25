@@ -158,8 +158,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "sample v1 peers from all brokers" in new Fixture {
     networkConfig.enableP2pV2 is false
     val (_, _, probe) = addBroker(P2PV2)
-    blockFlowSynchronizerActor.sampleV1PeersFromAllBrokers().length is 1
-    blockFlowSynchronizerActor.samplePeers(P2PV1).length is 0
+    blockFlowSynchronizerActor.sampleV1Peers().length is 1
 
     val syncLocators = AVector((ChainIndex.unsafe(0, 0), AVector(BlockHash.generate)))
     blockFlowSynchronizer ! FlowHandler.SyncLocators(syncLocators)
@@ -245,8 +244,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     networkConfig.enableP2pV2 is true
     val (_, _, probe) = addBroker(P2PV1)
     val v2Brokers     = (0 until 3).map(_ => addBroker(P2PV2))
-    blockFlowSynchronizerActor.sampleV1PeersFromAllBrokers().length is 2
-    blockFlowSynchronizerActor.samplePeers(P2PV1).length is 1
+    blockFlowSynchronizerActor.sampleV1Peers().length is 1
 
     val syncLocators = AVector((ChainIndex.unsafe(0, 0), AVector(BlockHash.generate)))
     blockFlowSynchronizer ! FlowHandler.SyncLocators(syncLocators)
