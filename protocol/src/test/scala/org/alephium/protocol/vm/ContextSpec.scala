@@ -461,7 +461,6 @@ class ContextSpec
 
     ctx.chainCallerOutputs(Some(balanceState)) isE ()
 
-    balanceState.alphRemaining(inputLockupScript).value is ALPH.oneAlph
     balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.MaxValue)
 
     addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))

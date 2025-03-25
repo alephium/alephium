@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.TokenId
+import org.alephium.protocol.model.{NetworkId, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
@@ -147,7 +147,7 @@ class TransactionSpec
     Transaction.totalReward(hardReward * 2 + 2, 0, HardFork.Leman) is 0
   }
 
-  it should "seder the snapshots properly" in new TransactionSnapshotsFixture {
+  it should "serde the snapshots properly" in new TransactionSnapshotsFixture {
     implicit val basePath: String = "src/test/resources/models/transaction"
 
     import Hex._
@@ -199,7 +199,9 @@ class TransactionSpec
     {
       info("danube coinbase transaction")
 
-      implicit val networkConfig = NetworkConfigFixture.Danube
+      implicit val networkConfig = new NetworkConfigFixture.DanubeT {
+        override def networkId: NetworkId = NetworkId.AlephiumDevNet
+      }.networkConfig
       val blockHash = model.BlockHash.unsafe(
         hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7"
       )
