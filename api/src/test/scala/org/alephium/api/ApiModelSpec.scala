@@ -171,7 +171,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "buildInfo": { "releaseVersion": "1.2.3", "commit": "07b7f3e044" },
          |  "upnp": true,
-         |  "externalAddress": { "addr": "127.0.0.1", "port": 9000 }
+         |  "externalAddress": { "addr": "127.0.0.1", "port": 9000 },
+         |  "description": "Hello Alephium !"
          |}""".stripMargin
     }
     checkData(nodeInfo, jsonRaw)
