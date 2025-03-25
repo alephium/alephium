@@ -107,14 +107,18 @@ trait FlowDifficultyAdjustment {
   ): IOResult[Target] =
     getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Danube)(consensusConfigs.danube)
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {
-    val header = getBlockHeaderUnsafe(chainDep)
-    if (header.timestamp <= oldTimeStamp) {
-      0
-    } else {
-      calHeightDiffUnsafe(header.parentHash, oldTimeStamp) + 1
+    @scala.annotation.tailrec
+    def loop(currentHash: BlockHash, acc: Int): Int = {
+      val header = getBlockHeaderUnsafe(currentHash)
+      if (header.timestamp <= oldTimeStamp) {
+        acc
+      } else {
+        loop(header.parentHash, acc + 1)
+      }
     }
+
+    loop(chainDep, 0)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
