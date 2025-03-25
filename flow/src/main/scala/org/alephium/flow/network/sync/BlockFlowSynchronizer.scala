@@ -60,6 +60,8 @@ object BlockFlowSynchronizer {
   final case class UpdateBlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
   ) extends V2Command
+  final case class AddFlowData[T <: FlowData](datas: AVector[T], dataOrigin: DataOrigin)
+      extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -105,6 +107,12 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       // When the node is synced, it should download new blocks only through block announcements.
       // Ignoring them may trigger a new round of synchronization using v2.
       if (!isSyncingUsingV2 || isNodeSynced) handleBlockAnnouncement(hash)
+
+    case AddFlowData(datas, dataOrigin) =>
+      if (!isSyncingUsingV2) {
+        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+        allHandlers.dependencyHandler.tell(message, sender())
+      }
   }
 
   def addBroker(broker: BrokerActor, brokerInfo: BrokerInfo, p2pVersion: P2PVersion): Unit = {
@@ -183,7 +191,7 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
     case BlockFlowSynchronizer.Sync =>
       if (brokers.nonEmpty) {
         handleSyncCommandV2()
-        handleSyncCommandV1()
+        if (!isSyncingUsingV2) handleSyncCommandV1()
       }
       scheduleSync()
 

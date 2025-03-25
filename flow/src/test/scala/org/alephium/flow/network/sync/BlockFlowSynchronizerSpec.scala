@@ -223,9 +223,15 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
   it should "schedule sync" in new BlockFlowSynchronizerV2Fixture {
     addBroker()
+    blockFlowSynchronizerActor.isSyncingUsingV2 is false
     blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
     allProbes.flowHandler.expectMsg(FlowHandler.GetChainState)
     allProbes.flowHandler.expectMsg(FlowHandler.GetSyncLocators)
+
+    blockFlowSynchronizerActor.isSyncingUsingV2 = true
+    blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
+    allProbes.flowHandler.expectMsg(FlowHandler.GetChainState)
+    allProbes.flowHandler.expectNoMessage()
   }
 
   it should "be able to sync using v1" in new BlockFlowSynchronizerV2Fixture {
@@ -238,6 +244,21 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(probe.expectMsg(BrokerHandler.SyncLocators(hashes)))
     blockFlowSynchronizer.tell(BlockFlowSynchronizer.SyncInventories(hashes), brokerActor.ref)
     eventually(probe.expectMsg(BrokerHandler.DownloadBlocks(hashes.flatMap(identity))))
+  }
+
+  it should "forward flow data to dependency handler" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.isSyncingUsingV2 is false
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
+    eventually(
+      allProbes.dependencyHandler.expectMsg(
+        DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
+      )
+    )
+
+    blockFlowSynchronizerActor.isSyncingUsingV2 = false
+    blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
+    eventually(allProbes.dependencyHandler.expectNoMessage())
   }
 
   it should "sample v1 peers from v1 brokers" in new BlockFlowSynchronizerV2Fixture {
