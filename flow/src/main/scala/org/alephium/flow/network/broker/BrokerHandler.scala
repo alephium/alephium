@@ -332,6 +332,8 @@ trait FlowDataHandler extends BaseHandler {
   def allHandlers: AllHandlers
   def remoteAddress: InetSocketAddress
   def blockflow: BlockFlow
+  def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  def networkSetting: NetworkSetting
 
   def validateFlowData[T <: FlowData](datas: AVector[T], isBlock: Boolean): Boolean = {
     if (!Validation.preValidate(datas)(blockflow.consensusConfigs)) {
@@ -347,14 +349,25 @@ trait FlowDataHandler extends BaseHandler {
     }
   }
 
+  @inline final protected def handleValidFlowData[T <: FlowData](
+      datas: AVector[T],
+      dataOrigin: DataOrigin
+  ): Unit = {
+    if (networkSetting.enableP2pV2) {
+      blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(datas, dataOrigin)
+    } else {
+      val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+      allHandlers.dependencyHandler ! message
+    }
+  }
+
   def handleFlowData[T <: FlowData](
       datas: AVector[T],
       dataOrigin: DataOrigin,
       isBlock: Boolean
   ): Unit = {
     if (validateFlowData(datas, isBlock)) {
-      val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-      allHandlers.dependencyHandler ! message
+      handleValidFlowData(datas, dataOrigin)
     }
   }
 }

@@ -60,6 +60,8 @@ object BlockFlowSynchronizer {
   final case class UpdateBlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
   ) extends V2Command
+  final case class AddFlowData[T <: FlowData](datas: AVector[T], dataOrigin: DataOrigin)
+      extends Command
 }
 
 class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandlers)(implicit
@@ -105,6 +107,12 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       // When the node is synced, it should download new blocks only through block announcements.
       // Ignoring them may trigger a new round of synchronization using v2.
       if (!isSyncingUsingV2 || isNodeSynced) handleBlockAnnouncement(hash)
+
+    case AddFlowData(datas, dataOrigin) =>
+      if (!isSyncingUsingV2) {
+        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+        allHandlers.dependencyHandler.tell(message, sender())
+      }
   }
 
   def addBroker(broker: BrokerActor, brokerInfo: BrokerInfo, p2pVersion: P2PVersion): Unit = {
@@ -128,20 +136,22 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
     scheduleOnce(self, Sync, frequency)
   }
+
+  private[sync] def sampleV1Peers(): AVector[(BrokerActor, BrokerStatus)] = {
+    if (networkSetting.enableP2pV2) {
+      samplePeers(P2PV1)
+    } else {
+      sampleV1PeersFromAllBrokers()
+    }
+  }
 }
 
 trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
   import BlockFlowSynchronizer._
 
-  def handleV1: Receive = {
-    case Sync =>
-      if (brokers.nonEmpty) {
-        log.debug(s"Send sync requests to the network")
-        allHandlers.flowHandler ! FlowHandler.GetSyncLocators
-      }
-      scheduleSync()
+  protected def handleV1Base: Receive = {
     case flowLocators: FlowHandler.SyncLocators =>
-      samplePeers(P2PV1).foreach { case (actor, broker) =>
+      sampleV1Peers().foreach { case (actor, broker) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
       }
     case SyncInventories(hashes) =>
@@ -149,20 +159,39 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
       if (blockHashes.nonEmpty) {
         sender() ! BrokerHandler.DownloadBlocks(blockHashes)
       }
+  }
+
+  protected def handleSyncCommandV1(): Unit = {
+    log.debug("Sync V1: Send chain state to the network")
+    allHandlers.flowHandler ! FlowHandler.GetSyncLocators
+  }
+
+  def handleV1: Receive = handleV1Base orElse {
+    case Sync =>
+      if (brokers.nonEmpty) {
+        handleSyncCommandV1()
+      }
+      scheduleSync()
     case event: ChainHandler.FlowDataValidationEvent =>
-      finalized(event.data.hash)
+      onBlockProcessedV1(event.data.hash)
     case Terminated(actor)                         => removeBroker(ActorRefT(actor))
     case _: DependencyHandler.FlowDataAlreadyExist => ()
     case _: V2Command                              => ()
   }
 }
 
-trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
-  def handleV2: Receive = {
+trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
+  _: BlockFlowSynchronizer =>
+  protected def handleSyncCommandV2(): Unit = {
+    log.debug("Sync V2: Send chain state to the network")
+    allHandlers.flowHandler ! FlowHandler.GetChainState
+  }
+
+  def handleV2: Receive = handleV1Base orElse {
     case BlockFlowSynchronizer.Sync =>
       if (brokers.nonEmpty) {
-        log.debug(s"Send chain state to the network")
-        allHandlers.flowHandler ! FlowHandler.GetChainState
+        handleSyncCommandV2()
+        if (!isSyncingUsingV2) handleSyncCommandV1()
       }
       scheduleSync()
 
@@ -185,13 +214,13 @@ trait BlockFlowSynchronizerV2 extends SyncState { _: BlockFlowSynchronizer =>
       handleBlockDownloaded(result)
 
     case event: ChainHandler.FlowDataValidationEvent =>
-      onBlockProcessed(event)
+      onBlockProcessedV2(event)
+      onBlockProcessedV1(event.data.hash)
 
     case DependencyHandler.FlowDataAlreadyExist(data) =>
       onBlockProcessed(data)
 
-    case Terminated(actor)                  => onBrokerTerminated(ActorRefT(actor))
-    case _: BlockFlowSynchronizer.V1Command => ()
+    case Terminated(actor) => onBrokerTerminated(ActorRefT(actor))
   }
 }
 
@@ -309,7 +338,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  def onBlockProcessed(event: ChainHandler.FlowDataValidationEvent): Unit = {
+  def onBlockProcessedV2(event: ChainHandler.FlowDataValidationEvent): Unit = {
     if (isSyncingUsingV2) {
       val isBlockValid = event match {
         case _: ChainHandler.FlowDataAdded   => true

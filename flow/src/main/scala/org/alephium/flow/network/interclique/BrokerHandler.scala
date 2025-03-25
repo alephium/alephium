@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
-import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.{
@@ -69,8 +69,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
     val blocks = AVector(block)
     if (validateFlowData(blocks, isBlock = true)) {
       seenBlocks.put(block.hash, ())
-      val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
-      allHandlers.dependencyHandler ! message
+      handleValidFlowData(blocks, dataOrigin)
     }
   }
 
