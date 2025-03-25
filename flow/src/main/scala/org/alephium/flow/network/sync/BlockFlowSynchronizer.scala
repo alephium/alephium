@@ -128,6 +128,14 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       if (isNodeSynced) networkSetting.stableSyncFrequency else networkSetting.fastSyncFrequency
     scheduleOnce(self, Sync, frequency)
   }
+
+  protected def sampleV1Peers(): AVector[(BrokerActor, BrokerStatus)] = {
+    if (networkSetting.enableP2pV2) {
+      samplePeers(P2PV1)
+    } else {
+      sampleV1PeersFromAllBrokers()
+    }
+  }
 }
 
 trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
@@ -135,7 +143,7 @@ trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
 
   protected def handleV1Base: Receive = {
     case flowLocators: FlowHandler.SyncLocators =>
-      samplePeers(P2PV1).foreach { case (actor, broker) =>
+      sampleV1Peers().foreach { case (actor, broker) =>
         actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
       }
     case SyncInventories(hashes) =>

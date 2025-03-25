@@ -58,6 +58,19 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     def blockProcessed(block: Block): Unit = {
       blockFlowSynchronizer ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     }
+
+    def addBroker(version: P2PVersion = P2PV2): (BrokerActor, BrokerStatus, TestProbe) = {
+      val brokerInfo =
+        BrokerInfo.unsafe(CliqueId.generate, 0, 1, socketAddressGen.sample.get)
+      val probe                    = TestProbe()
+      val brokerActor: BrokerActor = ActorRefT(probe.ref)
+      probe.send(
+        blockFlowSynchronizer,
+        InterCliqueManager.HandShaked(probe.ref, brokerInfo, InboundConnection, "", version)
+      )
+      val brokerStatus = blockFlowSynchronizerActor.getBrokerStatus(brokerActor).get
+      (brokerActor, brokerStatus, probe)
+    }
   }
 
   it should "add/remove brokers" in new Fixture {
@@ -142,6 +155,17 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     }
   }
 
+  it should "sample v1 peers from all brokers" in new Fixture {
+    networkConfig.enableP2pV2 is false
+    val (_, _, probe) = addBroker(P2PV2)
+    blockFlowSynchronizerActor.sampleV1PeersFromAllBrokers().length is 1
+    blockFlowSynchronizerActor.samplePeers(P2PV1).length is 0
+
+    val syncLocators = AVector((ChainIndex.unsafe(0, 0), AVector(BlockHash.generate)))
+    blockFlowSynchronizer ! FlowHandler.SyncLocators(syncLocators)
+    eventually(probe.expectMsg(BrokerHandler.SyncLocators(syncLocators.map(_._2))))
+  }
+
   behavior of "BlockFlowSynchronizerV2"
 
   implicit class RichFlattenIndexedArray[T: ClassTag](array: FlattenIndexedArray[T]) {
@@ -159,19 +183,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       ("alephium.broker.broker-num", 1),
       ("alephium.network.enable-p2p-v2", true)
     )
-
-    def addBroker(version: P2PVersion = P2PV2): (BrokerActor, BrokerStatus, TestProbe) = {
-      val brokerInfo =
-        BrokerInfo.unsafe(CliqueId.generate, 0, 1, socketAddressGen.sample.get)
-      val probe                    = TestProbe()
-      val brokerActor: BrokerActor = ActorRefT(probe.ref)
-      probe.send(
-        blockFlowSynchronizer,
-        InterCliqueManager.HandShaked(probe.ref, brokerInfo, InboundConnection, "", version)
-      )
-      val brokerStatus = blockFlowSynchronizerActor.getBrokerStatus(brokerActor).get
-      (brokerActor, brokerStatus, probe)
-    }
 
     @scala.annotation.tailrec
     final def genBlockHash(chainIndex: ChainIndex): BlockHash = {
@@ -228,6 +239,21 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     eventually(probe.expectMsg(BrokerHandler.SyncLocators(hashes)))
     blockFlowSynchronizer.tell(BlockFlowSynchronizer.SyncInventories(hashes), brokerActor.ref)
     eventually(probe.expectMsg(BrokerHandler.DownloadBlocks(hashes.flatMap(identity))))
+  }
+
+  it should "sample v1 peers from v1 brokers" in new BlockFlowSynchronizerV2Fixture {
+    networkConfig.enableP2pV2 is true
+    val (_, _, probe) = addBroker(P2PV1)
+    val v2Brokers     = (0 until 3).map(_ => addBroker(P2PV2))
+    blockFlowSynchronizerActor.sampleV1PeersFromAllBrokers().length is 2
+    blockFlowSynchronizerActor.samplePeers(P2PV1).length is 1
+
+    val syncLocators = AVector((ChainIndex.unsafe(0, 0), AVector(BlockHash.generate)))
+    blockFlowSynchronizer ! FlowHandler.SyncLocators(syncLocators)
+    eventually {
+      probe.expectMsg(BrokerHandler.SyncLocators(syncLocators.map(_._2)))
+      v2Brokers.foreach(b => b._3.expectNoMessage())
+    }
   }
 
   it should "handle self chain state" in new BlockFlowSynchronizerV2Fixture {
