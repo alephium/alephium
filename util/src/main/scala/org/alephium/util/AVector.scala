@@ -743,7 +743,31 @@ final class AVector[@sp A](
     ArraySeq.unsafeWrapArray(toArray)
   }
 
-  def iterator: Iterator[A] = elems.iterator.slice(start, end)
+  def iterator: Iterator[A] = new Iterator[A] {
+    private var index = start
+
+    def hasNext: Boolean = index < end
+
+    def next(): A = {
+      assume(hasNext)
+      val result = elems(index)
+      index += 1
+      result
+    }
+  }
+
+  def reverseIterator: Iterator[A] = new Iterator[A] {
+    private var index = end - 1
+
+    def hasNext: Boolean = index >= start
+
+    def next(): A = {
+      assume(hasNext)
+      val result = elems(index)
+      index -= 1
+      result
+    }
+  }
 
   def toIterable: Iterable[A] = {
     new Iterable[A] {
