@@ -51,8 +51,7 @@ object BrokerStatusTracker {
     def canDownload(task: BlockDownloadTask)(implicit groupConfig: GroupConfig): Boolean = {
       requestNum < MaxRequestNum &&
       !pendingTasks.contains(task) &&
-      !containsMissedBlocks(task.chainIndex, task.id) &&
-      getChainTip(task.chainIndex).exists(_.height >= task.toHeight)
+      !missOrUnableDownload(task.chainIndex, task.id)
     }
     def addPendingTask(task: BlockDownloadTask): Unit = {
       requestNum += task.size
@@ -98,15 +97,19 @@ object BrokerStatusTracker {
       missedBlocks.remove(chainIndex)
       ()
     }
-    def containsMissedBlocks(
+    @inline def containsMissedBlocks(
+        chainIndex: ChainIndex,
+        batchId: BlockBatch
+    ): Boolean = {
+      missedBlocks.get(chainIndex).exists(_.contains(batchId))
+    }
+    def missOrUnableDownload(
         chainIndex: ChainIndex,
         batchId: BlockBatch
     )(implicit groupConfig: GroupConfig): Boolean = {
-      val chainTip = getChainTip(chainIndex)
-      if (chainTip.exists(_.height >= batchId.to)) {
-        missedBlocks.get(chainIndex).exists(_.contains(batchId))
-      } else {
-        false
+      containsMissedBlocks(chainIndex, batchId) || {
+        val chainTip = getChainTip(chainIndex)
+        chainTip.forall(_.height < batchId.to)
       }
     }
 

@@ -175,26 +175,39 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
 
   it should "add/contains/clear missed blocks" in new BrokerStatusFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
+    val batchId    = BlockBatch(1, 5)
+    status.containsMissedBlocks(chainIndex, batchId) is false
+    status.addMissedBlocks(chainIndex, batchId)
+    status.containsMissedBlocks(chainIndex, batchId) is true
+    status.clearMissedBlocks(chainIndex)
+    status.containsMissedBlocks(chainIndex, batchId) is false
+  }
+
+  it should "missOrUnableDownload" in new BrokerStatusFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
     val batchId0   = BlockBatch(1, 5)
     val batchId1   = BlockBatch(6, 10)
-    status.containsMissedBlocks(chainIndex, batchId0) is false
-    status.containsMissedBlocks(chainIndex, batchId1) is false
+    status.missOrUnableDownload(chainIndex, batchId0) is true
+    status.missOrUnableDownload(chainIndex, batchId1) is true
 
     val block = emptyBlock(blockFlow, chainIndex)
     status.tips(chainIndex) = ChainTip(block.hash, 10, Weight.zero)
 
     status.addMissedBlocks(chainIndex, batchId0)
-    status.addMissedBlocks(chainIndex, batchId1)
+    status.missOrUnableDownload(chainIndex, batchId0) is true
+    status.missOrUnableDownload(chainIndex, batchId1) is false
 
-    status.containsMissedBlocks(chainIndex, batchId0) is true
-    status.containsMissedBlocks(chainIndex, batchId1) is true
+    status.addMissedBlocks(chainIndex, batchId1)
+    status.missOrUnableDownload(chainIndex, batchId0) is true
+    status.missOrUnableDownload(chainIndex, batchId1) is true
+
     status.tips(chainIndex) = ChainTip(block.hash, 9, Weight.zero)
-    status.containsMissedBlocks(chainIndex, batchId0) is true
-    status.containsMissedBlocks(chainIndex, batchId1) is false
+    status.missOrUnableDownload(chainIndex, batchId0) is true
+    status.missOrUnableDownload(chainIndex, batchId1) is true
 
     status.clearMissedBlocks(chainIndex)
-    status.containsMissedBlocks(chainIndex, batchId0) is false
-    status.containsMissedBlocks(chainIndex, batchId1) is false
+    status.missOrUnableDownload(chainIndex, batchId0) is false
+    status.missOrUnableDownload(chainIndex, batchId1) is true
   }
 
   it should "handleBlockDownload" in new BrokerStatusFixture {
