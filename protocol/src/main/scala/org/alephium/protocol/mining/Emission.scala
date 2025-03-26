@@ -225,6 +225,16 @@ object Emission {
     new Emission(rhoneBlockTargetTime, fraction)(groupConfig)
   }
 
+  def danube(
+      groupConfig: GroupConfig,
+      mainnetBlockTargetTime: Duration,
+      danubeBlockTargetTime: Duration
+  ): Emission = {
+    assume(danubeBlockTargetTime.millis < mainnetBlockTargetTime.millis)
+    val fraction = Fraction(danubeBlockTargetTime.millis, mainnetBlockTargetTime.millis)
+    new Emission(danubeBlockTargetTime, fraction)(groupConfig)
+  }
+
   // scalastyle:off magic.number
   val yearsUntilStable: Int   = 4
   val yearsUntilNoReward: Int = 82
