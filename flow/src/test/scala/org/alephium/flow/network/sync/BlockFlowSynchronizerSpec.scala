@@ -945,6 +945,32 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is brokerActor1
   }
 
+  it should "check missed blocks only from v2 nodes" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    val v1Broker                  = addBroker(P2PV1)
+    val Seq(v2Broker0, v2Broker1) = Seq.fill(2)(addBroker(P2PV2))
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val syncingChain              = addSyncingChain(chainIndex, 5, v2Broker0._1)
+    val bestTips                  = AVector(syncingChain.bestTip)
+    val batchId                   = BlockBatch(0, 5)
+
+    blockFlowSynchronizerActor.allV2BrokersMissBlocks(chainIndex, batchId) is false
+    v2Broker0._2.updateTips(bestTips)
+    blockFlowSynchronizerActor.allV2BrokersMissBlocks(chainIndex, batchId) is false
+    v2Broker0._2.addMissedBlocks(chainIndex, batchId)
+    blockFlowSynchronizerActor.allV2BrokersMissBlocks(chainIndex, batchId) is true
+
+    v2Broker1._2.updateTips(bestTips)
+    blockFlowSynchronizerActor.allV2BrokersMissBlocks(chainIndex, batchId) is false
+    v2Broker1._2.addMissedBlocks(chainIndex, batchId)
+    blockFlowSynchronizerActor.allV2BrokersMissBlocks(chainIndex, batchId) is true
+
+    v1Broker._2.updateTips(bestTips)
+    v1Broker._2.missOrUnableDownload(chainIndex, batchId) is false
+    blockFlowSynchronizerActor.allV2BrokersMissBlocks(chainIndex, batchId) is true
+  }
+
   it should "resync if the origin peer is terminated" in new BlockFlowSynchronizerV2Fixture {
     val chainIndex                = ChainIndex.unsafe(0, 0)
     val brokers                   = Seq.fill(2)(addBroker())

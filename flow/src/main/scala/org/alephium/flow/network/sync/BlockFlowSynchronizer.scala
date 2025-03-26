@@ -294,9 +294,17 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
+  @inline private[sync] def allV2BrokersMissBlocks(
+      chainIndex: ChainIndex,
+      batchId: BlockBatch
+  ): Boolean = {
+    brokers.view
+      .filter(_._2.version == P2PV2)
+      .forall(_._2.missOrUnableDownload(chainIndex, batchId))
+  }
+
   private def handleMissedBlocks(state: SyncStatePerChain, batchId: BlockBatch): Unit = {
-    val isOriginBrokerInvalid = brokers.forall(_._2.containsMissedBlocks(state.chainIndex, batchId))
-    if (isOriginBrokerInvalid) {
+    if (allV2BrokersMissBlocks(state.chainIndex, batchId)) {
       // No one can fill in the skeleton, disconnect from the origin peer and restart the sync
       // once we receive the `Terminated` message.
       log.error(
