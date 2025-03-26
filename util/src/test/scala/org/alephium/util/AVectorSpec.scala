@@ -485,6 +485,18 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       (vc1.elems eq vc.elems) is true
     }
   }
+
+  it should "iterator" in new Fixture {
+    forAll(vectorGen) { vc =>
+      vc.iterator.toSeq is vc.toSeq
+    }
+  }
+
+  it should "reverseIterator" in new Fixture {
+    forAll(vectorGen) { vc =>
+      vc.reverseIterator.toSeq is vc.reverse.toSeq
+    }
+  }
 }
 
 class BooleanAVectorSpec extends AVectorSpec[Boolean]

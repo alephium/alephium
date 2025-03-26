@@ -890,6 +890,7 @@ object SyncV2Handler {
     BlockHeightRange.from(from, from + (count - 1) * span, span)
   }
 
+  // format: off
   /**
    * Validates a sequence of downloaded blocks by performing two critical checks:
    * 1. Verifies that the blocks form a valid chain by checking parent-child relationships
@@ -903,28 +904,29 @@ object SyncV2Handler {
    * @param toHeaderOpt Optional target header that the chain should connect to
    * @return true if the blocks form a valid chain of the expected size, false otherwise
    */
+  // format: on
   def validateBlocks(
       blocks: AVector[Block],
       mainChainBlockSize: Int,
       toHeaderOpt: Option[BlockHeader]
   ): Boolean = {
     assume(mainChainBlockSize > 0)
-    
-    if (blocks.size < mainChainBlockSize) {
-      return false
-    }
-    
-    val startHash = toHeaderOpt.map(_.hash).getOrElse(blocks.last.hash)
-    var nextBlockToCheck = startHash
-    var remainingBlocks = mainChainBlockSize
-    
-    for (block <- blocks.reverseIterator) {
-      if (block.hash == nextBlockToCheck) {
-        nextBlockToCheck = block.parentHash
-        remainingBlocks -= 1
+
+    if (blocks.length < mainChainBlockSize) {
+      false
+    } else {
+      val startHash        = toHeaderOpt.map(_.hash).getOrElse(blocks.last.hash)
+      var nextBlockToCheck = startHash
+      var remainingBlocks  = mainChainBlockSize
+
+      for (block <- blocks.reverseIterator) {
+        if (block.hash == nextBlockToCheck) {
+          nextBlockToCheck = block.parentHash
+          remainingBlocks -= 1
+        }
       }
+
+      remainingBlocks == 0
     }
-    
-    remainingBlocks == 0
   }
 }
