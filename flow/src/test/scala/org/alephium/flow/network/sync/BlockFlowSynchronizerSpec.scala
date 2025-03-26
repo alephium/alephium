@@ -221,7 +221,8 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "schedule sync" in new BlockFlowSynchronizerV2Fixture {
+  it should "try to sync using v1 and v2 before danube" in new BlockFlowSynchronizerV2Fixture {
+    setHardForkBefore(HardFork.Danube)
     addBroker()
     blockFlowSynchronizerActor.isSyncingUsingV2 is false
     blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
@@ -229,6 +230,15 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     allProbes.flowHandler.expectMsg(FlowHandler.GetSyncLocators)
 
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
+    blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
+    allProbes.flowHandler.expectMsg(FlowHandler.GetChainState)
+    allProbes.flowHandler.expectNoMessage()
+  }
+
+  it should "disable sync v1 since danube" in new BlockFlowSynchronizerV2Fixture {
+    setHardForkSince(HardFork.Danube)
+    addBroker()
+    blockFlowSynchronizerActor.isSyncingUsingV2 is false
     blockFlowSynchronizer ! BlockFlowSynchronizer.Sync
     allProbes.flowHandler.expectMsg(FlowHandler.GetChainState)
     allProbes.flowHandler.expectNoMessage()

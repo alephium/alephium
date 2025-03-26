@@ -33,7 +33,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, TimeStamp}
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 // scalastyle:off file.size.limit
@@ -187,11 +187,18 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
     allHandlers.flowHandler ! FlowHandler.GetChainState
   }
 
+  @inline private def trySyncUsingV1(): Unit = {
+    val hardFork = networkSetting.getHardFork(TimeStamp.now())
+    if (!hardFork.isDanubeEnabled()) {
+      handleSyncCommandV1()
+    }
+  }
+
   def handleV2: Receive = handleV1Base orElse {
     case BlockFlowSynchronizer.Sync =>
       if (brokers.nonEmpty) {
         handleSyncCommandV2()
-        if (!isSyncingUsingV2) handleSyncCommandV1()
+        if (!isSyncingUsingV2) trySyncUsingV1()
       }
       scheduleSync()
 
