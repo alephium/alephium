@@ -494,7 +494,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(HeadersByHeightsRequest(defaultRequestId, heights))
     listener.expectNoMessage()
 
-    val remoteAddress = brokerHandlerActor.remoteAddress
+    val remoteAddress  = brokerHandlerActor.remoteAddress
     val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsRequest(defaultRequestId, invalidHeights)
@@ -515,7 +515,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     listener.expectNoMessage()
 
-    val remoteAddress = brokerHandlerActor.remoteAddress
+    val remoteAddress  = brokerHandlerActor.remoteAddress
     val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
     brokerHandler ! BaseBrokerHandler.Received(
       BlocksAndUnclesByHeightsRequest(defaultRequestId, invalidHeights)
