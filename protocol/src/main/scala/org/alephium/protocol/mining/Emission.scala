@@ -88,9 +88,7 @@ final class Emission private (blockTargetTime: Duration, fraction: Emission.Frac
   def rewardWrtTime(blockTs: TimeStamp, launchTs: TimeStamp): U256 = {
     require(blockTs >= launchTs)
     val elapsed = blockTs.deltaUnsafe(launchTs)
-    if (elapsed >= durationToNoReward) {
-      U256.Zero
-    } else if (elapsed >= durationToStableMaxReward) {
+    if (elapsed >= durationToStableMaxReward) {
       stableMaxRewardPerChain
     } else {
       val reducedCents = ALPH.cent(elapsed.millis / durationToDropAboutOnceCent.millis)
@@ -225,6 +223,16 @@ object Emission {
     assume(rhoneBlockTargetTime.millis < mainnetBlockTargetTime.millis)
     val fraction = Fraction(rhoneBlockTargetTime.millis, mainnetBlockTargetTime.millis)
     new Emission(rhoneBlockTargetTime, fraction)(groupConfig)
+  }
+
+  def danube(
+      groupConfig: GroupConfig,
+      mainnetBlockTargetTime: Duration,
+      danubeBlockTargetTime: Duration
+  ): Emission = {
+    assume(danubeBlockTargetTime.millis < mainnetBlockTargetTime.millis)
+    val fraction = Fraction(danubeBlockTargetTime.millis, mainnetBlockTargetTime.millis)
+    new Emission(danubeBlockTargetTime, fraction)(groupConfig)
   }
 
   // scalastyle:off magic.number

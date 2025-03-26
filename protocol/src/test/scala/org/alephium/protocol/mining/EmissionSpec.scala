@@ -95,6 +95,8 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       ALPH.cent(189)
     rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(4 * 365 * 24), TimeStamp.zero) is
       ALPH.cent(125)
+    rewardWrtTime(TimeStamp.zero + Duration.ofHoursUnsafe(82 * 365 * 24), TimeStamp.zero) is
+      ALPH.cent(125)
   }
 
   def average(reward0: U256, reward1: U256): U256 = {

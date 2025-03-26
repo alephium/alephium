@@ -492,8 +492,7 @@ object BlockFlow extends StrictLogging {
 
     def updateViewPerChainIndexDanubeUnsafe(chainIndex: ChainIndex): Unit = {
       if (chainIndex.isIntraGroup) {
-        val bestFlowSkeleton = calBestFlowSkeletonUnsafe()
-        updateBestFlowSkeleton(bestFlowSkeleton)
+        updateBestFlowSkeletonUnsafe()
       }
 
       if (brokerConfig.contains(chainIndex.from)) {

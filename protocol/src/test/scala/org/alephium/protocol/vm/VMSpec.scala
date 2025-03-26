@@ -444,7 +444,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     def test(contract: StatefulContract, result: Option[ExeFailure]) = {
       val instrs = AVector[Instr[StatefulContext]](
         AddressConst(address0),
-        U256Const(Val.U256(10)),
+        U256Const(Val.U256(ALPH.oneAlph)),
         ApproveAlph,
         BytesConst(Val.ByteVec(serialize(contract))),
         BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),

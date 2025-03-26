@@ -6109,10 +6109,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
       updateStatements.foreach { statement =>
         compileContractFull(
-          code(statement, "@using(preapprovedAssets = true)")
+          code(statement, "@using(preapprovedAssets = true, updateFields = true)")
         ).rightValue.warnings.map(_.message) is warnings
         compileContractFull(
-          code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
+          code(
+            statement,
+            "@using(preapprovedAssets = true, updateFields = true, checkExternalCaller = false)"
+          )
         ).rightValue.warnings.map(_.message) is AVector.empty[String]
       }
       compileContractFull(code("let _ = map[0]")).rightValue.warnings.map(_.message) is
@@ -6147,6 +6150,46 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Global variables have the same name: counters")
+    }
+  }
+
+  it should "check the updateFields annotation for the map call" in new Fixture {
+    def code(statement: String, annotation: String = "") =
+      s"""
+         |Contract Foo(@unused address: Address) {
+         |  mapping[U256, U256] map
+         |  $annotation
+         |  pub fn foo() -> () {
+         |    $statement
+         |  }
+         |}
+         |""".stripMargin
+
+    val noUpdateFieldsWarning = AVector(Warnings.noUpdateFieldsCheck("Foo", "foo"))
+    val unnecessaryUpdateFieldsWarning =
+      AVector(Warnings.unnecessaryUpdateFieldsCheck("Foo", "foo"))
+
+    val updateStatements =
+      Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0", "map[0] += 1")
+    updateStatements.foreach { statement =>
+      compileContractFull(
+        code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
+      ).rightValue.warnings.map(_.message) is noUpdateFieldsWarning
+      compileContractFull(
+        code(
+          statement,
+          "@using(preapprovedAssets = true, checkExternalCaller = false, updateFields = true)"
+        )
+      ).rightValue.warnings.map(_.message) is AVector.empty[String]
+    }
+
+    val loadStatements =
+      Seq("let _ = map[0]", "let _ = map.contains!(0)")
+    loadStatements.foreach { statement =>
+      compileContractFull(code(statement)).rightValue.warnings.map(_.message).isEmpty is true
+      compileContractFull(
+        code(statement, "@using(checkExternalCaller = false, updateFields = true)")
+      ).rightValue.warnings.map(_.message) is unnecessaryUpdateFieldsWarning
     }
   }
 

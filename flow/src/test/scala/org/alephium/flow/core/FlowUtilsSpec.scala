@@ -435,20 +435,22 @@ class FlowUtilsSpec extends AlephiumSpec {
     with SinceRhoneGhostUncleFixture {
     setHardForkSince(HardFork.Rhone)
     override lazy val chainIndex = ChainIndex.unsafe(0, 0)
-    val emptyBlock               = mineFromMemPool(blockFlow, chainIndex)
-    val emission                 = consensusConfigs.rhone.emission
+
+    val hardFork   = networkConfig.getHardFork(TimeStamp.now())
+    val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
+    val emission   = consensusConfigs.getConsensusConfig(hardFork).emission
     val miningReward = emission
       .reward(emptyBlock.header)
       .miningReward
     miningReward is emission.rewardWrtTime(emptyBlock.header.timestamp, ALPH.LaunchTimestamp)
     emptyBlock.coinbase.unsigned.fixedOutputs.length is 1
-    val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+    val mainChainReward = Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
     emptyBlock.coinbaseReward is mainChainReward
     miningReward > mainChainReward is true
     addAndCheck(blockFlow, emptyBlock)
 
     val transferBlock = newTransferBlock()
-    transferBlock.coinbaseReward is Coinbase.calcMainChainReward(miningReward)
+    transferBlock.coinbaseReward is Coinbase.calcMainChainRewardSinceRhone(hardFork, miningReward)
     addAndCheck(blockFlow, transferBlock)
 
     {
@@ -483,6 +485,25 @@ class FlowUtilsSpec extends AlephiumSpec {
         uncleRewards.fold(U256.Zero)(_ addUnsafe _).divUnsafe(32)
       )
     }
+  }
+
+  "the rhone block reward" should "be roughly twice the danube block reward" in new FlowFixture {
+    val now = TimeStamp.now()
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", now.plusSecondsUnsafe(1).millis)
+    )
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val rhoneBlock = emptyBlock(blockFlow, chainIndex, now)
+    networkConfig.getHardFork(rhoneBlock.timestamp) is HardFork.Rhone
+    val danubeBlock = emptyBlock(blockFlow, chainIndex, now.plusSecondsUnsafe(1))
+    networkConfig.getHardFork(danubeBlock.timestamp) is HardFork.Danube
+
+    val rhoneReward        = rhoneBlock.coinbaseReward
+    val doubleDanubeReward = danubeBlock.coinbaseReward * 2
+    val tolerance          = rhoneReward / 20
+    doubleDanubeReward - rhoneReward < tolerance is true
+
+    addAndCheck(blockFlow, rhoneBlock, danubeBlock)
   }
 
   it should "prepare block template when txs are inter-dependent: pre-rhone" in new FlowFixture {
