@@ -86,8 +86,7 @@ trait Warnings {
   def warnNoUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
       warnings += Warning(
-        s"""Function ${Ast.funcName(typeId, funcId)} updates fields. """ +
-          s"""Please use "@using(updateFields = true)" for the function.""",
+        Warnings.noUpdateFieldsCheck(typeId.name, funcId.name),
         funcId.sourceIndex
       )
     }
@@ -96,8 +95,7 @@ trait Warnings {
   def warnUnnecessaryUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
       warnings += Warning(
-        s"Function ${Ast.funcName(typeId, funcId)} does not update fields. " +
-          s"""Please remove "@using(updateFields = true)" for the function.""",
+        Warnings.unnecessaryUpdateFieldsCheck(typeId.name, funcId.name),
         funcId.sourceIndex
       )
     }
@@ -156,6 +154,16 @@ object Warnings {
   def noCheckExternalCallerMsg(typeId: String, funcId: String): String = {
     s"""No external caller check for function "${typeId}.${funcId}". """ +
       s"""Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
+  }
+
+  def noUpdateFieldsCheck(typeId: String, funcId: String): String = {
+    s"""Function "${typeId}.${funcId}" updates fields. """ +
+      s"""Please use "@using(updateFields = true)" for the function."""
+  }
+
+  def unnecessaryUpdateFieldsCheck(typeId: String, funcId: String): String = {
+    s"""Function "${typeId}.${funcId}" does not update fields. """ +
+      s"""Please remove "@using(updateFields = true)" for the function."""
   }
 
   def unusedGlobalConstants(

@@ -46,13 +46,16 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
 
     (1 until 4).foreach(_ => addNewBroker(P2PV1))
     samplePeersSize(brokers.size, P2PV1) is 1
+    sampleV1PeersFromAllBrokers().toSeq.toMap.size is 1
     samplePeers(P2PV1).toSeq.toMap.size is 1
     samplePeers(P2PV2).isEmpty is true
     (4 until 9).foreach(_ => addNewBroker(P2PV2))
     samplePeersSize(brokers.size, P2PV1) is 2
-    samplePeers(P2PV1).toSeq.toMap.size is 2
+    sampleV1PeersFromAllBrokers().toSeq.toMap.size is 2
+    samplePeers(P2PV1).toSeq.toMap.size is 1
     (9 until 1024).foreach(_ => addNewBroker(P2PV1))
     samplePeersSize(brokers.size, P2PV1) is 3
+    sampleV1PeersFromAllBrokers().toSeq.toMap.size is 3
     samplePeers(P2PV1).toSeq.toMap.size is 3
 
     networkSetting.syncPeerSampleSizeV2 is 5

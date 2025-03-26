@@ -31,7 +31,7 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
-import org.alephium.util.EventStream.Subscriber
+import org.alephium.util.EventStream
 
 object DependencyHandler {
   def props(
@@ -50,6 +50,8 @@ object DependencyHandler {
   sealed trait Event
   final case class Pendings(datas: AVector[BlockHash]) extends Event
 
+  final case class FlowDataAlreadyExist(data: FlowData) extends EventStream.Event
+
   final case class PendingStatus(
       data: FlowData,
       event: ActorRefT[ChainHandler.Event],
@@ -64,7 +66,7 @@ class DependencyHandler(
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
 )(implicit val networkSetting: NetworkSetting)
     extends DependencyHandlerState
-    with Subscriber {
+    with EventStream.Subscriber {
   import DependencyHandler._
 
   override def preStart(): Unit = {
@@ -117,7 +119,7 @@ class DependencyHandler(
   }
 }
 
-trait DependencyHandlerState extends IOBaseActor {
+trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   import DependencyHandler.PendingStatus
 
   def blockFlow: BlockFlow
@@ -209,6 +211,8 @@ trait DependencyHandlerState extends IOBaseActor {
           }
           // update this at the end of this function to avoid cache invalidation issues
           pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
+        } else {
+          publishEvent(DependencyHandler.FlowDataAlreadyExist(data))
         }
       }
     }

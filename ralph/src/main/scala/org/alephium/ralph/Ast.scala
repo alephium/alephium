@@ -1292,20 +1292,28 @@ object Ast {
       }
     }
 
-    @inline private def isUpdateMap(state: Compiler.State[Ctx]): Boolean = {
-      body.exists {
-        case _: InsertToMap | _: RemoveFromMap => true
-        case Assign(targets, _) =>
-          targets.exists {
-            case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
-            case _                                  => false
+    private var _updatesMap: Option[Boolean] = None
+
+    @inline private[ralph] def updatesMap(state: Compiler.State[Ctx]): Boolean = {
+      _updatesMap match {
+        case Some(value) => value
+        case None =>
+          val funcUpdatesMap = body.exists {
+            case _: InsertToMap | _: RemoveFromMap => true
+            case Assign(targets, _) =>
+              targets.exists {
+                case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
+                case _                                  => false
+              }
+            case CompoundAssign(target, _, _) =>
+              target match {
+                case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
+                case _                                  => false
+              }
+            case _ => false
           }
-        case CompoundAssign(target, _, _) =>
-          target match {
-            case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
-            case _                                  => false
-          }
-        case _ => false
+          _updatesMap = Some(funcUpdatesMap)
+          funcUpdatesMap
       }
     }
 
@@ -1320,7 +1328,7 @@ object Ast {
         || useAssetsInContract != Ast.NotUseContractAssets
         || hasInterfaceFuncCall
         || hasMigrateSimple
-        || isUpdateMap(state))
+        || updatesMap(state))
     }
 
     lazy val signature: FuncSignature = FuncSignature(
