@@ -220,7 +220,7 @@ object Emission {
       mainnetBlockTargetTime: Duration,
       rhoneBlockTargetTime: Duration
   ): Emission = {
-    assume(rhoneBlockTargetTime.millis < mainnetBlockTargetTime.millis)
+    assume(rhoneBlockTargetTime.millis <= mainnetBlockTargetTime.millis)
     val fraction = Fraction(rhoneBlockTargetTime.millis, mainnetBlockTargetTime.millis)
     new Emission(rhoneBlockTargetTime, fraction)(groupConfig)
   }
@@ -230,7 +230,7 @@ object Emission {
       mainnetBlockTargetTime: Duration,
       danubeBlockTargetTime: Duration
   ): Emission = {
-    assume(danubeBlockTargetTime.millis < mainnetBlockTargetTime.millis)
+    assume(danubeBlockTargetTime.millis <= mainnetBlockTargetTime.millis)
     val fraction = Fraction(danubeBlockTargetTime.millis, mainnetBlockTargetTime.millis)
     new Emission(danubeBlockTargetTime, fraction)(groupConfig)
   }
