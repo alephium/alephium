@@ -216,7 +216,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           invalidBlock(GhostUnclesAlreadyUsed)
         } else if (hardFork.isDanubeEnabled()) {
           val mainChainHash =
-            if (ancestorIndex == 0) block.parentHash else ancestors(ancestorIndex - 1)
+            if (ancestorIndex == 0) parentHeader.hash else ancestors(ancestorIndex - 1)
           val disallowedHashes = usedUncles :+ mainChainHash
           checkDuplicateGhostUnclesSinceDanube(flow, disallowedHashes, uncle)
         } else {
