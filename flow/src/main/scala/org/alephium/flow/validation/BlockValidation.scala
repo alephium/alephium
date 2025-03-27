@@ -215,6 +215,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else if (usedUncles.contains(uncle.hash)) {
           invalidBlock(GhostUnclesAlreadyUsed)
         } else if (hardFork.isDanubeEnabled()) {
+          // Since we use a dummy header to validate the block template, `block.chainIndex` may be invalid.
+          // Therefore, we use `parentHeader.hash` instead of `block.parentHash`, as `block.parentHash` relies on `block.chainIndex`.
           val mainChainHash =
             if (ancestorIndex == 0) parentHeader.hash else ancestors(ancestorIndex - 1)
           val disallowedHashes = usedUncles :+ mainChainHash
