@@ -244,7 +244,7 @@ class AccountViewSpec extends AlephiumSpec {
       accountView.getBlockCachesAndConflictedTxs(blockFlow).rightValue
     blockCaches0.toSet is mainchainBlocks.map(blockFlow.getBlockCacheUnsafe(mainGroup, _)).toSet
 
-    conflictedTxs0 is AVector
+    conflictedTxs0.toSet is AVector
       .from(otherGroups)
       .map { to =>
         val chainIndex = ChainIndex.unsafe(mainGroup.value, to)
@@ -254,5 +254,6 @@ class AccountViewSpec extends AlephiumSpec {
       .sortBy(_.timestamp)
       .tail
       .map(_.nonCoinbase.head)
+      .toSet
   }
 }

@@ -1152,12 +1152,15 @@ trait GhostUncleFixture extends FlowFixture {
     block
   }
 
-  def mineBlocks(blockFlow: BlockFlow, chainIndex: ChainIndex, size: Int): Unit = {
+  def mineBlocks(blockFlow: BlockFlow, chainIndex: ChainIndex, size: Int): AVector[Block] = {
     val depGroupIndex = (chainIndex.from.value + 1) % blockFlow.brokerConfig.groups
     val depChainIndex = ChainIndex.unsafe(depGroupIndex, depGroupIndex)
-    (0 until size).foreach { _ =>
-      addAndCheck(blockFlow, emptyBlock(blockFlow, depChainIndex))
-      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    AVector.from(0 until size).flatMap { _ =>
+      val block0 = emptyBlock(blockFlow, depChainIndex)
+      addAndCheck(blockFlow, block0)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block1)
+      AVector(block0, block1)
     }
   }
 

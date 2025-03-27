@@ -42,5 +42,6 @@ class DanubeUpgradeTest extends AlephiumActorSpec {
 
     blocks.exists(_.timestamp.millis < danubeHardForkTimeStamp) is true
     blocks.exists(_.timestamp.millis > danubeHardForkTimeStamp) is true
+    clique.stop()
   }
 }

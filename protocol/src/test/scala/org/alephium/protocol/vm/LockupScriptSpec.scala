@@ -135,13 +135,13 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa") is a[ValidLockupScript]
     decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr") is a[ValidLockupScript]
     decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L") is a[HalfDecodedP2PK]
-    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L@0") is
+    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0") is
       a[ValidLockupScript]
-    decodeFromBase58("@1") is InvalidLockupScript
-    decodeFromBase58("1C2@1") is InvalidLockupScript
-    decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3@0") is InvalidLockupScript
-    decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa@0") is InvalidLockupScript
-    decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr@0") is InvalidLockupScript
+    decodeFromBase58(":1") is InvalidLockupScript
+    decodeFromBase58("1C2:1") is InvalidLockupScript
+    decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0") is InvalidLockupScript
+    decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0") is InvalidLockupScript
+    decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0") is InvalidLockupScript
     decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3") is InvalidLockupScript
   }
 }

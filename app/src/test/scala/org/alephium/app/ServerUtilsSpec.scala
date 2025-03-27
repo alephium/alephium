@@ -29,7 +29,7 @@ import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
@@ -4700,48 +4700,33 @@ class ServerUtilsSpec extends AlephiumSpec {
     simulatedGeneratedOutputs(1).amount is ALPH.alph(4)
   }
 
-  it should "get ghost uncles" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block0     = emptyBlock(blockFlow, chainIndex)
-    val block1     = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0, block1)
-    val block2 = mineBlockTemplate(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block2)
-    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 2
-
-    val ghostUncleHash  = blockFlow.getHashes(chainIndex, 1).rightValue.last
+  it should "get ghost uncles" in new Fixture with GhostUncleFixture {
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val ghostUncleHash  = mineUncleBlocks(blockFlow, chainIndex, 1).head
     val ghostUncleBlock = blockFlow.getBlock(ghostUncleHash).rightValue
-    val serverUtils     = new ServerUtils()
-    serverUtils.getBlock(blockFlow, block2.hash).rightValue.ghostUncles is
+    val block           = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    val serverUtils = new ServerUtils()
+    serverUtils.getBlock(blockFlow, block.hash).rightValue.ghostUncles is
       AVector(
         GhostUncleBlockEntry(ghostUncleHash, Address.Asset(ghostUncleBlock.minerLockupScript))
       )
   }
 
-  it should "get mainchain block by ghost uncle hash" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block0     = emptyBlock(blockFlow, chainIndex)
-    val block1     = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0, block1)
-    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
+  it should "get mainchain block by ghost uncle hash" in new Fixture with GhostUncleFixture {
+    val chainIndex     = ChainIndex.unsafe(0, 0)
+    val ghostUncleHash = mineUncleBlocks(blockFlow, chainIndex, 1).head
 
-    val serverUtils    = new ServerUtils()
-    val ghostUncleHash = blockFlow.getHashes(chainIndex, 1).rightValue.last
-    val blockNum       = Random.between(0, ALPH.MaxGhostUncleAge)
-    (0 until blockNum).foreach { _ =>
-      val block = emptyBlock(blockFlow, chainIndex)
-      block.ghostUncleHashes.rightValue.isEmpty is true
-      addAndCheck(blockFlow, block)
-    }
+    val serverUtils = new ServerUtils()
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).leftValue.detail is
       s"The mainchain block that references the ghost uncle block ${ghostUncleHash.toHexString} not found"
 
     val block = mineBlockTemplate(blockFlow, chainIndex)
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
-    val blockHeight = blockNum + 2
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
-      BlockEntry.from(block, blockHeight).rightValue
+      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash)).rightValue
 
     val invalidBlockHash = randomBlockHash(chainIndex)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
