@@ -122,6 +122,7 @@ object TxHandler {
     grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
       case MemPool.AddedToMemPool =>
         for {
+          _ <- blockFlow.updateViewPerChainIndexDanube(chainIndex).left.map(_.toString)
           _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
           addToMemPoolResult <-
             if (!chainIndex.isIntraGroup) {
