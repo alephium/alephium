@@ -16,6 +16,8 @@
 
 package org.alephium.flow.handler
 
+import akka.actor.Props
+
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
@@ -28,7 +30,7 @@ import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 class AccountViewHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends FlowFixture {
     lazy val accountViewHandler =
-      newTestActorRef[AccountViewHandler](AccountViewHandler.props(blockFlow))
+      newTestActorRef[AccountViewHandler](Props(new AccountViewHandler(blockFlow)))
 
     def setSynced() = {
       accountViewHandler ! InterCliqueManager.SyncedResult(true)

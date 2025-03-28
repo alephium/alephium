@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.collection.mutable
 
-import akka.actor.{Props, Terminated}
+import akka.actor.{ActorSystem, Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
@@ -34,15 +34,22 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, TimeStamp}
-import org.alephium.util.EventStream.{Publisher, Subscriber}
+import org.alephium.util.EventStream.Publisher
 
 // scalastyle:off file.size.limit
 object BlockFlowSynchronizer {
-  def props(blockflow: BlockFlow, allHandlers: AllHandlers)(implicit
+  def build(system: ActorSystem, blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit
       networkSetting: NetworkSetting,
       brokerConfig: BrokerConfig
-  ): Props =
-    Props(new BlockFlowSynchronizer(blockflow, allHandlers))
+  ): ActorRefT[Command] = {
+    val actor =
+      ActorRefT.build[Command](system, Props(new BlockFlowSynchronizer(blockFlow, allHandlers)))
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.HandShaked])
+    system.eventStream.subscribe(actor.ref, classOf[ChainHandler.FlowDataValidationEvent])
+    system.eventStream.subscribe(actor.ref, classOf[DependencyHandler.FlowDataAlreadyExist])
+    actor
+  }
 
   sealed trait Command
   sealed trait V1Command                                                extends Command
@@ -69,7 +76,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     val brokerConfig: BrokerConfig
 ) extends IOBaseActor
     with Publisher
-    with Subscriber
     with DownloadTracker
     with BlockFetcher
     with BrokerStatusTracker
@@ -83,9 +89,6 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     super.preStart()
     schedule(self, CleanDownloading, networkSetting.syncCleanupFrequency)
     scheduleSync()
-    subscribeEvent(self, classOf[InterCliqueManager.HandShaked])
-    subscribeEvent(self, classOf[ChainHandler.FlowDataValidationEvent])
-    subscribeEvent(self, classOf[DependencyHandler.FlowDataAlreadyExist])
   }
 
   override def receive: Receive = if (networkSetting.enableP2pV2) v2 else v1

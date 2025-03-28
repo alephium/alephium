@@ -19,6 +19,7 @@ package org.alephium.flow.handler
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.{FlowFixture, GhostUncleFixture}
@@ -38,7 +39,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
 
     lazy val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     lazy val dependencyHandler = TestActorRef[DependencyHandler](
-      DependencyHandler.props(blockFlow, allHandlers.blockHandlers, allHandlers.headerHandlers)
+      Props(new DependencyHandler(blockFlow, allHandlers.blockHandlers, allHandlers.headerHandlers))
     )
     lazy val state = dependencyHandler.underlyingActor
 

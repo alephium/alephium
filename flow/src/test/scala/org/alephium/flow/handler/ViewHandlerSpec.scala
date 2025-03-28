@@ -16,6 +16,7 @@
 
 package org.alephium.flow.handler
 
+import akka.actor.Props
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 
@@ -34,7 +35,9 @@ abstract class ViewHandlerBaseSpec extends AlephiumActorSpec {
       AVector.tabulate(groupConfig.groups)(i =>
         Address.Asset(addressGen(GroupIndex.unsafe(i)).sample.get._1)
       )
-    lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow))
+    lazy val viewHandler = TestActorRef[ViewHandler](
+      Props(new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript))))
+    )
 
     def setSynced(): Unit = viewHandler ! InterCliqueManager.SyncedResult(true)
   }
