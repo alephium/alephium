@@ -3914,11 +3914,17 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
-  it should "not load contract assets just after creation from Rhone upgrade" in new CreateContractFixture {
-    setHardForkSince(HardFork.Rhone)
+  it should "not load contract assets just after creation for Rhone upgrade" in new CreateContractFixture {
+    setHardFork(HardFork.Rhone)
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetAlreadyFlushed)") is true
+  }
+
+  it should "be able to use contract assets just after creation from Danube upgrade" in new CreateContractFixture {
+    setHardForkSince(HardFork.Danube)
+    val block = payableCall(blockFlow, chainIndex, script)
+    addAndCheck(blockFlow, block)
   }
 
   it should "load contract fields just after creation from Rhone upgrade" in new CreateContractFixture {
