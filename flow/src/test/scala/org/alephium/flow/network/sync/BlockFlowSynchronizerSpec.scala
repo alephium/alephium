@@ -19,7 +19,7 @@ package org.alephium.flow.network.sync
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import akka.actor.PoisonPill
+import akka.actor.{PoisonPill, Props}
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 
 import org.alephium.flow.FlowFixture
@@ -51,7 +51,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     lazy val (allHandlers, allProbes) = TestUtils.createAllHandlersProbe
     lazy val blockFlowSynchronizer = TestActorRef[BlockFlowSynchronizer](
-      BlockFlowSynchronizer.props(blockFlow, allHandlers)
+      Props(new BlockFlowSynchronizer(blockFlow, allHandlers))
     )
     lazy val blockFlowSynchronizerActor = blockFlowSynchronizer.underlyingActor
 

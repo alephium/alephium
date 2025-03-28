@@ -19,11 +19,11 @@ package org.alephium.flow.handler
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.{ActorRef, Cancellable, Props}
+import akka.actor.{ActorRef, ActorSystem, Cancellable, Props}
 import akka.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.mining.Miner
+import org.alephium.flow.mining.{Miner, MiningDispatcher}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
@@ -32,17 +32,22 @@ import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Address, ChainIndex, HardFork}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
-import org.alephium.util.EventStream.{Publisher, Subscriber}
+import org.alephium.util.EventStream.Publisher
 
 object ViewHandler {
-  def props(
-      blockFlow: BlockFlow
-  )(implicit
+  def build(system: ActorSystem, blockFlow: BlockFlow, namePostfix: String)(implicit
       brokerConfig: BrokerConfig,
       miningSetting: MiningSetting
-  ): Props = Props(
-    new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
-  )
+  ): ActorRefT[Command] = {
+    val props = Props(
+      new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
+    )
+    val actor = ActorRefT
+      .build[Command](system, props.withDispatcher(MiningDispatcher), s"ViewHandler$namePostfix")
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
+    system.eventStream.subscribe(actor.ref, classOf[ChainHandler.FlowDataAdded])
+    actor
+  }
 
   sealed trait Command
   case object BestDepsUpdatedPreDanube                                     extends Command
@@ -94,11 +99,8 @@ class ViewHandler(
 ) extends ViewHandlerState
     with BlockFlowUpdaterPreDanubeState
     with BlockFlowUpdaterDanubeState
-    with Subscriber
     with Publisher
     with InterCliqueManager.NodeSyncStatus {
-  subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
-
   override def receive: Receive                   = handle orElse updateNodeSyncStatus
   implicit def executionContext: ExecutionContext = context.dispatcher
 
