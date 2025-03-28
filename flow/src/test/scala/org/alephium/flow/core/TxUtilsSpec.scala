@@ -2873,6 +2873,8 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait PoLWCoinbaseTxFixture extends FlowFixture with LockupScriptGenerators {
+    setHardForkSince(HardFork.Rhone)
+    lazy val hardFork                   = networkConfig.getHardFork(TimeStamp.now())
     lazy val chainIndex                 = chainIndexGenForBroker(brokerConfig).sample.get
     lazy val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
 
@@ -2954,7 +2956,7 @@ class TxUtilsSpec extends AlephiumSpec {
     tx.fixedOutputs.length is 2
     tx.gasAmount is minimalGas
     tx.fixedOutputs(0).amount is Coinbase
-      .calcMainChainReward(polwReward.netRewardUnsafe())
+      .calcMainChainRewardSinceRhone(hardFork, polwReward.netRewardUnsafe())
       .addUnsafe(polwReward.burntAmount)
     tx.fixedOutputs(1).amount is dustUtxoAmount.addUnsafe(coinbaseGasFeeSubsidy)
   }

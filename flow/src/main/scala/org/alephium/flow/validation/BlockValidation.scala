@@ -215,8 +215,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else if (usedUncles.contains(uncle.hash)) {
           invalidBlock(GhostUnclesAlreadyUsed)
         } else if (hardFork.isDanubeEnabled()) {
+          // Since we use a dummy header to validate the block template, `block.chainIndex` may be invalid.
+          // Therefore, we use `parentHeader.hash` instead of `block.parentHash`, as `block.parentHash` relies on `block.chainIndex`.
           val mainChainHash =
-            if (ancestorIndex == 0) block.parentHash else ancestors(ancestorIndex - 1)
+            if (ancestorIndex == 0) parentHeader.hash else ancestors(ancestorIndex - 1)
           val disallowedHashes = usedUncles :+ mainChainHash
           checkDuplicateGhostUnclesSinceDanube(flow, disallowedHashes, uncle)
         } else {
@@ -458,7 +460,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  private[validation] def checkRewardRhone(
+  private[validation] def checkRewardSinceRhone(
+      hardFork: HardFork,
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -468,7 +471,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   ): BlockValidationResult[Unit] = {
     val burntAmount     = burntAmountOpt.getOrElse(U256.Zero)
     val netReward       = lockedReward.subUnsafe(burntAmount)
-    val mainChainReward = Coinbase.calcMainChainReward(netReward)
+    val mainChainReward = Coinbase.calcMainChainRewardSinceRhone(hardFork, netReward)
     val uncleRewards = uncles.map(uncle => Coinbase.calcGhostUncleReward(mainChainReward, uncle._2))
     val blockReward  = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
     val blockRewardLocked = blockReward.addUnsafe(burntAmount)
@@ -535,7 +538,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       _ <- if (isPoLW) preCheckPoLWCoinbase(block.coinbase, uncles.length) else validBlock(())
       _ <-
         if (hardFork.isRhoneEnabled()) {
-          checkRewardRhone(chainIndex, block, groupView, lockedReward, burntAmount, uncles)
+          checkRewardSinceRhone(
+            hardFork,
+            chainIndex,
+            block,
+            groupView,
+            lockedReward,
+            burntAmount,
+            uncles
+          )
         } else {
           checkRewardPreRhone(chainIndex, block, groupView, lockedReward)
         }

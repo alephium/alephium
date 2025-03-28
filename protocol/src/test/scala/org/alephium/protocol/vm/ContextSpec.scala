@@ -58,9 +58,11 @@ class ContextSpec
       ) is balances
       context.generatedOutputs.size is 1
 
-      context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
-      if (unblock) {
-        context.contractBlockList.remove(contractId)
+      if (!context.getHardFork().isDanubeEnabled()) {
+        context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
+        if (unblock) {
+          context.contractBlockList.remove(contractId)
+        }
       }
       contractId
     }
@@ -114,12 +116,20 @@ class ContextSpec
     context.generatedOutputs.size is 2
   }
 
-  it should "not generate contract output when the contract is loaded from Rhone upgrade" in new Fixture
-    with NetworkConfigFixture.SinceRhoneT {
-    Seq(HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
+  it should "not use contract output when the contract is just created in Rhone" in new Fixture
+    with NetworkConfigFixture.RhoneT {
+    context.getHardFork() is HardFork.Rhone
     val contractId = createContract()
     context.loadContractObj(contractId).isRight is true
     context.useContractAssets(contractId, 0).leftValue.rightValue is ContractAssetAlreadyFlushed
+  }
+
+  it should "be able to use contract output when the contract is just created in Danube" in new Fixture
+    with NetworkConfigFixture.SinceDanubeT {
+    context.getHardFork().isDanubeEnabled() is true
+    val contractId = createContract()
+    context.loadContractObj(contractId).isRight is true
+    context.useContractAssets(contractId, 0).isRight is true
   }
 
   it should "not cache new contract before Rhone upgrade" in new Fixture
@@ -130,12 +140,20 @@ class ContextSpec
     context.contractPool.contains(contractId) is false
   }
 
-  it should "cache new contract from Rhone upgrade" in new Fixture
-    with NetworkConfigFixture.SinceRhoneT {
-    Seq(HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
+  it should "cache new contract in Rhone upgrade" in new Fixture with NetworkConfigFixture.RhoneT {
+    context.getHardFork() is HardFork.Rhone
     val contractId = createContract(unblock = false)
     context.contractBlockList.contains(contractId) is true
     context.contractPool.contains(contractId) is true
+    context.loadContractObj(contractId).isRight is true
+  }
+
+  it should "not use blocklist for new contracts in Danube upgrade" in new Fixture
+    with NetworkConfigFixture.SinceDanubeT {
+    context.getHardFork().isDanubeEnabled() is true
+    val contractId = createContract(unblock = false)
+    context.contractBlockList.contains(contractId) is false
+    context.contractPool.contains(contractId) is false
     context.loadContractObj(contractId).isRight is true
   }
 
@@ -460,6 +478,11 @@ class ContextSpec
     val balanceState = getMutBalanceState(updatedPrevOutputs)
 
     ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    val alphAmount = ctx.txEnv.prevOutputs.tail.fold(ALPH.oneAlph) { case (acc, output) =>
+      if (output.lockupScript == inputLockupScript) acc.addUnsafe(output.amount) else acc
+    }
+    balanceState.alphRemaining(inputLockupScript).value is alphAmount
 
     balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.MaxValue)
 

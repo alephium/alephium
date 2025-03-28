@@ -16,32 +16,41 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{Block, BlockHeader}
-import org.alephium.util.{EventStream, TimeStamp}
+import org.alephium.util.{ActorRefT, TimeStamp}
 
 object AccountViewHandler {
-  def props(blockFlow: BlockFlow)(implicit
+  type Command = Nothing
+
+  def build(
+      system: ActorSystem,
+      blockFlow: BlockFlow,
+      namePostfix: String
+  )(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig
-  ): Props = Props(new AccountViewHandler(blockFlow))
+  ): ActorRefT[Command] = {
+    val actor = ActorRefT.build[Command](
+      system,
+      Props(new AccountViewHandler(blockFlow)),
+      s"AccountViewHandler$namePostfix"
+    )
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
+    system.eventStream.subscribe(actor.ref, classOf[ChainHandler.FlowDataAdded])
+    actor
+  }
 }
 
 final class AccountViewHandler(val blockFlow: BlockFlow)(implicit
     val brokerConfig: BrokerConfig,
     val networkConfig: NetworkConfig
 ) extends IOBaseActor
-    with EventStream.Subscriber
     with InterCliqueManager.NodeSyncStatus {
-
-  override def preStart(): Unit = {
-    super.preStart()
-    subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
-  }
 
   private def tryUpdateAccountView(block: Block): Unit = {
     val now         = TimeStamp.now()

@@ -24,7 +24,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
+import org.alephium.protocol.message.{P2PV1, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -51,8 +51,7 @@ object BrokerStatusTracker {
     def canDownload(task: BlockDownloadTask)(implicit groupConfig: GroupConfig): Boolean = {
       requestNum < MaxRequestNum &&
       !pendingTasks.contains(task) &&
-      !containsMissedBlocks(task.chainIndex, task.id) &&
-      getChainTip(task.chainIndex).exists(_.height >= task.toHeight)
+      !missOrUnableDownload(task.chainIndex, task.id)
     }
     def addPendingTask(task: BlockDownloadTask): Unit = {
       requestNum += task.size
@@ -98,15 +97,19 @@ object BrokerStatusTracker {
       missedBlocks.remove(chainIndex)
       ()
     }
-    def containsMissedBlocks(
+    @inline def containsMissedBlocks(
+        chainIndex: ChainIndex,
+        batchId: BlockBatch
+    ): Boolean = {
+      missedBlocks.get(chainIndex).exists(_.contains(batchId))
+    }
+    def missOrUnableDownload(
         chainIndex: ChainIndex,
         batchId: BlockBatch
     )(implicit groupConfig: GroupConfig): Boolean = {
-      val chainTip = getChainTip(chainIndex)
-      if (chainTip.exists(_.height >= batchId.to)) {
-        missedBlocks.get(chainIndex).exists(_.contains(batchId))
-      } else {
-        false
+      containsMissedBlocks(chainIndex, batchId) || {
+        val chainTip = getChainTip(chainIndex)
+        chainTip.forall(_.height < batchId.to)
       }
     }
 
@@ -146,11 +149,10 @@ trait BrokerStatusTracker {
     Math.min(peerSize, syncPeerSampleSize)
   }
 
-  def samplePeers(version: P2PVersion): AVector[(BrokerActor, BrokerStatus)] = {
-    val filtered = version match {
-      case P2PV2 => brokers.filter(_._2.version == P2PV2)
-      case P2PV1 => brokers
-    }
+  private def samplePeers(
+      filtered: scala.collection.Seq[(BrokerActor, BrokerStatus)],
+      version: P2PVersion
+  ): AVector[(BrokerActor, BrokerStatus)] = {
     if (filtered.isEmpty) {
       AVector.empty
     } else {
@@ -160,5 +162,14 @@ trait BrokerStatusTracker {
         filtered((startIndex + k) % filtered.size)
       }
     }
+  }
+
+  def sampleV1PeersFromAllBrokers(): AVector[(BrokerActor, BrokerStatus)] = {
+    samplePeers(brokers, P2PV1)
+  }
+
+  def samplePeers(version: P2PVersion): AVector[(BrokerActor, BrokerStatus)] = {
+    val filtered = brokers.filter(_._2.version == version)
+    samplePeers(filtered, version)
   }
 }

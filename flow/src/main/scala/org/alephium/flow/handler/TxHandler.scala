@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
@@ -42,16 +42,28 @@ import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.util._
 
 object TxHandler {
-  def props(
+  // scalastyle:off parameter.number
+  def build(
+      system: ActorSystem,
       blockFlow: BlockFlow,
       txStorage: PendingTxStorage,
-      eventBus: ActorRefT[EventBus.Message]
+      eventBus: ActorRefT[EventBus.Message],
+      namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props = Props(new TxHandler(blockFlow, txStorage, eventBus))
+  ): ActorRefT[Command] = {
+    val actor = ActorRefT.build[Command](
+      system,
+      Props(new TxHandler(blockFlow, txStorage, eventBus)),
+      s"TxHandler$namePostfix"
+    )
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
+    actor
+  }
+  // scalastyle:on parameter.number
 
   sealed trait Command
   final case class AddToMemPool(
@@ -127,7 +139,6 @@ object TxHandler {
             if (!chainIndex.isIntraGroup) {
               val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
               for {
-                _ <- blockFlow.updateViewPerChainIndexDanube(intraChain).left.map(_.toString)
                 result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
                   MemPool.AddedToMemPool
                 )

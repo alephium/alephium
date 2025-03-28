@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{NetworkId, TokenId}
+import org.alephium.protocol.model.TokenId
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
@@ -182,7 +182,6 @@ class TransactionSpec
 
     {
       info("rhone coinbase transaction")
-
       implicit val networkConfig = new NetworkConfigFixture.Default {
         override def danubeHardForkTimestamp: TimeStamp = TimeStamp.Max
       }.networkConfig
@@ -198,9 +197,8 @@ class TransactionSpec
 
     {
       info("danube coinbase transaction")
-
-      implicit val networkConfig = new NetworkConfigFixture.DanubeT {
-        override def networkId: NetworkId = NetworkId.AlephiumDevNet
+      implicit val networkConfig = new NetworkConfigFixture.Default {
+        override def danubeHardForkTimestamp: TimeStamp = TimeStamp.zero
       }.networkConfig
       val blockHash = model.BlockHash.unsafe(
         hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7"

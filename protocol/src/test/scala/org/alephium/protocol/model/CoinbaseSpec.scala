@@ -23,30 +23,51 @@ import org.alephium.protocol.config.{GroupConfigFixture}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
 class CoinbaseSpec extends AlephiumSpec with Generators with GroupConfigFixture.Default {
-  def checkEqual(u256: U256, double: Double) = {
-    val a = BigDecimal(u256.v)
-    val b = BigDecimal.valueOf(double)
-    ((a - b) / b < 0.01) is true
-    ((b - a) / b < 0.01) is true
+  trait Fixture {
+    def checkEqual(u256: U256, double: Double) = {
+      val a = BigDecimal(u256.v)
+      val b = BigDecimal.valueOf(double)
+      ((a - b) / b < 0.01) is true
+      ((b - a) / b < 0.01) is true
+    }
+
+    def calcMainChainReward(miningReward: U256): U256
+    def uncleRate: Double
+
+    def test(): Unit = {
+      val double = Random.nextDouble() * Math.pow(10.0, 18) * 3
+      val u256   = U256.unsafe(BigDecimal.valueOf(double).toBigInt)
+      checkEqual(
+        calcMainChainReward(u256),
+        double / (uncleRate * 7 / 8 * (1 + 1 / 32) + 1)
+      )
+      (1 to 7) foreach { heightDiff =>
+        checkEqual(
+          Coinbase.calcGhostUncleReward(u256, heightDiff),
+          double * (8 - heightDiff) / 8
+        )
+      }
+      (1 to 3) foreach { uncleNum =>
+        checkEqual(
+          Coinbase.calcBlockReward(u256, AVector.fill(uncleNum)(u256)),
+          double + double * uncleNum / 32
+        )
+      }
+    }
   }
-  it should "check the ghost reward formula" in {
-    val double = Random.nextDouble() * Math.pow(10.0, 18) * 3
-    val u256   = U256.unsafe(BigDecimal.valueOf(double).toBigInt)
-    checkEqual(
-      Coinbase.calcMainChainReward(u256),
-      double / (0.05 * 7 / 8 * (1 + 1 / 32) + 1)
-    )
-    (1 to 7) foreach { heightDiff =>
-      checkEqual(
-        Coinbase.calcGhostUncleReward(u256, heightDiff),
-        double * (8 - heightDiff) / 8
-      )
-    }
-    (1 to 3) foreach { uncleNum =>
-      checkEqual(
-        Coinbase.calcBlockReward(u256, AVector.fill(uncleNum)(u256)),
-        double + double * uncleNum / 32
-      )
-    }
+  it should "check the ghost reward formula: rhone" in new Fixture {
+    def calcMainChainReward(miningReward: U256): U256 =
+      Coinbase.calcMainChainRewardRhone(miningReward)
+    def uncleRate: Double = 0.05
+
+    test()
+  }
+
+  it should "check the ghost reward formula: danube" in new Fixture {
+    def calcMainChainReward(miningReward: U256): U256 =
+      Coinbase.calcMainChainRewardDanube(miningReward)
+    def uncleRate: Double = 0.1
+
+    test()
   }
 }

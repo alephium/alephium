@@ -170,7 +170,9 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     connectionHandler.expectMsg(ConnectionHandler.Send(Message.serialize(response)))
   }
 
-  it should "handle blocks response" in new Fixture {
+  it should "handle blocks response: p2pv1" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.network.enable-p2p-v2", false))
+    networkConfig.enableP2pV2 is false
     receivedHandshakeMessage()
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = emptyBlock(blockFlow, chainIndex)
@@ -181,6 +183,23 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       allHandlerProbes.dependencyHandler.expectMsg(
         DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
       )
+      blockFlowSynchronizer.expectNoMessage()
+    }
+  }
+
+  it should "handle blocks response: p2pv2" in new Fixture {
+    networkConfig.enableP2pV2 is true
+    receivedHandshakeMessage()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    val response = BlocksResponse.fromBlocks(RequestId.random(), AVector(block))
+    brokerHandler ! BrokerHandler.Received(response)
+    eventually {
+      blockFlowSynchronizer.expectMsg(
+        BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
+      )
+      allHandlerProbes.dependencyHandler.expectNoMessage()
     }
   }
 

@@ -1786,7 +1786,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val signatures = signRaw(tx.id.bytes, priKey)
 
     val signatureStack = Stack.ofCapacity[Byte64](signatures.length + 1)
-    val signature0     = Byte64.from(bytesGen(64).sample.get).get
+    val signature0     = Byte64.from(ByteString(-1) ++ bytesGen(63).sample.get).get
     signatureStack.push(signature0)
     signatureStack.push(signatures.reverse)
 

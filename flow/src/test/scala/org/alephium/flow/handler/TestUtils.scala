@@ -69,7 +69,7 @@ object TestUtils {
     val viewProbe          = TestProbe()
     val viewHandler        = ActorRefT[ViewHandler.Command](viewProbe.ref)
     val accountViewProbe   = TestProbe()
-    val accountViewHandler = ActorRefT[Unit](accountViewProbe.ref)
+    val accountViewHandler = ActorRefT[AccountViewHandler.Command](accountViewProbe.ref)
     val allHandlers = AllHandlers(
       flowHandler,
       txHandler,

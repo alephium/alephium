@@ -289,6 +289,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.consensus.mainnet.block-target-time", "2 seconds"),
         ("alephium.consensus.rhone.block-target-time", "1 seconds"),
         ("alephium.consensus.rhone.uncle-dependency-gap-time", "1 seconds"),
+        ("alephium.consensus.danube.block-target-time", "1 seconds"),
+        ("alephium.consensus.danube.uncle-dependency-gap-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),

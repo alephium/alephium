@@ -1538,9 +1538,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def checkValidTx(tx: Transaction) = {
       tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
       checkUnlockGas(tx)
-      tx.fail(NonExistInput)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-      tx.fail(NonExistInput)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-      tx.fail(NonExistInput)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
+      blockFlow.updateViewPreDanube() isE ()
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
     }
 
     def checkInvalidTx(invalidTx: Transaction) = {

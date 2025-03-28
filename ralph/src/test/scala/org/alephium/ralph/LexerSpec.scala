@@ -47,6 +47,7 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val pubKey     = PublicKey.generate
     val pubKeyLike = PublicKeyLike.SecP256K1(pubKey)
     val address1   = Address.p2pkh(pubKey)
+    val address2   = Address.Asset(LockupScript.P2PK.unsafe(pubKeyLike, 0.toByte))
 
     parsePositioned("5", Lexer.typedNum(_)).get.value.v is Val.U256(U256.unsafe(5))
     parsePositioned("5u", Lexer.typedNum(_)).get.value.v is Val.U256(U256.unsafe(5))
@@ -85,6 +86,13 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       )
     }
 
+    val address2Base58 = address2.toBase58
+    parsePositioned(s"@$address2Base58", Lexer.address(_)).get.value.v is Val.Address(
+      address2.lockupScript
+    )
+    intercept[CompilerError.`Invalid address`] {
+      parsePositioned(s"@${address2Base58.dropRight(2)}", Lexer.address(_))
+    } is CompilerError.`Invalid address`(s"${address2Base58.dropRight(2)}", 1, fileURI)
     parsePositioned("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     parsePositioned("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     parsePositioned("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
