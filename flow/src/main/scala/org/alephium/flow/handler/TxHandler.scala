@@ -139,7 +139,6 @@ object TxHandler {
             if (!chainIndex.isIntraGroup) {
               val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
               for {
-                _ <- blockFlow.updateViewPerChainIndexDanube(intraChain).left.map(_.toString)
                 result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
                   MemPool.AddedToMemPool
                 )
@@ -189,6 +188,7 @@ object TxHandler {
     val (_, minerPubKey) = chainIndex.to.generateKey
     val miner            = LockupScript.p2pkh(minerPubKey)
     val result = for {
+      _            <- blockFlow.updateViewPerChainIndexDanube(chainIndex).left.map(_.toString)
       flowTemplate <- blockFlow.prepareBlockFlow(chainIndex, miner).left.map(_.getMessage)
       block = Miner.mineForDev(chainIndex, flowTemplate)
       _ <- validateAndAddBlock(blockFlow, block)
