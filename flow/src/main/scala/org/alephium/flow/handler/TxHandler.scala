@@ -127,7 +127,6 @@ object TxHandler {
             if (!chainIndex.isIntraGroup) {
               val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
               for {
-                _ <- blockFlow.updateViewPerChainIndexDanube(intraChain).left.map(_.toString)
                 result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
                   MemPool.AddedToMemPool
                 )
