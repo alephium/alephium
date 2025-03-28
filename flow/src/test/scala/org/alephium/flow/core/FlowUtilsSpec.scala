@@ -501,7 +501,12 @@ class FlowUtilsSpec extends AlephiumSpec {
     val rhoneReward        = rhoneBlock.coinbaseReward
     val doubleDanubeReward = danubeBlock.coinbaseReward * 2
     val tolerance          = rhoneReward / 20
-    doubleDanubeReward - rhoneReward < tolerance is true
+    val diff = if (doubleDanubeReward > rhoneReward) {
+      doubleDanubeReward - rhoneReward
+    } else {
+      rhoneReward - doubleDanubeReward
+    }
+    diff < tolerance is true
 
     addAndCheck(blockFlow, rhoneBlock, danubeBlock)
   }
