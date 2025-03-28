@@ -131,13 +131,9 @@ object InterCliqueManager {
   trait NodeSyncStatus extends BaseActor with EventStream.Subscriber {
     private var nodeSynced: Boolean      = false
     private var firstTimeSynced: Boolean = true
+    subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
 
     protected def onFirstTimeSynced(): Unit = {}
-
-    override def preStart(): Unit = {
-      super.preStart()
-      subscribeEvent(self, classOf[InterCliqueManager.SyncedResult])
-    }
 
     def updateNodeSyncStatus: Receive = {
       case InterCliqueManager.SyncedResult(isSynced) =>
