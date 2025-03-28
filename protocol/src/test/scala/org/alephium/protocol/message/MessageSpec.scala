@@ -93,10 +93,11 @@ class MessageSpec extends AlephiumSpec with NetworkConfigFixture.Default {
   it should "fail to deserialize if magic number doesn't match" in {
     Message
       .deserialize(Message.serialize(message)(new NetworkConfig {
-        val networkId: NetworkId              = NetworkId.AlephiumMainNet
-        val noPreMineProof: ByteString        = ByteString.empty
-        val lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
-        val rhoneHardForkTimestamp: TimeStamp = TimeStamp.now()
+        val networkId: NetworkId               = NetworkId.AlephiumMainNet
+        val noPreMineProof: ByteString         = ByteString.empty
+        val lemanHardForkTimestamp: TimeStamp  = TimeStamp.now()
+        val rhoneHardForkTimestamp: TimeStamp  = TimeStamp.now()
+        val danubeHardForkTimestamp: TimeStamp = TimeStamp.now()
       }))
       .swap isE
       SerdeError.wrongFormat("Wrong magic bytes")

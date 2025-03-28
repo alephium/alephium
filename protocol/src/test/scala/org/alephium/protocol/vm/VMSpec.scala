@@ -22,6 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
@@ -443,7 +444,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     def test(contract: StatefulContract, result: Option[ExeFailure]) = {
       val instrs = AVector[Instr[StatefulContext]](
         AddressConst(address0),
-        U256Const(Val.U256(10)),
+        U256Const(Val.U256(ALPH.oneAlph)),
         ApproveAlph,
         BytesConst(Val.ByteVec(serialize(contract))),
         BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
@@ -593,7 +594,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val context0 = genStatefulContext(None)
     StatefulVM.checkRemainingSignatures(context0) isE ()
 
-    val signature = Signature.generate
+    val signature = Byte64.from(Signature.generate)
     val context1  = genStatefulContext(None, signatures = AVector(signature))
     StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures(1)
   }
@@ -757,9 +758,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     }
   }
 
-  it should "switch back frames properly: Rhone" in new SwitchBackFixture
+  it should "switch back frames properly: since-rhone" in new SwitchBackFixture
     with NetworkConfigFixture.SinceRhoneT {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    Seq(HardFork.Rhone, HardFork.Danube).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
 
     addAndCheckBalance(0)
     for {

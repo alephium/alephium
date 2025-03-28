@@ -24,5 +24,6 @@ import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 final case class NodeIndexesStorage(
     logStorage: LogStorage,
     txOutputRefIndexStorage: Option[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]],
-    subContractIndexStorage: Option[SubContractIndexStorage]
+    subContractIndexStorage: Option[SubContractIndexStorage],
+    conflictedTxsStorage: ConflictedTxsStorage
 )

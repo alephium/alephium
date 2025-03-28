@@ -62,12 +62,15 @@ final case class ConsensusSetting(
   val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
 
   private val crossShardHeightGapThresholdPreRhone: Int = powAveragingWindow
-  private val crossShardHeightGapThreshold: Int         = powAveragingWindow / 2
+  private val crossShardHeightGapThresholdRhone: Int    = powAveragingWindow / 2
+  private val crossShardHeightGapThresholdDanube: Int   = powAveragingWindow
 
   def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int, hardFork: HardFork): Difficulty = {
     assume(hardFork.isLemanEnabled())
-    val (threshold, factor) = if (hardFork.isRhoneEnabled()) {
-      crossShardHeightGapThreshold -> 3
+    val (threshold, factor) = if (hardFork.isDanubeEnabled()) {
+      crossShardHeightGapThresholdDanube -> 3
+    } else if (hardFork.isRhoneEnabled()) {
+      crossShardHeightGapThresholdRhone -> 3
     } else {
       crossShardHeightGapThresholdPreRhone -> 5
     }
@@ -94,10 +97,17 @@ final case class ConsensusSetting(
 final case class ConsensusSettings(
     mainnet: ConsensusSetting,
     rhone: ConsensusSetting,
+    danube: ConsensusSetting,
     blockCacheCapacityPerChain: Int
 ) extends ConsensusConfigs {
   override def getConsensusConfig(hardFork: HardFork): ConsensusSetting = {
-    if (hardFork.isRhoneEnabled()) rhone else mainnet
+    if (hardFork.isDanubeEnabled()) {
+      danube
+    } else if (hardFork.isRhoneEnabled()) {
+      rhone
+    } else {
+      mainnet
+    }
   }
   override def getConsensusConfig(
       ts: TimeStamp
@@ -107,10 +117,10 @@ final case class ConsensusSettings(
 
   val conflictCacheKeepDuration: Duration =
     Math.max(
-      mainnet.expectedTimeSpan,
-      rhone.expectedTimeSpan
+      rhone.expectedTimeSpan,
+      danube.expectedTimeSpan
     ) timesUnsafe blockCacheCapacityPerChain.toLong
-  val tipsPruneDuration: Duration = Math.max(mainnet.tipsPruneDuration, rhone.tipsPruneDuration)
+  val tipsPruneDuration: Duration = Math.max(rhone.tipsPruneDuration, danube.tipsPruneDuration)
 
   val recentBlockHeightDiff: Int         = 30
   val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
@@ -129,6 +139,7 @@ final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
     rhoneHardForkTimestamp: TimeStamp,
+    danubeHardForkTimestamp: TimeStamp,
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
@@ -259,6 +270,7 @@ object AlephiumConfig {
   final private case class TempConsensusSettings(
       mainnet: TempConsensusSetting,
       rhone: TempConsensusSetting,
+      danube: TempConsensusSetting,
       blockCacheCapacityPerChain: Int,
       numZerosAtLeastInHash: Int
   ) {
@@ -266,9 +278,12 @@ object AlephiumConfig {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
       val rhoneEmission =
         Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
+      val danubeEmission =
+        Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
       ConsensusSettings(
         mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
         rhone.toConsensusSetting(rhoneEmission, numZerosAtLeastInHash),
+        danube.toConsensusSetting(danubeEmission, numZerosAtLeastInHash),
         blockCacheCapacityPerChain
       )
     }
@@ -291,6 +306,7 @@ object AlephiumConfig {
       networkId: NetworkId,
       lemanHardForkTimestamp: TimeStamp,
       rhoneHardForkTimestamp: TimeStamp,
+      danubeHardForkTimestamp: TimeStamp,
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
@@ -329,6 +345,7 @@ object AlephiumConfig {
         networkId,
         lemanHardForkTimestamp,
         rhoneHardForkTimestamp,
+        danubeHardForkTimestamp,
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
@@ -459,18 +476,19 @@ object AlephiumConfig {
   def load(config: Config): AlephiumConfig = load(config, "alephium")
 
   def sanityCheck(config: AlephiumConfig): AlephiumConfig = {
-    if (
-      config.network.networkId == NetworkId.AlephiumMainNet &&
-      config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)
-    ) {
+    val isMainNet = config.network.networkId == NetworkId.AlephiumMainNet
+    if (isMainNet && config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
     }
 
-    if (
-      config.network.networkId == NetworkId.AlephiumMainNet &&
-      config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(1718186400000L)
-    ) {
+    if (isMainNet && config.network.rhoneHardForkTimestamp != TimeStamp.unsafe(1718186400000L)) {
       throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
+    }
+
+    if (
+      isMainNet && config.network.danubeHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+    ) {
+      throw new IllegalArgumentException("Invalid timestamp for danube hard fork")
     }
 
     config

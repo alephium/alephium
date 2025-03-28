@@ -22,7 +22,8 @@ import akka.util.ByteString
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.crypto.Byte64
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript
@@ -36,11 +37,12 @@ class TxOrderBench {
     override def groups: Int = 4
   }
   implicit val networkConfig: NetworkConfig = new NetworkConfig {
-    val networkId: NetworkId              = NetworkId(0)
-    val noPreMineProof: ByteString        = ByteString.empty
-    val now                               = TimeStamp.now()
-    val lemanHardForkTimestamp: TimeStamp = now
-    val rhoneHardForkTimestamp: TimeStamp = now
+    val networkId: NetworkId               = NetworkId(0)
+    val noPreMineProof: ByteString         = ByteString.empty
+    val now                                = TimeStamp.now()
+    val lemanHardForkTimestamp: TimeStamp  = now
+    val rhoneHardForkTimestamp: TimeStamp  = now
+    val danubeHardForkTimestamp: TimeStamp = now
   }
   val txNum: Int = 2000
   val header: BlockHeader =
@@ -60,7 +62,7 @@ class TxOrderBench {
           AVector.empty,
           AVector.empty
         ),
-        AVector.empty[Signature]
+        AVector.empty[Byte64]
       )
     )
   val block: Block = Block(header, txs)

@@ -171,18 +171,22 @@ object Ast {
         state: Compiler.State[Ctx],
         func: Compiler.FuncInfo[Ctx]
     ): Seq[Instr[Ctx]] = {
-      (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
-        case (true, false) =>
-          throw Compiler.Error(
-            s"Function `${func.name}` does not use preapproved assets",
-            sourceIndex
-          )
-        case (false, true) =>
-          throw Compiler.Error(
-            s"Function `${func.name}` needs preapproved assets, please use braces syntax",
-            sourceIndex
-          )
-        case _ => ()
+      val isContractCreation = BuiltIn.isContractCreationFunc(func.name)
+      // Ignore contract creation functions as they can either use preapproved assets or not
+      if (!isContractCreation) {
+        (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
+          case (true, false) =>
+            throw Compiler.Error(
+              s"Function `${func.name}` does not use preapproved assets",
+              sourceIndex
+            )
+          case (false, true) =>
+            throw Compiler.Error(
+              s"Function `${func.name}` needs preapproved assets, please use braces syntax",
+              sourceIndex
+            )
+          case _ => ()
+        }
       }
       approveAssets.flatMap(_.genCode(state))
     }

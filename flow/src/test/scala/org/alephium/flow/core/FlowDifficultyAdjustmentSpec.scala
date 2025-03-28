@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{ChainIndex, NetworkId, Target}
+import org.alephium.protocol.model.{ChainIndex, HardFork, NetworkId, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, TimeStamp}
 
@@ -28,7 +28,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   it should "calculate weighted target" in new PreLemanDifficultyFixture {
     prepareBlocks(2)
 
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+    val bestDeps = blockFlow.getBestDepsPreDanube(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
       .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
@@ -43,7 +43,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   it should "clip target" in new PreLemanDifficultyFixture {
     prepareBlocks(8 * groups0)
 
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
+    val bestDeps = blockFlow.getBestDepsPreDanube(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
       .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
@@ -96,7 +96,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       }
     }
     brokerConfig.cliqueGroupIndexes.foreach { index =>
-      val blockDeps = blockFlow.getBestDeps(index)
+      val blockDeps = blockFlow.getBestDepsPreDanube(index)
       val intraDeps = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, index)
       intraDeps is brokerConfig.cliqueGroupIndexes
         .map(group => blockFlow.genesisHashes(group.value)(group.value))
@@ -194,7 +194,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       earliestDepTs is getEarliestDepTs(height)
     }
     brokerConfig.cliqueGroupIndexes.foreach { groupIndex =>
-      val blockDeps = blockFlow.getBestDeps(groupIndex)
+      val blockDeps = blockFlow.getBestDepsPreDanube(groupIndex)
       val intraDeps = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, groupIndex)
       val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(intraDeps)
       diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum * 2)
@@ -211,12 +211,10 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   it should "use diff penalty for leman fork" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
-      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
-      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis),
       ("alephium.consensus.num-zeros-at-least-in-hash", 3)
     )
+    setHardFork(HardFork.Leman)
     config.network.networkId is NetworkId.AlephiumDevNet
-    config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
     implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
     consensusConfig.numZerosAtLeastInHash is 3
 
@@ -241,12 +239,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   trait PreLemanDifficultyFixture extends FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis),
-      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
-    )
-    config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is false
-
+    setHardFork(HardFork.Mainnet)
     val chainIndex                                 = ChainIndex.unsafe(0, 1)
     implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
 
@@ -260,7 +253,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock), None)
         } else {
           addAndCheck(blockFlow, block)
-          val bestDep = blockFlow.getBestDeps(chainIndex.from)
+          val bestDep = blockFlow.getBestDepsPreDanube(chainIndex.from)
           blockFlow.getNextHashTarget(
             chainIndex,
             bestDep,
@@ -272,13 +265,10 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   trait LemanDifficultyFixture extends FlowFixture {
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.broker.broker-num", 1),
-      ("alephium.network.rhone-hard-fork-timestamp ", TimeStamp.Max.millis)
-    )
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Leman)
 
     implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
-    config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 
     def checkTemplates(testTarget: Option[Target => Unit] = None) = {
       val targets = brokerConfig.cliqueChainIndexes.map { index =>

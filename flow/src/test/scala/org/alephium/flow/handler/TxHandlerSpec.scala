@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Props}
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
@@ -207,7 +207,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system: ActorSystem = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
-      TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref))
+      Props(new TxHandler(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref)))
     )
 
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
@@ -403,7 +403,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def test(message: String) = {
       EventFilter.debug(message, occurrences = 5).intercept {
         val txHandler = system.actorOf(
-          TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref))
+          Props(new TxHandler(blockFlow, storages.pendingTxStorage, ActorRefT(TestProbe().ref)))
         )
         txHandler ! InterCliqueManager.SyncedResult(true)
       }
@@ -463,7 +463,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.fromGroupConfirmations is 1
     confirmed.toGroupConfirmations is 1
     val blockHash = confirmed.index.hash
-    blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
+    blockFlow.getBestDepsPreDanube(chainIndex.from).deps.contains(blockHash) is true
   }
 
   it should "report validation error when auto-mine is enabled" in new Fixture {
@@ -541,7 +541,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     confirmed.fromGroupConfirmations is 1
     confirmed.toGroupConfirmations is 0
     val blockHash = confirmed.index.hash
-    blockFlow.getBestDeps(index.from).deps.contains(blockHash) is true
+    blockFlow.getBestDepsPreDanube(index.from).deps.contains(blockHash) is true
 
     val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
     val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
@@ -744,7 +744,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     lazy val eventBus   = TestProbe()
     lazy val txHandler =
       newTestActorRef[TxHandler](
-        TxHandler.props(blockFlow, storages.pendingTxStorage, ActorRefT(eventBus.ref))
+        Props(new TxHandler(blockFlow, storages.pendingTxStorage, ActorRefT(eventBus.ref)))
       )
     lazy val orphanPool = blockFlow.getGrandPool().orphanPool
 

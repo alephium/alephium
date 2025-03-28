@@ -18,11 +18,11 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{Checksum, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{AVector, Base58, Bytes}
+import org.alephium.util.{AVector, Base58, Bytes, DjbHash}
 
 sealed trait LockupScript {
   def scriptHint: ScriptHint
@@ -34,6 +34,7 @@ sealed trait LockupScript {
   def isAssetType: Boolean
 }
 
+// scalastyle:off number.of.methods
 object LockupScript {
   implicit val serde: Serde[LockupScript] = new Serde[LockupScript] {
     override def serialize(input: LockupScript): ByteString = {
@@ -42,6 +43,7 @@ object LockupScript {
         case s: P2MPKH => ByteString(1) ++ P2MPKH.serde.serialize(s)
         case s: P2SH   => ByteString(2) ++ serdeImpl[Hash].serialize(s.scriptHash)
         case s: P2C    => ByteString(3) ++ serdeImpl[Hash].serialize(s.contractId.value)
+        case s: P2PK   => ByteString(4) ++ P2PK.serde.serialize(s)
       }
     }
 
@@ -55,6 +57,8 @@ object LockupScript {
           serdeImpl[Hash]._deserialize(content).map(_.mapValue(P2SH.apply))
         case Staging(3, content) =>
           P2C.serde._deserialize(content)
+        case Staging(4, content) =>
+          P2PK.serde._deserialize(content)
         case Staging(n, _) =>
           Left(SerdeError.wrongFormat(s"Invalid lockupScript prefix $n"))
       }
@@ -64,7 +68,68 @@ object LockupScript {
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
   def fromBase58(input: String): Option[LockupScript] = {
-    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption)
+    decodeFromBase58(input).getLockupScript
+  }
+
+  trait DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript]
+  }
+  final case class ValidLockupScript(lockupScript: LockupScript) extends DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript] = Some(lockupScript)
+  }
+  case object InvalidLockupScript extends DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript] = None
+  }
+  final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends DecodeLockupScriptResult {
+    def getLockupScript: Option[LockupScript] = None
+  }
+
+  def decodeFromBase58(input: String): DecodeLockupScriptResult = {
+    if (input.length > 2 && input(input.length - 2) == ':') {
+      decodeP2PK(input)
+    } else {
+      Base58
+        .decode(input)
+        .map { bytes =>
+          if (bytes.startsWith(ByteString(4))) {
+            halfDecodeP2PK(bytes)
+          } else {
+            decodeLockupScript(bytes)
+          }
+        }
+        .getOrElse(InvalidLockupScript)
+    }
+  }
+
+  private def halfDecodeP2PK(bytes: ByteString): DecodeLockupScriptResult = {
+    P2PK.decodePublicKey(bytes.drop(1)) match {
+      case Some(publicKey) => HalfDecodedP2PK(publicKey)
+      case None            => InvalidLockupScript
+    }
+  }
+
+  private def decodeLockupScript(bytes: ByteString): DecodeLockupScriptResult = {
+    deserialize[LockupScript](bytes).toOption match {
+      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case None               => InvalidLockupScript
+    }
+  }
+
+  private def decodeP2PK(input: String): DecodeLockupScriptResult = {
+    val result = for {
+      groupByte <- input.takeRight(1).toByteOption
+      bytes     <- Base58.decode(input.dropRight(2))
+      lockupScriptOpt <-
+        if (bytes.startsWith(ByteString(4))) {
+          P2PK.fromDecodedBase58(bytes.drop(1), groupByte)
+        } else {
+          None
+        }
+    } yield lockupScriptOpt
+    result match {
+      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case None               => InvalidLockupScript
+    }
   }
 
   def asset(input: String): Option[LockupScript.Asset] = {
@@ -92,6 +157,7 @@ object LockupScript {
       case _                   => None
     }
   }
+  def p2pk(key: PublicKeyLike, groupIndex: GroupIndex): P2PK = P2PK(key, groupIndex)
 
   sealed trait Asset extends LockupScript {
     def hintBytes: ByteString = serialize(Hint.ofAsset(scriptHint))
@@ -154,8 +220,76 @@ object LockupScript {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)
   }
 
+  final case class P2PK private (publicKey: PublicKeyLike, groupByte: Byte) extends Asset {
+    // We need to use `scriptHint` to calculate the group index in the `AssetOutputRef`,
+    // so we need to find a `scriptHint` that matches the group index.
+    // Since the least significant byte is already used to distinguish the output type,
+    // we use the most significant byte here to calculate the new `scriptHint`.
+    override lazy val scriptHint: ScriptHint = {
+      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes)).value
+      val xorResult    = Bytes.xorByte(initialHint)
+      val byte0        = (initialHint >> 24).toByte
+      val newByte0     = byte0 ^ xorResult ^ groupByte
+      val newHintValue = (newByte0 << 24) | (initialHint & 0x00ffffff)
+      ScriptHint.fromHash(newHintValue)
+    }
+
+    override def groupIndex(implicit config: GroupConfig): GroupIndex =
+      GroupIndex.unsafe(groupByte % config.groups)
+
+    def toBase58: String = {
+      val bytes = serialize[LockupScript](this).dropRight(P2PK.groupByteLength)
+      s"${Base58.encode(bytes)}:$groupByte"
+    }
+  }
+
+  object P2PK {
+    private val groupByteLength: Int = 1
+
+    def apply(publicKey: PublicKeyLike, groupIndex: GroupIndex): P2PK = {
+      P2PK(publicKey, groupIndex.value.toByte)
+    }
+
+    def unsafe(publicKey: PublicKeyLike, groupByte: Byte): P2PK = {
+      P2PK(publicKey, groupByte)
+    }
+
+    def decodePublicKey(bytes: ByteString): Option[PublicKeyLike] = {
+      safePublicKeySerde.deserialize(bytes).toOption
+    }
+
+    def fromDecodedBase58(bytes: ByteString, groupByte: Byte): Option[P2PK] = {
+      decodePublicKey(bytes).map(P2PK(_, groupByte))
+    }
+
+    private val safePublicKeySerde: Serde[PublicKeyLike] = new Serde[PublicKeyLike] {
+      override def serialize(input: PublicKeyLike): ByteString = {
+        val publicKey = PublicKeyLike.serde.serialize(input)
+        val checksum  = Checksum.calcAndSerialize(publicKey)
+        publicKey ++ checksum
+      }
+
+      override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyLike]] = {
+        for {
+          publicKeyResult <- PublicKeyLike.serde._deserialize(input)
+          data = input.take(input.length - publicKeyResult.rest.length)
+          checksumResult <- Checksum.serde._deserialize(publicKeyResult.rest)
+          _              <- checksumResult.value.check(data)
+        } yield Staging(publicKeyResult.value, checksumResult.rest)
+      }
+    }
+
+    implicit val serde: Serde[P2PK] = {
+      Serde.forProduct2(P2PK.unsafe, (p: P2PK) => (p.publicKey, p.groupByte))(
+        safePublicKeySerde,
+        serdeImpl[Byte]
+      )
+    }
+  }
+
   def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
     val hash = Bytes.toPosInt(Bytes.xorByte(shortKey))
     GroupIndex.unsafe(hash % config.groups)
   }
 }
+// scalastyle:on number.of.methods

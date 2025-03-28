@@ -228,7 +228,7 @@ object DiscoveryMessage {
       case None    => Signature.zero.bytes
     }
     val data     = signature ++ header ++ payload
-    val checksum = MessageSerde.checksum(data)
+    val checksum = Checksum.calcAndSerialize(data)
     val length   = MessageSerde.length(data)
 
     magic ++ checksum ++ length ++ data
@@ -243,7 +243,7 @@ object DiscoveryMessage {
       .flatMap { case (checksum, length, rest) =>
         for {
           messageRest   <- MessageSerde.extractMessageBytes(length, rest)
-          _             <- MessageSerde.checkChecksum(checksum, messageRest.value)
+          _             <- checksum.check(messageRest.value)
           signaturePair <- _deserialize[Signature](messageRest.value)
           headerRest    <- _deserialize[Header](signaturePair.rest)
           payload       <- Payload.deserialize(headerRest.rest)

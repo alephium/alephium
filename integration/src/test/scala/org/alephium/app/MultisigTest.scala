@@ -21,9 +21,9 @@ import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
-import org.alephium.protocol.{Hash, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.{Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasBox
+import org.alephium.protocol.vm.{GasBox, LockupScript}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -35,10 +35,9 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey2, _)           = generateAccount
     val (_, publicKey3, privateKey3) = generateAccount
 
-    val buildTxResult = createMultisigTransaction(
-      AVector(publicKey, publicKey2, publicKey3),
-      AVector(publicKey, publicKey3)
-    )
+    val allPublicKeys = AVector(publicKey, publicKey2, publicKey3)
+    val lockupScript = getLockupScript(allPublicKeys, 2)
+    val buildTxResult = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3))
 
     val unsignedTx =
       deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
@@ -73,7 +72,7 @@ class MultisigTest extends AlephiumActorSpec {
 
     submitSuccessfulMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20000))
+    verifyEstimatedGas(lockupScript, unsignedTx, GasBox.unsafe(20000))
 
     clique.stopMining()
     clique.stop()
@@ -83,14 +82,13 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey2, _) = generateAccount
     val (_, publicKey3, _) = generateAccount
 
-    val buildResult = createMultisigTransaction(
-      AVector(publicKey, publicKey2, publicKey3),
-      AVector(publicKey)
-    )
+    val allPublicKeys = AVector(publicKey, publicKey2, publicKey3)
+    val lockupScript = getLockupScript(allPublicKeys, 1)
+    val buildResult = createMultisigTransaction(allPublicKeys, AVector(publicKey))
 
     val unsignedTx = submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey))
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20000))
+    verifyEstimatedGas(lockupScript, unsignedTx, GasBox.unsafe(20000))
 
     clique.stopMining()
     clique.stop()
@@ -100,15 +98,14 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey2, _)           = generateAccount
     val (_, publicKey3, privateKey3) = generateAccount
 
-    val buildResult = createMultisigTransaction(
-      AVector(publicKey, publicKey2, publicKey3),
-      AVector(publicKey, publicKey3)
-    )
+    val allPublicKeys = AVector(publicKey, publicKey2, publicKey3)
+    val lockupScript = getLockupScript(allPublicKeys, 2)
+    val buildResult = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3))
 
     val unsignedTx =
       submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey, privateKey3))
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20000))
+    verifyEstimatedGas(lockupScript, unsignedTx, GasBox.unsafe(20000))
 
     clique.stopMining()
     clique.stop()
@@ -119,17 +116,16 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey3, privateKey3) = generateAccount
     val (_, publicKey4, privateKey4) = generateAccount
 
-    val buildResult = createMultisigTransaction(
-      AVector(publicKey, publicKey2, publicKey3, publicKey4),
-      AVector(publicKey, publicKey3, publicKey4)
-    )
+    val allPublicKeys = AVector(publicKey, publicKey2, publicKey3, publicKey4)
+    val lockupScript = getLockupScript(allPublicKeys, 3)
+    val buildResult = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3, publicKey4))
 
     val unsignedTx = submitSuccessfulMultisigTransaction(
       buildResult,
       AVector(privateKey, privateKey3, privateKey4)
     )
 
-    verifyEstimatedGas(unsignedTx, GasBox.unsafe(20180))
+    verifyEstimatedGas(lockupScript, unsignedTx, GasBox.unsafe(20180))
 
     clique.stopMining()
     clique.stop()
@@ -349,8 +345,12 @@ class MultisigTest extends AlephiumActorSpec {
       ).detail
     }
 
-    def verifyEstimatedGas(unsignedTx: UnsignedTransaction, gas: GasBox) = {
-      val inputUnlockScripts = unsignedTx.inputs.map(_.unlockScript)
+    def getLockupScript(allPublicKeys: AVector[String], unlockKeySize: Int) = {
+      LockupScript.p2mpkhUnsafe(allPublicKeys.map(key => PublicKey.unsafe(Hex.unsafe(key))), unlockKeySize)
+    }
+
+    def verifyEstimatedGas(lockupScript: LockupScript, unsignedTx: UnsignedTransaction, gas: GasBox) = {
+      val inputUnlockScripts = unsignedTx.inputs.map(i => (lockupScript, i.unlockScript))
       val estimatedGas = GasEstimation
         .estimate(
           inputUnlockScripts,

@@ -22,8 +22,8 @@ import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import org.alephium.flow.setting._
 import org.alephium.protocol.{ALPH, PrivateKey, PublicKey}
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.model.{Address, GroupIndex, HardFork}
 import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
 import org.alephium.util.{AVector, Duration, Env, Number, U256}
 
@@ -33,13 +33,37 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
 
   val genesisBalance: U256 = ALPH.alph(Number.million)
 
+  private var networkConfigValues: Option[Map[String, Any]] = None
+
+  private def setNetworkConfigValues(config: NetworkConfig): Unit = {
+    networkConfigValues = Some(
+      Map(
+        ("alephium.network.leman-hard-fork-timestamp", config.lemanHardForkTimestamp.millis),
+        ("alephium.network.rhone-hard-fork-timestamp", config.rhoneHardForkTimestamp.millis),
+        ("alephium.network.danube-hard-fork-timestamp", config.danubeHardForkTimestamp.millis)
+      )
+    )
+  }
+
+  def setHardFork(hardFork: HardFork): Unit = {
+    setNetworkConfigValues(NetworkConfigFixture.getNetworkConfig(hardFork))
+  }
+
+  def setHardForkSince(hardFork: HardFork): Unit = {
+    setNetworkConfigValues(NetworkConfigFixture.getNetworkConfigSince(hardFork))
+  }
+
+  def setHardForkBefore(hardFork: HardFork): Unit = {
+    setNetworkConfigValues(NetworkConfigFixture.getNetworkConfigBefore(hardFork))
+  }
+
   lazy val env      = Env.resolve()
   lazy val rootPath = Platform.getRootPath(env)
 
   def buildNewConfig() = {
     val predefined = ConfigFactory
       .parseMap(
-        (configPortsValues ++ configValues).view
+        (configPortsValues ++ networkConfigValues.getOrElse(Map.empty) ++ configValues).view
           .mapValues {
             case value: AVector[_] =>
               ConfigValueFactory.fromIterable(value.toIterable.asJava)

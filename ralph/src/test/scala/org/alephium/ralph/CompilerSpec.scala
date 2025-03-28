@@ -22,6 +22,7 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, TokenId}
 import org.alephium.protocol.vm._
@@ -638,9 +639,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args             = AVector[Val](Val.ByteVec.from(pubKey))
-    val statelessContext = genStatelessContext(signatures = AVector(Signature.zero))
-    val signature        = SignatureSchema.sign(statelessContext.txId.bytes, priKey)
-    statelessContext.signatures.pop().rightValue is Signature.zero
+    val statelessContext = genStatelessContext(signatures = AVector(Byte64.from(Signature.zero)))
+    val signature        = Byte64.from(SignatureSchema.sign(statelessContext.txId.bytes, priKey))
+    statelessContext.signatures.pop().rightValue is Byte64.from(Signature.zero)
     statelessContext.signatures.push(signature) isE ()
     StatelessVM.execute(statelessContext, script.toObject, args).isRight is true
     StatelessVM.execute(statelessContext, script.toObject, args) is
@@ -9784,6 +9785,46 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.methods(0).usePayToContractOnly is false
       compiled.methods(1).useContractAssets is true
       compiled.methods(1).usePayToContractOnly is false
+    }
+  }
+
+  it should "skip preapproved assets check for contract creation" in {
+    val noAnnotation   = ""
+    val withAnnotation = ", preapprovedAssets = true"
+
+    {
+      info("Test createContract without deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  @using(checkExternalCaller = false$annotation)
+           |  pub fn noDeposit() -> () {
+           |    createContract!(#00, #00, #00)
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code(noAnnotation)).isRight is true
+      compileContract(code(withAnnotation)).isRight is true
+    }
+
+    {
+      info("Test createContract with deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  $$@using(checkExternalCaller = false$annotation)
+           |  pub fn withDeposit() -> () {
+           |    createContract!{callerAddress!() -> ALPH: 1}(#00, #00, #00)
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code(noAnnotation),
+        """Function "Create.withDeposit" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"""
+      )
+      compileContract(replace(code(withAnnotation))).isRight is true
     }
   }
 }

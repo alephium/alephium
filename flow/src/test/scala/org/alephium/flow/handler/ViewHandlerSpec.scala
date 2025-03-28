@@ -16,6 +16,7 @@
 
 package org.alephium.flow.handler
 
+import akka.actor.Props
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 
@@ -24,11 +25,25 @@ import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.*
+import org.alephium.util._
 
-class ViewHandlerSpec extends AlephiumActorSpec {
+abstract class ViewHandlerBaseSpec extends AlephiumActorSpec {
+  trait Fixture extends FlowFixture with LockupScriptGenerators {
+    lazy val minderAddresses =
+      AVector.tabulate(groupConfig.groups)(i =>
+        Address.Asset(addressGen(GroupIndex.unsafe(i)).sample.get._1)
+      )
+    lazy val viewHandler = TestActorRef[ViewHandler](
+      Props(new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript))))
+    )
+
+    def setSynced(): Unit = viewHandler ! InterCliqueManager.SyncedResult(true)
+  }
+}
+
+class ViewHandlerSpec extends ViewHandlerBaseSpec {
   it should "update when necessary" in {
     implicit val brokerConfig = new BrokerConfig {
       override def brokerId: Int  = 1
@@ -40,28 +55,21 @@ class ViewHandlerSpec extends AlephiumActorSpec {
       from <- Seq(0, 2)
       to   <- 0 until 4
     } {
-      ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is (from equals to)
+      ViewHandler.needUpdatePreDanube(ChainIndex.unsafe(from, to)) is false
+      ViewHandler.needUpdateDanube(ChainIndex.unsafe(from, to)) is (from equals to)
     }
 
     for {
       from <- Seq(1, 3)
       to   <- 0 until 4
     } {
-      ViewHandler.needUpdate(ChainIndex.unsafe(from, to)) is true
+      ViewHandler.needUpdatePreDanube(ChainIndex.unsafe(from, to)) is true
+      ViewHandler.needUpdateDanube(ChainIndex.unsafe(from, to)) is true
     }
   }
 
-  trait Fixture extends FlowFixture with LockupScriptGenerators {
-
-    lazy val minderAddresses =
-      AVector.tabulate(groupConfig.groups)(i =>
-        Address.Asset(addressGen(GroupIndex.unsafe(i)).sample.get._1)
-      )
-    lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow))
-  }
-
   trait SyncedFixture extends Fixture {
-    viewHandler ! InterCliqueManager.SyncedResult(true)
+    setSynced()
   }
 
   it should "not subscribe when miner addresses are not set" in new SyncedFixture {
@@ -104,6 +112,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     mempool.contains(tx1) is true
     mempool.isReady(tx0.id) is true
     mempool.isReady(tx1.id) is false
+    mineFromMemPool(blockFlow, chainIndex).nonCoinbase.head.id is tx0.id
     addWithoutViewUpdate(blockFlow, block0)
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
@@ -205,68 +214,331 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     expectMsg(ViewHandler.SubscribeResult(false))
   }
 
+  trait DanubeFixture extends Fixture {
+    setHardForkSince(HardFork.Danube)
+
+    def createSubscriber(): TestProbe = {
+      val probe = TestProbe()
+      viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
+      probe.send(viewHandler, ViewHandler.Subscribe)
+      eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe.ref))
+      probe
+    }
+  }
+
+  it should "notify subscribers once the block is added since danube" in new DanubeFixture {
+    setSynced()
+    val probe = createSubscriber()
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+  }
+
+  it should "not notify subscribers when the best view is updated since danube" in new DanubeFixture {
+    setSynced()
+    val probe = createSubscriber()
+    viewHandler ! ViewHandler.BestDepsUpdatedPreDanube
+    eventually(probe.expectNoMessage())
+  }
+
+  it should "only update the best flow skeleton if the danube upgrade is activated" in new DanubeFixture {
+    setSynced()
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addWithoutViewUpdate(blockFlow, block)
+
+    blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+    blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
+      blockFlow
+        .getBestDepsPreDanube(block.chainIndex.from)
+        .deps
+        .contains(block.hash) is false
+    }
+  }
+
+  it should "only update the best deps if the danube upgrade will not be activated soon" in new Fixture {
+    val now = TimeStamp.now()
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.rhone-hard-fork-timestamp", now.millis),
+      ("alephium.network.danube-hard-fork-timestamp", now.plusSecondsUnsafe(20).millis)
+    )
+    setSynced()
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addWithoutViewUpdate(blockFlow, block)
+
+    blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+    blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+      blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "update the best view when the danube upgrade is about to be activated" in new Fixture {
+    val now = TimeStamp.now()
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.rhone-hard-fork-timestamp", now.millis),
+      ("alephium.network.danube-hard-fork-timestamp", now.plusSecondsUnsafe(5).millis)
+    )
+    setSynced()
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addWithoutViewUpdate(blockFlow, block)
+
+    blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+    blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
+      blockFlow.getBestDepsPreDanube(block.chainIndex.from).deps.contains(block.hash) is true
+    }
+  }
+
+  it should "update mempool properly since danube" in new DanubeFixture {
+    setSynced()
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
+    blockFlow.grandPool.add(chainIndex, tx.toTemplate, TimeStamp.now())
+    val block = mineFromMemPool(blockFlow, chainIndex)
+    addWithoutViewUpdate(blockFlow, block)
+    blockFlow.getMemPool(chainIndex.from).contains(tx.id) is true
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      blockFlow.getMemPool(chainIndex.from).contains(tx.id) is false
+    }
+  }
+}
+
+abstract class UpdateBestViewSpec extends ViewHandlerBaseSpec {
   behavior of "update best deps"
 
-  trait UpdateBestDepsFixture extends SyncedFixture {
+  trait UpdateBestViewFixture extends Fixture {
+    def containBlockHashInBestDeps(blockHash: BlockHash): Boolean
+    def setHardFork(): Unit
+    def state: AsyncUpdateState
+    def bestDepsUpdatedMsg: ViewHandler.Command
+    def bestDepsUpdateFailedMsg: ViewHandler.Command
+
+    setHardFork()
+    setSynced()
+
     val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = emptyBlock(blockFlow, chainIndex)
-    addWithoutViewUpdate(blockFlow, block)
-    blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
-  }
+    val block = {
+      val block = emptyBlock(blockFlow, chainIndex)
+      addWithoutViewUpdate(blockFlow, block)
+      containBlockHashInBestDeps(block.hash) is false
+      block
+    }
 
-  it should "update best deps after receiving FlowDataAdded event" in new UpdateBestDepsFixture {
-    viewHandler.underlyingActor.updateBestDepsCount is 0
-    viewHandler.underlyingActor.updatingBestDeps is false
-    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
-
-    eventually {
-      viewHandler.underlyingActor.updateBestDepsCount is 0
-      viewHandler.underlyingActor.updatingBestDeps is false
-      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is true
+    def setUpdating() = {
+      state.requestUpdate()
+      state.tryUpdate() is true
+      state.requestUpdate()
+      state.requestUpdate()
+      state.requestCount is 2
+      state.isUpdating is true
     }
   }
 
-  it should "not update best deps if the update task is running" in new UpdateBestDepsFixture {
-    viewHandler.underlyingActor.updatingBestDeps = true
-    viewHandler.underlyingActor.updateBestDepsCount is 0
-    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
-    viewHandler.underlyingActor.updatingBestDeps is true
-    viewHandler.underlyingActor.updateBestDepsCount is 1
-    blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+  def newFixture: UpdateBestViewFixture
 
+  it should "update best deps after receiving FlowDataAdded event" in new AlephiumFixture {
+    val fixture = newFixture
+    import fixture._
+    state.requestCount is 0
+    state.isUpdating is false
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
-    viewHandler.underlyingActor.updatingBestDeps is true
-    viewHandler.underlyingActor.updateBestDepsCount is 2
-    blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
 
-    viewHandler.underlyingActor.updatingBestDeps = false
-    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {
-      viewHandler.underlyingActor.updateBestDepsCount is 0
-      viewHandler.underlyingActor.updatingBestDeps is false
-      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is true
+      state.requestCount is 0
+      state.isUpdating is false
+      containBlockHashInBestDeps(block.hash) is true
     }
   }
 
-  it should "update best deps after receiving BestDepsUpdated event" in new UpdateBestDepsFixture {
-    viewHandler.underlyingActor.updateBestDepsCount = 2
-    viewHandler.underlyingActor.updatingBestDeps = true
-    viewHandler ! ViewHandler.BestDepsUpdated
+  it should "not update best deps if the update task is running" in new AlephiumFixture {
+    val fixture = newFixture
+    import fixture._
+    state.tryUpdate() is false
+    state.requestUpdate()
+    state.tryUpdate() is true
+    state.requestCount is 0
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    state.isUpdating is true
+    state.tryUpdate() is false
+    state.requestCount is 1
+    containBlockHashInBestDeps(block.hash) is false
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    state.isUpdating is true
+    state.tryUpdate() is false
+    state.requestCount is 2
+    containBlockHashInBestDeps(block.hash) is false
+
+    state.setCompleted()
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually {
-      viewHandler.underlyingActor.updateBestDepsCount is 0
-      viewHandler.underlyingActor.updatingBestDeps is false
-      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is true
+      state.requestCount is 0
+      state.isUpdating is false
+      containBlockHashInBestDeps(block.hash) is true
     }
   }
 
-  it should "not update best deps after receiving BestDepsUpdateFailed event" in new UpdateBestDepsFixture {
-    viewHandler.underlyingActor.updateBestDepsCount = 2
-    viewHandler.underlyingActor.updatingBestDeps = true
-    viewHandler ! ViewHandler.BestDepsUpdateFailed
+  it should "update best deps after receiving BestDepsUpdated event" in new AlephiumFixture {
+    val fixture = newFixture
+    import fixture._
+    setUpdating()
+    viewHandler ! bestDepsUpdatedMsg
     eventually {
-      viewHandler.underlyingActor.updateBestDepsCount is 2
-      viewHandler.underlyingActor.updatingBestDeps is false
-      blockFlow.getBestDeps(chainIndex.from).deps.contains(block.hash) is false
+      state.requestCount is 0
+      state.isUpdating is false
+      containBlockHashInBestDeps(block.hash) is true
     }
+  }
+
+  it should "not update best deps after receiving BestDepsUpdateFailed event" in new AlephiumFixture {
+    val fixture = newFixture
+    import fixture._
+    setUpdating()
+    viewHandler ! bestDepsUpdateFailedMsg
+    eventually {
+      state.requestCount is 2
+      state.isUpdating is false
+      containBlockHashInBestDeps(block.hash) is false
+    }
+  }
+}
+
+class PreDanubeUpdateBestViewSpec extends UpdateBestViewSpec {
+  trait PreDanubeUpdateBestViewFixture extends UpdateBestViewFixture {
+    def setHardFork(): Unit     = setHardForkBefore(HardFork.Danube)
+    def state: AsyncUpdateState = viewHandler.underlyingActor.preDanubeUpdateState
+    override def containBlockHashInBestDeps(blockHash: BlockHash): Boolean =
+      blockFlow.getBestDepsPreDanube(chainIndex.from).deps.contains(blockHash)
+    def bestDepsUpdatedMsg: ViewHandler.Command      = ViewHandler.BestDepsUpdatedPreDanube
+    def bestDepsUpdateFailedMsg: ViewHandler.Command = ViewHandler.BestDepsUpdateFailedPreDanube
+  }
+
+  def newFixture: UpdateBestViewFixture = new PreDanubeUpdateBestViewFixture {}
+}
+
+class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
+  trait DanubeUpdateBestViewFixture extends UpdateBestViewFixture {
+    def setHardFork(): Unit = setHardForkSince(HardFork.Danube)
+    def state: AsyncUpdateState =
+      viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
+    override def containBlockHashInBestDeps(blockHash: BlockHash): Boolean =
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(blockHash)
+    def bestDepsUpdatedMsg: ViewHandler.Command = ViewHandler.BestDepsUpdatedDanube(chainIndex)
+    def bestDepsUpdateFailedMsg: ViewHandler.Command =
+      ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
+  }
+
+  def newFixture: UpdateBestViewFixture = new DanubeUpdateBestViewFixture {}
+
+  it should "update best view for all groups" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+    setSynced()
+
+    val interBlocks = brokerConfig.chainIndexes.filter(!_.isIntraGroup).map { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      blockFlow
+        .getBestFlowSkeleton()
+        .intraGroupTipOutTips
+        .flatMap(identity)
+        .contains(block.hash) is false
+      block
+    }
+
+    val intraBlocks = brokerConfig.groupRange.map { group =>
+      val chainIndex = ChainIndex.unsafe(group, group)
+      val block      = emptyBlock(blockFlow, chainIndex)
+      addWithoutViewUpdate(blockFlow, block)
+      blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is false
+      block
+    }
+
+    intraBlocks.foreach { block =>
+      viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    }
+
+    eventually {
+      val bestFlowSkeleton = blockFlow.getBestFlowSkeleton()
+      intraBlocks.foreach(block => bestFlowSkeleton.intraGroupTips.contains(block.hash) is true)
+
+      val interTips = bestFlowSkeleton.intraGroupTipOutTips.flatMap(identity)
+      interBlocks.foreach(block => interTips.contains(block.hash) is true)
+    }
+  }
+
+  it should "test requestDanubeUpdate" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    brokerConfig.chainIndexes.foreach { chainIndex =>
+      val state = viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
+      state.requestCount is 0
+      state.isUpdating is false
+
+      viewHandler.underlyingActor.requestDanubeUpdate(chainIndex)
+      state.requestCount is 1
+      state.isUpdating is false
+
+      viewHandler.underlyingActor.requestDanubeUpdate(chainIndex)
+      state.requestCount is 2
+      state.isUpdating is false
+    }
+  }
+
+  it should "test setDanubeUpdateCompleted" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardFork(HardFork.Danube)
+
+    brokerConfig.chainIndexes.foreach { chainIndex =>
+      val state = viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
+      state.requestUpdate()
+      state.tryUpdate() is true
+      state.isUpdating is true
+
+      viewHandler.underlyingActor.setDanubeUpdateCompleted(chainIndex)
+      state.isUpdating is false
+    }
+  }
+
+  it should "test AsyncUpdateState" in {
+    val state = AsyncUpdateState()
+    state.isUpdating is false
+    state.requestCount is 0
+
+    state.requestUpdate()
+    state.requestCount is 1
+    state.tryUpdate() is true
+    state.isUpdating is true
+    state.requestCount is 0
+
+    state.tryUpdate() is false
+    state.setCompleted()
+    state.isUpdating is false
+    state.tryUpdate() is false
+
+    state.requestUpdate()
+    state.requestCount is 1
+    state.isUpdating is false
+    state.requestUpdate()
+    state.requestCount is 2
+    state.isUpdating is false
+    state.tryUpdate() is true
+    state.isUpdating is true
+    state.requestCount is 0
   }
 }

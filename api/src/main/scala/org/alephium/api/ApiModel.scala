@@ -42,7 +42,7 @@ import org.alephium.protocol.model.{
   TokenId,
   TransactionId
 }
-import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
 
@@ -57,6 +57,8 @@ object ApiModel {
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ApiModelCodec {
+
+  implicit def groupConfig: GroupConfig
 
   implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
   implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
@@ -137,14 +139,10 @@ trait ApiModelCodec {
 
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
     StringWriter.comap[Address.Asset](_.toBase58)
-  implicit lazy val assetAddressReader: Reader[Address.Asset] = StringReader.map { input =>
-    Address.fromBase58(input) match {
-      case Some(address: Address.Asset) => address
-      case Some(_: Address.Contract) =>
-        throw Abort(s"Expect asset address, but was contract address: $input")
-      case None =>
-        throw Abort(s"Unable to decode address from $input")
-    }
+  implicit lazy val assetAddressReader: Reader[Address.Asset] = addressReader.map {
+    case address: Address.Asset => address
+    case address: Address.Contract =>
+      throw Abort(s"Expect asset address, but was contract address: ${address.toBase58}")
   }
 
   implicit lazy val contractAddressRW: RW[Address.Contract] = readwriter[String].bimap(
@@ -161,11 +159,14 @@ trait ApiModelCodec {
 
   implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
   implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
-    Address
-      .fromBase58(input)
-      .getOrElse(
-        throw new Abort(s"Unable to decode address from $input")
-      )
+    LockupScript.decodeFromBase58(input) match {
+      case LockupScript.ValidLockupScript(lockupScript) => Address.from(lockupScript)
+      case LockupScript.HalfDecodedP2PK(publicKey) =>
+        val groupIndex = publicKey.defaultGroup
+        Address.Asset(LockupScript.p2pk(publicKey, groupIndex))
+      case LockupScript.InvalidLockupScript =>
+        throw Abort(s"Unable to decode address from $input")
+    }
   }
 
   implicit val cliqueIdWriter: Writer[CliqueId] = StringWriter.comap[CliqueId](_.toHexString)

@@ -81,13 +81,11 @@ object Node {
     val blockFlow: BlockFlow = buildBlockFlowUnsafe(storages)
 
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command] =
-      ActorRefT.build(
+      MisbehaviorManager.build(
         system,
-        MisbehaviorManager.props(
-          networkSetting.banDuration,
-          networkSetting.penaltyForgiveness,
-          networkSetting.penaltyFrequency
-        )
+        networkSetting.banDuration,
+        networkSetting.penaltyForgiveness,
+        networkSetting.penaltyFrequency
       )
 
     val discoveryProps: Props =
@@ -101,11 +99,7 @@ object Node {
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
 
     val tcpController: ActorRefT[TcpController.Command] =
-      ActorRefT
-        .build[TcpController.Command](
-          system,
-          TcpController.props(config.network.bindAddress, misbehaviorManager)
-        )
+      TcpController.build(system, misbehaviorManager)
 
     val eventBus: ActorRefT[EventBus.Message] =
       ActorRefT.build[EventBus.Message](system, EventBus.props())
@@ -114,7 +108,7 @@ object Node {
       AllHandlers.build(system, blockFlow, eventBus, storages)
 
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] =
-      ActorRefT.build(system, BlockFlowSynchronizer.props(blockFlow, allHandlers))
+      BlockFlowSynchronizer.build(system, blockFlow, allHandlers)
     lazy val cliqueManager: ActorRefT[CliqueManager.Command] =
       ActorRefT.build(
         system,

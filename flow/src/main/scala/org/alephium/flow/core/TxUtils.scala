@@ -107,6 +107,7 @@ trait TxUtils { Self: FlowUtils =>
           .Build(ProvidedGas(gasOpt, gasPrice, None))
           .select(
             AssetAmounts(totalAmount, totalAmountPerToken),
+            fromLockupScript,
             fromUnlockScript,
             extraUtxosInfo.merge(utxos),
             txOutputLength,
@@ -135,7 +136,7 @@ trait TxUtils { Self: FlowUtils =>
             case None =>
               for {
                 estimatedGas <- GasEstimation.estimateWithInputScript(
-                  fromUnlockScript,
+                  (fromLockupScript, fromUnlockScript),
                   utxoRefs.length,
                   outputScripts.length,
                   AssetScriptGasEstimator.NotImplemented // Not P2SH
@@ -269,6 +270,7 @@ trait TxUtils { Self: FlowUtils =>
           .Build(ProvidedGas(None, coinbaseGasPrice, None))
           .select(
             AssetAmounts(totalAmount, AVector.empty),
+            fromLockupScript,
             fromUnlockScript,
             utxos,
             rewardOutputs.length + 1,
@@ -482,6 +484,7 @@ trait TxUtils { Self: FlowUtils =>
         )
       _ <- blockFlow
         .sanityCheckBalance(
+          fromLockupScript,
           fromUnlockScript,
           inputSelection,
           outputInfos,
@@ -532,6 +535,7 @@ trait TxUtils { Self: FlowUtils =>
           .Build(ProvidedGas(None, gasPrice, None))
           .select(
             AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
+            fromLockupScript,
             fromUnlockScript,
             inputs,
             amountTokensOutputCount._3,
@@ -594,14 +598,16 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def sanityCheckBalance(
+      fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
       gasPrice: GasPrice
   ): Either[String, Unit] =
-    getAssetRemainders(fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
+    getAssetRemainders(fromLockupScript, fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
 
   def getAssetRemainders(
+      fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
@@ -612,7 +618,7 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       for {
         gasBox <- GasEstimation.estimateWithInputScript(
-          fromUnlockScript,
+          (fromLockupScript, fromUnlockScript),
           inputs.length,
           countResultingTxOutputs(outputs),
           AssetScriptGasEstimator.Default(blockFlow)
@@ -1062,6 +1068,7 @@ trait TxUtils { Self: FlowUtils =>
       selected <- UtxoSelectionAlgo
         .SelectionWithGasEstimation(gasPrice)
         .select(
+          fromLockupScript,
           fromUnlockScript,
           totalNumOfOutputs,
           UtxoSelectionAlgo.SelectedSoFar(totalAlphAmount, tokenUtxos, alphUtxos),
@@ -1108,7 +1115,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, UnsignedTransaction] = {
     for {
       estimatedGas <- GasEstimation.estimateWithInputScript(
-        fromUnlockScript,
+        (fromLockupScript, fromUnlockScript),
         alphUtxos.length,
         1,
         AssetScriptGasEstimator.Default(blockFlow)

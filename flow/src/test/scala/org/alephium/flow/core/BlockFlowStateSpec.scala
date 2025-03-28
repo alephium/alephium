@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.FlowFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.nodeindexes
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
 class BlockFlowStateSpec extends AlephiumSpec {
@@ -27,6 +28,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
   }
 
   it should "calculate all the hashes for state update" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
     def prepare(chainIndex: ChainIndex): Block = {
       val block = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
@@ -38,7 +40,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     val block1    = prepare(ChainIndex.unsafe(1, 0))
     prepare(ChainIndex.unsafe(1, 1))
     val block2 = prepare(ChainIndex.unsafe(0, 1))
-    blockFlow.getHashesForUpdates(mainGroup).rightValue.toSet is
+    blockFlow.getHashesForUpdatesPreDanube(mainGroup).rightValue.toSet is
       Set(block0.hash, block1.hash, block2.hash)
   }
 
@@ -141,5 +143,150 @@ class BlockFlowStateSpec extends AlephiumSpec {
     chain.getAllTips.toSet is Set(block10.hash, block11.hash)
     blockFlow.sanityCheckUnsafe()
     chain.getAllTips.toSet is Set(block11.hash)
+  }
+
+  trait DanubeGroupViewFixture extends Fixture {
+    setHardForkSince(HardFork.Danube)
+
+    var now = TimeStamp.now()
+    def nextBlockTs: TimeStamp = {
+      val newTs = now.plusMillisUnsafe(1)
+      now = newTs
+      newTs
+    }
+    val chainIndex0 = ChainIndex.unsafe(1, 0)
+    val block0      = transfer(blockFlow, chainIndex0, nextBlockTs)
+    val chainIndex1 = ChainIndex.unsafe(1, 2)
+    val block1      = transfer(blockFlow, chainIndex1, nextBlockTs)
+    addAndCheck(blockFlow, block0, block1)
+    block0.nonCoinbase.head.allInputRefs.head is block1.nonCoinbase.head.allInputRefs.head
+
+    val block2 = emptyBlock(blockFlow, ChainIndex.unsafe(1, 1), nextBlockTs)
+    block2.blockDeps.deps.contains(block0.hash) is true
+    block2.blockDeps.deps.contains(block1.hash) is true
+    addAndCheck(blockFlow, block2)
+
+    private val worldState = blockFlow.getBestPersistedWorldState(chainIndex0.from).rightValue
+    block0.nonCoinbase.foreach(_.fixedOutputRefs.foreach(ref => {
+      if (ref.fromGroup == chainIndex0.from) {
+        worldState.existOutput(ref) isE true
+      } else {
+        worldState.existOutput(ref) isE false
+      }
+    }))
+    block1.nonCoinbase.foreach(_.outputRefs.foreach(worldState.existOutput(_) isE false))
+
+    val block3 = transfer(blockFlow, ChainIndex.unsafe(0, 1), nextBlockTs)
+    val block4 = transfer(blockFlow, ChainIndex.unsafe(0, 2), nextBlockTs)
+    addAndCheck(blockFlow, block3, block4)
+  }
+
+  it should "get correct mutable group view since danube" in new DanubeGroupViewFixture {
+    val block5 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs)
+    val groupView0 =
+      blockFlow
+        .getMutableGroupViewDanube(block5.chainIndex, block5.blockDeps, Some(block5.hash))
+        .rightValue
+    groupView0.worldState.existOutput(block0.nonCoinbase.head.fixedOutputRefs.head) isE true
+    groupView0.worldState.existOutput(block3.nonCoinbase.head.fixedOutputRefs.last) isE true
+    groupView0.worldState.existOutput(block4.nonCoinbase.head.fixedOutputRefs.last) isE false
+    val conflictedTxsStorage0 =
+      groupView0.worldState.nodeIndexesState.conflictedTxsStorageCache.conflictedTxsReversedIndex
+    conflictedTxsStorage0.exists(block3.hash) isE false
+    conflictedTxsStorage0.exists(block4.hash) isE true
+
+    val block6 = emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs)
+    val groupView1 =
+      blockFlow
+        .getMutableGroupViewDanube(block6.chainIndex, block6.blockDeps, Some(block6.hash))
+        .rightValue
+    groupView1.worldState.existOutput(block1.nonCoinbase.head.fixedOutputRefs.head) isE false
+
+    addAndCheck(blockFlow, block5)
+    addAndCheck(blockFlow, block6)
+
+    val worldState = blockFlow.getBestPersistedWorldState(GroupIndex.unsafe(0)).rightValue
+    worldState.existOutput(block0.nonCoinbase.head.fixedOutputRefs.head) isE true
+    worldState.existOutput(block3.nonCoinbase.head.fixedOutputRefs.last) isE true
+    worldState.existOutput(block4.nonCoinbase.head.fixedOutputRefs.last) isE false
+    val conflictedTxsStorage1 =
+      worldState.nodeIndexesStorage.conflictedTxsStorage.conflictedTxsReversedIndex
+    conflictedTxsStorage1.exists(block3.hash) isE false
+    conflictedTxsStorage1.getUnsafe(block4.hash) is AVector(
+      nodeindexes.ConflictedTxsSource(block5.hash, AVector(block4.nonCoinbase.head.id))
+    )
+  }
+
+  it should "get correct immutable group view since danube" in new DanubeGroupViewFixture {
+    val groupView0 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(0)).rightValue
+    groupView0
+      .getPreAssetOutputInfo(block0.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .nonEmpty is true
+    groupView0
+      .getPreAssetOutputInfo(block3.nonCoinbase.head.fixedOutputRefs.last)
+      .rightValue
+      .nonEmpty is true
+    groupView0
+      .getPreAssetOutputInfo(block4.nonCoinbase.head.fixedOutputRefs.last)
+      .rightValue
+      .isEmpty is true
+
+    val lockupScript = getGenesisLockupScript(GroupIndex.unsafe(0))
+    val utxos        = groupView0.getRelevantUtxos(lockupScript, Int.MaxValue, false).rightValue
+    utxos.exists(_.ref == block3.nonCoinbase.head.fixedOutputRefs.last) is true
+    utxos.exists(_.ref == block4.nonCoinbase.head.fixedOutputRefs.last) is false
+
+    val groupView1 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(2)).rightValue
+    groupView1
+      .getPreAssetOutputInfo(block1.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .nonEmpty is true
+
+    val block5 = transfer(blockFlow, ChainIndex.unsafe(1, 0), nextBlockTs)
+    addAndCheck(blockFlow, block5)
+    val groupView2 = blockFlow.getImmutableGroupView(GroupIndex.unsafe(0)).rightValue
+    groupView2
+      .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .nonEmpty is true
+    val groupView3 = blockFlow.getImmutableGroupViewIncludePool(GroupIndex.unsafe(0)).rightValue
+    groupView3
+      .getPreAssetOutputInfo(block5.nonCoinbase.head.fixedOutputRefs.head)
+      .rightValue
+      .nonEmpty is true
+  }
+
+  it should "sort blocks properly" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 1)
+    )
+    setHardForkSince(HardFork.Danube)
+
+    val now = TimeStamp.now()
+    val blocks = (1 to 3).map { toGroup =>
+      val chainIndex = ChainIndex.unsafe(0, toGroup)
+      transfer(blockFlow, chainIndex, now)
+    }
+    addAndCheck(blockFlow, blocks: _*)
+
+    (1 to 3).foreach { toGroup =>
+      val chainIndex = ChainIndex.unsafe(0, toGroup)
+      (1 to 10).foreach { _ =>
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      }
+    }
+
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block3)
+
+    val worldState = blockFlow.getBestPersistedWorldState(GroupIndex.unsafe(0)).rightValue
+    val output0    = blocks(0).nonCoinbase.head.fixedOutputRefs.last
+    val output1    = blocks(1).nonCoinbase.head.fixedOutputRefs.last
+    val output2    = blocks(2).nonCoinbase.head.fixedOutputRefs.last
+    worldState.existOutput(output0) isE true
+    worldState.existOutput(output1) isE false
+    worldState.existOutput(output2) isE false
   }
 }

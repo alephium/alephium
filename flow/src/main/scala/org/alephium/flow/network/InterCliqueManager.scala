@@ -337,11 +337,8 @@ class InterCliqueManager(
     }
   }
 
-  def publishNodeStatus(result: SyncedResult): Unit = {
-    blockFlowSynchronizer.ref ! result
-    allHandlers.viewHandler.ref ! result
-    allHandlers.txHandler.ref ! result
-    allHandlers.blockHandlers.foreach(_._2.ref ! result)
+  @inline def publishNodeStatus(result: SyncedResult): Unit = {
+    publishEvent(result)
   }
 
   def connect(broker: BrokerInfo): Unit = {

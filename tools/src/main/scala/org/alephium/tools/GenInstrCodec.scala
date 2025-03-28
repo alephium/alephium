@@ -357,7 +357,7 @@ object GenInstrCodec extends App {
   }
 
   private val removed = Seq(
-    typeOf[VerifySignatureMockup.type],
+    typeOf[GenericVerifySignatureMockup.type],
     typeOf[VerifyTxSignatureMockup.type],
     typeOf[TemplateVariable]
   ).map(_.typeSymbol)

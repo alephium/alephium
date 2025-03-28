@@ -20,7 +20,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props, Stash, Terminated}
+import akka.actor.{ActorRef, ActorSystem, Props, Stash, Terminated}
 import akka.io.{IO, Tcp}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -28,11 +28,16 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
 object TcpController {
-  def props(
-      bindAddress: InetSocketAddress,
+  def build(
+      system: ActorSystem,
       misbehaviorManager: ActorRefT[broker.MisbehaviorManager.Command]
-  )(implicit networkSetting: NetworkSetting): Props =
-    Props(new TcpController(bindAddress, misbehaviorManager))
+  )(implicit networkSetting: NetworkSetting): ActorRefT[Command] = {
+    val props = Props(new TcpController(networkSetting.bindAddress, misbehaviorManager))
+    val actor = ActorRefT.build[Command](system, props)
+    system.eventStream.subscribe(actor.ref, classOf[MisbehaviorManager.PeerBanned])
+    system.eventStream.subscribe(actor.ref, classOf[TcpController.ConnectTo])
+    actor
+  }
 
   sealed trait Command
   final case class Start(bootstrapper: ActorRef) extends Command
@@ -55,7 +60,7 @@ class TcpController(
 )(implicit networkSetting: NetworkSetting)
     extends BaseActor
     with Stash
-    with EventStream {
+    with EventStream.Publisher {
 
   val tcpManager: ActorRef = IO(Tcp)(context.system)
 
@@ -63,11 +68,6 @@ class TcpController(
     mutable.Map.empty
   val confirmedConnections: mutable.HashMap[InetSocketAddress, ActorRefT[Tcp.Command]] =
     mutable.HashMap.empty
-
-  override def preStart(): Unit = {
-    subscribeEvent(self, classOf[MisbehaviorManager.PeerBanned])
-    subscribeEvent(self, classOf[TcpController.ConnectTo])
-  }
 
   override def receive: Receive = awaitStart
 

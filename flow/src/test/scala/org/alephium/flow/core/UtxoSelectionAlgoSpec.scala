@@ -376,6 +376,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
           .Build(ProvidedGas(gasOpt, GasPrice(1), None))
           .select(
             AssetAmounts(alph, AVector.from(tokens)),
+            defaultLockupScript,
             defaultUnlockScript,
             utxos,
             outputs.length,

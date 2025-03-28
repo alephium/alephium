@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import org.alephium.crypto.{ED25519PublicKey, SecP256R1PublicKey}
 import org.alephium.macros.Gas
 import org.alephium.protocol.PublicKey
 
@@ -264,9 +265,21 @@ object GasSchedule {
   val txInputBaseGas: GasBox  = GasBox.unsafe(2000)
   val txOutputBaseGas: GasBox = GasBox.unsafe(4500)
 
-  val p2pkUnlockGas: GasBox = {
+  val secp256K1UnlockGas: GasBox = {
     GasBox.unsafe(GasHash.gas(PublicKey.length).value + GasSignature.gas.value)
   }
 
-  def p2mpkUnlockGas(m: Int): GasBox = p2pkUnlockGas.mulUnsafe(m)
+  val secp256R1UnlockGas: GasBox =
+    GasBox.unsafe(GasHash.gas(SecP256R1PublicKey.length).value + GasSignature.gas.value)
+
+  def webauthnUnlockGas(webauthnLength: Int): GasBox = {
+    GasBox.unsafe(
+      GasHash.gas(SecP256R1PublicKey.length + webauthnLength).value + GasSignature.gas.value
+    )
+  }
+
+  val ed25519UnlockGas: GasBox =
+    GasBox.unsafe(GasHash.gas(ED25519PublicKey.length).value + GasSignature.gas.value)
+
+  def p2mpkUnlockGas(m: Int): GasBox = secp256K1UnlockGas.mulUnsafe(m)
 }

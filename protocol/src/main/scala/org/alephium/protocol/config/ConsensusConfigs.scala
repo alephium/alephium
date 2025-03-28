@@ -22,11 +22,18 @@ import org.alephium.util.{Duration, Math, TimeStamp}
 trait ConsensusConfigs {
   def mainnet: ConsensusConfig
   def rhone: ConsensusConfig
+  def danube: ConsensusConfig
 
   lazy val maxAllowedMiningTarget: Target = Math.max(mainnet.maxMiningTarget, rhone.maxMiningTarget)
 
   def getConsensusConfig(hardFork: HardFork): ConsensusConfig = {
-    if (hardFork.isRhoneEnabled()) rhone else mainnet
+    if (hardFork.isDanubeEnabled()) {
+      danube
+    } else if (hardFork.isRhoneEnabled()) {
+      rhone
+    } else {
+      mainnet
+    }
   }
 
   def getConsensusConfig(ts: TimeStamp)(implicit networkConfig: NetworkConfig): ConsensusConfig = {
