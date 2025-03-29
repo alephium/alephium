@@ -5614,19 +5614,20 @@ class ServerUtilsSpec extends AlephiumSpec {
       val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
       addAndCheck(blockFlow, block)
     }
-    val lockupScript = LockupScript.p2pkh(publicKey)
-    val assetAddress = Address.from(lockupScript)
+    val lockupScript     = LockupScript.p2pkh(publicKey)
+    val assetAddress     = Address.from(lockupScript)
+    val assetAddressLike = AddressLike.from(lockupScript)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
     val serverUtils0 = createServerUtils(9)
-    serverUtils0.getBalance(blockFlow, assetAddress.toBase58, true).leftValue.detail is
+    serverUtils0.getBalance(blockFlow, assetAddressLike, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
     serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
-      .getBalance(blockFlow, assetAddress.toBase58, true)
+      .getBalance(blockFlow, assetAddressLike, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
@@ -5638,7 +5639,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils2 = createServerUtils(11)
     serverUtils2
-      .getBalance(blockFlow, assetAddress.toBase58, true)
+      .getBalance(blockFlow, assetAddressLike, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
@@ -5743,7 +5744,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, address.toBase58, true) isE Balance.from(
+    serverUtils
+      .getBalance(blockFlow, AddressLike.from(address.lockupScript), true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

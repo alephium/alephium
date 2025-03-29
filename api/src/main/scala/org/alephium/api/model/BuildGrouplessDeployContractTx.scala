@@ -19,13 +19,14 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
+import org.alephium.protocol.model.{Address, AddressLike, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.LockupScript.HalfDecodedP2PK
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessDeployContractTx(
-    fromAddress: String,
+    fromAddress: AddressLike,
     bytecode: ByteString,
     initialAttoAlphAmount: Option[Amount] = None,
     initialTokenAmounts: Option[AVector[Token]] = None,
@@ -43,23 +44,25 @@ final case class BuildGrouplessDeployContractTx(
   override def getLockPair()(implicit
       config: GroupConfig
   ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
-    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
-      getFromAddress().flatMap { address =>
-        address.lockupScript match {
-          case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK))
-          case _ => Left(s"Invalid from address: $address, expected a groupless address")
+    fromAddress.lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript) =>
+        lockupScript match {
+          case p2pkLockupScript: LockupScript.P2PK => Right((p2pkLockupScript, UnlockScript.P2PK))
+          case _ => Left(notGrouplessAddressError)
         }
-      }
-    } else {
-      Left(explicitGroupInfoError)
+      case LockupScript.HalfDecodedP2PK(_) =>
+        Left(explicitGroupInfoError)
     }
   }
 
   def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex] = {
-    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
-      getFromAddress().map(_.groupIndex)
-    } else {
-      Left(explicitGroupInfoError)
+    fromAddress.lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript: LockupScript.P2PK) =>
+        Right(lockupScript.groupIndex)
+      case HalfDecodedP2PK(_) =>
+        Left(explicitGroupInfoError)
+      case _ =>
+        Left(notGrouplessAddressError)
     }
   }
 }

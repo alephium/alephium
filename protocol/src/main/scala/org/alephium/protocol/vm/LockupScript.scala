@@ -68,27 +68,33 @@ object LockupScript {
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
   def fromBase58(input: String): Option[LockupScript] = {
+    fromBase58(input, None)
+  }
+
+  def fromBase58(input: String, groupIndex: Option[GroupIndex]): Option[LockupScript] = {
     decodeFromBase58(input) match {
-      case ValidLockupScript(lockupScript) =>
+      case CompleteLockupScript(lockupScript) =>
         Some(lockupScript)
       case HalfDecodedP2PK(publicKey) =>
-        // FIXME: Temporarily default to group 0 if no group is specified
-        Some(LockupScript.p2pk(publicKey, new GroupIndex(0)))
+        groupIndex.map(groupIndex => p2pk(publicKey, groupIndex))
       case InvalidLockupScript =>
         None
     }
   }
 
-  trait DecodeLockupScriptResult {
+  sealed trait DecodeLockupScriptResult {
     def getLockupScript: Option[LockupScript]
   }
-  final case class ValidLockupScript(lockupScript: LockupScript) extends DecodeLockupScriptResult {
+
+  sealed trait ValidLockupScript extends DecodeLockupScriptResult
+
+  final case class CompleteLockupScript(lockupScript: LockupScript) extends ValidLockupScript {
     def getLockupScript: Option[LockupScript] = Some(lockupScript)
   }
   case object InvalidLockupScript extends DecodeLockupScriptResult {
     def getLockupScript: Option[LockupScript] = None
   }
-  final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends DecodeLockupScriptResult {
+  final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends ValidLockupScript {
     def getLockupScript: Option[LockupScript] = None
   }
 
@@ -118,7 +124,7 @@ object LockupScript {
 
   private def decodeLockupScript(bytes: ByteString): DecodeLockupScriptResult = {
     deserialize[LockupScript](bytes).toOption match {
-      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case Some(lockupScript) => CompleteLockupScript(lockupScript)
       case None               => InvalidLockupScript
     }
   }
@@ -135,7 +141,7 @@ object LockupScript {
         }
     } yield lockupScriptOpt
     result match {
-      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case Some(lockupScript) => CompleteLockupScript(lockupScript)
       case None               => InvalidLockupScript
     }
   }

@@ -26,6 +26,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
+  AddressLike,
   BlockHash,
   CliqueId,
   ContractId,
@@ -1159,16 +1160,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val transactionIdExamples: List[Example[TransactionId]] =
     simpleExample(transaction.unsigned.txId)
 
-  private val grouplessAddress =
-    Address.Asset(LockupScript.P2PK(PublicKeyLike.SecP256K1(publicKey), groupIndex))
-  private val grouplessAddressRaw = grouplessAddress.toBase58
+  private val grouplessAddressLike = AddressLike.from(
+    LockupScript.P2PK(PublicKeyLike.SecP256K1(publicKey), groupIndex)
+  )
   implicit val buildGrouplessTransferExamples: List[Example[BuildGrouplessTransferTx]] = List(
     defaultExample(
-      BuildGrouplessTransferTx(grouplessAddressRaw, defaultDestinations)
+      BuildGrouplessTransferTx(grouplessAddressLike, defaultDestinations)
     ),
     moreSettingsExample(
       BuildGrouplessTransferTx(
-        grouplessAddressRaw,
+        grouplessAddressLike,
         moreSettingsDestinations,
         Some(model.nonCoinbaseMinGasPrice)
       )
@@ -1177,10 +1178,10 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildGrouplessExecuteScriptTxExamples: List[Example[BuildGrouplessExecuteScriptTx]] =
     List(
-      defaultExample(BuildGrouplessExecuteScriptTx(grouplessAddressRaw, bytecode = byteString)),
+      defaultExample(BuildGrouplessExecuteScriptTx(grouplessAddressLike, bytecode = byteString)),
       moreSettingsExample(
         BuildGrouplessExecuteScriptTx(
-          grouplessAddressRaw,
+          grouplessAddressLike,
           byteString,
           Some(Amount(model.dustUtxoAmount)),
           Some(tokens),
@@ -1217,10 +1218,10 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildGrouplessDeployContractTxExamples
       : List[Example[BuildGrouplessDeployContractTx]] = List(
-    defaultExample(BuildGrouplessDeployContractTx(grouplessAddressRaw, bytecode = byteString)),
+    defaultExample(BuildGrouplessDeployContractTx(grouplessAddressLike, bytecode = byteString)),
     moreSettingsExample(
       BuildGrouplessDeployContractTx(
-        grouplessAddressRaw,
+        grouplessAddressLike,
         byteString,
         Some(bigAmount),
         Some(tokens),

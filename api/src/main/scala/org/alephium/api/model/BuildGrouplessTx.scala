@@ -17,31 +17,25 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, AddressLike, GroupIndex}
 import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 
 trait BuildGrouplessTx {
-  val fromAddress: String
+  val fromAddress: AddressLike
 
   def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex]
 
-  var decodedAddress: Option[Address.Asset] = None
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def getFromAddress(): Either[String, Address.Asset] = {
-    if (decodedAddress.isDefined) {
-      Right(decodedAddress.get)
-    } else {
-      Address.fromBase58(fromAddress) match {
-        case Some(address: Address.Asset) =>
-          decodedAddress = Some(address)
-          Right(address)
-        case Some(_: Address.Contract) =>
-          Left(s"Expect asset address, but was contract address: $fromAddress")
-        case None =>
-          Left(s"Unable to decode address from $fromAddress")
-      }
+  def getFromAddress()(implicit config: GroupConfig): Either[String, Address.Asset] = {
+    fromAddress.getAddress() match {
+      case address: Address.Asset =>
+        Right(address)
+      case _: Address.Contract =>
+        Left(s"Expect asset address, but was contract address: $fromAddress")
     }
   }
 
   def getLockPair()(implicit config: GroupConfig): Either[String, (LockupScript.P2PK, UnlockScript)]
+
+  val notGrouplessAddressError = s"Invalid from address: `$fromAddress`, expected a groupless address"
 }

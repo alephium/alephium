@@ -85,16 +85,13 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def getGrouplessBalance(
       blockFlow: BlockFlow,
-      address: Address,
+      halfDecodedP2PK: LockupScript.HalfDecodedP2PK,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     for {
-      p2pk <- address.lockupScript match {
-        case lock: LockupScript.P2PK => Right(lock)
-        case _                       => Left(badRequest(s"Invalid groupless address: $address"))
-      }
       allBalances <- wrapResult(AVector.from(brokerConfig.groupRange).mapE { groupIndex =>
-        val lockupScript = LockupScript.p2pk(p2pk.publicKey, GroupIndex.unsafe(groupIndex))
+        val lockupScript =
+          LockupScript.p2pk(halfDecodedP2PK.publicKey, GroupIndex.unsafe(groupIndex))
         blockFlow.getBalance(lockupScript, apiConfig.defaultUtxosLimit, getMempoolUtxos)
       })
       balance <- allBalances.foldE(model.Balance.zero)(_ merge _).left.map(failed)

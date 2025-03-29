@@ -175,7 +175,7 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
     Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isDefined is true
     Address
       .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
-      .isDefined is true
+      .isDefined is false
     Address
       .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
       .isDefined is true

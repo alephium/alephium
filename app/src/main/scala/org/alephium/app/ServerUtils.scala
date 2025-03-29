@@ -157,31 +157,26 @@ class ServerUtils(implicit
 
   def getBalance(
       blockFlow: BlockFlow,
-      addressRaw: String,
+      address: AddressLike,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
-    Address.fromBase58(addressRaw) match {
-      case Some(address) =>
-        address.lockupScript match {
-          case _: LockupScript.P2PK if !LockupScript.P2PK.hasExplicitGroupIndex(addressRaw) =>
-            getGrouplessBalance(blockFlow, address, getMempoolUtxos)
-          case _ =>
-            for {
-              _ <- checkGroup(address.lockupScript)
-              balance <- blockFlow
-                .getBalance(
-                  address.lockupScript,
-                  utxosLimit,
-                  getMempoolUtxos
-                )
-                .map(Balance.from)
-                .left
-                .flatMap(tooManyUtxos)
-            } yield balance
-        }
-      case None =>
-        Left(ApiError.BadRequest(s"Unable to decode address from $addressRaw"))
+    address.lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript) =>
+        for {
+          _ <- checkGroup(lockupScript)
+          balance <- blockFlow
+            .getBalance(
+              lockupScript,
+              utxosLimit,
+              getMempoolUtxos
+            )
+            .map(Balance.from)
+            .left
+            .flatMap(tooManyUtxos)
+        } yield balance
+      case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
+        getGrouplessBalance(blockFlow, halfDecodedP2PK, getMempoolUtxos)
     }
   }
 

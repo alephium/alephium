@@ -19,13 +19,13 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BlockHash, GroupIndex}
+import org.alephium.protocol.model.{AddressLike, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildGrouplessExecuteScriptTx(
-    fromAddress: String,
+    fromAddress: AddressLike,
     bytecode: ByteString,
     attoAlphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
@@ -39,37 +39,29 @@ final case class BuildGrouplessExecuteScriptTx(
   def getLockPair()(implicit
       config: GroupConfig
   ): Either[String, (LockupScript.P2PK, UnlockScript)] = {
-    getFromAddress().flatMap { address =>
-      address.lockupScript match {
-        case lock: LockupScript.P2PK => {
-          val unlockScript = UnlockScript.P2PK
-          if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
-            Right((lock, unlockScript))
-          } else {
-            groupIndex().map { groupIndex =>
-              (LockupScript.P2PK(lock.publicKey, groupIndex), unlockScript)
-            }
+    fromAddress.lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript) =>
+        lockupScript match {
+          case p2pkLockupScript: LockupScript.P2PK =>
+            Right((p2pkLockupScript, UnlockScript.P2PK))
+          case _ =>
+            Left(notGrouplessAddressError)
+        }
+      case LockupScript.HalfDecodedP2PK(publicKey) =>
+        decodeStatefulScript().flatMap { script =>
+          StatefulScript.deriveContractAddress(script) match {
+            case Some(contractAddress) =>
+              Right((LockupScript.P2PK(publicKey, contractAddress.groupIndex), UnlockScript.P2PK))
+            case None =>
+              Left(
+                s"Can not determine group: `${fromAddress}` has no explicit group and no contract address can be derived from TxScript"
+              )
           }
         }
-        case _ => Left(s"Invalid from address: $address, expected a groupless address")
-      }
     }
   }
 
   def groupIndex()(implicit config: GroupConfig): Either[String, GroupIndex] = {
-    if (LockupScript.P2PK.hasExplicitGroupIndex(fromAddress)) {
-      getFromAddress().map(_.groupIndex)
-    } else {
-      decodeStatefulScript().flatMap { script =>
-        StatefulScript.deriveContractAddress(script) match {
-          case Some(contractAddress) =>
-            Right(contractAddress.groupIndex)
-          case None =>
-            Left(
-              s"Can not determine group: `${fromAddress}` has no explicit group and no contract address can be derived from TxScript"
-            )
-        }
-      }
-    }
+    getLockPair().map(_._1.groupIndex)
   }
 }

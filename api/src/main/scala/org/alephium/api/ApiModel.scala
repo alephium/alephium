@@ -33,6 +33,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
+  AddressLike,
   BlockHash,
   CliqueId,
   ContractId,
@@ -160,12 +161,21 @@ trait ApiModelCodec {
   implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
   implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
     LockupScript.decodeFromBase58(input) match {
-      case LockupScript.ValidLockupScript(lockupScript) => Address.from(lockupScript)
+      case LockupScript.CompleteLockupScript(lockupScript) => Address.from(lockupScript)
       case LockupScript.HalfDecodedP2PK(publicKey) =>
         val groupIndex = publicKey.defaultGroup
         Address.Asset(LockupScript.p2pk(publicKey, groupIndex))
       case LockupScript.InvalidLockupScript =>
         throw Abort(s"Unable to decode address from $input")
+    }
+  }
+
+  implicit lazy val addressLikeWriter: Writer[AddressLike] =
+    StringWriter.comap[AddressLike](_.toBase58)
+  implicit lazy val addressLikeReader: Reader[AddressLike] = StringReader.map { input =>
+    AddressLike.fromBase58(input) match {
+      case Some(addressLike) => addressLike
+      case None              => throw Abort(s"Unable to decode address from $input")
     }
   }
 
