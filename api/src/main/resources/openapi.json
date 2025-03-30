@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.12.6"
+    "version": "3.12.1"
   },
   "servers": [
     {
@@ -5704,7 +5704,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           },
           {
@@ -14967,7 +14968,8 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "bytecode": {
             "type": "string",
@@ -15029,7 +15031,8 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "bytecode": {
             "type": "string",
@@ -15087,7 +15090,8 @@
         ],
         "properties": {
           "fromAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "destinations": {
             "type": "array",
