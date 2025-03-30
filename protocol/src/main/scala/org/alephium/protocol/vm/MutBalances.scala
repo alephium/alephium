@@ -106,6 +106,17 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     }
   }
 
+  def useForChainedInput(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
+    val index = all.indexWhere { case (ls, _) => ls == lockupScript }
+    if (index == -1) {
+      None
+    } else {
+      val result = all(index)._2
+      all(index) = lockupScript -> MutBalancesPerLockup.empty
+      Some(result)
+    }
+  }
+
   def useForNewContract(): Option[MutBalancesPerLockup] = {
     Option.when(all.nonEmpty) {
       val accumulator = MutBalancesPerLockup.empty

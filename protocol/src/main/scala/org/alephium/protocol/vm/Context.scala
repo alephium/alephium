@@ -25,6 +25,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{discard, AVector, EitherF, Math, TimeStamp, U256}
 
+//scalastyle:off file.size.limit
 final case class BlockEnv(
     chainIndex: ChainIndex,
     networkId: NetworkId,
@@ -433,7 +434,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def chainCallerOutputs(frameBalanceState: MutBalanceState): ExeResult[Unit] = {
     EitherF.foreachTry(allInputAddresses.toIterable) { caller =>
       val success = outputBalances
-        .useAll(caller.lockupScript)
+        .useForChainedInput(caller.lockupScript)
         .forall(outputs => frameBalanceState.remaining.add(caller.lockupScript, outputs).nonEmpty)
 
       if (success) okay else failed(ChainCallerOutputsFailed(caller))
