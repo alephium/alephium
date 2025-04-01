@@ -9580,6 +9580,53 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       result.debugCode.methods.length is 2
       result.code.methods.length is 1
     }
+
+    {
+      info(s"Arrays and structs as inline function parameters")
+      val code =
+        s"""
+           |struct Bar { a: U256, b: U256 }
+           |Contract Foo() {
+           |  @inline fn foo0(array: [U256; 2], bar: Bar) -> U256 {
+           |    return array[0] + array[1] + bar.a + bar.b
+           |  }
+           |  pub fn foo1(array: [U256; 2]) -> U256 {
+           |    return foo0(array, Bar { a: 1, b: 2 })
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector[Val](Val.U256(1), Val.U256(2)), AVector(Val.U256(6)))
+    }
+
+    {
+      info("Arrays and structs as local var in inline functions")
+      val code =
+        s"""
+           |struct Bar { a: U256, b: U256 }
+           |Contract Foo() {
+           |  @inline fn foo0() -> U256 {
+           |    let c = 0
+           |    let array = [1, 2]
+           |    let b = 1
+           |    let bar = Bar { a: 1, b: 2 }
+           |    let a = 2
+           |    return array[0] + array[1] + bar.a + bar.b + a + b + c
+           |  }
+           |  pub fn foo1() -> U256 {
+           |    return foo0()
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector.empty[Val], AVector(Val.U256(9)))
+      // format: off
+      check(code, AVector(
+        U256Const0, StoreLocal(0), U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), U256Const1,
+        StoreLocal(3), U256Const1, U256Const2, StoreLocal(5), StoreLocal(4), U256Const2, StoreLocal(6),
+        LoadLocal(1), LoadLocal(2), U256Add, LoadLocal(4), U256Add, LoadLocal(5), U256Add,
+        LoadLocal(6), U256Add, LoadLocal(3), U256Add, LoadLocal(0), U256Add, Return
+      ))
+      // format: on
+    }
   }
 
   it should "get correct local variable size" in {
