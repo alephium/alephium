@@ -294,7 +294,7 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
-      lockPair <- query.getLockPair()
+      lockPair <- query.getLockPair(query.group)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         lockPair._1,
@@ -319,17 +319,7 @@ class ServerUtils(implicit
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
-          for {
-            txs <- buildTransferTxWithFallbackAddresses(
-              blockFlow,
-              lockupPair,
-              otherGroupsLockupPairs(lockupScript),
-              query.destinations,
-              query.gasPrice,
-              query.targetBlockHash
-            )
-            result <- BuildGrouplessTransferTxResult.from(txs)
-          } yield result
+          buildGrouplessTransferTx(blockFlow, query, lockupScript, extraUtxosInfo)
         case _ =>
           buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
             .map(BuildSimpleTransferTxResult.from)
