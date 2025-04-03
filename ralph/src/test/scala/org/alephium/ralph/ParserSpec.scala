@@ -2487,9 +2487,24 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Const(Val.U256(U256.Zero))
       )
     )
+    parse(
+      "map.insert!(1, 0)",
+      StatefulParser.statement(_)
+    ).get.value is Ast.InsertToMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](
+        Const(Val.NullContractAddress),
+        Const(Val.U256(U256.One)),
+        Const(Val.U256(U256.Zero))
+      )
+    )
     parse("map.remove!(address, 1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
       Ident("map"),
       Seq[Expr[StatefulContext]](Variable(Ident("address")), Const(Val.U256(U256.One)))
+    )
+    parse("map.remove!(1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](Const(Val.NullContractAddress), Const(Val.U256(U256.One)))
     )
 
     parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(

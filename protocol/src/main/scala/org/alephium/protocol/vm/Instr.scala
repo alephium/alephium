@@ -2638,8 +2638,14 @@ object ContractExists
 object DestroySelf extends ContractInstr with GasDestroy {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address <- frame.popOpStackAddress()
-      _       <- frame.destroyContract(address.lockupScript)
+      address0 <- frame.popOpStackAddress()
+      address <-
+        if (address0 == Val.NullContractAddress && frame.ctx.getHardFork().isDanubeEnabled()) {
+          frame.ctx.getFirstTxInputAddress()
+        } else {
+          Right(address0)
+        }
+      _ <- frame.destroyContract(address.lockupScript)
     } yield ()
   }
 }

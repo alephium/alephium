@@ -1141,7 +1141,11 @@ object Ast {
         mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val approveALPHCodes    = args(0).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
+      val approveALPHCodes = if (args(0) == Const[StatefulContext](Val.NullContractAddress)) {
+        Seq.empty
+      } else {
+        args(0).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
+      }
       val createContractCodes = genCreateContract(state)
       approveALPHCodes ++ createContractCodes
     }
