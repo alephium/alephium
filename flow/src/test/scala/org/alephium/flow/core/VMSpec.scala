@@ -6021,6 +6021,56 @@ class VMSpec extends AlephiumSpec with Generators {
     removeFromMap(1, 1)
   }
 
+  it should "test caller should pay map entry deposit and get refund for map insert and remove" in new ContractFixture {
+    val (privateKey, publicKey) = chainIndex.from.generateKey
+    val lockupScript            = LockupScript.p2pkh(publicKey)
+    val genesisKey              = genesisKeys(chainIndex.from.value)._1
+    val block0                  = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+
+    addAndCheck(blockFlow, block0)
+
+    val mapContract =
+      s"""
+         |Contract MapContract() {
+         |  mapping[U256, ByteVec] map
+         |  pub fn insert() -> () {
+         |    map.insert!(0, #00)
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    map.remove!(0)
+         |  }
+         |}
+         |""".stripMargin
+    lazy val mapContractId = createContract(mapContract)._1
+
+    lazy val insert =
+      s"""
+         |TxScript Insert {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.insert()
+         |}
+         |$mapContract
+         |""".stripMargin
+    val block1  = callTxScript(insert, keyPairOpt = Some((privateKey, publicKey)))
+    val gasFee1 = block1.nonCoinbase.head.gasFeeUnsafe
+    var balance = ALPH.alph(10).subUnsafe(gasFee1 + minimalAlphInContract)
+    getAlphBalance(blockFlow, lockupScript) is balance
+
+    lazy val remove =
+      s"""
+         |TxScript Remove {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.remove()
+         |}
+         |$mapContract
+         |""".stripMargin
+    val block2  = callTxScript(remove, keyPairOpt = Some((privateKey, publicKey)))
+    val gasFee2 = block2.nonCoinbase.head.gasFeeUnsafe
+    balance = balance.subUnsafe(gasFee2).addUnsafe(minimalAlphInContract)
+    getAlphBalance(blockFlow, lockupScript) is balance
+  }
+
   it should "check caller contract id when calling generated map contract functions" in new MapFixture {
     val mapContract =
       s"""

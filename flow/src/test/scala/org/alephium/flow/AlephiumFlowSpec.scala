@@ -1039,10 +1039,11 @@ trait FlowFixture
 
   def callTxScript(
       input: String,
-      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0),
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
     val script = Compiler.compileTxScript(input).rightValue
-    callCompiledTxScript(script, chainIndex)
+    callCompiledTxScript(script, chainIndex, keyPairOpt)
   }
 
   def callCompiledTxScript(
