@@ -6021,7 +6021,9 @@ class VMSpec extends AlephiumSpec with Generators {
     removeFromMap(1, 1)
   }
 
-  it should "test caller should pay map entry deposit and get refund for map insert and remove" in new ContractFixture {
+  it should "test caller should pay map entry deposit and get refund for map.insert! and map.remove! after Danube" in new ContractFixture {
+    setHardForkSince(HardFork.Danube)
+
     val (privateKey, publicKey) = chainIndex.from.generateKey
     val lockupScript            = LockupScript.p2pkh(publicKey)
     val genesisKey              = genesisKeys(chainIndex.from.value)._1
@@ -6069,6 +6071,94 @@ class VMSpec extends AlephiumSpec with Generators {
     val gasFee2 = block2.nonCoinbase.head.gasFeeUnsafe
     balance = balance.subUnsafe(gasFee2).addUnsafe(minimalAlphInContract)
     getAlphBalance(blockFlow, lockupScript) is balance
+  }
+
+  it should "test map.insert! would fail without depositor address before Danube" in new ContractFixture {
+    setHardFork(HardFork.Rhone)
+
+    val (privateKey, publicKey) = chainIndex.from.generateKey
+    val genesisKey              = genesisKeys(chainIndex.from.value)._1
+    val block0                  = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+
+    addAndCheck(blockFlow, block0)
+
+    val mapContract =
+      s"""
+         |Contract MapContract() {
+         |  mapping[U256, ByteVec] map
+         |  pub fn insert() -> () {
+         |    map.insert!(0, #00)
+         |  }
+         |}
+         |""".stripMargin
+    lazy val mapContractId = createContract(mapContract)._1
+
+    def insert =
+      s"""
+         |TxScript Insert {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.insert()
+         |}
+         |$mapContract
+         |""".stripMargin
+
+    intercept[AssertionError](
+      callTxScript(insert, keyPairOpt = Some((privateKey, publicKey)))
+    ).getMessage.startsWith("Right(TxScriptExeFailed(No balance available.") is true
+  }
+
+  it should "test map.remove! should fail without refund address before Danube" in new ContractFixture {
+    setHardFork(HardFork.Rhone)
+
+    val nullContrctLockupScript  = LockupScript.p2c(ContractId.zero)
+    val nullContractAddress      = Address.from(nullContrctLockupScript)
+    val groupIndex               = nullContrctLockupScript.groupIndex
+    override lazy val chainIndex = new ChainIndex(groupIndex, groupIndex)
+    val (privateKey, publicKey)  = groupIndex.generateKey
+    val genesisKey               = genesisKeys(groupIndex.value)._1
+    val block                    = transfer(blockFlow, genesisKey, publicKey, ALPH.alph(10))
+
+    addAndCheck(blockFlow, block)
+
+    val mapContract =
+      s"""
+         |Contract MapContract() {
+         |  mapping[U256, ByteVec] map
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    map.insert!(callerAddress!(), 0, #00)
+         |  }
+         |  pub fn remove() -> () {
+         |    map.remove!(0)
+         |  }
+         |}
+         |""".stripMargin
+    lazy val mapContractId = createContract(mapContract, chainIndex = chainIndex)._1
+
+    def insert =
+      s"""
+         |TxScript Insert {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.insert{callerAddress!() -> ALPH: mapEntryDeposit!()}()
+         |}
+         |$mapContract
+         |""".stripMargin
+    callTxScript(insert, chainIndex, keyPairOpt = Some((privateKey, publicKey)))
+
+    lazy val remove =
+      s"""
+         |TxScript Remove {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.remove()
+         |}
+         |$mapContract
+         |""".stripMargin
+
+    intercept[AssertionError](
+      callTxScript(remove, chainIndex, keyPairOpt = Some((privateKey, publicKey)))
+    ).getMessage.startsWith(
+      s"Right(TxScriptExeFailed(Pay to contract address $nullContractAddress is not allowed"
+    ) is true
   }
 
   it should "check caller contract id when calling generated map contract functions" in new MapFixture {
