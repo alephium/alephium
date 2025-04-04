@@ -232,8 +232,11 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
+  private def returnExprs[Unknown: P] = P(P(expr.rep(1, ","))) | P("(" ~ expr.rep(1, ",") ~ ")") |
+    Pass.map(_ => Seq.empty[Ast.Expr[Ctx]])
+
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
-    P(Lexer.token(Keyword.`return`) ~/ expr.rep(0, ",")).map { case (returnIndex, returns) =>
+    P(Lexer.token(Keyword.`return`) ~/ returnExprs).map { case (returnIndex, returns) =>
       val too =
         returns.lastOption.flatMap(_.sourceIndex.map(_.endIndex)).getOrElse(returnIndex.endIndex)
       Ast.ReturnStmt.apply[Ctx](returns).atSourceIndex(returnIndex.index, too, fileURI)

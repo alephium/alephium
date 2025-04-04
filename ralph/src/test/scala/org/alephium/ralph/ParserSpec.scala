@@ -520,9 +520,21 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse return" in {
-    parse("return x, y", StatelessParser.ret(_)).isSuccess is true
-    parse("return x + y", StatelessParser.ret(_)).isSuccess is true
-    parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
+    def test(statement: String) = {
+      val result = parse(statement, StatelessParser.ret(_))
+      result.isSuccess is true
+      result.get.index is statement.length
+    }
+
+    test("return x, y")
+    test("return (x, y)")
+    test("return x + y")
+    test("return (x + y)")
+    test("return (x)")
+    test("return (x + 1) * 2")
+    test("return (x + 1) * (x + 2)")
+    test("return ((x + 1) * 2, x)")
+    test("return")
     intercept[Compiler.Error](parse("return return", StatelessParser.ret(_))).message is
       "Consecutive return statements are not allowed"
   }

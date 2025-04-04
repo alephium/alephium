@@ -457,6 +457,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    }
          |  }
          |}
+         |""".stripMargin,
+      s"""
+         |Contract Foo() {
+         |  fn foo0() -> U256 {
+         |    return (0)
+         |  }
+         |  fn foo1() -> (U256, U256) {
+         |    return (0, 1)
+         |  }
+         |}
          |""".stripMargin
     )
     succeed.foreach { code =>
