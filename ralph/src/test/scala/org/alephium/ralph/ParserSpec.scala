@@ -99,8 +99,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             Mul,
             Variable(Ident("x")),
             IfElseExpr(
-              Seq(IfBranchExpr(ParenExpr(Const(Val.True)), Variable(Ident("a")))),
-              ElseBranchExpr(Variable(Ident("b")))
+              Seq(IfBranchExpr(ParenExpr(Const(Val.True)), Seq.empty, Variable(Ident("a")))),
+              ElseBranchExpr(Seq.empty, Variable(Ident("b")))
             )
           )
         ),
@@ -109,8 +109,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("[if (a) b else c; 2]", StatelessParser.expr(_)).get.value is
       CreateArrayExpr2[StatelessContext](
         IfElseExpr(
-          Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Variable(Ident("b")))),
-          ElseBranchExpr(Variable(Ast.Ident("c")))
+          Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+          ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
         ),
         Const(Val.U256(U256.Two))
       )
@@ -118,12 +118,12 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       CreateArrayExpr1[StatelessContext](
         Seq(
           IfElseExpr(
-            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Variable(Ident("b")))),
-            ElseBranchExpr(Variable(Ast.Ident("c")))
+            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+            ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
           ),
           IfElseExpr(
-            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Variable(Ident("b")))),
-            ElseBranchExpr(Variable(Ast.Ident("c")))
+            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+            ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
           )
         )
       )
@@ -659,9 +659,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(ParenExpr(Variable(Ast.Ident("cond"))), Ast.Const(Val.U256(U256.Zero)))
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
       )
 
     fastparse
@@ -670,10 +674,18 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(ParenExpr(Variable(Ast.Ident("cond0"))), Ast.Const(Val.U256(U256.Zero))),
-          Ast.IfBranchExpr(ParenExpr(Variable(Ast.Ident("cond1"))), Ast.Const(Val.U256(U256.One)))
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond0"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          ),
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond1"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.One))
+          )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.Two)))
       )
 
     fastparse
@@ -682,36 +694,55 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Ast.Const(Val.U256(U256.Zero)))
+          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Seq.empty, Ast.Const(Val.U256(U256.Zero)))
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
       )
 
-    fastparse
-      .parse("if cond0 0 else if cond1 1 else 2", StatelessParser.expr(_))
-      .get
-      .value is
-      Ast.IfElseExpr[StatelessContext](
-        Seq(
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond0")), Ast.Const(Val.U256(U256.Zero))),
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Ast.Const(Val.U256(U256.One)))
-        ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
-      )
+    Seq(
+      "if cond0 0 else if cond1 1 else 2",
+      "if cond0 { 0 } else if cond1 { 1 } else { 2 }",
+      "if cond0 0 else if cond1 { 1 } else { 2 }",
+      "if cond0 0 else if cond1 1 else { 2 }"
+    ).foreach { expr =>
+      fastparse
+        .parse(expr, StatelessParser.expr(_))
+        .get
+        .value is
+        Ast.IfElseExpr[StatelessContext](
+          Seq(
+            Ast.IfBranchExpr(
+              Variable(Ast.Ident("cond0")),
+              Seq.empty,
+              Ast.Const(Val.U256(U256.Zero))
+            ),
+            Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Seq.empty, Ast.Const(Val.U256(U256.One)))
+          ),
+          Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.Two)))
+        )
+    }
 
-    fastparse
-      .parse("if x < 1 0 else 1", StatelessParser.expr(_))
-      .get
-      .value is
-      Ast.IfElseExpr[StatelessContext](
-        Seq(
-          Ast.IfBranchExpr(
-            Binop(Lt, Variable(Ident("x")), Const(Val.U256(U256.One))),
-            Ast.Const(Val.U256(U256.Zero))
-          )
-        ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
-      )
+    Seq(
+      "if x < 1 0 else 1",
+      "if x < 1 { 0 } else { 1 }",
+      "if x < 1 { 0 } else 1",
+      "if x < 1 0 else { 1 }"
+    ).foreach { expr =>
+      fastparse
+        .parse(expr, StatelessParser.expr(_))
+        .get
+        .value is
+        Ast.IfElseExpr[StatelessContext](
+          Seq(
+            Ast.IfBranchExpr(
+              Binop(Lt, Variable(Ident("x")), Const(Val.U256(U256.One))),
+              Seq.empty,
+              Ast.Const(Val.U256(U256.Zero))
+            )
+          ),
+          Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+        )
+    }
 
     fastparse
       .parse("if (x - 1) < 1 0 else 1", StatelessParser.expr(_))
@@ -725,10 +756,43 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
               ParenExpr(Binop(Sub, Variable(Ident("x")), Const(Val.U256(U256.One)))),
               Const(Val.U256(U256.One))
             ),
+            Seq.empty,
             Ast.Const(Val.U256(U256.Zero))
           )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+      )
+
+    val expr =
+      s"""
+         |if (x - 1) < 1 {
+         |  foo()
+         |  0
+         |} else {
+         |  bar()
+         |  1
+         |}
+         |""".stripMargin
+    fastparse
+      .parse(expr, StatelessParser.ifElseExpr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(
+            Binop(
+              Lt,
+              ParenExpr(Binop(Sub, Variable(Ident("x")), Const(Val.U256(U256.One)))),
+              Const(Val.U256(U256.One))
+            ),
+            Seq(FuncCall(FuncId("foo", false), Seq.empty, Seq.empty)),
+            Ast.Const(Val.U256(U256.Zero))
+          )
+        ),
+        Ast.ElseBranchExpr(
+          Seq(FuncCall(FuncId("bar", false), Seq.empty, Seq.empty)),
+          Ast.Const(Val.U256(U256.One))
+        )
       )
 
     val missingElseCode = "if (cond0) 0"
