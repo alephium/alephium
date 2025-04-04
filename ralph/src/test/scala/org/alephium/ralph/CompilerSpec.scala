@@ -6677,19 +6677,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "assign correct method index to interface functions" in {
     def createFunc(name: String, methodIndex: Option[Int] = None): Ast.FuncDef[StatefulContext] =
       Ast.FuncDef(
-        Seq.empty,
-        Ast.FuncId(name, false),
+        annotations = Seq.empty,
+        id = Ast.FuncId(name, false),
         isPublic = false,
         usePreapprovedAssets = false,
-        Ast.NotUseContractAssets,
+        useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         useCheckExternalCaller = false,
+        useRoutePattern = false,
         useUpdateFields = false,
-        methodIndex,
+        useMethodIndex = methodIndex,
         inline = false,
-        Seq.empty,
-        Seq.empty,
-        None
+        args = Seq.empty,
+        rtypes = Seq.empty,
+        bodyOpt = None
       )
 
     def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
