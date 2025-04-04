@@ -92,7 +92,7 @@ trait Constants[Ctx <: StatelessContext] {
   }
 
   private def checkAndCalc(expr: Ast.Expr[Ctx], op: Operator, values: Seq[Val]): Val = {
-    expr.positionedError(op.getReturnType(values.map(v => Type.fromVal(v.tpe))))
+    expr.positionedError(op.getReturnType(values.map(v => Type.fromVal(v))))
     op.calc(values) match {
       case Right(value) => value
       case Left(error)  => throw Error(error, expr.sourceIndex)

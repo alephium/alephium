@@ -52,16 +52,13 @@ object Type {
   val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def fromVal(tpe: Val.Type): Type = {
-    tpe match {
-      case Val.Bool                           => Bool
-      case Val.I256                           => I256
-      case Val.U256                           => U256
-      case Val.ByteVec                        => ByteVec
-      case Val.Address                        => Address
-      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), Left(size))
-      case Val.Struct(name)                   => Struct(Ast.TypeId(name))
-      case Val.Map(key, value)                => Map(fromVal(key), fromVal(value))
+  def fromVal(value: Val): Type = {
+    value match {
+      case _: Val.Bool    => Bool
+      case _: Val.I256    => I256
+      case _: Val.U256    => U256
+      case _: Val.ByteVec => ByteVec
+      case _: Val.Address => Address
     }
   }
 

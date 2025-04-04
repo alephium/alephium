@@ -926,7 +926,7 @@ object Compiler {
       val varInfo =
         VarInfo.Constant(
           ident,
-          Type.fromVal(value.tpe),
+          Type.fromVal(value),
           value,
           Seq(value.toConstInstr),
           constantDef
