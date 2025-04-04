@@ -1164,7 +1164,14 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val pathCodes = MapOps.genSubContractPath(state, ident, args(1))
       val objCodes  = genMapDebug(state, pathCodes, isInsert = false) :+ SubContractId
-      args(0).genCode(state) ++ Seq(
+
+      val refundAddressCodes = if (args(0) == Const[StatefulContext](Val.NullContractAddress)) {
+        Seq(NullContractAddress)
+      } else {
+        args(0).genCode(state)
+      }
+
+      refundAddressCodes ++ Seq(
         ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
         ConstInstr.u256(Val.U256(U256.Zero))
       ) ++ objCodes :+ CallExternal(CreateMapEntry.DestroyMethodIndex)
