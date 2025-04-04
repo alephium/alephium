@@ -239,10 +239,10 @@ case object TxCallerBalanceNotAvailable extends ExeFailure {
   override def toString: String = "Transaction caller balance is not available"
 }
 
-case object InsufficientDepositForContractCreation extends ExeFailure {
+case object InsufficientFundsForUTXODustAmount extends ExeFailure {
   override def toString: String =
-    "Insufficient funds to cover minimal contract deposit requirement (0.1 ALPH). " +
-      "Please ensure transaction caller has enough ALPH to pay for contract creation."
+    "Insufficient funds to cover the minimum amount for contract UTXO (0.1 ALPH) or asset UTXO (0.001 ALPH). " +
+      "Please ensure transaction caller approves enough ALPH."
 }
 
 final case class NotEnoughApprovedBalance(

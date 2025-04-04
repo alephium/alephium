@@ -240,7 +240,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       frame.ctx.setTxCallerBalance(
         createRemainingBalanceState(txCaller, ALPH.oneNanoAlph)
       )
-      frame.getInitialBalancesForNewContract().leftValue isE InsufficientDepositForContractCreation
+      frame.getInitialBalancesForNewContract().leftValue isE InsufficientFundsForUTXODustAmount
 
       frame.ctx.setTxCallerBalance(
         createRemainingBalanceState(txCaller, ALPH.oneAlph)
@@ -268,7 +268,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       val txCallerBalance = createRemainingBalanceState(txCaller, ALPH.oneNanoAlph)
 
       frame.ctx.setTxCallerBalance(txCallerBalance)
-      frame.getInitialBalancesForNewContract().leftValue isE InsufficientDepositForContractCreation
+      frame.getInitialBalancesForNewContract().leftValue isE InsufficientFundsForUTXODustAmount
     }
 
     def testFrameWithSufficientRemainingBalance() = {

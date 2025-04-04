@@ -644,8 +644,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def cleanBalancesDanube(): ExeResult[Unit] = {
     for {
-      _ <- outputRemainingContractAssetsForRhone()
       _ <- reimburseGas()
+      _ <- outputRemainingContractAssetsForRhone()
       _ <- coverUtxoMinimalAmounts()
       _ <- flushCallerBalances()
       _ <- outputGeneratedBalances()
@@ -733,7 +733,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     for {
       txCallerBalance <- getTxCallerBalance()
       callerAddress   <- getFirstTxInputAddress()
-      _ <- coverMinimalContractStorageDepositFromBalances(
+      _ <- coverExtraAlphAmount(
         targetBalance,
         callerAddress.lockupScript,
         txCallerBalance,
@@ -742,7 +742,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     } yield ()
   }
 
-  private def coverMinimalContractStorageDepositFromBalances(
+  private def coverExtraAlphAmount(
       targetBalance: MutBalancesPerLockup,
       caller: LockupScript,
       callerBalance: MutBalanceState,
@@ -767,7 +767,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     if (remainingAfterApproved == U256.Zero) {
       okay
     } else {
-      failed(InsufficientDepositForContractCreation)
+      failed(InsufficientFundsForUTXODustAmount)
     }
   }
 
