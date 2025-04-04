@@ -7264,8 +7264,8 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "support assetInContract function followed by preapprovedAssets + assetInContract function" in new ContractFixture {
     val (_, publicKey) = chainIndex.from.generateKey
-    val lockupScript            = LockupScript.p2pkh(publicKey)
-    val address                 = Address.from(lockupScript)
+    val lockupScript   = LockupScript.p2pkh(publicKey)
+    val address        = Address.from(lockupScript)
 
     val contract =
       s"""
@@ -7284,7 +7284,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
     val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(10))._1
 
-    val balance = getContractAsset(contractId).amount
+    var balance = getContractAsset(contractId).amount
     balance is ALPH.alph(10)
 
     val script =
@@ -7296,7 +7296,12 @@ class VMSpec extends AlephiumSpec with Generators {
          |$contract
          |""".stripMargin
 
-    intercept[AssertionError](callTxScript(script)).getMessage is "Right(InvalidAlphBalance)"
+    callTxScript(script)
+
+    balance = getContractAsset(contractId).amount
+    balance is ALPH.alph(8)
+    balance = getAlphBalance(blockFlow, lockupScript)
+    balance is ALPH.alph(2)
   }
 
   private def getEvents(
