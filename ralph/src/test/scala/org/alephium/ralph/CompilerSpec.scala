@@ -2928,7 +2928,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  fn foo() -> U256 {
-           |    if ($$0$$) {
+           |    if $$(0)$$ {
            |      return 0
            |    } else {
            |      return 1
@@ -3011,6 +3011,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "If ... else if constructs should be terminated with an else statement"
       )
+    }
+
+    {
+      info("If branch without parens")
+      def code(cond: String) =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> () {
+           |    if $cond {
+           |      return
+           |    } else if ($cond) {
+           |      return
+           |    } else {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Seq("x < 1", "(x < 1)", "(x + 1) < 1", "(x + 1) * (x + 2) < 1").foreach { cond =>
+        compileContract(code(cond)).isRight is true
+      }
     }
 
     new Fixture {
@@ -3128,12 +3149,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  fn foo() -> U256 {
-           |    return if ($$0$$) 0 else 1
+           |    return if $$(0)$$ 0 else 1
            |  }
            |}
            |""".stripMargin
 
       testContractError(code, "Invalid type of condition expr: List(U256)")
+    }
+
+    {
+      info("If branch without parens")
+      def code(cond: String) =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if $cond 0 else if ($cond) 1 else 2
+           |  }
+           |}
+           |""".stripMargin
+      Seq("x < 1", "(x < 1)", "(x + 1) < 1", "(x + 1) * (x + 2) < 1").foreach { cond =>
+        compileContract(code(cond)).isRight is true
+      }
     }
 
     new Fixture {

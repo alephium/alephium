@@ -190,8 +190,10 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.ParenExpr.apply[Ctx](ex)
     }
 
+  private def withOptionalParens[Unknown: P, T](parser: => P[T]) = P(parser | P("(" ~ parser ~ ")"))
+  private def ifCondition[Unknown: P]: P[Ast.Expr[Ctx]]          = withOptionalParens(expr)
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ expr).map { case (ifIndex, condition, expr) =>
+    P(Lexer.token(Keyword.`if`) ~ ifCondition ~ expr).map { case (ifIndex, condition, expr) =>
       val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
       Ast.IfBranchExpr(condition, expr).atSourceIndex(sourceIndex)
     }
@@ -232,8 +234,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
-  private def returnExprs[Unknown: P] = P(P(expr.rep(1, ","))) | P("(" ~ expr.rep(1, ",") ~ ")") |
-    Pass.map(_ => Seq.empty[Ast.Expr[Ctx]])
+  private def returnExprs[Unknown: P] = P(
+    withOptionalParens(expr.rep(1, ",")) | Pass.map(_ => Seq.empty[Ast.Expr[Ctx]])
+  )
 
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.token(Keyword.`return`) ~/ returnExprs).map { case (returnIndex, returns) =>
@@ -482,7 +485,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ block ~~ Index).map {
+    P(Lexer.token(Keyword.`if`) ~ ifCondition ~ block ~~ Index).map {
       case (ifIndex, condition, body, endIndex) =>
         Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex, fileURI)
     }
