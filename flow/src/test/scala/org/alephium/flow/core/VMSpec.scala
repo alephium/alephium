@@ -665,6 +665,65 @@ class VMSpec extends AlephiumSpec with Generators {
     getContractAsset(fooContractId).amount is minimalAlphInContract * 2
   }
 
+  it should "route contract calls" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo(caller: Address) -> () {
+         |    assert!(callerAddress!() == caller, 0)
+         |    assert!(externalCallerAddress!() == caller, 1)
+         |
+         |    bar(caller)
+         |  }
+         |
+         |  fn bar(caller: Address) -> () {
+         |    assert!(callerAddress!() == selfAddress!(), 2)
+         |    assert!(externalCallerAddress!() == caller, 3)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo)._1
+
+    val bar =
+      s"""
+         |Contract Bar(foo: Foo) {
+         |  @using(routePattern = true)
+         |  pub fn bax(caller: Address) -> () {
+         |    foo.foo(caller)
+         |  }
+         |
+         |  pub fn bay(caller: Address) -> () {
+         |    foo.foo(caller)
+         |  }
+         |
+         |  pub fn baz(caller: Address) -> () {
+         |    bax(caller)
+         |  }
+         |
+         |  @using(routePattern = true)
+         |  pub fn bar(caller: Address) -> () {
+         |    bax(caller)
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId      = createContract(bar, AVector(Val.ByteVec(fooId.bytes)))._1
+    val barAddress = Address.contract(barId)
+
+    val callBar =
+      s"""
+         | TxScript Main {
+         |   let bar = Bar(#${barId.toHexString})
+         |   bar.bax(@$genesisAddress)
+         |   bar.bay(@$barAddress)
+         |   bar.baz(@$barAddress)
+         |   bar.bar(@$genesisAddress)
+         | }
+         | $bar
+         |""".stripMargin
+    callTxScript(callBar)
+  }
+
   it should "burn token" in new ContractFixture {
     val contract =
       s"""
