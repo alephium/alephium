@@ -288,10 +288,19 @@ final case class StatefulFrame(
     }
   }
 
+  @tailrec
   def getCallAddress(): ExeResult[Val.Address] = {
     obj.contractIdOpt match {
       case Some(contractId) => // frame for contract method
-        Right(Val.Address(LockupScript.p2c(contractId)))
+        if (method.useRoutePattern) {
+          // Can't use flatMap here due to tailrec
+          getCallerFrame() match {
+            case Right(callerFrame) => callerFrame.getCallAddress()
+            case Left(e)            => Left(e)
+          }
+        } else {
+          Right(Val.Address(LockupScript.p2c(contractId)))
+        }
       case None => // frame for script
         ctx.getUniqueTxInputAddress()
     }
@@ -300,33 +309,28 @@ final case class StatefulFrame(
   def getExternalCallerContractId(): ExeResult[Val.ByteVec] = {
     getExternalCallerAddress().flatMap {
       case Val.Address(LockupScript.P2C(contractId)) => Right(Val.ByteVec(contractId.bytes))
-      case _                                         => failed(ExternalCallerNotAvailable)
+      case _                                         => failed(ExternalCallerIsNotContract)
     }
   }
 
   def getExternalCallerAddress(): ExeResult[Val.Address] = {
     this.obj.contractIdOpt match {
-      case Some(contractId) => this.getExternalCallerAddress(contractId)
-      case None             => failed(CurrentFrameIsNotContract)
+      case Some(contractId) => this.getExternalCallerFrame(contractId).flatMap(_.getCallAddress())
+      case None => // frame for script
+        ctx.getUniqueTxInputAddress()
     }
   }
 
   @tailrec
-  private def getExternalCallerAddress(currentContractId: ContractId): ExeResult[Val.Address] = {
+  private def getExternalCallerFrame(currentContractId: ContractId): ExeResult[StatefulFrame] = {
     callerFrameOpt match {
       case Some(callerFrame) =>
         callerFrame.obj.contractIdOpt match {
-          case Some(contractId) =>
-            if (contractId == currentContractId) {
-              // Skip frames from the same contract to find the external caller
-              callerFrame.getExternalCallerAddress(currentContractId)
-            } else {
-              // Found the first external contract caller
-              Right(Val.Address(LockupScript.p2c(contractId)))
-            }
-          case None =>
-            // Reached a script frame, return the transaction input address
-            ctx.getUniqueTxInputAddress()
+          case Some(contractId) if contractId == currentContractId =>
+            // Skip frames from the same contract to find the external caller
+            callerFrame.getExternalCallerFrame(currentContractId)
+          case _ =>
+            Right(callerFrame)
         }
       case None =>
         // Dead branch, no caller frame exists, which should not happen for contract frames

@@ -4419,7 +4419,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Current frame is a script frame")
       val frame = prepareScriptFrame()
-      ExternalCallerAddress.runWith(frame).leftValue isE CurrentFrameIsNotContract
+      test(
+        ExternalCallerAddress,
+        uniqueAddress,
+        frame,
+        extraGas = GasUniqueAddress.gas(frame.ctx.txEnv.prevOutputs.length)
+      )
     }
 
     {
@@ -4432,12 +4437,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       info("Current frame is a contract with caller script frame")
       val scriptFrame = prepareScriptFrame()
       val frame       = prepareContractFrame(callerFrameOpt = Some(scriptFrame))
-      test(
-        ExternalCallerAddress,
-        uniqueAddress,
-        frame,
-        GasUniqueAddress.gas(txEnvWithUniqueAddress.prevOutputs.length)
-      )
+      test(ExternalCallerAddress, uniqueAddress, frame)
     }
 
     {
@@ -4490,7 +4490,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Current frame is a script frame")
       val scriptFrame = prepareScriptFrame()
-      ExternalCallerContractId.runWith(scriptFrame).leftValue isE CurrentFrameIsNotContract
+      ExternalCallerContractId.runWith(scriptFrame).leftValue isE ExternalCallerIsNotContract
     }
 
     {

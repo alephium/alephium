@@ -379,6 +379,11 @@ case object ExternalCallerNotAvailable extends ExeFailure {
     "Failed to get external caller: no external contract caller found in the call chain"
 }
 
+case object ExternalCallerIsNotContract extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: external caller is not a contract"
+}
+
 case object CurrentFrameIsNotContract extends ExeFailure {
   override def toString: String =
     "Failed to get external caller: current frame is not a contract frame"
