@@ -1440,6 +1440,7 @@ object Ast {
         usePreapprovedAssets,
         useAssetsInContract != Ast.NotUseContractAssets,
         usePayToContractOnly = usePayToContractOnly,
+        useRoutePattern = false,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVarSize,
         returnLength = state.flattenTypeLength(rtypes),

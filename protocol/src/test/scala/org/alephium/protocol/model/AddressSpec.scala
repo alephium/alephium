@@ -134,11 +134,8 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val script1 = StatelessScript.unsafe(
       AVector(
-        Method[StatelessContext](
+        Method.testDefault(
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,

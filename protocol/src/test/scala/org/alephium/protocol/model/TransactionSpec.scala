@@ -299,6 +299,7 @@ class TransactionSpec
             usePreapprovedAssets = true,
             useContractAssets = true,
             usePayToContractOnly = false,
+            useRoutePattern = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -445,11 +446,8 @@ class TransactionSpec
       // Compiled from the script above
       val script = StatelessScript.unsafe(
         AVector(
-          Method(
+          Method.testDefault(
             isPublic = true,
-            usePreapprovedAssets = false,
-            useContractAssets = false,
-            usePayToContractOnly = false,
             argsLength = 2,
             localsLength = 2,
             returnLength = 0,
@@ -527,11 +525,8 @@ class TransactionSpec
       // Compiled from the script above
       val script = StatefulScript.unsafe(
         AVector(
-          Method(
+          Method.testDefault(
             isPublic = true,
-            usePreapprovedAssets = true,
-            useContractAssets = true,
-            usePayToContractOnly = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,

@@ -219,11 +219,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         blockEnv: Option[BlockEnv] = None,
         txEnv: Option[TxEnv] = None
     )(implicit networkConfig: NetworkConfig): Frame[StatelessContext] = {
-      val baseMethod = Method[StatelessContext](
+      val baseMethod = Method.testDefault(
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = localsLength,
         returnLength = 0,
@@ -2167,17 +2164,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait StatefulFixture extends GenFixture {
-    lazy val baseMethod =
-      Method[StatefulContext](
-        isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
-        argsLength = 0,
-        localsLength = 0,
-        returnLength = 0,
-        instrs = AVector()
-      )
+    lazy val baseMethod = Method.testDefault[StatefulContext](
+      isPublic = true,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector()
+    )
 
     lazy val contract = StatefulContract(2, methods = AVector(baseMethod))
 
@@ -3694,11 +3687,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     def prepareFrame(lengthOpt: Option[(U256, U256)])(implicit
         networkConfig: NetworkConfig
     ): Frame[StatefulContext] = {
-      val contractMethod = Method[StatefulContext](
+      val contractMethod = Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -3710,11 +3700,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         BytesConst(Val.ByteVec(obj.contractId.bytes)),
         CallExternal(0)
       )
-      val scriptMethod = Method[StatefulContext](
+      val scriptMethod = Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -3799,21 +3786,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         prepareFrame(Some(balanceState))(NetworkConfigFixture.Rhone)
 
     val contract0 =
-      StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, true, false, false, 0, 0, 0, AVector.empty)))
     val contract1 =
-      StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, false, false, false, 0, 0, 0, AVector.empty)))
     val contract2 =
-      StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, false, false, false, 0, 0, 0, AVector.empty)))
     val contract3 =
-      StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, true, false, false, 0, 0, 0, AVector.empty)))
     val contract4 =
-      StatefulContract(0, AVector(Method(true, true, true, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, true, true, false, 0, 0, 0, AVector.empty)))
     val contract5 =
-      StatefulContract(0, AVector(Method(true, false, false, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, false, true, false, 0, 0, 0, AVector.empty)))
     val contract6 =
-      StatefulContract(0, AVector(Method(true, true, false, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, false, true, false, 0, 0, 0, AVector.empty)))
     val contract7 =
-      StatefulContract(0, AVector(Method(true, false, true, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, true, true, false, 0, 0, 0, AVector.empty)))
 
     def testModifier(
         instr: Instr[StatefulContext],
@@ -4107,6 +4094,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         usePreapprovedAssets = true,
         useContractAssets = true,
         usePayToContractOnly = false,
+        useRoutePattern = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -4118,11 +4106,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         prepareContract(destroyContract, AVector.empty[Val], AVector.empty[Val])
 
       val callingMethod =
-        Method[StatefulContext](
+        Method.testDefault[StatefulContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,

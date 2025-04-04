@@ -901,6 +901,10 @@ object AVector {
     unsafe(elems.iterator.toArray)
   }
 
+  def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {
+    unsafe(elems.iterator.toArray)
+  }
+
   @inline def unsafe[@sp A: ClassTag](elems: Array[A], start: Int): AVector[A] = {
     val appendable = true
     unsafe(elems, start, elems.length, appendable)

@@ -106,21 +106,21 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     }
 
     val contract0 =
-      StatefulContract(0, AVector(Method(true, true, true, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, true, false, false, 0, 0, 0, AVector.empty)))
     val contract1 =
-      StatefulContract(0, AVector(Method(true, false, false, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, false, false, false, 0, 0, 0, AVector.empty)))
     val contract2 =
-      StatefulContract(0, AVector(Method(true, true, false, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, false, false, false, 0, 0, 0, AVector.empty)))
     val contract3 =
-      StatefulContract(0, AVector(Method(true, false, true, false, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, true, false, false, 0, 0, 0, AVector.empty)))
     val contract4 =
-      StatefulContract(0, AVector(Method(true, true, true, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, true, true, false, 0, 0, 0, AVector.empty)))
     val contract5 =
-      StatefulContract(0, AVector(Method(true, false, false, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, false, true, false, 0, 0, 0, AVector.empty)))
     val contract6 =
-      StatefulContract(0, AVector(Method(true, true, false, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, true, false, true, false, 0, 0, 0, AVector.empty)))
     val contract7 =
-      StatefulContract(0, AVector(Method(true, false, true, true, 0, 0, 0, AVector.empty)))
+      StatefulContract(0, AVector(Method(true, false, true, true, false, 0, 0, 0, AVector.empty)))
 
     def test(_frame: => StatefulFrame, contract: StatefulContract, emptyOutput: Boolean) = {
       val frame      = _frame
@@ -366,6 +366,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
           false,
           useContractAssets = true,
           usePayToContractOnly = false,
+          useRoutePattern = false,
           0,
           0,
           0,
@@ -376,6 +377,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
           false,
           useContractAssets = false,
           usePayToContractOnly = true,
+          useRoutePattern = false,
           0,
           0,
           0,
@@ -409,7 +411,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   }
 
   it should "charge gas for method selector" in {
-    val method    = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector.empty)
+    val method    = Method.testDefault[StatefulContext](true, 0, 0, 0, AVector.empty)
     val selector0 = Method.Selector(0)
     val selector1 = Method.Selector(1)
     val methods = AVector(
@@ -458,6 +460,7 @@ trait FrameFixture extends ContextGenerators {
     usePreapprovedAssets = usePreapprovedAssets,
     useContractAssets = useAssetsInContract,
     usePayToContractOnly = usePayToContractOnly,
+    useRoutePattern = false,
     argsLength = localsLength - 1,
     localsLength,
     returnLength = 0,

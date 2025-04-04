@@ -43,11 +43,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       val contractId = ContractId.generate
       val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
       val outputRef  = contractId.inaccurateFirstOutputRef()
-      val method = Method[StatefulContext](
+      val method = Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,

@@ -667,7 +667,7 @@ class BlockValidationSpec extends AlephiumSpec {
     )
     val script =
       StatefulScript.unsafe(
-        AVector(Method(true, false, false, false, 0, 0, 0, AVector(vm.TxGasFee)))
+        AVector(Method.testDefault(true, 0, 0, 0, AVector(vm.TxGasFee)))
       )
     val block = simpleScript(blockflowLeman, chainIndex, script)
     intercept[AssertionError](simpleScript(blockflowGenesis, chainIndex, script)).getMessage is

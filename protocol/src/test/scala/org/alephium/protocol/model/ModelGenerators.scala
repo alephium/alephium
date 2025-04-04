@@ -335,11 +335,8 @@ trait TxGenerators
     StatefulContract(
       1,
       AVector(
-        vm.Method(
+        vm.Method.testDefault(
           isPublic = false,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
