@@ -760,7 +760,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       info("More use annotation")
       val parsed =
         parseFunc(
-          """@using(assetsInContract = true, routePattern = true, updateFields = true)
+          """@using(assetsInContract = true, preserveCaller = true, updateFields = true)
             |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
         ).get.value
       parsed.usePreapprovedAssets is false

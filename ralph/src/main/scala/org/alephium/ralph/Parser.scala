@@ -774,7 +774,7 @@ object Parser {
     val useContractAssetsKey      = "assetsInContract"
     val usePayToContractOnly      = "payToContractOnly"
     val useCheckExternalCallerKey = "checkExternalCaller"
-    val useRoutePattern           = "routePattern"
+    val useRoutePattern           = "preserveCaller"
     val useUpdateFieldsKey        = "updateFields"
     val useMethodIndexKey         = "methodIndex"
     val keys: AVector[String] = AVector(
