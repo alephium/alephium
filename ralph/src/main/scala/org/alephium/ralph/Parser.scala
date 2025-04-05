@@ -190,18 +190,10 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.ParenExpr.apply[Ctx](ex)
     }
 
-  private def withOptionalParens[Unknown: P, T](parser: => P[T]) = P(parser | P("(" ~ parser ~ ")"))
-  private def ifCondition[Unknown: P]: P[Ast.Expr[Ctx]]          = withOptionalParens(expr)
-
-  private def ifElseExprSimpleBody[Unknown: P] = P(expr | P("{" ~ expr ~ "}")).map { expr =>
-    (Seq.empty[Ast.Statement[Ctx]], expr)
-  }
-  private def ifElseExprComplexBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] = {
-    P("{" ~ statement.rep(0) ~ expr ~ "}")
-  }
-  private def ifElseExprBody[Unknown: P] = P(ifElseExprSimpleBody | ifElseExprComplexBody)
+  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
+    P("{" ~ statement.rep(0) ~ expr ~ "}" | expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)))
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ ifCondition ~ ifElseExprBody).map {
+    P(Lexer.token(Keyword.`if`) ~ expr ~ ifElseExprBody).map {
       case (ifIndex, condition, (statements, expr)) =>
         val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
         Ast.IfBranchExpr(condition, statements, expr).atSourceIndex(sourceIndex)
@@ -247,6 +239,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
+  private def withOptionalParens[Unknown: P, T](parser: => P[T]) = P(parser | P("(" ~ parser ~ ")"))
   private def returnExprs[Unknown: P] = P(
     withOptionalParens(expr.rep(1, ",")) | Pass.map(_ => Seq.empty[Ast.Expr[Ctx]])
   )
@@ -498,7 +491,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ ifCondition ~ block ~~ Index).map {
+    P(Lexer.token(Keyword.`if`) ~ expr ~ block ~~ Index).map {
       case (ifIndex, condition, body, endIndex) =>
         Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex, fileURI)
     }
