@@ -642,6 +642,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
     }
   }
 
+  // outputRemainingContractAssetsForRhone is called before coverUtxoMinimalAmounts to check
+  // if the contract UTxOs need more ALPH to cover the minimal storage deposit.
   def cleanBalancesDanube(): ExeResult[Unit] = {
     for {
       _ <- reimburseGas()
