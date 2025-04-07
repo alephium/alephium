@@ -220,7 +220,7 @@ object Ast {
   }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
     def toConstInstr: Instr[StatelessContext]                    = v.toConstInstr
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       Seq(v.toConstInstr)
@@ -2164,7 +2164,7 @@ object Ast {
       }
     }
     def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
-      val tpe = Type.fromVal(value.tpe)
+      val tpe = Type.fromVal(value)
       constants(ident) =
         Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
     }

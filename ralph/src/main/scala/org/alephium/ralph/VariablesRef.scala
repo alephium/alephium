@@ -230,6 +230,19 @@ object VariablesRef {
   // scalastyle:on method.length
 }
 
+sealed trait LocalVarRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
+  def refOffset: LocalRefOffset[Ctx]
+
+  def getConstantOffset(): Int = {
+    assume(isLocal)
+    refOffset.offset match {
+      case ConstantVarOffset(value) => value
+      case _ => // dead branch
+        throw Compiler.Error(s"Local var ref $ident.name has invalid offset", ident.sourceIndex)
+    }
+  }
+}
+
 sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
   def ast: Ast.Struct
   def tpe: Type.Struct = ast.tpe
@@ -359,7 +372,8 @@ final case class LocalStructRef[Ctx <: StatelessContext](
     isTemplate: Boolean,
     refOffset: LocalRefOffset[Ctx],
     ast: Ast.Struct
-) extends StructRef[Ctx] {
+) extends StructRef[Ctx]
+    with LocalVarRef[Ctx] {
   def calcRefOffset(state: Compiler.State[Ctx], selector: Ast.Ident): LocalRefOffset[Ctx] = {
     LocalRefOffset(refOffset.offset.add(ast.calcLocalOffset(state, selector)))
   }
@@ -616,7 +630,8 @@ final case class LocalArrayRef[Ctx <: StatelessContext](
     isMutable: Boolean,
     isTemplate: Boolean,
     refOffset: LocalRefOffset[Ctx]
-) extends ArrayRef[Ctx] {
+) extends ArrayRef[Ctx]
+    with LocalVarRef[Ctx] {
   def calcRefOffset(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): LocalRefOffset[Ctx] = {
     LocalRefOffset(
       VarOffset.calcArrayElementOffset(
