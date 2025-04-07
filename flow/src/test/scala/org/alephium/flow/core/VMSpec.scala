@@ -8156,7 +8156,12 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(code)
   }
 
-  it should "support assetInContract function followed by preapprovedAssets + assetInContract function" in new ContractFixture {
+  trait UseContractAssetFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
     val (_, publicKey) = chainIndex.from.generateKey
     val lockupScript   = LockupScript.p2pkh(publicKey)
     val address        = Address.from(lockupScript)
@@ -8175,6 +8180,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
+
     val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(10))._1
 
     var balance = getContractAsset(contractId).amount
@@ -8188,6 +8194,16 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$contract
          |""".stripMargin
+  }
+
+  it should "test assetInContract function followed by preapprovedAssets + assetInContract function: before Danube" in new UseContractAssetFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    intercept[AssertionError](callTxScript(script)).getMessage is "Right(InvalidAlphBalance)"
+  }
+
+  it should "test assetInContract function followed by preapprovedAssets + assetInContract function: after Danube" in new UseContractAssetFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
 
     callTxScript(script)
 

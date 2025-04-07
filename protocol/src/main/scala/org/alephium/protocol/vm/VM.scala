@@ -340,12 +340,20 @@ final class StatefulVM(
     val hardFork = ctx.getHardFork()
 
     OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
-      if (shouldKeepContractBalances(hardFork, isApproved, lockupScript)) {
-        Some(())
-      } else if (balancesPerLockup.scopeDepth <= 0) {
-        ctx.outputBalances.add(lockupScript, balancesPerLockup)
+      val keepContractBalances = shouldKeepContractBalances(hardFork, isApproved, lockupScript)
+
+      if (balancesPerLockup.scopeDepth <= 0) {
+        if (keepContractBalances) {
+          Some(())
+        } else {
+          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+        }
       } else {
-        previous.add(lockupScript, balancesPerLockup)
+        if (keepContractBalances && hardFork.isDanubeEnabled()) {
+          Some(())
+        } else {
+          previous.add(lockupScript, balancesPerLockup)
+        }
       }
     }
   }
