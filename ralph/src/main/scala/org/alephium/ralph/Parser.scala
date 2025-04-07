@@ -1053,23 +1053,15 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     )
       .map { case (fromIndex, ident, exprs, endIndex) =>
         val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        Ast.InsertToMap(ident, updateMapExprs(exprs, 2)).atSourceIndex(sourceIndex)
+        Ast.InsertToMap(ident, exprs).atSourceIndex(sourceIndex)
       }
 
   def removeFromMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(Index ~ Lexer.ident ~ "." ~ "remove!" ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index).map {
       case (fromIndex, ident, exprs, endIndex) =>
         val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        Ast.RemoveFromMap(ident, updateMapExprs(exprs, 1)).atSourceIndex(sourceIndex)
+        Ast.RemoveFromMap(ident, exprs).atSourceIndex(sourceIndex)
     }
-
-  private def updateMapExprs(exprs: Seq[Ast.Expr[StatefulContext]], withoutAddrArgsLength: Int) = {
-    if (exprs.length == withoutAddrArgsLength) {
-      Ast.Const[StatefulContext](Val.NullContractAddress) +: exprs
-    } else {
-      exprs
-    }
-  }
 
   def mapCall[Unknown: P]: P[Ast.Statement[StatefulContext]] = P(insertToMap | removeFromMap)
 
