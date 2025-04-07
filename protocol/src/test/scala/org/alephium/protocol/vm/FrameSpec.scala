@@ -536,7 +536,6 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     frameWithoutRoutePattern.getCallAddress() isE Val.Address(LockupScript.p2c(contractId))
 
     // With useRoutePattern = true, it should go through callerFrame.getCallerAddress()
-    // But since this frame has no caller, it will return tx input address
     frameWithRoutePattern.getCallAddress() isE Val.Address(LockupScript.p2c(callerContractId))
   }
 

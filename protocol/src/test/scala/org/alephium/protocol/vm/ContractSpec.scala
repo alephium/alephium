@@ -370,6 +370,46 @@ class ContractSpec extends AlephiumSpec {
       .foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
   }
 
+  it should "validate useRoutePattern on pre-Danube and Danube forks" in new ContractFixture {
+    val preDanubeContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
+    val danubeContext    = genStatefulContext(None)(NetworkConfigFixture.Danube)
+
+    // Test methods with useRoutePattern enabled
+    val methodsWithRoutePattern = Seq(
+      statelessMethodR0,
+      statelessMethodR1,
+      statelessMethodR2,
+      statelessMethodR3,
+      statelessMethodR4
+    ).map(method => StatelessScript.unsafe(AVector(method)))
+
+    // Check that all methods with useRoutePattern=true are rejected on pre-Danube
+    methodsWithRoutePattern.foreach { contract =>
+      contract.checkAssetsModifier(preDanubeContext).leftValue isE InvalidMethodModifierPreDanube
+    }
+
+    // Check that all methods with useRoutePattern=true are accepted on Danube
+    methodsWithRoutePattern.foreach { contract =>
+      // Some methods might still be rejected due to other modifiers
+      if (contract.methods.head.useContractAssets && contract.methods.head.usePayToContractOnly) {
+        contract.checkAssetsModifier(danubeContext).leftValue isE InvalidMethodModifierSinceRhone
+      } else {
+        contract.checkAssetsModifier(danubeContext) isE ()
+      }
+    }
+
+    // Individual method tests
+    statelessMethodR0.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
+    statelessMethodR1.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
+    statelessMethodR2.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
+    statelessMethodR3.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
+    statelessMethodR4.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
+
+    // Method without useRoutePattern should be fine
+    statelessMethod0.checkModifierPreDanube() isE ()
+    statelessMethod1.checkModifierPreDanube() isE ()
+  }
+
   it should "serde Method.Selector" in {
     def test(index: Int, encoded: ByteString) = {
       val selector = Method.Selector(index)

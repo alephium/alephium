@@ -44,6 +44,14 @@ final case class Method[Ctx <: StatelessContext](
 ) {
   def usesAssetsFromInputs(): Boolean = usePreapprovedAssets || useContractAssets
 
+  def checkModifierPreDanube(): ExeResult[Unit] = {
+    if (useRoutePattern) {
+      failed(InvalidMethodModifierPreDanube)
+    } else {
+      okay
+    }
+  }
+
   def checkModifierSinceRhone(): ExeResult[Unit] = {
     if (useContractAssets && usePayToContractOnly) {
       failed(InvalidMethodModifierSinceRhone)
@@ -249,6 +257,9 @@ sealed trait Contract[Ctx <: StatelessContext] {
     EitherF.foreachTry(0 until methodsLength) { methodIndex =>
       for {
         method <- getMethod(methodIndex)
+        _ <-
+          if (hardFork.isDanubeEnabled()) { okay }
+          else { method.checkModifierPreDanube() }
         _ <-
           if (hardFork.isRhoneEnabled()) { method.checkModifierSinceRhone() }
           else { method.checkModifierPreRhone() }
