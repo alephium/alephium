@@ -244,7 +244,7 @@ trait TxValidation {
     }
   }
 
-  protected[validation] def checkBlockTx(
+  def checkBlockTx(
       chainIndex: ChainIndex,
       tx: Transaction,
       groupView: BlockFlowGroupView[WorldState.Cached],
