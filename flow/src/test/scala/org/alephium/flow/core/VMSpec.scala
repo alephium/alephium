@@ -7262,6 +7262,48 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
   }
 
+  it should "support assetInContract function followed by preapprovedAssets + assetInContract function" in new ContractFixture {
+    val (_, publicKey) = chainIndex.from.generateKey
+    val lockupScript   = LockupScript.p2pkh(publicKey)
+    val address        = Address.from(lockupScript)
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn payWithContract() -> () {
+         |    payWithContractInner{selfAddress!() -> ALPH: 2 alph}()
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  fn payWithContractInner() -> () {
+         |    transferToken!(selfAddress!(), @$address, ALPH, 2 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(10))._1
+
+    var balance = getContractAsset(contractId).amount
+    balance is ALPH.alph(10)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let contract = Foo(#${contractId.toHexString})
+         |  contract.payWithContract()
+         |}
+         |$contract
+         |""".stripMargin
+
+    callTxScript(script)
+
+    balance = getContractAsset(contractId).amount
+    balance is ALPH.alph(8)
+    balance = getAlphBalance(blockFlow, lockupScript)
+    balance is ALPH.alph(2)
+  }
+
   it should "test if-else expressions and statements" in new ContractFixture {
     val code =
       s"""
