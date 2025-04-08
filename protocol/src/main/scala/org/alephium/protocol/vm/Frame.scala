@@ -24,7 +24,7 @@ import org.alephium.protocol.model.{minimalContractStorageDeposit, Address, Cont
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.serde.{avectorSerde, deserialize}
-import org.alephium.util.{AVector, Bytes, Math, U256}
+import org.alephium.util.{AVector, Bytes, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 abstract class Frame[Ctx <: StatelessContext] {
@@ -510,80 +510,10 @@ final case class StatefulFrame(
     minimalDeposit.sub(contractBalance.attoAlphAmount) match {
       case Some(alphToCover) if alphToCover > U256.Zero =>
         // Need to cover additional deposit
-        coverMinimalContractStorageDeposit(contractBalance, alphToCover)
+        ctx.coverExtraAlphAmount(contractBalance, alphToCover)
       case _ =>
         // Contract already has sufficient deposit
         Right(())
-    }
-  }
-
-  private def coverMinimalContractStorageDeposit(
-      contractBalance: MutBalancesPerLockup,
-      alphToCover: U256
-  ): ExeResult[Unit] = {
-    for {
-      txCallerBalance <- ctx.getTxCallerBalance()
-      callerAddress   <- ctx.getUniqueTxInputAddress()
-      _ <- coverMinimalContractStorageDepositFromBalances(
-        contractBalance,
-        callerAddress.lockupScript,
-        txCallerBalance,
-        alphToCover
-      )
-    } yield ()
-  }
-
-  private def coverMinimalContractStorageDepositFromBalances(
-      contractBalance: MutBalancesPerLockup,
-      caller: LockupScript,
-      callerBalance: MutBalanceState,
-      alphToCover: U256
-  ): ExeResult[Unit] = {
-    // First try to cover from remaining balance
-    val remainingAfterRemaining = transferAvailableDeposit(
-      contractBalance,
-      caller,
-      callerBalance.remaining,
-      alphToCover
-    )
-
-    // Then try to cover from approved balance if needed
-    val remainingAfterApproved = transferAvailableDeposit(
-      contractBalance,
-      caller,
-      callerBalance.approved,
-      remainingAfterRemaining
-    )
-
-    if (remainingAfterApproved == U256.Zero) {
-      okay
-    } else {
-      failed(InsufficientDepositForContractCreation)
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def transferAvailableDeposit(
-      contractBalance: MutBalancesPerLockup,
-      caller: LockupScript,
-      callerBalance: MutBalances,
-      alphToCover: U256
-  ): U256 = {
-    if (alphToCover == U256.Zero) {
-      U256.Zero
-    } else {
-      callerBalance.getBalances(caller) match {
-        case Some(balances) =>
-          val ableToCover = Math.min(alphToCover, balances.attoAlphAmount)
-          // It's safe to use `get` here because:
-          // 1. We're only subtracting what's available (ableToCover ≤ balances.attoAlphAmount)
-          // 2. We're only adding a positive value to contractBalance
-          (for {
-            _ <- balances.subAlph(ableToCover)
-            _ <- contractBalance.addAlph(ableToCover)
-          } yield alphToCover.subUnsafe(ableToCover)).get
-        case None => alphToCover
-      }
     }
   }
 

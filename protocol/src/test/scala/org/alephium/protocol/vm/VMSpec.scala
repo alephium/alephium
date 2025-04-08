@@ -269,7 +269,6 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       new StatefulContext with NetworkConfigFixture.Default with GroupConfigFixture.Default {
         val worldState: WorldState.Staging = cachedWorldState.staging()
         def blockEnv: BlockEnv             = genBlockEnv()
-        def txEnv: TxEnv                   = genTxEnv(None, AVector.empty)
         override def txId: TransactionId   = TransactionId.zero
         var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
@@ -283,6 +282,35 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
                 address1.lockupScript -> balances1
               )
             )
+          )
+        }
+
+        def txEnv: TxEnv = {
+          val env = genTxEnv(None, AVector.empty)
+          val prevOutputs = AVector(
+            AssetOutput(
+              balances0.attoAlphAmount,
+              address0.lockupScript.asInstanceOf[LockupScript.Asset],
+              TimeStamp.zero,
+              balances0.tokenVector,
+              ByteString.empty
+            ),
+            AssetOutput(
+              balances1.attoAlphAmount,
+              address1.lockupScript.asInstanceOf[LockupScript.Asset],
+              TimeStamp.zero,
+              balances1.tokenVector,
+              ByteString.empty
+            )
+          )
+          TxEnv.mockup(
+            env.txId,
+            env.signatures,
+            prevOutputs,
+            env.fixedOutputs,
+            env.gasPrice,
+            env.gasAmount,
+            isEntryMethodPayable = true
           )
         }
 

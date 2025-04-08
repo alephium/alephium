@@ -282,6 +282,15 @@ class VMSpec extends AlephiumSpec with Generators {
         s"Right(TxScriptExeFailed($failure))"
     }
 
+    def pass(
+        blockFlow: BlockFlow,
+        chainIndex: ChainIndex,
+        script: StatefulScript
+    ) = {
+      val block = payableCall(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+    }
+
     def checkContractState(
         contractId: String,
         code: String,
@@ -810,8 +819,8 @@ class VMSpec extends AlephiumSpec with Generators {
     checkOutput(5, timestamp2, ALPH.cent(4) - (dustUtxoAmount * 2))
   }
 
-  it should "not use up contract assets" in new ContractFixture {
-    val input =
+  trait UseAllContractAssetsFixture extends ContractFixture {
+    lazy val input =
       """
         |Contract Foo() {
         |  @using(assetsInContract = true)
@@ -821,9 +830,10 @@ class VMSpec extends AlephiumSpec with Generators {
         |}
         |""".stripMargin
 
-    val contractId = createContractAndCheckState(input, 2, 2, initialMutState = AVector.empty)._1
+    lazy val contractId =
+      createContractAndCheckState(input, 2, 2, initialMutState = AVector.empty)._1
 
-    val main =
+    lazy val main =
       s"""
          |TxScript Main {
          |  let foo = Foo(#${contractId.toHexString})
@@ -833,8 +843,17 @@ class VMSpec extends AlephiumSpec with Generators {
          |$input
          |""".stripMargin
 
-    val script = Compiler.compileTxScript(main).rightValue
+    lazy val script = Compiler.compileTxScript(main).rightValue
+  }
+
+  it should "not use up contract assets: Rhone" in new UseAllContractAssetsFixture {
+    setHardFork(HardFork.Rhone)
     fail(blockFlow, chainIndex, script, EmptyContractAsset(Address.contract(contractId)))
+  }
+
+  it should "be able to use up contract assets: Danube" in new UseAllContractAssetsFixture {
+    setHardForkSince(HardFork.Danube)
+    pass(blockFlow, chainIndex, script)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -4991,9 +5010,9 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph, false)
   }
 
-  it should "return LowerThanContractMinimalBalance if contract balance falls below the minimal deposit" in new ContractFixture {
-    def test(amount: U256) = {
-      val code: String =
+  trait MinimalContractDepositFixture extends ContractFixture {
+    def test(remainingAlph: U256, succeed: Boolean) = {
+      lazy val code: String =
         s"""
            |Contract Foo() {
            |  @using(assetsInContract=true, preapprovedAssets = true)
@@ -5003,8 +5022,10 @@ class VMSpec extends AlephiumSpec with Generators {
            |}
            |""".stripMargin
 
-      val contractInitialAlphAmount = ALPH.oneAlph * 2
-      val contractId = createContract(code, initialAttoAlphAmount = contractInitialAlphAmount)._1
+      lazy val contractInitialAlphAmount = ALPH.oneAlph * 2
+      lazy val amount                    = contractInitialAlphAmount.subUnsafe(remainingAlph)
+      lazy val contractId =
+        createContract(code, initialAttoAlphAmount = contractInitialAlphAmount)._1
 
       val script: String =
         s"""|
@@ -5017,7 +5038,7 @@ class VMSpec extends AlephiumSpec with Generators {
             |${code}
             |""".stripMargin
 
-      if (amount > ALPH.oneAlph) {
+      if (!succeed) {
         failCallTxScript(
           script,
           LowerThanContractMinimalBalance(
@@ -5029,11 +5050,24 @@ class VMSpec extends AlephiumSpec with Generators {
         callTxScript(script)
       }
     }
+  }
 
-    test(ALPH.oneNanoAlph)
-    test(minimalAlphInContract - 1)
-    test(minimalAlphInContract)
-    test(minimalAlphInContract + 1)
+  it should "return LowerThanContractMinimalBalance if contract balance falls below the minimal deposit: Rhone" in new MinimalContractDepositFixture {
+    setHardFork(HardFork.Rhone)
+
+    test(ALPH.oneNanoAlph, succeed = false)
+    test(minimalAlphInContract - 1, succeed = false)
+    test(minimalAlphInContract, succeed = true)
+    test(minimalAlphInContract + 1, succeed = true)
+  }
+
+  it should "Charge contract deposit from tx caller if contract balance falls below the minimal deposit: Danube" in new MinimalContractDepositFixture {
+    setHardForkSince(HardFork.Danube)
+
+    test(ALPH.oneNanoAlph, succeed = true)
+    test(minimalAlphInContract - 1, succeed = true)
+    test(minimalAlphInContract, succeed = true)
+    test(minimalAlphInContract + 1, succeed = true)
   }
 
   it should "use tx caller assets if not enough deposit for new contract" in new ContractFixture {
@@ -6184,8 +6218,8 @@ class VMSpec extends AlephiumSpec with Generators {
     test(false)
   }
 
-  it should "insert/remove map entries using contract assets" in new ContractFixture {
-    val foo =
+  trait InsertRemoveMapEntriesFixture extends ContractFixture {
+    lazy val foo =
       s"""
          |Contract Foo() {
          |  mapping[U256, U256] map
@@ -6200,9 +6234,9 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    val entrySize     = 4
-    val initialAmount = minimalAlphInContract * entrySize
-    val fooId         = createContract(foo, initialAttoAlphAmount = initialAmount)._1
+    lazy val entrySize     = 4
+    lazy val initialAmount = minimalAlphInContract * entrySize
+    lazy val fooId         = createContract(foo, initialAttoAlphAmount = initialAmount)._1
 
     def insert(idx: Int) = {
       val script =
@@ -6227,6 +6261,10 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
       callTxScript(script)
     }
+  }
+
+  it should "insert/remove map entries using contract assets: Rhone" in new InsertRemoveMapEntriesFixture {
+    setHardFork(HardFork.Rhone)
 
     (0 until entrySize - 1).foreach { idx =>
       insert(idx)
@@ -6240,6 +6278,21 @@ class VMSpec extends AlephiumSpec with Generators {
       getContractAsset(fooId).amount is minimalAlphInContract * (idx + 2)
     }
     getContractAsset(fooId).amount is initialAmount
+  }
+
+  it should "insert/remove map entries using contract assets: Danube" in new InsertRemoveMapEntriesFixture {
+    setHardForkSince(HardFork.Danube)
+    (0 until entrySize).foreach { idx =>
+      insert(idx)
+      val expectedAmount =
+        Math.max(initialAmount - minimalAlphInContract * (idx + 1), minimalAlphInContract)
+      getContractAsset(fooId).amount is expectedAmount
+    }
+
+    (0 until entrySize).foreach { idx =>
+      remove(idx)
+      getContractAsset(fooId).amount is minimalAlphInContract * (idx + 2)
+    }
   }
 
   behavior of "Reentrancy protection"

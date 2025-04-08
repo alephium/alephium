@@ -2002,11 +2002,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult0.error is s"Group mismatch: provided group is 1; group for ${fooAddress.toBase58} is 0"
   }
 
-  "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
-    val groupIndex   = brokerConfig.chainIndexes.sample().from
-    val (_, pubKey)  = SignatureSchema.generatePriPub()
-    val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
-    val foo =
+  trait TestContractOperationFixture extends Fixture {
+    lazy val groupIndex   = brokerConfig.chainIndexes.sample().from
+    lazy val (_, pubKey)  = SignatureSchema.generatePriPub()
+    lazy val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
+    lazy val foo =
       s"""
          |Contract Foo() {
          |  @using(assetsInContract = true)
@@ -2016,11 +2016,11 @@ class ServerUtilsSpec extends AlephiumSpec {
          |}
          |""".stripMargin
 
-    val fooContract         = Compiler.compileContract(foo).rightValue
-    val fooByteCode         = Hex.toHexString(serialize(fooContract))
-    val createContractPath  = "00"
-    val destroyContractPath = "11"
-    val bar =
+    lazy val fooContract         = Compiler.compileContract(foo).rightValue
+    lazy val fooByteCode         = Hex.toHexString(serialize(fooContract))
+    lazy val createContractPath  = "00"
+    lazy val destroyContractPath = "11"
+    lazy val bar =
       s"""
          |Contract Bar() {
          |  @using(assetsInContract = true)
@@ -2033,11 +2033,11 @@ class ServerUtilsSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
 
-    val barContract   = Compiler.compileContract(bar).rightValue
-    val barContractId = ContractId.random
-    val destroyedFooContractId =
+    lazy val barContract   = Compiler.compileContract(bar).rightValue
+    lazy val barContractId = ContractId.random
+    lazy val destroyedFooContractId =
       barContractId.subContractId(Hex.unsafe(destroyContractPath), groupIndex)
-    val existingContract = ContractState(
+    lazy val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
       fooContract.hash,
@@ -2046,7 +2046,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector.empty[Val],
       AssetState(ALPH.oneAlph)
     )
-    val testContractParams = TestContract(
+    lazy val testContractParams = TestContract(
       group = Some(groupIndex.value),
       address = Some(Address.contract(barContractId)),
       bytecode = barContract,
@@ -2055,13 +2055,18 @@ class ServerUtilsSpec extends AlephiumSpec {
       inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
     ).toComplete().rightValue
 
-    val testFlow    = BlockFlow.emptyUnsafe(config)
-    val serverUtils = new ServerUtils()
-    val createdFooContractId =
+    lazy val createdFooContractId =
       barContractId.subContractId(
         Hex.unsafe(createContractPath),
         ChainIndex.unsafe(testContractParams.group, testContractParams.group).from
       )
+
+    lazy val testFlow    = BlockFlow.emptyUnsafe(config)
+    lazy val serverUtils = new ServerUtils()
+  }
+
+  "the test contract endpoint" should "handle create and destroy contracts properly: Rhone" in new TestContractOperationFixture {
+    setHardFork(HardFork.Rhone)
 
     val result =
       serverUtils.runTestContract(testFlow, testContractParams).rightValue
@@ -2069,6 +2074,22 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(0).address is Address.contract(createdFooContractId)
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
+    assetOutput.address is assetAddress
+    assetOutput.attoAlphAmount is Amount(
+      ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)
+    )
+  }
+
+  it should "handle create and destroy contracts properly: Danube" in new TestContractOperationFixture {
+    setHardForkSince(HardFork.Danube)
+
+    val result =
+      serverUtils.runTestContract(testFlow, testContractParams).rightValue
+    result.contracts.length is 2
+    result.contracts(0).address is Address.contract(createdFooContractId)
+    result.contracts(1).address is Address.contract(barContractId)
+    // Since Danube, caller assets are chained after each contract call, so assetOutput was collected from output
+    val assetOutput = result.txOutputs(2)
     assetOutput.address is assetAddress
     assetOutput.attoAlphAmount is Amount(
       ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)

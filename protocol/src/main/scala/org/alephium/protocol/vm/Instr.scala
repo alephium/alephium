@@ -2065,12 +2065,14 @@ sealed trait Transfer extends AssetInstr {
   @inline def transferAlph[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
-      toThunk: => ExeResult[LockupScript]
+      toThunk: => ExeResult[LockupScript],
+      checkAddress: (HardFork, LockupScript, LockupScript) => ExeResult[Unit]
   ): ExeResult[Unit] = {
     for {
       amount <- frame.popOpStackU256()
       to     <- toThunk
       from   <- fromThunk
+      _      <- checkAddress(frame.ctx.getHardFork(), from, to)
       _      <- transferAlph(frame, from, to, amount)
     } yield ()
   }
@@ -2109,7 +2111,8 @@ sealed trait Transfer extends AssetInstr {
   @inline def transferToken[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
-      toThunk: => ExeResult[LockupScript]
+      toThunk: => ExeResult[LockupScript],
+      checkAddress: (HardFork, LockupScript, LockupScript) => ExeResult[Unit]
   ): ExeResult[Unit] = {
     for {
       amount     <- frame.popOpStackU256()
@@ -2117,6 +2120,7 @@ sealed trait Transfer extends AssetInstr {
       tokenId    <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId.from(tokenIdRaw)))
       to         <- toThunk
       from       <- fromThunk
+      _          <- checkAddress(frame.ctx.getHardFork(), from, to)
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
           transferAlph(frame, from, to, amount)
@@ -2127,12 +2131,27 @@ sealed trait Transfer extends AssetInstr {
   }
 }
 
+object Transfer {
+  def checkAddressForSelfTransfer(
+      hardFork: HardFork,
+      from: LockupScript,
+      to: LockupScript
+  ): ExeResult[Unit] = {
+    if (hardFork.isDanubeEnabled() && from == to) {
+      failed(InvalidSelfTransfer)
+    } else {
+      okay
+    }
+  }
+}
+
 object TransferAlph extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      (_, _, _) => okay
     )
   }
 }
@@ -2142,7 +2161,8 @@ object TransferAlphFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferAlph(
       frame,
       getContractLockupScript(frame),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -2152,7 +2172,8 @@ object TransferAlphToSelf extends Transfer with StatefulInstrCompanion0 {
     transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getContractLockupScript(frame)
+      getContractLockupScript(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -2162,7 +2183,8 @@ object TransferToken extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      (_, _, _) => okay
     )
   }
 }
@@ -2172,7 +2194,8 @@ object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       getContractLockupScript(frame),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -2182,7 +2205,8 @@ object TransferTokenToSelf extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getContractLockupScript(frame)
+      getContractLockupScript(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }

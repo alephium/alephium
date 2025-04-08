@@ -119,6 +119,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= balances.all.length) {
+        balances.all.clear()
         Some(())
       } else {
         val (lockupScript, balancesPerLockup) = balances.all(index)

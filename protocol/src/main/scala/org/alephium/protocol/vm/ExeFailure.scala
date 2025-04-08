@@ -278,6 +278,10 @@ final case class NoTokenBalanceForTheAddress(tokenId: TokenId, address: Address)
     s"No balance for token ${tokenId.toHexString} for the address ${address.toBase58}"
 }
 
+case object InvalidSelfTransfer extends ExeFailure {
+  override def toString: String = "Contract self transfer is not allowed"
+}
+
 case object InvalidBalances                    extends ExeFailure
 case object BalanceErrorWhenSwitchingBackFrame extends ExeFailure
 

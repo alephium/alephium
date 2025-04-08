@@ -23,7 +23,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
-import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, EitherF, Math, TimeStamp, U256}
 
 final case class BlockEnv(
     chainIndex: ChainIndex,
@@ -88,6 +88,9 @@ sealed trait TxEnv {
 
   def isEntryMethodPayable: Boolean
   def txIndex: Int // 0 for tx simulation
+
+  def isTxCaller(lockupScript: LockupScript): Boolean =
+    prevOutputs.exists(_.lockupScript == lockupScript)
 }
 
 object TxEnv {
@@ -250,6 +253,10 @@ trait StatelessContext extends CostStrategy {
     } yield address
   }
 
+  def getFirstTxInputAddress(): ExeResult[Val.Address] = {
+    getTxInputAddressAt(Val.U256(U256.Zero))
+  }
+
   private def _getUniqueTxInputAddress(): ExeResult[Val.Address] = {
     txEnv.prevOutputs.headOption match {
       case Some(firstInput) =>
@@ -311,6 +318,7 @@ object StatelessContext {
   }
 }
 
+// scalastyle:off number.of.methods
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
@@ -605,6 +613,185 @@ trait StatefulContext extends StatelessContext with ContractPool {
         .map(e => Left(IOErrorCreateSubContractIndex(e)))
     } else {
       Right(())
+    }
+  }
+
+  def outputGeneratedBalances(): ExeResult[Unit] = {
+    val hardFork = getHardFork()
+    for {
+      _ <- EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
+        lockupScript match {
+          case l: LockupScript.P2C if !assetStatus.contains(l.contractId) =>
+            failed(ContractAssetUnloaded(Address.contract(l.contractId)))
+          case _ =>
+            for {
+              outputs <- balances.toTxOutput(lockupScript, hardFork)
+              _       <- outputs.foreachE(output => generateOutput(output))
+            } yield ()
+        }
+      }
+    } yield ()
+  }
+
+  def cleanBalances(): ExeResult[Unit] = {
+    if (getHardFork().isDanubeEnabled()) {
+      cleanBalancesDanube()
+    } else {
+      cleanBalancesPreDanube()
+    }
+  }
+
+  def cleanBalancesDanube(): ExeResult[Unit] = {
+    for {
+      _ <- outputRemainingContractAssetsForRhone()
+      _ <- reimburseGas()
+      _ <- coverUtxoMinimalAmounts()
+      _ <- flushCallerBalances()
+      _ <- outputGeneratedBalances()
+      _ <- checkAllAssetsFlushed()
+    } yield ()
+  }
+
+  def cleanBalancesPreDanube(): ExeResult[Unit] = {
+    for {
+      _ <- flushCallerBalances()
+      _ <- reimburseGas()
+      _ <- outputRemainingContractAssetsForRhone()
+      _ <- outputGeneratedBalances()
+      _ <- checkAllAssetsFlushed()
+    } yield ()
+  }
+
+  private def coverUtxoMinimalAmounts(): ExeResult[Unit] = {
+    if (getHardFork().isDanubeEnabled()) {
+      coverUtxoMinimalAmountsDanube()
+    } else {
+      okay
+    }
+  }
+
+  private def coverUtxoMinimalAmountsDanube(): ExeResult[Unit] = {
+    EitherF.foreachTry(outputBalances.all) { case (lockupScript, outputBalance) =>
+      if (txEnv.isTxCaller(lockupScript)) {
+        okay
+      } else {
+        coverUtxoDustAmounts(lockupScript, outputBalance)
+      }
+    }
+  }
+
+  private def coverUtxoDustAmounts(
+      lockupScript: LockupScript,
+      balances: MutBalancesPerLockup
+  ): ExeResult[Unit] = {
+    balances.utxoMinimalAlphAmountToCover(lockupScript) match {
+      case None => okay
+      case Some(alphToCover) =>
+        coverExtraAlphAmount(balances, alphToCover)
+    }
+  }
+
+  def flushCallerBalances(): ExeResult[Unit] = {
+    txCallerBalance match {
+      case None => okay
+      case Some(balances) =>
+        val resultOpt = for {
+          _ <- outputBalances.merge(balances.approved)
+          _ <- outputBalances.merge(balances.remaining)
+        } yield ()
+        resultOpt match {
+          case Some(_) => okay
+          case None    => failed(InvalidBalances)
+        }
+    }
+  }
+
+  def reimburseGas(): ExeResult[Unit] = {
+    if (getHardFork().isRhoneEnabled() && gasFeePaid > U256.Zero) {
+      val totalGasFee = txEnv.gasFeeUnsafe
+
+      assume(totalGasFee >= gasFeePaid) // This should always be true, so we check with assume
+
+      txEnv.prevOutputs.headOption match {
+        case Some(firstInput) =>
+          outputBalances
+            .addAlph(firstInput.lockupScript, gasFeePaid)
+            .toRight(Right(InvalidBalances))
+        case None =>
+          okay
+      }
+    } else {
+      okay
+    }
+  }
+
+  def coverExtraAlphAmount(
+      targetBalance: MutBalancesPerLockup,
+      alphToCover: U256
+  ): ExeResult[Unit] = {
+    for {
+      txCallerBalance <- getTxCallerBalance()
+      callerAddress   <- getFirstTxInputAddress()
+      _ <- coverMinimalContractStorageDepositFromBalances(
+        targetBalance,
+        callerAddress.lockupScript,
+        txCallerBalance,
+        alphToCover
+      )
+    } yield ()
+  }
+
+  private def coverMinimalContractStorageDepositFromBalances(
+      targetBalance: MutBalancesPerLockup,
+      caller: LockupScript,
+      callerBalance: MutBalanceState,
+      alphToCover: U256
+  ): ExeResult[Unit] = {
+    // First try to cover from remaining balance
+    val remainingAfterRemaining = transferAvailableDeposit(
+      targetBalance,
+      caller,
+      callerBalance.remaining,
+      alphToCover
+    )
+
+    // Then try to cover from approved balance if needed
+    val remainingAfterApproved = transferAvailableDeposit(
+      targetBalance,
+      caller,
+      callerBalance.approved,
+      remainingAfterRemaining
+    )
+
+    if (remainingAfterApproved == U256.Zero) {
+      okay
+    } else {
+      failed(InsufficientDepositForContractCreation)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def transferAvailableDeposit(
+      targetBalance: MutBalancesPerLockup,
+      caller: LockupScript,
+      callerBalance: MutBalances,
+      alphToCover: U256
+  ): U256 = {
+    if (alphToCover == U256.Zero) {
+      U256.Zero
+    } else {
+      callerBalance.getBalances(caller) match {
+        case Some(balances) =>
+          val ableToCover = Math.min(alphToCover, balances.attoAlphAmount)
+          // It's safe to use `get` here because:
+          // 1. We're only subtracting what's available (ableToCover ≤ balances.attoAlphAmount)
+          // 2. We're only adding a positive value to contractBalance
+          (for {
+            _ <- balances.subAlph(ableToCover)
+            _ <- targetBalance.addAlph(ableToCover)
+          } yield alphToCover.subUnsafe(ableToCover)).get
+        case None => alphToCover
+      }
     }
   }
 }

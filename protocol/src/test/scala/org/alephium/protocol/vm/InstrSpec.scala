@@ -4938,4 +4938,185 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
     // format: on
   }
+
+  it should "test Transfer.checkAddressForContractTransfer" in new GenFixture {
+    val p2c   = LockupScript.P2C(ContractId.random)
+    val p2pkh = assetLockupScriptGen.sample.get
+
+    // Pre-Danube hardfork - should not validate equality
+    Transfer.checkAddressForSelfTransfer(
+      NetworkConfigFixture.PreDanube.getHardFork(TimeStamp.now()),
+      p2c,
+      p2c
+    ) isE ()
+    Transfer.checkAddressForSelfTransfer(
+      NetworkConfigFixture.PreDanube.getHardFork(TimeStamp.now()),
+      p2pkh,
+      p2pkh
+    ) isE ()
+    Transfer.checkAddressForSelfTransfer(
+      NetworkConfigFixture.PreDanube.getHardFork(TimeStamp.now()),
+      p2c,
+      p2pkh
+    ) isE ()
+    Transfer.checkAddressForSelfTransfer(
+      NetworkConfigFixture.PreDanube.getHardFork(TimeStamp.now()),
+      p2pkh,
+      p2c
+    ) isE ()
+
+    // Danube hardfork - should validate equality for contract transfers
+    Transfer
+      .checkAddressForSelfTransfer(
+        NetworkConfigFixture.Danube.getHardFork(TimeStamp.now()),
+        p2c,
+        p2c
+      )
+      .leftValue isE InvalidSelfTransfer
+    Transfer
+      .checkAddressForSelfTransfer(
+        NetworkConfigFixture.Danube.getHardFork(TimeStamp.now()),
+        p2pkh,
+        p2pkh
+      )
+      .leftValue isE InvalidSelfTransfer
+    Transfer.checkAddressForSelfTransfer(
+      NetworkConfigFixture.Danube.getHardFork(TimeStamp.now()),
+      p2c,
+      p2pkh
+    ) isE ()
+    Transfer.checkAddressForSelfTransfer(
+      NetworkConfigFixture.Danube.getHardFork(TimeStamp.now()),
+      p2pkh,
+      p2c
+    ) isE ()
+  }
+
+  it should "validate contract self transfers in transfer instructions with Danube hardfork" in new StatefulFixture {
+    val contractId           = ContractId.from(tokenId.bytes).value
+    val contractLockupScript = LockupScript.P2C(contractId)
+    val assetLockupScript    = assetLockupScriptGen.sample.get
+
+    val contractOutput    = ContractOutput(ALPH.alph(0), contractLockupScript, AVector.empty)
+    val txId              = TransactionId.generate
+    val contractOutputRef = ContractOutputRef.from(txId, contractOutput, 0)
+    val contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
+
+    val balanceState =
+      MutBalanceState.from(
+        balances(contractLockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph))
+      )
+    balanceState.remaining.addAlph(assetLockupScript, ALPH.oneAlph)
+    balanceState.remaining.addToken(assetLockupScript, tokenId, ALPH.oneAlph)
+
+    // Test Transfer*Self instructions with same contract address (should fail in Danube)
+    def testSelfTransferFails(
+        instruction: Instr[StatefulContext],
+        setupStack: Frame[StatefulContext] => Any,
+        message: String
+    ) = {
+      info(message)
+      val frame =
+        prepareFrame(Some(balanceState), contractOutputOpt)(NetworkConfigFixture.Danube)
+      setupStack(frame)
+      instruction.runWith(frame).leftValue isE InvalidSelfTransfer
+    }
+
+    // Test transfers between different addresses (should succeed)
+    def testDifferentAddressTransferSucceeds(
+        instruction: Instr[StatefulContext],
+        setupStack: Frame[StatefulContext] => Any,
+        message: String
+    ) = {
+      info(message)
+      val frame =
+        prepareFrame(Some(balanceState), contractOutputOpt)(NetworkConfigFixture.Danube)
+      setupStack(frame)
+      instruction.runWith(frame) isE ()
+    }
+
+    // Test TransferAlphFromSelf with same contract address
+    testSelfTransferFails(
+      TransferAlphFromSelf,
+      frame => {
+        frame.opStack.push(Val.Address(contractLockupScript))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferAlphFromSelf to same contract should fail"
+    )
+
+    // Test TransferAlphToSelf with same contract address
+    testSelfTransferFails(
+      TransferAlphToSelf,
+      frame => {
+        frame.opStack.push(Val.Address(contractLockupScript))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferAlphToSelf from same contract should fail"
+    )
+
+    // Test TransferTokenFromSelf with same contract address
+    testSelfTransferFails(
+      TransferTokenFromSelf,
+      frame => {
+        frame.opStack.push(Val.Address(contractLockupScript))
+        frame.opStack.push(Val.ByteVec(tokenId.bytes))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferTokenFromSelf to same contract should fail"
+    )
+
+    // Test TransferTokenToSelf with same contract address
+    testSelfTransferFails(
+      TransferTokenToSelf,
+      frame => {
+        frame.opStack.push(Val.Address(contractLockupScript))
+        frame.opStack.push(Val.ByteVec(tokenId.bytes))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferTokenToSelf from same contract should fail"
+    )
+
+    // Test TransferAlphFromSelf with different addresses (should succeed)
+    testDifferentAddressTransferSucceeds(
+      TransferAlphFromSelf,
+      frame => {
+        frame.opStack.push(Val.Address(assetLockupScript))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferAlphFromSelf to different address should succeed"
+    )
+
+    // Test TransferAlphToSelf with different addresses (should succeed)
+    testDifferentAddressTransferSucceeds(
+      TransferAlphToSelf,
+      frame => {
+        frame.opStack.push(Val.Address(assetLockupScript))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferAlphToSelf from different address should succeed"
+    )
+
+    // Test TransferTokenFromSelf with different addresses (should succeed)
+    testDifferentAddressTransferSucceeds(
+      TransferTokenFromSelf,
+      frame => {
+        frame.opStack.push(Val.Address(assetLockupScript))
+        frame.opStack.push(Val.ByteVec(tokenId.bytes))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferTokenFromSelf to different address should succeed"
+    )
+
+    // Test TransferTokenToSelf with different addresses (should succeed)
+    testDifferentAddressTransferSucceeds(
+      TransferTokenToSelf,
+      frame => {
+        frame.opStack.push(Val.Address(assetLockupScript))
+        frame.opStack.push(Val.ByteVec(tokenId.bytes))
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      },
+      "TransferTokenToSelf to different address should succeed"
+    )
+  }
 }
