@@ -190,23 +190,28 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.ParenExpr.apply[Ctx](ex)
     }
 
+  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
+    P("{" ~ statement.rep(0) ~ expr ~ "}" | expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)))
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ expr).map { case (ifIndex, condition, expr) =>
-      val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
-      Ast.IfBranchExpr(condition, expr).atSourceIndex(sourceIndex)
+    P(Lexer.token(Keyword.`if`) ~ expr ~ ifElseExprBody).map {
+      case (ifIndex, condition, (statements, expr)) =>
+        val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
+        Ast.IfBranchExpr(condition, statements, expr).atSourceIndex(sourceIndex)
     }
   def elseIfBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ ifBranchExpr).map { case (elseIndex, ifBranch) =>
       val sourceIndex = SourceIndex(Some(elseIndex), ifBranch.sourceIndex)
-      Ast.IfBranchExpr(ifBranch.condition, ifBranch.expr).atSourceIndex(sourceIndex)
+      Ast
+        .IfBranchExpr(ifBranch.condition, ifBranch.statements, ifBranch.expr)
+        .atSourceIndex(sourceIndex)
     }
   def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`else`) ~ expr).map { case (elseIndex, expr) =>
+    P(Lexer.token(Keyword.`else`) ~ ifElseExprBody).map { case (elseIndex, (statements, expr)) =>
       val sourceIndex = SourceIndex(Some(elseIndex), expr.sourceIndex)
-      Ast.ElseBranchExpr(expr).atSourceIndex(sourceIndex)
+      Ast.ElseBranchExpr(statements, expr).atSourceIndex(sourceIndex)
     }
 
-  def ifelseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
+  def rawIfElseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
     P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~~ Index ~ elseBranchExpr.?).map {
       case (ifBranch, elseIfBranches, _, Some(elseBranch)) =>
         val sourceIndex = SourceIndex(ifBranch.sourceIndex, elseBranch.sourceIndex)
@@ -214,6 +219,8 @@ abstract class Parser[Ctx <: StatelessContext] {
       case (_, _, index, None) =>
         throw CompilerError.`Expected else statement`(index, fileURI)
     }
+
+  def ifElseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] = P(Start ~ rawIfElseExpr ~ End)
 
   def stringLiteral[Unknown: P]: P[Ast.Const[Ctx]] =
     PP("b" ~ Lexer.string) { s =>
@@ -232,8 +239,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
+  private def withOptionalParens[Unknown: P, T](parser: => P[T]) = P(parser | P("(" ~ parser ~ ")"))
+  private def returnExprs[Unknown: P] = P(
+    withOptionalParens(expr.rep(1, ",")) | Pass.map(_ => Seq.empty[Ast.Expr[Ctx]])
+  )
+
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
-    P(Lexer.token(Keyword.`return`) ~/ expr.rep(0, ",")).map { case (returnIndex, returns) =>
+    P(Lexer.token(Keyword.`return`) ~/ returnExprs).map { case (returnIndex, returns) =>
       val too =
         returns.lastOption.flatMap(_.sourceIndex.map(_.endIndex)).getOrElse(returnIndex.endIndex)
       Ast.ReturnStmt.apply[Ctx](returns).atSourceIndex(returnIndex.index, too, fileURI)
@@ -479,7 +491,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ block ~~ Index).map {
+    P(Lexer.token(Keyword.`if`) ~ expr ~ block ~~ Index).map {
       case (ifIndex, condition, body, endIndex) =>
         Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex, fileURI)
     }
@@ -923,7 +935,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | loadData | callExpr | contractConv |
-        structCtor | variable | parenExpr | arrayExpr | ifelseExpr
+        structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
     )
 
   private def loadDataBase[Unknown: P] = P(
@@ -968,7 +980,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
-        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
     )
 
   def mapKeyType[Unknown: P]: P[Type] = {

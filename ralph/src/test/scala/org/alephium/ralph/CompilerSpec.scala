@@ -457,6 +457,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    }
          |  }
          |}
+         |""".stripMargin,
+      s"""
+         |Contract Foo() {
+         |  fn foo0() -> U256 {
+         |    return (0)
+         |  }
+         |  fn foo1() -> (U256, U256) {
+         |    return (0, 1)
+         |  }
+         |}
          |""".stripMargin
     )
     succeed.foreach { code =>
@@ -2918,7 +2928,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  fn foo() -> U256 {
-           |    if ($$0$$) {
+           |    if $$(0)$$ {
            |      return 0
            |    } else {
            |      return 1
@@ -3001,6 +3011,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "If ... else if constructs should be terminated with an else statement"
       )
+    }
+
+    {
+      info("If branch without parens")
+      def code(cond: String) =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> () {
+           |    if $cond {
+           |      return
+           |    } else if ($cond) {
+           |      return
+           |    } else {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Seq("x < 1", "(x < 1)", "(x + 1) < 1", "(x + 1) * (x + 2) < 1").foreach { cond =>
+        compileContract(code(cond)).isRight is true
+      }
     }
 
     new Fixture {
@@ -3118,7 +3149,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  fn foo() -> U256 {
-           |    return if ($$0$$) 0 else 1
+           |    return if $$(0)$$ 0 else 1
            |  }
            |}
            |""".stripMargin
@@ -3126,19 +3157,136 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code, "Invalid type of condition expr: List(U256)")
     }
 
+    {
+      info("If branch without parens")
+      def code(cond: String) =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if $cond 0 else if ($cond) 1 else 2
+           |  }
+           |}
+           |""".stripMargin
+      Seq("x < 1", "(x < 1)", "(x + 1) < 1", "(x + 1) * (x + 2) < 1").foreach { cond =>
+        compileContract(code(cond)).isRight is true
+      }
+    }
+
+    {
+      info("Optional parens and braces")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo0() -> U256 {
+           |    let _ = if x > 1 foo1() else foo2()
+           |    let _ = if (x > 1) { foo3() 1 } else 2
+           |    let _ = if x > 1 1 else { foo3() 2 }
+           |    return if x > 1 {
+           |      foo3()
+           |      1
+           |    } else if x < 3 {
+           |      foo3()
+           |      2
+           |    } else {
+           |      foo3()
+           |      3
+           |    }
+           |  }
+           |
+           |  pub fn foo1() -> U256 {
+           |    return if x > 1 1 else 2
+           |  }
+           |  pub fn foo2() -> U256 {
+           |    return if x > 1 1 else if x < 3 2 else 3
+           |  }
+           |  pub fn foo3() -> () { return }
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
+
+    {
+      info("Check statements in if branch")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if x > 1 {
+           |      $$x = 1$$
+           |      0
+           |    } else {
+           |      1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable x.")
+    }
+
+    {
+      info("Check statements in else-if branch")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if x > 1 {
+           |      0
+           |    } else if x < 3 {
+           |      $$x = 1$$
+           |      1
+           |    } else {
+           |      2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable x.")
+    }
+
+    {
+      info("Check statements in else branch")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if x > 1 {
+           |      0
+           |    } else {
+           |      $$x = 1$$
+           |      1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable x.")
+    }
+
     new Fixture {
       val code =
         s"""
            |Contract Foo() {
-           |  pub fn foo(x: U256) -> U256 {
-           |    return if (x == 1) 1 else if (x == 0) 10 else 100
+           |  pub fn foo0(x: U256) -> U256 {
+           |    let mut a = 0
+           |    return if (x == 1) {
+           |      a = foo1(x)
+           |      a + 1
+           |    } else if (x == 0) {
+           |      a = foo1(x)
+           |      a + 10
+           |    } else {
+           |      a = foo1(x)
+           |      a + 100
+           |    }
+           |  }
+           |  fn foo1(x: U256) -> U256 {
+           |    return x
            |  }
            |}
            |""".stripMargin
 
       test(code, args = AVector(Val.U256(U256.Zero)), output = AVector(Val.U256(U256.unsafe(10))))
-      test(code, args = AVector(Val.U256(U256.One)), output = AVector(Val.U256(U256.unsafe(1))))
-      test(code, args = AVector(Val.U256(U256.Two)), output = AVector(Val.U256(U256.unsafe(100))))
+      test(code, args = AVector(Val.U256(U256.One)), output = AVector(Val.U256(U256.unsafe(2))))
+      test(code, args = AVector(Val.U256(U256.Two)), output = AVector(Val.U256(U256.unsafe(102))))
     }
   }
 
@@ -9579,6 +9727,53 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val result = Compiler.compileTxScriptFull(code1).rightValue
       result.debugCode.methods.length is 2
       result.code.methods.length is 1
+    }
+
+    {
+      info(s"Arrays and structs as inline function parameters")
+      val code =
+        s"""
+           |struct Bar { a: U256, b: U256 }
+           |Contract Foo() {
+           |  @inline fn foo0(array: [U256; 2], bar: Bar) -> U256 {
+           |    return array[0] + array[1] + bar.a + bar.b
+           |  }
+           |  pub fn foo1(array: [U256; 2]) -> U256 {
+           |    return foo0(array, Bar { a: 1, b: 2 })
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector[Val](Val.U256(1), Val.U256(2)), AVector(Val.U256(6)))
+    }
+
+    {
+      info("Arrays and structs as local var in inline functions")
+      val code =
+        s"""
+           |struct Bar { a: U256, b: U256 }
+           |Contract Foo() {
+           |  @inline fn foo0() -> U256 {
+           |    let c = 0
+           |    let array = [1, 2]
+           |    let b = 1
+           |    let bar = Bar { a: 1, b: 2 }
+           |    let a = 2
+           |    return array[0] + array[1] + bar.a + bar.b + a + b + c
+           |  }
+           |  pub fn foo1() -> U256 {
+           |    return foo0()
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector.empty[Val], AVector(Val.U256(9)))
+      // format: off
+      check(code, AVector(
+        U256Const0, StoreLocal(0), U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), U256Const1,
+        StoreLocal(3), U256Const1, U256Const2, StoreLocal(5), StoreLocal(4), U256Const2, StoreLocal(6),
+        LoadLocal(1), LoadLocal(2), U256Add, LoadLocal(4), U256Add, LoadLocal(5), U256Add,
+        LoadLocal(6), U256Add, LoadLocal(3), U256Add, LoadLocal(0), U256Add, Return
+      ))
+      // format: on
     }
   }
 

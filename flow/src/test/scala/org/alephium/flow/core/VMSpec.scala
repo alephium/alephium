@@ -7304,6 +7304,53 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is ALPH.alph(2)
   }
 
+  it should "test if-else expressions and statements" in new ContractFixture {
+    val code =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(simpleIfElseExpr(0) == 0, 0)
+         |  assert!(simpleIfElseExpr(10) == 1, 1)
+         |  assert!(simpleIfElseExpr(100) == 2, 2)
+         |  assert!(ifElseStat(0) == 0, 3)
+         |  assert!(ifElseStat(10) == 1, 4)
+         |  assert!(ifElseStat(100) == 2, 5)
+         |  assert!(complexIfElseExpr(0) == 0, 6)
+         |  assert!(complexIfElseExpr(10) == 2, 7)
+         |  assert!(complexIfElseExpr(100) == 4, 8)
+         |
+         |  fn simpleIfElseExpr(v: U256) -> U256 {
+         |    return if v < 10 0 else if v < 100 1 else 2
+         |  }
+         |  fn complexIfElseExpr(v: U256) -> U256 {
+         |    let mut res = ifElseStat(v)
+         |    return if v < 10 {
+         |      res += 0
+         |      res
+         |    } else if v < 100 {
+         |      res += 1
+         |      res
+         |    } else {
+         |      res += 2
+         |      res
+         |    }
+         |  }
+         |  fn ifElseStat(v: U256) -> U256 {
+         |    let mut res = 0
+         |    if v < 10 {
+         |      res = 0
+         |    } else if v < 100 {
+         |      res = 1
+         |    } else {
+         |      res = 2
+         |    }
+         |    return res
+         |  }
+         |}
+         |""".stripMargin
+    testSimpleScript(code)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
