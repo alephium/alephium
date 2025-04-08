@@ -3936,6 +3936,7 @@ class VMSpec extends AlephiumSpec with Generators {
   trait CreateContractFixture extends ContractFixture {
     def useAssets         = true
     def useMethodSelector = true
+    // format: off
     lazy val contract: String =
       s"""
          |Contract Foo(mut n: U256) implements IFoo {
@@ -3949,7 +3950,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |  @using(${if (useAssets) "assetsInContract = true, " else ""}updateFields = true)
          |  pub fn bar() -> () {
-         |    ${if (useAssets) "transferTokenFromSelf!(selfAddress!(), ALPH, 1 alph)" else ""}
+         |    ${if (useAssets) s"assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)" else ""}
          |    n = n + 1
          |  }
          |}
@@ -3961,6 +3962,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn bar() -> ()
          |}
          |""".stripMargin
+    // format: on
     lazy val contractId =
       createContractAndCheckState(
         contract,
@@ -4667,14 +4669,13 @@ class VMSpec extends AlephiumSpec with Generators {
       val bar: String =
         s"""
            |Contract Bar(index: U256, nextBarId: ByteVec) {
-           |  @using(assetsInContract = true)
+           |  @using(assetsInContract = enforced)
            |  pub fn bar(to: Address) -> () {
            |    if (index == 0) {
            |      let foo = Foo(#${fooId.toHexString})
            |      foo.foo(to)
            |    } else {
            |      let bar = Bar(nextBarId)
-           |      transferTokenFromSelf!(selfAddress!(), ALPH, 0) // dirty hack
            |      bar.bar(to)
            |    }
            |  }
