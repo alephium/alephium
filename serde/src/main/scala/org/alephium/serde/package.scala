@@ -115,4 +115,12 @@ package object serde {
   }
 
   implicit val serdeTS: Serde[TimeStamp] = TimeStampSerde
+
+  def extractBytes(bytes: ByteString, length: Int): SerdeResult[Staging[ByteString]] = {
+    Either.cond(
+      bytes.length >= length,
+      bytes.splitAt(length) match { case (data, rest) => Staging(data, rest) },
+      SerdeError.notEnoughBytes(length, bytes.length)
+    )
+  }
 }

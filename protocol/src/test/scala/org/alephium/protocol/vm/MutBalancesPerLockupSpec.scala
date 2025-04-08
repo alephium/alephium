@@ -325,6 +325,112 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
       .failRhone(InvalidTokenNumForContractOutput(address, tokens.length))
   }
 
+  it should "utxoMinimalAlphAmountToCover" in new Fixture {
+    // Asset lockup script case
+    val assetLockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
+
+    // Empty token map
+    val balancesEmpty = MutBalancesPerLockup(U256.Zero, mutable.Map.empty, 1)
+    balancesEmpty.utxoMinimalAlphAmountToCover(assetLockupScript) is None
+
+    // With tokens but zero ALPH
+    val balancesWithTokensZeroAlph = MutBalancesPerLockup(
+      0,
+      mutable.Map(tokenId -> 1),
+      1
+    )
+    balancesWithTokensZeroAlph.utxoMinimalAlphAmountToCover(assetLockupScript) is
+      Some(dustUtxoAmount)
+
+    // With 2 tokens but zero ALPH
+    val tokenId2 = TokenId.generate
+    val balancesWith2TokensZeroAlph = MutBalancesPerLockup(
+      0,
+      mutable.Map(tokenId -> 1, tokenId2 -> 1),
+      1
+    )
+    balancesWith2TokensZeroAlph.utxoMinimalAlphAmountToCover(assetLockupScript) is
+      Some(dustUtxoAmount.mulUnsafe(2))
+
+    // With tokens and ALPH amount less than token dust
+    val balancesWithTokensLessAlph = MutBalancesPerLockup(
+      dustUtxoAmount.divUnsafe(2),
+      mutable.Map(tokenId -> 1),
+      1
+    )
+    balancesWithTokensLessAlph.utxoMinimalAlphAmountToCover(assetLockupScript) is
+      Some(dustUtxoAmount.divUnsafe(2))
+
+    // With tokens and ALPH amount equal to token dust
+    val balancesWithTokensEqualAlph = MutBalancesPerLockup(
+      dustUtxoAmount,
+      mutable.Map(tokenId -> 1),
+      1
+    )
+    balancesWithTokensEqualAlph.utxoMinimalAlphAmountToCover(assetLockupScript) is None
+
+    // With tokens and ALPH amount more than token dust but not exactly token dust + dustUtxoAmount
+    val balancesWithTokensMoreAlph = MutBalancesPerLockup(
+      dustUtxoAmount.addUnsafe(dustUtxoAmount.divUnsafe(2)),
+      mutable.Map(tokenId -> 1),
+      1
+    )
+    balancesWithTokensMoreAlph.utxoMinimalAlphAmountToCover(assetLockupScript) is
+      Some(dustUtxoAmount.divUnsafe(2))
+
+    // With tokens and ALPH amount exactly equal to token dust + dustUtxoAmount
+    val balancesWithTokensExactAmount = MutBalancesPerLockup(
+      dustUtxoAmount.addUnsafe(dustUtxoAmount),
+      mutable.Map(tokenId -> 1),
+      1
+    )
+    balancesWithTokensExactAmount.utxoMinimalAlphAmountToCover(assetLockupScript) is None
+
+    // With tokens and ALPH amount more than token dust + dustUtxoAmount
+    val balancesWithTokensMoreThanExact = MutBalancesPerLockup(
+      dustUtxoAmount.mulUnsafe(3),
+      mutable.Map(tokenId -> 1),
+      1
+    )
+    balancesWithTokensMoreThanExact.utxoMinimalAlphAmountToCover(assetLockupScript) is None
+
+    // P2C lockup script case
+    val p2cLockupScript = LockupScript.p2c(ContractId.generate)
+
+    // Zero ALPH
+    val balancesP2CZeroAlph = MutBalancesPerLockup(
+      0,
+      mutable.Map.empty,
+      1
+    )
+    balancesP2CZeroAlph.utxoMinimalAlphAmountToCover(p2cLockupScript) is Some(minimalAlphInContract)
+
+    // Half minimalAlphInContract
+    val balancesP2CHalfAlph = MutBalancesPerLockup(
+      minimalAlphInContract.divUnsafe(2),
+      mutable.Map.empty,
+      1
+    )
+    balancesP2CHalfAlph.utxoMinimalAlphAmountToCover(p2cLockupScript) is
+      Some(minimalAlphInContract.divUnsafe(2))
+
+    // Equal to minimalAlphInContract
+    val balancesP2CEqualAlph = MutBalancesPerLockup(
+      minimalAlphInContract,
+      mutable.Map.empty,
+      1
+    )
+    balancesP2CEqualAlph.utxoMinimalAlphAmountToCover(p2cLockupScript) is None
+
+    // More than minimalAlphInContract
+    val balancesP2CMoreAlph = MutBalancesPerLockup(
+      minimalAlphInContract.mulUnsafe(2),
+      mutable.Map.empty,
+      1
+    )
+    balancesP2CMoreAlph.utxoMinimalAlphAmountToCover(p2cLockupScript) is None
+  }
+
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
     val tokenId = TokenId.generate
 

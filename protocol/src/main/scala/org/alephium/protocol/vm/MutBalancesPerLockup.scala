@@ -145,6 +145,30 @@ final case class MutBalancesPerLockup(
   ): ExeResult[AVector[TxOutput]] = {
     toTxOutputLeman(lockupScript, lockTime, hardFork)
   }
+
+  def utxoMinimalAlphAmountToCover(lockupScript: LockupScript): Option[U256] = {
+    lockupScript match {
+      case _: LockupScript.Asset =>
+        val tokenDust = dustUtxoAmount.mulUnsafe(U256.unsafe(tokenAmounts.size))
+        if (attoAlphAmount > tokenDust) {
+          if (attoAlphAmount < tokenDust.addUnsafe(dustUtxoAmount)) {
+            Some(tokenDust.addUnsafe(dustUtxoAmount).subUnsafe(attoAlphAmount))
+          } else {
+            None
+          }
+        } else if (attoAlphAmount == tokenDust) {
+          None
+        } else {
+          tokenDust.sub(attoAlphAmount)
+        }
+      case _: LockupScript.P2C =>
+        if (attoAlphAmount < minimalAlphInContract) {
+          Some(minimalAlphInContract.subUnsafe(attoAlphAmount))
+        } else {
+          None
+        }
+    }
+  }
 }
 
 object MutBalancesPerLockup {

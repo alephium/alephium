@@ -23,7 +23,7 @@ import org.alephium.util.AVector
 
 private[crypto] trait PrivateKey extends RandomBytes
 
-private[crypto] trait PublicKey extends RandomBytes
+trait PublicKey extends RandomBytes
 
 private[crypto] trait Signature extends RandomBytes
 

@@ -37,8 +37,9 @@ class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
     val bootstrapper       = TestProbe()
 
     val bindAddress = SocketUtil.temporaryServerAddress()
-    val controller =
-      newTestActorRef[TcpController](TcpController.props(bindAddress, misbehaviorManager.ref))
+    val controller = newTestActorRef[TcpController](
+      Props(new TcpController(bindAddress, misbehaviorManager.ref))
+    )
     val controllerActor = controller.underlyingActor
 
     EventFilter.info(start = "Node bound to").intercept {

@@ -67,6 +67,10 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
       if (miningStarted) {
         updateAndStartTasks(templates)
       }
+    case ViewHandler.NewTemplate(template) =>
+      if (miningStarted) {
+        updateAndStartTask(template)
+      }
     case BlockChainHandler.BlockAdded(hash) =>
       setIdle(ChainIndex.from(hash))
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -89,6 +93,14 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
       val job = Job.from(templates(fromShift)(to))
       pendingTasks(fromShift)(to) = Some(job)
     }
+    startNewTasks()
+  }
+
+  def updateAndStartTask(template: BlockFlowTemplate): Unit = {
+    val fromShift = template.index.from.value / brokerConfig.brokerNum
+    val to        = template.index.to.value
+    val job       = Job.from(template)
+    pendingTasks(fromShift)(to) = Some(job)
     startNewTasks()
   }
 }

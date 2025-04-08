@@ -119,17 +119,33 @@
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",
-    "doc": "Returns the contract id of the caller.",
+    "doc": "Returns the contract id of the immediate caller, which could be the current contract in case of recursive calls.",
     "params": [],
-    "returns": "@returns the contract id of the caller"
+    "returns": "@returns the contract id of the immediate caller, which could be the current contract in case of recursive calls"
   },
   {
     "name": "callerAddress",
     "category": "Contract",
     "signature": "fn callerAddress!() -> (Address)",
-    "doc": "<ol><li>When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same. If not all input addresses are the same, `callAddress!()` function fails.</li><li>When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)</li><li>When used in a contract function called from another contract, returns the address of the calling contract.</li></ol>",
+    "doc": "<ol>\n<li>When used in a TxScript, returns the transaction caller's address. The transaction must have identical input addresses, otherwise the call fails.</li>\n<li>When used in a contract function called from a TxScript, returns the transaction caller's address.</li>\n<li>When used in a contract function called from another contract, returns the address of the calling contract.</li>\n</ol>",
     "params": [],
     "returns": "@returns the address of the caller"
+  },
+  {
+    "name": "externalCallerContractId",
+    "category": "Contract",
+    "signature": "fn externalCallerContractId!() -> (ByteVec)",
+    "doc": "Returns the contract id of the first external contract in the call stack (different from the current contract).",
+    "params": [],
+    "returns": "@returns the contract id of the first external contract in the call stack (different from the current contract)"
+  },
+  {
+    "name": "externalCallerAddress",
+    "category": "Contract",
+    "signature": "fn externalCallerAddress!() -> (Address)",
+    "doc": "<ol>\n<li>When used in a TxScript, returns the transaction caller's address. The transaction must have identical input addresses, otherwise the call fails.</li>\n<li>When used in a contract function called from a TxScript, returns the transaction caller's address.</li>\n<li>When used in a contract function called from another contract, returns the address of the first external calling contract in the call stack (different from the current contract). If multiple calls come from the same contract, it skips intermediate frames to find the first external contract caller.</li>\n</ol>",
+    "params": [],
+    "returns": "@returns the address of the external caller"
   },
   {
     "name": "contractInitialStateHash",
@@ -316,10 +332,10 @@
   {
     "name": "map.insert",
     "category": "Map",
-    "signature": "fn <map>.insert!(depositorAddress: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
+    "signature": "fn <map>.insert!(depositorAddress?: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
     "doc": "Insert a key/value pair into the map. No brace syntax is required, as the minimal storage deposit will be deducted from the approved assets by the VM",
     "params": [
-      "@param depositorAddress the address to pay the minimal storage deposit (0.1 ALPH) for the new map entry",
+      "@param depositorAddress the address to pay the minimal storage deposit (0.1 ALPH) for the new map entry. If not provided, minimal storage deposit will be paid by the transaction caller",
       "@param key the key to insert",
       "@param value the value to insert"
     ],
@@ -328,10 +344,10 @@
   {
     "name": "map.remove",
     "category": "Map",
-    "signature": "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+    "signature": "fn <map>.remove!(refundRecipient?: Address, key: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
     "doc": "Remove a key from the map",
     "params": [
-      "@param depositRecipient the address to receive the redeemed minimal storage deposit",
+      "@param refundRecipient the address to receive the redeemed minimal storage deposit. If not provided, minimal storage deposit will be received by the transaction caller",
       "@param key the key to remove"
     ],
     "returns": "@returns "
@@ -1043,5 +1059,50 @@
       "@param signature the signature value"
     ],
     "returns": "@returns the ETH account that signed the data"
+  },
+  {
+    "name": "verifySignature",
+    "category": "Cryptography",
+    "signature": "fn verifySignature!(data:ByteVec, publicKey:ByteVec, signature:ByteVec, publicKeyType:ByteVec) -> ()",
+    "doc": "(Deprecated) Verifies the signature of the input and public key. This function is deprecated, please use the other specific verify functions instead.",
+    "params": [
+      "@param data the data that was supposed to have been signed",
+      "@param publicKey the public key of the signer",
+      "@param signature the signature value",
+      "@param publicKeyType the type of the public key"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "verifySecP256R1",
+    "category": "Cryptography",
+    "signature": "fn verifySecP256R1!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
+    "doc": "Verifies the SecP256R1 signature of the input data using the provided public key.",
+    "params": [
+      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param publicKey the public key (33 bytes) of the signer",
+      "@param signature the signature value (64 bytes)"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "verifyWebAuthn",
+    "category": "Cryptography",
+    "signature": "fn verifyWebAuthn!(challenge:ByteVec, publicKey:ByteVec, payload:ByteVec) -> ()",
+    "doc": "Verifies a WebAuthn signature for the input challenge using the provided public key.",
+    "params": [
+      "@param challenge The challenge (32 bytes) in the webauthn client data that was supposed to have been signed",
+      "@param publicKey the public key (33 bytes) of the signer",
+      "@param payload the WebAuthn payload containing the signature and authenticator data"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "getSegregatedWebAuthnSignature",
+    "category": "Cryptography",
+    "signature": "fn getSegregatedWebAuthnSignature!() -> (ByteVec)",
+    "doc": "Retrieves the segregated WebAuthn signature payload from the current transaction",
+    "params": [],
+    "returns": "@returns the segregated WebAuthn payload containing the signature and authenticator data"
   }
 ]

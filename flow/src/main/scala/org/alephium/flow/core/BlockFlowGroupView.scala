@@ -105,22 +105,25 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
 object BlockFlowGroupView {
   def onlyBlocks[WS <: WorldState[_, _, _, _]](
       worldState: WS,
-      blockCaches: AVector[BlockCache]
+      blockCaches: AVector[BlockCache],
+      conflictedTxs: AVector[Transaction]
   ): BlockFlowGroupView[WS] = {
-    new Impl0[WS](worldState, blockCaches)
+    new Impl0[WS](worldState, blockCaches, conflictedTxs)
   }
 
   def includePool[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache],
+      conflictedTxs: AVector[Transaction],
       mempool: MemPool
   ): BlockFlowGroupView[WS] = {
-    new Impl1[WS](worldState, blockCaches, mempool)
+    new Impl1[WS](worldState, blockCaches, conflictedTxs, mempool)
   }
 
   private class Impl0[WS <: WorldState[_, _, _, _]](
       _worldState: WS,
-      blockCaches: AVector[BlockCache]
+      blockCaches: AVector[BlockCache],
+      conflictedTxs: AVector[Transaction]
   ) extends BlockFlowGroupView[WS] {
     def worldState: WS = _worldState
 
@@ -145,6 +148,8 @@ object BlockFlowGroupView {
       }
     }
 
+    private lazy val outputsInConflictedTxs = conflictedTxs.flatMap(_.fixedOutputRefs)
+
     def getPreAssetOutputInfo(outputRef: AssetOutputRef): IOResult[Option[AssetOutputInfo]] = {
       if (TxUtils.isSpent(blockCaches, outputRef)) {
         Right(None)
@@ -159,7 +164,11 @@ object BlockFlowGroupView {
               .collectFirst(_.relatedOutputs.get(outputRef))
               .map {
                 case output: AssetOutput =>
-                  Right(Some(AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)))
+                  if (outputsInConflictedTxs.contains(outputRef)) {
+                    Right(None)
+                  } else {
+                    Right(Some(AssetOutputInfo(outputRef, output, UnpersistedBlockOutput)))
+                  }
                 case _: ContractOutput =>
                   Left(WorldState.expectedAssetError)
               }
@@ -203,7 +212,10 @@ object BlockFlowGroupView {
         AVector
           .from(
             blockCache.relatedOutputs.view
-              .filter(p => ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset)
+              .filter(p =>
+                ableToUse(p._2, lockupScript) && p._1.isAssetType && p._2.isAsset &&
+                  !outputsInConflictedTxs.contains(p._1.asInstanceOf[AssetOutputRef])
+              )
               .map(p =>
                 AssetOutputInfo(
                   p._1.asInstanceOf[AssetOutputRef],
@@ -249,8 +261,9 @@ object BlockFlowGroupView {
   private class Impl1[WS <: WorldState[_, _, _, _]](
       worldState: WS,
       blockCaches: AVector[BlockCache],
+      conflictedTxs: AVector[Transaction],
       mempool: MemPool
-  ) extends Impl0[WS](worldState, blockCaches) {
+  ) extends Impl0[WS](worldState, blockCaches, conflictedTxs) {
 
     override def getPreAssetOutputInfo(
         outputRef: AssetOutputRef

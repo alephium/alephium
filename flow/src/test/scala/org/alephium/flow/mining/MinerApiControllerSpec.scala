@@ -27,6 +27,8 @@ import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
+import org.alephium.protocol.Generators
+import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex, Target}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util.{AVector, SocketUtil}
@@ -268,5 +270,48 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     minerApiController ! ViewHandler.SubscribeResult(false)
     probe.expectMsgType[Tcp.ErrorClosed]
     eventually(minerApiController.underlyingActor.connections.length is 0)
+  }
+
+  it should "calculate job index" in {
+    Seq((0, 2, 4), (1, 2, 4), (0, 4, 4), (0, 1, 4)).foreach {
+      case (_brokerId, _brokerNum, _groups) =>
+        val config = new BrokerConfig {
+          def brokerId: Int  = _brokerId
+          def brokerNum: Int = _brokerNum
+          def groups: Int    = _groups
+        }
+        config.chainIndexes.zipWithIndex.foreach { case (chainIndex, index) =>
+          MinerApiController.calcJobIndex(chainIndex)(config) is index
+        }
+    }
+  }
+
+  it should "publish jobs once the new template is received" in new SyncedFixture with Generators {
+    val minerApiControllerActor = minerApiController.underlyingActor
+    minerApiControllerActor.latestJobs.isEmpty is true
+    val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
+    minerApiController ! ViewHandler.NewTemplates(templates)
+    val templates0 = AVector.from(templates.flatten)
+    eventually {
+      minerApiControllerActor.latestJobs.isEmpty is false
+      minerApiControllerActor.latestJobs.value.map(_._2) is templates0
+    }
+
+    val probe = TestProbe()
+    connectToServer(probe)
+
+    val chainIndex  = chainIndexGenForBroker(brokerConfig).sample.get
+    val block       = emptyBlock(blockFlow, chainIndex)
+    val newTemplate = BlockFlowTemplate.from(block, 1)
+    minerApiController ! ViewHandler.NewTemplate(newTemplate)
+    probe.expectMsgPF() { case Tcp.Received(data) =>
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
+    }
+    eventually {
+      val index        = MinerApiController.calcJobIndex(chainIndex)
+      val newTemplates = templates0.replace(index, newTemplate)
+      minerApiControllerActor.latestJobs.isEmpty is false
+      minerApiControllerActor.latestJobs.value.map(_._2) is newTemplates
+    }
   }
 }

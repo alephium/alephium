@@ -36,12 +36,21 @@ final case class Method[Ctx <: StatelessContext](
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
     usePayToContractOnly: Boolean,
+    useRoutePattern: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
   def usesAssetsFromInputs(): Boolean = usePreapprovedAssets || useContractAssets
+
+  def checkModifierPreDanube(): ExeResult[Unit] = {
+    if (useRoutePattern) {
+      failed(InvalidMethodModifierPreDanube)
+    } else {
+      okay
+    }
+  }
 
   def checkModifierSinceRhone(): ExeResult[Unit] = {
     if (useContractAssets && usePayToContractOnly) {
@@ -84,6 +93,8 @@ final case class Method[Ctx <: StatelessContext](
 
 object Method {
   val payToContractOnlyMask: Int = 4
+  val routePatternMask: Int      = 8
+  val combinedModifierMask: Int  = payToContractOnlyMask | routePatternMask
 
   private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
     val first2bits = (method.usePreapprovedAssets, method.useContractAssets) match {
@@ -92,18 +103,23 @@ object Method {
       case (false, true)  => 2
       case (true, false)  => 3
     }
-    ByteString(first2bits | (if (method.usePayToContractOnly) payToContractOnlyMask else 0))
+    ByteString(
+      first2bits |
+        (if (method.usePayToContractOnly) payToContractOnlyMask else 0) |
+        (if (method.useRoutePattern) routePatternMask else 0)
+    )
   }
 
   private def deserializeAssetModifier[Ctx <: StatelessContext](
       input: Byte
-  ): SerdeResult[(Boolean, Boolean, Boolean)] = {
+  ): SerdeResult[(Boolean, Boolean, Boolean, Boolean)] = {
     val payToContractOnlyFlag = (input & payToContractOnlyMask) != 0
-    (input & ~payToContractOnlyMask: @switch) match {
-      case 0 => Right((false, false, payToContractOnlyFlag))
-      case 1 => Right((true, true, payToContractOnlyFlag))
-      case 2 => Right((false, true, payToContractOnlyFlag))
-      case 3 => Right((true, false, payToContractOnlyFlag))
+    val routePatternFlag      = (input & routePatternMask) != 0
+    (input & ~combinedModifierMask: @switch) match {
+      case 0 => Right((false, false, payToContractOnlyFlag, routePatternFlag))
+      case 1 => Right((true, true, payToContractOnlyFlag, routePatternFlag))
+      case 2 => Right((false, true, payToContractOnlyFlag, routePatternFlag))
+      case 3 => Right((true, false, payToContractOnlyFlag, routePatternFlag))
       case _ => Left(SerdeError.wrongFormat("Invalid assets modifier"))
     }
   }
@@ -135,6 +151,7 @@ object Method {
               assetModifier._1,
               assetModifier._2,
               assetModifier._3,
+              assetModifier._4,
               argsLengthRest.value,
               localsLengthRest.value,
               returnLengthRest.value,
@@ -158,6 +175,7 @@ object Method {
       usePreapprovedAssets = false,
       useContractAssets = false,
       usePayToContractOnly = false,
+      useRoutePattern = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -201,6 +219,26 @@ object Method {
       case _ => None
     }
   }
+
+  def testDefault[Ctx <: StatelessContext](
+      isPublic: Boolean,
+      argsLength: Int,
+      localsLength: Int,
+      returnLength: Int,
+      instrs: AVector[Instr[Ctx]]
+  ): Method[Ctx] = {
+    Method[Ctx](
+      isPublic = isPublic,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      usePayToContractOnly = false,
+      useRoutePattern = false,
+      argsLength = argsLength,
+      localsLength = localsLength,
+      returnLength = returnLength,
+      instrs = instrs
+    )
+  }
 }
 
 sealed trait Contract[Ctx <: StatelessContext] {
@@ -219,6 +257,9 @@ sealed trait Contract[Ctx <: StatelessContext] {
     EitherF.foreachTry(0 until methodsLength) { methodIndex =>
       for {
         method <- getMethod(methodIndex)
+        _ <-
+          if (hardFork.isDanubeEnabled()) { okay }
+          else { method.checkModifierPreDanube() }
         _ <-
           if (hardFork.isRhoneEnabled()) { method.checkModifierSinceRhone() }
           else { method.checkModifierPreRhone() }
@@ -327,6 +368,7 @@ object StatefulScript {
           usePreapprovedAssets = true,
           useContractAssets = true,
           usePayToContractOnly = false,
+          useRoutePattern = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,

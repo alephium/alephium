@@ -218,8 +218,9 @@ class MutBalancesSpec extends AlephiumSpec {
 
   it should "merge" in new Fixture {
 
-    val lockupScript2 = lockupScriptGen.sample.get
-    val balances2     = MutBalances(ArrayBuffer((lockupScript2, balancesPerLockup)))
+    val lockupScript2   = lockupScriptGen.sample.get
+    val balances2       = MutBalances(ArrayBuffer((lockupScript2, balancesPerLockup)))
+    val balances2Copied = MutBalances(ArrayBuffer((lockupScript2, balancesPerLockup)))
 
     balances.merge(balances2)
 
@@ -227,7 +228,7 @@ class MutBalancesSpec extends AlephiumSpec {
       ArrayBuffer((lockupScript, balancesPerLockup), (lockupScript2, balancesPerLockup))
     )
 
-    balances.merge(balances2)
+    balances.merge(balances2Copied)
 
     balances is MutBalances(
       ArrayBuffer(

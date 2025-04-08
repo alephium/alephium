@@ -46,7 +46,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
       request[TransferResults](sweepActiveAddress(walletName, transferAddress), restPort)
     transfer1.results.length is 0
 
-    clique.startMining()
+    clique.stopMining()
     clique.stop()
   }
 
@@ -69,7 +69,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
       request[TransferResults](sweepAllAddresses(walletName, transferAddress), restPort)
     transfer1.results.length is 0
 
-    clique.startMining()
+    clique.stopMining()
     clique.stop()
   }
 

@@ -35,6 +35,16 @@ class BuiltInSpec extends AlephiumSpec {
         BuiltIn.copyCreateSubContract,
         BuiltIn.copyCreateSubContractWithToken
       )
+    BuiltIn.contractCreationFuncs.toSet is Set(
+      "createContract",
+      "createContractWithToken",
+      "copyCreateContract",
+      "copyCreateContractWithToken",
+      "createSubContract",
+      "createSubContractWithToken",
+      "copyCreateSubContract",
+      "copyCreateSubContractWithToken"
+    )
   }
 
   it should "check all functions that can use assets in contract" in {

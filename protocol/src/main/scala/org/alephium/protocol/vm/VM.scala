@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF, OptionF, U256}
+import org.alephium.util.{AVector, OptionF}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -71,10 +71,14 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     ctx.getInitialBalances().flatMap { balances =>
+      // Store the transaction caller's balance to use later if needed to cover contract creation deposits
+      val txCallerBalance = MutBalanceState.from(balances)
+      ctx.setTxCallerBalance(txCallerBalance)
+
       startPayableFrame(
         obj,
         ctx,
-        MutBalanceState.from(balances),
+        txCallerBalance,
         method,
         args,
         operandStack,
@@ -336,14 +340,20 @@ final class StatefulVM(
     val hardFork = ctx.getHardFork()
 
     OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
+      val keepContractBalances = shouldKeepContractBalances(hardFork, isApproved, lockupScript)
+
       if (balancesPerLockup.scopeDepth <= 0) {
-        if (shouldKeepContractBalances(hardFork, isApproved, lockupScript)) {
+        if (keepContractBalances) {
           Some(())
         } else {
           ctx.outputBalances.add(lockupScript, balancesPerLockup)
         }
       } else {
-        previous.add(lockupScript, balancesPerLockup)
+        if (keepContractBalances && hardFork.isDanubeEnabled()) {
+          Some(())
+        } else {
+          previous.add(lockupScript, balancesPerLockup)
+        }
       }
     }
   }
@@ -358,69 +368,11 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
-    val hardFork = ctx.getHardFork()
-    if (lastFrame.method.usesAssetsFromInputs()) {
-      val resultOpt = for {
-        balances <- lastFrame.balanceStateOpt
-        _        <- ctx.outputBalances.merge(balances.approved)
-        _        <- ctx.outputBalances.merge(balances.remaining)
-      } yield ()
-      for {
-        _ <- resultOpt match {
-          case Some(_) => okay
-          case None    => failed(InvalidBalances)
-        }
-        _ <- reimburseGas(hardFork)
-        _ <- outputGeneratedBalances(ctx.outputBalances)
-        _ <- ctx.checkAllAssetsFlushed()
-      } yield ()
-    } else {
-      if (ctx.getHardFork().isLemanEnabled()) {
-        for {
-          _ <- reimburseGas(hardFork)
-          _ <- outputGeneratedBalances(ctx.outputBalances)
-          _ <- ctx.checkAllAssetsFlushed()
-        } yield ()
-      } else {
-        Right(())
-      }
-    }
-  }
-
-  def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
-    if (hardFork.isRhoneEnabled() && ctx.gasFeePaid > U256.Zero) {
-      val totalGasFee = ctx.txEnv.gasFeeUnsafe
-      val gasFeePaid  = ctx.gasFeePaid
-
-      assume(totalGasFee >= gasFeePaid) // This should always be true, so we check with assume
-
-      ctx.txEnv.prevOutputs.headOption match {
-        case Some(firstInput) =>
-          ctx.outputBalances
-            .addAlph(firstInput.lockupScript, gasFeePaid)
-            .toRight(Right(InvalidBalances))
-        case None =>
-          okay
-      }
+    if (lastFrame.method.usesAssetsFromInputs() || ctx.getHardFork().isLemanEnabled()) {
+      ctx.cleanBalances()
     } else {
       okay
     }
-  }
-
-  private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
-    for {
-      _ <- ctx.outputRemainingContractAssetsForRhone()
-      _ <- EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-        lockupScript match {
-          case l: LockupScript.P2C if !ctx.assetStatus.contains(l.contractId) =>
-            failed(ContractAssetUnloaded(Address.contract(l.contractId)))
-          case _ =>
-            balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
-              outputs.foreachE(output => ctx.generateOutput(output))
-            }
-        }
-      }
-    } yield ()
   }
 }
 
