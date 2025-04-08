@@ -18,10 +18,12 @@ package org.alephium.tools
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import scala.annotation.tailrec
+
 import org.alephium.flow.client.Node
 import org.alephium.flow.setting.Platform
 import org.alephium.flow.validation._
-import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -37,36 +39,53 @@ object ReplayTxScript extends App {
 
   Runtime.getRuntime.addShutdownHook(new Thread(() => storages.closeUnsafe()))
 
-  IOUtils.tryExecute(replayUnsafe()) match {
-    case Right(threads) =>
-      threads.foreach(_.start())
-      threads.foreach(_.join())
-      print(s"Replay completed\n")
-    case Left(error) =>
-      print(s"IO error occurred when replaying: $error\n")
-      sys.exit(1)
+  private val maxHeightPerChain = (0 until brokerConfig.groups).map { index =>
+    val groupIndex = GroupIndex.unsafe(index)
+    val chainIndex = ChainIndex(groupIndex, groupIndex)
+    blockFlow.getMaxHeightByWeight(chainIndex) match {
+      case Right(height) => height
+      case Left(error)   => exitOnError(s"Failed to get max height due to IO error $error")
+    }
+  }
+  private val executedCount = new AtomicInteger(0)
+  private val totalCount    = maxHeightPerChain.sum
+
+  private val initHeight        = ALPH.GenesisHeight + 1
+  private var currentGroupIndex = 0
+  private var currentHeight     = initHeight
+
+  private val threads = (0 until 4).map(_ => new Thread(() => replayBlocks()))
+  threads.foreach(_.start())
+  threads.foreach(_.join())
+  print("Replay completed\n")
+
+  @tailrec private def replayBlocks(): Unit = {
+    nextHeightRange() match {
+      case Some((group, from, to)) =>
+        val chainIndex = ChainIndex(group, group)
+        (from until to).foreach(replayBlock(chainIndex, _))
+        val count    = executedCount.addAndGet(to - from)
+        val progress = (count.toDouble / totalCount.toDouble) * 100
+        print(s"Executed #$count blocks, progress: ${f"$progress%.0f%%"}\n")
+        replayBlocks()
+      case None => ()
+    }
   }
 
-  private def replayUnsafe() = {
-    val fromHeight    = ALPH.GenesisHeight + 1
-    var totalCount    = 0
-    val executedCount = new AtomicInteger(0)
-    (0 until brokerConfig.groups).map { index =>
-      val groupIndex = GroupIndex.unsafe(index)
-      val chainIndex = ChainIndex(groupIndex, groupIndex)
-      val maxHeight  = blockFlow.getBlockChain(chainIndex).maxHeightByWeightUnsafe
-      totalCount += maxHeight
-
-      new Thread(() =>
-        (fromHeight to maxHeight).foreach { height =>
-          replayBlock(chainIndex, height)
-          val count = executedCount.addAndGet(1)
-          if (count % 10000 == 0) {
-            val progress = (count.toDouble / totalCount.toDouble) * 100
-            print(s"Executed #$count blocks, progress: ${f"$progress%.0f%%"}\n")
-          }
-        }
-      )
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def nextHeightRange(): Option[(GroupIndex, Int, Int)] = this.synchronized {
+    if (currentGroupIndex >= brokerConfig.groups) {
+      None
+    } else if (currentHeight >= maxHeightPerChain(currentGroupIndex)) {
+      currentGroupIndex += 1
+      currentHeight = initHeight
+      nextHeightRange()
+    } else {
+      val fromHeight = currentHeight
+      currentHeight += 10000
+      val maxHeight = maxHeightPerChain(currentGroupIndex) + 1
+      val toHeight  = math.min(currentHeight, maxHeight)
+      Some((GroupIndex.unsafe(currentGroupIndex), fromHeight, toHeight))
     }
   }
 
@@ -83,8 +102,8 @@ object ReplayTxScript extends App {
         }
     } yield ()
     result.left.foreach { error =>
-      print(
-        s"IO error occurred when replaying block: $error, chain index: $chainIndex, height: $height\n"
+      exitOnError(
+        s"IO error occurred when replaying block: $error, chain index: $chainIndex, height: $height"
       )
     }
   }
@@ -95,10 +114,9 @@ object ReplayTxScript extends App {
       stateHash <- replayBlock(block)
     } yield {
       if (stateHash != expected) {
-        print(
-          s"State hash mismatch: expected ${expected.toHexString}, got ${stateHash.toHexString}, block hash: ${block.hash.toHexString}\n"
+        exitOnError(
+          s"State hash mismatch: expected ${expected.toHexString}, got ${stateHash.toHexString}, block hash: ${block.hash.toHexString}"
         )
-        sys.exit(1)
       }
     }
   }
@@ -123,12 +141,16 @@ object ReplayTxScript extends App {
             case Right(_)                                                       => ()
             case Left(Right(TxScriptExeFailed(_))) if tx.contractInputs.isEmpty => ()
             case Left(error) =>
-              print(s"Failed to validate tx ${tx.id.toHexString} due to $error\n")
-              sys.exit(1)
+              exitOnError(s"Failed to validate tx ${tx.id.toHexString} due to $error")
           }
           if (sequentialTxSupported) blockEnv.addOutputRefFromTx(tx.unsigned)
         }
         groupView.worldState.contractState.getRootHash()
       }
+  }
+
+  private def exitOnError(error: String): Nothing = {
+    print(s"$error\n")
+    sys.exit(1)
   }
 }
