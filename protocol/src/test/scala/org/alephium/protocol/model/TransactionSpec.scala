@@ -525,8 +525,12 @@ class TransactionSpec
       // Compiled from the script above
       val script = StatefulScript.unsafe(
         AVector(
-          Method.testDefault(
+          Method[StatefulContext](
             isPublic = true,
+            usePreapprovedAssets = true,
+            useContractAssets = true,
+            usePayToContractOnly = false,
+            useRoutePattern = false,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
