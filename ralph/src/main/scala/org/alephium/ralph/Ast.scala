@@ -224,7 +224,7 @@ object Ast {
   }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
     def toConstInstr: Instr[StatelessContext]                    = v.toConstInstr
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       Seq(v.toConstInstr)
@@ -904,22 +904,38 @@ object Ast {
     }
   }
 
-  final case class IfBranchExpr[Ctx <: StatelessContext](
-      condition: Expr[Ctx],
-      expr: Expr[Ctx]
-  ) extends IfBranch[Ctx] {
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = expr.genCode(state)
+  sealed trait IfElseExprBase[Ctx <: StatelessContext] {
+    def statements: Seq[Statement[Ctx]]
+    def expr: Expr[Ctx]
+    def checkAndGetType(state: Compiler.State[Ctx]): Seq[Type] = {
+      statements.foreach(_.check(state))
+      expr.getType(state)
+    }
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      statements.flatMap(_.genCode(state)) ++ expr.genCode(state)
+    }
     def reset(): Unit = {
-      condition.reset()
+      statements.foreach(_.reset())
       expr.reset()
     }
   }
-  final case class ElseBranchExpr[Ctx <: StatelessContext](
+
+  final case class IfBranchExpr[Ctx <: StatelessContext](
+      condition: Expr[Ctx],
+      statements: Seq[Statement[Ctx]],
       expr: Expr[Ctx]
-  ) extends ElseBranch[Ctx] {
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = expr.genCode(state)
-    def reset(): Unit                                        = expr.reset()
+  ) extends IfBranch[Ctx]
+      with IfElseExprBase[Ctx] {
+    override def reset(): Unit = {
+      condition.reset()
+      super.reset()
+    }
   }
+  final case class ElseBranchExpr[Ctx <: StatelessContext](
+      statements: Seq[Statement[Ctx]],
+      expr: Expr[Ctx]
+  ) extends ElseBranch[Ctx]
+      with IfElseExprBase[Ctx]
   final case class IfElseExpr[Ctx <: StatelessContext](
       ifBranches: Seq[IfBranchExpr[Ctx]],
       elseBranch: ElseBranchExpr[Ctx]
@@ -928,10 +944,10 @@ object Ast {
     def elseBranchOpt: Option[ElseBranch[Ctx]] = Some(elseBranch)
 
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      val elseBranchType = elseBranch.expr.getType(state)
+      val elseBranchType = elseBranch.checkAndGetType(state)
       ifBranches.foreach { ifBranch =>
         ifBranch.checkCondition(state)
-        val ifBranchType = ifBranch.expr.getType(state)
+        val ifBranchType = ifBranch.checkAndGetType(state)
         if (ifBranchType != elseBranchType) {
           throw Compiler.Error(
             s"Invalid types of if-else expression branches, expected ${quote(elseBranchType)}, got ${quote(ifBranchType)}",
@@ -2180,7 +2196,7 @@ object Ast {
       }
     }
     def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
-      val tpe = Type.fromVal(value.tpe)
+      val tpe = Type.fromVal(value)
       constants(ident) =
         Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
     }
