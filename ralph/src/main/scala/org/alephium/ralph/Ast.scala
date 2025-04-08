@@ -1137,26 +1137,25 @@ object Ast {
       }
     }
 
-    private val mapKey   = if (args.length == 2) args(0) else args(1)
-    private val mapValue = if (args.length == 2) args(1) else args(2)
-
-    private def checkFieldLength(length: Int): Unit = {
+    private def checkFieldLength(length: Int, expr: Expr[StatefulContext]): Unit = {
       if (length > 0xff) {
         throw Compiler.Error(
           s"The number of struct fields exceeds the maximum limit",
-          mapValue.sourceIndex
+          expr.sourceIndex
         )
       }
     }
     private def genCreateContract(
         state: Compiler.State[StatefulContext]
     ): Seq[Instr[StatefulContext]] = {
+      val mapKey           = if (args.length == 2) args(0) else args(1)
+      val mapValue         = if (args.length == 2) args(1) else args(2)
       val mapType          = getMapType(state)
       val fieldsMutability = state.flattenTypeMutability(mapType.value, isMutable = true)
       val mutFieldLength   = fieldsMutability.count(identity)
       val immFieldLength   = fieldsMutability.length - mutFieldLength + 1 // parent contract id
-      checkFieldLength(mutFieldLength)
-      checkFieldLength(immFieldLength)
+      checkFieldLength(mutFieldLength, mapValue)
+      checkFieldLength(immFieldLength, mapValue)
 
       val pathCodes              = MapOps.genSubContractPath(state, ident, mapKey)
       val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(mapValue))
@@ -1190,8 +1189,8 @@ object Ast {
       }
     }
 
-    private val mapKey = if (args.length == 1) args(0) else args(1)
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
+      val mapKey    = if (args.length == 1) args(0) else args(1)
       val pathCodes = MapOps.genSubContractPath(state, ident, mapKey)
       val objCodes  = genMapDebug(state, pathCodes, isInsert = false) :+ SubContractId
 
