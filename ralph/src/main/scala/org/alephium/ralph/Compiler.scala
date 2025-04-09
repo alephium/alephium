@@ -689,7 +689,7 @@ object Compiler {
     def getVariablesRef(ident: Ast.Ident): VariablesRef[Ctx] = {
       getVariable(ident) match {
         case v: VarInfo.MultipleVar[Ctx @unchecked] => v.ref
-        case _ => throw Error(s"Struct ${ident.name} does not exist", ident.sourceIndex)
+        case _ => throw Error(s"Array or struct ${ident.name} does not exist", ident.sourceIndex)
       }
     }
 
@@ -741,13 +741,17 @@ object Compiler {
       args.view.zipWithIndex.flatMap { case (argExpr, index) =>
         val code = argCodes(index)
         val arg  = funcDef.args(index)
+        val tpe  = resolveType(arg.tpe)
         argExpr match {
           case _: Ast.Variable[Ctx @unchecked] | _: Ast.Const[Ctx @unchecked] =>
-            addInlinedArgument(arg.ident, arg.tpe, code)
+            tpe match {
+              case _: Type.FixedSizeArray | _: Type.Struct => ()
+              case tpe => addInlinedArgument(arg.ident, tpe, code)
+            }
             Seq.empty[Instr[Ctx]]
           case _ =>
-            addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, false)
-            code ++ genStoreCode(arg.ident).flatten
+            addLocalVariable(arg.ident, tpe, arg.isMutable, arg.isUnused, false)
+            code ++ genStoreCode(arg.ident).reverse.flatten
         }
       }.toSeq
     }
@@ -792,29 +796,38 @@ object Compiler {
 
     private def addLocalVarsExceptArgs(func: Ast.FuncDef[Ctx]): Unit = {
       val argNames = func.args.map(arg => scopedName(func.id, arg.ident.name))
+      val prefix   = scopedNamePrefix(func.id)
+      val varInfos = mutable.ArrayBuffer.empty[(VarKey, VarInfo, Int)]
       varTable.view
-        .filterKeys(key =>
-          key.name.startsWith(scopedNamePrefix(func.id)) && !argNames.contains(key.name)
-        )
-        .collect { case (key, varInfo: VarInfo.Local) => (key, varInfo) }
-        .toSeq
-        .sortBy(_._2.index)
-        .foreach { case (key, varInfo) =>
-          val scopeRefs = key.scope.getScopeRefPath
-          addLocalVariable(scopeRefs, varInfo)
+        .filter { case (key, varInfo) =>
+          key.name.startsWith(prefix) &&
+          !argNames.contains(key.name) &&
+          !varInfo.isGenerated &&
+          varInfo.isLocal
+        }
+        .foreach {
+          case (key, info: VarInfo.Local) => varInfos.addOne((key, info, info.index.toInt))
+          case (key, info @ VarInfo.MultipleVar(_, _, _, _, ref: LocalVarRef[_])) =>
+            varInfos.addOne((key, info, ref.getConstantOffset()))
+          case _ => ()
+        }
+      varInfos
+        .sortBy(_._3)
+        .foreach { case (key, varInfo, _) =>
+          addLocalVariable(key.scope.getScopeRefPath, varInfo)
         }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    private def addLocalVariable(scopeRefs: Seq[Ast.Positioned], varInfo: VarInfo.Local): Unit = {
+    private def addLocalVariable(scopeRefs: Seq[Ast.Positioned], varInfo: VarInfo): Unit = {
       if (scopeRefs.isEmpty) {
-        addLocalVariable(varInfo)
+        addVarInfo(varInfo)
       } else {
         withScope(scopeRefs(0))(addLocalVariable(scopeRefs.drop(1), varInfo))
       }
     }
 
-    private def addLocalVariable(varInfo: VarInfo.Local): Unit = {
+    private def addVarInfo(varInfo: VarInfo): Unit = {
       addLocalVariable(
         varInfo.ident,
         varInfo.tpe,
@@ -934,7 +947,7 @@ object Compiler {
       val varInfo =
         VarInfo.Constant(
           ident,
-          Type.fromVal(value.tpe),
+          Type.fromVal(value),
           value,
           Seq(value.toConstInstr),
           constantDef

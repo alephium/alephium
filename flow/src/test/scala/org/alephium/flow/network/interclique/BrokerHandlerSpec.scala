@@ -494,11 +494,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(HeadersByHeightsRequest(defaultRequestId, heights))
     listener.expectNoMessage()
 
+    val remoteAddress  = brokerHandlerActor.remoteAddress
     val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
     brokerHandler ! BaseBrokerHandler.Received(
       HeadersByHeightsRequest(defaultRequestId, invalidHeights)
     )
-    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
     expectTerminated(brokerHandler.ref)
   }
 
@@ -514,11 +515,12 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     )
     listener.expectNoMessage()
 
+    val remoteAddress  = brokerHandlerActor.remoteAddress
     val invalidHeights = heights :+ (invalidChainIndex -> BlockHeightRange(1, 4, 1))
     brokerHandler ! BaseBrokerHandler.Received(
       BlocksAndUnclesByHeightsRequest(defaultRequestId, invalidHeights)
     )
-    listener.expectMsg(MisbehaviorManager.InvalidFlowData(brokerHandlerActor.remoteAddress))
+    listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
     expectTerminated(brokerHandler.ref)
   }
 
@@ -1032,27 +1034,30 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       blockSize += uncleSize + 1
     }
 
-    val blockchain = blockFlow.getBlockChain(chainIndex)
-    val blocks     = blockchain.getBlocksWithUnclesByHeightsUnsafe(AVector.from(1 to 4))
-    blocks.length is blockSize
+    val blockchain    = blockFlow.getBlockChain(chainIndex)
+    val heights       = AVector.from(1 to 4)
+    val orderedBlocks = blockchain.getBlocksWithUnclesByHeightsUnsafe(heights)
+    orderedBlocks.length is blockSize
 
-    def getHeader(height: Int): BlockHeader = {
-      val hash = blockchain.getHashesUnsafe(height).head
-      blockchain.getBlockHeaderUnsafe(hash)
+    val unorderedBlocks = heights.flatMap { height =>
+      val hashes = blockchain.getHashesUnsafe(height)
+      hashes.shuffle().map(blockchain.getBlockUnsafe)
     }
-    val toHeader        = getHeader(4)
-    val invalidToHeader = getHeader(3)
+    unorderedBlocks.length is blockSize
 
-    SyncV2Handler.validateBlocks(blocks, 4, None) is true
-    SyncV2Handler.validateBlocks(blocks, 4, Some(toHeader)) is true
-    SyncV2Handler.validateBlocks(blocks, 3, None) is false
-    SyncV2Handler.validateBlocks(blocks, 5, None) is false
-    SyncV2Handler.validateBlocks(blocks, 4, Some(invalidToHeader)) is false
+    val validToHeaders  = blockchain.getHashesUnsafe(4).map(blockchain.getBlockHeaderUnsafe)
+    val invalidToHeader = blockchain.getBlockHeaderUnsafe(blockchain.getHashesUnsafe(3).sample())
 
-    val index         = blocks.indexWhere(_.header == invalidToHeader)
-    val invalidBlocks = blocks.replace(index, blocks.last)
-    SyncV2Handler.validateBlocks(invalidBlocks, 4, None) is false
-    SyncV2Handler.validateBlocks(invalidBlocks, 4, Some(toHeader)) is false
+    Seq(orderedBlocks, unorderedBlocks).foreach { blocks =>
+      SyncV2Handler.validateBlocks(blocks.take(3), 4, None) is false
+      SyncV2Handler.validateBlocks(blocks, 4, None) is true
+      SyncV2Handler.validateBlocks(blocks, 3, None) is false
+      SyncV2Handler.validateBlocks(blocks, 5, None) is false
+      validToHeaders.foreach(header =>
+        SyncV2Handler.validateBlocks(blocks, 4, Some(header)) is true
+      )
+      SyncV2Handler.validateBlocks(blocks, 4, Some(invalidToHeader)) is false
+    }
   }
 
   it should "check pending requests" in new SyncV2Fixture {

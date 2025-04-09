@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
-import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.{
@@ -69,8 +69,7 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
     val blocks = AVector(block)
     if (validateFlowData(blocks, isBlock = true)) {
       seenBlocks.put(block.hash, ())
-      val message = DependencyHandler.AddFlowData(blocks, dataOrigin)
-      allHandlers.dependencyHandler ! message
+      handleValidFlowData(blocks, dataOrigin)
     }
   }
 
@@ -891,23 +890,43 @@ object SyncV2Handler {
     BlockHeightRange.from(from, from + (count - 1) * span, span)
   }
 
-  // This function does the following two checks:
-  // 1. Check if the downloaded blocks form a valid chain
-  // 2. Check if the latest mainchain block matches the `toHeader`
+  // format: off
+  /**
+   * Validates a sequence of downloaded blocks by performing two critical checks:
+   * 1. Verifies that the blocks form a valid chain by checking parent-child relationships
+   * 2. Ensures the chain connects properly to the target header (if provided)
+   *
+   * The function traverses the blocks in reverse order, starting from the most recent block,
+   * and verifies that each block's hash matches the expected hash in the chain.
+   *
+   * @param blocks The vector of blocks to validate
+   * @param mainChainBlockSize The expected number of blocks in the main chain
+   * @param toHeaderOpt Optional target header that the chain should connect to
+   * @return true if the blocks form a valid chain of the expected size, false otherwise
+   */
+  // format: on
   def validateBlocks(
       blocks: AVector[Block],
       mainChainBlockSize: Int,
-      toHeader: Option[BlockHeader]
+      toHeaderOpt: Option[BlockHeader]
   ): Boolean = {
-    assume(blocks.nonEmpty)
-    var lastMainChainBlock = blocks.head
-    var size               = 1
-    blocks.tail.foreach { block =>
-      if (block.parentHash == lastMainChainBlock.hash) {
-        lastMainChainBlock = block
-        size += 1
+    assume(mainChainBlockSize > 0)
+
+    if (blocks.length < mainChainBlockSize) {
+      false
+    } else {
+      val startHash        = toHeaderOpt.map(_.hash).getOrElse(blocks.last.hash)
+      var nextBlockToCheck = startHash
+      var remainingBlocks  = mainChainBlockSize
+
+      for (block <- blocks.reverseIterator) {
+        if (block.hash == nextBlockToCheck) {
+          nextBlockToCheck = block.parentHash
+          remainingBlocks -= 1
+        }
       }
+
+      remainingBlocks == 0
     }
-    size == mainChainBlockSize && toHeader.forall(_ == lastMainChainBlock.header)
   }
 }

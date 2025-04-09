@@ -465,7 +465,7 @@ object BuiltIn {
       Seq(Type.U256),
       BlockTimeStamp,
       Seq(),
-      retComment = "the block timestamp in milliseconds"
+      retComment = "the timestamp of the current block in milliseconds since the Unix epoch"
     )
   val blockTarget: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
