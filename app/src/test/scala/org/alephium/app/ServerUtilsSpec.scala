@@ -5704,11 +5704,16 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       serverUtils.compileProject(blockFlow, api.Compile.Project(code(now))).isRight is true
+      val invalidTs = now.plusMillisUnsafe(1)
       serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(now.plusMillisUnsafe(1))))
+        .compileProject(blockFlow, api.Compile.Project(code(invalidTs)))
         .leftValue
-        .detail
-        .contains("Test failed: Foo:foo") is true
+        .detail is
+        s"""|-- error (9:5): Testing error
+            |9 |    testCheck!(foo() == ${invalidTs.millis})
+            |  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed in test `Foo:foo`
+            |""".stripMargin
     }
 
     {
@@ -5738,8 +5743,12 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils
         .compileProject(blockFlow, api.Compile.Project(code(20)))
         .leftValue
-        .detail
-        .contains("Test failed: Foo:add") is true
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testCheck!(add() == 20)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed in test `Foo:add`
+            |""".stripMargin
     }
 
     {
@@ -5769,8 +5778,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils
         .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
         .leftValue
-        .detail
-        .contains("Test failed: Foo:transfer") is true
+        .detail is
+        s"""|-- error (16:5): Testing error
+            |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed in test `Foo:transfer`
+            |   |--------------------------------------------------------------------------------------------------
+            |   |Debug messages:
+            |   |> Contract @ Foo - balance: 0
+            |""".stripMargin
     }
 
     {
@@ -5800,8 +5816,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         serverUtils
           .compileProject(blockFlow, api.Compile.Project(code))
           .leftValue
-          .detail
-          .contains("Test failed: Base:base") is true
+          .detail is
+          s"""|-- error (17:5): Testing error
+              |17 |    testCheck!(base() == result)
+              |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed in test `Base:base`
+              |""".stripMargin
       }
     }
 
@@ -5832,19 +5852,23 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils
         .compileProject(blockFlow, api.Compile.Project(code(invalid0)))
         .leftValue
-        .detail
-        .contains(
-          "Test failed: Foo:foo, detail: invalid field bar.a, expected U256(0), have: U256(1)"
-        ) is true
+        .detail is
+        s"""|-- error (14:9): Testing error
+            |14 |  after Self(Bar { a: 0, b: [1, 0], c: [0; 2] }) {
+            |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |        Test failed: Foo:foo, detail: invalid field bar.a, expected U256(0), have: U256(1)
+            |""".stripMargin
 
       val invalid1 = "Bar { a: 1, b: [1, 1], c: [0; 2] }"
       serverUtils
         .compileProject(blockFlow, api.Compile.Project(code(invalid1)))
         .leftValue
-        .detail
-        .contains(
-          "Test failed: Foo:foo, detail: invalid field bar.b[1], expected U256(1), have: U256(0)"
-        ) is true
+        .detail is
+        s"""|-- error (14:9): Testing error
+            |14 |  after Self(Bar { a: 1, b: [1, 1], c: [0; 2] }) {
+            |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |        Test failed: Foo:foo, detail: invalid field bar.b[1], expected U256(1), have: U256(0)
+            |""".stripMargin
     }
 
     {
