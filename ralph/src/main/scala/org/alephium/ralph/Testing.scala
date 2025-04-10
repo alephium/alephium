@@ -19,12 +19,16 @@ package org.alephium.ralph
 import scala.collection.mutable
 import scala.util.Random
 
-import org.alephium.protocol.config.GroupConfig
+import akka.util.ByteString
+
+import org.alephium.io.IOResult
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.ralph.error.CompilerError
-import org.alephium.util.{AVector, Hex, TimeStamp, U256}
+import org.alephium.util.{AVector, Hex, I256, TimeStamp, U256}
 
+// scalastyle:off number.of.methods
 object Testing {
   private def checkAndGetValue[Ctx <: StatelessContext, V <: Val](
       state: Compiler.State[Ctx],
@@ -504,6 +508,23 @@ object Testing {
       val group = settings.map(_.group).getOrElse(0)
       GroupIndex.from(group).toRight(s"Invalid group setting $group in test $name")
     }
+
+    def getInputAssets(): AVector[AssetOutput] = {
+      assets
+        .map(_.assets.map { case (lockupScript, tokens) =>
+          val attoAlphAmount =
+            tokens.find(_._1 == TokenId.alph).map(_._2).getOrElse(dustUtxoAmount)
+          val remains = tokens.filter(_._1 != TokenId.alph)
+          AssetOutput(
+            attoAlphAmount,
+            lockupScript,
+            TimeStamp.zero,
+            remains,
+            ByteString.empty
+          )
+        })
+        .getOrElse(AVector.empty)
+    }
   }
 
   private def checkFields(
@@ -611,6 +632,164 @@ object Testing {
         testCheckCalls.clear()
         CompiledUnitTests(tests, errorCodes)
       }
+    }
+  }
+
+  // scalastyle:off method.length
+  def run(
+      createWorldState: GroupIndex => IOResult[WorldState.Staging],
+      sourceCode: String,
+      contracts: AVector[CompiledContract]
+  )(implicit
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): Either[String, Unit] = {
+    val contractMap = contracts.map(c => (c.ast.ident.name, c)).iterator.toMap
+    contracts.foreachE { testingContract =>
+      testingContract.tests.tests.foreachE { test =>
+        for {
+          groupIndex <- test.getGroupIndex
+          worldState <- from(createWorldState(groupIndex))
+          blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
+          blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
+          txId           = TransactionId.random
+          _ <- createContracts(
+            worldState,
+            contractMap,
+            testingContract,
+            test,
+            blockHash,
+            txId
+          )
+          blockEnv    = BlockEnv.mockup(groupIndex, blockHash, blockTimeStamp)
+          testGasFee  = nonCoinbaseMinGasPrice * maximalGasPerTx
+          inputAssets = test.getInputAssets()
+          txEnv       = TxEnv.mockup(txId, inputAssets)
+          context     = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+          _ <- ContractRunner.run(
+            context,
+            test.selfContract.contractId,
+            None,
+            inputAssets,
+            testingContract.debugCode.methodsLength,
+            AVector.empty,
+            test.method,
+            testGasFee
+          ) match {
+            case Right(_) => Right(())
+            case Left(Left(error)) =>
+              Left(s"IO error occurred when running test `${test.name}`: $error")
+            case Left(Right(error)) =>
+              val debugMessages = extractDebugMessage(worldState, test)
+              Left(getUnitTestError(sourceCode, testingContract, test.name, error, debugMessages))
+          }
+          _ <- checkStateAfterTesting(worldState, sourceCode, test)
+        } yield ()
+      }
+    }
+  }
+  // scalastyle:off method.length
+
+  private def createContracts(
+      worldState: WorldState.Staging,
+      allContracts: Map[String, CompiledContract],
+      testingContract: CompiledContract,
+      test: Testing.CompiledUnitTest[StatefulContext],
+      blockHash: BlockHash,
+      txId: TransactionId
+  ) = {
+    test.before.foreachE { c =>
+      val contractCode = if (c.typeId == testingContract.ast.ident) {
+        val code = testingContract.debugCode
+        code.copy(methods = code.methods :+ test.method)
+      } else {
+        allContracts(c.typeId.name).debugCode
+      }
+      val attoAlphAmount =
+        c.tokens.find(_._1 == TokenId.alph).map(_._2).getOrElse(minimalAlphInContract)
+      val remains = c.tokens.filter(_._1 != TokenId.alph)
+      val output  = ContractOutput(attoAlphAmount, LockupScript.p2c(c.contractId), remains)
+      ContractRunner
+        .createContractUnsafe(
+          worldState,
+          c.contractId,
+          contractCode,
+          c.immFields.map(_._2),
+          c.mutFields.map(_._2),
+          output,
+          blockHash,
+          txId
+        )
+        .left
+        .map(err => s"IO error occurred when creating contract: $err")
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def getUnitTestError(
+      sourceCode: String,
+      testingContract: CompiledContract,
+      testName: String,
+      exeFailure: ExeFailure,
+      debugMessages: String
+  ): String = {
+    val (errorCode, msg) = exeFailure match {
+      case AssertionFailedWithErrorCode(_, errorCode) =>
+        (Some(errorCode), s"Assertion Failed in test `$testName`")
+      case _ => (None, exeFailure.toString)
+    }
+    val detail = s"VM execution error: $msg"
+    testingContract.tests
+      .getError(testName, errorCode, detail, debugMessages)
+      .format(sourceCode)
+  }
+
+  private def extractDebugMessage(
+      worldState: WorldState.Staging,
+      unitTest: CompiledUnitTest[StatefulContext]
+  ): String = {
+    val allEvents     = worldState.nodeIndexesState.logState.getNewLogs()
+    val debugMessages = mutable.ArrayBuffer.empty[String]
+    allEvents.foreach { event =>
+      unitTest.before.find(_.contractId == event.contractId).foreach { contract =>
+        event.states.foreach { state =>
+          if (I256.from(state.index.toInt) == debugEventIndex.v) {
+            state.fields.headOption match {
+              case Some(value: Val.ByteVec) =>
+                val message = s"> Contract @ ${contract.typeId.name} - ${value.bytes.utf8String}"
+                debugMessages.addOne(message)
+              case _ => ()
+            }
+          }
+        }
+      }
+    }
+    if (debugMessages.isEmpty) "" else debugMessages.mkString("", "\n", "\n")
+  }
+
+  private def from[T](result: IOResult[T]): Either[String, T] = {
+    result.left.map(error => s"Failed in IO: $error")
+  }
+
+  private def checkStateAfterTesting(
+      worldState: WorldState.Staging,
+      sourceCode: String,
+      test: CompiledUnitTest[StatefulContext]
+  ): Either[String, Unit] = {
+    test.after.foreachWithIndexE { case (contract, index) =>
+      for {
+        state <- from(worldState.getContractState(contract.contractId))
+        asset <- from(worldState.getContractAsset(contract.contractId))
+        _ <- checkContractState(contract, state.immFields, state.mutFields, asset).left
+          .map { detail =>
+            val sourceIndex  = test.ast.after.defs(index).sourceIndex
+            val debugMessage = extractDebugMessage(worldState, test)
+            val error        = getTestError(test.name, sourceIndex, detail, debugMessage)
+            error.format(sourceCode)
+          }
+      } yield ()
     }
   }
 }

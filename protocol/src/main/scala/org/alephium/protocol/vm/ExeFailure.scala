@@ -416,17 +416,15 @@ final case class InvalidErrorCode(errorCode: U256) extends ExeFailure {
 }
 final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
     extends ExeFailure {
-  def getErrorMessageWithoutErrorCode: String = {
+  override def toString: String = {
     contractIdOpt match {
       case Some(contractId) =>
         val contractAddressString = Address.contract(contractId).toBase58
-        s"Assertion Failed in Contract @ $contractAddressString"
+        s"Assertion Failed in Contract @ $contractAddressString, Error Code: $errorCode"
       case None =>
-        s"Assertion Failed in TxScript"
+        s"Assertion Failed in TxScript, Error Code: $errorCode"
     }
   }
-
-  override def toString: String = s"$getErrorMessageWithoutErrorCode, Error Code: $errorCode"
 }
 
 sealed trait IOFailure extends Product {
