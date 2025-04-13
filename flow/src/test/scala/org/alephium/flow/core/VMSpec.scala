@@ -8156,6 +8156,47 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(code)
   }
 
+  it should "be able to use assets for the newly created contract" in new ContractFixture {
+    val fancyTokenCode =
+      s"""
+         |Contract FancyToken() {
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn transferTokens(recipient: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(recipient, selfTokenId!(), amount)
+         |  }
+         |}
+         |""".stripMargin
+
+    val fancyTokenTemplateId = createContract(fancyTokenCode)._1
+
+    val fancyTokenFactoryCode =
+      s"""
+         |Contract FancyTokenFactory() {
+         |  @using(checkExternalCaller = false)
+         |  pub fn mint(name: ByteVec) -> () {
+         |    let fancyTokenContractId = copyCreateSubContractWithToken!(name, #${fancyTokenTemplateId.toHexString}, #00, #00, 2)
+         |    FancyToken(fancyTokenContractId).transferTokens(callerAddress!(), 1)
+         |  }
+         |}
+         |
+         |$fancyTokenCode
+         |""".stripMargin
+
+    val fancyTokenFactoryId = createContract(fancyTokenFactoryCode)._1
+
+    val mintScriptCode =
+      s"""
+         |TxScript Main {
+         |  FancyTokenFactory(#${fancyTokenFactoryId.toHexString}).mint(b`fancyToken`)
+         |}
+         |
+         |$fancyTokenFactoryCode
+         |""".stripMargin
+
+
+    intercept[AssertionError](callTxScript(mintScriptCode)).getMessage is "Right(InvalidTokenBalance)"
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
