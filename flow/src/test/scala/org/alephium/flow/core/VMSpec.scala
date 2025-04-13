@@ -8193,8 +8193,17 @@ class VMSpec extends AlephiumSpec with Generators {
          |$fancyTokenFactoryCode
          |""".stripMargin
 
+    val mintScript = Compiler.compileTxScript(mintScriptCode).rightValue
+    val block      = payableCall(blockFlow, chainIndex, mintScript)
+    addAndCheck(blockFlow, block)
 
-    intercept[AssertionError](callTxScript(mintScriptCode)).getMessage is "Right(InvalidTokenBalance)"
+    val fancyTokenContractId =
+      fancyTokenFactoryId.subContractId(ByteString.fromString("fancyToken"), chainIndex.from)
+    getContractAsset(fancyTokenContractId) is ContractOutput(
+      minimalAlphInContract,
+      LockupScript.P2C(fancyTokenContractId),
+      AVector((TokenId.from(fancyTokenContractId), U256.One))
+    )
   }
 
   private def getEvents(
