@@ -2887,10 +2887,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
 
     def prepareStack(
-      attoAlphAmount: U256,
-      tokenAmount: U256,
-      timestamp: U256,
-      recipient: LockupScript.Asset = assetAddress
+        attoAlphAmount: U256,
+        tokenAmount: U256,
+        timestamp: U256,
+        recipient: LockupScript.Asset = assetAddress
     ): ExeResult[Unit] = {
       balanceState.approveALPH(assetAddress, attoAlphAmount)
       balanceState.approveToken(assetAddress, tokenId, tokenAmount)
