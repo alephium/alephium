@@ -378,21 +378,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       failed(ContractAssetUnloaded(Address.contract(contractId)))
     } else {
       if (getHardFork().isDanubeEnabled()) {
-        val lockupScript         = LockupScript.p2c(contractId)
-        val generatedOutputIndex = generatedOutputs.indexWhere(_.lockupScript == lockupScript)
-        if (generatedOutputIndex == -1) {
-          generateContractOutputLeman(contractId, contractOutput, inputIndex)
-        } else {
-          // Newly created contract
-          val outputIndex = txEnv.fixedOutputs.length + generatedOutputIndex
-          contractInputs.remove(inputIndex)
-          generateContractOutputSimple(
-            contractId,
-            contractOutput,
-            outputIndex,
-            generatedOutputs(generatedOutputIndex) = _
-          )
-        }
+        generateContractOutputDanube(contractId, contractOutput, inputIndex)
       } else {
         generateContractOutputLeman(contractId, contractOutput, inputIndex)
       }
@@ -414,6 +400,28 @@ trait StatefulContext extends StatelessContext with ContractPool {
         contractOutput,
         nextOutputIndex,
         generatedOutputs.addOne
+      )
+    }
+  }
+
+  def generateContractOutputDanube(
+      contractId: ContractId,
+      contractOutput: ContractOutput,
+      inputIndex: Int
+  ): ExeResult[Unit] = {
+    val lockupScript         = LockupScript.p2c(contractId)
+    val generatedOutputIndex = generatedOutputs.indexWhere(_.lockupScript == lockupScript)
+    if (generatedOutputIndex == -1) {
+      generateContractOutputLeman(contractId, contractOutput, inputIndex)
+    } else {
+      // Newly created contract
+      val outputIndex = txEnv.fixedOutputs.length + generatedOutputIndex
+      contractInputs.remove(inputIndex)
+      generateContractOutputSimple(
+        contractId,
+        contractOutput,
+        outputIndex,
+        generatedOutputs(generatedOutputIndex) = _
       )
     }
   }
