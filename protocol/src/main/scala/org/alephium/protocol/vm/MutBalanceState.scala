@@ -73,6 +73,10 @@ final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) 
     approved.useAll(lockupScript)
   }
 
+  def useAllApproved(): Option[MutBalancesPerLockup] = {
+    approved.useAll()
+  }
+
   def useAlph(lockupScript: LockupScript, amount: U256): Option[Unit] = {
     remaining.subAlph(lockupScript, amount)
   }

@@ -1834,14 +1834,20 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
 
 object LockApprovedAssets extends LockApprovedAssetsInstr {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    val hardFork = frame.ctx.getHardFork()
     for {
       lockTime     <- popTimestamp(frame)
       lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
-      approved <- balanceState
-        .useAllApproved(lockupScript)
-        .toRight(Right(NoAssetsApproved(Address.Asset(lockupScript))))
-      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, frame.ctx.getHardFork())
+      approved <-
+        if (hardFork.isDanubeEnabled()) {
+          balanceState.useAllApproved().toRight(Right(NoAssetsApproved(None)))
+        } else {
+          balanceState
+            .useAllApproved(lockupScript)
+            .toRight(Right(NoAssetsApproved(Some(Address.Asset(lockupScript)))))
+        }
+      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, hardFork)
       _       <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
