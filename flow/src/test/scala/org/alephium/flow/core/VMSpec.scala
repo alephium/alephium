@@ -3950,7 +3950,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |  @using(${if (useAssets) "assetsInContract = true, " else ""}updateFields = true)
          |  pub fn bar() -> () {
-         |    ${if (useAssets) s"assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)" else ""}
+         |    ${if (useAssets) s"transferTokenFromSelf!(@$genesisAddress, ALPH, 1 alph)" else ""}
          |    n = n + 1
          |  }
          |}
