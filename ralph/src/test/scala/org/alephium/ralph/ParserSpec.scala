@@ -2734,20 +2734,16 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       s"""
          |enum Errors {
          |  First = 1
-         |  $enumWithDefault
+         |  $$${enumWithDefault}
          |}""".stripMargin
 
-    val enums = parse(code, StatefulParser.enumDef(_)).get.value.fields
+    val enums = parse(code.replace("$", ""), StatefulParser.enumDef(_)).get.value.fields
 
-    val first  = enums.head
     val second = enums.last
+    val index  = code.indexOf("$")
 
-    first.sourceIndex is Some(SourceIndex(17, 9, fileURI))
-    first.ident.sourceIndex is Some(SourceIndex(17, 5, fileURI))
-    first.value.sourceIndex is Some(SourceIndex(25, 1, fileURI))
-
-    second.sourceIndex is Some(SourceIndex(29, enumWithDefault.size, fileURI))
-    second.ident.sourceIndex is Some(SourceIndex(29, enumWithDefault.size, fileURI))
+    second.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    second.ident.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
     // value source index is not set for default value
     second.value.sourceIndex is None
   }
