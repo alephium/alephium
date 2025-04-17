@@ -5901,6 +5901,28 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testCheck!(foo() == 1)
+           |  }
+           |}
+           |""".stripMargin
+      val options0 = CompilerOptions(skipTests = Some(true))
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code, Some(options0)))
+        .isRight is true
+      val options1 = CompilerOptions(skipTests = Some(false))
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code, Some(options1)))
+        .isRight is false
+    }
   }
 
   @scala.annotation.tailrec

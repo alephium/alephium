@@ -648,45 +648,49 @@ object Testing {
   ): Either[String, Unit] = {
     val contractMap = contracts.map(c => (c.ast.ident.name, c)).iterator.toMap
     contracts.foreachE { testingContract =>
-      testingContract.tests.tests.foreachE { test =>
-        for {
-          groupIndex <- test.getGroupIndex
-          worldState <- from(createWorldState(groupIndex))
-          blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
-          blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
-          txId           = TransactionId.random
-          _ <- createContracts(
-            worldState,
-            contractMap,
-            testingContract,
-            test,
-            blockHash,
-            txId
-          )
-          blockEnv    = BlockEnv.mockup(groupIndex, blockHash, blockTimeStamp)
-          testGasFee  = nonCoinbaseMinGasPrice * maximalGasPerTx
-          inputAssets = test.getInputAssets()
-          txEnv       = TxEnv.mockup(txId, inputAssets)
-          context     = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-          _ <- ContractRunner.run(
-            context,
-            test.selfContract.contractId,
-            None,
-            inputAssets,
-            testingContract.debugCode.methodsLength,
-            AVector.empty,
-            test.method,
-            testGasFee
-          ) match {
-            case Right(_) => Right(())
-            case Left(Left(error)) =>
-              Left(s"IO error occurred when running test `${test.name}`: $error")
-            case Left(Right(error)) =>
-              val debugMessages = extractDebugMessage(worldState, test)
-              Left(getUnitTestError(sourceCode, testingContract, test.name, error, debugMessages))
+      testingContract.tests match {
+        case Some(tests) =>
+          tests.tests.foreachE { test =>
+            for {
+              groupIndex <- test.getGroupIndex
+              worldState <- from(createWorldState(groupIndex))
+              blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
+              blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
+              txId           = TransactionId.random
+              _ <- createContracts(
+                worldState,
+                contractMap,
+                testingContract,
+                test,
+                blockHash,
+                txId
+              )
+              blockEnv    = BlockEnv.mockup(groupIndex, blockHash, blockTimeStamp)
+              testGasFee  = nonCoinbaseMinGasPrice * maximalGasPerTx
+              inputAssets = test.getInputAssets()
+              txEnv       = TxEnv.mockup(txId, inputAssets)
+              context     = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+              _ <- ContractRunner.run(
+                context,
+                test.selfContract.contractId,
+                None,
+                inputAssets,
+                testingContract.debugCode.methodsLength,
+                AVector.empty,
+                test.method,
+                testGasFee
+              ) match {
+                case Right(_) => Right(())
+                case Left(Left(error)) =>
+                  Left(s"IO error occurred when running test `${test.name}`: $error")
+                case Left(Right(error)) =>
+                  val debugMessages = extractDebugMessage(worldState, test)
+                  Left(getUnitTestError(sourceCode, tests, test.name, error, debugMessages))
+              }
+              _ <- checkStateAfterTesting(worldState, sourceCode, test)
+            } yield ()
           }
-          _ <- checkStateAfterTesting(worldState, sourceCode, test)
-        } yield ()
+        case None => Right(())
       }
     }
   }
@@ -730,7 +734,7 @@ object Testing {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def getUnitTestError(
       sourceCode: String,
-      testingContract: CompiledContract,
+      tests: CompiledUnitTests[StatefulContext],
       testName: String,
       exeFailure: ExeFailure,
       debugMessages: String
@@ -741,9 +745,7 @@ object Testing {
       case _ => (None, exeFailure.toString)
     }
     val detail = s"VM execution error: $msg"
-    testingContract.tests
-      .getError(testName, errorCode, detail, debugMessages)
-      .format(sourceCode)
+    tests.getError(testName, errorCode, detail, debugMessages).format(sourceCode)
   }
 
   private def extractDebugMessage(

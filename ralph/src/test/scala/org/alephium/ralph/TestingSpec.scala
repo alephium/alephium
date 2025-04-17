@@ -38,7 +38,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
@@ -62,7 +62,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
@@ -86,7 +86,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
@@ -109,7 +109,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
@@ -140,7 +140,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
@@ -182,7 +182,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       test.before.length is 3
 
@@ -225,7 +225,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val contracts = compileContractFull(code).rightValue.tests.tests.head.before
+      val contracts = compileContractFull(code).rightValue.tests.value.tests.head.before
       contracts.length is 2
       val bar = contracts.head
       bar.typeId is Ast.TypeId("Bar")
@@ -268,7 +268,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      val tests = compileContractFull(code).rightValue.tests.tests
+      val tests = compileContractFull(code).rightValue.tests.value.tests
       tests.length is 4
       tests.zipWithIndex.foreach { case (test, index) =>
         test.settings.isEmpty is true
@@ -299,7 +299,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |""".stripMargin
 
       def checkSettings(str: String, value: Testing.SettingsValue) = {
-        val test = compileContractFull(code(str)).rightValue.tests.tests.head
+        val test = compileContractFull(code(str)).rightValue.tests.value.tests.head
         test.settings is Some(value)
       }
 
@@ -345,7 +345,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val test = compileContractFull(code).rightValue.tests.tests.head
+      val test = compileContractFull(code).rightValue.tests.value.tests.head
       test.settings.isEmpty is true
       val assets = test.assets.value.assets
       assets.length is 2
@@ -392,7 +392,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val tests       = compileContractFull(code).rightValue.tests
+      val tests       = compileContractFull(code).rightValue.tests.value
       val barContract = tests.tests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
       barContract.immFields is AVector[(String, Val)](
@@ -433,14 +433,14 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |""".stripMargin
       val contracts = Compiler.compileProject(code).rightValue._1
       contracts.length is 2
-      val fooTests = contracts(0).tests.tests
+      val fooTests = contracts(0).tests.value.tests
       fooTests.length is 1
       val fooContract = fooTests.head.before.head
       fooContract.typeId is Ast.TypeId("Foo")
       fooContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
       fooContract.mutFields is AVector[(String, Val)](("c", Val.False))
 
-      val barTests = contracts(1).tests.tests
+      val barTests = contracts(1).tests.value.tests
       barTests.length is 1
       val barContract = barTests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
@@ -472,7 +472,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |}
          |""".stripMargin
     val contract    = compileContractFull(code).rightValue
-    val tests       = contract.tests
+    val tests       = contract.tests.value
     val sourceIndex = contract.ast.unitTests.head.tests.head.body.head.sourceIndex
     tests.getError("foo", None, "error", "") is CompilerError.TestError(
       "Test failed: foo, detail: error",
@@ -544,7 +544,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |}
          |""".stripMargin
 
-    val contractState = compileContractFull(code).rightValue.tests.tests.head.after.head
+    val contractState = compileContractFull(code).rightValue.tests.value.tests.head.after.head
     val immFields = AVector[Val](
       Val.U256(U256.Zero),
       Val.U256(U256.One),

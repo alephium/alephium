@@ -36,7 +36,7 @@ final case class CompiledContract(
     ast: Ast.Contract,
     warnings: AVector[Warning],
     debugCode: StatefulContract,
-    tests: Testing.CompiledUnitTests[StatefulContext]
+    tests: Option[Testing.CompiledUnitTests[StatefulContext]]
 )
 final case class CompiledScript(
     code: StatefulScript,
