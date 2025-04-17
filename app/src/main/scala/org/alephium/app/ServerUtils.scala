@@ -1441,10 +1441,26 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildDeployContractTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[BuildDeployContractTxResult] = {
+  ): Try[Either[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult]] = {
     for {
-      utx <- buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildDeployContractTxResult.from(utx)
+      lockupPair <- query.getLockPair()
+      result <- lockupPair._1 match {
+        case lockupScript: LockupScript.P2PK =>
+          buildDeployContractTxWithFallbackAddresses(
+            blockFlow,
+            lockupPair,
+            otherGroupsLockupPairs(lockupScript),
+            query,
+            query.gasAmount,
+            query.gasPrice,
+            query.targetBlockHash
+          ).map(Left.apply)
+        case _ =>
+          buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
+            .map(BuildDeployContractTxResult.from)
+            .map(Right.apply)
+      }
+    } yield result
   }
 
   def buildChainedTransactions(

@@ -558,11 +558,14 @@ trait Endpoints
       .out(jsonBody[CompileProjectResult])
       .summary("Compile a project")
 
-  lazy val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, BuildDeployContractTxResult] =
+  lazy val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, Either[
+    BuildGrouplessDeployContractTxResult,
+    BuildDeployContractTxResult
+  ]] =
     contractsUnsignedTxEndpoint.post
       .in("deploy-contract")
       .in(jsonBody[BuildDeployContractTx])
-      .out(jsonBody[BuildDeployContractTxResult])
+      .out(jsonBody[Either[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult]])
       .summary("Build an unsigned contract")
 
   lazy val buildChainedTransactions

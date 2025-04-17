@@ -935,16 +935,19 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
+  implicit val buildDeployContractTxResultExamples
+      : List[Example[Either[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult]]] =
     simpleExample(
-      BuildDeployContractTxResult(
-        fromGroup = 2,
-        toGroup = 2,
-        unsignedTx = hexString,
-        model.minimalGas,
-        model.nonCoinbaseMinGasPrice,
-        txId = txId,
-        contractAddress = Address.contract(contractId)
+      Right(
+        BuildDeployContractTxResult(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId,
+          contractAddress = Address.contract(contractId)
+        )
       )
     )
 

@@ -1605,6 +1605,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           )
         )
         .rightValue
+        .rightValue
 
       val deployContractTx =
         deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
@@ -3324,6 +3325,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .rightValue
 
     def deployContract() = {
       val deployContractTx =
@@ -3898,7 +3900,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     def buildDeployContractTx(
         query: BuildDeployContractTx
     ): BuildDeployContractTxResult = {
-      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue.rightValue
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
       val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
