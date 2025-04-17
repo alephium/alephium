@@ -2731,6 +2731,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     )
   }
 
+  it should "Enum with default value shouldn't have a source index" in {
+
+    val enumWithDefault = "Second"
+
+    val code =
+      s"""
+         |enum Errors {
+         |  First = 1
+         |  $$${enumWithDefault}
+         |}""".stripMargin
+
+    val enums = parse(code.replace("$", ""), StatefulParser.enumDef(_)).get.value.fields
+
+    val second = enums.last
+    val index  = code.indexOf("$")
+
+    second.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    second.ident.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    // value source index is not set for default value
+    second.value.sourceIndex is None
+  }
+
   it should "set the origin contract id for constants and functions" in {
     val code =
       s"""
