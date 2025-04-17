@@ -314,10 +314,25 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildTransferTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[BuildTransferTxResult] = {
+  ): Try[Either[AVector[BuildTransferTxResult], BuildTransferTxResult]] = {
     for {
-      unsignedTx <- buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
-    } yield BuildTransferTxResult.from(unsignedTx)
+      lockupPair <- query.getLockPair()
+      result <- lockupPair._1 match {
+        case lockupScript: LockupScript.P2PK =>
+          buildTransferTxWithFallbackAddresses(
+            blockFlow,
+            lockupPair,
+            otherGroupsLockupPairs(lockupScript),
+            query.destinations,
+            query.gasPrice,
+            query.targetBlockHash
+          ).map(Left.apply)
+        case _ =>
+          buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
+            .map(BuildTransferTxResult.from)
+            .map(Right.apply)
+      }
+    } yield result
   }
 
   def buildMultiInputsTransaction(

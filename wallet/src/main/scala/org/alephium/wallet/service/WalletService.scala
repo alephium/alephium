@@ -395,7 +395,7 @@ object WalletService {
           .prepareTransaction(pubKey, destinations, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
-            case Right(buildTxResult) =>
+            case Right(Right(buildTxResult)) =>
               val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
               blockFlowClient
                 .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
@@ -405,6 +405,8 @@ object WalletService {
                   )
                 )
                 .map(_.left.map(BlockFlowClientError.apply))
+            case Right(Left(_)) =>
+              Future.successful(Left(OtherError("Multiple transactions result not supported yet")))
           }
       }
     }

@@ -19,11 +19,18 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.crypto.BIP340SchnorrPublicKey
+import org.alephium.crypto.{BIP340SchnorrPublicKey, SecP256K1PublicKey}
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.{
+  GasBox,
+  GasPrice,
+  LockupScript,
+  PublicKeyLike,
+  StatefulScript,
+  UnlockScript
+}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
@@ -39,15 +46,22 @@ object BuildTxCommon {
   sealed trait PublicKeyType
   object Default       extends PublicKeyType // SecP256K1
   object BIP340Schnorr extends PublicKeyType
+  object GLSecP256K1   extends PublicKeyType
 
   trait FromPublicKey {
     def fromPublicKey: ByteString
     def fromPublicKeyType: Option[PublicKeyType]
 
-    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)] = fromPublicKeyType match {
-      case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
-      case _                                 => p2pkhLockPair(fromPublicKey)
-    }
+    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+    def getLockPair(
+        groupIndex: Option[GroupIndex] = None
+    )(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] =
+      fromPublicKeyType match {
+        case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
+        case Some(BuildTxCommon.GLSecP256K1) =>
+          grouplessSecP256K1LockPair(fromPublicKey, groupIndex)
+        case _ => p2pkhLockPair(fromPublicKey)
+      }
   }
 
   def p2pkhLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
@@ -66,6 +80,21 @@ object BuildTxCommon {
         Right(address.lockupScript -> address.unlockScript)
       case None =>
         Left(badRequest(s"Invalid BIP340Schnorr public key: ${Hex.toHexString(fromPublicKey)}"))
+    }
+  }
+
+  def grouplessSecP256K1LockPair(
+      fromPublicKey: ByteString,
+      groupOpt: Option[GroupIndex]
+  )(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] = {
+    SecP256K1PublicKey.from(fromPublicKey) match {
+      case Some(publicKey) =>
+        val publicKeyLike = PublicKeyLike.SecP256K1(publicKey)
+        val group         = groupOpt.getOrElse(publicKeyLike.defaultGroup)
+        val lockupScript  = LockupScript.p2pk(publicKeyLike, group)
+        Right(lockupScript -> UnlockScript.P2PK)
+      case None =>
+        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 

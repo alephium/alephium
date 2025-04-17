@@ -337,11 +337,13 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  val buildTransferTransaction: BaseEndpoint[BuildTransferTx, BuildTransferTxResult] =
+  val buildTransferTransaction: BaseEndpoint[BuildTransferTx, Either[AVector[
+    BuildTransferTxResult
+  ], BuildTransferTxResult]] =
     transactionsEndpoint.post
       .in("build")
       .in(jsonBodyWithAlph[BuildTransferTx])
-      .out(jsonBody[BuildTransferTxResult])
+      .out(jsonBody[Either[AVector[BuildTransferTxResult], BuildTransferTxResult]])
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
   val buildTransferFromOneToManyGroups

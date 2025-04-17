@@ -99,7 +99,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def otherGroupsLockupPairs(
+  protected def otherGroupsLockupPairs(
       lockup: LockupScript.P2PK
   ): AVector[(LockupScript.Asset, UnlockScript)] = {
     AVector

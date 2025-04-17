@@ -48,7 +48,7 @@ final case class BuildGrouplessDeployContractTx(
       case LockupScript.CompleteLockupScript(lockupScript) =>
         lockupScript match {
           case p2pkLockupScript: LockupScript.P2PK => Right((p2pkLockupScript, UnlockScript.P2PK))
-          case _ => Left(notGrouplessAddressError)
+          case _                                   => Left(notGrouplessAddressError)
         }
       case LockupScript.HalfDecodedP2PK(_) =>
         Left(explicitGroupInfoError)

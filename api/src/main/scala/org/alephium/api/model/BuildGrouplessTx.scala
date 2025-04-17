@@ -37,5 +37,6 @@ trait BuildGrouplessTx {
 
   def getLockPair()(implicit config: GroupConfig): Either[String, (LockupScript.P2PK, UnlockScript)]
 
-  val notGrouplessAddressError = s"Invalid from address: `$fromAddress`, expected a groupless address"
+  val notGrouplessAddressError =
+    s"Invalid from address: `$fromAddress`, expected a groupless address"
 }

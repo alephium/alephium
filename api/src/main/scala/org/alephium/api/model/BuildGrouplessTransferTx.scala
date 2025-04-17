@@ -37,7 +37,7 @@ final case class BuildGrouplessTransferTx(
     getFromAddress().flatMap { address =>
       address.lockupScript match {
         case lock: LockupScript.P2PK => Right((lock, UnlockScript.P2PK))
-        case _ => Left(notGrouplessAddressError)
+        case _                       => Left(notGrouplessAddressError)
       }
     }
   }

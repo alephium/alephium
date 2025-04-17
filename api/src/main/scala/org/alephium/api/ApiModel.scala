@@ -282,10 +282,12 @@ trait ApiModelCodec {
     {
       case BuildTxCommon.Default       => "default"
       case BuildTxCommon.BIP340Schnorr => "bip340-schnorr"
+      case BuildTxCommon.GLSecP256K1   => "gl-secp256k1"
     },
     {
       case "default"        => BuildTxCommon.Default
       case "bip340-schnorr" => BuildTxCommon.BIP340Schnorr
+      case "gl-secp256k1"   => BuildTxCommon.GLSecP256K1
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
