@@ -419,7 +419,8 @@ trait Endpoints
       .out(jsonBody[BuildTransferTxResult])
       .summary("Build a multisig unsigned transaction")
 
-  lazy val buildSweepMultisig: BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =
+  lazy val buildSweepMultisig
+      : BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =
     multisigEndpoint.post
       .in("sweep")
       .in(jsonBody[BuildSweepMultisig])
@@ -533,11 +534,14 @@ trait Endpoints
       .out(jsonBody[CompileScriptResult])
       .summary("Compile a script")
 
-  lazy val buildExecuteScriptTx: BaseEndpoint[BuildExecuteScriptTx, BuildExecuteScriptTxResult] =
+  lazy val buildExecuteScriptTx: BaseEndpoint[BuildExecuteScriptTx, Either[
+    BuildGrouplessExecuteScriptTxResult,
+    BuildExecuteScriptTxResult
+  ]] =
     contractsUnsignedTxEndpoint.post
       .in("execute-script")
       .in(jsonBody[BuildExecuteScriptTx])
-      .out(jsonBody[BuildExecuteScriptTxResult])
+      .out(jsonBody[Either[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult]])
       .summary("Build an unsigned script")
 
   lazy val compileContract: BaseEndpoint[Compile.Contract, CompileContractResult] =

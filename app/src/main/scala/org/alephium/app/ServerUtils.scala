@@ -1627,13 +1627,32 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[BuildExecuteScriptTxResult] = {
+  ): Try[Either[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult]] = {
     for {
-      buildUnsignedTxResult <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildExecuteScriptTxResult.from(
-      buildUnsignedTxResult._1,
-      SimulationResult.from(buildUnsignedTxResult._2)
-    )
+      lockupPair <- query.getLockPair()
+      result <- lockupPair._1 match {
+        case lockupScript: LockupScript.P2PK =>
+          for {
+            amounts <- query.getAmounts.left.map(badRequest)
+            script  <- query.decodeStatefulScript().left.map(badRequest)
+            result <- buildExecuteScriptTxWithFallbackAddresses(
+              blockFlow,
+              lockupPair,
+              otherGroupsLockupPairs(lockupScript),
+              script,
+              amounts,
+              query.gasEstimationMultiplier,
+              query.gasAmount,
+              query.gasPrice,
+              query.targetBlockHash
+            )
+          } yield Left(result)
+        case _ =>
+          buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
+            .map(res => BuildExecuteScriptTxResult.from(res._1, SimulationResult.from(res._2)))
+            .map(Right.apply)
+      }
+    } yield result
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

@@ -3361,7 +3361,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     def executeTxScript(
         buildExecuteScript: BuildExecuteScriptTx
     ): BuildExecuteScriptTxResult = {
-      serverUtils.buildExecuteScriptTx(blockFlow, buildExecuteScript).rightValue
+      serverUtils.buildExecuteScriptTx(blockFlow, buildExecuteScript).rightValue.rightValue
     }
 
     def failedExecuteTxScript(
@@ -5083,6 +5083,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .rightValue
+
     val result1 = serverUtils
       .buildExecuteScriptTx(
         blockFlow,
@@ -5094,6 +5096,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .rightValue
+
     result1.gasAmount.value > result0.gasAmount.value is true
 
     executeScript(script, Some((genesisPrivateKey, genesisPublicKey)))

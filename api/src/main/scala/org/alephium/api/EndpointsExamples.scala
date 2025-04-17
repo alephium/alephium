@@ -964,16 +964,19 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
+  implicit val buildExecuteScriptTxResultExamples
+      : List[Example[Either[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult]]] =
     simpleExample(
-      BuildExecuteScriptTxResult(
-        fromGroup = 2,
-        toGroup = 2,
-        unsignedTx = hexString,
-        model.minimalGas,
-        model.nonCoinbaseMinGasPrice,
-        txId = txId,
-        simulationResult
+      Right(
+        BuildExecuteScriptTxResult(
+          fromGroup = 2,
+          toGroup = 2,
+          unsignedTx = hexString,
+          model.minimalGas,
+          model.nonCoinbaseMinGasPrice,
+          txId = txId,
+          simulationResult
+        )
       )
     )
 
