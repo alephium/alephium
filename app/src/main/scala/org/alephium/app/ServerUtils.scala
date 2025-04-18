@@ -1443,7 +1443,7 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[Either[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult]] = {
     for {
-      lockupPair <- query.getLockPair()
+      lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
           buildDeployContractTxWithFallbackAddresses(
@@ -1645,7 +1645,7 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[Either[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult]] = {
     for {
-      lockupPair <- query.getLockPair()
+      lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
           for {

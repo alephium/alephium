@@ -52,6 +52,11 @@ object BuildTxCommon {
     def fromPublicKey: ByteString
     def fromPublicKeyType: Option[PublicKeyType]
 
+    def isGrouplessAddress: Boolean = fromPublicKeyType match {
+      case Some(BuildTxCommon.GLSecP256K1) => true
+      case _                               => false
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
     def getLockPair(
         groupIndex: Option[GroupIndex] = None

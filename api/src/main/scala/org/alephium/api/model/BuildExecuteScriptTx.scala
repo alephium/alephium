@@ -18,9 +18,12 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.BlockHash
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.api.{badRequest, Try}
+import org.alephium.protocol.model.{BlockHash, GroupIndex}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.vm.StatefulScript
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildExecuteScriptTx(
@@ -32,6 +35,7 @@ final case class BuildExecuteScriptTx(
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None,
+    group: Option[GroupIndex] = None,
     gasEstimationMultiplier: Option[Double] = None
 ) extends BuildTxCommon.ExecuteScriptTx
     with BuildTxCommon.FromPublicKey {
@@ -42,6 +46,34 @@ final case class BuildExecuteScriptTx(
       Left(
         "Parameters `gasAmount` and `gasEstimationMultiplier` cannot be specified simultaneously"
       )
+    }
+  }
+  override def getLockPair(groupIndex: Option[GroupIndex] = None)(implicit
+      config: GroupConfig
+  ): Try[(LockupScript.Asset, UnlockScript)] = {
+    if (isGrouplessAddress) {
+      group match {
+        case Some(value) =>
+          super.getLockPair(Some(value))
+        case None =>
+          decodeStatefulScript() match {
+            case Right(script) =>
+              StatefulScript.deriveContractAddress(script) match {
+                case Some(contractAddress) =>
+                  super.getLockPair(Some(contractAddress.groupIndex))
+                case None =>
+                  Left(
+                    badRequest(
+                      s"Can not determine group: request has no explicit group and no contract address can be derived from TxScript"
+                    )
+                  )
+              }
+            case Left(error) =>
+              Left(badRequest(error))
+          }
+      }
+    } else {
+      super.getLockPair(groupIndex)
     }
   }
 }

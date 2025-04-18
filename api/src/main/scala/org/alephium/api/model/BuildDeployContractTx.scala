@@ -18,9 +18,11 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.{Address, BlockHash}
+import org.alephium.api.{badRequest, Try}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -35,9 +37,29 @@ final case class BuildDeployContractTx(
     issueTokenTo: Option[Address.Asset] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
+    group: Option[GroupIndex] = None,
     targetBlockHash: Option[BlockHash] = None
 ) extends BuildTxCommon.DeployContractTx
-    with BuildTxCommon.FromPublicKey
+    with BuildTxCommon.FromPublicKey {
+
+  override def getLockPair(groupIndex: Option[GroupIndex] = None)(implicit
+      config: GroupConfig
+  ): Try[(LockupScript.Asset, UnlockScript)] = {
+    if (isGrouplessAddress) {
+      if (group.isDefined) {
+        super.getLockPair(group)
+      } else {
+        Left(
+          badRequest(
+            s"Contract deployment using groupless address requires explicit group information"
+          )
+        )
+      }
+    } else {
+      super.getLockPair(groupIndex)
+    }
+  }
+}
 
 object BuildDeployContractTx {
   final case class Code(
