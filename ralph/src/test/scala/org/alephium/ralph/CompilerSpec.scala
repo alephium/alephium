@@ -5861,7 +5861,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
         code("address, #00"),
         "Invalid args type List(Address, ByteVec), expected List(Address, U256)"
       )
-      testContractError(code("f1(address)"), "Invalid args length, expected 2, got 1")
+      testContractError(
+        code("f1(address)"),
+        "Invalid args type List(Address, U256), expected List(U256)"
+      )
       testContractError(code("address, 1, 1"), "Invalid args length, expected 2, got 3")
     }
 

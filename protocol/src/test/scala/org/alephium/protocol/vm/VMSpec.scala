@@ -749,11 +749,48 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     }
   }
 
-  it should "switch back frames properly: since-rhone" in new SwitchBackFixture
-    with NetworkConfigFixture.SinceRhoneT {
-    Seq(HardFork.Rhone, HardFork.Danube).contains(
-      networkConfig.getHardFork(TimeStamp.now())
-    ) is true
+  it should "switch back frames properly: Danube" in new SwitchBackFixture
+    with NetworkConfigFixture.DanubeT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Danube
+
+    addAndCheckBalance(0)
+    for {
+      previousBalanceType <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      previousUseAsset    <- Seq(UsePreapproved, UseAssetInContract, UsePayToContractOnly)
+      previousScoptDepth  <- Seq(0, 1)
+      currentBalanceType  <- Seq(NoBalance, RemainingBalanceOnly, ApprovedBalanceOnly)
+      currentUseAsset     <- Seq(UsePreapproved, UseAssetInContract, UsePayToContractOnly)
+      currentScoptDepth   <- Seq(0, 1)
+    } yield {
+      val previousFrame = buildFrame(previousBalanceType, previousUseAsset, previousScoptDepth)
+      val currentFrame  = buildFrame(currentBalanceType, currentUseAsset, currentScoptDepth)
+      vm.switchBackFrame(currentFrame, previousFrame) isE ()
+      currentBalanceType match {
+        case NoBalance => addAndCheckBalance(0)
+        case _ =>
+          if (currentScoptDepth == 0) {
+            if (currentUseAsset != UsePreapproved && currentBalanceType == RemainingBalanceOnly) {
+              addAndCheckBalance(0, isContract = currentUseAsset != UsePreapproved)
+            } else {
+              addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+            }
+          } else {
+            if (
+              previousBalanceType == NoBalance && (currentUseAsset == UsePreapproved || currentBalanceType == ApprovedBalanceOnly)
+            ) {
+              addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
+            } else {
+              addAndCheckBalance(0, isContract = true)
+              addAndCheckBalance(0, isContract = false)
+            }
+          }
+      }
+    }
+  }
+
+  it should "switch back frames properly: Rhone" in new SwitchBackFixture
+    with NetworkConfigFixture.RhoneT {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
 
     addAndCheckBalance(0)
     for {
