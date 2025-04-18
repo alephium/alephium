@@ -143,8 +143,8 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       }
     }
 
-    private def buildGrouplessTransferTx(query: BuildGrouplessTransferTx) = {
-      val txs = serverUtils.buildGrouplessTransferTx(blockFlow, query).rightValue
+    private def buildGrouplessTransferTx(query: BuildTransferTx) = {
+      val txs = serverUtils.buildTransferTransaction(blockFlow, query).rightValue.leftValue
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx.unsignedTx)).rightValue)
     }
 
@@ -163,7 +163,13 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           Some(AVector(Token(tokenId, tokenTransferAmount)))
         )
       }
-      val query = BuildGrouplessTransferTx(fromAddressWithGroup, destinations)
+
+      val query = BuildTransferTx(
+        fromPublicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+        group = Some(chainIndex.from),
+        destinations = destinations
+      )
 
       val txs = buildGrouplessTransferTx(query)
       txs.length is expectedTxSize
@@ -287,8 +293,8 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     val contractId = createContract(contract, chainIndex = chainIndex)._1
 
-    private def buildGrouplessExecuteScriptTx(query: BuildGrouplessExecuteScriptTx) = {
-      val result = serverUtils.buildGrouplessExecuteScriptTx(blockFlow, query).rightValue
+    private def buildGrouplessExecuteScriptTx(query: BuildExecuteScriptTx) = {
+      val result = serverUtils.buildExecuteScriptTx(blockFlow, query).rightValue.leftValue
       val txs    = result.transferTxs.map(_.unsignedTx) :+ result.executeScriptTx.unsignedTx
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
@@ -296,7 +302,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     def buildExecuteScriptQuery(
         alphAmount: U256,
         tokenAmount: U256
-    ): BuildGrouplessExecuteScriptTx = {
+    ): BuildExecuteScriptTx = {
       val script =
         s"""
            |TxScript Main {
@@ -305,10 +311,12 @@ class GrouplessUtilsSpec extends AlephiumSpec {
            |$contract
            |""".stripMargin
       val compiledScript = Compiler.compileTxScript(script).rightValue
-      BuildGrouplessExecuteScriptTx(
-        fromAddressWithGroup,
+      BuildExecuteScriptTx(
+        fromPublicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
         serialize(compiledScript),
         attoAlphAmount = Some(alphAmount),
+        group = Some(chainIndex.from),
         tokens = Some(AVector(Token(tokenId, tokenAmount)))
       )
     }
@@ -356,13 +364,13 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
     val query0 = buildExecuteScriptQuery(ALPH.alph(2), ALPH.alph(2))
     serverUtils
-      .buildGrouplessExecuteScriptTx(blockFlow, query0)
+      .buildExecuteScriptTx(blockFlow, query0)
       .leftValue
       .detail is "Not enough ALPH balance, requires an additional 0.504 ALPH"
 
     val query1 = buildExecuteScriptQuery(ALPH.oneAlph, ALPH.alph(3))
     serverUtils
-      .buildGrouplessExecuteScriptTx(blockFlow, query1)
+      .buildExecuteScriptTx(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }
@@ -371,22 +379,24 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     def buildDeployContractQuery(
         alphAmount: U256,
         tokenAmount: U256
-    ): BuildGrouplessDeployContractTx = {
+    ): BuildDeployContractTx = {
       val code = BuildDeployContractTx.Code(
         Compiler.compileContract(contract).rightValue,
         AVector.empty,
         AVector.empty
       )
-      BuildGrouplessDeployContractTx(
-        fromAddressWithGroup,
+      BuildDeployContractTx(
+        fromPublicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
         serialize(code),
+        group = Some(chainIndex.from),
         initialAttoAlphAmount = Some(alphAmount),
         initialTokenAmounts = Some(AVector(Token(tokenId, tokenAmount)))
       )
     }
 
-    private def buildGrouplessDeployContractTx(query: BuildGrouplessDeployContractTx) = {
-      val result      = serverUtils.buildGrouplessDeployContractTx(blockFlow, query).rightValue
+    private def buildGrouplessDeployContractTx(query: BuildDeployContractTx) = {
+      val result      = serverUtils.buildDeployContractTx(blockFlow, query).rightValue.leftValue
       val txs         = result.transferTxs.map(_.unsignedTx) :+ result.deployContractTx.unsignedTx
       val unsignedTxs = txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
       (unsignedTxs, result.deployContractTx.contractAddress.contractId)
@@ -434,13 +444,13 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
     val query0 = buildDeployContractQuery(ALPH.alph(2), ALPH.alph(2))
     serverUtils
-      .buildGrouplessDeployContractTx(blockFlow, query0)
+      .buildDeployContractTx(blockFlow, query0)
       .leftValue
       .detail is "Not enough ALPH balance, requires an additional 0.504 ALPH"
 
     val query1 = buildDeployContractQuery(ALPH.oneAlph, ALPH.alph(3))
     serverUtils
-      .buildGrouplessDeployContractTx(blockFlow, query1)
+      .buildDeployContractTx(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }

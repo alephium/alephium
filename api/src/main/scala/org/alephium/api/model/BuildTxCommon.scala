@@ -19,7 +19,7 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.crypto.{BIP340SchnorrPublicKey, SecP256K1PublicKey}
+import org.alephium.crypto.{BIP340SchnorrPublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -47,6 +47,8 @@ object BuildTxCommon {
   object Default       extends PublicKeyType // SecP256K1
   object BIP340Schnorr extends PublicKeyType
   object GLSecP256K1   extends PublicKeyType
+  object GLSecP256R1   extends PublicKeyType
+  object GLWebAuthn    extends PublicKeyType
 
   trait FromPublicKey {
     def fromPublicKey: ByteString
@@ -54,6 +56,8 @@ object BuildTxCommon {
 
     def isGrouplessAddress: Boolean = fromPublicKeyType match {
       case Some(BuildTxCommon.GLSecP256K1) => true
+      case Some(BuildTxCommon.GLSecP256R1) => true
+      case Some(BuildTxCommon.GLWebAuthn)  => true
       case _                               => false
     }
 
@@ -64,7 +68,26 @@ object BuildTxCommon {
       fromPublicKeyType match {
         case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
         case Some(BuildTxCommon.GLSecP256K1) =>
-          grouplessSecP256K1LockPair(fromPublicKey, groupIndex)
+          grouplessLockPair(
+            fromPublicKey,
+            groupIndex,
+            "SecP256K1",
+            SecP256K1PublicKey.from(_).map(PublicKeyLike.SecP256K1.apply)
+          )
+        case Some(BuildTxCommon.GLSecP256R1) =>
+          grouplessLockPair(
+            fromPublicKey,
+            groupIndex,
+            "SecP256R1",
+            SecP256R1PublicKey.from(_).map(PublicKeyLike.SecP256R1.apply)
+          )
+        case Some(BuildTxCommon.GLWebAuthn) =>
+          grouplessLockPair(
+            fromPublicKey,
+            groupIndex,
+            "WebAuthn",
+            SecP256R1PublicKey.from(_).map(PublicKeyLike.WebAuthn.apply)
+          )
         case _ => p2pkhLockPair(fromPublicKey)
       }
   }
@@ -88,18 +111,19 @@ object BuildTxCommon {
     }
   }
 
-  def grouplessSecP256K1LockPair(
+  def grouplessLockPair(
       fromPublicKey: ByteString,
-      groupOpt: Option[GroupIndex]
+      groupOpt: Option[GroupIndex],
+      publicKeyType: String,
+      convertToPublicKeyLike: ByteString => Option[PublicKeyLike]
   )(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] = {
-    SecP256K1PublicKey.from(fromPublicKey) match {
-      case Some(publicKey) =>
-        val publicKeyLike = PublicKeyLike.SecP256K1(publicKey)
-        val group         = groupOpt.getOrElse(publicKeyLike.defaultGroup)
-        val lockupScript  = LockupScript.p2pk(publicKeyLike, group)
+    convertToPublicKeyLike(fromPublicKey) match {
+      case Some(publicKeyLike) =>
+        val group        = groupOpt.getOrElse(publicKeyLike.defaultGroup)
+        val lockupScript = LockupScript.p2pk(publicKeyLike, group)
         Right(lockupScript -> UnlockScript.P2PK)
       case None =>
-        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
+        Left(badRequest(s"Invalid $publicKeyType public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 

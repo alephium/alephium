@@ -283,11 +283,15 @@ trait ApiModelCodec {
       case BuildTxCommon.Default       => "default"
       case BuildTxCommon.BIP340Schnorr => "bip340-schnorr"
       case BuildTxCommon.GLSecP256K1   => "gl-secp256k1"
+      case BuildTxCommon.GLSecP256R1   => "gl-secp256r1"
+      case BuildTxCommon.GLWebAuthn    => "gl-webauthn"
     },
     {
       case "default"        => BuildTxCommon.Default
       case "bip340-schnorr" => BuildTxCommon.BIP340Schnorr
       case "gl-secp256k1"   => BuildTxCommon.GLSecP256K1
+      case "gl-secp256r1"   => BuildTxCommon.GLSecP256R1
+      case "gl-webauthn"    => BuildTxCommon.GLWebAuthn
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
