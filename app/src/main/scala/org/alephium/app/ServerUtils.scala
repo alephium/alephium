@@ -27,7 +27,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.Byte32
+import org.alephium.crypto.{Byte32, Byte64}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
@@ -468,7 +468,7 @@ class ServerUtils(implicit
   ): TransactionTemplate = {
     TransactionTemplate(
       unsignedTx,
-      signatures,
+      signatures.map(Byte64.from),
       scriptSignatures = AVector.empty
     )
   }
@@ -1355,6 +1355,7 @@ class ServerUtils(implicit
           )
           .select(
             AssetAmounts(totalSelectAmount, tokens),
+            fromLockupScript,
             fromUnlockScript,
             extraUtxosInfo.merge(utxos),
             txOutputsLength = estimatedTxOutputsLength,
@@ -1759,9 +1760,11 @@ class ServerUtils(implicit
     for {
       groupIndex <- params.validate()
       _          <- checkGroup(groupIndex)
-      blockHash = params.worldStateBlockHash.getOrElse(
-        blockFlow.getBestDeps(groupIndex).uncleHash(groupIndex)
-      )
+      blockHash = params.worldStateBlockHash.getOrElse {
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        val bestDeps = blockFlow.getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
+        bestDeps.uncleHash(groupIndex)
+      }
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
       )
@@ -1873,9 +1876,10 @@ class ServerUtils(implicit
         failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
       )
     } else {
-      val bestDepss = blockFlow.brokerConfig.groupRange.map(group =>
-        blockFlow.getBestDeps(GroupIndex.unsafe(group))
-      )
+      val bestDepss = blockFlow.brokerConfig.groupRange.map { group =>
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        blockFlow.getBestDeps(ChainIndex.unsafe(group, group), hardFork)
+      }
       params.calls
         .mapE { call =>
           call.validate().map { groupIndex =>

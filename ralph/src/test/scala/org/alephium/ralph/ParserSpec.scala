@@ -826,6 +826,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.usePreapprovedAssets is false
       parsed.useAssetsInContract is Ast.NotUseContractAssets
       parsed.usePayToContractOnly is false
+      parsed.useRoutePattern is false
       parsed.inline is false
       parsed.args.size is 2
       parsed.rtypes is Seq(Type.U256, Type.U256)
@@ -843,6 +844,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.useAssetsInContract is Ast.NotUseContractAssets
       parsed.usePayToContractOnly is false
       parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is false
       parsed.useUpdateFields is false
       parsed.inline is false
       parsed.args.size is 2
@@ -870,6 +872,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.useAssetsInContract is Ast.UseContractAssets
       parsed.usePayToContractOnly is false
       parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is false
       parsed.useUpdateFields is false
       parsed.inline is false
       parsed.args.size is 2
@@ -888,13 +891,14 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       info("More use annotation")
       val parsed =
         parseFunc(
-          """@using(assetsInContract = true, updateFields = true)
+          """@using(assetsInContract = true, preserveCaller = true, updateFields = true)
             |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
         ).get.value
       parsed.usePreapprovedAssets is false
       parsed.useAssetsInContract is Ast.UseContractAssets
       parsed.usePayToContractOnly is false
       parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is true
       parsed.useUpdateFields is true
       parsed.inline is false
       parsed.signature is FuncSignature(
@@ -917,6 +921,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.useAssetsInContract is Ast.EnforcedUseContractAssets
       parsed.usePayToContractOnly is false
       parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is false
       parsed.useUpdateFields is false
       parsed.inline is false
       parsed.signature is FuncSignature(
@@ -1575,6 +1580,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
             inline = false,
@@ -1804,6 +1810,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
             inline = false,
@@ -1946,6 +1953,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
             inline = false,
@@ -1989,6 +1997,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
             inline = false,
@@ -2040,6 +2049,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         checkExternalCaller,
+        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = None,
         inline = false,
@@ -2057,6 +2067,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         checkExternalCaller,
+        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = None,
         inline = false,
@@ -2250,6 +2261,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         useCheckExternalCaller = true,
+        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = None,
         inline = false,
@@ -2285,6 +2297,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Ast.NotUseContractAssets,
           usePayToContractOnly = false,
           useCheckExternalCaller = true,
+          useRoutePattern = false,
           useUpdateFields = false,
           useMethodIndex = None,
           inline = false,
@@ -2623,9 +2636,23 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Const(Val.U256(U256.Zero))
       )
     )
+    parse(
+      "map.insert!(1, 0)",
+      StatefulParser.statement(_)
+    ).get.value is Ast.InsertToMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](
+        Const(Val.U256(U256.One)),
+        Const(Val.U256(U256.Zero))
+      )
+    )
     parse("map.remove!(address, 1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
       Ident("map"),
       Seq[Expr[StatefulContext]](Variable(Ident("address")), Const(Val.U256(U256.One)))
+    )
+    parse("map.remove!(1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](Const(Val.U256(U256.One)))
     )
 
     parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(

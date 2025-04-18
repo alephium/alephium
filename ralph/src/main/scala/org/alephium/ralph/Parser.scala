@@ -402,6 +402,7 @@ abstract class Parser[Ctx <: StatelessContext] {
               assetsInContract = Ast.NotUseContractAssets,
               payToContractOnly = false,
               checkExternalCaller = true,
+              routePattern = false,
               updateFields = false,
               methodIndex = None
             )
@@ -424,6 +425,7 @@ abstract class Parser[Ctx <: StatelessContext] {
             usingAnnotation.assetsInContract,
             usingAnnotation.payToContractOnly,
             usingAnnotation.checkExternalCaller,
+            usingAnnotation.routePattern,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
             inline,
@@ -442,19 +444,20 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
     Ast
       .FuncDef(
-        f.annotations,
-        f.id,
-        f.isPublic,
-        f.usePreapprovedAssets,
-        f.useContractAssets,
-        f.usePayToContractOnly,
-        f.useCheckExternalCaller,
-        f.useUpdateFields,
-        f.useMethodIndex,
-        f.inline,
-        f.args,
-        f.rtypes,
-        f.body
+        annotations = f.annotations,
+        id = f.id,
+        isPublic = f.isPublic,
+        usePreapprovedAssets = f.usePreapprovedAssets,
+        useAssetsInContract = f.useContractAssets,
+        usePayToContractOnly = f.usePayToContractOnly,
+        useCheckExternalCaller = f.useCheckExternalCaller,
+        useRoutePattern = f.useRoutePattern,
+        useUpdateFields = f.useUpdateFields,
+        useMethodIndex = f.useMethodIndex,
+        inline = f.inline,
+        args = f.args,
+        rtypes = f.rtypes,
+        bodyOpt = f.body
       )
       .atSourceIndex(f.sourceIndex)
   }
@@ -687,6 +690,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useContractAssets: Ast.ContractAssetsAnnotation,
     usePayToContractOnly: Boolean,
     useCheckExternalCaller: Boolean,
+    useRoutePattern: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
     inline: Boolean,
@@ -771,6 +775,7 @@ object Parser {
       assetsInContract: Ast.ContractAssetsAnnotation,
       payToContractOnly: Boolean,
       checkExternalCaller: Boolean,
+      routePattern: Boolean,
       updateFields: Boolean,
       methodIndex: Option[Int]
   )
@@ -781,6 +786,7 @@ object Parser {
     val useContractAssetsKey      = "assetsInContract"
     val usePayToContractOnly      = "payToContractOnly"
     val useCheckExternalCallerKey = "checkExternalCaller"
+    val useRoutePattern           = "preserveCaller"
     val useUpdateFieldsKey        = "updateFields"
     val useMethodIndexKey         = "methodIndex"
     val keys: AVector[String] = AVector(
@@ -788,6 +794,7 @@ object Parser {
       useContractAssetsKey,
       usePayToContractOnly,
       useCheckExternalCallerKey,
+      useRoutePattern,
       useUpdateFieldsKey,
       useMethodIndexKey
     )
@@ -836,6 +843,7 @@ object Parser {
           useCheckExternalCallerKey,
           Val.Bool(default.checkExternalCaller)
         ).v,
+        extractField(annotation, useRoutePattern, Val.Bool(default.routePattern)).v,
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
         methodIndex
       )
@@ -1122,6 +1130,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
                 assetsInContract = Ast.NotUseContractAssets,
                 payToContractOnly = false,
                 checkExternalCaller = true,
+                routePattern = false,
                 updateFields = false,
                 methodIndex = None
               )
@@ -1278,19 +1287,20 @@ class StatefulParser(val fileURI: Option[java.net.URI])
         case None =>
           Ast
             .FuncDef(
-              f.annotations,
-              f.id,
-              f.isPublic,
-              f.usePreapprovedAssets,
-              f.useContractAssets,
-              f.usePayToContractOnly,
-              f.useCheckExternalCaller,
-              f.useUpdateFields,
-              f.useMethodIndex,
-              f.inline,
-              f.args,
-              f.rtypes,
-              None
+              annotations = f.annotations,
+              id = f.id,
+              isPublic = f.isPublic,
+              usePreapprovedAssets = f.usePreapprovedAssets,
+              useAssetsInContract = f.useContractAssets,
+              usePayToContractOnly = f.usePayToContractOnly,
+              useCheckExternalCaller = f.useCheckExternalCaller,
+              useRoutePattern = f.useRoutePattern,
+              useUpdateFields = f.useUpdateFields,
+              useMethodIndex = f.useMethodIndex,
+              inline = f.inline,
+              args = f.args,
+              rtypes = f.rtypes,
+              bodyOpt = None
             )
             .atSourceIndex(f.sourceIndex)
         case _ =>

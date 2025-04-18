@@ -16,11 +16,11 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 import akka.util.ByteString
 import io.prometheus.client.{Counter, Gauge, Histogram}
 
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
@@ -37,18 +37,26 @@ import org.alephium.util.{ActorRefT, EventBus, EventStream, Hex}
 
 object BlockChainHandler {
   // scalastyle:off parameter.number
-  def props(
+  def build(
+      system: ActorSystem,
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       eventBus: ActorRefT[EventBus.Message],
-      maxForkDepth: Int
+      namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props =
-    Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
+  ): ActorRefT[Command] = {
+    val actor = ActorRefT.build[Command](
+      system,
+      Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth)),
+      s"BlockChainHandler-${chainIndex.from.value}-${chainIndex.to.value}$namePostfix"
+    )
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
+    actor
+  }
   // scalastyle:on parameter.number
 
   sealed trait Command

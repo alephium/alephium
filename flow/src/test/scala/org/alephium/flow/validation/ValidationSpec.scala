@@ -43,6 +43,7 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     val newConsensusConfigs = new ConsensusConfigs {
       override def mainnet: ConsensusConfig = consensusConfig
       override def rhone: ConsensusConfig   = consensusConfig
+      override def danube: ConsensusConfig  = consensusConfig
     }
     Validation.preValidate(AVector(block))(newConsensusConfigs) is false
 

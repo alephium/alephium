@@ -50,7 +50,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
       ("alephium.consensus.mainnet.block-target-time", "11 seconds"),
-      ("alephium.consensus.rhone.block-target-time", "4 seconds")
+      ("alephium.consensus.rhone.block-target-time", "4 seconds"),
+      ("alephium.consensus.danube.block-target-time", "3 seconds")
     )
 
     config.broker.groups is 12
@@ -59,6 +60,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.networkId is NetworkId(2)
     config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
+    config.consensus.danube.blockTargetTime is Duration.ofSecondsUnsafe(3)
     config.network.connectionBufferCapacityInByte is 100000000L
     config.network.syncPeerSampleSizeV1 is 3
     config.network.syncPeerSampleSizeV2 is 5
@@ -113,6 +115,26 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1718186400000L)
   }
 
+  it should "load danube config" in {
+    val rootPath = Files.tmpDir
+    val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.danube.numZerosAtLeastInHash is 37
+    config.consensus.danube.blockTargetTime is Duration.ofSecondsUnsafe(8)
+    config.consensus.danube.uncleDependencyGapTime is Duration.ofSecondsUnsafe(4)
+    val initialHashRate =
+      HashRate.from(
+        config.consensus.danube.maxMiningTarget,
+        config.consensus.danube.blockTargetTime
+      )(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("4398054899712"))
+    config.network.networkId is NetworkId.AlephiumMainNet
+    config.network.danubeHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
+  }
+
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
@@ -130,6 +152,17 @@ class AlephiumConfigSpec extends AlephiumSpec {
       AlephiumConfig.load(buildNewConfig(), "alephium")
     ).getMessage is
       "Invalid timestamp for rhone hard fork"
+  }
+
+  it should "check danube hardfork timestamp" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.network.danube-hard-fork-timestamp", 0)
+    )
+    intercept[RuntimeException](
+      AlephiumConfig.load(buildNewConfig(), "alephium")
+    ).getMessage is
+      "Invalid timestamp for danube hard fork"
   }
 
   it should "load bootstrap config" in {
@@ -391,6 +424,19 @@ class AlephiumConfigSpec extends AlephiumSpec {
     (11 until 18 * 3).foreach { gap =>
       consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Rhone) is
         Difficulty.unsafe(N * (100 + 3 * (gap - 8)) / 100)
+    }
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18, HardFork.Danube) is
+      Difficulty.unsafe(N * 103 / 100)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19, HardFork.Danube) is
+      Difficulty.unsafe(N * 106 / 100)
+    (20 until 18 * 3).foreach { gap =>
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Danube) is
+        Difficulty.unsafe(N * (100 + 3 * (gap - 17)) / 100)
     }
   }
 }

@@ -22,6 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
@@ -31,11 +32,8 @@ import org.alephium.util._
 // scalastyle:off file.size.limit
 class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixture.Default {
   trait BaseFixture[Ctx <: StatelessContext] {
-    val baseMethod = Method[Ctx](
+    val baseMethod = Method.testDefault[Ctx](
       isPublic = true,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -107,11 +105,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   trait Fixture {
-    val baseMethod = Method[StatefulContext](
+    val baseMethod = Method.testDefault[StatefulContext](
       isPublic = true,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -174,11 +169,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "overflow oprand stack" in new Fixture {
     val method =
-      Method[StatefulContext](
+      Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -206,11 +198,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "execute the following script" in {
     val method =
-      Method[StatefulContext](
+      Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -228,22 +217,16 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   it should "call method" in {
-    val method0 = Method[StatelessContext](
+    val method0 = Method.testDefault[StatelessContext](
       isPublic = true,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
       instrs = AVector(LoadLocal(0), CallLocal(1), Return)
     )
     val method1 =
-      Method[StatelessContext](
+      Method.testDefault[StatelessContext](
         isPublic = false,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -268,7 +251,6 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       new StatefulContext with NetworkConfigFixture.Default with GroupConfigFixture.Default {
         val worldState: WorldState.Staging = cachedWorldState.staging()
         def blockEnv: BlockEnv             = genBlockEnv()
-        def txEnv: TxEnv                   = genTxEnv(None, AVector.empty)
         override def txId: TransactionId   = TransactionId.zero
         var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
@@ -285,6 +267,35 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
           )
         }
 
+        def txEnv: TxEnv = {
+          val env = genTxEnv(None, AVector.empty)
+          val prevOutputs = AVector(
+            AssetOutput(
+              balances0.attoAlphAmount,
+              address0.lockupScript.asInstanceOf[LockupScript.Asset],
+              TimeStamp.zero,
+              balances0.tokenVector,
+              ByteString.empty
+            ),
+            AssetOutput(
+              balances1.attoAlphAmount,
+              address1.lockupScript.asInstanceOf[LockupScript.Asset],
+              TimeStamp.zero,
+              balances1.tokenVector,
+              ByteString.empty
+            )
+          )
+          TxEnv.mockup(
+            env.txId,
+            env.signatures,
+            prevOutputs,
+            env.fixedOutputs,
+            env.gasPrice,
+            env.gasAmount,
+            isEntryMethodPayable = true
+          )
+        }
+
         override val outputBalances: MutBalances = MutBalances.empty
       }
 
@@ -298,6 +309,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
           usePreapprovedAssets = true,
           useContractAssets = false,
           usePayToContractOnly = false,
+          useRoutePattern = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = expected.fold(_ => 0, _.length),
@@ -443,7 +455,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     def test(contract: StatefulContract, result: Option[ExeFailure]) = {
       val instrs = AVector[Instr[StatefulContext]](
         AddressConst(address0),
-        U256Const(Val.U256(10)),
+        U256Const(Val.U256(ALPH.oneAlph)),
         ApproveAlph,
         BytesConst(Val.ByteVec(serialize(contract))),
         BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
@@ -462,6 +474,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       usePreapprovedAssets = true,
       useContractAssets = false,
       usePayToContractOnly = false,
+      useRoutePattern = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -488,11 +501,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "serde script" in {
     val method =
-      Method[StatefulContext](
+      Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -593,7 +603,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val context0 = genStatefulContext(None)
     StatefulVM.checkRemainingSignatures(context0) isE ()
 
-    val signature = Signature.generate
+    val signature = Byte64.from(Signature.generate)
     val context1  = genStatefulContext(None, signatures = AVector(signature))
     StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures(1)
   }
@@ -662,17 +672,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     {
       info("No local variables")
       val method0 =
-        Method[StatefulContext](
-          true,
-          false,
-          false,
-          false,
-          0,
-          0,
-          0,
-          AVector(ConstTrue, CallLocal(1))
-        )
-      val method1 = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(Pop))
+        Method.testDefault[StatefulContext](true, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method.testDefault[StatefulContext](true, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
     }
@@ -681,17 +682,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       info("Non-empty local variables")
 
       val method0 =
-        Method[StatefulContext](
-          true,
-          false,
-          false,
-          false,
-          0,
-          1,
-          0,
-          AVector(ConstTrue, CallLocal(1))
-        )
-      val method1 = Method[StatefulContext](true, false, false, false, 0, 0, 0, AVector(Pop))
+        Method.testDefault[StatefulContext](true, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method.testDefault[StatefulContext](true, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
     }
@@ -757,9 +749,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     }
   }
 
-  it should "switch back frames properly: Rhone" in new SwitchBackFixture
+  it should "switch back frames properly: since-rhone" in new SwitchBackFixture
     with NetworkConfigFixture.SinceRhoneT {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    Seq(HardFork.Rhone, HardFork.Danube).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
 
     addAndCheckBalance(0)
     for {

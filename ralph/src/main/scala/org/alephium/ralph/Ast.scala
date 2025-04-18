@@ -171,18 +171,22 @@ object Ast {
         state: Compiler.State[Ctx],
         func: Compiler.FuncInfo[Ctx]
     ): Seq[Instr[Ctx]] = {
-      (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
-        case (true, false) =>
-          throw Compiler.Error(
-            s"Function `${func.name}` does not use preapproved assets",
-            sourceIndex
-          )
-        case (false, true) =>
-          throw Compiler.Error(
-            s"Function `${func.name}` needs preapproved assets, please use braces syntax",
-            sourceIndex
-          )
-        case _ => ()
+      val isContractCreation = BuiltIn.isContractCreationFunc(func.name)
+      // Ignore contract creation functions as they can either use preapproved assets or not
+      if (!isContractCreation) {
+        (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
+          case (true, false) =>
+            throw Compiler.Error(
+              s"Function `${func.name}` does not use preapproved assets",
+              sourceIndex
+            )
+          case (false, true) =>
+            throw Compiler.Error(
+              s"Function `${func.name}` needs preapproved assets, please use braces syntax",
+              sourceIndex
+            )
+          case _ => ()
+        }
       }
       approveAssets.flatMap(_.genCode(state))
     }
@@ -1126,13 +1130,21 @@ object Ast {
   ) extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
       val mapType = getMapType(state)
-      checkArgTypes(state, Seq(Type.Address, mapType.key, mapType.value))
+      if (args.length == 2) {
+        checkArgTypes(state, Seq(mapType.key, mapType.value))
+      } else {
+        checkArgTypes(state, Seq(Type.Address, mapType.key, mapType.value))
+      }
     }
+
+    private val mapKey   = if (args.length == 2) args(0) else args(1)
+    private val mapValue = if (args.length == 2) args(1) else args(2)
+
     private def checkFieldLength(length: Int): Unit = {
       if (length > 0xff) {
         throw Compiler.Error(
           s"The number of struct fields exceeds the maximum limit",
-          args(2).sourceIndex
+          mapValue.sourceIndex
         )
       }
     }
@@ -1146,16 +1158,20 @@ object Ast {
       checkFieldLength(mutFieldLength)
       checkFieldLength(immFieldLength)
 
-      val pathCodes              = MapOps.genSubContractPath(state, ident, args(1))
-      val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(args(2)))
+      val pathCodes              = MapOps.genSubContractPath(state, ident, mapKey)
+      val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, Seq(mapValue))
       val insertWithDebug        = genMapDebug(state, pathCodes, isInsert = true)
       insertWithDebug ++ (immFields :+ SelfContractId) ++
         mutFields :+ CreateMapEntry(immFieldLength.toByte, mutFieldLength.toByte)
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val approveALPHCodes    = args(0).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
+      val depositAddressCodes = if (args.length == 2) {
+        Seq(NullContractAddress)
+      } else {
+        args(0).genCode(state) ++ Seq(MinimalContractDeposit, ApproveAlph)
+      }
       val createContractCodes = genCreateContract(state)
-      approveALPHCodes ++ createContractCodes
+      depositAddressCodes ++ createContractCodes
     }
     override def reset(): Unit = {
       args.foreach(_.reset())
@@ -1167,12 +1183,25 @@ object Ast {
       extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
       val mapType = getMapType(state)
-      checkArgTypes(state, Seq(Type.Address, mapType.key))
+      if (args.length == 1) {
+        checkArgTypes(state, Seq(mapType.key))
+      } else {
+        checkArgTypes(state, Seq(Type.Address, mapType.key))
+      }
     }
+
+    private val mapKey = if (args.length == 1) args(0) else args(1)
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val pathCodes = MapOps.genSubContractPath(state, ident, args(1))
+      val pathCodes = MapOps.genSubContractPath(state, ident, mapKey)
       val objCodes  = genMapDebug(state, pathCodes, isInsert = false) :+ SubContractId
-      args(0).genCode(state) ++ Seq(
+
+      val refundAddressCodes = if (args.length == 1) {
+        Seq(NullContractAddress)
+      } else {
+        args(0).genCode(state)
+      }
+
+      refundAddressCodes ++ Seq(
         ConstInstr.u256(Val.U256(U256.One)), // the `address` parameter
         ConstInstr.u256(Val.U256(U256.Zero))
       ) ++ objCodes :+ CallExternal(CreateMapEntry.DestroyMethodIndex)
@@ -1263,6 +1292,7 @@ object Ast {
       useAssetsInContract: Ast.ContractAssetsAnnotation,
       usePayToContractOnly: Boolean,
       useCheckExternalCaller: Boolean,
+      useRoutePattern: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Int],
       inline: Boolean,
@@ -1427,6 +1457,7 @@ object Ast {
         usePreapprovedAssets,
         useAssetsInContract != Ast.NotUseContractAssets,
         usePayToContractOnly = usePayToContractOnly,
+        useRoutePattern = useRoutePattern,
         argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVarSize,
         returnLength = state.flattenTypeLength(rtypes),
@@ -1456,6 +1487,7 @@ object Ast {
         useAssetsInContract = useAssetsInContract,
         usePayToContractOnly = false,
         useCheckExternalCaller = true,
+        useRoutePattern = false,
         useUpdateFields = useUpdateFields,
         useMethodIndex = None,
         inline = false,

@@ -19,6 +19,7 @@ package org.alephium.flow.validation
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.model.{BlockHash, Transaction}
 import org.alephium.protocol.vm._
+import org.alephium.serde.SerdeError
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.types
@@ -94,6 +95,8 @@ case object GhostUncleHashConflictWithParentHash  extends InvalidGhostUncleStatu
 case object GhostUnclesAlreadyUsed                extends InvalidGhostUncleStatus
 case object GhostUncleDoesNotExist                extends InvalidGhostUncleStatus
 case object InvalidGhostUncleMiner                extends InvalidGhostUncleStatus
+final case class DuplicateGhostUncleSinceDanube(uncleHash: BlockHash)
+    extends InvalidGhostUncleStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =
@@ -203,3 +206,5 @@ final case object InvalidGeneratedOutputs                       extends InvalidT
 final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus
 final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus
 final case object UsingBreakingInstrs                           extends InvalidTxStatus
+case object InvalidLockupScriptPreDanube                        extends InvalidTxStatus
+final case class InvalidWebauthnPayload(error: SerdeError)      extends InvalidTxStatus

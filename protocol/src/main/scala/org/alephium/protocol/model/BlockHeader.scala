@@ -157,4 +157,8 @@ object BlockHeader {
   ): BlockHeader = {
     unsafeWithRawDeps(deps.deps, depStateHash, txsHash, timestamp, target, nonce)
   }
+
+  @inline def fromSameTemplate(header0: BlockHeader, header1: BlockHeader): Boolean = {
+    header0.blockDeps == header1.blockDeps
+  }
 }

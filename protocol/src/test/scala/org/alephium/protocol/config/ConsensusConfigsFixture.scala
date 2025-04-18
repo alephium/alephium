@@ -42,6 +42,13 @@ object ConsensusConfigsFixture {
         val emission: Emission =
           Emission.rhone(groupConfig, mainnet.blockTargetTime, blockTargetTime)
       }
+      val danube: ConsensusConfig = new ConsensusConfig {
+        val maxMiningTarget: Target          = Target.Max
+        val blockTargetTime: Duration        = Duration.ofSecondsUnsafe(8)
+        val uncleDependencyGapTime: Duration = blockTargetTime
+        val emission: Emission =
+          Emission.danube(groupConfig, mainnet.blockTargetTime, blockTargetTime)
+      }
     }
   }
 }
