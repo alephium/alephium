@@ -6568,16 +6568,29 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildTransferTxResult"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/BuildTransferTxResult"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BuildTransferTxResult"
+                      }
+                    }
+                  ]
                 },
-                "example": {
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "fromGroup": 2,
-                  "toGroup": 1
-                }
+                "example": [
+                  1,
+                  {
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "fromGroup": 2,
+                    "toGroup": 1
+                  }
+                ]
               }
             }
           },
@@ -9023,70 +9036,73 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
+                  "$ref": "#/components/schemas/Either_BuildGrouplessExecuteScriptTxResult_BuildExecuteScriptTxResult"
                 },
-                "example": {
-                  "fromGroup": 2,
-                  "toGroup": 2,
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "simulationResult": {
-                    "contractInputs": [
-                      {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "attoAlphAmount": "1000000000000000",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "1000000000000000000"
-                          }
-                        ]
-                      },
-                      {
-                        "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
-                        "attoAlphAmount": "100000000000000000",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "100000000000000000000"
-                          },
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "100000000000000000000"
-                          }
-                        ]
-                      }
-                    ],
-                    "generatedOutputs": [
-                      {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "attoAlphAmount": "1000000000000000",
-                        "tokens": [
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "1000000000000000000"
-                          }
-                        ]
-                      },
-                      {
-                        "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
-                        "attoAlphAmount": "100000000000000000",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "99000000000000000000"
-                          },
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "101000000000000000000"
-                          }
-                        ]
-                      }
-                    ]
+                "example": [
+                  1,
+                  {
+                    "fromGroup": 2,
+                    "toGroup": 2,
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "simulationResult": {
+                      "contractInputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "100000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "100000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "generatedOutputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "99000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "101000000000000000000"
+                            }
+                          ]
+                        }
+                      ]
+                    }
                   }
-                }
+                ]
               }
             }
           },
@@ -9799,17 +9815,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildDeployContractTxResult"
+                  "$ref": "#/components/schemas/Either_BuildGrouplessDeployContractTxResult_BuildDeployContractTxResult"
                 },
-                "example": {
-                  "fromGroup": 2,
-                  "toGroup": 2,
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
-                }
+                "example": [
+                  1,
+                  {
+                    "fromGroup": 2,
+                    "toGroup": 2,
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
+                  }
+                ]
               }
             }
           },
@@ -14822,6 +14841,10 @@
             "type": "string",
             "format": "uint256"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
@@ -14911,6 +14934,10 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
           },
           "gasEstimationMultiplier": {
             "type": "number",
@@ -15370,6 +15397,10 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
           },
           "targetBlockHash": {
             "type": "string",
@@ -16315,6 +16346,28 @@
             "Unreachable": "#/components/schemas/Unreachable"
           }
         }
+      },
+      "Either_BuildGrouplessDeployContractTxResult_BuildDeployContractTxResult": {
+        "title": "Either_BuildGrouplessDeployContractTxResult_BuildDeployContractTxResult",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildDeployContractTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildGrouplessDeployContractTxResult"
+          }
+        ]
+      },
+      "Either_BuildGrouplessExecuteScriptTxResult_BuildExecuteScriptTxResult": {
+        "title": "Either_BuildGrouplessExecuteScriptTxResult_BuildExecuteScriptTxResult",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildGrouplessExecuteScriptTxResult"
+          }
+        ]
       },
       "Enum": {
         "title": "Enum",
