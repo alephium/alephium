@@ -258,8 +258,13 @@ final case class NotEnoughApprovedBalance(
   }
 }
 
-final case class NoAssetsApproved(address: Address.Asset) extends ExeFailure {
-  override def toString: String = s"No assets approved from address ${address.toBase58}"
+final case class NoAssetsApproved(address: Option[Address.Asset]) extends ExeFailure {
+  override def toString: String = {
+    address match {
+      case Some(address) => s"No assets approved from address ${address.toBase58}"
+      case None          => "No assets approved"
+    }
+  }
 }
 
 final case class ChainCallerOutputsFailed(address: Address) extends ExeFailure {

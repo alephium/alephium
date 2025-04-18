@@ -119,7 +119,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     }
   }
 
-  def useForNewContract(): Option[MutBalancesPerLockup] = {
+  def useAll(): Option[MutBalancesPerLockup] = {
     Option.when(all.nonEmpty) {
       val accumulator = MutBalancesPerLockup.empty
       all.foreach { balances => accumulator.add(balances._2) }

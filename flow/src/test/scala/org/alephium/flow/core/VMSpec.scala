@@ -3950,7 +3950,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |  @using(${if (useAssets) "assetsInContract = true, " else ""}updateFields = true)
          |  pub fn bar() -> () {
-         |    ${if (useAssets) s"assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)" else ""}
+         |    ${if (useAssets) s"transferTokenFromSelf!(@$genesisAddress, ALPH, 1 alph)" else ""}
          |    n = n + 1
          |  }
          |}
@@ -8154,6 +8154,122 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(code)
+  }
+
+  it should "be able to use assets for the newly created contract" in new ContractFixture {
+    val fancyTokenCode =
+      s"""
+         |Contract FancyToken() {
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn transferTokens(recipient: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(recipient, selfTokenId!(), amount)
+         |  }
+         |}
+         |""".stripMargin
+
+    val fancyTokenTemplateId = createContract(fancyTokenCode)._1
+
+    val fancyTokenFactoryCode =
+      s"""
+         |Contract FancyTokenFactory() {
+         |  @using(checkExternalCaller = false)
+         |  pub fn mint(name: ByteVec) -> () {
+         |    let fancyTokenContractId = copyCreateSubContractWithToken!(name, #${fancyTokenTemplateId.toHexString}, #00, #00, 2)
+         |    FancyToken(fancyTokenContractId).transferTokens(callerAddress!(), 1)
+         |  }
+         |}
+         |
+         |$fancyTokenCode
+         |""".stripMargin
+
+    val fancyTokenFactoryId = createContract(fancyTokenFactoryCode)._1
+
+    val mintScriptCode =
+      s"""
+         |TxScript Main {
+         |  FancyTokenFactory(#${fancyTokenFactoryId.toHexString}).mint(b`fancyToken`)
+         |}
+         |
+         |$fancyTokenFactoryCode
+         |""".stripMargin
+
+    val mintScript = Compiler.compileTxScript(mintScriptCode).rightValue
+    val block      = payableCall(blockFlow, chainIndex, mintScript)
+    addAndCheck(blockFlow, block)
+
+    val fancyTokenContractId =
+      fancyTokenFactoryId.subContractId(ByteString.fromString("fancyToken"), chainIndex.from)
+    getContractAsset(fancyTokenContractId) is ContractOutput(
+      minimalAlphInContract,
+      LockupScript.P2C(fancyTokenContractId),
+      AVector((TokenId.from(fancyTokenContractId), U256.One))
+    )
+  }
+
+  it should "be able to lock assets from the newly created contract" in new ContractFixture {
+    val (_, randomPubKey) = chainIndex.from.generateKey
+    val recipient         = Address.p2pkh(randomPubKey)
+    val lockTimestamp     = TimeStamp.now().plusHoursUnsafe(1)
+
+    val fancyTokenCode =
+      s"""
+         |Contract FancyToken() {
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn lockTokens(amount: U256) -> () {
+         |    lockApprovedAssets!{
+         |      selfAddress!() -> selfTokenId!(): amount, ALPH: dustAmount!()
+         |    }(@$recipient, ${lockTimestamp.millis})
+         |  }
+         |}
+         |""".stripMargin
+
+    val fancyTokenTemplateId = createContract(fancyTokenCode)._1
+
+    val fancyTokenFactoryCode =
+      s"""
+         |Contract FancyTokenFactory() {
+         |  @using(preapprovedAssets = true, checkExternalCaller = false)
+         |  pub fn lock(name: ByteVec) -> () {
+         |    let fancyTokenContractId = copyCreateSubContractWithToken!{
+         |      callerAddress!() -> ALPH: 1 alph
+         |    }(name, #${fancyTokenTemplateId.toHexString}, #00, #00, 2)
+         |
+         |    FancyToken(fancyTokenContractId).lockTokens(1)
+         |  }
+         |}
+         |
+         |$fancyTokenCode
+         |""".stripMargin
+
+    val fancyTokenFactoryId = createContract(fancyTokenFactoryCode)._1
+
+    val lockScriptCode =
+      s"""
+         |TxScript Main {
+         |  FancyTokenFactory(#${fancyTokenFactoryId.toHexString}).lock{callerAddress!() -> ALPH: 1 alph}(b`fancyToken`)
+         |}
+         |
+         |$fancyTokenFactoryCode
+         |""".stripMargin
+
+    val lockScript = Compiler.compileTxScript(lockScriptCode).rightValue
+    val block      = payableCall(blockFlow, chainIndex, lockScript)
+    addAndCheck(blockFlow, block)
+
+    val fancyTokenContractId =
+      fancyTokenFactoryId.subContractId(ByteString.fromString("fancyToken"), chainIndex.from)
+    getContractAsset(fancyTokenContractId) is ContractOutput(
+      ALPH.oneAlph.subUnsafe(dustUtxoAmount),
+      LockupScript.P2C(fancyTokenContractId),
+      AVector((TokenId.from(fancyTokenContractId), U256.One))
+    )
+
+    val utxos = blockFlow.getUTXOs(recipient.lockupScript, defaultUtxoLimit, true).rightValue
+    utxos.length is 1
+    val output = utxos(0).output.asInstanceOf[AssetOutput]
+    output.amount is dustUtxoAmount
+    output.tokens is AVector((TokenId.from(fancyTokenContractId), U256.One))
+    output.lockTime is lockTimestamp
   }
 
   private def getEvents(
