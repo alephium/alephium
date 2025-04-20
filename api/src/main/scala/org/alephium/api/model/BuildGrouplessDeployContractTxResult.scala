@@ -19,6 +19,6 @@ package org.alephium.api.model
 import org.alephium.util.AVector
 
 final case class BuildGrouplessDeployContractTxResult(
-    transferTxs: AVector[BuildTransferTxResult],
+    transferTxs: AVector[BuildSimpleTransferTxResult],
     deployContractTx: BuildDeployContractTxResult
 )

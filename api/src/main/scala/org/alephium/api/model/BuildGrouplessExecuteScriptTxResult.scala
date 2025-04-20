@@ -19,6 +19,6 @@ package org.alephium.api.model
 import org.alephium.util.AVector
 
 final case class BuildGrouplessExecuteScriptTxResult(
-    transferTxs: AVector[BuildTransferTxResult],
+    transferTxs: AVector[BuildSimpleTransferTxResult],
     executeScriptTx: BuildExecuteScriptTxResult
 )

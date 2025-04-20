@@ -20,7 +20,7 @@ sealed trait BuildChainedTxResult {
 }
 
 @upickle.implicits.key("Transfer")
-final case class BuildChainedTransferTxResult(value: BuildTransferTxResult)
+final case class BuildChainedTransferTxResult(value: BuildSimpleTransferTxResult)
     extends BuildChainedTxResult
 
 @upickle.implicits.key("DeployContract")

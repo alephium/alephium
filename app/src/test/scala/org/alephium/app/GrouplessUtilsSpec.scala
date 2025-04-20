@@ -144,8 +144,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
 
     private def buildGrouplessTransferTx(query: BuildTransferTx) = {
-      val result = serverUtils.buildTransferTransaction(blockFlow, query).rightValue.leftValue
-      val txs    = result.transferTxs :+ result.transferTx
+      val result = serverUtils
+        .buildTransferTransaction(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildGrouplessTransferTxResult]
+      val txs = result.transferTxs :+ result.transferTx
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx.unsignedTx)).rightValue)
     }
 

@@ -231,7 +231,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
@@ -261,7 +262,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
-        .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -324,7 +325,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
-        .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -534,7 +535,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
@@ -578,7 +579,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
-        .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -661,7 +662,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
-        .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -886,7 +887,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, destinations)
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val decodedUnsignedTx =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
@@ -911,7 +912,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, selfDestinations)
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val txTemplate = signAndAddToMemPool(
       buildTransferTransaction.txId,
@@ -1286,7 +1287,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val txSeenAt = TimeStamp.now()
     val txTemplate = signAndAddToMemPool(
@@ -4114,7 +4115,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     signAndAndToMemPool(transferToAddress0, genesisPrivateKey)
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))

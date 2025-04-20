@@ -674,7 +674,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val contractId = ContractId.generate
 
     val transfer = BuildChainedTransferTxResult(
-      BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+      BuildSimpleTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
     )
     val transferJson = s"""
                           |{
@@ -938,7 +938,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
-    val result   = BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+    val result   = BuildSimpleTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
     val jsonRaw = s"""
                      |{
                      |  "unsignedTx":"tx",

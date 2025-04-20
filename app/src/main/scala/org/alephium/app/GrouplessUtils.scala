@@ -29,7 +29,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   def buildGrouplessTransferTx(
       blockFlow: BlockFlow,
       query: BuildGrouplessTransferTx
-  ): Try[AVector[BuildTransferTxResult]] = {
+  ): Try[AVector[BuildSimpleTransferTxResult]] = {
     for {
       lockPair <- query.getLockPair().left.map(badRequest)
       result <- buildTransferTxWithFallbackAddresses(

@@ -252,7 +252,7 @@ class ServerUtils(implicit
   def buildTransferFromOneToManyGroups(
       blockFlow: BlockFlow,
       transferRequest: BuildTransferTx
-  ): Try[AVector[BuildTransferTxResult]] =
+  ): Try[AVector[BuildSimpleTransferTxResult]] =
     for {
       _ <- Either.cond(
         transferRequest.gasAmount.isEmpty,
@@ -286,7 +286,7 @@ class ServerUtils(implicit
         .left
         .map(failed)
       txs <- unsignedTxs.mapE(validateUnsignedTransaction)
-    } yield txs.map(BuildTransferTxResult.from)
+    } yield txs.map(BuildSimpleTransferTxResult.from)
 
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
@@ -314,7 +314,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildTransferTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[Either[BuildGrouplessTransferTxResult, BuildTransferTxResult]] = {
+  ): Try[BuildTransferTxResult] = {
     for {
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
@@ -329,11 +329,10 @@ class ServerUtils(implicit
               query.targetBlockHash
             )
             result <- BuildGrouplessTransferTxResult.from(txs)
-          } yield Left(result)
+          } yield result
         case _ =>
           buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
-            .map(BuildTransferTxResult.from)
-            .map(Right.apply)
+            .map(BuildSimpleTransferTxResult.from)
       }
     } yield result
   }
@@ -341,20 +340,20 @@ class ServerUtils(implicit
   def buildMultiInputsTransaction(
       blockFlow: BlockFlow,
       query: BuildMultiAddressesTransaction
-  ): Try[BuildTransferTxResult] = {
+  ): Try[BuildSimpleTransferTxResult] = {
     for {
       unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
         blockFlow,
         query
       )
     } yield {
-      BuildTransferTxResult.from(unsignedTx)
+      BuildSimpleTransferTxResult.from(unsignedTx)
     }
   }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
-  ): Try[BuildTransferTxResult] = {
+  ): Try[BuildSimpleTransferTxResult] = {
     for {
       _ <- checkGroup(query.fromAddress.lockupScript)
       unlockScript <- buildMultisigUnlockScript(
@@ -372,7 +371,7 @@ class ServerUtils(implicit
         ExtraUtxosInfo.empty
       )
     } yield {
-      BuildTransferTxResult.from(unsignedTx)
+      BuildSimpleTransferTxResult.from(unsignedTx)
     }
   }
 
@@ -1507,7 +1506,7 @@ class ServerUtils(implicit
             extraUtxosInfo
           )
         } yield (
-          BuildChainedTransferTxResult(BuildTransferTxResult.from(unsignedTx)),
+          BuildChainedTransferTxResult(BuildSimpleTransferTxResult.from(unsignedTx)),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
       case buildExecuteScript: BuildChainedExecuteScriptTx =>

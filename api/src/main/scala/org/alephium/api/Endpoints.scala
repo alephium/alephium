@@ -338,33 +338,30 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  lazy val buildTransferTransaction: BaseEndpoint[BuildTransferTx, Either[
-    BuildGrouplessTransferTxResult,
-    BuildTransferTxResult
-  ]] =
+  lazy val buildTransferTransaction: BaseEndpoint[BuildTransferTx, BuildTransferTxResult] =
     transactionsEndpoint.post
       .in("build")
       .in(jsonBodyWithAlph[BuildTransferTx])
-      .out(jsonBodyEither[BuildGrouplessTransferTxResult, BuildTransferTxResult])
+      .out(jsonBody[BuildTransferTxResult])
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
   lazy val buildTransferFromOneToManyGroups
-      : BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
+      : BaseEndpoint[BuildTransferTx, AVector[BuildSimpleTransferTxResult]] =
     transactionsEndpoint.post
       .in("build-transfer-from-one-to-many-groups")
       .in(jsonBodyWithAlph[BuildTransferTx])
-      .out(jsonBody[AVector[BuildTransferTxResult]])
+      .out(jsonBody[AVector[BuildSimpleTransferTxResult]])
       .summary(
         "Build unsigned transfer transactions from an address of one group to addresses of many groups. " +
           "Each target group requires a dedicated transaction or more in case large number of outputs needed to be split."
       )
 
   lazy val buildMultiAddressesTransaction
-      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransferTxResult] =
+      : BaseEndpoint[BuildMultiAddressesTransaction, BuildSimpleTransferTxResult] =
     transactionsEndpoint.post
       .in("build-multi-addresses")
       .in(jsonBodyWithAlph[BuildMultiAddressesTransaction])
-      .out(jsonBody[BuildTransferTxResult])
+      .out(jsonBody[BuildSimpleTransferTxResult])
       .summary(
         "Build an unsigned transaction with multiple addresses to a number of recipients"
       )
@@ -414,11 +411,11 @@ trait Endpoints
       .out(jsonBody[BuildMultisigAddressResult])
       .summary("Create the multisig address and unlock script")
 
-  lazy val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransferTxResult] =
+  lazy val buildMultisig: BaseEndpoint[BuildMultisig, BuildSimpleTransferTxResult] =
     multisigEndpoint.post
       .in("build")
       .in(jsonBody[BuildMultisig])
-      .out(jsonBody[BuildTransferTxResult])
+      .out(jsonBody[BuildSimpleTransferTxResult])
       .summary("Build a multisig unsigned transaction")
 
   lazy val buildSweepMultisig
@@ -725,11 +722,11 @@ trait Endpoints
       .summary("Get contract events for a block")
 
   lazy val buildGrouplessTransfer
-      : BaseEndpoint[BuildGrouplessTransferTx, AVector[BuildTransferTxResult]] =
+      : BaseEndpoint[BuildGrouplessTransferTx, AVector[BuildSimpleTransferTxResult]] =
     grouplessEndpoint.post
       .in("transfer")
       .in(jsonBodyWithAlph[BuildGrouplessTransferTx])
-      .out(jsonBody[AVector[BuildTransferTxResult]])
+      .out(jsonBody[AVector[BuildSimpleTransferTxResult]])
       .summary("Build unsigned transfer transactions from a groupless address")
 
   lazy val buildGrouplessExecuteScriptTx
@@ -737,7 +734,10 @@ trait Endpoints
     grouplessEndpoint.post
       .in("execute-script")
       .in(jsonBody[BuildGrouplessExecuteScriptTx])
-      .out(jsonBody[BuildGrouplessExecuteScriptTxResult])
+      .out(
+        jsonBody[BuildGrouplessExecuteScriptTxResult]
+          .examples(buildGrouplessExecuteScriptTxResultExamples)
+      )
       .summary("Build an unsigned execute script transaction from a groupless address")
 
   lazy val buildGrouplessDeployContractTx

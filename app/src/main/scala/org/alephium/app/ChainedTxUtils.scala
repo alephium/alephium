@@ -40,7 +40,7 @@ trait ChainedTxUtils { self: ServerUtils =>
       destinations: AVector[Destination],
       gasPriceOpt: Option[GasPrice],
       targetBlockHashOpt: Option[BlockHash]
-  ): Try[AVector[BuildTransferTxResult]] = {
+  ): Try[AVector[BuildSimpleTransferTxResult]] = {
     val outputInfos = prepareOutputInfos(destinations)
     val gasPrice    = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
     for {
@@ -67,7 +67,7 @@ trait ChainedTxUtils { self: ServerUtils =>
         gasPrice,
         targetBlockHashOpt
       )
-    } yield txs.map(BuildTransferTxResult.from)
+    } yield txs.map(BuildSimpleTransferTxResult.from)
   }
 
   // scalastyle:off parameter.number
@@ -103,7 +103,7 @@ trait ChainedTxUtils { self: ServerUtils =>
     } yield {
       val (transferTxs, executeScriptTx, txScriptExecution) = result
       BuildGrouplessExecuteScriptTxResult(
-        transferTxs.map(BuildTransferTxResult.from),
+        transferTxs.map(BuildSimpleTransferTxResult.from),
         BuildExecuteScriptTxResult.from(executeScriptTx, SimulationResult.from(txScriptExecution))
       )
     }
@@ -147,7 +147,7 @@ trait ChainedTxUtils { self: ServerUtils =>
     } yield {
       val (transferTxs, deployContractTx, _) = result
       BuildGrouplessDeployContractTxResult(
-        transferTxs.map(BuildTransferTxResult.from),
+        transferTxs.map(BuildSimpleTransferTxResult.from),
         BuildDeployContractTxResult.from(deployContractTx)
       )
     }
