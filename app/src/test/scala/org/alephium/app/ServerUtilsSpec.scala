@@ -1606,7 +1606,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           )
         )
         .rightValue
-        .rightValue
+        .asInstanceOf[BuildSimpleDeployContractTxResult]
 
       val deployContractTx =
         deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
@@ -3326,7 +3326,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleDeployContractTxResult]
 
     def deployContract() = {
       val deployContractTx =
@@ -3364,7 +3364,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     def executeTxScript(
         buildExecuteScript: BuildExecuteScriptTx
     ): BuildExecuteScriptTxResult = {
-      serverUtils.buildExecuteScriptTx(blockFlow, buildExecuteScript).rightValue.rightValue
+      serverUtils
+        .buildExecuteScriptTx(blockFlow, buildExecuteScript)
+        .rightValue
+        .asInstanceOf[BuildSimpleExecuteScriptTxResult]
     }
 
     def failedExecuteTxScript(
@@ -3900,8 +3903,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit val serverUtils: ServerUtils = new ServerUtils()
     def buildDeployContractTx(
         query: BuildDeployContractTx
-    ): BuildDeployContractTxResult = {
-      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue.rightValue
+    ): BuildSimpleDeployContractTxResult = {
+      val result = serverUtils
+        .buildDeployContractTx(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildSimpleDeployContractTxResult]
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
       val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
@@ -5086,7 +5092,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
 
     val result1 = serverUtils
       .buildExecuteScriptTx(
@@ -5099,13 +5105,13 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
-      .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
 
     result1.gasAmount.value > result0.gasAmount.value is true
 
     executeScript(script, Some((genesisPrivateKey, genesisPublicKey)))
 
-    def createTxTemplate(result: BuildExecuteScriptTxResult): TransactionTemplate = {
+    def createTxTemplate(result: BuildSimpleExecuteScriptTxResult): TransactionTemplate = {
       val signature = SecP256K1.sign(result.txId.bytes, privateKey)
       serverUtils.createTxTemplate(SubmitTransaction(result.unsignedTx, signature)).rightValue
     }

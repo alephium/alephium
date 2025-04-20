@@ -942,7 +942,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
-      BuildDeployContractTxResult(
+      BuildSimpleDeployContractTxResult(
         fromGroup = 2,
         toGroup = 2,
         unsignedTx = hexString,
@@ -957,7 +957,7 @@ trait EndpointsExamples extends ErrorExamples {
       : List[Example[BuildChainedDeployContractTxResult]] =
     simpleExample(
       BuildChainedDeployContractTxResult(
-        BuildDeployContractTxResult(
+        BuildSimpleDeployContractTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -971,7 +971,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
     simpleExample(
-      BuildExecuteScriptTxResult(
+      BuildSimpleExecuteScriptTxResult(
         fromGroup = 2,
         toGroup = 2,
         unsignedTx = hexString,
@@ -986,7 +986,7 @@ trait EndpointsExamples extends ErrorExamples {
       : List[Example[BuildChainedExecuteScriptTxResult]] =
     simpleExample(
       BuildChainedExecuteScriptTxResult(
-        BuildExecuteScriptTxResult(
+        BuildSimpleExecuteScriptTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -1013,7 +1013,7 @@ trait EndpointsExamples extends ErrorExamples {
           )
         ),
         BuildChainedExecuteScriptTxResult(
-          BuildExecuteScriptTxResult(
+          BuildSimpleExecuteScriptTxResult(
             fromGroup = 2,
             toGroup = 2,
             unsignedTx = hexString,
@@ -1283,7 +1283,7 @@ trait EndpointsExamples extends ErrorExamples {
             toGroup = 1
           )
         ),
-        executeScriptTx = BuildExecuteScriptTxResult(
+        executeScriptTx = BuildSimpleExecuteScriptTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -1325,7 +1325,7 @@ trait EndpointsExamples extends ErrorExamples {
             toGroup = 1
           )
         ),
-        deployContractTx = BuildDeployContractTxResult(
+        deployContractTx = BuildSimpleDeployContractTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,

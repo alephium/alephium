@@ -318,12 +318,12 @@ trait ApiModelCodec {
   implicit val txStatusRW: RW[TxStatus] =
     RW.merge(macroRW[Confirmed], macroRW[MemPooled], macroRW[TxNotFound])
 
-  implicit val buildTransferRW: RW[BuildTransferTx]                           = macroRW
-  implicit val buildDeployContractTxRW: RW[BuildDeployContractTx]             = macroRW
-  implicit val buildExecuteScriptTxRW: RW[BuildExecuteScriptTx]               = macroRW
-  implicit val buildSimpleTransferResultRW: RW[BuildSimpleTransferTxResult]   = macroRW
-  implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
-  implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult]   = macroRW
+  implicit val buildTransferRW: RW[BuildTransferTx]                                       = macroRW
+  implicit val buildDeployContractTxRW: RW[BuildDeployContractTx]                         = macroRW
+  implicit val buildExecuteScriptTxRW: RW[BuildExecuteScriptTx]                           = macroRW
+  implicit val buildSimpleTransferResultRW: RW[BuildSimpleTransferTxResult]               = macroRW
+  implicit val buildSimpleDeployContractTxResultRW: RW[BuildSimpleDeployContractTxResult] = macroRW
+  implicit val buildSimpleExecuteScriptTxResultRW: RW[BuildSimpleExecuteScriptTxResult]   = macroRW
 
   implicit val buildTransactionTransferRW: RW[BuildChainedTransferTx] = macroRW
   implicit val buildTransactionDeployContractRW: RW[BuildChainedDeployContractTx] =
@@ -526,8 +526,9 @@ trait ApiModelCodec {
   implicit val buildGrouplessDeployContractTxResultRW: RW[BuildGrouplessDeployContractTxResult] =
     macroRW
 
-  implicit val buildTransferResultRW: RW[BuildTransferTxResult] = macroRW
-
+  implicit val buildTransferResultRW: RW[BuildTransferTxResult]               = macroRW
+  implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult]   = macroRW
+  implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)
 

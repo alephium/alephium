@@ -24,9 +24,9 @@ final case class BuildChainedTransferTxResult(value: BuildSimpleTransferTxResult
     extends BuildChainedTxResult
 
 @upickle.implicits.key("DeployContract")
-final case class BuildChainedDeployContractTxResult(value: BuildDeployContractTxResult)
+final case class BuildChainedDeployContractTxResult(value: BuildSimpleDeployContractTxResult)
     extends BuildChainedTxResult
 
 @upickle.implicits.key("ExecuteScript")
-final case class BuildChainedExecuteScriptTxResult(value: BuildExecuteScriptTxResult)
+final case class BuildChainedExecuteScriptTxResult(value: BuildSimpleExecuteScriptTxResult)
     extends BuildChainedTxResult

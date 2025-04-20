@@ -1443,7 +1443,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildDeployContractTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[Either[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult]] = {
+  ): Try[BuildDeployContractTxResult] = {
     for {
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
@@ -1456,11 +1456,10 @@ class ServerUtils(implicit
             query.gasAmount,
             query.gasPrice,
             query.targetBlockHash
-          ).map(Left.apply)
+          )
         case _ =>
           buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
-            .map(BuildDeployContractTxResult.from)
-            .map(Right.apply)
+            .map(BuildSimpleDeployContractTxResult.from)
       }
     } yield result
   }
@@ -1530,7 +1529,7 @@ class ServerUtils(implicit
           val simulationResult = SimulationResult.from(txScriptExecution)
           (
             BuildChainedExecuteScriptTxResult(
-              BuildExecuteScriptTxResult.from(
+              BuildSimpleExecuteScriptTxResult.from(
                 unsignedTx,
                 simulationResult
               )
@@ -1549,7 +1548,7 @@ class ServerUtils(implicit
           )
         } yield (
           BuildChainedDeployContractTxResult(
-            BuildDeployContractTxResult.from(unsignedTx)
+            BuildSimpleDeployContractTxResult.from(unsignedTx)
           ),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
@@ -1645,7 +1644,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[Either[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult]] = {
+  ): Try[BuildExecuteScriptTxResult] = {
     for {
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
@@ -1664,11 +1663,12 @@ class ServerUtils(implicit
               query.gasPrice,
               query.targetBlockHash
             )
-          } yield Left(result)
+          } yield result
         case _ =>
           buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-            .map(res => BuildExecuteScriptTxResult.from(res._1, SimulationResult.from(res._2)))
-            .map(Right.apply)
+            .map(res =>
+              BuildSimpleExecuteScriptTxResult.from(res._1, SimulationResult.from(res._2))
+            )
       }
     } yield result
   }

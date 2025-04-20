@@ -533,14 +533,11 @@ trait Endpoints
       .out(jsonBody[CompileScriptResult])
       .summary("Compile a script")
 
-  lazy val buildExecuteScriptTx: BaseEndpoint[BuildExecuteScriptTx, Either[
-    BuildGrouplessExecuteScriptTxResult,
-    BuildExecuteScriptTxResult
-  ]] =
+  lazy val buildExecuteScriptTx: BaseEndpoint[BuildExecuteScriptTx, BuildExecuteScriptTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("execute-script")
       .in(jsonBody[BuildExecuteScriptTx])
-      .out(jsonBodyEither[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult])
+      .out(jsonBody[BuildExecuteScriptTxResult])
       .summary("Build an unsigned script")
 
   lazy val compileContract: BaseEndpoint[Compile.Contract, CompileContractResult] =
@@ -557,14 +554,11 @@ trait Endpoints
       .out(jsonBody[CompileProjectResult])
       .summary("Compile a project")
 
-  lazy val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, Either[
-    BuildGrouplessDeployContractTxResult,
-    BuildDeployContractTxResult
-  ]] =
+  lazy val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, BuildDeployContractTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("deploy-contract")
       .in(jsonBody[BuildDeployContractTx])
-      .out(jsonBodyEither[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult])
+      .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
 
   lazy val buildChainedTransactions

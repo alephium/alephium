@@ -680,6 +680,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                           |{
                           |  "type": "Transfer",
                           |  "value": {
+                          |    "type": "BuildSimpleTransferTxResult",
                           |    "unsignedTx":"tx",
                           |    "gasAmount": 1,
                           |    "gasPrice": "1",
@@ -692,7 +693,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(transfer, transferJson)
 
     val deploy = BuildChainedDeployContractTxResult(
-      BuildDeployContractTxResult(
+      BuildSimpleDeployContractTxResult(
         fromGroup = 2,
         toGroup = 2,
         unsignedTx = "0000",
@@ -707,6 +708,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "type": "DeployContract",
          |  "value": {
+         |    "type": "BuildSimpleDeployContractTxResult",
          |    "fromGroup": 2,
          |    "toGroup": 2,
          |    "unsignedTx": "0000",
@@ -744,7 +746,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
     )
     val execute = BuildChainedExecuteScriptTxResult(
-      BuildExecuteScriptTxResult(
+      BuildSimpleExecuteScriptTxResult(
         fromGroup = 1,
         toGroup = 1,
         unsignedTx = "0000",
@@ -759,6 +761,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "type": "ExecuteScript",
          |  "value": {
+         |    "type": "BuildSimpleExecuteScriptTxResult",
          |    "fromGroup": 1,
          |    "toGroup": 1,
          |    "unsignedTx": "0000",
@@ -941,6 +944,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val result   = BuildSimpleTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
     val jsonRaw = s"""
                      |{
+                     |  "type": "BuildSimpleTransferTxResult",
                      |  "unsignedTx":"tx",
                      |  "gasAmount": 1,
                      |  "gasPrice": "1",
@@ -1161,7 +1165,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = TransactionId.generate
     val contractId = ContractId.generate
-    val buildDeployContractTxResult = BuildDeployContractTxResult(
+    val buildDeployContractTxResult = BuildSimpleDeployContractTxResult(
       fromGroup = 2,
       toGroup = 2,
       unsignedTx = "0000",
@@ -1173,6 +1177,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""
          |{
+         |  "type": "BuildSimpleDeployContractTxResult",
          |  "fromGroup": 2,
          |  "toGroup": 2,
          |  "unsignedTx": "0000",
@@ -1232,7 +1237,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         )
       )
     )
-    val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
+    val buildExecuteScriptTxResult = BuildSimpleExecuteScriptTxResult(
       fromGroup = 1,
       toGroup = 1,
       unsignedTx = "0000",
@@ -1244,6 +1249,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""
          |{
+         |  "type": "BuildSimpleExecuteScriptTxResult",
          |  "fromGroup": 1,
          |  "toGroup": 1,
          |  "unsignedTx": "0000",

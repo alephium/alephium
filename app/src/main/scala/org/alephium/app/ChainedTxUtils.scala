@@ -104,7 +104,10 @@ trait ChainedTxUtils { self: ServerUtils =>
       val (transferTxs, executeScriptTx, txScriptExecution) = result
       BuildGrouplessExecuteScriptTxResult(
         transferTxs.map(BuildSimpleTransferTxResult.from),
-        BuildExecuteScriptTxResult.from(executeScriptTx, SimulationResult.from(txScriptExecution))
+        BuildSimpleExecuteScriptTxResult.from(
+          executeScriptTx,
+          SimulationResult.from(txScriptExecution)
+        )
       )
     }
   }
@@ -148,7 +151,7 @@ trait ChainedTxUtils { self: ServerUtils =>
       val (transferTxs, deployContractTx, _) = result
       BuildGrouplessDeployContractTxResult(
         transferTxs.map(BuildSimpleTransferTxResult.from),
-        BuildDeployContractTxResult.from(deployContractTx)
+        BuildSimpleDeployContractTxResult.from(deployContractTx)
       )
     }
   }

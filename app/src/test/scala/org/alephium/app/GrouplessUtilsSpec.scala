@@ -298,8 +298,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val contractId = createContract(contract, chainIndex = chainIndex)._1
 
     private def buildGrouplessExecuteScriptTx(query: BuildExecuteScriptTx) = {
-      val result = serverUtils.buildExecuteScriptTx(blockFlow, query).rightValue.leftValue
-      val txs    = result.transferTxs.map(_.unsignedTx) :+ result.executeScriptTx.unsignedTx
+      val result = serverUtils
+        .buildExecuteScriptTx(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildGrouplessExecuteScriptTxResult]
+      val txs = result.transferTxs.map(_.unsignedTx) :+ result.executeScriptTx.unsignedTx
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
 
@@ -400,7 +403,10 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
 
     private def buildGrouplessDeployContractTx(query: BuildDeployContractTx) = {
-      val result      = serverUtils.buildDeployContractTx(blockFlow, query).rightValue.leftValue
+      val result = serverUtils
+        .buildDeployContractTx(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildGrouplessDeployContractTxResult]
       val txs         = result.transferTxs.map(_.unsignedTx) :+ result.deployContractTx.unsignedTx
       val unsignedTxs = txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
       (unsignedTxs, result.deployContractTx.contractAddress.contractId)

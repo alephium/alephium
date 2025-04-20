@@ -19,11 +19,10 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.model.{BlockHash, GroupIndex}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
-import org.alephium.util.AVector
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.StatefulScript
+import org.alephium.protocol.model.{BlockHash, GroupIndex}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildExecuteScriptTx(
