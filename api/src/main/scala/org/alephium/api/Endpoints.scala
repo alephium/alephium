@@ -140,11 +140,6 @@ trait Endpoints
     eventsEndpoint
       .in("contract")
 
-  private val grouplessEndpoint: BaseEndpoint[Unit, Unit] =
-    baseEndpoint
-      .in("groupless")
-      .tag("Groupless")
-
   lazy val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
       .in("node")
@@ -714,33 +709,6 @@ trait Endpoints
       .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[ContractEventsByBlockHash])
       .summary("Get contract events for a block")
-
-  lazy val buildGrouplessTransfer
-      : BaseEndpoint[BuildGrouplessTransferTx, AVector[BuildSimpleTransferTxResult]] =
-    grouplessEndpoint.post
-      .in("transfer")
-      .in(jsonBodyWithAlph[BuildGrouplessTransferTx])
-      .out(jsonBody[AVector[BuildSimpleTransferTxResult]])
-      .summary("Build unsigned transfer transactions from a groupless address")
-
-  lazy val buildGrouplessExecuteScriptTx
-      : BaseEndpoint[BuildGrouplessExecuteScriptTx, BuildGrouplessExecuteScriptTxResult] =
-    grouplessEndpoint.post
-      .in("execute-script")
-      .in(jsonBody[BuildGrouplessExecuteScriptTx])
-      .out(
-        jsonBody[BuildGrouplessExecuteScriptTxResult]
-          .examples(buildGrouplessExecuteScriptTxResultExamples)
-      )
-      .summary("Build an unsigned execute script transaction from a groupless address")
-
-  lazy val buildGrouplessDeployContractTx
-      : BaseEndpoint[BuildGrouplessDeployContractTx, BuildGrouplessDeployContractTxResult] =
-    grouplessEndpoint.post
-      .in("deploy-contract")
-      .in(jsonBody[BuildGrouplessDeployContractTx])
-      .out(jsonBody[BuildGrouplessDeployContractTxResult])
-      .summary("Build an unsigned deploy contract transaction from a groupless address")
 }
 
 object Endpoints {

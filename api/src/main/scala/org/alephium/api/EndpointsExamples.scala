@@ -26,16 +26,14 @@ import org.alephium.protocol._
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
-  AddressLike,
   BlockHash,
   CliqueId,
   ContractId,
-  GroupIndex,
   NetworkId,
   TokenId,
   TransactionId
 }
-import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, StatefulContract, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -317,8 +315,6 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
   )
-
-  private val groupIndex = new GroupIndex(0)
 
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
@@ -1180,22 +1176,6 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val transactionIdExamples: List[Example[TransactionId]] =
     simpleExample(transaction.unsigned.txId)
 
-  private val grouplessAddressLike = AddressLike.from(
-    LockupScript.P2PK(PublicKeyLike.SecP256K1(publicKey), groupIndex)
-  )
-  implicit val buildGrouplessTransferExamples: List[Example[BuildGrouplessTransferTx]] = List(
-    defaultExample(
-      BuildGrouplessTransferTx(grouplessAddressLike, defaultDestinations)
-    ),
-    moreSettingsExample(
-      BuildGrouplessTransferTx(
-        grouplessAddressLike,
-        moreSettingsDestinations,
-        Some(model.nonCoinbaseMinGasPrice)
-      )
-    )
-  )
-
   val buildGrouplessTransferTxResultExamples: List[Example[BuildGrouplessTransferTxResult]] =
     simpleExample(
       BuildGrouplessTransferTxResult(
@@ -1255,20 +1235,6 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildGrouplessExecuteScriptTxExamples: List[Example[BuildGrouplessExecuteScriptTx]] =
-    List(
-      defaultExample(BuildGrouplessExecuteScriptTx(grouplessAddressLike, bytecode = byteString)),
-      moreSettingsExample(
-        BuildGrouplessExecuteScriptTx(
-          grouplessAddressLike,
-          byteString,
-          Some(Amount(model.dustUtxoAmount)),
-          Some(tokens),
-          Some(model.nonCoinbaseMinGasPrice)
-        )
-      )
-    )
-
   implicit val buildGrouplessExecuteScriptTxResultExamples
       : List[Example[BuildGrouplessExecuteScriptTxResult]] =
     simpleExample(
@@ -1294,22 +1260,6 @@ trait EndpointsExamples extends ErrorExamples {
         )
       )
     )
-
-  implicit val buildGrouplessDeployContractTxExamples
-      : List[Example[BuildGrouplessDeployContractTx]] = List(
-    defaultExample(BuildGrouplessDeployContractTx(grouplessAddressLike, bytecode = byteString)),
-    moreSettingsExample(
-      BuildGrouplessDeployContractTx(
-        grouplessAddressLike,
-        byteString,
-        Some(bigAmount),
-        Some(tokens),
-        Some(bigAmount),
-        Some(address),
-        Some(model.nonCoinbaseMinGasPrice)
-      )
-    )
-  )
 
   implicit val buildGrouplessDeployContractTxResultExamples
       : List[Example[BuildGrouplessDeployContractTxResult]] =

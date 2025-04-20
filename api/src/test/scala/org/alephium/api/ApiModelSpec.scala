@@ -251,23 +251,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(data, jsonRaw)
   }
 
-  it should "encode/decode BuildGrouplessExecuteScriptTx" in {
-    val fromPublicKey = PublicKey.generate
-    val fromLockupScript =
-      LockupScript.p2pk(PublicKeyLike.SecP256K1(fromPublicKey), GroupIndex.unsafe(0))
-    val fromAddressLike = AddressLike.from(fromLockupScript)
-    val attoAlphAmount  = Amount(U256.unsafe(1))
-    val bytecode        = ByteString(0, 0)
-    val request = BuildGrouplessExecuteScriptTx(fromAddressLike, bytecode, Some(attoAlphAmount))
-    val jsonRaw =
-      s"""{
-         |  "fromAddress": "$fromAddressLike",
-         |  "bytecode": "0000",
-         |  "attoAlphAmount": "1"
-         |}""".stripMargin
-    checkData(request, jsonRaw)
-  }
-
   it should "encode/decode Token" in {
     val id     = TokenId.generate
     val amount = ALPH.oneAlph
