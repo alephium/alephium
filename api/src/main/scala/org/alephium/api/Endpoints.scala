@@ -24,6 +24,7 @@ import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
 import sttp.tapir.EndpointOutput.OneOfVariant
 import sttp.tapir.generic.auto._
+import sttp.tapir.oneOfVariantValueMatcher
 
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemasLike
@@ -337,13 +338,14 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  lazy val buildTransferTransaction: BaseEndpoint[BuildTransferTx, Either[AVector[
+  lazy val buildTransferTransaction: BaseEndpoint[BuildTransferTx, Either[
+    BuildGrouplessTransferTxResult,
     BuildTransferTxResult
-  ], BuildTransferTxResult]] =
+  ]] =
     transactionsEndpoint.post
       .in("build")
       .in(jsonBodyWithAlph[BuildTransferTx])
-      .out(jsonBody[Either[AVector[BuildTransferTxResult], BuildTransferTxResult]])
+      .out(jsonBodyEither[BuildGrouplessTransferTxResult, BuildTransferTxResult])
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
   lazy val buildTransferFromOneToManyGroups
@@ -541,7 +543,7 @@ trait Endpoints
     contractsUnsignedTxEndpoint.post
       .in("execute-script")
       .in(jsonBody[BuildExecuteScriptTx])
-      .out(jsonBody[Either[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult]])
+      .out(jsonBodyEither[BuildGrouplessExecuteScriptTxResult, BuildExecuteScriptTxResult])
       .summary("Build an unsigned script")
 
   lazy val compileContract: BaseEndpoint[Compile.Contract, CompileContractResult] =
@@ -565,7 +567,7 @@ trait Endpoints
     contractsUnsignedTxEndpoint.post
       .in("deploy-contract")
       .in(jsonBody[BuildDeployContractTx])
-      .out(jsonBody[Either[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult]])
+      .out(jsonBodyEither[BuildGrouplessDeployContractTxResult, BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
 
   lazy val buildChainedTransactions
@@ -777,5 +779,19 @@ object Endpoints {
           s"Format 2: `x.y ALPH`, where `1 ALPH = ${ALPH.oneAlph}\n\n" +
           s"Field fromPublicKeyType can be  `default` or `bip340-schnorr`"
       )
+  }
+
+  def jsonBodyEither[A: ReadWriter: Schema, B: ReadWriter: Schema](implicit
+      aExamples: List[Example[A]],
+      bExamples: List[Example[B]]
+  ): EndpointOutput.OneOf[Either[A, B], Either[A, B]] = {
+    val leftBody =
+      jsonBody[A].map(Left(_))(_.swap.getOrElse(throw new RuntimeException("Expect Left value")))
+    val rightBody = jsonBody[B].map(Right(_))(_.value)
+
+    oneOf[Either[A, B]](
+      oneOfVariantValueMatcher(StatusCode.Ok, leftBody) { case Left(_) => true },
+      oneOfVariantValueMatcher(StatusCode.Ok, rightBody) { case Right(_) => true }
+    )
   }
 }

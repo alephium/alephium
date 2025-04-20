@@ -518,6 +518,7 @@ trait ApiModelCodec {
   implicit val simulationResultRW: RW[SimulationResult]   = macroRW
 
   implicit val buildGrouplessTransferRW: RW[BuildGrouplessTransferTx]             = macroRW
+  implicit val buildGrouplessTransferResultRW: RW[BuildGrouplessTransferTxResult] = macroRW
   implicit val buildGrouplessExecuteScriptTxRW: RW[BuildGrouplessExecuteScriptTx] = macroRW
   implicit val buildGrouplessExecuteScriptTxResultRW: RW[BuildGrouplessExecuteScriptTxResult] =
     macroRW

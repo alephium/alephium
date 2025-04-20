@@ -6568,29 +6568,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
+                  "anyOf": [
                     {
-                      "$ref": "#/components/schemas/BuildTransferTxResult"
+                      "$ref": "#/components/schemas/BuildGrouplessTransferTxResult"
                     },
                     {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/BuildTransferTxResult"
-                      }
+                      "$ref": "#/components/schemas/BuildTransferTxResult"
                     }
                   ]
                 },
-                "example": [
-                  1,
-                  {
-                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                "example": {
+                  "transferTxs": [
+                    {
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "transferTx": {
+                    "unsignedTx": "4c5eb8d712aa9cc35d1b2a520a0da3",
                     "gasAmount": 20000,
                     "gasPrice": "100000000000",
-                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                    "fromGroup": 2,
-                    "toGroup": 1
+                    "txId": "ff833c028e417bd9693b7240882f0a43a54a4008f4a66708ea45524b0ad15484",
+                    "fromGroup": 1,
+                    "toGroup": 3
                   }
-                ]
+                }
               }
             }
           },
@@ -9036,11 +9042,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Either_BuildGrouplessExecuteScriptTxResult_BuildExecuteScriptTxResult"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BuildGrouplessExecuteScriptTxResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
+                    }
+                  ]
                 },
-                "example": [
-                  1,
-                  {
+                "example": {
+                  "transferTxs": [
+                    {
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "executeScriptTx": {
                     "fromGroup": 2,
                     "toGroup": 2,
                     "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -9102,7 +9124,7 @@
                       ]
                     }
                   }
-                ]
+                }
               }
             }
           },
@@ -9815,11 +9837,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Either_BuildGrouplessDeployContractTxResult_BuildDeployContractTxResult"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BuildGrouplessDeployContractTxResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BuildDeployContractTxResult"
+                    }
+                  ]
                 },
-                "example": [
-                  1,
-                  {
+                "example": {
+                  "transferTxs": [
+                    {
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "deployContractTx": {
                     "fromGroup": 2,
                     "toGroup": 2,
                     "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -9828,7 +9866,7 @@
                     "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                     "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                   }
-                ]
+                }
               }
             }
           },
@@ -15136,6 +15174,25 @@
           }
         }
       },
+      "BuildGrouplessTransferTxResult": {
+        "title": "BuildGrouplessTransferTxResult",
+        "type": "object",
+        "required": [
+          "transferTxs",
+          "transferTx"
+        ],
+        "properties": {
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildTransferTxResult"
+            }
+          },
+          "transferTx": {
+            "$ref": "#/components/schemas/BuildTransferTxResult"
+          }
+        }
+      },
       "BuildInfo": {
         "title": "BuildInfo",
         "type": "object",
@@ -16346,28 +16403,6 @@
             "Unreachable": "#/components/schemas/Unreachable"
           }
         }
-      },
-      "Either_BuildGrouplessDeployContractTxResult_BuildDeployContractTxResult": {
-        "title": "Either_BuildGrouplessDeployContractTxResult_BuildDeployContractTxResult",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/BuildDeployContractTxResult"
-          },
-          {
-            "$ref": "#/components/schemas/BuildGrouplessDeployContractTxResult"
-          }
-        ]
-      },
-      "Either_BuildGrouplessExecuteScriptTxResult_BuildExecuteScriptTxResult": {
-        "title": "Either_BuildGrouplessExecuteScriptTxResult_BuildExecuteScriptTxResult",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
-          },
-          {
-            "$ref": "#/components/schemas/BuildGrouplessExecuteScriptTxResult"
-          }
-        ]
       },
       "Enum": {
         "title": "Enum",

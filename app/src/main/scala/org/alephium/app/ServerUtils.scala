@@ -314,19 +314,22 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildTransferTx,
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
-  ): Try[Either[AVector[BuildTransferTxResult], BuildTransferTxResult]] = {
+  ): Try[Either[BuildGrouplessTransferTxResult, BuildTransferTxResult]] = {
     for {
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
-          buildTransferTxWithFallbackAddresses(
-            blockFlow,
-            lockupPair,
-            otherGroupsLockupPairs(lockupScript),
-            query.destinations,
-            query.gasPrice,
-            query.targetBlockHash
-          ).map(Left.apply)
+          for {
+            txs <- buildTransferTxWithFallbackAddresses(
+              blockFlow,
+              lockupPair,
+              otherGroupsLockupPairs(lockupScript),
+              query.destinations,
+              query.gasPrice,
+              query.targetBlockHash
+            )
+            result <- BuildGrouplessTransferTxResult.from(txs)
+          } yield Left(result)
         case _ =>
           buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
             .map(BuildTransferTxResult.from)
