@@ -236,9 +236,14 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.alph(2))),
         Some(AVector(Token(tokenId, ALPH.alph(2))))
       )
-    val query0 = BuildGrouplessTransferTx(fromAddressWithGroup, AVector(destination0))
+    val query0 = BuildTransferTx(
+      fromPublicKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+      group = Some(chainIndex.from),
+      destinations = AVector(destination0)
+    )
     serverUtils
-      .buildGrouplessTransferTx(blockFlow, query0)
+      .buildTransferTransaction(blockFlow, query0)
       .leftValue
       .detail is "Not enough ALPH balance, requires an additional 0.502 ALPH"
 
@@ -248,9 +253,14 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.oneAlph)),
         Some(AVector(Token(tokenId, ALPH.alph(3))))
       )
-    val query1 = BuildGrouplessTransferTx(fromAddressWithGroup, AVector(destination1))
+    val query1 = BuildTransferTx(
+      fromPublicKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+      group = Some(chainIndex.from),
+      destinations = AVector(destination1)
+    )
     serverUtils
-      .buildGrouplessTransferTx(blockFlow, query1)
+      .buildTransferTransaction(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }
@@ -261,9 +271,14 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
     val destination0 = Destination(toAddress, Some(Amount(ALPH.oneAlph)), None)
-    val query0       = BuildGrouplessTransferTx(fromAddressWithGroup, AVector(destination0))
+    val query0 = BuildTransferTx(
+      fromPublicKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+      group = Some(chainIndex.from),
+      destinations = AVector(destination0)
+    )
     serverUtils
-      .buildGrouplessTransferTx(blockFlow, query0)
+      .buildTransferTransaction(blockFlow, query0)
       .leftValue
       .detail is "Not enough ALPH balance, requires an additional 1.501 ALPH"
 
@@ -274,9 +289,14 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(Amount(ALPH.oneAlph)),
         Some(AVector(Token(tokenId, ALPH.alph(2))))
       )
-    val query1 = BuildGrouplessTransferTx(fromAddressWithGroup, AVector(destination1))
+    val query1 = BuildTransferTx(
+      fromPublicKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+      group = Some(chainIndex.from),
+      destinations = AVector(destination1)
+    )
     serverUtils
-      .buildGrouplessTransferTx(blockFlow, query1)
+      .buildTransferTransaction(blockFlow, query1)
       .leftValue
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }

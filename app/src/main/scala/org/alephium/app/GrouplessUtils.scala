@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import org.alephium.api.{badRequest, failed, wrapResult, Try}
+import org.alephium.api.{failed, wrapResult, Try}
 import org.alephium.api.model._
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.model
@@ -25,63 +25,6 @@ import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.util.AVector
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
-
-  def buildGrouplessTransferTx(
-      blockFlow: BlockFlow,
-      query: BuildGrouplessTransferTx
-  ): Try[AVector[BuildSimpleTransferTxResult]] = {
-    for {
-      lockPair <- query.getLockPair().left.map(badRequest)
-      result <- buildTransferTxWithFallbackAddresses(
-        blockFlow,
-        lockPair,
-        otherGroupsLockupPairs(lockPair._1),
-        query.destinations,
-        query.gasPrice,
-        query.targetBlockHash
-      )
-    } yield result
-  }
-
-  def buildGrouplessExecuteScriptTx(
-      blockFlow: BlockFlow,
-      query: BuildGrouplessExecuteScriptTx
-  ): Try[BuildGrouplessExecuteScriptTxResult] = {
-    for {
-      lockPair <- query.getLockPair().left.map(badRequest)
-      amounts  <- query.getAmounts.left.map(badRequest)
-      script   <- query.decodeStatefulScript().left.map(badRequest)
-      result <- buildExecuteScriptTxWithFallbackAddresses(
-        blockFlow,
-        lockPair,
-        otherGroupsLockupPairs(lockPair._1),
-        script,
-        amounts,
-        query.gasEstimationMultiplier,
-        query.gasAmount,
-        query.gasPrice,
-        query.targetBlockHash
-      )
-    } yield result
-  }
-
-  def buildGrouplessDeployContractTx(
-      blockFlow: BlockFlow,
-      query: BuildGrouplessDeployContractTx
-  ): Try[BuildGrouplessDeployContractTxResult] = {
-    for {
-      lockPair <- query.getLockPair().left.map(badRequest)
-      result <- buildDeployContractTxWithFallbackAddresses(
-        blockFlow,
-        lockPair,
-        otherGroupsLockupPairs(lockPair._1),
-        query,
-        query.gasAmount,
-        query.gasPrice,
-        query.targetBlockHash
-      )
-    } yield result
-  }
 
   def getGrouplessBalance(
       blockFlow: BlockFlow,

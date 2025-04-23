@@ -128,18 +128,6 @@ final case class AddressLike(lockupScriptResult: LockupScript.ValidLockupScript)
     }
   }
 
-  def isGrouplessAddress: Boolean = {
-    lockupScriptResult match {
-      case LockupScript.CompleteLockupScript(lockupScript) =>
-        lockupScript match {
-          case LockupScript.P2PK(_, _) => true
-          case _                       => false
-        }
-      case LockupScript.HalfDecodedP2PK(_) =>
-        true
-    }
-  }
-
   def toBase58: String = { // TODO: test from & to base58
     lockupScriptResult match {
       case LockupScript.CompleteLockupScript(lockupScript) =>
@@ -151,6 +139,7 @@ final case class AddressLike(lockupScriptResult: LockupScript.ValidLockupScript)
 
   override def toString: String = toBase58
 }
+
 object AddressLike {
   def fromBase58(input: String): Option[AddressLike] = {
     LockupScript.decodeFromBase58(input) match {
