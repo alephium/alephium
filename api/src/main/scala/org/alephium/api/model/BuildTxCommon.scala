@@ -215,10 +215,10 @@ object BuildTxCommon {
         Right(statefulScript.get)
       } else {
         deserialize[StatefulScript](bytecode)
-          .map(script => {
+          .map { script =>
             statefulScript = Some(script)
             script
-          })
+          }
           .left
           .map(serdeError => serdeError.getMessage)
       }

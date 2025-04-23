@@ -32,7 +32,11 @@ import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.model.UnsignedTransaction.{TxOutputInfo, UnlockScriptWithAssets}
+import org.alephium.protocol.model.UnsignedTransaction.{
+  TotalAmountNeeded,
+  TxOutputInfo,
+  UnlockScriptWithAssets
+}
 import org.alephium.protocol.vm._
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
@@ -93,7 +97,7 @@ trait TxUtils { Self: FlowUtils =>
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      totalAmount: UnsignedTransaction.TotalAmountNeeded,
+      totalAmount: TotalAmountNeeded,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int,
@@ -233,7 +237,7 @@ trait TxUtils { Self: FlowUtils =>
     )
   }
 
-  // scalastyle:off parameter.number
+  // scalastyle:off parameter.number method.length
   def polwCoinbase(
       chainIndex: ChainIndex,
       fromPublicKey: PublicKey,
@@ -253,7 +257,11 @@ trait TxUtils { Self: FlowUtils =>
       blockTs,
       minerData
     )
-    val totalAmount      = reward.burntAmount.addUnsafe(dustUtxoAmount)
+    val totalAmount = TotalAmountNeeded(
+      reward.burntAmount.addUnsafe(dustUtxoAmount),
+      AVector.empty,
+      rewardOutputs.length + 1
+    )
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.polw(fromPublicKey)
     getUsableUtxos(None, fromLockupScript, Int.MaxValue)
@@ -262,11 +270,11 @@ trait TxUtils { Self: FlowUtils =>
           fromLockupScript,
           fromUnlockScript,
           utxos,
-          (totalAmount, AVector.empty, rewardOutputs.length + 1),
-          None,
-          None,
-          None,
-          coinbaseGasPrice
+          totalAmount,
+          gasEstimationMultiplier = None,
+          txScriptOpt = None,
+          gasOpt = None,
+          gasPrice = coinbaseGasPrice
         )
       }
       .map(
@@ -347,7 +355,7 @@ trait TxUtils { Self: FlowUtils =>
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
-  ): Either[String, UnsignedTransaction.TotalAmountNeeded] = {
+  ): Either[String, TotalAmountNeeded] = {
     for {
       _               <- preTransferCheck(fromLockupScript, outputInfos, gasOpt, gasPrice)
       calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
@@ -358,7 +366,7 @@ trait TxUtils { Self: FlowUtils =>
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       utxos: AVector[FlowUtils.AssetOutputInfo],
-      totalAmount: UnsignedTransaction.TotalAmountNeeded,
+      totalAmount: TotalAmountNeeded,
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
       txScriptOpt: Option[StatefulScript],
       gasOpt: Option[GasBox],
@@ -367,11 +375,11 @@ trait TxUtils { Self: FlowUtils =>
     UtxoSelectionAlgo
       .Build(ProvidedGas(gasOpt, gasPrice, gasEstimationMultiplier))
       .select(
-        AssetAmounts(totalAmount._1, totalAmount._2),
+        AssetAmounts(totalAmount.alphAmount, totalAmount.tokens),
         fromLockupScript,
         fromUnlockScript,
         utxos,
-        totalAmount._3,
+        totalAmount.outputLength,
         txScriptOpt,
         AssetScriptGasEstimator.Default(Self.blockFlow),
         TxScriptEmulator.Default(Self.blockFlow)
@@ -382,7 +390,7 @@ trait TxUtils { Self: FlowUtils =>
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
-      totalAmount: UnsignedTransaction.TotalAmountNeeded,
+      totalAmount: TotalAmountNeeded,
       utxos: AVector[FlowUtils.AssetOutputInfo],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice
@@ -778,7 +786,7 @@ trait TxUtils { Self: FlowUtils =>
           targetBlockHashOpt,
           input.fromLockupScript,
           input.fromUnlockScript,
-          (amountWithDust, input.tokens.getOrElse(AVector.empty), txOutputLength),
+          TotalAmountNeeded(amountWithDust, input.tokens.getOrElse(AVector.empty), txOutputLength),
           input.gasOpt,
           gasPrice,
           utxosLimit,
@@ -976,11 +984,10 @@ trait TxUtils { Self: FlowUtils =>
     for {
       totalAmount     <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
       calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
-      (totalAmountNeeded, _, txOutputLength) = calculateResult
-      dustAmount <- totalAmountNeeded.sub(totalAmount).toRight("ALPH underflow")
+      dustAmount      <- calculateResult.alphAmount.sub(totalAmount).toRight("ALPH underflow")
     } yield {
       // `calculateTotalAmountNeeded` is adding a +1 length for the sender's output
-      (dustAmount, txOutputLength)
+      (dustAmount, calculateResult.outputLength)
     }
   }
 

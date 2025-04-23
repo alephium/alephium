@@ -40,7 +40,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{Balance => _, ContractOutput => ProtocolContractOutput, _}
-import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
+import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
@@ -1363,7 +1363,7 @@ class ServerUtils(implicit
         fromLockupScript,
         fromUnlockScript,
         utxos,
-        (amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1),
+        TotalAmountNeeded(amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1),
         gasEstimationMultiplier,
         Some(script),
         gas,

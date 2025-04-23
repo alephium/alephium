@@ -222,7 +222,8 @@ trait ChainedTxUtils { self: ServerUtils =>
     ) match {
       case Right((unsignedTx, outputs)) => Right((AVector.empty, unsignedTx, outputs))
       case Left(_) =>
-        val totalAmount = (amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1)
+        val totalAmount =
+          TotalAmountNeeded(amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1)
         for {
           crossGroupTxs <-
             buildTransferTxsFromFallbackAddresses(
@@ -253,16 +254,16 @@ trait ChainedTxUtils { self: ServerUtils =>
       blockFlow: BlockFlow,
       lockup: LockupScript.Asset,
       otherLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
-      totalAmount: TotalAmountNeeded,
+      totalAmountNeeded: TotalAmountNeeded,
       utxos: AVector[FlowUtils.AssetOutputInfo],
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash]
   ): Try[(AVector[UnsignedTransaction], U256, AVector[(TokenId, U256)])] = {
-    val (alphNeeded, tokenNeeded, _) = totalAmount
     val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
     val maxGasFee                    = gasPrice * getMaximalGasPerTx()
-    val remainAlph        = maxGasFee.addUnsafe(alphNeeded).sub(alphBalance).getOrElse(U256.Zero)
-    val (remainTokens, _) = calcTokenAmount(tokenBalances, tokenNeeded)
+    val remainAlph =
+      maxGasFee.addUnsafe(totalAmountNeeded.alphAmount).sub(alphBalance).getOrElse(U256.Zero)
+    val (remainTokens, _) = calcTokenAmount(tokenBalances, totalAmountNeeded.tokens)
     val result = transferFromFallbackAddresses(
       blockFlow,
       lockup,

@@ -513,7 +513,7 @@ object UnsignedTransaction {
   // Note: this would calculate excess dustAmount to cover the complicated cases
   def calculateTotalAmountNeeded(
       outputInfos: AVector[TxOutputInfo]
-  ): Either[String, UnsignedTransaction.TotalAmountNeeded] = {
+  ): Either[String, TotalAmountNeeded] = {
     outputInfos
       .foldE((U256.Zero, ListMap.empty[TokenId, U256], 0)) {
         case ((totalAlphAmount, totalTokens, totalOutputLength), outputInfo) =>
@@ -532,7 +532,7 @@ object UnsignedTransaction {
         val alphAmountSender   = dustUtxoAmount.mulUnsafe(U256.unsafe(outputLengthSender))
         totalAlphAmount.add(alphAmountSender).toRight("ALPH amount overflow").map {
           finalAlphAmount =>
-            (
+            TotalAmountNeeded(
               finalAlphAmount,
               AVector.from(totalTokens.iterator),
               totalOutputLength + outputLengthSender
@@ -624,5 +624,9 @@ object UnsignedTransaction {
       assets: AVector[(AssetOutputRef, AssetOutput)]
   )
 
-  type TotalAmountNeeded = (U256, AVector[(TokenId, U256)], Int)
+  final case class TotalAmountNeeded(
+      alphAmount: U256,
+      tokens: AVector[(TokenId, U256)],
+      outputLength: Int
+  )
 }
