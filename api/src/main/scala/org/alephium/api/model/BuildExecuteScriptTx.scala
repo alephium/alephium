@@ -47,7 +47,8 @@ final case class BuildExecuteScriptTx(
       )
     }
   }
-  override def getLockPair(groupIndex: Option[GroupIndex] = None)(implicit
+
+  def getLockPair()(implicit
       config: GroupConfig
   ): Try[(LockupScript.Asset, UnlockScript)] = {
     if (isGrouplessAddress) {
@@ -72,7 +73,7 @@ final case class BuildExecuteScriptTx(
           }
       }
     } else {
-      super.getLockPair(groupIndex)
+      super.getLockPair(group)
     }
   }
 }

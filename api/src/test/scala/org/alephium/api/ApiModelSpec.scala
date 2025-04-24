@@ -2015,6 +2015,24 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         contractAddress.groupIndex
       ), UnlockScript.P2PK)
     }
+
+    {
+      val groupIndex = fromLockupScript.groupIndex
+      val request = BuildExecuteScriptTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = None,
+        ByteString(0, 0),
+        group = Some(groupIndex)
+      )
+      request.getLockPair().rightValue is (LockupScript.p2pkh(fromPublicKey.publicKey), UnlockScript
+        .p2pkh(fromPublicKey.publicKey))
+      request
+        .copy(group = Some(GroupIndex.unsafe(1)))
+        .getLockPair()
+        .leftValue
+        .detail is s"Mismatch between group in request (1) and SecP256K1 public key: ${Hex
+          .toHexString(fromPublicKey.publicKey.bytes)}"
+    }
   }
 
   it should "getLockPair for BuildDeployContractTx" in new GrouplessModelFixture {
@@ -2040,6 +2058,24 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         group = Some(groupIndex)
       )
       request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK)
+    }
+
+    {
+      val groupIndex = fromLockupScript.groupIndex
+      val request = BuildDeployContractTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = None,
+        ByteString(0, 0),
+        group = Some(groupIndex)
+      )
+      request.getLockPair().rightValue is (LockupScript.p2pkh(fromPublicKey.publicKey), UnlockScript
+        .p2pkh(fromPublicKey.publicKey))
+      request
+        .copy(group = Some(GroupIndex.unsafe(1)))
+        .getLockPair()
+        .leftValue
+        .detail is s"Mismatch between group in request (1) and SecP256K1 public key: ${Hex
+          .toHexString(fromPublicKey.publicKey.bytes)}"
     }
   }
 

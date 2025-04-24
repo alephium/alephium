@@ -19,7 +19,12 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.crypto.{BIP340SchnorrPublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
+import org.alephium.crypto.{
+  BIP340SchnorrPublicKey,
+  ED25519PublicKey,
+  SecP256K1PublicKey,
+  SecP256R1PublicKey
+}
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -48,6 +53,7 @@ object BuildTxCommon {
   object BIP340Schnorr extends PublicKeyType
   object GLSecP256K1   extends PublicKeyType
   object GLSecP256R1   extends PublicKeyType
+  object GLED25519     extends PublicKeyType
   object GLWebAuthn    extends PublicKeyType
 
   trait FromPublicKey {
@@ -58,6 +64,7 @@ object BuildTxCommon {
       case Some(BuildTxCommon.GLSecP256K1) => true
       case Some(BuildTxCommon.GLSecP256R1) => true
       case Some(BuildTxCommon.GLWebAuthn)  => true
+      case Some(BuildTxCommon.GLED25519)   => true
       case _                               => false
     }
 
@@ -66,7 +73,6 @@ object BuildTxCommon {
         groupIndex: Option[GroupIndex] = None
     )(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] =
       fromPublicKeyType match {
-        case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
         case Some(BuildTxCommon.GLSecP256K1) =>
           grouplessLockPair(
             fromPublicKey,
@@ -81,6 +87,13 @@ object BuildTxCommon {
             "SecP256R1",
             SecP256R1PublicKey.from(_).map(PublicKeyLike.SecP256R1.apply)
           )
+        case Some(BuildTxCommon.GLED25519) =>
+          grouplessLockPair(
+            fromPublicKey,
+            groupIndex,
+            "ED25519",
+            ED25519PublicKey.from(_).map(PublicKeyLike.ED25519.apply)
+          )
         case Some(BuildTxCommon.GLWebAuthn) =>
           grouplessLockPair(
             fromPublicKey,
@@ -88,24 +101,52 @@ object BuildTxCommon {
             "WebAuthn",
             SecP256R1PublicKey.from(_).map(PublicKeyLike.WebAuthn.apply)
           )
-        case _ => p2pkhLockPair(fromPublicKey)
+        case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey, groupIndex)
+        case _                                 => p2pkhLockPair(fromPublicKey, groupIndex)
       }
   }
 
-  def p2pkhLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def p2pkhLockPair(
+      fromPublicKey: ByteString,
+      groupOpt: Option[GroupIndex]
+  )(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] = {
     PublicKey.from(fromPublicKey) match {
       case Some(publicKey) =>
-        Right(LockupScript.p2pkh(publicKey) -> UnlockScript.p2pkh(publicKey))
+        val lockupScript = LockupScript.p2pkh(publicKey)
+        if (groupOpt.exists(_ != lockupScript.groupIndex)) {
+          Left(
+            badRequest(
+              s"Mismatch between group in request (${groupOpt.get.value}) and SecP256K1 public key: ${Hex
+                  .toHexString(fromPublicKey)}"
+            )
+          )
+        } else {
+          Right(lockupScript -> UnlockScript.p2pkh(publicKey))
+        }
       case None =>
         Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 
-  def schnorrLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def schnorrLockPair(
+      fromPublicKey: ByteString,
+      groupOpt: Option[GroupIndex]
+  )(implicit config: GroupConfig): Try[(LockupScript.Asset, UnlockScript)] = {
     BIP340SchnorrPublicKey.from(fromPublicKey) match {
       case Some(publicKey) =>
         val address = SchnorrAddress(publicKey)
-        Right(address.lockupScript -> address.unlockScript)
+        if (groupOpt.exists(_ != address.lockupScript.groupIndex)) {
+          Left(
+            badRequest(
+              s"Mismatch between group in request (${groupOpt.get.value}) and BIP340Schnorr public key: ${Hex
+                  .toHexString(fromPublicKey)}"
+            )
+          )
+        } else {
+          Right(address.lockupScript -> address.unlockScript)
+        }
       case None =>
         Left(badRequest(s"Invalid BIP340Schnorr public key: ${Hex.toHexString(fromPublicKey)}"))
     }

@@ -42,7 +42,7 @@ final case class BuildDeployContractTx(
 ) extends BuildTxCommon.DeployContractTx
     with BuildTxCommon.FromPublicKey {
 
-  override def getLockPair(groupIndex: Option[GroupIndex] = None)(implicit
+  def getLockPair()(implicit
       config: GroupConfig
   ): Try[(LockupScript.Asset, UnlockScript)] = {
     if (isGrouplessAddress) {
@@ -56,7 +56,7 @@ final case class BuildDeployContractTx(
         )
       }
     } else {
-      super.getLockPair(groupIndex)
+      super.getLockPair(group)
     }
   }
 }
