@@ -25,13 +25,13 @@ import org.alephium.api.model._
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, AddressLike, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait BlockFlowClient {
   def fetchBalance(
-      address: Address.Asset
+      addressLike: AddressLike
   ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
@@ -107,11 +107,29 @@ object BlockFlowClient {
     }
 
     def fetchBalance(
-        address: Address.Asset
+        addressLike: AddressLike
     ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] =
-      requestFromGroup(address.groupIndex, getBalance, (address, Some(true))).map(
+      addressLike.lockupScriptResult match {
+        case LockupScript.CompleteLockupScript(_: LockupScript.P2C) =>
+          Future.successful(
+            Left(
+              ApiError.BadRequest(s"Expect asset address, but was contract address: $addressLike")
+            )
+          )
+        case LockupScript.CompleteLockupScript(lockupScript) =>
+          getBalance(addressLike, lockupScript.groupIndex)
+        case LockupScript.HalfDecodedP2PK(publicKey) =>
+          getBalance(addressLike, publicKey.defaultGroup)
+      }
+
+    private def getBalance(
+        addressLike: AddressLike,
+        groupIndex: GroupIndex
+    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] = {
+      requestFromGroup(groupIndex, getBalance, (addressLike, Some(true))).map(
         _.map(res => (res.balance, res.lockedBalance))
       )
+    }
 
     def prepareTransaction(
         fromPublicKey: PublicKey,

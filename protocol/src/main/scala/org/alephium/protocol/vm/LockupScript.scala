@@ -68,24 +68,38 @@ object LockupScript {
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
   def fromBase58(input: String): Option[LockupScript] = {
-    decodeFromBase58(input).getLockupScript
+    fromBase58(input, None)
   }
 
-  trait DecodeLockupScriptResult {
+  def fromBase58(input: String, groupIndex: Option[GroupIndex]): Option[LockupScript] = {
+    decodeFromBase58(input) match {
+      case CompleteLockupScript(lockupScript) =>
+        Some(lockupScript)
+      case HalfDecodedP2PK(publicKey) =>
+        groupIndex.map(groupIndex => p2pk(publicKey, groupIndex))
+      case InvalidLockupScript =>
+        None
+    }
+  }
+
+  sealed trait DecodeLockupScriptResult {
     def getLockupScript: Option[LockupScript]
   }
-  final case class ValidLockupScript(lockupScript: LockupScript) extends DecodeLockupScriptResult {
+
+  sealed trait ValidLockupScript extends DecodeLockupScriptResult
+
+  final case class CompleteLockupScript(lockupScript: LockupScript) extends ValidLockupScript {
     def getLockupScript: Option[LockupScript] = Some(lockupScript)
   }
   case object InvalidLockupScript extends DecodeLockupScriptResult {
     def getLockupScript: Option[LockupScript] = None
   }
-  final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends DecodeLockupScriptResult {
+  final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends ValidLockupScript {
     def getLockupScript: Option[LockupScript] = None
   }
 
   def decodeFromBase58(input: String): DecodeLockupScriptResult = {
-    if (input.length > 2 && input(input.length - 2) == ':') {
+    if (P2PK.hasExplicitGroupIndex(input)) {
       decodeP2PK(input)
     } else {
       Base58
@@ -110,7 +124,7 @@ object LockupScript {
 
   private def decodeLockupScript(bytes: ByteString): DecodeLockupScriptResult = {
     deserialize[LockupScript](bytes).toOption match {
-      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case Some(lockupScript) => CompleteLockupScript(lockupScript)
       case None               => InvalidLockupScript
     }
   }
@@ -127,7 +141,7 @@ object LockupScript {
         }
     } yield lockupScriptOpt
     result match {
-      case Some(lockupScript) => ValidLockupScript(lockupScript)
+      case Some(lockupScript) => CompleteLockupScript(lockupScript)
       case None               => InvalidLockupScript
     }
   }
@@ -237,9 +251,11 @@ object LockupScript {
     override def groupIndex(implicit config: GroupConfig): GroupIndex =
       GroupIndex.unsafe(groupByte % config.groups)
 
-    def toBase58: String = {
+    def toBase58: String = s"${toBase58WithoutGroup}:$groupByte"
+
+    def toBase58WithoutGroup: String = {
       val bytes = serialize[LockupScript](this).dropRight(P2PK.groupByteLength)
-      s"${Base58.encode(bytes)}:$groupByte"
+      Base58.encode(bytes)
     }
   }
 
@@ -252,6 +268,10 @@ object LockupScript {
 
     def unsafe(publicKey: PublicKeyLike, groupByte: Byte): P2PK = {
       P2PK(publicKey, groupByte)
+    }
+
+    def hasExplicitGroupIndex(input: String): Boolean = {
+      input.length > 2 && input(input.length - 2) == ':'
     }
 
     def decodePublicKey(bytes: ByteString): Option[PublicKeyLike] = {
@@ -285,11 +305,6 @@ object LockupScript {
         serdeImpl[Byte]
       )
     }
-  }
-
-  def groupIndex(shortKey: Int)(implicit config: GroupConfig): GroupIndex = {
-    val hash = Bytes.toPosInt(Bytes.xorByte(shortKey))
-    GroupIndex.unsafe(hash % config.groups)
   }
 }
 // scalastyle:on number.of.methods

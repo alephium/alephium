@@ -24,7 +24,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.Byte64
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, TokenId}
+import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -9960,6 +9960,57 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.methods(0).usePayToContractOnly is false
       compiled.methods(1).useContractAssets is true
       compiled.methods(1).usePayToContractOnly is false
+    }
+  }
+
+  it should "derive contract address from script" in {
+    val contractId      = ContractId.generate
+    val contractAddress = Address.contract(contractId)
+
+    {
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(1 == 1, 0)
+           |}
+      """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is None
+
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  callBar()
+           |
+           |  fn callBar() -> () {
+           |    Bar(#${contractId.toHexString}).bar()
+           |  }
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
     }
   }
 

@@ -24,6 +24,7 @@ import org.alephium.util.TimeStamp
 
 final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
     extends Ordered[ReleaseVersion] {
+
   override def compare(that: ReleaseVersion): Int = {
     major.compare(that.major) match {
       case 0 =>

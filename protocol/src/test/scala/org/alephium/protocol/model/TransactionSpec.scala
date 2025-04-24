@@ -147,7 +147,7 @@ class TransactionSpec
     Transaction.totalReward(hardReward * 2 + 2, 0, HardFork.Leman) is 0
   }
 
-  it should "seder the snapshots properly" in new TransactionSnapshotsFixture {
+  it should "serde the snapshots properly" in new TransactionSnapshotsFixture {
     implicit val basePath: String = "src/test/resources/models/transaction"
 
     import Hex._

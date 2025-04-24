@@ -142,7 +142,7 @@ class TxUtilsSpec extends AlephiumSpec {
       blockFlow
         .getBalance(genesisLockup, defaultUtxoLimit, true)
         .rightValue
-        ._1 is genesisBalance
+        .totalAlph is genesisBalance
       testUnsignedTx(unsignedTx, genesisPriKey)
     }
   }
@@ -1004,11 +1004,10 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     def getBalances(lockupScript: LockupScript.Asset): (U256, AVector[(TokenId, U256)]) = {
-      val (alph, lockedAlph, tokens, lockedTokens, _) =
-        blockFlow.getBalance(lockupScript, Int.MaxValue, true).rightValue
-      lockedAlph is U256.Zero
-      lockedTokens.isEmpty is true
-      (alph, tokens)
+      val balance = blockFlow.getBalance(lockupScript, Int.MaxValue, true).rightValue
+      balance.lockedAlph is U256.Zero
+      balance.lockedTokens.isEmpty is true
+      (balance.totalAlph, balance.totalTokens)
     }
 
     def submitSweepTxs(txs: AVector[Transaction]) = {
@@ -1500,8 +1499,8 @@ class TxUtilsSpec extends AlephiumSpec {
 
           val sendersBalance =
             blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue
-          sendersBalance._1 is expectedSenderBalanceWithGas
-          sendersBalance._5 is expectedSenderUtxosCount
+          sendersBalance.totalAlph is expectedSenderBalanceWithGas
+          sendersBalance.utxosNum is expectedSenderUtxosCount
         }
     }
     // scalastyle:on parameter.number
@@ -1520,11 +1519,10 @@ class TxUtilsSpec extends AlephiumSpec {
     val newBlock = block.copy(transactions = AVector(newTx))
     addAndUpdateView(blockFlow, newBlock)
 
-    val (balance, lockedBalance, _, _, numOfUtxos) =
-      blockFlow.getBalance(output.lockupScript, Int.MaxValue, true).rightValue
-    balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
-    lockedBalance is 0
-    numOfUtxos is n
+    val balance = blockFlow.getBalance(output.lockupScript, Int.MaxValue, true).rightValue
+    balance.totalAlph is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
+    balance.lockedAlph is 0
+    balance.utxosNum is n
   }
 
   it should "get all available utxos" in new LargeUtxos {
@@ -2122,16 +2120,15 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     forAll(assetOutputsGen) { assetOutputs =>
-      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, lockedTokenBalances) =
-        TxUtils.getBalance(assetOutputs.as[TxOutput])
+      val balance = TxUtils.getBalance(assetOutputs.as[TxOutput])
 
-      attoAlphBalance is U256.unsafe(assetOutputs.sumBy(_.amount.v))
-      attoAlphLockedBalance is U256.unsafe(assetOutputs.filter(_.lockTime > now).sumBy(_.amount.v))
+      balance.totalAlph is U256.unsafe(assetOutputs.sumBy(_.amount.v))
+      balance.lockedAlph is U256.unsafe(assetOutputs.filter(_.lockTime > now).sumBy(_.amount.v))
 
       val expectedTokenBalances       = getTokenBalances(assetOutputs)
       val expectedLockedTokenBalances = getTokenBalances(assetOutputs.filter(_.lockTime > now))
-      tokenBalances.sorted is expectedTokenBalances.sorted
-      lockedTokenBalances.sorted is expectedLockedTokenBalances.sorted
+      balance.totalTokens.sorted is expectedTokenBalances.sorted
+      balance.lockedTokens.sorted is expectedLockedTokenBalances.sorted
     }
   }
 
@@ -2187,13 +2184,12 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get balance for contract address" in new ContractFixture {
-    val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
-      blockFlow.getBalance(contractOutputScript, Int.MaxValue, true).rightValue
-    attoAlphBalance is minimalAlphInContract
-    attoAlphLockedBalance is U256.Zero
-    tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
-    tokenLockedBalances.length is 0
-    utxosNum is 1
+    val balance = blockFlow.getBalance(contractOutputScript, Int.MaxValue, true).rightValue
+    balance.totalAlph is minimalAlphInContract
+    balance.lockedAlph is U256.Zero
+    balance.totalTokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
+    balance.lockedTokens.length is 0
+    balance.utxosNum is 1
   }
 
   it should "get UTXOs for contract address" in new ContractFixture {
@@ -2228,10 +2224,9 @@ class TxUtilsSpec extends AlephiumSpec {
     val confirmBlock = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, confirmBlock)
 
-    val (balance, _, _, _, utxoNum) =
-      blockFlow.getBalance(schnorrAddress.lockupScript, Int.MaxValue, true).rightValue
-    balance is ALPH.alph(2)
-    utxoNum is 1
+    val balance = blockFlow.getBalance(schnorrAddress.lockupScript, Int.MaxValue, true).rightValue
+    balance.totalAlph is ALPH.alph(2)
+    balance.utxosNum is 1
 
     val unsignedTx = blockFlow
       .transfer(
@@ -2682,6 +2677,44 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "fail if the output length exceeds the maximum allowed output length" in new FlowFixture {
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val fromPublicKey    = genesisKeys(chainIndex.from.value)._2
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    val toLockupScript   = LockupScript.p2pkh(chainIndex.from.generateKey._2)
+    val outputInfos = AVector.fill(ALPH.MaxTxOutputNum) {
+      UnsignedTransaction.TxOutputInfo(toLockupScript, dustUtxoAmount, AVector.empty, None)
+    }
+    blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        fromUnlockScript,
+        outputInfos.drop(1),
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .isRight is true
+
+    blockFlow
+      .transfer(
+        None,
+        fromLockupScript,
+        fromUnlockScript,
+        outputInfos,
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .leftValue is "Too many outputs for the transfer, consider to reduce the amount to send."
+  }
+
   trait BuildScriptTxFixture extends UnsignedTransactionFixture {
     val script        = StatefulScript.unsafe(AVector.empty)
     val defaultGasFee = nonCoinbaseMinGasPrice * minimalGas
@@ -2948,7 +2981,8 @@ class TxUtilsSpec extends AlephiumSpec {
           ALPH.alph(2)
         )
         addAndCheck(blockFlow, block)
-        blockFlow.getBalance(toLockupScript, Int.MaxValue, true).rightValue._1 is ALPH.alph(2)
+        blockFlow.getBalance(toLockupScript, Int.MaxValue, true).rightValue.totalAlph is ALPH
+          .alph(2)
       }
 
       (0 until groupConfig.groups).foreach { group =>
@@ -2973,7 +3007,7 @@ class TxUtilsSpec extends AlephiumSpec {
         addAndCheck(blockFlow, block)
 
         val balance = ALPH.alph(2).subUnsafe(ALPH.oneAlph).subUnsafe(tx.gasFeeUnsafe)
-        blockFlow.getBalance(fromLockupScript, Int.MaxValue, true).rightValue._1 is balance
+        blockFlow.getBalance(fromLockupScript, Int.MaxValue, true).rightValue.totalAlph is balance
       }
     }
   }

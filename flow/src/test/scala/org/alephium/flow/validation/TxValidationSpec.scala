@@ -1540,9 +1540,6 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def checkValidTx(tx: Transaction) = {
       tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
       checkUnlockGas(tx)
-      // The block generated in `prepare` is post-danube upgrade, so we only update the danube best deps.
-      // This causes the following tests to be unable to get the correct best deps.
-      // So we need to call `updateViewPreDanube` to update the pre-danube best deps.
       blockFlow.updateViewPreDanube() isE ()
       tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
       tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
