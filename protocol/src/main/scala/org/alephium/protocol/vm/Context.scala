@@ -353,7 +353,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
         if (getHardFork().isLemanEnabled()) {
           generateContractOutputLeman(contractId, contractOutput)
         } else {
-          generateContractOutputSimple(contractId, contractOutput)
+          generateContractOutputSimple(
+            contractId,
+            contractOutput,
+            nextOutputIndex,
+            generatedOutputs.addOne
+          )
         }
       case assetOutput: AssetOutput =>
         if (getHardFork().isLemanEnabled()) {
@@ -372,30 +377,68 @@ trait StatefulContext extends StatelessContext with ContractPool {
     if (inputIndex == -1) {
       failed(ContractAssetUnloaded(Address.contract(contractId)))
     } else {
-      val (_, input) = contractInputs(inputIndex)
-      if (contractOutput == input) {
-        contractInputs.remove(inputIndex)
-        for {
-          _ <- markAssetFlushed(contractId)
-        } yield ()
+      if (getHardFork().isDanubeEnabled()) {
+        generateContractOutputDanube(contractId, contractOutput, inputIndex)
       } else {
-        generateContractOutputSimple(contractId, contractOutput)
+        generateContractOutputLeman(contractId, contractOutput, inputIndex)
       }
+    }
+  }
+
+  def generateContractOutputLeman(
+      contractId: ContractId,
+      contractOutput: ContractOutput,
+      inputIndex: Int
+  ): ExeResult[Unit] = {
+    val (_, input) = contractInputs(inputIndex)
+    if (contractOutput == input) {
+      contractInputs.remove(inputIndex)
+      markAssetFlushed(contractId)
+    } else {
+      generateContractOutputSimple(
+        contractId,
+        contractOutput,
+        nextOutputIndex,
+        generatedOutputs.addOne
+      )
+    }
+  }
+
+  def generateContractOutputDanube(
+      contractId: ContractId,
+      contractOutput: ContractOutput,
+      inputIndex: Int
+  ): ExeResult[Unit] = {
+    val lockupScript         = LockupScript.p2c(contractId)
+    val generatedOutputIndex = generatedOutputs.indexWhere(_.lockupScript == lockupScript)
+    if (generatedOutputIndex == -1) {
+      generateContractOutputLeman(contractId, contractOutput, inputIndex)
+    } else {
+      // Newly created contract
+      val outputIndex = txEnv.fixedOutputs.length + generatedOutputIndex
+      contractInputs.remove(inputIndex)
+      generateContractOutputSimple(
+        contractId,
+        contractOutput,
+        outputIndex,
+        generatedOutputs(generatedOutputIndex) = _
+      )
     }
   }
 
   def generateContractOutputSimple(
       contractId: ContractId,
-      contractOutput: ContractOutput
+      contractOutput: ContractOutput,
+      contractOutputIndex: Int,
+      updateGeneratedOutput: TxOutput => Unit
   ): ExeResult[Unit] = {
-    val outputRef       = nextContractOutputRef(contractOutput)
-    val txOutputLocator = TxOutputLocator.from(blockEnv, txEnv, nextOutputIndex)
+    val outputRef       = ContractOutputRef.from(txId, contractOutput, contractOutputIndex)
+    val txOutputLocator = TxOutputLocator.from(blockEnv, txEnv, contractOutputIndex)
     for {
       _ <- chargeGeneratedOutput()
       _ <- updateContractAsset(contractId, outputRef, contractOutput, txOutputLocator)
     } yield {
-      generatedOutputs.addOne(contractOutput)
-      ()
+      updateGeneratedOutput(contractOutput)
     }
   }
 

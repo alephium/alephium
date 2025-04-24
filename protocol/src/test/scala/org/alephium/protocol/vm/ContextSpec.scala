@@ -116,6 +116,48 @@ class ContextSpec
     context.generatedOutputs.size is 2
   }
 
+  trait GenerateContractOutputDanubeFixture extends Fixture with NetworkConfigFixture.DanubeT {
+    context.getHardFork() is HardFork.Danube
+
+    val contractId = createContract()
+    context.loadContractObj(contractId).isRight is true
+    context.useContractAssets(contractId, 0).isRight is true
+    context.generatedOutputs.size is 1
+    context.contractInputs.size is 1
+
+    val halfAmount            = context.generatedOutputs(0).amount.divUnsafe(2)
+    val contractOutput        = context.generatedOutputs(0).asInstanceOf[ContractOutput]
+    val contractOutputUpdated = contractOutput.copy(amount = halfAmount)
+    val assetOutput = assetOutputGen(GroupIndex.unsafe(0))(
+      _amountGen = Gen.const(halfAmount)
+    ).sample.get
+  }
+
+  it should "generate contract output correctly when assets from newly created contract is used in Danube" in new GenerateContractOutputDanubeFixture {
+    context.generatedOutputs.addOne(assetOutput)
+    context.generatedOutputs.size is 2
+    context.contractInputs.size is 1
+
+    context.generateContractOutputDanube(contractId, contractOutputUpdated, 0) isE ()
+    context.generatedOutputs.size is 2
+    context.generatedOutputs(0) is contractOutputUpdated
+    context.generatedOutputs(1) is assetOutput
+    context.contractInputs.size is 0
+  }
+
+  it should "generate contract output correctly when assets from existing contract is used in Danube" in new GenerateContractOutputDanubeFixture {
+    context.generatedOutputs.clear()
+    context.generatedOutputs.addOne(assetOutput)
+    context.generatedOutputs.size is 1
+    context.contractInputs.size is 1
+
+    context.generateContractOutputDanube(contractId, contractOutputUpdated, 0) isE ()
+    context.generatedOutputs.size is 2
+    context.generatedOutputs(0) is assetOutput
+    context.generatedOutputs(1) is contractOutputUpdated
+    context.contractInputs.size is 1
+  }
+
   it should "not use contract output when the contract is just created in Rhone" in new Fixture
     with NetworkConfigFixture.RhoneT {
     context.getHardFork() is HardFork.Rhone

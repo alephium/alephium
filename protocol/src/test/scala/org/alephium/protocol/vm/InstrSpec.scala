@@ -2878,19 +2878,23 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     BurnToken.runWith(frame).leftValue isE BurningAlphNotAllowed
   }
 
-  it should "LockApprovedAssets" in new StatefulInstrFixture {
+  trait LockApprovedAssetsFixture extends StatefulInstrFixture {
     val assetAddress = assetLockupScriptGen.sample.get
     val balanceState = MutBalanceState.from {
       val balance = tokenBalance(assetAddress, tokenId, ALPH.alph(2))
       balance.merge(alphBalance(assetAddress, ALPH.alph(2)))
       balance
     }
-    override lazy val frame = prepareFrame(Some(balanceState))
 
-    def prepareStack(attoAlphAmount: U256, tokenAmount: U256, timestamp: U256) = {
+    def prepareStack(
+        attoAlphAmount: U256,
+        tokenAmount: U256,
+        timestamp: U256,
+        recipient: LockupScript.Asset = assetAddress
+    ): ExeResult[Unit] = {
       balanceState.approveALPH(assetAddress, attoAlphAmount)
       balanceState.approveToken(assetAddress, tokenId, tokenAmount)
-      stack.push(Val.Address(assetAddress))
+      stack.push(Val.Address(recipient))
       stack.push(Val.U256(timestamp))
     }
 
@@ -2924,15 +2928,33 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, U256.MaxValue)
     LockApprovedAssets.runWith(frame).leftValue isE LockTimeOverflow
 
-    // use up remaining approved assets
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), 0)
+    LockApprovedAssets.runWith(frame).leftValue isE a[InvalidLockTime]
+  }
+
+  it should "LockApprovedAssets before Danube" in new LockApprovedAssetsFixture {
+    override lazy val frame = prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+
+    val recipient = assetLockupScriptGen.sample.get
+    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, validTimestamp.millis, recipient)
+    LockApprovedAssets.runWith(frame).leftValue isE a[NoAssetsApproved]
+
     prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, validTimestamp.millis)
     LockApprovedAssets.runWith(frame) isE ()
 
     prepareStack(ALPH.oneAlph, ALPH.alph(2), validTimestamp.millis)
     LockApprovedAssets.runWith(frame).leftValue isE a[NoAssetsApproved]
+  }
 
-    prepareStack(ALPH.oneAlph, ALPH.alph(2), 0)
-    LockApprovedAssets.runWith(frame).leftValue isE a[InvalidLockTime]
+  it should "LockApprovedAssets after Danube" in new LockApprovedAssetsFixture {
+    override lazy val frame = prepareFrame(Some(balanceState))(NetworkConfigFixture.SinceDanube)
+
+    val recipient = assetLockupScriptGen.sample.get
+    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, validTimestamp.millis, recipient)
+    LockApprovedAssets.runWith(frame) isE ()
+
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), validTimestamp.millis)
+    LockApprovedAssets.runWith(frame).leftValue isE a[NoAssetsApproved]
   }
 
   it should "TransferAlph" in new StatefulInstrFixture {

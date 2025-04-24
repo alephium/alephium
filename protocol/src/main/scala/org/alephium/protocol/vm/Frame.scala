@@ -483,7 +483,7 @@ final case class StatefulFrame(
   def getInitialBalancesForNewContractPreDanube(): ExeResult[MutBalancesPerLockup] = {
     for {
       balanceState <- getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      balances     <- balanceState.approved.useAll().toRight(Right(InvalidBalances))
     } yield balances
   }
 
