@@ -664,7 +664,7 @@ abstract class Parser[Ctx <: StatelessContext] {
                     )
                   (
                     nextValue,
-                    Ast.Const[Ctx](Val.U256(nextValue)).atSourceIndex(ident.sourceIndex)
+                    Ast.Const[Ctx](Val.U256(nextValue))
                   )
               }
               (newValue, fields :+ Ast.EnumField(ident, value).atSourceIndex(rawField.sourceIndex))
