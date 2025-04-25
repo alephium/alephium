@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class AccountViewSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -209,13 +209,19 @@ class AccountViewSpec extends AlephiumSpec {
       accountView = newView.rightValue.get
     }
 
+    var timestamp = TimeStamp.now()
+    def nextBlockTs: TimeStamp = {
+      timestamp = timestamp.plusMillisUnsafe(1)
+      timestamp
+    }
+
     val blocks = otherGroups.flatMap { from =>
       val chainIndex0 = ChainIndex.unsafe(from, mainGroup.value)
-      val block0      = transfer(blockFlow, chainIndex0)
-      val block1      = transfer(blockFlow, chainIndex0)
+      val block0      = transfer(blockFlow, chainIndex0, nextBlockTs)
+      val block1      = transfer(blockFlow, chainIndex0, nextBlockTs)
       val chainIndex1 = ChainIndex.unsafe(mainGroup.value, from)
-      val block2      = transfer(blockFlow, chainIndex1)
-      val block3      = transfer(blockFlow, chainIndex1)
+      val block2      = transfer(blockFlow, chainIndex1, nextBlockTs)
+      val block3      = transfer(blockFlow, chainIndex1, nextBlockTs)
       AVector(block0, block1, block2, block3)
     }
     addAndCheck(blockFlow, blocks: _*)
@@ -224,9 +230,9 @@ class AccountViewSpec extends AlephiumSpec {
     val mainchainBlocks = mutable.ArrayBuffer.empty[Block]
     otherGroups.foreach { from =>
       val chainIndex0 = ChainIndex.unsafe(from, mainGroup.value)
-      val block0      = emptyBlock(blockFlow, chainIndex0)
+      val block0      = emptyBlock(blockFlow, chainIndex0, nextBlockTs)
       val chainIndex1 = ChainIndex.unsafe(mainGroup.value, from)
-      val block1      = emptyBlock(blockFlow, chainIndex1)
+      val block1      = emptyBlock(blockFlow, chainIndex1, nextBlockTs)
       addAndCheck(blockFlow, block0, block1)
       addToView(block0)
       addToView(block1)
