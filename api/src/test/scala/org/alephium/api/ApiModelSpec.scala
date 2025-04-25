@@ -2017,7 +2017,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val groupIndex = fromLockupScript.groupIndex
+      val groupIndex = LockupScript.p2pkh(fromPublicKey.publicKey).groupIndex
       val request = BuildExecuteScriptTx(
         fromPublicKey.publicKey.bytes,
         fromPublicKeyType = None,
@@ -2026,11 +2026,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
       request.getLockPair().rightValue is (LockupScript.p2pkh(fromPublicKey.publicKey), UnlockScript
         .p2pkh(fromPublicKey.publicKey))
+      val invalidGroup = (groupIndex.value + 1) % groupConfig.groups
       request
-        .copy(group = Some(GroupIndex.unsafe(1)))
+        .copy(group = Some(GroupIndex.unsafe(invalidGroup)))
         .getLockPair()
         .leftValue
-        .detail is s"Mismatch between group in request (1) and SecP256K1 public key: ${Hex
+        .detail is s"Mismatch between group in request ($invalidGroup) and SecP256K1 public key: ${Hex
           .toHexString(fromPublicKey.publicKey.bytes)}"
     }
   }
@@ -2061,7 +2062,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val groupIndex = fromLockupScript.groupIndex
+      val groupIndex = LockupScript.p2pkh(fromPublicKey.publicKey).groupIndex
       val request = BuildDeployContractTx(
         fromPublicKey.publicKey.bytes,
         fromPublicKeyType = None,
@@ -2070,11 +2071,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       )
       request.getLockPair().rightValue is (LockupScript.p2pkh(fromPublicKey.publicKey), UnlockScript
         .p2pkh(fromPublicKey.publicKey))
+      val invalidGroup = (groupIndex.value + 1) % groupConfig.groups
       request
-        .copy(group = Some(GroupIndex.unsafe(1)))
+        .copy(group = Some(GroupIndex.unsafe(invalidGroup)))
         .getLockPair()
         .leftValue
-        .detail is s"Mismatch between group in request (1) and SecP256K1 public key: ${Hex
+        .detail is s"Mismatch between group in request ($invalidGroup) and SecP256K1 public key: ${Hex
           .toHexString(fromPublicKey.publicKey.bytes)}"
     }
   }

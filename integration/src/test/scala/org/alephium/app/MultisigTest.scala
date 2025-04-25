@@ -22,7 +22,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.flow.validation.{InvalidSignature, NotEnoughSignature}
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.vm.{GasBox, LockupScript}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
@@ -51,7 +51,7 @@ class MultisigTest extends AlephiumActorSpec {
     decodedTx.toGroup is unsignedTx.toGroup.value
     decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
-    val submitTx = submitTransaction(buildTxResult, privateKey)
+    val submitTx = submitTransaction(buildTxResult, privateKey).head
     request[ApiError.InternalServerError](
       submitTx,
       restPort
@@ -169,7 +169,7 @@ class MultisigTest extends AlephiumActorSpec {
       transferAmount / 2
     )
 
-    val buildTxResult = request[BuildTransferTxResult](buildTx, restPort)
+    val buildTxResult = request[BuildTransferTxResult](buildTx, restPort).asInstanceOf[BuildSimpleTransferTxResult]
 
     val unsignedTx =
       deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
@@ -278,7 +278,7 @@ class MultisigTest extends AlephiumActorSpec {
     def createMultisigTransaction(
         allPubKeys: AVector[String],
         unlockPubKeys: AVector[String]
-    ): BuildTransferTxResult = {
+    ): BuildSimpleTransferTxResult = {
       val multisigAddress = buildAddressAndSendFunds(allPubKeys, unlockPubKeys)
 
       val amount = transferAmount + (transferAmount / 2) // To force 2 inputs
@@ -290,7 +290,7 @@ class MultisigTest extends AlephiumActorSpec {
         amount
       )
 
-      request[BuildTransferTxResult](buildTx, restPort)
+      request[BuildTransferTxResult](buildTx, restPort).asInstanceOf[BuildSimpleTransferTxResult]
     }
 
     def createSweepTransaction(
@@ -309,7 +309,7 @@ class MultisigTest extends AlephiumActorSpec {
     }
 
     def submitSuccessfulMultisigTransaction(
-        buildTxResult: BuildTransferTxResult,
+        buildTxResult: BuildSimpleTransferTxResult,
         unlockPrivKeys: AVector[String]
     ): UnsignedTransaction = {
       val unsignedTx =
@@ -325,7 +325,8 @@ class MultisigTest extends AlephiumActorSpec {
       decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
-      val multisigTx       = request[SubmitTxResult](submitMultisigTx, restPort)
+      assume(submitMultisigTx.length == 1)
+      val multisigTx       = request[SubmitTxResult](submitMultisigTx.head, restPort)
 
       confirmTx(multisigTx, restPort)
 
@@ -339,8 +340,9 @@ class MultisigTest extends AlephiumActorSpec {
       val failedTx =
         signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
 
+      assume(failedTx.length == 1)
       request[ApiError.InternalServerError](
-        failedTx,
+        failedTx.head,
         restPort
       ).detail
     }
@@ -363,7 +365,7 @@ class MultisigTest extends AlephiumActorSpec {
     }
 
     def sweepToBuildTransactionResult(sweep: SweepAddressTransaction, from: Int, to: Int) =
-      BuildTransferTxResult(
+      BuildSimpleTransferTxResult(
         sweep.unsignedTx,
         sweep.gasAmount,
         sweep.gasPrice,
