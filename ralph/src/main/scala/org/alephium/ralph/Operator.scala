@@ -138,7 +138,7 @@ object ArithOperator {
   val ModMul: ArithOperator = u256Binary("|*|", U256ModMul, _ modMul _)
   val ModExp: ArithOperator = u256Binary("|**|", U256ModExp, _ modPow _)
   val SHL: ArithOperator    = u256Binary("<<", U256SHL, _ shlDeprecated _)
-  val SHR: ArithOperator    = u256Binary(">>", U256SHR, _ shrDeprecated _)
+  val SHR: ArithOperator    = u256Binary(">>", U256SHR, _ shr _)
   val BitAnd: ArithOperator = u256Binary("&", U256BitAnd, _ bitAnd _)
   val BitOr: ArithOperator  = u256Binary("|", U256BitOr, _ bitOr _)
   val Xor: ArithOperator    = u256Binary("^", U256Xor, _ xor _)

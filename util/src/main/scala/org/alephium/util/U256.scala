@@ -151,6 +151,7 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     U256.unsafe(this.v.xor(that.v))
   }
 
+  // compute (this * 2 ** n), no overflow check
   def shlDeprecated(n: U256): U256 = {
     try {
       val nInt = n.toBigInt.intValueExact()
@@ -164,16 +165,29 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     }
   }
 
-  def shrDeprecated(n: U256): U256 = {
-    try {
-      val nInt = n.toBigInt.intValueExact()
+  // compute (this * 2 ** n), with overflow check
+  def shl(n: U256): Option[U256] = {
+    if (this.isZero) {
+      Some(U256.Zero)
+    } else if (n.byteLength() >= 3) {
+      None
+    } else {
+      val nInt = n.toBigInt.intValue()
       if (nInt >= 0 && nInt < 256) {
-        U256.unsafe(this.v.shiftRight(nInt))
+        U256.from(this.v.shiftLeft(nInt))
       } else {
-        U256.Zero
+        None
       }
-    } catch {
-      case _: ArithmeticException => U256.Zero
+    }
+  }
+
+  // compute (this / 2 ** n)
+  def shr(n: U256): U256 = {
+    if (this.isZero || n.byteLength() >= 3) {
+      U256.Zero
+    } else {
+      val nInt = n.toBigInt.intValue()
+      U256.unsafe(this.v.shiftRight(nInt))
     }
   }
 
