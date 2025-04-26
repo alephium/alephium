@@ -151,7 +151,7 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     U256.unsafe(this.v.xor(that.v))
   }
 
-  def shl(n: U256): U256 = {
+  def shlDeprecated(n: U256): U256 = {
     try {
       val nInt = n.toBigInt.intValueExact()
       if (nInt >= 0 && nInt < 256) {
@@ -164,7 +164,7 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     }
   }
 
-  def shr(n: U256): U256 = {
+  def shrDeprecated(n: U256): U256 = {
     try {
       val nInt = n.toBigInt.intValueExact()
       if (nInt >= 0 && nInt < 256) {

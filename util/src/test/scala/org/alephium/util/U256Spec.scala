@@ -149,8 +149,8 @@ class U256Spec extends AlephiumSpec {
     } {
       val xU256    = U256.unsafe(x)
       val nBounded = if (n > U256.unsafe(256)) 256 else n.toBigInt.intValue()
-      xU256.shl(n).toBigInt is x.shiftLeft(nBounded).mod(U256.upperBound)
-      xU256.shr(n).toBigInt is x.shiftRight(nBounded).mod(U256.upperBound)
+      xU256.shlDeprecated(n).toBigInt is x.shiftLeft(nBounded).mod(U256.upperBound)
+      xU256.shrDeprecated(n).toBigInt is x.shiftRight(nBounded).mod(U256.upperBound)
     }
   }
 

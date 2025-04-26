@@ -826,11 +826,11 @@ object U256Xor extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Ga
 }
 object U256SHL extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Op((x, y) => x.shl(y))(x, y)
+    BinaryArithmeticInstr.u256Op((x, y) => x.shlDeprecated(y))(x, y)
 }
 object U256SHR extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Op((x, y) => x.shr(y))(x, y)
+    BinaryArithmeticInstr.u256Op((x, y) => x.shrDeprecated(y))(x, y)
 }
 object U256Eq extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =

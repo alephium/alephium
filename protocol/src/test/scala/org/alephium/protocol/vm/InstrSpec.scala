@@ -921,11 +921,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "U256SHL" in new U256BinaryArithmeticInstrFixture {
-    testOp(U256SHL, _ shl _)
+    testOp(U256SHL, _ shlDeprecated _)
   }
 
   it should "U256SHR" in new U256BinaryArithmeticInstrFixture {
-    testOp(U256SHR, _ shr _)
+    testOp(U256SHR, _ shrDeprecated _)
   }
 
   trait ExpArithmeticInstrFixture extends StatelessInstrFixture {
