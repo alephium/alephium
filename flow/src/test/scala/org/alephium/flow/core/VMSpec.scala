@@ -8329,6 +8329,31 @@ class VMSpec extends AlephiumSpec with Generators {
     output.lockTime is lockTimestamp
   }
 
+  trait U256SHLFixture extends ContractFixture {
+    def code(a: U256, b: U256, res: U256) =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!($a << $b == $res, 0)
+         |}
+         |""".stripMargin
+  }
+
+  it should "test U256SHL before Danube" in new U256SHLFixture {
+    setHardFork(HardFork.Rhone)
+    testSimpleScript(code(U256.HalfMaxValue, 1, U256.HalfMaxValue shlDeprecated 1))
+    testSimpleScript(code(U256.MaxValue, 1, U256.MaxValue shlDeprecated 1))
+  }
+
+  it should "test U256SHL since Danube" in new U256SHLFixture {
+    setHardForkSince(HardFork.Danube)
+    testSimpleScript(code(U256.HalfMaxValue, 1, U256.HalfMaxValue.shl(1).get))
+    val script = Compiler.compileTxScript(code(U256.MaxValue, 1, 0)).rightValue
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage.startsWith(
+      "Right(TxScriptExeFailed(ArithmeticError"
+    ) is true
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

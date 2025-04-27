@@ -920,8 +920,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     testOp(U256Xor, _ xor _)
   }
 
-  it should "U256SHL" in new U256BinaryArithmeticInstrFixture {
+  it should "U256SHL Pre-Danube" in new U256BinaryArithmeticInstrFixture {
+    override lazy val frame = prepareFrame(AVector.empty)(NetworkConfigFixture.PreDanube)
     testOp(U256SHL, _ shlDeprecated _)
+  }
+
+  it should "U256SHL Danube" in new U256BinaryArithmeticInstrFixture {
+    override lazy val frame = prepareFrame(AVector.empty)(NetworkConfigFixture.Danube)
+    testOp(U256SHL, (x, y) => x.shl(y).get, U256.HalfMaxValue, U256.One)
+    fail(U256SHL, U256.MaxValue, U256.One)
   }
 
   it should "U256SHR" in new U256BinaryArithmeticInstrFixture {

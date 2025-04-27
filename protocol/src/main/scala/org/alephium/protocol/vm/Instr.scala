@@ -698,6 +698,20 @@ sealed trait BinaryArithmeticInstr[T <: Val]
   }
 }
 
+sealed trait DanubeBinaryArithmeticInstr[T <: Val] extends BinaryArithmeticInstr[T] {
+  final override def op(x: T, y: T): ExeResult[Val] = ???
+  protected def op(x: T, y: T, hardFork: HardFork): ExeResult[Val]
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value2 <- popOpStack(frame)
+      value1 <- popOpStack(frame)
+      out    <- op(value1, value2, frame.ctx.getHardFork())
+      _      <- frame.pushOpStack(out)
+    } yield ()
+  }
+}
+
 object BinaryArithmeticInstr {
   def error(a: Val, b: Val, op: ArithmeticInstr): ArithmeticError = {
     ArithmeticError(s"Arithmetic error: $op($a, $b)")
@@ -824,9 +838,14 @@ object U256Xor extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Ga
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.xor(_))(x, y)
 }
-object U256SHL extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Op((x, y) => x.shlDeprecated(y))(x, y)
+object U256SHL extends DanubeBinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
+  protected def op(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] = {
+    if (hardFork.isDanubeEnabled()) {
+      BinaryArithmeticInstr.u256SafeOp(this, (x, y) => x.shl(y))(x, y)
+    } else {
+      BinaryArithmeticInstr.u256Op((x, y) => x.shlDeprecated(y))(x, y)
+    }
+  }
 }
 object U256SHR extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
