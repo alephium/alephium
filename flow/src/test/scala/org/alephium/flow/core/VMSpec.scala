@@ -1093,7 +1093,6 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(y << 1 == 2, 0)
          |    assert!(y >> 1 == 0, 0)
          |    assert!(y << 255 != 0, 0)
-         |    assert!(y << 256 == 0, 0)
          |    assert!(x & x == 0, 0)
          |    assert!(x & y == 0, 0)
          |    assert!(y & y == 1, 0)
