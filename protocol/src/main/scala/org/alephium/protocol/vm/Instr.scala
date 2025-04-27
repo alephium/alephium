@@ -698,16 +698,57 @@ sealed trait BinaryArithmeticInstr[T <: Val]
   }
 }
 
-sealed trait DanubeBinaryArithmeticInstr[T <: Val] extends BinaryArithmeticInstr[T] {
-  final override def op(x: T, y: T): ExeResult[Val] = ???
-  protected def op(x: T, y: T, hardFork: HardFork): ExeResult[Val]
+sealed trait DanubeBinaryArithmeticInstr extends BinaryArithmeticInstr[Val] {
+  final override def op(x: Val, y: Val): ExeResult[Val]   = ???
+  @inline def popOpStack(frame: Frame[_]): ExeResult[Val] = frame.popOpStack()
+  protected def checkI256Op[T <: Val](
+      value1: Val.I256,
+      value2: T,
+      op: (Val.I256, T) => ExeResult[Val],
+      hardFork: HardFork
+  ): ExeResult[Val] = {
+    if (hardFork.isDanubeEnabled()) {
+      op(value1, value2)
+    } else {
+      failed(ArithmeticError(s"$this($value1, $value2) is not enabled before Danube"))
+    }
+  }
+}
+
+sealed trait DanubeShiftInstr extends DanubeBinaryArithmeticInstr {
+  protected def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val]
+  protected def opI256(x: Val.I256, y: Val.U256): ExeResult[Val]
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val hardFork = frame.ctx.getHardFork()
+    for {
+      value2 <- popOpStack(frame)
+      value1 <- popOpStack(frame)
+      out <- (value1, value2) match {
+        case (value1: Val.U256, value2: Val.U256) => opU256(value1, value2, hardFork)
+        case (value1: Val.I256, value2: Val.U256) => checkI256Op(value1, value2, opI256, hardFork)
+        case _ => failed(BinaryArithmeticInstr.error(value1, value2, this))
+      }
+      _ <- frame.pushOpStack(out)
+    } yield ()
+  }
+}
+
+sealed trait DanubeBitwiseInstr extends DanubeBinaryArithmeticInstr {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val]
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val]
 
   override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       value2 <- popOpStack(frame)
       value1 <- popOpStack(frame)
-      out    <- op(value1, value2, frame.ctx.getHardFork())
-      _      <- frame.pushOpStack(out)
+      out <- (value1, value2) match {
+        case (value1: Val.U256, value2: Val.U256) => opU256(value1, value2)
+        case (value1: Val.I256, value2: Val.I256) =>
+          checkI256Op(value1, value2, opI256, frame.ctx.getHardFork())
+        case _ => failed(BinaryArithmeticInstr.error(value1, value2, this))
+      }
+      _ <- frame.pushOpStack(out)
     } yield ()
   }
 }
@@ -726,6 +767,17 @@ object BinaryArithmeticInstr {
       instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Option[util.I256]
   )(x: Val.I256, y: Val.I256): ExeResult[Val.I256] =
+    op(x.v, y.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(x, y, instr)))
+
+  @inline def i256ShiftOp(
+      op: (util.I256, util.U256) => util.I256
+  )(x: Val.I256, y: Val.U256): ExeResult[Val.I256] =
+    Right(Val.I256.apply(op(x.v, y.v)))
+
+  @inline def i256SafeShiftOp(
+      instr: ArithmeticInstr,
+      op: (util.I256, util.U256) => Option[util.I256]
+  )(x: Val.I256, y: Val.U256): ExeResult[Val.I256] =
     op(x.v, y.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(x, y, instr)))
 
   @inline def u256Op(
@@ -826,30 +878,41 @@ object U256ModMul extends BinaryArithmeticInstr[Val.U256] with U256StackOps with
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.modMul(_))(x, y)
 }
-object U256BitAnd extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object U256BitAnd extends DanubeBitwiseInstr with GasLow {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.bitAnd(_))(x, y)
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Op(_.bitAnd(_))(x, y)
 }
-object U256BitOr extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object U256BitOr extends DanubeBitwiseInstr with GasLow {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.bitOr(_))(x, y)
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Op(_.bitOr(_))(x, y)
 }
-object U256Xor extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object U256Xor extends DanubeBitwiseInstr with GasLow {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.xor(_))(x, y)
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Op(_.xor(_))(x, y)
 }
-object U256SHL extends DanubeBinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] = {
+object U256SHL extends DanubeShiftInstr with GasLow {
+  def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] = {
     if (hardFork.isDanubeEnabled()) {
       BinaryArithmeticInstr.u256SafeOp(this, (x, y) => x.shl(y))(x, y)
     } else {
       BinaryArithmeticInstr.u256Op((x, y) => x.shlDeprecated(y))(x, y)
     }
   }
+  def opI256(x: Val.I256, y: Val.U256): ExeResult[Val] = {
+    BinaryArithmeticInstr.i256SafeShiftOp(this, (x, y) => x.shl(y))(x, y)
+  }
 }
-object U256SHR extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object U256SHR extends DanubeShiftInstr with GasLow {
+  def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op((x, y) => x.shr(y))(x, y)
+  def opI256(x: Val.I256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256ShiftOp((x, y) => x.shr(y))(x, y)
 }
 object U256Eq extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =

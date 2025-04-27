@@ -686,8 +686,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         op: (B, B) => R,
         genB: Gen[B]
     ) = {
-      forAll(genB, genB) { case (b1, b2) =>
-        binaryArithmeticTest(instr, buildArg, buildRes, op, b1, b2)
+      binaryArithmeticGenTest[A, B, B, R](instr, buildArg, buildArg, buildRes, op, genB, genB)
+    }
+
+    def binaryArithmeticGenTest[T <: Val, B1, B2, R](
+        instr: BinaryArithmeticInstr[T],
+        buildArg1: B1 => Val,
+        buildArg2: B2 => Val,
+        buildRes: R => Val,
+        op: (B1, B2) => R,
+        genB1: Gen[B1],
+        genB2: Gen[B2]
+    ) = {
+      forAll(genB1, genB2) { case (b1, b2) =>
+        binaryArithmeticTest[T, B1, B2, R](instr, buildArg1, buildArg2, buildRes, op, b1, b2)
       }
     }
 
@@ -699,8 +711,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         b1: B,
         b2: B
     ) = {
-      val a1: A = buildArg(b1)
-      val a2: A = buildArg(b2)
+      binaryArithmeticTest[A, B, B, R](instr, buildArg, buildArg, buildRes, op, b1, b2)
+    }
+
+    def binaryArithmeticTest[T <: Val, B1, B2, R](
+        instr: BinaryArithmeticInstr[T],
+        buildArg1: B1 => Val,
+        buildArg2: B2 => Val,
+        buildRes: R => Val,
+        op: (B1, B2) => R,
+        b1: B1,
+        b2: B2
+    ) = {
+      val a1 = buildArg1(b1)
+      val a2 = buildArg2(b2)
       stack.push(a1)
       stack.push(a2)
 
@@ -715,6 +739,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       stack.push(a1)
       instr.runWith(frame).leftValue isE StackUnderflow
+
+      instr match {
+        case _: DanubeBitwiseInstr | _: DanubeShiftInstr =>
+          stack.push(a1)
+          stack.push(Val.False)
+          instr.runWith(frame).leftValue.rightValue is a[ArithmeticError]
+        case _ => ()
+      }
     }
 
     def binaryArithmeticfail[A <: Val, B](
@@ -723,8 +755,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         b2: B,
         buildArg: B => A
     ) = {
-      val a1: A = buildArg(b1)
-      val a2: A = buildArg(b2)
+      binaryArithmeticfail[A, B, B](instr, b1, b2, buildArg, buildArg)
+    }
+
+    def binaryArithmeticfail[T <: Val, B1, B2](
+        instr: BinaryArithmeticInstr[T],
+        b1: B1,
+        b2: B2,
+        buildArg1: B1 => Val,
+        buildArg2: B2 => Val
+    ) = {
+      val a1 = buildArg1(b1)
+      val a2 = buildArg2(b2)
       stack.push(a1)
       stack.push(a2)
 
@@ -739,6 +781,22 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       binaryArithmeticGenTest(instr, Val.I256.apply, Val.I256.apply, op, i256Gen)
     }
 
+    def testBitwiseOp(instr: DanubeBitwiseInstr, op: (I256, I256) => I256) = {
+      binaryArithmeticGenTest(instr, Val.I256.apply, Val.I256.apply, op, i256Gen)
+    }
+
+    def testShiftOp(instr: DanubeShiftInstr, op: (I256, U256) => I256) = {
+      binaryArithmeticGenTest(
+        instr,
+        Val.I256.apply,
+        Val.U256.apply,
+        Val.I256.apply,
+        op,
+        i256Gen,
+        u256Gen
+      )
+    }
+
     def testOp(
         instr: BinaryArithmeticInstr[Val.I256],
         op: (I256, I256) => I256,
@@ -748,12 +806,25 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       binaryArithmeticTest(instr, Val.I256.apply, Val.I256.apply, op, b1, b2)
     }
 
+    def testShiftOp(
+        instr: DanubeShiftInstr,
+        op: (I256, U256) => I256,
+        b1: I256,
+        b2: U256
+    ) = {
+      binaryArithmeticTest(instr, Val.I256.apply, Val.U256.apply, Val.I256.apply, op, b1, b2)
+    }
+
     def testComp(instr: BinaryArithmeticInstr[Val.I256], comp: (I256, I256) => Boolean) = {
       binaryArithmeticGenTest(instr, Val.I256.apply, Val.Bool.apply, comp, i256Gen)
     }
 
     def fail(instr: BinaryArithmeticInstr[Val.I256], b1: I256, b2: I256) = {
       binaryArithmeticfail(instr, b1, b2, Val.I256.apply)
+    }
+
+    def fail(instr: DanubeShiftInstr, b1: I256, b2: U256) = {
+      binaryArithmeticfail(instr, b1, b2, Val.I256.apply, Val.U256.apply)
     }
   }
 
@@ -815,6 +886,52 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     testComp(I256Ge, _ >= _)
   }
 
+  it should "I256BitAnd" in new I256BinaryArithmeticInstrFixture {
+    testBitwiseOp(U256BitAnd, _ bitAnd _)
+  }
+
+  it should "I256BitOr" in new I256BinaryArithmeticInstrFixture {
+    testBitwiseOp(U256BitOr, _ bitOr _)
+  }
+
+  it should "I256Xor" in new I256BinaryArithmeticInstrFixture {
+    testBitwiseOp(U256Xor, _ xor _)
+  }
+
+  it should "I256SHL" in new I256BinaryArithmeticInstrFixture {
+    testShiftOp(U256SHL, (x, y) => x.shl(y).get, I256.HalfMaxValue, U256.One)
+    fail(U256SHL, I256.MaxValue, U256.One)
+  }
+
+  it should "I256SHR" in new I256BinaryArithmeticInstrFixture {
+    testShiftOp(U256SHR, _ shr _)
+  }
+
+  it should "test I256 instrs before Danube" in new I256BinaryArithmeticInstrFixture {
+    override lazy val frame = prepareFrame(AVector.empty)(NetworkConfigFixture.PreDanube)
+    Seq(U256BitAnd, U256BitOr, U256Xor).foreach { instr =>
+      stack.push(Val.I256(i256Gen.sample.get))
+      stack.push(Val.I256(i256Gen.sample.get))
+      instr
+        .runWith(frame)
+        .leftValue
+        .rightValue
+        .toString
+        .contains("is not enabled before Danube") is true
+    }
+
+    Seq(U256SHL, U256SHR).foreach { instr =>
+      stack.push(Val.I256(i256Gen.sample.get))
+      stack.push(Val.U256(u256Gen.sample.get))
+      instr
+        .runWith(frame)
+        .leftValue
+        .rightValue
+        .toString
+        .contains("is not enabled before Danube") is true
+    }
+  }
+
   trait U256BinaryArithmeticInstrFixture extends BinaryArithmeticInstrFixture {
     override val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
 
@@ -822,8 +939,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       binaryArithmeticGenTest(instr, Val.U256.apply, Val.U256.apply, op, u256Gen)
     }
 
+    def testOp(instr: DanubeBinaryArithmeticInstr, op: (U256, U256) => U256) = {
+      binaryArithmeticGenTest(instr, Val.U256.apply, Val.U256.apply, op, u256Gen)
+    }
+
     def testOp(
         instr: BinaryArithmeticInstr[Val.U256],
+        op: (U256, U256) => U256,
+        b1: U256,
+        b2: U256
+    ) = {
+      binaryArithmeticTest(instr, Val.U256.apply, Val.U256.apply, op, b1, b2)
+    }
+
+    def testOp(
+        instr: DanubeBinaryArithmeticInstr,
         op: (U256, U256) => U256,
         b1: U256,
         b2: U256
@@ -838,7 +968,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     def fail(instr: BinaryArithmeticInstr[Val.U256], b1: U256, b2: U256) = {
       binaryArithmeticfail(instr, b1, b2, Val.U256.apply)
     }
+
+    def fail(instr: DanubeBinaryArithmeticInstr, b1: U256, b2: U256) = {
+      binaryArithmeticfail(instr, b1, b2, Val.U256.apply)
+    }
   }
+
   it should "U256Add" in new U256BinaryArithmeticInstrFixture {
     testOp(U256Add, _ addUnsafe _)
     fail(U256Add, U256.MaxValue, U256.One)

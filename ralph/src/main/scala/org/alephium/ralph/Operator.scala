@@ -68,7 +68,7 @@ object ArithOperator {
 
   private def u256Binary(
       name: String,
-      instr: BinaryInstr[Val.U256],
+      instr: Instr[StatelessContext], // TODO: improve this
       func: (U256, U256) => U256
   ): ArithOperator = {
     new ArithOperator {
