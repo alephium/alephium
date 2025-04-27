@@ -191,7 +191,7 @@ object Instr {
     BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
-    U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
+    U256ModAdd, U256ModSub, U256ModMul, NumericBitAnd, NumericBitOr, NumericXor, NumericSHL, NumericSHR,
     I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
     ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
     IsAssetAddress, IsContractAddress,
@@ -878,25 +878,25 @@ object U256ModMul extends BinaryArithmeticInstr[Val.U256] with U256StackOps with
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.modMul(_))(x, y)
 }
-object U256BitAnd extends DanubeBitwiseInstr with GasLow {
+object NumericBitAnd extends DanubeBitwiseInstr with GasLow {
   protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.bitAnd(_))(x, y)
   protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Op(_.bitAnd(_))(x, y)
 }
-object U256BitOr extends DanubeBitwiseInstr with GasLow {
+object NumericBitOr extends DanubeBitwiseInstr with GasLow {
   protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.bitOr(_))(x, y)
   protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Op(_.bitOr(_))(x, y)
 }
-object U256Xor extends DanubeBitwiseInstr with GasLow {
+object NumericXor extends DanubeBitwiseInstr with GasLow {
   protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.xor(_))(x, y)
   protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Op(_.xor(_))(x, y)
 }
-object U256SHL extends DanubeShiftInstr with GasLow {
+object NumericSHL extends DanubeShiftInstr with GasLow {
   def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] = {
     if (hardFork.isDanubeEnabled()) {
       BinaryArithmeticInstr.u256SafeOp(this, (x, y) => x.shl(y))(x, y)
@@ -908,7 +908,7 @@ object U256SHL extends DanubeShiftInstr with GasLow {
     BinaryArithmeticInstr.i256SafeShiftOp(this, (x, y) => x.shl(y))(x, y)
   }
 }
-object U256SHR extends DanubeShiftInstr with GasLow {
+object NumericSHR extends DanubeShiftInstr with GasLow {
   def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op((x, y) => x.shr(y))(x, y)
   def opI256(x: Val.I256, y: Val.U256): ExeResult[Val] =

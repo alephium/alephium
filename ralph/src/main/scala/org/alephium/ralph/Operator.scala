@@ -199,12 +199,12 @@ object ArithOperator {
   val ModSub: ArithOperator = u256Binary("|-|", U256ModSub, _ modSub _)
   val ModMul: ArithOperator = u256Binary("|*|", U256ModMul, _ modMul _)
   val ModExp: ArithOperator = u256Binary("|**|", U256ModExp, _ modPow _)
-  val SHL: ArithOperator    = shiftOp("<<", U256SHL, _ shl _, _ shl _)
+  val SHL: ArithOperator    = shiftOp("<<", NumericSHL, _ shl _, _ shl _)
   val SHR: ArithOperator =
-    shiftOp(">>", U256SHR, (x, y) => Some(x.shr(y)), (x, y) => Some(x.shr(y)))
-  val BitAnd: ArithOperator = bitwiseOp("&", U256BitAnd, _ bitAnd _, _ bitAnd _)
-  val BitOr: ArithOperator  = bitwiseOp("|", U256BitOr, _ bitOr _, _ bitOr _)
-  val Xor: ArithOperator    = bitwiseOp("^", U256Xor, _ xor _, _ xor _)
+    shiftOp(">>", NumericSHR, (x, y) => Some(x.shr(y)), (x, y) => Some(x.shr(y)))
+  val BitAnd: ArithOperator = bitwiseOp("&", NumericBitAnd, _ bitAnd _, _ bitAnd _)
+  val BitOr: ArithOperator  = bitwiseOp("|", NumericBitOr, _ bitOr _, _ bitOr _)
+  val Xor: ArithOperator    = bitwiseOp("^", NumericXor, _ xor _, _ xor _)
 
   val Concat: Operator = new Operator {
     def operatorName: String = "++"

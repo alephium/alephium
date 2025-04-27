@@ -887,29 +887,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "I256BitAnd" in new I256BinaryArithmeticInstrFixture {
-    testBitwiseOp(U256BitAnd, _ bitAnd _)
+    testBitwiseOp(NumericBitAnd, _ bitAnd _)
   }
 
   it should "I256BitOr" in new I256BinaryArithmeticInstrFixture {
-    testBitwiseOp(U256BitOr, _ bitOr _)
+    testBitwiseOp(NumericBitOr, _ bitOr _)
   }
 
   it should "I256Xor" in new I256BinaryArithmeticInstrFixture {
-    testBitwiseOp(U256Xor, _ xor _)
+    testBitwiseOp(NumericXor, _ xor _)
   }
 
   it should "I256SHL" in new I256BinaryArithmeticInstrFixture {
-    testShiftOp(U256SHL, (x, y) => x.shl(y).get, I256.HalfMaxValue, U256.One)
-    fail(U256SHL, I256.MaxValue, U256.One)
+    testShiftOp(NumericSHL, (x, y) => x.shl(y).get, I256.HalfMaxValue, U256.One)
+    fail(NumericSHL, I256.MaxValue, U256.One)
   }
 
   it should "I256SHR" in new I256BinaryArithmeticInstrFixture {
-    testShiftOp(U256SHR, _ shr _)
+    testShiftOp(NumericSHR, _ shr _)
   }
 
   it should "test I256 instrs before Danube" in new I256BinaryArithmeticInstrFixture {
     override lazy val frame = prepareFrame(AVector.empty)(NetworkConfigFixture.PreDanube)
-    Seq(U256BitAnd, U256BitOr, U256Xor).foreach { instr =>
+    Seq(NumericBitAnd, NumericBitOr, NumericXor).foreach { instr =>
       stack.push(Val.I256(i256Gen.sample.get))
       stack.push(Val.I256(i256Gen.sample.get))
       instr
@@ -920,7 +920,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .contains("is not enabled before Danube") is true
     }
 
-    Seq(U256SHL, U256SHR).foreach { instr =>
+    Seq(NumericSHL, NumericSHR).foreach { instr =>
       stack.push(Val.I256(i256Gen.sample.get))
       stack.push(Val.U256(u256Gen.sample.get))
       instr
@@ -1044,30 +1044,30 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "U256BitAnd" in new U256BinaryArithmeticInstrFixture {
-    testOp(U256BitAnd, _ bitAnd _)
+    testOp(NumericBitAnd, _ bitAnd _)
   }
 
   it should "U256BitOr" in new U256BinaryArithmeticInstrFixture {
-    testOp(U256BitOr, _ bitOr _)
+    testOp(NumericBitOr, _ bitOr _)
   }
 
   it should "U256Xor" in new U256BinaryArithmeticInstrFixture {
-    testOp(U256Xor, _ xor _)
+    testOp(NumericXor, _ xor _)
   }
 
   it should "U256SHL Pre-Danube" in new U256BinaryArithmeticInstrFixture {
     override lazy val frame = prepareFrame(AVector.empty)(NetworkConfigFixture.PreDanube)
-    testOp(U256SHL, _ shlDeprecated _)
+    testOp(NumericSHL, _ shlDeprecated _)
   }
 
   it should "U256SHL Danube" in new U256BinaryArithmeticInstrFixture {
     override lazy val frame = prepareFrame(AVector.empty)(NetworkConfigFixture.Danube)
-    testOp(U256SHL, (x, y) => x.shl(y).get, U256.HalfMaxValue, U256.One)
-    fail(U256SHL, U256.MaxValue, U256.One)
+    testOp(NumericSHL, (x, y) => x.shl(y).get, U256.HalfMaxValue, U256.One)
+    fail(NumericSHL, U256.MaxValue, U256.One)
   }
 
   it should "U256SHR" in new U256BinaryArithmeticInstrFixture {
-    testOp(U256SHR, _ shr _)
+    testOp(NumericSHR, _ shr _)
   }
 
   trait ExpArithmeticInstrFixture extends StatelessInstrFixture {
@@ -4822,7 +4822,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BoolNot -> 3, BoolAnd -> 3, BoolOr -> 3, BoolEq -> 3, BoolNeq -> 3, BoolToByteVec -> 1,
       I256Add -> 3, I256Sub -> 3, I256Mul -> 5, I256Div -> 5, I256Mod -> 5, I256Eq -> 3, I256Neq -> 3, I256Lt -> 3, I256Le -> 3, I256Gt -> 3, I256Ge -> 3,
       U256Add -> 3, U256Sub -> 3, U256Mul -> 5, U256Div -> 5, U256Mod -> 5, U256Eq -> 3, U256Neq -> 3, U256Lt -> 3, U256Le -> 3, U256Gt -> 3, U256Ge -> 3,
-      U256ModAdd -> 8, U256ModSub -> 8, U256ModMul -> 8, U256BitAnd -> 5, U256BitOr -> 5, U256Xor -> 5, U256SHL -> 5, U256SHR -> 5,
+      U256ModAdd -> 8, U256ModSub -> 8, U256ModMul -> 8, NumericBitAnd -> 5, NumericBitOr -> 5, NumericXor -> 5, NumericSHL -> 5, NumericSHR -> 5,
       I256ToU256 -> 3, I256ToByteVec -> 5, U256ToI256 -> 3, U256ToByteVec -> 5,
       ByteVecEq -> 7, ByteVecNeq -> 7, ByteVecSize -> 2, ByteVecConcat -> 1, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
       IsAssetAddress -> 3, IsContractAddress -> 3,
@@ -4961,7 +4961,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BoolNot -> 25, BoolAnd -> 26, BoolOr -> 27, BoolEq -> 28, BoolNeq -> 29, BoolToByteVec -> 30,
       I256Add -> 31, I256Sub -> 32, I256Mul -> 33, I256Div -> 34, I256Mod -> 35, I256Eq -> 36, I256Neq -> 37, I256Lt -> 38, I256Le -> 39, I256Gt -> 40, I256Ge -> 41,
       U256Add -> 42, U256Sub -> 43, U256Mul -> 44, U256Div -> 45, U256Mod -> 46, U256Eq -> 47, U256Neq -> 48, U256Lt -> 49, U256Le -> 50, U256Gt -> 51, U256Ge -> 52,
-      U256ModAdd -> 53, U256ModSub -> 54, U256ModMul -> 55, U256BitAnd -> 56, U256BitOr -> 57, U256Xor -> 58, U256SHL -> 59, U256SHR -> 60,
+      U256ModAdd -> 53, U256ModSub -> 54, U256ModMul -> 55, NumericBitAnd -> 56, NumericBitOr -> 57, NumericXor -> 58, NumericSHL -> 59, NumericSHR -> 60,
       I256ToU256 -> 61, I256ToByteVec -> 62, U256ToI256 -> 63, U256ToByteVec -> 64,
       ByteVecEq -> 65, ByteVecNeq -> 66, ByteVecSize -> 67, ByteVecConcat -> 68, AddressEq -> 69, AddressNeq -> 70, AddressToByteVec -> 71,
       IsAssetAddress -> 72, IsContractAddress -> 73,
@@ -5039,7 +5039,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
       I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
       U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
-      U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
+      U256ModAdd, U256ModSub, U256ModMul, NumericBitAnd, NumericBitOr, NumericXor, NumericSHL, NumericSHR,
       I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
       ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
       IsAssetAddress, IsContractAddress,
