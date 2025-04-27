@@ -27,8 +27,10 @@ sealed trait Operator {
 }
 
 sealed trait ArithOperator extends Operator {
+  def isValidArgsType(argsType: Seq[Type]): Boolean = argsType(0) == argsType(1)
+
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
-    if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
+    if (argsType.length != 2 || !isValidArgsType(argsType) || !argsType(0).toVal.isNumeric) {
       throw Compiler.Error(s"Invalid param types $argsType for $operatorName operator", None)
     } else {
       Seq(argsType(0))
@@ -66,9 +68,69 @@ object ArithOperator {
     }
   }
 
+  def shiftOp(
+      name: String,
+      instr: DanubeShiftInstr,
+      u256Op: (U256, U256) => Option[U256],
+      i256Op: (I256, U256) => Option[I256]
+  ): ArithOperator = {
+    new ArithOperator {
+      override def isValidArgsType(argsType: Seq[Type]): Boolean =
+        (argsType(0) == Type.U256 || argsType(0) == Type.I256) && argsType(1) == Type.U256
+
+      def operatorName: String = name
+
+      def calc(values: Seq[Val]): Either[String, Val] = {
+        values match {
+          case Seq(left: Val.U256, right: Val.U256) =>
+            u256Op(left.v, right.v).map(Val.U256(_)).toRight(s"${left.v} $name ${right.v} overflow")
+          case Seq(left: Val.I256, right: Val.U256) =>
+            i256Op(left.v, right.v).map(Val.I256(_)).toRight(s"${left.v} $name ${right.v} overflow")
+          case _ => Left(s"Expect (I256/U256, U256) for $name operator")
+        }
+      }
+
+      override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+        argsType match {
+          case Seq(Type.U256, Type.U256) => Seq(instr)
+          case Seq(Type.I256, Type.U256) => Seq(instr)
+          case _ => throw Compiler.Error(s"Expect (I256/U256, U256) for $name operator", None)
+        }
+      }
+    }
+  }
+
+  def bitwiseOp(
+      name: String,
+      instr: DanubeBitwiseInstr,
+      u256Op: (U256, U256) => U256,
+      i256Op: (I256, I256) => I256
+  ): ArithOperator = {
+    new ArithOperator {
+      def operatorName: String = name
+
+      def calc(values: Seq[Val]): Either[String, Val] = {
+        values match {
+          case Seq(left: Val.U256, right: Val.U256) => Right(Val.U256(u256Op(left.v, right.v)))
+          case Seq(left: Val.I256, right: Val.I256) => Right(Val.I256(i256Op(left.v, right.v)))
+          case _ => Left(s"Expect (U256, U256)/(I256, I256) for $name operator")
+        }
+      }
+
+      override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+        argsType match {
+          case Seq(Type.U256, Type.U256) => Seq(instr)
+          case Seq(Type.I256, Type.I256) => Seq(instr)
+          case _ =>
+            throw Compiler.Error(s"Expect (U256, U256)/(I256, I256) for $name operator", None)
+        }
+      }
+    }
+  }
+
   private def u256Binary(
       name: String,
-      instr: Instr[StatelessContext], // TODO: improve this
+      instr: BinaryInstr[Val.U256],
       func: (U256, U256) => U256
   ): ArithOperator = {
     new ArithOperator {
@@ -137,11 +199,12 @@ object ArithOperator {
   val ModSub: ArithOperator = u256Binary("|-|", U256ModSub, _ modSub _)
   val ModMul: ArithOperator = u256Binary("|*|", U256ModMul, _ modMul _)
   val ModExp: ArithOperator = u256Binary("|**|", U256ModExp, _ modPow _)
-  val SHL: ArithOperator    = u256Binary("<<", U256SHL, _ shlDeprecated _)
-  val SHR: ArithOperator    = u256Binary(">>", U256SHR, _ shr _)
-  val BitAnd: ArithOperator = u256Binary("&", U256BitAnd, _ bitAnd _)
-  val BitOr: ArithOperator  = u256Binary("|", U256BitOr, _ bitOr _)
-  val Xor: ArithOperator    = u256Binary("^", U256Xor, _ xor _)
+  val SHL: ArithOperator    = shiftOp("<<", U256SHL, _ shl _, _ shl _)
+  val SHR: ArithOperator =
+    shiftOp(">>", U256SHR, (x, y) => Some(x.shr(y)), (x, y) => Some(x.shr(y)))
+  val BitAnd: ArithOperator = bitwiseOp("&", U256BitAnd, _ bitAnd _, _ bitAnd _)
+  val BitOr: ArithOperator  = bitwiseOp("|", U256BitOr, _ bitOr _, _ bitOr _)
+  val Xor: ArithOperator    = bitwiseOp("^", U256Xor, _ xor _, _ xor _)
 
   val Concat: Operator = new Operator {
     def operatorName: String = "++"

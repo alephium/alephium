@@ -8354,6 +8354,32 @@ class VMSpec extends AlephiumSpec with Generators {
     ) is true
   }
 
+  trait I256BitwiseFixture extends ContractFixture {
+    val code =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(0i >> 1 == 0i, 0)
+         |  assert!(1i << 1 == 2i, 1)
+         |  assert!(0xffi & 0xf0i == 0xf0i, 2)
+         |  assert!(0xffi | 0xf0i == 0xffi, 3)
+         |  assert!(0xffi ^ 0xf0i == 0x0fi, 4)
+         |}
+         |""".stripMargin
+  }
+
+  it should "test bitwise operators for I256 before Danube" in new I256BitwiseFixture {
+    setHardForkBefore(HardFork.Danube)
+    intercept[AssertionError](testSimpleScript(code)).getMessage.contains(
+      "is not enabled before Danube"
+    ) is true
+  }
+
+  it should "test bitwise operators for I256 since Danube" in new I256BitwiseFixture {
+    setHardForkSince(HardFork.Danube)
+    testSimpleScript(code)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
