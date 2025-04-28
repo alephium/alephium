@@ -395,5 +395,13 @@ class I256Spec extends AlephiumSpec {
     I256.NegOne.shr(U256.MaxValue) is I256.Zero
     I256.MinValue.shr(U256.MaxValue) is I256.Zero
     I256.MaxValue.shr(U256.MaxValue) is I256.Zero
+
+    // Test shr rounding
+    I256.unsafe(-1).shr(U256.One) is I256.unsafe(0)
+    I256.unsafe(-2).shr(U256.One) is I256.unsafe(-1)
+    I256.unsafe(-3).shr(U256.One) is I256.unsafe(-1)
+    I256.unsafe(1).shr(U256.One) is I256.unsafe(0)
+    I256.unsafe(2).shr(U256.One) is I256.unsafe(1)
+    I256.unsafe(3).shr(U256.One) is I256.unsafe(1)
   }
 }
