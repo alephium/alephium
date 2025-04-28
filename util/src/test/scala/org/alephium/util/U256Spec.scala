@@ -203,6 +203,12 @@ class U256Spec extends AlephiumSpec {
     U256.Two.shl(U256.unsafe(256)) is None
     U256.MaxValue.shl(U256.unsafe(256)) is None
 
+    // Test shl with max shift amount
+    U256.Zero.shl(U256.MaxValue).value is U256.Zero
+    U256.One.shl(U256.MaxValue) is None
+    U256.Two.shl(U256.MaxValue) is None
+    U256.MaxValue.shl(U256.MaxValue) is None
+
     // Test shr with zero shift amount
     U256.Zero.shr(U256.Zero) is U256.Zero
     U256.One.shr(U256.Zero) is U256.One
@@ -226,6 +232,12 @@ class U256Spec extends AlephiumSpec {
     U256.One.shr(U256.unsafe(256)) is U256.unsafe(0)
     U256.Two.shr(U256.unsafe(256)) is U256.unsafe(0)
     U256.MaxValue.shr(U256.unsafe(256)) is U256.unsafe(0)
+
+    // Test shr with max shift amount
+    U256.Zero.shr(U256.MaxValue) is U256.Zero
+    U256.One.shr(U256.MaxValue) is U256.Zero
+    U256.Two.shr(U256.MaxValue) is U256.Zero
+    U256.MaxValue.shr(U256.MaxValue) is U256.Zero
   }
 
   it should "convert to/from bytes" in {

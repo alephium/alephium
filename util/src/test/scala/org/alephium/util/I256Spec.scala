@@ -344,6 +344,13 @@ class I256Spec extends AlephiumSpec {
     I256.MinValue.shl(U256.unsafe(256)) is None
     I256.MaxValue.shl(U256.unsafe(256)) is None
 
+    // Test shl with max shift amount
+    I256.Zero.shl(U256.MaxValue).value is I256.Zero
+    I256.One.shl(U256.MaxValue) is None
+    I256.NegOne.shl(U256.MaxValue) is None
+    I256.MinValue.shl(U256.MaxValue) is None
+    I256.MaxValue.shl(U256.MaxValue) is None
+
     // Test shr with zero shift amount
     I256.Zero.shr(U256.Zero) is I256.Zero
     I256.One.shr(U256.Zero) is I256.One
@@ -381,5 +388,12 @@ class I256Spec extends AlephiumSpec {
     I256.NegOne.shr(U256.unsafe(256)) is I256.unsafe(0)
     I256.MinValue.shr(U256.unsafe(256)) is I256.unsafe(0)
     I256.MaxValue.shr(U256.unsafe(256)) is I256.unsafe(0)
+
+    // Test shr with max shift amount
+    I256.Zero.shr(U256.MaxValue) is I256.Zero
+    I256.One.shr(U256.MaxValue) is I256.Zero
+    I256.NegOne.shr(U256.MaxValue) is I256.Zero
+    I256.MinValue.shr(U256.MaxValue) is I256.Zero
+    I256.MaxValue.shr(U256.MaxValue) is I256.Zero
   }
 }
