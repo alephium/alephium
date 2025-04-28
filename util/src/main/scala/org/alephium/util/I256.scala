@@ -241,18 +241,4 @@ object I256 {
   val MinValue: I256 = unsafe(lowerBound)
 
   val HalfMaxValue: I256 = MaxValue.divUnsafe(Two)
-
-  @inline def shiftAmount(n: U256): Option[Int] = {
-    try {
-      val nInt = n.toBigInt.intValueExact()
-      if (nInt >= 0 && nInt < 256) {
-        Some(nInt)
-      } else {
-        None
-      }
-    } catch {
-      // ArithmeticException is thrown when the shift amount is not in the range of int
-      case _: ArithmeticException => None
-    }
-  }
 }
