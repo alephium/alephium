@@ -17,17 +17,12 @@
 package org.alephium.flow.handler
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{
-  BlockHash,
-  BrokerGroupInfo,
-  ChainIndex,
-  NoIndexModelGeneratorsLike
-}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.model._
 import org.alephium.util.AVector
 
 class FlowHandlerSpec extends AlephiumFlowActorSpec with NoIndexModelGeneratorsLike {
-  it should "calculate locators" in {
+  trait Fixture {
     val groupNum = 6
 
     val brokerGroupInfo0 = new BrokerConfig {
@@ -47,16 +42,36 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec with NoIndexModelGeneratorsL
       override def brokerId: Int  = 0
       override def brokerNum: Int = 3
     }
+  }
 
+  it should "calculate locators" in new Fixture {
     val locatorsWithIndex = AVector.tabulate(3 * 6) { k =>
       ChainIndex.unsafe(k / 6 * 2 + 1, k % 6)(brokerGroupInfo0) ->
         AVector.fill(k)(BlockHash.generate)
     }
-    val flowEvent = FlowHandler.SyncLocators(brokerGroupInfo0, locatorsWithIndex)
+    val flowEvent = FlowHandler.SyncLocators(locatorsWithIndex)
     val locators  = locatorsWithIndex.map(_._2)
-    flowEvent.filerFor(brokerGroupInfo0) is locators
-    flowEvent.filerFor(brokerGroupInfo1) is locators.takeRight(groupNum)
-    flowEvent.filerFor(brokerGroupInfo2) is locators.take(groupNum)
-    flowEvent.filerFor(brokerGroupInfo3) is locators.drop(groupNum).take(groupNum)
+    flowEvent.filterFor(brokerGroupInfo0) is locators
+    flowEvent.filterFor(brokerGroupInfo1) is locators.takeRight(groupNum)
+    flowEvent.filterFor(brokerGroupInfo2) is locators.take(groupNum)
+    flowEvent.filterFor(brokerGroupInfo3) is locators.drop(groupNum).take(groupNum)
+  }
+
+  it should "filter chain tips" in new Fixture {
+    val groupConfig: GroupConfig = new GroupConfig { val groups: Int = groupNum }
+    val chainTips                = AVector.fill(3 * 6)(ChainTip(BlockHash.generate, 1, Weight.zero))
+    val chainTipsWithGroup = (0 until groupConfig.groups).map { index =>
+      val groupIndex = GroupIndex.unsafe(index)(groupConfig)
+      chainTips.filter(_.chainIndex(groupConfig).from == groupIndex)
+    }
+
+    def getTips(groups: Seq[Int]): Set[ChainTip] =
+      groups.flatMap(index => chainTipsWithGroup(index)).toSet
+
+    val flowEvent = FlowHandler.UpdateChainState(chainTips)
+    flowEvent.filterFor(brokerGroupInfo0).toSet is getTips(Seq(1, 3, 5))
+    flowEvent.filterFor(brokerGroupInfo1).toSet is getTips(Seq(2, 5))
+    flowEvent.filterFor(brokerGroupInfo2).toSet is getTips(Seq(1, 4))
+    flowEvent.filterFor(brokerGroupInfo3).toSet is getTips(Seq(0, 3))
   }
 }

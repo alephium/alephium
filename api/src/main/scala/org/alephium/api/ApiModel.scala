@@ -497,6 +497,9 @@ trait ApiModelCodec {
   implicit val contractParentRW: RW[ContractParent]                     = macroRW
   implicit val subContractsRW: RW[SubContracts]                         = macroRW
 
+  implicit val addressAssetStateRW: RW[AddressAssetState] = macroRW
+  implicit val simulationResultRW: RW[SimulationResult]   = macroRW
+
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)
 

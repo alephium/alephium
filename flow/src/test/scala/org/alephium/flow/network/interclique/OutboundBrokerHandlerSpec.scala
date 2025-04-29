@@ -16,6 +16,8 @@
 
 package org.alephium.flow.network.interclique
 
+import scala.util.Random
+
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
 
@@ -23,7 +25,7 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.{Generators, SignatureSchema}
-import org.alephium.protocol.message.Hello
+import org.alephium.protocol.message.{Hello, P2PV1, P2PV2}
 import org.alephium.protocol.model.InterBrokerInfo
 import org.alephium.util.ActorRefT
 
@@ -33,7 +35,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
       expectedRemoteBroker.address,
       Generators.socketAddressGen.sample.get
     )
-    val hello = Hello.unsafe(expectedRemoteBroker.interBrokerInfo, priKey)
+    val hello = Hello.unsafe(expectedRemoteBroker.interBrokerInfo, priKey, selfP2PVersion)
     brokerHandler ! BrokerHandler.Received(hello)
     brokerHandlerActor.pingPongTickOpt is a[Some[_]]
   }
@@ -50,7 +52,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
       expectedRemoteBroker.brokerId,
       expectedRemoteBroker.brokerNum
     )
-    val hello = Hello.unsafe(wrongBroker, priKey)
+    val hello = Hello.unsafe(wrongBroker, priKey, selfP2PVersion)
     brokerHandler ! BrokerHandler.Received(hello)
     handlerProbe.expectTerminated(brokerHandler.ref)
   }
@@ -61,6 +63,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
     val blockFlowSynchronizer = TestProbe()
     val maxForkDepth          = 5
     val expectedRemoteBroker  = Generators.brokerInfoGen.sample.get
+    val selfP2PVersion        = if (Random.nextBoolean()) P2PV1 else P2PV2
 
     lazy val (priKey, pubKey)               = SignatureSchema.secureGeneratePriPub()
     lazy val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe

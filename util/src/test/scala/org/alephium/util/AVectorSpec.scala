@@ -25,7 +25,7 @@ import scala.util.Random
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Assertion
 
-//scalastyle:off file.size.limit
+// scalastyle:off file.size.limit
 abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Ordering[A])
     extends AlephiumSpec {
 
@@ -259,6 +259,19 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "reverseForeach" in new Fixture {
+    val empty  = AVector.empty[A]
+    val buffer = ArrayBuffer.empty[A]
+    empty.foreachReversed(buffer.append)
+    buffer.isEmpty is true
+
+    forAll(vectorGen) { vc =>
+      val buffer = ArrayBuffer.empty[A]
+      vc.foreachReversed(buffer.append)
+      checkEq(vc.reverse, buffer)
+    }
+  }
+
   it should "map" in new Fixture {
     forAll(vectorGen) { vc =>
       val vc0 = vc.map(identity)
@@ -403,6 +416,36 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "findReversedE" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversedE(_ => Right(false)) isE None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversedE(e => Right(e._1 == elem)) isE Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversedE(_ => Right(false)) isE None
+        vector.findReversedE(_ => Left("error")).leftValue is "error"
+      }
+    }
+  }
+
+  it should "findReversed" in new Fixture {
+    val empty = AVector.empty[A]
+    empty.findReversed(_ => false) is None
+    empty.findReversed(_ => true) is None
+
+    forAll(vectorGen) { vc =>
+      val vector = vc.mapWithIndex((v, index) => (v, index))
+      val arr    = vc.toArray
+      arr.foreach { elem =>
+        vector.findReversed(e => e._1 == elem) is Some((elem, arr.lastIndexOf(elem)))
+        vector.findReversed(_ => false) is None
+      }
+    }
+  }
+
   it should "indexWhere" in new Fixture {
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
@@ -448,6 +491,18 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
       val vc1 = vc ++ AVector.empty[A]
       vc1.toSeq is vc.toSeq
       (vc1.elems eq vc.elems) is true
+    }
+  }
+
+  it should "iterator" in new Fixture {
+    forAll(vectorGen) { vc =>
+      vc.iterator.toSeq is vc.toSeq
+    }
+  }
+
+  it should "reverseIterator" in new Fixture {
+    forAll(vectorGen) { vc =>
+      vc.reverseIterator.toSeq is vc.reverse.toSeq
     }
   }
 }

@@ -99,8 +99,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             Mul,
             Variable(Ident("x")),
             IfElseExpr(
-              Seq(IfBranchExpr(Const(Val.True), Variable(Ident("a")))),
-              ElseBranchExpr(Variable(Ident("b")))
+              Seq(IfBranchExpr(ParenExpr(Const(Val.True)), Seq.empty, Variable(Ident("a")))),
+              ElseBranchExpr(Seq.empty, Variable(Ident("b")))
             )
           )
         ),
@@ -109,8 +109,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("[if (a) b else c; 2]", StatelessParser.expr(_)).get.value is
       CreateArrayExpr2[StatelessContext](
         IfElseExpr(
-          Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
-          ElseBranchExpr(Variable(Ast.Ident("c")))
+          Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+          ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
         ),
         Const(Val.U256(U256.Two))
       )
@@ -118,12 +118,12 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       CreateArrayExpr1[StatelessContext](
         Seq(
           IfElseExpr(
-            Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
-            ElseBranchExpr(Variable(Ast.Ident("c")))
+            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+            ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
           ),
           IfElseExpr(
-            Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
-            ElseBranchExpr(Variable(Ast.Ident("c")))
+            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+            ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
           )
         )
       )
@@ -278,7 +278,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Seq.empty,
           Seq.empty
         ),
-        Seq(IdentSelector(Ident("d")), IndexSelector(Const(Val.U256(U256.Zero))))
+        Seq(
+          IdentSelector[StatefulContext](Ident("d")),
+          IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
+        )
       )
     parse("a.b.foo()[0].bar().c.d[0]", StatefulParser.expr(_)).get.value is
       LoadDataBySelectors(
@@ -297,9 +300,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Seq.empty
         ),
         Seq(
-          IdentSelector(Ident("c")),
-          IdentSelector(Ident("d")),
-          IndexSelector(Const(Val.U256(U256.Zero)))
+          IdentSelector[StatefulContext](Ident("c")),
+          IdentSelector[StatefulContext](Ident("d")),
+          IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
         )
       )
   }
@@ -517,9 +520,21 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse return" in {
-    parse("return x, y", StatelessParser.ret(_)).isSuccess is true
-    parse("return x + y", StatelessParser.ret(_)).isSuccess is true
-    parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
+    def test(statement: String) = {
+      val result = parse(statement, StatelessParser.ret(_))
+      result.isSuccess is true
+      result.get.index is statement.length
+    }
+
+    test("return x, y")
+    test("return (x, y)")
+    test("return x + y")
+    test("return (x + y)")
+    test("return (x)")
+    test("return (x + 1) * 2")
+    test("return (x + 1) * (x + 2)")
+    test("return ((x + 1) * 2, x)")
+    test("return")
     intercept[Compiler.Error](parse("return return", StatelessParser.ret(_))).message is
       "Consecutive return statements are not allowed"
   }
@@ -614,7 +629,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .get
       .value is
       Ast.IfElseStatement[StatelessContext](
-        Seq(Ast.IfBranchStatement(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
+        Seq(Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty)))),
         None
       )
 
@@ -630,8 +645,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseStatement[StatelessContext](
         Seq(
-          Ast.IfBranchStatement(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
-          Ast.IfBranchStatement(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
+          Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty))),
+          Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("y"))), Seq(ReturnStmt(Seq.empty)))
         ),
         Some(Ast.ElseBranchStatement(Seq.empty))
       )
@@ -644,9 +659,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Ast.Const(Val.U256(U256.Zero)))
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
       )
 
     fastparse
@@ -655,10 +674,125 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond0")), Ast.Const(Val.U256(U256.Zero))),
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Ast.Const(Val.U256(U256.One)))
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond0"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          ),
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond1"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.One))
+          )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.Two)))
+      )
+
+    fastparse
+      .parse("if cond 0 else 1", StatelessParser.expr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Seq.empty, Ast.Const(Val.U256(U256.Zero)))
+        ),
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+      )
+
+    Seq(
+      "if cond0 0 else if cond1 1 else 2",
+      "if cond0 { 0 } else if cond1 { 1 } else { 2 }",
+      "if cond0 0 else if cond1 { 1 } else { 2 }",
+      "if cond0 0 else if cond1 1 else { 2 }"
+    ).foreach { expr =>
+      fastparse
+        .parse(expr, StatelessParser.expr(_))
+        .get
+        .value is
+        Ast.IfElseExpr[StatelessContext](
+          Seq(
+            Ast.IfBranchExpr(
+              Variable(Ast.Ident("cond0")),
+              Seq.empty,
+              Ast.Const(Val.U256(U256.Zero))
+            ),
+            Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Seq.empty, Ast.Const(Val.U256(U256.One)))
+          ),
+          Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.Two)))
+        )
+    }
+
+    Seq(
+      "if x < 1 0 else 1",
+      "if x < 1 { 0 } else { 1 }",
+      "if x < 1 { 0 } else 1",
+      "if x < 1 0 else { 1 }"
+    ).foreach { expr =>
+      fastparse
+        .parse(expr, StatelessParser.expr(_))
+        .get
+        .value is
+        Ast.IfElseExpr[StatelessContext](
+          Seq(
+            Ast.IfBranchExpr(
+              Binop(Lt, Variable(Ident("x")), Const(Val.U256(U256.One))),
+              Seq.empty,
+              Ast.Const(Val.U256(U256.Zero))
+            )
+          ),
+          Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+        )
+    }
+
+    fastparse
+      .parse("if (x - 1) < 1 0 else 1", StatelessParser.expr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(
+            Binop(
+              Lt,
+              ParenExpr(Binop(Sub, Variable(Ident("x")), Const(Val.U256(U256.One)))),
+              Const(Val.U256(U256.One))
+            ),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          )
+        ),
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+      )
+
+    val expr =
+      s"""
+         |if (x - 1) < 1 {
+         |  foo()
+         |  0
+         |} else {
+         |  bar()
+         |  1
+         |}
+         |""".stripMargin
+    fastparse
+      .parse(expr, StatelessParser.ifElseExpr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(
+            Binop(
+              Lt,
+              ParenExpr(Binop(Sub, Variable(Ident("x")), Const(Val.U256(U256.One)))),
+              Const(Val.U256(U256.One))
+            ),
+            Seq(FuncCall(FuncId("foo", false), Seq.empty, Seq.empty)),
+            Ast.Const(Val.U256(U256.Zero))
+          )
+        ),
+        Ast.ElseBranchExpr(
+          Seq(FuncCall(FuncId("bar", false), Seq.empty, Seq.empty)),
+          Ast.Const(Val.U256(U256.One))
+        )
       )
 
     val missingElseCode = "if (cond0) 0"
@@ -1018,6 +1152,33 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     exprs.foreach { case (str, expr) =>
       checkParseExpr(str, expr)
     }
+  }
+
+  it should "parse compound assign statement" in {
+    def stats(op: CompoundAssignmentOperator): List[(String, Ast.Statement[StatelessContext])] =
+      List(
+        s"a ${op.operatorName} b" -> Ast
+          .CompoundAssign(
+            AssignmentSimpleTarget(Ident("a")),
+            op,
+            Ast.Variable(Ast.Ident("b"))
+          ),
+        s"a[0] ${op.operatorName} b" -> Ast.CompoundAssign(
+          AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0)))),
+          op,
+          Ast.Variable(Ast.Ident("b"))
+        ),
+        s"a.b[0] ${op.operatorName} c" -> Ast.CompoundAssign(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
+          ),
+          op,
+          Ast.Variable(Ast.Ident("c"))
+        )
+      )
+
+    CompoundAssignmentOperator.values.foreach { stats(_).foreach(checkParseStat.tupled) }
   }
 
   it should "parse assign statement" in {
@@ -2563,6 +2724,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq(EnumField(Ident("Red"), Const(Val.U256(U256.Zero))))
       )
     )
+  }
+
+  it should "Enum with default value shouldn't have a source index" in {
+
+    val enumWithDefault = "Second"
+
+    val code =
+      s"""
+         |enum Errors {
+         |  First = 1
+         |  $$${enumWithDefault}
+         |}""".stripMargin
+
+    val enums = parse(code.replace("$", ""), StatefulParser.enumDef(_)).get.value.fields
+
+    val second = enums.last
+    val index  = code.indexOf("$")
+
+    second.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    second.ident.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    // value source index is not set for default value
+    second.value.sourceIndex is None
   }
 
   it should "set the origin contract id for constants and functions" in {

@@ -25,12 +25,16 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
-final case class TxScriptEmulationResult(gasUsed: GasBox, generatedOutputs: AVector[TxOutput])
+final case class TxScriptEmulationResult(gasUsed: GasBox, value: TxScriptExecution)
 
 trait TxScriptEmulator {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def emulate(
       inputWithAssets: AVector[TxInputWithAsset],
-      script: StatefulScript
+      fixedOutputs: AVector[AssetOutput],
+      script: StatefulScript,
+      gasAmountOpt: Option[GasBox] = None,
+      gasPriceOpt: Option[GasPrice] = None
   ): Either[String, TxScriptEmulationResult]
 }
 
@@ -44,9 +48,13 @@ object TxScriptEmulator {
       config: GroupConfig,
       logConfig: LogConfig
   ) extends TxScriptEmulator {
+
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
-        script: StatefulScript
+        fixedOutputs: AVector[AssetOutput],
+        script: StatefulScript,
+        gasAmountOpt: Option[GasBox],
+        gasPriceOpt: Option[GasPrice]
     ): Either[String, TxScriptEmulationResult] = {
       assume(inputWithAssets.nonEmpty)
       val groupIndex      = inputWithAssets.head.input.fromGroup
@@ -58,8 +66,16 @@ object TxScriptEmulator {
           groupView: BlockFlowGroupView[WorldState.Cached],
           preOutputs: AVector[AssetOutput]
       ): Either[String, TxScriptExecution] = {
+        val gasAmount = gasAmountOpt.getOrElse(minimalGas)
+        val gasPrice  = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
         val txTemplate = TransactionTemplate(
-          UnsignedTransaction(Some(script), inputWithAssets.map(_.input), AVector.empty),
+          UnsignedTransaction(
+            Some(script),
+            gasAmount,
+            gasPrice,
+            inputWithAssets.map(_.input),
+            fixedOutputs
+          ),
           inputSignatures = AVector.fill(16)(Signature.generate),
           scriptSignatures = AVector.fill(16)(Signature.generate)
         )
@@ -92,7 +108,7 @@ object TxScriptEmulator {
         result <- runScript(blockEnv, groupView, preOutputs)
       } yield TxScriptEmulationResult(
         maximalGasPerTx.subUnsafe(result.gasBox),
-        result.generatedOutputs
+        result
       )
     }
   }
@@ -101,16 +117,32 @@ object TxScriptEmulator {
   object Mock extends TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
-        script: StatefulScript
+        fixedOutputs: AVector[AssetOutput],
+        script: StatefulScript,
+        gasAmountOpt: Option[GasBox],
+        gasFeeOpt: Option[GasPrice]
     ): Either[String, TxScriptEmulationResult] = {
-      Right(TxScriptEmulationResult(defaultGasPerInput, AVector.empty))
+      Right(
+        TxScriptEmulationResult(
+          defaultGasPerInput,
+          TxScriptExecution(
+            defaultGasPerInput,
+            AVector.empty,
+            AVector.empty,
+            AVector.empty
+          )
+        )
+      )
     }
   }
 
   object NotImplemented extends TxScriptEmulator {
     def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
-        script: StatefulScript
+        fixedOutputs: AVector[AssetOutput],
+        script: StatefulScript,
+        gasAmountOpt: Option[GasBox],
+        gasFeeOpt: Option[GasPrice]
     ): Either[String, TxScriptEmulationResult] = {
       throw new NotImplementedError("TxScriptEmulator not implemented")
     }

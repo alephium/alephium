@@ -20,7 +20,7 @@ alephium {
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
-    max-clique-from-same-ip = 3
+    max-clique-from-same-ip = 10
 
     ws-max-connections = 100
     ws-max-frame-size = 16384 // increase with ws-max-contract-event-addresses
@@ -40,7 +40,9 @@ alephium {
 
     fast-sync-frequency = 2 second
     stable-sync-frequency = 20 second
-    sync-peer-sample-size = 5
+    sync-peer-sample-size-v1 = 3
+    sync-peer-sample-size-v2 = 5
+    enable-p2p-v2 = true
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 2 minute

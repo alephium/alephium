@@ -51,10 +51,12 @@ alephium {
 
     fast-sync-frequency = 1 second
     stable-sync-frequency = 20 second
-    sync-peer-sample-size = 5
+    sync-peer-sample-size-v1 = 3
+    sync-peer-sample-size-v2 = 5
+    enable-p2p-v2 = true
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
-    dependency-expiry-period = 2 minute
+    dependency-expiry-period = 5 minute
     update-synced-frequency = 5 second
 
     txs-broadcast-delay = 5 second

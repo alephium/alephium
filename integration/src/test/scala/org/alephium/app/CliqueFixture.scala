@@ -845,6 +845,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     def getServer(fromGroup: Int): Server = servers(fromGroup % brokers)
     def getRestPort(fromGroup: Int): Int  = getServer(fromGroup).config.network.restPort
 
+    def startWithoutCheckSyncState(): Unit = {
+      servers.map(_.start()).foreach(_.futureValue is ())
+    }
+
     def start(): Unit = {
       servers.map(_.start()).foreach(_.futureValue is ())
       servers.foreach { server =>

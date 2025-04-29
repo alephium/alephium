@@ -375,6 +375,25 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.getIntraSyncInventories() isE blocks.map(_.hash).map(AVector(_))
   }
 
+  it should "get chain state" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+
+    val tips0 = blockFlow.getChainTipsUnsafe()
+    tips0 is brokerConfig.chainIndexes.map { chainIndex =>
+      val blockChain = blockFlow.getBlockChain(chainIndex)
+      ChainTip(blockChain.genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)
+    }
+
+    val tips1 = brokerConfig.chainIndexes.map { chainIndex =>
+      addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block1)
+      val weight = blockFlow.getWeightUnsafe(block1.hash)
+      ChainTip(block1.hash, 2, weight)
+    }
+    blockFlow.getChainTipsUnsafe() is tips1
+  }
+
   behavior of "Mining"
 
   it should "sanity check rewards" in new FlowFixture {

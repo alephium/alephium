@@ -27,6 +27,7 @@ import org.alephium.flow.network.broker.{OutboundBrokerHandler => BaseOutboundBr
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.ActorRefT
 
@@ -61,13 +62,17 @@ class OutboundBrokerHandler(
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
-    extends BaseOutboundBrokerHandler
-    with BrokerHandler {
+    extends BrokerHandler
+    with BaseOutboundBrokerHandler {
   val remoteAddress: InetSocketAddress = expectedRemoteBroker.address
 
-  override def handleHandshakeInfo(remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  override def handleHandshakeInfo(
+      remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      p2pVersion: P2PVersion
+  ): Unit = {
     if (remoteBrokerInfo == expectedRemoteBroker) {
-      super.handleHandshakeInfo(remoteBrokerInfo, clientInfo)
+      super.handleHandshakeInfo(remoteBrokerInfo, clientInfo, p2pVersion)
     } else {
       log.debug(
         s"Remote broker has different broker info: expected: $expectedRemoteBroker, actual: $remoteBrokerInfo"

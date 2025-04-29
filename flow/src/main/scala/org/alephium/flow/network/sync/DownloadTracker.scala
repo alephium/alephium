@@ -19,39 +19,35 @@ package org.alephium.flow.network.sync
 import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.model.BlockHash
-import org.alephium.util.{AVector, BaseActor, Duration, TimeStamp}
+import org.alephium.util.{AVector, Duration, TimeStamp}
 
-trait DownloadTracker extends BaseActor {
+trait DownloadTracker {
   def blockflow: BlockFlow
 
   val syncing: mutable.HashMap[BlockHash, TimeStamp] = mutable.HashMap.empty
 
-  def needToDownload(hash: BlockHash): Boolean =
-    !(syncing.contains(hash) || blockflow.containsUnsafe(hash))
+  private def needToDownload(hash: BlockHash): Boolean = {
+    !(syncing.contains(hash) || blockflow.contains(hash).exists(identity))
+  }
 
-  def download(hashes: AVector[AVector[BlockHash]]): Unit = {
+  def getDownloadBlockHashes(hashes: AVector[AVector[BlockHash]]): AVector[BlockHash] = {
     val currentTs  = TimeStamp.now()
     val toDownload = hashes.flatMap(_.filter(needToDownload))
     toDownload.foreach(hash => syncing.addOne(hash -> currentTs))
-    sender() ! BrokerHandler.DownloadBlocks(toDownload)
+    toDownload
   }
 
-  def finalized(hash: BlockHash): Unit = {
+  def onBlockProcessedV1(hash: BlockHash): Unit = {
     syncing -= hash
   }
 
-  def cleanupSyncing(aliveDuration: Duration): Unit = {
+  def cleanupSyncing(aliveDuration: Duration): Int = {
     val threshold = TimeStamp.now().minusUnsafe(aliveDuration)
     val oldSize   = syncing.size
     syncing.filterInPlace { case (_, timestamp) =>
       timestamp > threshold
     }
-    val newSize   = syncing.size
-    val sizeDelta = oldSize - newSize
-    if (sizeDelta > 0) {
-      log.debug(s"Clean up #$sizeDelta hashes from syncing pool")
-    }
+    oldSize - syncing.size
   }
 }

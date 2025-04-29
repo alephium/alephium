@@ -155,6 +155,18 @@ class BlockChainHandler(
       }
   }
 
+  override def handleInvalidData(
+      data: Block,
+      broker: ActorRefT[ChainHandler.Event],
+      origin: DataOrigin,
+      status: InvalidBlockStatus
+  ): Unit = {
+    super.handleInvalidData(data, broker, origin, status)
+    if (!origin.isLocal) {
+      publishEvent(ChainHandler.InvalidFlowData(data, origin))
+    }
+  }
+
   def validateWithSideEffect(
       block: Block,
       broker: ActorRefT[ChainHandler.Event],

@@ -33,9 +33,15 @@ import org.alephium.util.EventStream.Publisher
 object ChainHandler {
   trait Event
 
+  sealed trait FlowDataValidationEvent extends Event with EventStream.Event {
+    def data: FlowData
+    def origin: DataOrigin
+  }
+
   final case class FlowDataAdded(data: FlowData, origin: DataOrigin, addedAt: TimeStamp)
-      extends Event
-      with EventStream.Event
+      extends FlowDataValidationEvent
+  final case class InvalidFlowData(data: FlowData, origin: DataOrigin)
+      extends FlowDataValidationEvent
 
   val chainValidationFailed: Counter = Counter
     .build(
