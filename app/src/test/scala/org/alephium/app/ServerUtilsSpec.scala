@@ -5716,6 +5716,77 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
   }
 
+  it should "test contract with specified dust amount" in new Fixture {
+    setHardForkSince(HardFork.Danube)
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  mapping[U256, U256] map
+         |
+         |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+         |    map.insert!(0, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    val assetAddress = Address.p2pkh(genesisKeys.head._2)
+    val code         = Compiler.compileContract(contract).toOption.get
+    val testContractParams0 = TestContract(
+      bytecode = code,
+      inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+    ).toComplete().rightValue
+    val serverUtils = new ServerUtils()
+    serverUtils
+      .runTestContract(blockFlow, testContractParams0)
+      .leftValue
+      .detail
+      .contains(
+        "Insufficient funds to cover the minimum amount for contract UTXO"
+      ) is true
+
+    val testContractParams1 = testContractParams0.copy(dustAmount = Amount(minimalAlphInContract))
+    serverUtils.runTestContract(blockFlow, testContractParams1).isRight is true
+  }
+
+  it should "test contract with specified gas fee" in new ContractFixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val assetAddress = Address.Asset(lockupScript)
+    val code         = Compiler.compileContract(contract).toOption.get
+    val testContractParams0 = TestContract(
+      bytecode = code,
+      inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+    ).toComplete().rightValue
+    val result0   = serverUtils.runTestContract(blockFlow, testContractParams0).rightValue
+    val maxGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
+    result0.txOutputs.find(_.address == assetAddress).get.attoAlphAmount.value is
+      ALPH.oneAlph.subUnsafe(ALPH.cent(10)).subUnsafe(maxGasFee)
+
+    val testContractParams1 =
+      testContractParams0.copy(gasAmount = GasBox.unsafe(maximalGasPerTx.value / 2))
+    val result1 = serverUtils.runTestContract(blockFlow, testContractParams1).rightValue
+    result1.txOutputs.find(_.address == assetAddress).get.attoAlphAmount.value is
+      ALPH.oneAlph.subUnsafe(ALPH.cent(10)).subUnsafe(maxGasFee / 2)
+
+    val testContractParams2 = testContractParams0.copy(
+      gasAmount = GasBox.unsafe(maximalGasPerTx.value / 2),
+      gasPrice = GasPrice(nonCoinbaseMinGasPrice.value * 2)
+    )
+    val result2 = serverUtils.runTestContract(blockFlow, testContractParams2).rightValue
+    result2.txOutputs.find(_.address == assetAddress).get.attoAlphAmount.value is
+      ALPH.oneAlph.subUnsafe(ALPH.cent(10)).subUnsafe(maxGasFee)
+  }
+
   @scala.annotation.tailrec
   private def randomBlockHash(
       chainIndex: ChainIndex

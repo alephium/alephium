@@ -1854,7 +1854,7 @@ class ServerUtils(implicit
       script: StatefulScript
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv = mockupBlockEnv(groupIndex, blockHash, TimeStamp.now())
-    val txEnv    = mockupTxEnv(txId, inputAssets)
+    val txEnv    = mockupTxEnv(txId, inputAssets, maximalGasPerTx, nonCoinbaseMinGasPrice)
     val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
     wrapExeResult(StatefulVM.runTxScriptWithOutputsTestOnly(context, script))
   }
@@ -1874,14 +1874,19 @@ class ServerUtils(implicit
     )
   }
 
-  @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
+  @inline private def mockupTxEnv(
+      txId: TransactionId,
+      inputAssets: AVector[TestInputAsset],
+      gasAmount: GasBox,
+      gasPrice: GasPrice
+  ) = {
     TxEnv.mockup(
       txId = txId,
       signatures = Stack.popOnly(AVector.empty[Byte64]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
-      gasPrice = nonCoinbaseMinGasPrice,
-      gasAmount = maximalGasPerTx,
+      gasPrice = gasPrice,
+      gasAmount = gasAmount,
       isEntryMethodPayable = true
     )
   }
@@ -1919,15 +1924,17 @@ class ServerUtils(implicit
     for {
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
+      inputAssets = params.inputAssets.getOrElse(AVector.empty)
+      txEnv       = mockupTxEnv(txId, inputAssets, maximalGasPerTx, nonCoinbaseMinGasPrice)
       result <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
         params.callerAddress.map(_.contractId),
-        txId,
+        txEnv,
         blockHash,
         TimeStamp.now(),
-        params.inputAssets.getOrElse(AVector.empty),
+        inputAssets,
         params.methodIndex,
         params.args.getOrElse(AVector.empty),
         method
@@ -1976,12 +1983,18 @@ class ServerUtils(implicit
       )
       _      <- createContract(worldState, contractId, testContract)
       method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      txEnv = mockupTxEnv(
+        testContract.txId,
+        testContract.allInputs,
+        testContract.gasAmount,
+        testContract.gasPrice
+      )
       executionResultPair <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
         testContract.callerContractIdOpt,
-        testContract.txId,
+        txEnv,
         testContract.blockHash,
         testContract.blockTimeStamp,
         testContract.inputAssets,
@@ -1996,7 +2009,7 @@ class ServerUtils(implicit
     } yield {
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
-      val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
+      val gasUsed          = testContract.gasAmount.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -2128,7 +2141,7 @@ class ServerUtils(implicit
       groupIndex: GroupIndex,
       contractId: ContractId,
       callerContractIdOpt: Option[ContractId],
-      txId: TransactionId,
+      txEnv: TxEnv,
       blockHash: BlockHash,
       blockTimeStamp: TimeStamp,
       inputAssets: AVector[TestInputAsset],
@@ -2137,9 +2150,8 @@ class ServerUtils(implicit
       method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv   = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
-    val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
-    val txEnv      = mockupTxEnv(txId, inputAssets)
-    val context    = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+    val testGasFee = txEnv.gasFeeUnsafe
+    val context    = StatefulContext(blockEnv, txEnv, worldState, txEnv.gasAmount)
     for {
       _ <- checkArgs(args, method)
       _ <- checkGasFee(testGasFee, inputAssets)

@@ -20,8 +20,8 @@ import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, BlockHash, ContractId, GroupIndex, TransactionId}
-import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.{BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.util.{AVector, TimeStamp}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -39,7 +39,10 @@ final case class TestContract(
     methodIndex: Option[Int] = None,
     args: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[ContractState]] = None,
-    inputAssets: Option[AVector[TestInputAsset]] = None
+    inputAssets: Option[AVector[TestInputAsset]] = None,
+    gasAmount: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None,
+    dustAmount: Option[Amount] = None
 ) {
   def toComplete(): Try[TestContract.Complete] = {
     val testMethodIndex = methodIndex.getOrElse(testMethodIndexDefault)
@@ -69,7 +72,10 @@ final case class TestContract(
             testMethodIndex,
             args.getOrElse(AVector.empty),
             existingContracts.getOrElse(existingContractsDefault),
-            inputAssets.getOrElse(inputAssetsDefault)
+            inputAssets.getOrElse(inputAssetsDefault),
+            gasAmount.getOrElse(gasAmountDefault),
+            gasPrice.getOrElse(gasPriceDefault),
+            dustAmount.getOrElse(dustAmountDefault)
           )
         )
       case None => Left(badRequest(s"Invalid method index ${testMethodIndex}"))
@@ -86,6 +92,9 @@ object TestContract {
   val existingContractsDefault: AVector[ContractState] = AVector.empty
   val inputAssetsDefault: AVector[TestInputAsset]      = AVector.empty
   val initialAssetDefault: AssetState                  = AssetState(ALPH.alph(1))
+  val gasAmountDefault: GasBox                         = maximalGasPerTx
+  val gasPriceDefault: GasPrice                        = nonCoinbaseMinGasPrice
+  val dustAmountDefault: Amount                        = Amount.Zero
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
@@ -103,7 +112,10 @@ object TestContract {
       testMethodIndex: Int = testMethodIndexDefault,
       testArgs: AVector[Val] = testArgsDefault,
       existingContracts: AVector[ContractState] = existingContractsDefault,
-      inputAssets: AVector[TestInputAsset] = inputAssetsDefault
+      inputAssets: AVector[TestInputAsset] = inputAssetsDefault,
+      gasAmount: GasBox = maximalGasPerTx,
+      gasPrice: GasPrice = nonCoinbaseMinGasPrice,
+      dustAmount: Amount = Amount.Zero
   ) {
     // We return original code hash when testing private methods
     // We return the new code hash when the test code is migrated
@@ -114,6 +126,16 @@ object TestContract {
 
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
       GroupIndex.from(group).toRight(badRequest("Invalid group index"))
+    }
+
+    def allInputs: AVector[TestInputAsset] = {
+      if (inputAssets.isEmpty || dustAmount == Amount.Zero) {
+        inputAssets
+      } else {
+        val firstInput = inputAssets.head
+        val dustInput  = TestInputAsset(firstInput.address, AssetState(dustAmount.value, None))
+        inputAssets :+ dustInput
+      }
     }
   }
 }
