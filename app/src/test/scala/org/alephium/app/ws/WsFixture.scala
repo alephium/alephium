@@ -235,7 +235,6 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
   protected def dummyServerWs(id: String): ServerWsLike = new ServerWsLike {
     override def textHandlerID(): WsId                                       = id
     override def isClosed: Boolean                                           = false
-    override def reject(statusCode: Int): Unit                               = ()
     override def closeHandler(handler: () => Unit): ServerWsLike             = this
     override def textMessageHandler(handler: String => Unit): ServerWsLike   = this
     override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this

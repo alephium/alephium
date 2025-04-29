@@ -26,6 +26,7 @@ import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
+import io.vertx.core.http.ServerWebSocketHandshake
 
 import org.alephium.app.ws.WsParams._
 import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
@@ -33,7 +34,7 @@ import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json.write
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
-import org.alephium.util.{ActorRefT, AVector, BaseActor}
+import org.alephium.util.{discard, ActorRefT, AVector, BaseActor}
 
 protected[ws] object WsSubscriptionHandler {
 
@@ -75,8 +76,9 @@ protected[ws] object WsSubscriptionHandler {
   sealed trait Command         extends SubscriptionMsg
   sealed trait CommandResponse extends SubscriptionMsg
 
-  final case class Connect(socket: ServerWsLike)             extends Command
-  final case class ConnectResult(status: HttpResponseStatus) extends CommandResponse
+  final case class Handshake(handshake: ServerWebSocketHandshake) extends Command
+
+  final case class Connect(socket: ServerWsLike) extends Command
 
   final case object GetSubscriptions extends Command
 
@@ -152,9 +154,8 @@ protected[ws] class WsSubscriptionHandler(
       openedWsConnections.foreachEntry { case (wsId, ws) =>
         if (ws.isClosed) self ! Disconnect(wsId) else ws.writePing(Buffer.buffer("ping"))
       }
-    case Connect(ws) =>
-      val httpResponseStatus = connect(ws)
-      sender() ! ConnectResult(httpResponseStatus)
+    case Handshake(hs) => handshake(hs)
+    case Connect(ws)   => connect(ws)
     case Subscribe(id, ws, params) =>
       subscribe(id, ws, params)
     case Unsubscribe(id, ws, subscriptionId) =>
@@ -226,26 +227,36 @@ protected[ws] class WsSubscriptionHandler(
     }
   }
 
-  private def connect(ws: ServerWsLike): HttpResponseStatus = {
-    val connectionsCount = openedWsConnections.size
-    if (connectionsCount >= maxConnections) {
-      log.warning(s"WebSocket connections reached max limit $connectionsCount")
-      HttpResponseStatus.SERVICE_UNAVAILABLE
-    } else {
-      ws.frameHandler { frame =>
-        if (frame.isPing) {
-          ws.writePong(Buffer.buffer("pong")).onComplete {
-            case Success(_) =>
-            case Failure(ex) =>
-              log.error(ex, "Websocket keep-alive failure")
-          }
+  private def handshake(handshake: ServerWebSocketHandshake): Unit = {
+    discard {
+      if (handshake.path().equals("/ws")) {
+        val connectionsCount = openedWsConnections.size
+        if (connectionsCount >= maxConnections) {
+          log.warning(s"WebSocket connections reached max limit $connectionsCount")
+          handshake.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
+        } else {
+          handshake.accept()
+        }
+      } else {
+        handshake.reject(HttpResponseStatus.BAD_REQUEST.code())
+      }
+    }
+  }
+
+  private def connect(ws: ServerWsLike): Unit = {
+    ws.frameHandler { frame =>
+      if (frame.isPing) {
+        ws.writePong(Buffer.buffer("pong")).onComplete {
+          case Success(_) =>
+          case Failure(ex) =>
+            log.error(ex, "Websocket keep-alive failure")
         }
       }
-      ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
-      val _ = ws.textMessageHandler(msg => handleMessage(ws, msg))
-      val _ = openedWsConnections.put(ws.textHandlerID(), ws)
-      HttpResponseStatus.SWITCHING_PROTOCOLS
     }
+    ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
+    ws.textMessageHandler(msg => handleMessage(ws, msg))
+    openedWsConnections.put(ws.textHandlerID(), ws)
+    ()
   }
 
   private def handleMessage(ws: ServerWsLike, msg: String): Unit = {
