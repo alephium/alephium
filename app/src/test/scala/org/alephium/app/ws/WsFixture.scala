@@ -239,7 +239,6 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
     override def textMessageHandler(handler: String => Unit): ServerWsLike   = this
     override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
     override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
-    override def writePong(data: Buffer): Future[Unit]                       = Future.successful(())
     override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
   }
 

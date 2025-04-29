@@ -244,15 +244,6 @@ protected[ws] class WsSubscriptionHandler(
   }
 
   private def connect(ws: ServerWsLike): Unit = {
-    ws.frameHandler { frame =>
-      if (frame.isPing) {
-        ws.writePong(Buffer.buffer("pong")).onComplete {
-          case Success(_) =>
-          case Failure(ex) =>
-            log.error(ex, "Websocket keep-alive failure")
-        }
-      }
-    }
     ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
     ws.textMessageHandler(msg => handleMessage(ws, msg))
     openedWsConnections.put(ws.textHandlerID(), ws)

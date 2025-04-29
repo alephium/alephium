@@ -86,7 +86,6 @@ trait ServerWsLike {
   def textMessageHandler(handler: String => Unit): ServerWsLike
   def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike
   def writeTextMessage(msg: String): Future[Unit]
-  def writePong(data: Buffer): Future[Unit]
   def writePing(data: Buffer): Future[Unit]
 }
 
@@ -111,9 +110,6 @@ final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
 
   def writeTextMessage(msg: String): Future[Unit] =
     underlying.writeTextMessage(msg).asScala.mapTo[Unit]
-
-  def writePong(data: Buffer): Future[Unit] =
-    underlying.writePong(data).asScala.mapTo[Unit]
 
   def writePing(data: Buffer): Future[Unit] =
     underlying.writePing(data).asScala.mapTo[Unit]
