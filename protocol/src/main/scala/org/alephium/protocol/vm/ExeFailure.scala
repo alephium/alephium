@@ -243,7 +243,7 @@ case object TxCallerBalanceNotAvailable extends ExeFailure {
 final case class InsufficientFundsForUTXODustAmount(required: U256) extends ExeFailure {
   override def toString: String =
     "Insufficient funds to cover the minimum amount for contract UTXO (0.1 ALPH) or asset UTXO (0.001 ALPH). " +
-      "Please ensure transaction caller approves enough ALPH."
+      s"You are short by ${ALPH.prettifyAmount(required)} ALPH. Please ensure transaction caller approves enough ALPH."
 }
 
 final case class NotEnoughApprovedBalance(
