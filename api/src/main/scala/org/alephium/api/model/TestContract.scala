@@ -40,8 +40,6 @@ final case class TestContract(
     args: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestInputAsset]] = None,
-    gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
     dustAmount: Option[Amount] = None
 ) {
   def toComplete(): Try[TestContract.Complete] = {
@@ -73,8 +71,6 @@ final case class TestContract(
             args.getOrElse(AVector.empty),
             existingContracts.getOrElse(existingContractsDefault),
             inputAssets.getOrElse(inputAssetsDefault),
-            gasAmount.getOrElse(gasAmountDefault),
-            gasPrice.getOrElse(gasPriceDefault),
             dustAmount.getOrElse(dustAmountDefault)
           )
         )
@@ -92,8 +88,6 @@ object TestContract {
   val existingContractsDefault: AVector[ContractState] = AVector.empty
   val inputAssetsDefault: AVector[TestInputAsset]      = AVector.empty
   val initialAssetDefault: AssetState                  = AssetState(ALPH.alph(1))
-  val gasAmountDefault: GasBox                         = maximalGasPerTx
-  val gasPriceDefault: GasPrice                        = nonCoinbaseMinGasPrice
   val dustAmountDefault: Amount                        = Amount.Zero
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -113,8 +107,6 @@ object TestContract {
       testArgs: AVector[Val] = testArgsDefault,
       existingContracts: AVector[ContractState] = existingContractsDefault,
       inputAssets: AVector[TestInputAsset] = inputAssetsDefault,
-      gasAmount: GasBox = maximalGasPerTx,
-      gasPrice: GasPrice = nonCoinbaseMinGasPrice,
       dustAmount: Amount = Amount.Zero
   ) {
     // We return original code hash when testing private methods
@@ -126,16 +118,6 @@ object TestContract {
 
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
       GroupIndex.from(group).toRight(badRequest("Invalid group index"))
-    }
-
-    def allInputs: AVector[TestInputAsset] = {
-      if (inputAssets.isEmpty || dustAmount == Amount.Zero) {
-        inputAssets
-      } else {
-        val firstInput = inputAssets.head
-        val dustInput  = TestInputAsset(firstInput.address, AssetState(dustAmount.value, None))
-        inputAssets :+ dustInput
-      }
     }
   }
 }

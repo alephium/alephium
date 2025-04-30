@@ -1822,9 +1822,9 @@ class ServerUtils(implicit
   }
 
   def callTxScript(blockFlow: BlockFlow, params: CallTxScript): Try[CallTxScriptResult] = {
-    val txId        = params.txId.getOrElse(TransactionId.random)
-    val inputAssets = params.inputAssets.getOrElse(AVector.empty)
+    val txId = params.txId.getOrElse(TransactionId.random)
     for {
+      inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
       script <- deserialize[StatefulScript](params.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
@@ -1854,7 +1854,7 @@ class ServerUtils(implicit
       script: StatefulScript
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv = mockupBlockEnv(groupIndex, blockHash, TimeStamp.now())
-    val txEnv    = mockupTxEnv(txId, inputAssets, maximalGasPerTx, nonCoinbaseMinGasPrice)
+    val txEnv    = mockupTxEnv(txId, inputAssets)
     val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
     wrapExeResult(StatefulVM.runTxScriptWithOutputsTestOnly(context, script))
   }
@@ -1874,19 +1874,14 @@ class ServerUtils(implicit
     )
   }
 
-  @inline private def mockupTxEnv(
-      txId: TransactionId,
-      inputAssets: AVector[TestInputAsset],
-      gasAmount: GasBox,
-      gasPrice: GasPrice
-  ) = {
+  @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
     TxEnv.mockup(
       txId = txId,
       signatures = Stack.popOnly(AVector.empty[Byte64]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
-      gasPrice = gasPrice,
-      gasAmount = gasAmount,
+      gasPrice = nonCoinbaseMinGasPrice,
+      gasAmount = maximalGasPerTx,
       isEntryMethodPayable = true
     )
   }
@@ -1924,8 +1919,8 @@ class ServerUtils(implicit
     for {
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
-      inputAssets = params.inputAssets.getOrElse(AVector.empty)
-      txEnv       = mockupTxEnv(txId, inputAssets, maximalGasPerTx, nonCoinbaseMinGasPrice)
+      inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
+      txEnv = mockupTxEnv(txId, inputAssets)
       result <- executeContractMethod(
         worldState,
         groupIndex,
@@ -1970,34 +1965,63 @@ class ServerUtils(implicit
     }
   }
 
+  private def inputAssetsWithGasFee(
+      inputAssets: AVector[TestInputAsset]
+  ): Try[AVector[TestInputAsset]] = {
+    if (inputAssets.isEmpty) {
+      Right(inputAssets)
+    } else {
+      val asset  = inputAssets.head.asset
+      val gasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
+      asset.attoAlphAmount
+        .add(gasFee)
+        .toRight(badRequest("ALPH amount overflow"))
+        .map { amount =>
+          val newAsset = asset.copy(attoAlphAmount = amount)
+          val newInput = inputAssets.head.copy(asset = newAsset)
+          inputAssets.replace(0, newInput)
+        }
+    }
+  }
+
+  private def inputAssetsWithDustAmount(
+      inputAssets: AVector[TestInputAsset],
+      dustAmount: U256
+  ): AVector[TestInputAsset] = {
+    if (inputAssets.isEmpty || dustAmount.isZero) {
+      inputAssets
+    } else {
+      val address   = inputAssets.head.address
+      val dustInput = TestInputAsset(address, AssetState(dustAmount, None))
+      inputAssets :+ dustInput
+    }
+  }
+
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
   ): Try[TestContractResult] = {
     val contractId = testContract.contractId
+    val txId       = testContract.txId
+    val blockHash  = testContract.blockHash
     for {
       groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _ <- testContract.existingContracts.foreachE(
-        createContract(worldState, _, testContract.blockHash, testContract.txId)
-      )
-      _      <- createContract(worldState, contractId, testContract)
-      method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
-      txEnv = mockupTxEnv(
-        testContract.txId,
-        testContract.allInputs,
-        testContract.gasAmount,
-        testContract.gasPrice
-      )
+      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, blockHash, txId))
+      _ <- createContract(worldState, contractId, testContract)
+      method      <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      inputAssets <- inputAssetsWithGasFee(testContract.inputAssets)
+      allInputs = inputAssetsWithDustAmount(inputAssets, testContract.dustAmount.value)
+      txEnv     = mockupTxEnv(txId, allInputs)
       executionResultPair <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
         testContract.callerContractIdOpt,
         txEnv,
-        testContract.blockHash,
+        blockHash,
         testContract.blockTimeStamp,
-        testContract.inputAssets,
+        inputAssets,
         testContract.testMethodIndex,
         testContract.testArgs,
         method
@@ -2009,7 +2033,7 @@ class ServerUtils(implicit
     } yield {
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
-      val gasUsed          = testContract.gasAmount.subUnsafe(executionResult.gasBox)
+      val gasUsed          = txEnv.gasAmount.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -2154,7 +2178,6 @@ class ServerUtils(implicit
     val context    = StatefulContext(blockEnv, txEnv, worldState, txEnv.gasAmount)
     for {
       _ <- checkArgs(args, method)
-      _ <- checkGasFee(testGasFee, inputAssets)
       result <- runWithDebugError(
         context,
         contractId,
@@ -2178,19 +2201,6 @@ class ServerUtils(implicit
       )
     } else {
       Right(())
-    }
-  }
-
-  private def checkGasFee(testGasFee: U256, inputAssets: AVector[TestInputAsset]): Try[Unit] = {
-    inputAssets.headOption match {
-      case Some(inputAsset) if inputAsset.asset.attoAlphAmount < testGasFee =>
-        Left(
-          failed(
-            s"First input asset should have at least ${ALPH.prettifyAmount(testGasFee)} to cover gas"
-          )
-        )
-      case _ =>
-        Right(())
     }
   }
 
