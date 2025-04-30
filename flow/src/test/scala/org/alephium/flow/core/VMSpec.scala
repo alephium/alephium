@@ -1093,7 +1093,6 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(y << 1 == 2, 0)
          |    assert!(y >> 1 == 0, 0)
          |    assert!(y << 255 != 0, 0)
-         |    assert!(y << 256 == 0, 0)
          |    assert!(x & x == 0, 0)
          |    assert!(x & y == 0, 0)
          |    assert!(y & y == 1, 0)
@@ -8327,6 +8326,57 @@ class VMSpec extends AlephiumSpec with Generators {
     output.amount is dustUtxoAmount
     output.tokens is AVector((TokenId.from(fancyTokenContractId), U256.One))
     output.lockTime is lockTimestamp
+  }
+
+  trait U256SHLFixture extends ContractFixture {
+    def code(a: U256, b: U256, res: U256) =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!($a << $b == $res, 0)
+         |}
+         |""".stripMargin
+  }
+
+  it should "test U256SHL before Danube" in new U256SHLFixture {
+    setHardFork(HardFork.Rhone)
+    testSimpleScript(code(U256.HalfMaxValue, 1, U256.HalfMaxValue shlDeprecated 1))
+    testSimpleScript(code(U256.MaxValue, 1, U256.MaxValue shlDeprecated 1))
+  }
+
+  it should "test U256SHL since Danube" in new U256SHLFixture {
+    setHardForkSince(HardFork.Danube)
+    testSimpleScript(code(U256.HalfMaxValue, 1, U256.HalfMaxValue.shl(1).get))
+    val script = Compiler.compileTxScript(code(U256.MaxValue, 1, 0)).rightValue
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage.startsWith(
+      "Right(TxScriptExeFailed(ArithmeticError"
+    ) is true
+  }
+
+  trait I256BitwiseFixture extends ContractFixture {
+    val code =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(0i >> 1 == 0i, 0)
+         |  assert!(1i << 1 == 2i, 1)
+         |  assert!(0xffi & 0xf0i == 0xf0i, 2)
+         |  assert!(0xffi | 0xf0i == 0xffi, 3)
+         |  assert!(0xffi ^ 0xf0i == 0x0fi, 4)
+         |}
+         |""".stripMargin
+  }
+
+  it should "test bitwise operators for I256 before Danube" in new I256BitwiseFixture {
+    setHardForkBefore(HardFork.Danube)
+    intercept[AssertionError](testSimpleScript(code)).getMessage.contains(
+      "is not enabled before Danube"
+    ) is true
+  }
+
+  it should "test bitwise operators for I256 since Danube" in new I256BitwiseFixture {
+    setHardForkSince(HardFork.Danube)
+    testSimpleScript(code)
   }
 
   private def getEvents(

@@ -151,27 +151,51 @@ class OperatorSpec
 
   it should "test <<" in new U256Fixture {
     val operator: Operator = ArithOperator.SHL
-    test(Seq(0xff, 4), 0xff0)
+    test(Seq(Val.U256(0xff), Val.U256(4)), Val.U256(0xff0))
+    operator.calc(Seq(Val.U256(U256.MaxValue), Val.U256(1))).leftValue is
+      s"${U256.MaxValue} << 1 overflow"
+    test(Seq(Val.I256(I256.unsafe(0xff)), Val.U256(4)), Val.I256(I256.unsafe(0xff0)))
+    operator.calc(Seq(Val.I256(I256.MaxValue), Val.U256(1))).leftValue is
+      s"${I256.MaxValue} << 1 overflow"
+    operator
+      .calc(Seq.fill(2)(Val.I256(I256.One)))
+      .leftValue is "Expect (I256/U256, U256) for << operator"
   }
 
   it should "test >>" in new U256Fixture {
     val operator: Operator = ArithOperator.SHR
-    test(Seq(0xff, 4), 0x0f)
+    test(Seq(Val.U256(0xff), Val.U256(4)), Val.U256(0x0f))
+    test(Seq(Val.I256(I256.unsafe(0xff)), Val.U256(4)), Val.I256(I256.unsafe(0x0f)))
+    operator
+      .calc(Seq.fill(2)(Val.I256(I256.One)))
+      .leftValue is "Expect (I256/U256, U256) for >> operator"
   }
 
   it should "test &" in new U256Fixture {
     val operator: Operator = ArithOperator.BitAnd
-    test(Seq(0xff, 0xf0), 0xf0)
+    test(Seq(Val.U256(0xff), Val.U256(0xf0)), Val.U256(0xf0))
+    test(Seq(Val.I256(I256.unsafe(0xff)), Val.I256(I256.unsafe(0xf0))), Val.I256(I256.unsafe(0xf0)))
+    operator
+      .calc(Seq(Val.U256(0xff), Val.I256(I256.unsafe(0xff))))
+      .leftValue is "Expect (U256, U256)/(I256, I256) for & operator"
   }
 
   it should "test |" in new U256Fixture {
     val operator: Operator = ArithOperator.BitOr
-    test(Seq(0xff, 0xf0), 0xff)
+    test(Seq(Val.U256(0xff), Val.U256(0xf0)), Val.U256(0xff))
+    test(Seq(Val.I256(I256.unsafe(0xff)), Val.I256(I256.unsafe(0xf0))), Val.I256(I256.unsafe(0xff)))
+    operator
+      .calc(Seq(Val.U256(0xff), Val.I256(I256.unsafe(0xff))))
+      .leftValue is "Expect (U256, U256)/(I256, I256) for | operator"
   }
 
   it should "test ^" in new U256Fixture {
     val operator: Operator = ArithOperator.Xor
-    test(Seq(0xff, 0xf0), 0x0f)
+    test(Seq(Val.U256(0xff), Val.U256(0xf0)), Val.U256(0x0f))
+    test(Seq(Val.I256(I256.unsafe(0xff)), Val.I256(I256.unsafe(0xf0))), Val.I256(I256.unsafe(0x0f)))
+    operator
+      .calc(Seq(Val.U256(0xff), Val.I256(I256.unsafe(0xff))))
+      .leftValue is "Expect (U256, U256)/(I256, I256) for ^ operator"
   }
 
   it should "test ==" in new Fixture {

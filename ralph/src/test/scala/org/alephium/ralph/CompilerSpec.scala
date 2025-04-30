@@ -10053,4 +10053,37 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compileContract(replace(code(withAnnotation))).isRight is true
     }
   }
+
+  it should "support bitwise operators for I256" in {
+    def code(expr: String, retTpe: String) =
+      s"""
+         |Contract Foo(@unused a: I256, @unused b: I256, @unused c: U256) {
+         |  pub fn foo() -> $retTpe {
+         |    return $expr
+         |  }
+         |}
+         |""".stripMargin
+
+    val exprs0 = Seq("a & b", "a | b", "a ^ b", "a << c", "a >> c")
+    exprs0.foreach(expr => compileContract(code(expr, "I256")).isRight is true)
+    exprs0.foreach(expr =>
+      compileContract(code(expr, "U256")).leftValue.message is
+        s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
+    )
+    val exprs1 = Seq("a & c", "a | c", "a ^ c")
+    exprs1.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, U256) for ${expr.slice(2, 3)} operator"""
+    )
+    val exprs2 = Seq("a << b", "a >> b")
+    exprs2.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, I256) for ${expr.slice(2, 4)} operator"""
+    )
+    val exprs3 = Seq("c << b", "c >> b")
+    exprs3.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(U256, I256) for ${expr.slice(2, 4)} operator"""
+    )
+  }
 }

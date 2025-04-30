@@ -139,6 +139,54 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
   }
 
   override def toString: String = v.toString
+
+  def bitAnd(that: I256): I256 = {
+    I256.unsafe(this.v.and(that.v))
+  }
+
+  def bitOr(that: I256): I256 = {
+    I256.unsafe(this.v.or(that.v))
+  }
+
+  def xor(that: I256): I256 = {
+    I256.unsafe(this.v.xor(that.v))
+  }
+
+  // compute (this * 2**n)
+  def shl(n: U256): Option[I256] = {
+    if (this.isZero) {
+      Some(I256.Zero)
+    } else if (n.byteLength() >= 3) {
+      // Overflow
+      None
+    } else {
+      val nInt = n.v.intValue()
+      if (nInt >= 0 && nInt < 256) {
+        I256.from(this.v.shiftLeft(nInt))
+      } else {
+        None
+      }
+    }
+  }
+
+  // compute (this / 2**n)
+  def shr(n: U256): I256 = {
+    // Note that `intValue` takes the lower-order 32 bits of n
+    // It's safe to use `intValue` because the result is 0 when `n` is greater than 256
+    if (this.isZero || n.byteLength() >= 3) {
+      I256.Zero
+    } else {
+      val nInt = n.v.intValue()
+      I256.unsafe {
+        if (this.isNegative) {
+          // Get around cases like `-1 >> n == -1` in JVM
+          this.v.negate().shiftRight(nInt).negate()
+        } else {
+          this.v.shiftRight(nInt)
+        }
+      }
+    }
+  }
 }
 
 object I256 {

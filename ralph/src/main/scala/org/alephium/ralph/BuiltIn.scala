@@ -1023,7 +1023,7 @@ object BuiltIn {
     val instrs = Seq[Instr[StatelessContext]](
       U256Const1,
       U256Const(Val.U256(U256.unsafe(255))),
-      U256SHL,
+      NumericSHL,
       U256Const1,
       U256Sub,
       U256ToI256
@@ -1044,7 +1044,7 @@ object BuiltIn {
     val instrs = Seq[Instr[StatelessContext]](
       U256Const1,
       U256Const(Val.U256(U256.unsafe(255))),
-      U256SHL,
+      NumericSHL,
       U256Const1,
       U256Sub,
       U256ToI256,
