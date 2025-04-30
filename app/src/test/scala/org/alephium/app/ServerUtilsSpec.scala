@@ -5684,38 +5684,105 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
   }
 
-  it should "test contract with specified dust amount" in new Fixture {
-    setHardForkSince(HardFork.Danube)
-    val contract =
-      s"""
-         |Contract Foo() {
-         |  mapping[U256, U256] map
-         |
-         |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
-         |  pub fn foo() -> () {
-         |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
-         |    map.insert!(0, 0)
-         |  }
-         |}
-         |""".stripMargin
+  it should "test auto fund" in {
+    new Fixture {
+      info("success if the dust amount is not specified")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
 
-    val assetAddress = Address.p2pkh(genesisKeys.head._2)
-    val code         = Compiler.compileContract(contract).toOption.get
-    val testContractParams0 = TestContract(
-      bytecode = code,
-      inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
-    ).toComplete().rightValue
-    val serverUtils = new ServerUtils()
-    serverUtils
-      .runTestContract(blockFlow, testContractParams0)
-      .leftValue
-      .detail
-      .contains(
-        "Insufficient funds to cover the minimum amount for contract UTXO"
-      ) is true
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils.runTestContract(blockFlow, testContractParams).isRight is true
+    }
 
-    val testContractParams1 = testContractParams0.copy(dustAmount = Amount(minimalAlphInContract))
-    serverUtils.runTestContract(blockFlow, testContractParams1).isRight is true
+    new Fixture {
+      info("fail if the dust amount is not enough")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn foo() -> () {
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneNanoAlph)))),
+        dustAmount = Some(Amount(ALPH.oneNanoAlph))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils
+        .runTestContract(blockFlow, testContractParams)
+        .leftValue
+        .detail
+        .contains(
+          "Insufficient funds to cover the minimum amount for contract UTXO"
+        ) is true
+    }
+
+    new Fixture {
+      info("fail if exceeds max retry times")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo(num: U256) -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val baseParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.alph(2)))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      (0 to 3).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        serverUtils.runTestContract(blockFlow, params).isRight is true
+      }
+      (4 to 6).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        serverUtils
+          .runTestContract(blockFlow, params)
+          .leftValue
+          .detail
+          .contains(
+            "Insufficient funds to cover the minimum amount for contract UTXO"
+          ) is true
+      }
+    }
   }
 
   @scala.annotation.tailrec

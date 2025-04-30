@@ -1919,20 +1919,25 @@ class ServerUtils(implicit
     for {
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
+      args = params.args.getOrElse(AVector.empty)
+      _           <- checkArgs(args, method)
       inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
       txEnv = mockupTxEnv(txId, inputAssets)
-      result <- executeContractMethod(
+      result <- fromExeResult(
         worldState,
-        groupIndex,
-        contractId,
-        params.callerAddress.map(_.contractId),
-        txEnv,
-        blockHash,
-        TimeStamp.now(),
-        inputAssets,
-        params.methodIndex,
-        params.args.getOrElse(AVector.empty),
-        method
+        executeContractMethod(
+          worldState,
+          groupIndex,
+          contractId,
+          params.callerAddress.map(_.contractId),
+          txEnv,
+          blockHash,
+          TimeStamp.now(),
+          inputAssets,
+          params.methodIndex,
+          args,
+          method
+        )
       )
     } yield result
   }
@@ -2001,19 +2006,34 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
   ): Try[TestContractResult] = {
+    val maxRetryTimes = if (testContract.dustAmount.value.isZero) 3 else 0
+    for {
+      groupIndex <- testContract.groupIndex
+      method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      _          <- checkArgs(testContract.testArgs, method)
+      result     <- tryRunTestContract(blockFlow, testContract, groupIndex, method, maxRetryTimes)
+    } yield result
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def tryRunTestContract(
+      blockFlow: BlockFlow,
+      testContract: TestContract.Complete,
+      groupIndex: GroupIndex,
+      method: Method[StatefulContext],
+      retryTimes: Int
+  ): Try[TestContractResult] = {
     val contractId = testContract.contractId
     val txId       = testContract.txId
     val blockHash  = testContract.blockHash
     for {
-      groupIndex <- testContract.groupIndex
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
       _ <- testContract.existingContracts.foreachE(createContract(worldState, _, blockHash, txId))
       _ <- createContract(worldState, contractId, testContract)
-      method      <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       inputAssets <- inputAssetsWithGasFee(testContract.inputAssets)
       allInputs = inputAssetsWithDustAmount(inputAssets, testContract.dustAmount.value)
       txEnv     = mockupTxEnv(txId, allInputs)
-      executionResultPair <- executeContractMethod(
+      result <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
@@ -2025,15 +2045,42 @@ class ServerUtils(implicit
         testContract.testMethodIndex,
         testContract.testArgs,
         method
-      )
-      events = fetchContractEvents(worldState)
+      ) match {
+        case Right(result) =>
+          fromRunTestContractResult(txEnv, worldState, testContract, result._1, result._2)
+        case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
+        case Left(Right(error: InsufficientFundsForUTXODustAmount)) =>
+          if (retryTimes > 0) {
+            val newDustAmount = Amount(testContract.dustAmount.value.addUnsafe(error.required))
+            tryRunTestContract(
+              blockFlow,
+              testContract.copy(dustAmount = newDustAmount),
+              groupIndex,
+              method,
+              retryTimes - 1
+            )
+          } else {
+            fromExeFailure(worldState, error)
+          }
+        case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+      }
+    } yield result
+  }
+
+  private def fromRunTestContractResult(
+      txEnv: TxEnv,
+      worldState: WorldState.Staging,
+      testContract: TestContract.Complete,
+      executionOutputs: AVector[vm.Val],
+      executionResult: StatefulVM.TxScriptExecution
+  ): Try[TestContractResult] = {
+    val events = fetchContractEvents(worldState)
+    for {
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
       eventsSplit <- extractDebugMessages(events)
     } yield {
-      val executionOutputs = executionResultPair._1
-      val executionResult  = executionResultPair._2
-      val gasUsed          = txEnv.gasAmount.subUnsafe(executionResult.gasBox)
+      val gasUsed = txEnv.gasAmount.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -2159,7 +2206,7 @@ class ServerUtils(implicit
     wrapResult(result)
   }
 
-  // scalastyle:off method.length parameter.number
+  // scalastyle:off parameter.number
   private def executeContractMethod(
       worldState: WorldState.Staging,
       groupIndex: GroupIndex,
@@ -2172,25 +2219,39 @@ class ServerUtils(implicit
       methodIndex: Int,
       args: AVector[Val],
       method: Method[StatefulContext]
-  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val blockEnv   = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
-    val testGasFee = txEnv.gasFeeUnsafe
-    val context    = StatefulContext(blockEnv, txEnv, worldState, txEnv.gasAmount)
-    for {
-      _ <- checkArgs(args, method)
-      result <- runWithDebugError(
-        context,
-        contractId,
-        callerContractIdOpt,
-        inputAssets,
-        methodIndex,
-        args,
-        method,
-        testGasFee
-      )
-    } yield result
+  ): ExeResult[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val blockEnv = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
+    val context  = StatefulContext(blockEnv, txEnv, worldState, txEnv.gasAmount)
+    runWithDebugError(
+      context,
+      contractId,
+      callerContractIdOpt,
+      inputAssets,
+      methodIndex,
+      args,
+      method,
+      txEnv.gasFeeUnsafe
+    )
   }
-  // scalastyle:on method.length parameter.number
+  // scalastyle:on parameter.number
+
+  private def fromExeResult[T](worldState: WorldState.Staging, exeResult: ExeResult[T]): Try[T] = {
+    exeResult match {
+      case Right(result)           => Right(result)
+      case Left(Left(ioFailure))   => Left(failedInIO(ioFailure.error))
+      case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def fromExeFailure[T](worldState: WorldState.Staging, exeFailure: ExeFailure): Try[T] = {
+    val errorString = s"VM execution error: ${exeFailure.toString()}"
+    val events      = fetchContractEvents(worldState)
+    extractDebugMessages(events).flatMap { case (_, debugMessages) =>
+      val detail = showDebugMessages(debugMessages) ++ errorString
+      Left(failed(detail))
+    }
+  }
 
   private def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
     if (args.sumBy(_.flattenSize()) != method.argsLength) {
@@ -2205,7 +2266,6 @@ class ServerUtils(implicit
   }
 
   // scalastyle:off method.length
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def runWithDebugError(
       context: StatefulContext,
       contractId: ContractId,
@@ -2215,8 +2275,8 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext],
       testGasFee: U256
-  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val executionResult = callerContractIdOpt match {
+  ): ExeResult[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    callerContractIdOpt match {
       case None =>
         val script = StatefulScript.unsafe(
           AVector(
@@ -2268,17 +2328,6 @@ class ServerUtils(implicit
           mockCallerContract,
           callerContractId
         )
-    }
-    executionResult match {
-      case Right(result)         => Right(result)
-      case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
-      case Left(Right(exeFailure)) =>
-        val errorString = s"VM execution error: ${exeFailure.toString()}"
-        val events      = fetchContractEvents(context.worldState)
-        extractDebugMessages(events).flatMap { case (_, debugMessages) =>
-          val detail = showDebugMessages(debugMessages) ++ errorString
-          Left(failed(detail))
-        }
     }
   }
   // scalastyle:on method.length

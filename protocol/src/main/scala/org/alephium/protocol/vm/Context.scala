@@ -812,7 +812,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     if (remainingAfterApproved == U256.Zero) {
       okay
     } else {
-      failed(InsufficientFundsForUTXODustAmount)
+      failed(InsufficientFundsForUTXODustAmount(remainingAfterApproved))
     }
   }
 
