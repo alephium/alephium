@@ -23,9 +23,9 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.Platform
-import org.alephium.flow.validation.{BlockValidation, BlockValidationResult}
+import org.alephium.flow.validation.{BlockValidation, BlockValidationResult, GhostUncleDoesNotExist}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.model.{Block, GroupIndex}
+import org.alephium.protocol.model.{Block, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{Files => AFiles}
 
@@ -52,11 +52,33 @@ class ReplayBlockFlow(
     }
   }
 
-  private def handleBlock(block: Block, height: Int): BlockValidationResult[Unit] = {
+  private def validateAndAddBlock(hash: BlockHash): BlockValidationResult[Unit] = {
     for {
+      block <- from(sourceBlockFlow.getBlock(hash))
+      _     <- validateAndAddBlock(block)
+    } yield ()
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def validateAndAddBlock(block: Block): BlockValidationResult[Unit] = {
+    (for {
       sideEffect <- validator.validate(block, targetBlockFlow)
       _          <- from(targetBlockFlow.add(block, sideEffect))
-      _          <- from(IOUtils.tryExecute(loadMoreBlocksUnsafe(block.chainIndex, height)))
+    } yield ()) match {
+      case Left(Right(GhostUncleDoesNotExist(uncleHash))) =>
+        for {
+          _ <- validateAndAddBlock(uncleHash)
+          _ <- validateAndAddBlock(block)
+        } yield ()
+      case result => result
+    }
+  }
+
+  private def handleBlock(block: Block, height: Int): BlockValidationResult[Unit] = {
+    for {
+      exist <- from(targetBlockFlow.contains(block.hash))
+      _     <- if (!exist) validateAndAddBlock(block) else Right(())
+      _     <- from(IOUtils.tryExecute(loadMoreBlocksUnsafe(block.chainIndex, height)))
     } yield ()
   }
 
@@ -83,11 +105,9 @@ class ReplayBlockFlow(
   ): BlockValidationResult[Unit] = {
     val chainIndex = block.chainIndex
     for {
-      sideEffect <- validator.validate(block, targetBlockFlow)
-      _          <- from(targetBlockFlow.add(block, sideEffect))
-      _          <- from(targetBlockFlow.updateBestFlowSkeleton())
-      _          <- from(targetBlockFlow.prepareBlockFlow(chainIndex, miners(chainIndex.to.value)))
-      _          <- from(IOUtils.tryExecute(loadMoreBlocksUnsafe(chainIndex, height)))
+      _ <- handleBlock(block, height)
+      _ <- from(targetBlockFlow.updateBestFlowSkeleton())
+      _ <- from(targetBlockFlow.prepareBlockFlow(chainIndex, miners(chainIndex.to.value)))
     } yield ()
   }
 
