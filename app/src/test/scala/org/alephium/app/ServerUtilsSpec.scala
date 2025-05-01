@@ -5774,13 +5774,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       }
       (4 to 6).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
         val params = baseParams.copy(testArgs = args)
+        val errorString =
+          "Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to 0.3 ALPH, " +
+            "but at least 0.1 ALPH is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
         serverUtils
           .runTestContract(blockFlow, params)
           .leftValue
           .detail
-          .contains(
-            "Insufficient funds to cover the minimum amount for contract UTXO"
-          ) is true
+          .contains(errorString) is true
       }
     }
   }

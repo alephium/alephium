@@ -2006,12 +2006,20 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
   ): Try[TestContractResult] = {
-    val maxRetryTimes = if (testContract.dustAmount.value.isZero) 3 else 0
+    val dustAmountProvided = testContract.dustAmount.value.nonZero
+    val maxRetryTimes      = if (!dustAmountProvided) 3 else 0
     for {
       groupIndex <- testContract.groupIndex
       method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       _          <- checkArgs(testContract.testArgs, method)
-      result     <- tryRunTestContract(blockFlow, testContract, groupIndex, method, maxRetryTimes)
+      result <- tryRunTestContract(
+        blockFlow,
+        testContract,
+        groupIndex,
+        method,
+        maxRetryTimes,
+        dustAmountProvided
+      )
     } yield result
   }
 
@@ -2021,7 +2029,8 @@ class ServerUtils(implicit
       testContract: TestContract.Complete,
       groupIndex: GroupIndex,
       method: Method[StatefulContext],
-      retryTimes: Int
+      retryTimes: Int,
+      dustAmountProvided: Boolean
   ): Try[TestContractResult] = {
     val contractId = testContract.contractId
     val txId       = testContract.txId
@@ -2057,10 +2066,20 @@ class ServerUtils(implicit
               testContract.copy(dustAmount = newDustAmount),
               groupIndex,
               method,
-              retryTimes - 1
+              retryTimes - 1,
+              dustAmountProvided
             )
           } else {
-            fromExeFailure(worldState, error)
+            if (!dustAmountProvided) {
+              val dustAmount = ALPH.prettifyAmount(testContract.dustAmount.value)
+              val required   = ALPH.prettifyAmount(error.required)
+              val errorString =
+                s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
+                  s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+              fromErrorString(worldState, errorString)
+            } else {
+              fromExeFailure(worldState, error)
+            }
           }
         case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
       }
@@ -2245,8 +2264,11 @@ class ServerUtils(implicit
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def fromExeFailure[T](worldState: WorldState.Staging, exeFailure: ExeFailure): Try[T] = {
-    val errorString = s"VM execution error: ${exeFailure.toString()}"
-    val events      = fetchContractEvents(worldState)
+    fromErrorString(worldState, s"VM execution error: ${exeFailure.toString()}")
+  }
+
+  private def fromErrorString[T](worldState: WorldState.Staging, errorString: String): Try[T] = {
+    val events = fetchContractEvents(worldState)
     extractDebugMessages(events).flatMap { case (_, debugMessages) =>
       val detail = showDebugMessages(debugMessages) ++ errorString
       Left(failed(detail))
