@@ -1822,9 +1822,9 @@ class ServerUtils(implicit
   }
 
   def callTxScript(blockFlow: BlockFlow, params: CallTxScript): Try[CallTxScriptResult] = {
-    val txId        = params.txId.getOrElse(TransactionId.random)
-    val inputAssets = params.inputAssets.getOrElse(AVector.empty)
+    val txId = params.txId.getOrElse(TransactionId.random)
     for {
+      inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
       script <- deserialize[StatefulScript](params.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
@@ -1919,18 +1919,25 @@ class ServerUtils(implicit
     for {
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
-      result <- executeContractMethod(
+      args = params.args.getOrElse(AVector.empty)
+      _           <- checkArgs(args, method)
+      inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
+      txEnv = mockupTxEnv(txId, inputAssets)
+      result <- fromExeResult(
         worldState,
-        groupIndex,
-        contractId,
-        params.callerAddress.map(_.contractId),
-        txId,
-        blockHash,
-        TimeStamp.now(),
-        params.inputAssets.getOrElse(AVector.empty),
-        params.methodIndex,
-        params.args.getOrElse(AVector.empty),
-        method
+        executeContractMethod(
+          worldState,
+          groupIndex,
+          contractId,
+          params.callerAddress.map(_.contractId),
+          txEnv,
+          blockHash,
+          TimeStamp.now(),
+          inputAssets,
+          params.methodIndex,
+          args,
+          method
+        )
       )
     } yield result
   }
@@ -1963,40 +1970,136 @@ class ServerUtils(implicit
     }
   }
 
+  private def inputAssetsWithGasFee(
+      inputAssets: AVector[TestInputAsset]
+  ): Try[AVector[TestInputAsset]] = {
+    if (inputAssets.isEmpty) {
+      Right(inputAssets)
+    } else {
+      val asset  = inputAssets.head.asset
+      val gasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
+      asset.attoAlphAmount
+        .add(gasFee)
+        .toRight(badRequest("ALPH amount overflow"))
+        .map { amount =>
+          val newAsset = asset.copy(attoAlphAmount = amount)
+          val newInput = inputAssets.head.copy(asset = newAsset)
+          inputAssets.replace(0, newInput)
+        }
+    }
+  }
+
+  private def inputAssetsWithDustAmount(
+      inputAssets: AVector[TestInputAsset],
+      dustAmount: U256
+  ): AVector[TestInputAsset] = {
+    if (inputAssets.isEmpty || dustAmount.isZero) {
+      inputAssets
+    } else {
+      val address   = inputAssets.head.address
+      val dustInput = TestInputAsset(address, AssetState(dustAmount, None))
+      inputAssets :+ dustInput
+    }
+  }
+
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
   ): Try[TestContractResult] = {
-    val contractId = testContract.contractId
+    val dustAmountProvided = testContract.dustAmount.value.nonZero
+    val maxRetryTimes      = if (!dustAmountProvided) 3 else 0
     for {
       groupIndex <- testContract.groupIndex
-      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _ <- testContract.existingContracts.foreachE(
-        createContract(worldState, _, testContract.blockHash, testContract.txId)
+      method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      _          <- checkArgs(testContract.testArgs, method)
+      result <- tryRunTestContract(
+        blockFlow,
+        testContract,
+        groupIndex,
+        method,
+        maxRetryTimes,
+        dustAmountProvided
       )
-      _      <- createContract(worldState, contractId, testContract)
-      method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
-      executionResultPair <- executeContractMethod(
+    } yield result
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def tryRunTestContract(
+      blockFlow: BlockFlow,
+      testContract: TestContract.Complete,
+      groupIndex: GroupIndex,
+      method: Method[StatefulContext],
+      retryTimes: Int,
+      dustAmountProvided: Boolean
+  ): Try[TestContractResult] = {
+    val contractId = testContract.contractId
+    val txId       = testContract.txId
+    val blockHash  = testContract.blockHash
+    for {
+      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
+      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, blockHash, txId))
+      _ <- createContract(worldState, contractId, testContract)
+      inputAssets <- inputAssetsWithGasFee(testContract.inputAssets)
+      allInputs = inputAssetsWithDustAmount(inputAssets, testContract.dustAmount.value)
+      txEnv     = mockupTxEnv(txId, allInputs)
+      result <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
         testContract.callerContractIdOpt,
-        testContract.txId,
-        testContract.blockHash,
+        txEnv,
+        blockHash,
         testContract.blockTimeStamp,
-        testContract.inputAssets,
+        inputAssets,
         testContract.testMethodIndex,
         testContract.testArgs,
         method
-      )
-      events = fetchContractEvents(worldState)
+      ) match {
+        case Right(result) =>
+          fromRunTestContractResult(txEnv, worldState, testContract, result._1, result._2)
+        case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
+        case Left(Right(error: InsufficientFundsForUTXODustAmount)) =>
+          if (retryTimes > 0) {
+            val newDustAmount = Amount(testContract.dustAmount.value.addUnsafe(error.required))
+            tryRunTestContract(
+              blockFlow,
+              testContract.copy(dustAmount = newDustAmount),
+              groupIndex,
+              method,
+              retryTimes - 1,
+              dustAmountProvided
+            )
+          } else {
+            if (!dustAmountProvided) {
+              val dustAmount = ALPH.prettifyAmount(testContract.dustAmount.value)
+              val required   = ALPH.prettifyAmount(error.required)
+              val errorString =
+                s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
+                  s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+              fromErrorString(worldState, errorString)
+            } else {
+              fromExeFailure(worldState, error)
+            }
+          }
+        case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+      }
+    } yield result
+  }
+
+  private def fromRunTestContractResult(
+      txEnv: TxEnv,
+      worldState: WorldState.Staging,
+      testContract: TestContract.Complete,
+      executionOutputs: AVector[vm.Val],
+      executionResult: StatefulVM.TxScriptExecution
+  ): Try[TestContractResult] = {
+    val events = fetchContractEvents(worldState)
+    for {
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
       eventsSplit <- extractDebugMessages(events)
     } yield {
-      val executionOutputs = executionResultPair._1
-      val executionResult  = executionResultPair._2
-      val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
+      val gasUsed = txEnv.gasAmount.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -2122,40 +2225,55 @@ class ServerUtils(implicit
     wrapResult(result)
   }
 
-  // scalastyle:off method.length parameter.number
+  // scalastyle:off parameter.number
   private def executeContractMethod(
       worldState: WorldState.Staging,
       groupIndex: GroupIndex,
       contractId: ContractId,
       callerContractIdOpt: Option[ContractId],
-      txId: TransactionId,
+      txEnv: TxEnv,
       blockHash: BlockHash,
       blockTimeStamp: TimeStamp,
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
       args: AVector[Val],
       method: Method[StatefulContext]
-  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val blockEnv   = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
-    val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
-    val txEnv      = mockupTxEnv(txId, inputAssets)
-    val context    = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-    for {
-      _ <- checkArgs(args, method)
-      _ <- checkGasFee(testGasFee, inputAssets)
-      result <- runWithDebugError(
-        context,
-        contractId,
-        callerContractIdOpt,
-        inputAssets,
-        methodIndex,
-        args,
-        method,
-        testGasFee
-      )
-    } yield result
+  ): ExeResult[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val blockEnv = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
+    val context  = StatefulContext(blockEnv, txEnv, worldState, txEnv.gasAmount)
+    runWithDebugError(
+      context,
+      contractId,
+      callerContractIdOpt,
+      inputAssets,
+      methodIndex,
+      args,
+      method,
+      txEnv.gasFeeUnsafe
+    )
   }
-  // scalastyle:on method.length parameter.number
+  // scalastyle:on parameter.number
+
+  private def fromExeResult[T](worldState: WorldState.Staging, exeResult: ExeResult[T]): Try[T] = {
+    exeResult match {
+      case Right(result)           => Right(result)
+      case Left(Left(ioFailure))   => Left(failedInIO(ioFailure.error))
+      case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def fromExeFailure[T](worldState: WorldState.Staging, exeFailure: ExeFailure): Try[T] = {
+    fromErrorString(worldState, s"VM execution error: ${exeFailure.toString()}")
+  }
+
+  private def fromErrorString[T](worldState: WorldState.Staging, errorString: String): Try[T] = {
+    val events = fetchContractEvents(worldState)
+    extractDebugMessages(events).flatMap { case (_, debugMessages) =>
+      val detail = showDebugMessages(debugMessages) ++ errorString
+      Left(failed(detail))
+    }
+  }
 
   private def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
     if (args.sumBy(_.flattenSize()) != method.argsLength) {
@@ -2169,21 +2287,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def checkGasFee(testGasFee: U256, inputAssets: AVector[TestInputAsset]): Try[Unit] = {
-    inputAssets.headOption match {
-      case Some(inputAsset) if inputAsset.asset.attoAlphAmount < testGasFee =>
-        Left(
-          failed(
-            s"First input asset should have at least ${ALPH.prettifyAmount(testGasFee)} to cover gas"
-          )
-        )
-      case _ =>
-        Right(())
-    }
-  }
-
   // scalastyle:off method.length
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def runWithDebugError(
       context: StatefulContext,
       contractId: ContractId,
@@ -2193,8 +2297,8 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext],
       testGasFee: U256
-  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val executionResult = callerContractIdOpt match {
+  ): ExeResult[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    callerContractIdOpt match {
       case None =>
         val script = StatefulScript.unsafe(
           AVector(
@@ -2246,17 +2350,6 @@ class ServerUtils(implicit
           mockCallerContract,
           callerContractId
         )
-    }
-    executionResult match {
-      case Right(result)         => Right(result)
-      case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
-      case Left(Right(exeFailure)) =>
-        val errorString = s"VM execution error: ${exeFailure.toString()}"
-        val events      = fetchContractEvents(context.worldState)
-        extractDebugMessages(events).flatMap { case (_, debugMessages) =>
-          val detail = showDebugMessages(debugMessages) ++ errorString
-          Left(failed(detail))
-        }
     }
   }
   // scalastyle:on method.length

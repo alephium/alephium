@@ -1899,7 +1899,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       result0.contracts.head.asset.attoAlphAmount is minimalAlphInContract * 2
       result0.txOutputs
         .find(_.address == callerAddress)
-        .exists(_.attoAlphAmount.value == ALPH.cent(40)) is true
+        .exists(_.attoAlphAmount.value == ALPH.cent(90)) is true
       result0.txOutputs
         .find(_.address == fooAddress)
         .exists(_.attoAlphAmount.value == ALPH.cent(20)) is true
@@ -1913,7 +1913,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       result1.contracts.head.asset.attoAlphAmount is minimalAlphInContract * 3
       result1.txOutputs
         .find(_.address == callerAddress)
-        .exists(_.attoAlphAmount.value == ALPH.cent(40)) is true
+        .exists(_.attoAlphAmount.value == ALPH.cent(90)) is true
       result1.txOutputs
         .find(_.address == fooAddress)
         .exists(_.attoAlphAmount.value == ALPH.cent(30)) is true
@@ -2065,9 +2065,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    assetOutput.attoAlphAmount is Amount(
-      ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)
-    )
+    assetOutput.attoAlphAmount is Amount(ALPH.alph(2))
   }
 
   it should "test destroying self" in new Fixture {
@@ -2250,8 +2248,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    val totalGas = nonCoinbaseMinGasPrice * maximalGasPerTx
-    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph.subUnsafe(totalGas))
+    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph)
     val contractOutput = result.txOutputs(0)
     contractOutput.address is Address.contract(fooCallerContractId)
     contractOutput.attoAlphAmount.value is ALPH.alph(2)
@@ -2489,7 +2486,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(500000000000000000L),
+      Amount(1000000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2542,7 +2539,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(500000000000000000L),
+      Amount(1000000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2596,7 +2593,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(2) is AssetOutput(
       result0.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(90500000000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(91000000000L) - dustUtxoAmount),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2645,7 +2642,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(110500000000L)),
+      Amount(ALPH.nanoAlph(111000000000L)),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2690,7 +2687,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(105500000000L)),
+      Amount(ALPH.nanoAlph(106000000000L)),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2748,7 +2745,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(2) is AssetOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(95500000000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(96000000000L) - dustUtxoAmount),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -3213,35 +3210,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       .runTestContract(blockFlow, testContract)
       .leftValue
       .detail is "The number of parameters is different from the number specified by the target method"
-  }
-
-  it should "report error when gas fee is not enough from the asset input" in new Fixture {
-    val contract =
-      s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    assert!(1 == 1, 0)
-         |  }
-         |}
-         |""".stripMargin
-    val code = Compiler.compileContract(contract).toOption.get
-
-    val serverUtils = new ServerUtils()
-    val caller      = Address.p2pkh(PublicKey.generate)
-
-    val testContract0 = TestContract(bytecode = code).toComplete().rightValue
-    serverUtils.runTestContract(blockFlow, testContract0).rightValue
-
-    val inputAssets1  = AVector(TestInputAsset(caller, AssetState(ALPH.oneAlph / 2)))
-    val testContract1 = testContract0.copy(inputAssets = inputAssets1)
-    serverUtils.runTestContract(blockFlow, testContract1).rightValue
-
-    val inputAssets2  = AVector(TestInputAsset(caller, AssetState(ALPH.oneAlph / 2 - 1)))
-    val testContract2 = testContract0.copy(inputAssets = inputAssets2)
-    serverUtils
-      .runTestContract(blockFlow, testContract2)
-      .leftValue
-      .detail is "First input asset should have at least 0.5 ALPH to cover gas"
   }
 
   it should "test utxo splits for generated outputs" in new Fixture {
@@ -5714,6 +5682,108 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"Contract code hash: ${codeHash.toHexString} not found"
     createContract(code, AVector.empty, AVector.empty)._2
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
+  }
+
+  it should "test auto fund" in {
+    new Fixture {
+      info("success if the dust amount is not specified")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils.runTestContract(blockFlow, testContractParams).isRight is true
+    }
+
+    new Fixture {
+      info("fail if the dust amount is not enough")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn foo() -> () {
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneNanoAlph)))),
+        dustAmount = Some(Amount(ALPH.oneNanoAlph))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils
+        .runTestContract(blockFlow, testContractParams)
+        .leftValue
+        .detail
+        .contains(
+          "Insufficient funds to cover the minimum amount for contract UTXO"
+        ) is true
+    }
+
+    new Fixture {
+      info("fail if exceeds max retry times")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo(num: U256) -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val baseParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.alph(2)))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      (0 to 3).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        serverUtils.runTestContract(blockFlow, params).isRight is true
+      }
+      (4 to 6).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        val errorString =
+          "Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to 0.3 ALPH, " +
+            "but at least 0.1 ALPH is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+        serverUtils
+          .runTestContract(blockFlow, params)
+          .leftValue
+          .detail
+          .contains(errorString) is true
+      }
+    }
   }
 
   @scala.annotation.tailrec
