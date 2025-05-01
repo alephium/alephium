@@ -37,7 +37,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.app.ws.{ClientWs, WsClient}
+import org.alephium.ws.{ClientWs, WsClient}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer

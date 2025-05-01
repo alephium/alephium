@@ -27,11 +27,12 @@ import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket, WebSocketFrame}
 
-import org.alephium.app.HttpServerLike
-import org.alephium.app.ws.WsParams.WsId
 import org.alephium.flow.client.Node
+import org.alephium.http.HttpServerLike
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.util.{ActorRefT, Duration, EventBus}
+import org.alephium.ws._
+import org.alephium.ws.WsParams.WsId
 
 final case class WsServer(
     httpServer: HttpServer,
@@ -79,18 +80,8 @@ object WsServer extends StrictLogging {
   // scalastyle:on parameter.number
 }
 
-trait ServerWsLike {
-  def textHandlerID(): WsId
-  def isClosed: Boolean
-  def closeHandler(handler: () => Unit): ServerWsLike
-  def textMessageHandler(handler: String => Unit): ServerWsLike
-  def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike
-  def writeTextMessage(msg: String): Future[Unit]
-  def writePing(data: Buffer): Future[Unit]
-}
-
 final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
-  import org.alephium.app.ws.WsUtils._
+  import org.alephium.ws.WsUtils._
   def textHandlerID(): WsId = underlying.textHandlerID()
   def isClosed: Boolean     = underlying.isClosed
   def closeHandler(handler: () => Unit): ServerWs = {

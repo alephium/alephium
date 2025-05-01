@@ -14,26 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app.ws
+package org.alephium.ws
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import org.alephium.app.ws.WsParams.{
+import org.alephium.protocol.model.Address
+import org.alephium.util.AVector
+import org.alephium.ws.WsParams.{
   ContractEventsSubscribeParams,
   WsEventIndex,
   WsId,
   WsSubscriptionId,
   WsSubscriptionParams
 }
-import org.alephium.app.ws.WsSubscriptionsState.{
+import org.alephium.ws.WsSubscriptionsState.{
   AddressKey,
   AddressWithEventIndexKey,
   ContractEventKey,
   SubscriptionOfConnection
 }
-import org.alephium.protocol.model.Address
-import org.alephium.util.AVector
 
 /** WsSubscriptionHandler actor state (mutable for performance reasons) with many-to-many
   * relationship between subscription of a connection and contract event keys
@@ -82,7 +82,7 @@ final case class WsSubscriptionsState[C: ClassTag](
     (filteredSubscriptions ++ unfilteredSubscriptions).map(_.subscriptionId).distinct
   }
 
-  protected[ws] def addSubscriptionForContractEventKeys(
+  def addSubscriptionForContractEventKeys(
       contractEventKeys: AVector[ContractEventKey],
       subscriptionOfConnection: SubscriptionOfConnection
   ): Unit =
@@ -121,7 +121,7 @@ final case class WsSubscriptionsState[C: ClassTag](
     }
   }
 
-  protected[ws] def removeSubscriptionByContractEventKey(
+  def removeSubscriptionByContractEventKey(
       contractEventKey: ContractEventKey,
       subscriptionOfConnection: SubscriptionOfConnection
   ): Option[AVector[SubscriptionOfConnection]] =
@@ -169,7 +169,7 @@ object WsSubscriptionsState {
   final case class AddressWithEventIndexKey(address: String, eventIndex: WsEventIndex)
       extends ContractEventKey
 
-  final protected[ws] case class SubscriptionOfConnection(
+  final case class SubscriptionOfConnection(
       wsId: WsId,
       subscriptionId: WsSubscriptionId
   )

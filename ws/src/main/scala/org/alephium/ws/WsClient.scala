@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app.ws
+package org.alephium.ws
 
 import java.util.concurrent.ConcurrentSkipListMap
 
@@ -27,21 +27,21 @@ import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{WebSocket, WebSocketClient, WebSocketClientOptions}
 
-import org.alephium.app.ws.ClientWs.WsException
-import org.alephium.app.ws.WsClient.KeepAlive
-import org.alephium.app.ws.WsParams.{
+import org.alephium.json.Json._
+import org.alephium.protocol.model.Address
+import org.alephium.rpc.model.JsonRPC
+import org.alephium.rpc.model.JsonRPC.{Notification, Response}
+import org.alephium.util.AVector
+import org.alephium.ws.ClientWs.WsException
+import org.alephium.ws.WsClient.KeepAlive
+import org.alephium.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
   WsCorrelationId,
   WsEventIndex,
   WsSubscriptionId
 }
-import org.alephium.app.ws.WsUtils._
-import org.alephium.json.Json._
-import org.alephium.protocol.model.Address
-import org.alephium.rpc.model.JsonRPC
-import org.alephium.rpc.model.JsonRPC.{Notification, Response}
-import org.alephium.util.AVector
+import org.alephium.ws.WsUtils._
 
 object ClientWs {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -115,7 +115,7 @@ final case class ClientWs(
   private val ongoingRequests =
     new ConcurrentSkipListMap[WsCorrelationId, Promise[Response]]().asScala
 
-  protected[ws] def writeRequestToSocket(request: WsRequest): Future[Response] = {
+  def writeRequestToSocket(request: WsRequest): Future[Response] = {
     if (ongoingRequests.contains(request.id)) {
       Future.failed(WsException(s"Request with id ${request.id} is being already handled."))
     } else {

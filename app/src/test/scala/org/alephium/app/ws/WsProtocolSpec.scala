@@ -22,13 +22,14 @@ import org.alephium.api.model.{
   ContractEventByBlockHash,
   TransactionTemplate
 }
-import org.alephium.app.ws.WsParams._
-import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams.{AddressesField, EventIndexField}
 import org.alephium.json.Json._
 import org.alephium.protocol.vm.{LogStateRef, LogStatesId}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.RequestUnsafe
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.ws._
+import org.alephium.ws.WsParams._
+import org.alephium.ws.WsParams.ContractEventsSubscribeParams.{AddressesField, EventIndexField}
 
 class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
 

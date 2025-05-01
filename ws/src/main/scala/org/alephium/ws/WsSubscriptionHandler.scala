@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app.ws
+package org.alephium.ws
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -28,15 +28,15 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.ServerWebSocketHandshake
 
-import org.alephium.app.ws.WsParams._
-import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
-import org.alephium.app.ws.WsUtils._
 import org.alephium.json.Json.write
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util.{discard, ActorRefT, AVector, BaseActor}
+import org.alephium.ws.WsParams._
+import org.alephium.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
+import org.alephium.ws.WsUtils._
 
-protected[ws] object WsSubscriptionHandler {
+object WsSubscriptionHandler {
 
   def apply(
       vertx: Vertx,
@@ -64,7 +64,7 @@ protected[ws] object WsSubscriptionHandler {
   sealed trait SubscriptionMsg
   sealed trait Event extends SubscriptionMsg
 
-  final protected[ws] case class NotificationPublished(params: WsNotificationParams) extends Event
+  final case class NotificationPublished(params: WsNotificationParams) extends Event
   final private case class NotificationFailed(
       id: WsCorrelationId,
       ws: ServerWsLike,
@@ -88,7 +88,7 @@ protected[ws] object WsSubscriptionHandler {
       contractKeysBySubscription: Map[SubscriptionOfConnection, AVector[ContractEventKey]]
   ) extends CommandResponse
 
-  final protected[ws] case class Subscribe(
+  final case class Subscribe(
       id: WsCorrelationId,
       ws: ServerWsLike,
       params: WsSubscriptionParams
@@ -100,7 +100,7 @@ protected[ws] object WsSubscriptionHandler {
       consumer: MessageConsumer[String]
   ) extends CommandResponse
 
-  final protected[ws] case class Unsubscribe(
+  final case class Unsubscribe(
       id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
@@ -116,19 +116,19 @@ protected[ws] object WsSubscriptionHandler {
       response: JsonRPC.Response.Failure
   ) extends CommandResponse
 
-  final protected[ws] case class Disconnect(id: WsId) extends Command
+  final case class Disconnect(id: WsId) extends Command
 
   private case object KeepAlive
 }
 
-protected[ws] class WsSubscriptionHandler(
+class WsSubscriptionHandler(
     vertx: Vertx,
     maxConnections: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: FiniteDuration
 ) extends BaseActor {
-  import org.alephium.app.ws.WsSubscriptionHandler._
+  import org.alephium.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
   private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]

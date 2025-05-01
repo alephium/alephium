@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app.ws
+package org.alephium.ws
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}

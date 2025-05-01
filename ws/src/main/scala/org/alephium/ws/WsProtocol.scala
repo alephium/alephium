@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app.ws
+package org.alephium.ws
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate}
-import org.alephium.app.ws.WsParams.{WsCorrelationId, WsSubscriptionParams}
 import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.Address
@@ -29,20 +28,21 @@ import org.alephium.protocol.vm.LockupScript
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util.{AVector, EitherF, Hex}
+import org.alephium.ws.WsParams.{WsCorrelationId, WsSubscriptionParams}
 
-protected[ws] object WsMethod {
+object WsMethod {
   private type WsMethodType = String
   val SubscribeMethod: WsMethodType    = "subscribe"
   val UnsubscribeMethod: WsMethodType  = "unsubscribe"
   val SubscriptionMethod: WsMethodType = "subscription"
 }
 
-protected[ws] object WsParams {
-  protected[ws] type WsEventType      = String
-  protected[ws] type WsEventIndex     = Int
-  protected[ws] type WsId             = String
-  protected[ws] type WsCorrelationId  = Long
-  protected[ws] type WsSubscriptionId = Hash
+object WsParams {
+  type WsEventType      = String
+  type WsEventIndex     = Int
+  type WsId             = String
+  type WsCorrelationId  = Long
+  type WsSubscriptionId = Hash
 
   sealed trait WsParams
   sealed trait WsSubscriptionParams extends WsParams {
@@ -52,13 +52,13 @@ protected[ws] object WsParams {
     lazy val subscriptionId: WsSubscriptionId = Hash.hash(eventType)
   }
   object SimpleSubscribeParams {
-    protected[ws] val BlockEvent: WsEventType = "block"
-    protected[ws] val TxEvent: WsEventType    = "tx"
+    val BlockEvent: WsEventType = "block"
+    val TxEvent: WsEventType    = "tx"
 
-    protected[ws] val Block: SimpleSubscribeParams = SimpleSubscribeParams(BlockEvent)
-    protected[ws] val Tx: SimpleSubscribeParams    = SimpleSubscribeParams(TxEvent)
+    val Block: SimpleSubscribeParams = SimpleSubscribeParams(BlockEvent)
+    val Tx: SimpleSubscribeParams    = SimpleSubscribeParams(TxEvent)
 
-    protected[ws] def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
+    def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
       json match {
         case ujson.Str(eventType) =>
           eventType match {
@@ -85,18 +85,18 @@ protected[ws] object WsParams {
         )
   }
   object ContractEventsSubscribeParams {
-    protected[ws] val ContractEvent: WsEventType = "contract"
-    protected[ws] val AddressesField             = "addresses"
-    protected[ws] val EventIndexField            = "eventIndex"
-    protected[ws] val LowestContractEventIndex   = -3
+    val ContractEvent: WsEventType    = "contract"
+    val AddressesField                = "addresses"
+    val EventIndexField               = "eventIndex"
+    val LowestContractEventIndex: Int = -3
 
-    protected[ws] def fromSingle(
+    def fromSingle(
         address: Address.Contract,
         eventIndex: Option[WsEventIndex]
     ): ContractEventsSubscribeParams =
       ContractEventsSubscribeParams(AVector(address), eventIndex)
 
-    protected[ws] def buildUniqueContractAddresses(
+    def buildUniqueContractAddresses(
         addressArr: mutable.ArrayBuffer[ujson.Value]
     ): Either[Error, AVector[Address.Contract]] = {
       EitherF
@@ -116,7 +116,7 @@ protected[ws] object WsParams {
         .map(AVector.from)
     }
 
-    protected[ws] def read(
+    def read(
         jsonObj: ujson.Obj,
         contractAddressLimit: Int
     ): Either[Error, ContractEventsSubscribeParams] = {
@@ -148,7 +148,7 @@ protected[ws] object WsParams {
 
   final case class UnsubscribeParams(subscriptionId: WsSubscriptionId) extends WsSubscriptionParams
   object UnsubscribeParams {
-    protected[ws] def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
+    def read(json: ujson.Value): Either[Error, WsSubscriptionParams] = {
       json match {
         case ujson.Str(subscriptionIdHex) =>
           (for {
@@ -168,7 +168,7 @@ protected[ws] object WsParams {
 
   sealed trait WsNotificationParams extends WsParams {
     def subscription: WsSubscriptionId
-    protected[ws] def asJsonRpcNotification: ujson.Obj = {
+    def asJsonRpcNotification: ujson.Obj = {
       ujson
         .Obj(
           "method" -> WsMethod.SubscriptionMethod,
@@ -176,43 +176,49 @@ protected[ws] object WsParams {
         )
     }
   }
-  object WsNotificationParams extends ApiModelCodec {
-    implicit val wsSubscriptionParamsWriter: Writer[WsNotificationParams] = {
-      implicit val blockSubscriptionWriter: Writer[WsBlockNotificationParams]            = macroW
-      implicit val txSubscriptionWriter: Writer[WsTxNotificationParams]                  = macroW
-      implicit val contractSubscriptionWriter: Writer[WsContractEventNotificationParams] = macroW
 
-      writer[ujson.Value].comap[WsNotificationParams] {
-        case block: WsBlockNotificationParams            => writeJs(block)
-        case tx: WsTxNotificationParams                  => writeJs(tx)
-        case contract: WsContractEventNotificationParams => writeJs(contract)
-      }
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  object WsNotificationParams extends ApiModelCodec {
+    implicit val blockSubscriptionWriter: ReadWriter[WsBlockNotificationParams]            = macroRW
+    implicit val txSubscriptionWriter: ReadWriter[WsTxNotificationParams]                  = macroRW
+    implicit val contractSubscriptionWriter: ReadWriter[WsContractEventNotificationParams] = macroRW
+
+    implicit val wsSubscriptionParamsWriter: ReadWriter[WsNotificationParams] = {
+      ReadWriter.merge(
+        blockSubscriptionWriter,
+        txSubscriptionWriter,
+        contractSubscriptionWriter
+      )
     }
   }
 
+  @upickle.implicits.key("Block")
   final case class WsBlockNotificationParams(
       subscription: WsSubscriptionId,
       result: BlockAndEvents
   ) extends WsNotificationParams
   object WsBlockNotificationParams {
-    protected[ws] def from(blockAndEvents: BlockAndEvents): WsBlockNotificationParams =
+    def from(blockAndEvents: BlockAndEvents): WsBlockNotificationParams =
       WsBlockNotificationParams(
         SimpleSubscribeParams.Block.subscriptionId,
         blockAndEvents
       )
   }
 
+  @upickle.implicits.key("Tx")
   final case class WsTxNotificationParams(
       subscription: WsSubscriptionId,
       result: TransactionTemplate
   ) extends WsNotificationParams
   object WsTxNotificationParams {
-    protected[ws] def from(txTemplate: TransactionTemplate): WsTxNotificationParams =
+    def from(txTemplate: TransactionTemplate): WsTxNotificationParams =
       WsTxNotificationParams(
         SimpleSubscribeParams.Tx.subscriptionId,
         txTemplate
       )
   }
+
+  @upickle.implicits.key("ContractEvent")
   final case class WsContractEventNotificationParams(
       subscription: WsSubscriptionId,
       result: ContractEvent
@@ -223,43 +229,42 @@ final case class WsRequest(id: WsCorrelationId, params: WsSubscriptionParams)
 object WsRequest extends ApiModelCodec {
   import WsParams._
 
-  implicit protected[ws] val wsRequestWriter: Writer[WsRequest] = writer[Request].comap[WsRequest] {
-    req =>
-      req.params match {
-        case SimpleSubscribeParams(eventType) =>
-          Request(WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(eventType)), req.id)
-        case UnsubscribeParams(subscriptionId) =>
-          Request(
-            WsMethod.UnsubscribeMethod,
-            ujson.Arr(ujson.Str(subscriptionId.toHexString)),
-            req.id
+  implicit val wsRequestWriter: Writer[WsRequest] = writer[Request].comap[WsRequest] { req =>
+    req.params match {
+      case SimpleSubscribeParams(eventType) =>
+        Request(WsMethod.SubscribeMethod, ujson.Arr(ujson.Str(eventType)), req.id)
+      case UnsubscribeParams(subscriptionId) =>
+        Request(
+          WsMethod.UnsubscribeMethod,
+          ujson.Arr(ujson.Str(subscriptionId.toHexString)),
+          req.id
+        )
+      case ContractEventsSubscribeParams(addresses, eventIndexOpt) =>
+        val addressArr =
+          ujson.Arr.from(
+            addresses.map(address => ujson.Str(address.toBase58))
           )
-        case ContractEventsSubscribeParams(addresses, eventIndexOpt) =>
-          val addressArr =
-            ujson.Arr.from(
-              addresses.map(address => ujson.Str(address.toBase58))
-            )
-          val optionalEventIndexEntry =
-            eventIndexOpt
-              .map { eventIndex =>
-                ContractEventsSubscribeParams.EventIndexField -> ujson.Num(eventIndex.toDouble)
-              }
+        val optionalEventIndexEntry =
+          eventIndexOpt
+            .map { eventIndex =>
+              ContractEventsSubscribeParams.EventIndexField -> ujson.Num(eventIndex.toDouble)
+            }
 
-          Request(
-            WsMethod.SubscribeMethod,
-            ujson.Arr(
-              ujson.Str(ContractEventsSubscribeParams.ContractEvent),
-              ujson.Obj(
-                ContractEventsSubscribeParams.AddressesField -> addressArr,
-                optionalEventIndexEntry.toList*
-              )
-            ),
-            req.id
-          )
-      }
+        Request(
+          WsMethod.SubscribeMethod,
+          ujson.Arr(
+            ujson.Str(ContractEventsSubscribeParams.ContractEvent),
+            ujson.Obj(
+              ContractEventsSubscribeParams.AddressesField -> addressArr,
+              optionalEventIndexEntry.toList*
+            )
+          ),
+          req.id
+        )
+    }
   }
 
-  protected[ws] def fromJsonRpc(
+  def fromJsonRpc(
       r: RequestUnsafe,
       contractAddressLimit: Int
   ): Either[Error, WsRequest] = {
@@ -288,7 +293,7 @@ object WsRequest extends ApiModelCodec {
     readParams.map(params => WsRequest(r.id, params))
   }
 
-  protected[ws] def fromJsonString(
+  def fromJsonString(
       msg: String,
       contractAddressLimit: Int
   ): Either[JsonRPC.Response.Failure, WsRequest] = {
@@ -300,11 +305,11 @@ object WsRequest extends ApiModelCodec {
     }
   }
 
-  protected[ws] def subscribe(id: WsCorrelationId, params: WsSubscriptionParams): WsRequest = {
+  def subscribe(id: WsCorrelationId, params: WsSubscriptionParams): WsRequest = {
     WsRequest(id, params)
   }
 
-  protected[ws] def unsubscribe(
+  def unsubscribe(
       id: WsCorrelationId,
       subscriptionId: WsSubscriptionId
   ): WsRequest = {

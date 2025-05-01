@@ -24,13 +24,14 @@ import org.scalatest.Inside.inside
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.exceptions.TestFailedException
 
-import org.alephium.app.ws.WsParams.ContractEventsSubscribeParams
-import org.alephium.app.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
-import org.alephium.app.ws.WsSubscriptionHandler.{GetSubscriptions, WsImmutableSubscriptions}
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.Response
 import org.alephium.util._
+import org.alephium.ws._
+import org.alephium.ws.WsParams.ContractEventsSubscribeParams
+import org.alephium.ws.WsParams.SimpleSubscribeParams.{Block, Tx}
+import org.alephium.ws.WsSubscriptionHandler.{GetSubscriptions, WsImmutableSubscriptions}
 
 class WsClientServerSpec extends AlephiumSpec {
 

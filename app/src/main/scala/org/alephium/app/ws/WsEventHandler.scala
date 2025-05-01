@@ -26,14 +26,14 @@ import org.alephium.api.model.{
   TransactionTemplate,
   Val
 }
-import org.alephium.app.ws.WsParams.{WsBlockNotificationParams, WsTxNotificationParams}
-import org.alephium.app.ws.WsSubscriptionHandler.{NotificationPublished, SubscriptionMsg}
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.Address
 import org.alephium.util.{ActorRefT, BaseActor, EventBus}
+import org.alephium.ws.WsParams.{WsBlockNotificationParams, WsTxNotificationParams}
+import org.alephium.ws.WsSubscriptionHandler.{NotificationPublished, SubscriptionMsg}
 
-protected[ws] object WsEventHandler extends ApiModelCodec {
+object WsEventHandler extends ApiModelCodec {
 
   def getSubscribedEventHandler(
       eventBusRef: ActorRefT[EventBus.Message],
@@ -51,7 +51,7 @@ protected[ws] object WsEventHandler extends ApiModelCodec {
   }
 }
 
-protected[ws] class WsEventHandler(subscriptionHandlerRef: ActorRefT[SubscriptionMsg])(implicit
+class WsEventHandler(subscriptionHandlerRef: ActorRefT[SubscriptionMsg])(implicit
     val networkConfig: NetworkConfig
 ) extends BaseActor
     with ApiModelCodec {

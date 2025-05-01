@@ -14,19 +14,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.app
+package org.alephium.ws
 
-import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpServer, HttpServerOptions}
+import scala.concurrent.Future
 
-trait HttpServerLike {
-  def httpServer: HttpServer
-}
+import io.vertx.core.buffer.Buffer
+import io.vertx.core.http.WebSocketFrame
 
-final case class SimpleHttpServer(httpServer: HttpServer) extends HttpServerLike
+import org.alephium.ws.WsParams.WsId
 
-object SimpleHttpServer {
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def apply(httpOptions: HttpServerOptions = new HttpServerOptions): SimpleHttpServer =
-    SimpleHttpServer(Vertx.vertx().createHttpServer(httpOptions))
+trait ServerWsLike {
+  def textHandlerID(): WsId
+  def isClosed: Boolean
+  def closeHandler(handler: () => Unit): ServerWsLike
+  def textMessageHandler(handler: String => Unit): ServerWsLike
+  def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike
+  def writeTextMessage(msg: String): Future[Unit]
+  def writePing(data: Buffer): Future[Unit]
 }

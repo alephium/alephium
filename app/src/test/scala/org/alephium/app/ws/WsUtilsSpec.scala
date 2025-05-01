@@ -22,8 +22,8 @@ import scala.concurrent.Future
 import io.vertx.core.{Future => VertxFuture}
 import org.scalatest.concurrent.ScalaFutures
 
-import org.alephium.app.ws.WsUtils._
 import org.alephium.util.AlephiumSpec
+import org.alephium.ws.WsUtils._
 
 class WsUtilsSpec extends AlephiumSpec with WsFixture with ScalaFutures {
 

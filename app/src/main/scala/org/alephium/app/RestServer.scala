@@ -29,11 +29,10 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.OpenAPIWriters.openApiJson
-import org.alephium.app.ws.WsServer
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
+import org.alephium.http.{EndpointSender, HttpServerLike, ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
@@ -230,7 +229,7 @@ object RestServer {
         .setRegisterWebSocketWriteHandlers(true)
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
     val webSocketServer =
-      WsServer(
+      ws.WsServer(
         flowSystem,
         node,
         networkSetting.wsMaxConnections,

@@ -18,9 +18,10 @@ package org.alephium.app.ws
 
 import scala.collection.mutable
 
-import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsSubscriptionId}
-import org.alephium.app.ws.WsSubscriptionsState.{buildContractEventKeys, SubscriptionOfConnection}
 import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.ws._
+import org.alephium.ws.WsParams.{SimpleSubscribeParams, WsSubscriptionId}
+import org.alephium.ws.WsSubscriptionsState.{buildContractEventKeys, SubscriptionOfConnection}
 
 class WsSubscriptionsStateSpec extends AlephiumSpec with WsFixture {
 

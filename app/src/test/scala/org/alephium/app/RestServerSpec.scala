@@ -40,8 +40,8 @@ import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap._
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.http.{HttpRouteFixture, SimpleHttpServer}
 import org.alephium.http.HttpFixture._
-import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.mining.HashRate

@@ -28,15 +28,16 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
-import org.alephium.app.ws.WsParams.{SimpleSubscribeParams, WsNotificationParams, WsSubscriptionId}
-import org.alephium.app.ws.WsSubscriptionHandler._
-import org.alephium.app.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
-import org.alephium.app.ws.WsUtils._
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Notification, Response}
 import org.alephium.util._
+import org.alephium.ws._
+import org.alephium.ws.WsParams.{SimpleSubscribeParams, WsNotificationParams, WsSubscriptionId}
+import org.alephium.ws.WsSubscriptionHandler._
+import org.alephium.ws.WsSubscriptionsState.{ContractEventKey, SubscriptionOfConnection}
+import org.alephium.ws.WsUtils._
 
 class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with ScalaFutures {
   import org.alephium.app.ws.WsBehaviorFixture._

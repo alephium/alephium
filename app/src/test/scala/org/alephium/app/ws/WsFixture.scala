@@ -36,7 +36,14 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter.VertxFutureToScalaFu
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate, ValU256}
 import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
-import org.alephium.app.ws.WsParams.{
+import org.alephium.flow.handler.TestUtils
+import org.alephium.json.Json.{read, reader, Reader}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.vm.{LogState, Val}
+import org.alephium.util._
+import org.alephium.ws._
+import org.alephium.ws.WsParams.{
   ContractEventsSubscribeParams,
   WsBlockNotificationParams,
   WsContractEventNotificationParams,
@@ -46,23 +53,17 @@ import org.alephium.app.ws.WsParams.{
   WsSubscriptionId,
   WsTxNotificationParams
 }
-import org.alephium.app.ws.WsRequest.fromJsonString
-import org.alephium.app.ws.WsSubscriptionHandler.{
+import org.alephium.ws.WsRequest.fromJsonString
+import org.alephium.ws.WsSubscriptionHandler.{
   GetSubscriptions,
   SubscriptionMsg,
   WsImmutableSubscriptions
 }
-import org.alephium.app.ws.WsSubscriptionsState.{
+import org.alephium.ws.WsSubscriptionsState.{
   buildContractEventKeys,
   ContractEventKey,
   SubscriptionOfConnection
 }
-import org.alephium.flow.handler.TestUtils
-import org.alephium.json.Json.{read, reader, Reader}
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, ContractId}
-import org.alephium.protocol.vm.{LogState, Val}
-import org.alephium.util._
 
 trait WsFixture extends ServerFixture {
 
@@ -335,8 +336,8 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
 }
 
 trait WsBehaviorFixture extends WsClientServerFixture {
-  import org.alephium.app.ws.WsSubscriptionHandler._
-  import org.alephium.app.ws.WsBehaviorFixture._
+  import org.alephium.ws.WsSubscriptionHandler._
+  import WsBehaviorFixture._
 
   protected def checkWS(
       initBehaviors: AVector[WsStartBehavior],
