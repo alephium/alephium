@@ -1694,18 +1694,20 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileProject(blockFlow: BlockFlow, query: Compile.Project): Try[CompileProjectResult] = {
     val compilerOptions = query.getLangCompilerOptions()
-    Compiler
-      .compileProject(query.code, compilerOptions)
-      .left
-      .map(error => failed(error.format(query.code)))
-      .flatMap { result =>
+    for {
+      result <- Compiler
+        .compileProject(query.code, compilerOptions)
+        .left
+        .map(error => failed(error.format(query.code)))
+      _ <-
         if (compilerOptions.skipTests) {
-          Right(result)
+          Right(())
         } else {
-          runTests(blockFlow, query.code, result._1).map(_ => result)
+          runTests(blockFlow, query.code, result._1)
         }
-      }
-      .map(p => CompileProjectResult.from(p._1, p._2, p._3, p._4))
+    } yield {
+      CompileProjectResult.from(result._1, result._2, result._3, result._4)
+    }
   }
 
   private def runTests(

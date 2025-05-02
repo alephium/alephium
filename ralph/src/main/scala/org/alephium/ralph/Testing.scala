@@ -28,8 +28,9 @@ import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AVector, Hex, I256, TimeStamp, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 object Testing {
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def checkAndGetValue[Ctx <: StatelessContext, V <: Val](
       state: Compiler.State[Ctx],
       expr: Ast.Expr[Ctx],
@@ -46,8 +47,13 @@ object Testing {
           case _ =>
             throw Compiler.Error(s"Invalid $name expr, expected a constant expr", expr.sourceIndex)
         }
+      case expr if expr.getType(state).map(_.toVal) == Seq(tpe) =>
+        state.calcConstant(expr).asInstanceOf[V]
       case _ =>
-        throw Compiler.Error(s"Invalid $name expr, expected a constant expr", expr.sourceIndex)
+        throw Compiler.Error(
+          s"Invalid $name expr, expected a constant expr of type $tpe",
+          expr.sourceIndex
+        )
     }
   }
 
@@ -91,7 +97,7 @@ object Testing {
       defs.find(d => !SettingsDef.keys.contains(d.name)).foreach { invalidDef =>
         throw Compiler.Error(
           s"Invalid setting key ${invalidDef.name}, it must be one of ${SettingsDef.keys
-              .mkString("[", ",", "]")}",
+              .mkString("[", ", ", "]")}",
           invalidDef.sourceIndex
         )
       }
@@ -342,17 +348,37 @@ object Testing {
       }
     }
 
+    private def getTokenAmount(state: Compiler.State[Ctx]): AVector[(TokenId, U256)] = {
+      val tokenAmounts = mutable.Map.empty[TokenId, U256]
+      tokens.foreach { case (tokenIdExpr, tokenAmountExpr) =>
+        val (tokenId, tokenAmount) = getApprovedToken(state, tokenIdExpr, tokenAmountExpr)
+        tokenAmounts.get(tokenId) match {
+          case None => tokenAmounts(tokenId) = tokenAmount
+          case Some(amount) =>
+            tokenAmounts(tokenId) = amount
+              .add(tokenAmount)
+              .getOrElse(
+                throw Compiler.Error(
+                  s"Token ${tokenId.toHexString} amount overflow",
+                  tokenAmountExpr.sourceIndex
+                )
+              )
+        }
+      }
+      AVector.from(tokenAmounts)
+    }
+
     def compileBeforeContract(
         state: Compiler.State[Ctx],
         origin: Ast.TypeId
     ): CreateContractValue = {
-      val tokenAmounts = tokens.map(token => getApprovedToken(state, token._1, token._2))
+      val tokenAmounts                   = getTokenAmount(state)
       val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin)
       val contractId                     = ContractId.random
       address.foreach(
         state.addTestingConstant(_, Val.ByteVec(contractId.bytes), Type.Contract(typeId))
       )
-      CreateContractValue(typeId, AVector.from(tokenAmounts), immFields, mutFields, contractId)
+      CreateContractValue(typeId, tokenAmounts, immFields, mutFields, contractId)
     }
 
     def compileAfterContract(
@@ -360,7 +386,7 @@ object Testing {
         origin: Ast.TypeId,
         selfContractId: ContractId
     ): CreateContractValue = {
-      val tokenAmounts = tokens.map(token => getApprovedToken(state, token._1, token._2))
+      val tokenAmounts                   = getTokenAmount(state)
       val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin)
       val contractId = address match {
         case Some(ident) =>
@@ -378,7 +404,7 @@ object Testing {
             throw Compiler.Error(s"Expect a contract id in after def", sourceIndex)
           }
       }
-      CreateContractValue(typeId, AVector.from(tokenAmounts), immFields, mutFields, contractId)
+      CreateContractValue(typeId, tokenAmounts, immFields, mutFields, contractId)
     }
   }
   final case class CreateContractValue(

@@ -321,7 +321,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       )
       testContractError(
         code(s"$$invalidKey = 0$$"),
-        "Invalid setting key invalidKey, it must be one of [group,blockHash,blockTimeStamp]"
+        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp]"
       )
     }
 
@@ -598,5 +598,38 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     invalidOutputs.foreach { case (output, error) =>
       Testing.checkContractState(contractState, immFields, mutFields, output).leftValue is error
     }
+  }
+
+  it should "throw an error if token amount overflow" in {
+    val max = U256.MaxValue
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> U256 { return 0 }
+         |  test "foo"
+         |  before Self{ALPH: $max, ALPH: 2}() {
+         |    testCheck!(foo() == 0)
+         |  }
+         |}
+         |""".stripMargin
+    compileContract(code).leftValue.getMessage is
+      s"Token ${TokenId.alph.toHexString} amount overflow"
+  }
+
+  it should "support constant expr in contract constructor" in {
+    val code =
+      s"""
+         |const Value0 = 1
+         |const Value1 = 1
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> U256 { return v }
+         |  test "foo"
+         |  before Self(Value0 + Value1) {
+         |    testCheck!(foo() == 2)
+         |  }
+         |}
+         |""".stripMargin
+    val test = compileContractFull(code).rightValue.tests.get.tests.head
+    test.selfContract.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(2))))
   }
 }

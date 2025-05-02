@@ -3126,7 +3126,7 @@ object Ast {
           contract,
           state.getWarnings,
           inlinedDebugCode,
-          if (compilerOptions.skipTests) None else Some(contract.genUnitTestCode(state))
+          Option.unless(compilerOptions.skipTests)(contract.genUnitTestCode(state))
         ) -> index
       }
       (warnings, compiled)
